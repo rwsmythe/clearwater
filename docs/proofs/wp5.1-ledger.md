@@ -43,7 +43,9 @@ so direct elementwise subtraction has no defined matching shape. Recommended:
 accept unequal shape as a detected wrong pose, with max > 64/255 for equal-shape
 wrong poses. No fallback planted asymmetric still is needed for content symmetry.
 
-Disposition: awaiting CHARC. This is a brief/oracle conflict, not a product defect.
+Disposition: resolved by CHARC `cdeefe5fb8114b0c`, R0-1. T2 bounds the
+oriented source decode at 2/255, records recipe mean without a bound, and accepts
+unequal shape as a detected wrong pose. This was not a product defect.
 
 ### R0-2 [MAJOR, NEW, in envelope]: specified PNG never reaches 64 KiB
 
@@ -65,7 +67,9 @@ Writer seam: `PhotoWriter.write` delegates at
 `Path.open`) only for binary output temporaries under the node's output folder.
 A blanket `builtins.open` patch would miss this writer.
 
-Disposition: awaiting CHARC; no failure injector has been implemented.
+Disposition: resolved by CHARC `cdeefe5fb8114b0c`, R0-2. T2 injects after
+1 KiB of actual writes at Path.open, limited to binary output temporaries under
+the node's output folder; the threshold and firing are asserted.
 
 ### R0-3 [MAJOR, NEW, in envelope]: truncated fixture is readable, not refused
 
@@ -90,7 +94,8 @@ cache and record. Exit **0**. Item 1 **done with warnings**, failure null, outpu
 Item 2 **done**, failure null, output `hevc8-bt709-full_corrected.mp4`.
 This is the shipped path obeying the spec, not a product defect to remediate.
 
-Disposition: awaiting CHARC; no failing acceptance node was invented against D86.
+Disposition: resolved by CHARC `cdeefe5fb8114b0c`, R0-3. T6 will require
+success with the D86 warning and readable-prefix fidelity, following the ruling.
 
 ### R0-4 [MAJOR, NEW, in envelope]: fixture sweep versus sizing rule
 
@@ -111,8 +116,9 @@ but does not explicitly resolve this brief's named synthetic-fixture sweep.
 The existing engine V4 node consumes those committed files without resizing
 (`tests/test_jobs_export_video.py:173`, `:183`).
 
-Disposition: awaiting CHARC. Marker selection and the <= 180 s new serial-leg
-budget cannot be certified from source inspection; neither is claimed met.
+Disposition: resolved by CHARC `cdeefe5fb8114b0c`, R0-4. The named fixture
+sweep uses committed files unchanged; derived cases retain six-frame sizing.
+The <= 180 s serial-leg budget remains subject to measurement at the seat.
 
 ## Anchor relocation on 2050a89a
 
@@ -433,8 +439,173 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | Turn / boundary | Session id | depth_input_tokens | Dispatcher action |
 |---|---|---|---|
 | 1 / T1 round 0 | pending dispatcher | pending dispatcher | read footer; rule on R0-1 through R0-4 before T2 |
+| 1 / retirement | `01a1962f-69c6-...` (dispatcher supplied abbreviation) | 210,098 | CHARC concurred with a fresh session for T2 onward |
+| 2 / T2 build | session 2; id pending dispatcher | pending dispatcher | read this turn's footer; resolve T2-1 before T3/T4 continuation |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
 T10. The final report will explicitly retain pending V2/CP5, V12/v2, V15/V16
 WP5.2, unavailable real-static V3 evidence and the final-rebase DR-98 status.
+
+## Session 2 / Turn 2: T2
+
+### Session boundary and scope
+
+This is the fresh session authorized by CHARC's re-seat ruling. Session 1
+retired at the dispatcher-supplied depth **210,098**. No depth for session 2
+has yet been supplied; none is estimated here. Inspected base: `d8778fa6`.
+The four round-0 dispositions above now reflect ruling `cdeefe5fb8114b0c`.
+The historical T1 evidence and roster have not been re-derived.
+
+Built this turn:
+
+- `tests/acceptance_support.py`: file-backed in-process main and subprocess
+  helpers, explicit output/settings/cache/record arguments, recursive names-only
+  checks, source MD5, Pillow/FFmpeg RGB8 PNG readers and output Orientation check.
+  Future video consumers have the paired FFmpeg decode, fidelity/roster check,
+  best-effort presence extraction, PNG/MP4 provenance readers and an IF-3
+  delegating returned-render digest wrapper. T2 exercises the photo subset;
+  video consumers and their validation remain T5-T8 work. `ACCEPTANCE_NODES`
+  explicitly has pending empty rows for V1-V18, N10 and D91; T9 populates it with
+  verified node addresses alongside the report. No pending row claims a pass.
+- `tests/test_v51_photo_acceptance.py`: the exact 14 planned instances: eight
+  JPEG two-reader/source-pose nodes, four HEIC two-reader/AD-24 nodes, real PNG
+  ENOSPC and real runner-process crash/startup cleanup. Every source is guarded
+  by a before/after MD5, including all 40 scratch batch copies for the crash.
+- Runner forms are in-process main for all 13 photo/ENOSPC cases and the shipped
+  script in a subprocess for the crash. No product module or existing test was
+  changed. Every test write is under its own tmp_path; raw decode files and
+  logs are there too. Evidence scripts/logs outside the node roots stay under
+  the allowed gitignored work folder. The footage folder was not opened.
+
+### T2-1 [MAJOR, NEW, in envelope]: the crash oracle rejects completed batch items
+
+**STOP to CHARC. Recommended ruling:** allow already committed, complete PNGs
+from the 40-item batch, including a commit racing with detection/kill; verify
+those finals are complete and preserved, require no partial final, and require
+startup to remove every remaining temporary. Keep the 10 ms polling and real
+runner process. This would amend the literal "nothing else new" assertion;
+it has NOT been applied to the committed node.
+
+Failing node:
+`tests/test_v51_photo_acceptance.py::test_v11_photo_crash_leftovers_are_cleaned_at_start`.
+Assertion retained verbatim in meaning: **"crash produced a new final output"**.
+The node currently fails before its cleanup assertions and planted-leftover
+negative control. It is neither skipped nor xfailed. No product defect is yet
+established by this assertion.
+
+Reproduction on the shipped product, with no injected hold or product change:
+
+1. The full new module run, `t2-photo.log` / `t2-photo.xml`, observed a temporary
+   on attempt 1 and failed. Four complete finals (`photo-00_corrected.png`
+   through `photo-03_corrected.png`) existed beside a temporary belonging to
+   `photo-03`. The latter is consistent with kill between safe-write link and
+   unlink; the files alone do not prove the exact instruction at kill.
+2. The isolated same-node rerun, `t2-crash-repro.log` / `t2-crash-repro.xml`,
+   also observed a temporary on attempt 1 and failed the same assertion.
+   Seven complete finals (`photo-00_corrected.png` through
+   `photo-06_corrected.png`) existed beside the temporary for `photo-07`.
+   The runner stderr ends at `[8/40] Writing photo-07.png`. This independently
+   shows that the poll can miss the first items' short-lived temporaries.
+3. Independent inspection in `t2-inspect.log`: Pillow verify AND full decode
+   succeeded on every final in both reproductions; all were 96 x 64. On copies
+   of those output folders under each node's temporary root, the shipped
+   `clean_leftovers(Settings(output_folder=...), WriteJournal(...))` removed
+   exactly the temporary and preserved every completed final and sentinel
+   byte-identically. The original failing evidence folders were retained.
+
+The brief selected 40 copies of the largest fixture. The manifest's largest
+committed still area is a tie at 96 x 64; the node checks that the chosen
+`png16-gradient-srgb` is in that maximum-area tie. It was not enlarged or
+replaced. A 10 ms poll detects a later in-flight item after completed earlier
+items, making the literal crash oracle reject safe completed outputs. Raising
+the polling rate, adding a hold, accepting completed outputs or changing the
+fixture would each need a ruling here; none was substituted silently.
+
+### Per-node results, controls and marker measurements
+
+Every row below has the file prefix `tests/test_v51_photo_acceptance.py::`.
+The isolated seconds are JUnit testcase elapsed time (setup + call + teardown),
+read from `t2-isolated-1.xml` through `t2-isolated-13.xml`, in roster order.
+They are sandbox development observations, not an exclusive hardware figure or
+the final owner's leg measurement. These 13 nodes have no marker and are
+parallel candidates under AD-30 (< 5 s individually). The crash keeps its
+mandated slow marker even though this failing development attempt is short.
+
+| Node | Marker / leg | Result | Isolated seconds | Passing-oracle probe |
+|---|---|---|---:|---|
+| test_v5_jpeg_two_readers_and_pose[land-o1] | none / parallel | GREEN-ON-ARRIVAL | 0.130 | reversed output rejected |
+| test_v5_jpeg_two_readers_and_pose[land-o3] | none / parallel | GREEN-ON-ARRIVAL | 0.141 | reversed output rejected |
+| test_v5_jpeg_two_readers_and_pose[land-o6] | none / parallel | GREEN-ON-ARRIVAL | 0.131 | reversed output rejected |
+| test_v5_jpeg_two_readers_and_pose[land-o8] | none / parallel | GREEN-ON-ARRIVAL | 0.135 | reversed output rejected |
+| test_v5_jpeg_two_readers_and_pose[port-o1] | none / parallel | GREEN-ON-ARRIVAL | 0.127 | reversed output rejected |
+| test_v5_jpeg_two_readers_and_pose[port-o3] | none / parallel | GREEN-ON-ARRIVAL | 0.139 | reversed output rejected |
+| test_v5_jpeg_two_readers_and_pose[port-o6] | none / parallel | GREEN-ON-ARRIVAL | 0.130 | reversed output rejected |
+| test_v5_jpeg_two_readers_and_pose[port-o8] | none / parallel | GREEN-ON-ARRIVAL | 0.126 | reversed output rejected |
+| test_v5_heic_two_readers_and_ad24[both] | none / parallel | GREEN-ON-ARRIVAL | 0.126 | reversed output rejected |
+| test_v5_heic_two_readers_and_ad24[irot-only] | none / parallel | GREEN-ON-ARRIVAL | 0.123 | reversed output rejected |
+| test_v5_heic_two_readers_and_ad24[exif-only] | none / parallel | GREEN-ON-ARRIVAL | 0.133 | reversed output rejected |
+| test_v5_heic_two_readers_and_ad24[neither] | none / parallel | GREEN-ON-ARRIVAL | 0.133 | reversed output rejected |
+| test_v11_png_disk_full_removes_partial_output | none / parallel | GREEN-ON-ARRIVAL | 0.142 | missing ENOSPC rejected |
+| test_v11_photo_crash_leftovers_are_cleaned_at_start | slow / serial | FAIL, T2-1 | 0.91 call | planned planted-leftover probe not reached |
+
+Photo probe details (committed within each respective green node, actually run):
+
+- All 12 outputs were pixel-identical between Pillow RGB conversion without
+  transpose and FFmpeg RGB24, and had output Orientation absent or 1. All JPEG
+  neutral source maximum errors were **0/255**, within the retained 2/255 bound.
+  Their recipe means were 0.523872-0.544488 levels. The prior round's 3/255
+  pristine-recipe maximum is a lossy-fixture property, not a product bound.
+- All HEIC recipe means were 0.990994-0.991753 levels; each passed the existing
+  AD-24 mean < 6 and alternative-pose oracle. Stored-pose controls for container
+  irot undo libheif's already applied container turn, without applying EXIF.
+  Non-identity JPEG/HEIC stored poses differ by shape or > 64/255 as ruled.
+- Every one of the 12 nodes also called the SAME pose assertion with its output
+  reversed in both axes and observed the expected AssertionError. This covers
+  the identity poses as well as the rotated ones; JUnit records the probe.
+- ENOSPC: the real PNG temporary received **1,024 actual flushed bytes**, then
+  the crossing write raised ENOSPC. Exit 1, failed item, source file name in the
+  failure text, outputs empty, output folder empty, source MD5 unchanged.
+  The injector was scoped to Path.open("wb") on a recognized temporary under
+  this node's output folder; settings and record writes were unaffected.
+  A second real export without that injection succeeded, and the SAME failure
+  assertion rejected it at exit status. JUnit records bytes and negative probe.
+
+### Validation and verification loop
+
+All command output is retained in worktree evidence files; no whole log was
+copied into the handoff. Commands used the sandbox mkdir shim on EVERY pytest
+invocation, with cacheprovider disabled. The full-module run used the supplied
+light marker expression, with durations and JUnit added.
+
+| Evidence file(s) | Observed summary |
+|---|---|
+| t2-photo.log / t2-photo.xml | 13 passed, 1 failed in 3.15 s; 14 xunit2 record_property warnings; failing crash node T2-1 |
+| t2-isolated-1..13.log / .xml | all 13 green nodes passed alone; xunit1 selected so no property-family warnings |
+| t2-crash-repro.log / .xml | 1 failed in 1.54 s; same crash assertion; 0.91 s call; xunit1 |
+| t2-inspect.log | all final PNGs independently verified/decoded; copied crash folders' startup cleanup removed exactly temporaries and preserved completed files |
+| t2-ruff.log | All checks passed! for both new modules |
+| t2-format.log | 2 files reformatted; seat format --check remains the dispatcher's check |
+| t2-mypy.log | Success: no issues found in 146 source files |
+| t2-test-mypy.log | Success: no issues found in 2 source files (new modules explicitly, MYPYPATH=tools;tests) |
+
+Verification loop: suspected bad source-pose/two-reader transport; rejected as
+false positives by independent decoded-source/reference checks and reversed-pose
+probes. Suspected a disk-full fixture/injection mismatch; confirmed actual
+1 KiB writes and missing-fault rejection, no product defect. Suspected crash
+partial finals; independently verified every final as complete, rejected the
+product-defect interpretation, and confirmed the literal crash-oracle conflict
+T2-1 on both module and isolated runs. Fixed: one test-helper Any-return type
+error and formatting/import order. No product fix, tolerance relaxation, skip or
+xfail was introduced. No full acceptance/gate pass or crash cleanup-node pass is
+claimed. The crash node and its negative control remain blocked by the ruling.
+
+Review status: no Reviewer A round has yet run on the T2 diff. This build-turn
+finding is not a counted Reviewer A round. Its ledger classification is
+Critical 0 / Major 1 / Minor 0; in-envelope 1 / out 0; NEW 1 / REOPENED 0;
+reverts 0; product-code fixes 0; test-only additions 2 modules.
+
+Yield: T2 complete as test construction, **STOP T2-1 before T3/T4 continuation**.
+No seat run is requested until CHARC rules on the retained failing crash oracle.
+The final gate, footage/GPU/GUI runs, final serial-leg delta and T9/T10 remain
+pending at their authorized boundaries.
