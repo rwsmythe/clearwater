@@ -11,8 +11,8 @@
 
 ### RESUME HERE (CHARC generation 10 LIVE: `clearwater-charc-20261031-2201`, online 2026-11-01 08:03Z, launched by gen 9 at its roll; gen 9 rolled 2026-11-01 ~08:00Z at ~410K; gen 8 2026-10-30 ~01:58Z; gen 7 2026-10-29 ~19:00Z)
 
-- **GEN 10 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 29 (name
-  from `comms/.launch-sessions.json`; gen 28 `clearwater-orchestrator-20261029-2103` rolled 09:35Z)** (gen 28 resumed 08:01Z on the owner's "resume"; status 225d1163: paces Codex 0.197,
+- **GEN 10 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 29
+  `clearwater-orchestrator-20261031-2335`** (online 09:37Z, gauge 33 ms; gen 28 rolled 09:35Z) (gen 28 resumed 08:01Z on the owner's "resume"; status 225d1163: paces Codex 0.197,
   Claude 0.994 = 84 % at 84.5 % of the window, Claude resets 2026-11-02 09:59Z, Codex 2026-11-04 10:07Z). ALL cues go
   there; re-read `comms/.launch-sessions.json` before every cue. Bash gauge 34 ms. Drain `read --role charc --all`.
   Main `dd3cf1eb` clean, FREE. C: 179 GB free, D: 2.4 TB. Subjects under 100 chars; see the `posted ->` line before
@@ -112,8 +112,14 @@
   (odd-width equivalence) `790541e7`, seat checks owed, 5b re-run from the start; Q4 EXIT 0 (1 passed); 5c-8 EXIT 0
   (7/7); 5c-16 and 5d EXCLUSIVE owed, opened to me. WP5.3 GREEN `f506b597` (70 passed), A R1 (Claude, executing)
   running. WP5.1 photo module done `93869f4c` (15 green); session 3 turn 6 = video module running. Claude 86 % at pace
-  1.007 (09:29Z): the 92 % rule stands. Waiting on: gen 29 online; WP4.6 gate / accept (rows mine); WP5.3 A R1; WP5.1
-  T6; WP3.6P 5b, 5c-16, 5d.
+  1.007 (09:29Z): the 92 % rule stands.
+- **GEN 29 ONLINE 09:37Z (query bd0cc7e0). WP4.6 done > total RULED CLAMP (my post + cue):** the engine reports written
+  frames against the DECLARED nb_frames (`export.py:1112`, `:969`), so done > total is legitimate; my bound as written
+  froze the bar and dropped the final "Saved" line in the process form. Final rule (AD-31 verbatim at the accept):
+  ints, 0 <= done, total null or <= 2**31-1, done <= 2**31-1; done > total forwarded as min(done, total) with the
+  message intact; anything else logged once, ignored. Bounded fresh opus-high cell: RED row, helper fix, Limit 12
+  rewritten; then narrow Codex B on `c0eedb0e..head`, gate, accept. Seat-verify of `52be44aa` meanwhile. Waiting on:
+  WP4.6 follow-on / B / gate / accept (rows mine); WP5.3 A R1; WP5.1 T6; WP3.6P 5b, 5c-16, 5d.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
