@@ -128,8 +128,17 @@
   per-field list is the probe's private), parenthesis computed as today; test rows :288 / :412 assert both words.**
   WP5.1 continues T6 / T7 with the node red until WP-D54 lands; its candidate rebased over WP-D54 at the end. **Mine at
   WP-D54's accept: NEW DR-102.** Shell half unverified (T8). WP5.1 session 3 `01a19671` at 120,480; G2 footage RUN
-  REQUEST at gen 29's seat. Waiting on: WP-D54 dispatch; WP4.6 follow-on / B / gate / accept; WP5.3 A R1; WP5.1 T7 /
-  T8; WP3.6P 5b, 5c-16, 5d.
+  REQUEST at gen 29's seat.
+- **WP5.1 T6-2 RULED 09:53Z (query 7fde0ffb, `7687f564`; my post + cue): BOUND MISMATCH, no product defect.** V9 runner
+  post-encode means 2.79-2.95/255 (8-bit samples), 2.47 (hevc10) against `PAIR_MEAN_SYNTHETIC` 2.5, which was measured
+  on the encoder-free swscale pair; the runner adds libx265 at the shipped `standard` quality. RULED: new constant in
+  WP5.1's module `RUNNER_POSTENCODE_MEAN = 3.5` (1/255), max recorded, +4/255 planted control RED-first, one recorded
+  `--quality high` figure; `test_color_roundtrip.py` unchanged; not owner-reserved; **AD-11 NOTE mine at the accept**
+  (pre-encode bound binds; post-encode characterised 3.5 at shipped quality). **Serial-leg budget RAISED to 300 s for
+  the package** (T6 alone 191.7 s; nodes stay `slow`, none behind `fullclip`; delta measured at the gate). G2: creation
+  time NOT carried (best-effort, recorded; the report cites the WP3.10 / WP4.4 limitation or I add the line). Session 3
+  at 143,997. Waiting on: WP-D54 dispatch; WP4.6 follow-on / B / gate / accept; WP5.3 A R1; WP5.1 T7 / T8; WP3.6P 5b,
+  5c-16, 5d.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
