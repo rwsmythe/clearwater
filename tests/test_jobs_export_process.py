@@ -679,6 +679,16 @@ def test_a_scratch_folder_that_cannot_be_made_names_the_error_type_only(
             "an elapsed_s too large for a float (R1 F3)",
             id="elapsed_s-overflow",
         ),
+        pytest.param(
+            b'{"progress": [1' + b"0" * 400 + b', 2, "a"]}',
+            "a progress done too large for a float (B-1)",
+            id="done-overflow",
+        ),
+        pytest.param(
+            b'{"progress": [1, -1' + b"0" * 400 + b', "a"]}',
+            "a progress total too large for a float (B-1)",
+            id="total-overflow",
+        ),
     ],
 )
 def test_an_invalid_line_is_ignored_and_logged(
@@ -1023,6 +1033,37 @@ def test_an_io_thread_that_cannot_start_kills_the_worker_and_closes_its_stdin(
         while not process.stdin.closed and time.monotonic() < deadline:
             time.sleep(0.01)
         assert process.stdin.closed
+    finally:
+        for process in spawned:
+            process.kill()
+            process.wait()
+
+
+def test_a_failure_in_the_conversations_set_up_kills_the_worker_and_closes_its_stdin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """B-2: the clean-up covers everything after the spawn, the set-up's allocations included."""
+    spawned: list[subprocess.Popen[bytes]] = []
+    real_popen = subprocess.Popen
+
+    def popen(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+        process = real_popen(*args, **kwargs)
+        spawned.append(process)
+        return process
+
+    def no_tail() -> None:
+        raise MemoryError("the tail could not be made")
+
+    monkeypatch.setattr(export_process.subprocess, "Popen", popen)
+    monkeypatch.setattr(export_process, "_Tail", no_tail)
+    waiting = "import sys, time; sys.stdin.buffer.readline(); time.sleep(30)"
+    command = [sys.executable, "-c", waiting]
+    try:
+        with pytest.raises(MemoryError, match="the tail could not be made"):
+            _run(tmp_path, command)
+        (process,) = spawned
+        assert process.poll() is not None, "the worker outlived its job"
+        assert process.stdin is not None and process.stdin.closed
     finally:
         for process in spawned:
             process.kill()

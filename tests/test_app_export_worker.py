@@ -169,6 +169,7 @@ def test_a_cancel_at_the_first_progress_leaves_nothing(tmp_path: Path) -> None:
         "a source that is not a string",
         "a negative cache limit",
         "a created that overflows",
+        "a created that overflows in the settings' last parameters",
     ],
 )
 def test_a_malformed_request_exits_2_with_one_stderr_line(tmp_path: Path, case: str) -> None:
@@ -177,6 +178,7 @@ def test_a_malformed_request_exits_2_with_one_stderr_line(tmp_path: Path, case: 
     missing = dict(sound)
     del missing["app_version"]
     overflow = {**sound["parameters"], "created": "0001-01-01T00:00:00+01:00"}  # R3-5
+    nested = {**sound["settings"], "last_parameters": overflow}  # B-3
     line = {
         "empty input": b"",
         "not JSON": b"{not json\n",
@@ -190,6 +192,9 @@ def test_a_malformed_request_exits_2_with_one_stderr_line(tmp_path: Path, case: 
         "a source that is not a string": json.dumps({**sound, "source": 7}).encode() + b"\n",
         "a negative cache limit": json.dumps({**sound, "cache_limit_bytes": -1}).encode() + b"\n",
         "a created that overflows": json.dumps({**sound, "parameters": overflow}).encode() + b"\n",
+        "a created that overflows in the settings' last parameters": (
+            json.dumps({**sound, "settings": nested}).encode() + b"\n"
+        ),
     }[case]
     done = subprocess.run(WORKER, input=line, capture_output=True, timeout=120)
     assert done.returncode == 2, (case, done.stderr)
