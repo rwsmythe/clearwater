@@ -344,7 +344,11 @@ def test_v9_neutral_runner_postencode(
     _assert_tags_and_rotation(record)
     if name == "rotated":
         assert probe(output).video.rotation == stream.rotation != 0
-    for tag in (*vf.COLOUR_ITEMS, "display orientation: video tkhd matrix"):
+    for tag in (
+        *vf.COLOUR_ITEMS,
+        "display orientation: display matrix (ffprobe side data)",
+        "display orientation: video tkhd matrix",
+    ):
         wrong = copy.deepcopy(record)
         _items(wrong)[tag]["status"] = compare.DIFFERENT
         with pytest.raises(AssertionError, match="colour/orientation changed"):

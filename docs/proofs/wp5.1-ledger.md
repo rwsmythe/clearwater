@@ -429,6 +429,7 @@ relative to the acceptance brief: a false acceptance oracle blocks its build.
 | 0 / T1 | 0 | 4 | 0 | 0 | 4 / 0 | 4 / 0 | 0 | ledger only; no test/product fix | no external reviewer yet | STOP for R0-1 through R0-4; yield before T2 |
 | 1 / Reviewer A, adjudicated and remediated T12 | 0 | 1 | 2 | 5 | 8 / 0 reviewed | 8 / 0 reviewed | 0 | tests/support fixes for F1/F2/F4-F8 (7); product-code fixes 0 | claude -p; claude-opus-5-5; requested high | NEW_CRITICAL_MAJOR_FOUND; fixes verified at seat and in R2; F3 REJECTED-WITH-RULING, CHARC c39cc00d confirms 8276adb5 end-state retry/SKIP |
 | 2 / Reviewer A, adjudicated with terminating cleanup T13 | 0 | 0 | 2 | 5 | 7 / 0 reviewed | 7 / 0 reviewed | 0 | tests/support fixes F1/F3/F5/F6/F7 (5); requested supplemental V17 addresses added; product-code fixes 0 | claude -p; claude-opus-5-5; requested high | NO_NEW_CRITICAL_MAJOR; CONVERGED; F2's missing-coverage premise rejected with existing version-reanalysis evidence; F4 banked; final light checks recorded below |
+| B / terminating cleanup T15 | 0 | 0 | 2 | 6 | 7 / 1 reviewed | 8 / 0 reviewed | 0 | tests/support fixes B-2..B-7 (6); product-code fixes 0 | Claude opus, high; dispatcher seat | NO_NEW_CRITICAL_MAJOR; B-1 no change by ruling; B-8 out-of-envelope Limit; scoped cleanup complete, final gate pending |
 
 For a further blocking Reviewer A round, adjudicate every finding in a ledger-only
 turn and yield before remediation. A terminating clean round can combine its
@@ -456,7 +457,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | 11 / Reviewer A round 1 adjudication; session 4 retires | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | 191,275 | committed `6d8689b3`; retired at the evaluation point before multi-finding remediation; fresh session 5 starts T12 |
 | 12 / Reviewer A round 1 remediation; session 5 starts | session 5; id pending dispatcher | 118,369 | committed `5f75a03a` before rebase; seat GUI/GPU 3 passed; F3 ruled closed; WP-D54 accepted and branch rebased to `f059b2e0`; R2 converged |
 | 13 / Reviewer A round 2 adjudicated, terminating cleanup | session 5; id pending dispatcher | 158,027 | committed `d44db8d1`, 0 CR; Reviewer A converged at R2; T12 seat run stands because the three nodes and their called helpers are unchanged |
-| 14 / T10 report | session 5; id pending dispatcher | pending dispatcher | documentation only through an exclusive host window; yield for Reviewer B and the final three-leg gate; no pytest, ruff or mypy |
+| 14 / T10 report; session 5 retirement | `01a196ca-bef4-...` (dispatcher supplied abbreviation) | 238,374 | committed `7ab7bd39`; documentation only through an exclusive host window; fresh session 6 starts T15 from the committed ledger |
+| 15 / Reviewer B cleanup; session 6 starts | session 6; id pending dispatcher | pending dispatcher | scoped terminating cleanup; local light checks and 15 isolated crash runs; yield for the final three-leg gate |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -2852,3 +2854,166 @@ fixture/dependency/local-config/register edit, footage-folder read,
 other-worktree access, mailbox post, commit, stash or rebase. All scratch
 writes are under work/wp5.1. Yield after T10 for the dispatcher's Reviewer
 B and final gate; the accept commit fills the report from its gate record.
+
+## Session 6 / Turn 15: Reviewer B clean-up
+
+### Session boundary and review packet
+
+Fresh **session 6** continues from committed **7ab7bd39** on branch
+wp5.1. Session 5 (`01a196ca-bef4-...`, dispatcher abbreviation) retired
+at the dispatcher-supplied **238,374** input tokens after T10. This
+turn's session id and depth remain for the dispatcher to fill, never
+estimated by the cell. Reviewer A remains converged at round 2.
+
+Read the dispatch protocol, application/conventions, prompting standard,
+the ledger's two latest turns and depth table, and the external
+**B/review.txt** read-only in place. No reviewer transcript was copied
+into the repository. Reviewer B on 7ab7bd39 returned
+**NO_NEW_CRITICAL_MAJOR**, with **34 passed, 2 deselected in 139.90 s**,
+including the crash node. Its four executed product mutants were caught
+(abort no-op, dropped orientation, swapped 6/8, retained D63 Orientation),
+and claims 1-7 held. These are returned reviewer results, not cell runs.
+
+This turn applies the dispatcher's binding adjudication as one terminating
+cleanup, with no product change or new review round. Counts:
+**Critical0 / Major0 / Minor2 / Advisory6**, in-envelope7 / out1,
+NEW8 / REOPENED0, reverts0; six tests/support fixes, product-code fixes0.
+
+### Findings, controls and dispositions
+
+**B-1 [ADVISORY, NO CHANGE, in envelope, NEW].** Case-sensitive
+`limited` is the ruled reading of CHARC f6252e0b per this dispatch;
+the shell and runner assertions and uppercase-only rejection stay intact.
+
+**B-2 [MINOR, ACCEPTED/FIXED, in envelope, NEW].** The real-interpreter
+command now includes **-X utf8** alongside -I/-S, so ignoring encoding
+environment variables cannot change the redirected stream codec. The
+existing import probe asserts **sys.flags.utf8_mode == 1** AND normalized
+**sys.stderr.encoding == utf8**, as well as the same worktree package.
+Each successful crash node records **real_interpreter_utf8_mode=True**.
+No locale-dependent read fallback or replacement of undecodable bytes.
+
+**B-3 [MINOR, ACCEPTED/FIXED, in envelope, NEW].** Import-probe timeout
+increases 10 -> **60 s**. A writer wait TimeoutExpired now kills/reaps
+the real child, records the attempt and retries inside the existing
+20-attempt rule, without claiming cleanup for that attempt. The final
+reap follows kill without a second timed wait. Before retry, the stable
+names/sizes witness, complete-final validation and sentinel identity
+still run; surviving temporary names and final count are recorded. PID
+identity is asserted whenever the prologue ran, and remains mandatory
+for every ordinary attempt and the successful cleanup attempt. All
+ordinary failure, Writing-item, source hash and D85 assertions remain.
+
+Executed an isolated, scratch-only wait mutant that raises TimeoutExpired
+once at the writer's timed wait. **t15-timeout-probe.log/xml**: **1 passed
+in 4.39 s**, timeout recorded for attempt 1, killed/reaped, then cleanup
+on **attempt 2**. The probe asserts the timeout property and successful
+UTF-8 witness. It patches no product or committed package-test file.
+
+The 15 isolated legitimate crash runs each launch pytest with the sandbox
+shim and no cache provider: **15 passed / 0 failed / 0 skipped**, cleanup
+attempts **1,1,1,1,1,1,1,1,1,1,1,1,1,1,1**. Summed XML suite times
+**37.444 s** (not loop wall or serial gate delta). The scratch XML audit
+requires the package, UTF-8, PID and stable-output witnesses on every run.
+Evidence: **t15-crash-01.log/xml** through **t15-crash-15.log/xml** and
+**t15-crash-repeat.log**. No source or timing bound changed.
+
+**B-4 [ADVISORY, ACCEPTED/FIXED, in envelope, NEW].** Add the two
+relative spellings **video\\hevc8.mp4** and **fixtures/video/x.mp4** as
+controls in nested provenance, record source and printed Writing text.
+Before the guard change, the committed control fails **DID NOT RAISE**:
+**t15-red-paths.log**, **1 failed in 1.67 s**. Extend assert_names_only
+to reject file paths containing either separator in relative spellings,
+retaining the existing absolute/known-folder checks. Filename-only and
+non-file slash text (`[1/40]`, `BT.709/limited`) remain valid. GREEN:
+**t15-trace.log**, **1 passed in 1.33 s**, both spellings/all surfaces.
+
+**B-5 [ADVISORY, ACCEPTED/FIXED, in envelope, NEW].** Remove the
+encoder-free test_color_roundtrip pair node from the Python V9 roster
+and report matrix. Its characterisation remains contextual in the
+tolerance discussion. V9 now lists the three full-path function nodes
+(WP4.1 photo, WP4.2 pre-encode video, WP5.1 post-encode runner).
+The table is now **20 ids / 83 addresses / 81 unique functions**.
+**t15-report-check.log** independently expands the source AST and
+requires an exact report/Python roster match; **104 (gate)** placeholders
+remain, including all final gate figures.
+
+**B-6 [ADVISORY, ACCEPTED/FIXED, in envelope, NEW].** Add **display
+orientation: display matrix (ffprobe side data)** to the V9 tag mutation
+loop. The existing legitimate helper already asserts it. RED: a scratch
+helper mutant omits only this assertion while the new control runs
+against an actual runner export; **t15-red-orientation.log**, **1 failed
+in 10.66 s**, specifically **DID NOT RAISE** at the new mutation control.
+No product mutant or product edit was needed. The unmutated helper and
+all four samples run in the final light suite.
+
+**B-7 [ADVISORY, ACCEPTED/FIXED, in envelope, NEW].** Add skip and xfail
+controls on a real traced function, with monkeypatch restoration; require
+rejection by that node's address. RED before the guard:
+**t15-red-marks.log**, **1 failed in 1.61 s**, **DID NOT RAISE**. The
+traceability check now rejects skip/xfail marks with the node name;
+conditional skipif stays allowed and is explicitly exercised. GREEN is
+the traceability pass above and the final light run. No existing test's
+on-disk mark is changed; controls restore all temporary attributes.
+
+**B-8 [ADVISORY, OUT OF ENVELOPE/BANKED, NEW].** Limit: the deterministic
+D85 os.link witness requires hard-link support; configured C: NTFS is in
+envelope, exFAT/FAT temp roots are not. Recorded in the acceptance report.
+
+### Final verification and handoff
+
+Turn-15 check results and the final scope audit are recorded below before
+yield. The report gains its Reviewer B section and all eight dispositions;
+the whole-set gate placeholders stay for the orchestrator. No new test
+function, parameter instance or scheduling marker was added: the new
+roster remains **38 instances**, with **34** runnable in this sandbox.
+
+Actual final light command (PowerShell set PYTHONPATH=scripts, equivalent
+to this Git Bash spelling; all output routed to the named file):
+
+```bash
+PYTHONPATH=scripts uv run pytest -q -rs tests/test_v51_photo_acceptance.py tests/test_v51_video_acceptance.py tests/test_v51_shell_acceptance.py tests/test_v51_traceability.py --basetemp=work/wp5.1/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t15-light.xml > work/wp5.1/t15-light.log 2>&1
+```
+
+Exit **0**, **34 passed / 4 deselected / 0 skipped in 162.53 s**.
+The four deselections are the real-trim metadata, GPU N10 and two shell
+nodes reserved to the dispatcher. No GUI/GPU/footage/fullclip test or
+footage-folder access by the cell. The legitimate display-matrix control
+and strengthened names-only guard pass over all local runner cases.
+These development times are not an exclusive serial-leg delta or gate
+budget decision; the actual package contribution remains **(gate)**.
+
+| Check | Actual result / evidence under work/wp5.1 |
+|---|---|
+| B-7 RED, then B-4 RED | t15-red-marks.log: 1 failed in 1.61 s; t15-red-paths.log: 1 failed in 1.67 s; both intended DID NOT RAISE |
+| Traceability controls GREEN | t15-trace.log: 1 passed in 1.33 s; skip/xfail rejected by address, skipif allowed, both relative spellings rejected |
+| B-6 omission mutant RED | t15-red-orientation.log: 1 failed in 10.66 s at added side-data mutation control |
+| Forced writer-wait timeout | t15-timeout-probe.log/xml: 1 passed in 4.39 s; recorded retry, cleanup on attempt 2 |
+| Crash repeat and UTF-8 proof | t15-crash-repeat.log: 15 passed, 0 failed, 0 skipped; all attempt 1; summed XML suite times 37.444 s |
+| Final four-module local suite | t15-light.log/xml: 34 passed, 4 deselected, 0 skipped, 162.53 s, exit 0 |
+| Ruff on support and four WP5.1 modules | t15-ruff.log: All checks passed!, exit 0 |
+| Ruff format --check on same five files | t15-format.log: 5 files already formatted, exit 0 |
+| Mypy, configured src/clearwater and tools scope | t15-mypy.log: Success: no issues found in 148 source files, exit 0 |
+| Report/Python roster | t15-report-check.log: 20 ids, 83 addresses, 81 unique functions, V9 3 full-path nodes, 104 gate placeholders retained |
+| Changed-file bytes / whitespace | t15-lf.log and t15-diff-check.log: all six changed files 0 CR and final LF; diff --check exit 0 |
+
+Verification loop: confirmed B-4/B-7 with RED controls before changing
+the guards; confirmed B-6's added control catches an omitted side-data
+assertion. Fixed the scoped guards and exercised the timeout branch
+independently; all final legitimate local nodes and 15 isolated crash
+runs pass. Checked the revised matrix against its Python source and
+all eight review dispositions against this dispatch. No new finding,
+STOP, tolerance change, run request or open question in this cleanup.
+
+Only the owned support, photo/video/traceability test modules, report and
+ledger change (six paths). The shell module, product/tools, every
+pre-WP5.1 test, fixtures, dependencies, local configuration, register and
+git metadata are unchanged. All scratch programs/logs/XML stay under
+work/wp5.1; test writes stay under tmp_path. No other worktree read,
+footage read, external write, mailbox post, commit, stash or rebase.
+
+Yield at the turn-15 boundary. Reviewer B's verdict remains
+**NO_NEW_CRITICAL_MAJOR** with its authorized terminating cleanup;
+parallel + serial + ONE fullclip, collection identity, final-rebase
+checks and the actual serial addition against 300 s remain at the
+orchestrator's seat. All report **(gate)** placeholders are retained.

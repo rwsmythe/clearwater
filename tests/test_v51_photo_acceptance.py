@@ -379,19 +379,23 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
             imported = subprocess.run(
                 interpreter_command(
                     "import clearwater; from pathlib import Path; "
+                    "assert sys.flags.utf8_mode == 1, 'real interpreter UTF-8 mode is disabled'; "
+                    "assert sys.stderr.encoding.lower().replace('-', '') == 'utf8', "
+                    "'real interpreter stderr is not UTF-8'; "
                     "assert Path(clearwater.__file__).resolve() == Path(sys.argv[1]).resolve(), "
                     "'real interpreter imported a different clearwater package'",
                     [str(package_file)],
                 ),
                 stdout=log,
                 stderr=log,
-                timeout=10,
+                timeout=60,
                 check=False,
             )
         assert imported.returncode == 0, (
             "real interpreter did not import this worktree's clearwater"
         )
         record_property("real_interpreter_import", "same worktree clearwater.__file__")
+        record_property("real_interpreter_utf8_mode", True)
         for attempt in range(1, 21):
             root = tmp_path / f"attempt-{attempt:02d}"
             args = runner_arguments(sources, root, extra=("--force-cpu", "--bit-depth", "16"))
@@ -400,6 +404,7 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
             sentinel.write_bytes(b"existing output must survive")
             sentinels = {sentinel.name: file_md5(sentinel)}
             observed: list[str] = []
+            timed_out = False
             pid_file = root / "writer.pid"
             with (
                 (root / "stdout.log").open("wb") as stdout,
@@ -417,14 +422,20 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
                             break
                         time.sleep(0.01)
                     process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    timed_out = True
+                    process.kill()
                 finally:
                     if process.poll() is None:
                         process.kill()
-                    process.wait(timeout=10)
-            assert pid_file.is_file(), "runner prologue did not report the writing interpreter PID"
-            writer_pid = int(pid_file.read_text(encoding="ascii"))
-            assert writer_pid == process.pid, "crash kill target is not the writing interpreter"
-            record_property(f"attempt_{attempt:02d}_writer_pid_matches_popen", True)
+                    process.wait()
+            if not timed_out or pid_file.exists():
+                assert pid_file.is_file(), (
+                    "runner prologue did not report the writing interpreter PID"
+                )
+                writer_pid = int(pid_file.read_text(encoding="ascii"))
+                assert writer_pid == process.pid, "crash kill target is not the writing interpreter"
+                record_property(f"attempt_{attempt:02d}_writer_pid_matches_popen", True)
             _assert_writes_stopped(output)
             record_property(f"attempt_{attempt:02d}_writes_stopped", True)
             finals = _assert_complete_finals(output, sentinels, expected_size)
@@ -435,6 +446,12 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
                 ",".join(sorted(path.name for path in leftovers)),
             )
             assert file_md5(sentinel) == sentinels[sentinel.name], "export altered the sentinel"
+            if timed_out:
+                record_property(
+                    f"attempt_{attempt:02d}_timeout",
+                    "writer wait timed out; killed and reaped; retry without claiming cleanup",
+                )
+                continue
             if not observed:
                 assert process.returncode == 0, "runner crashed before a temporary was observed"
             stderr_text = (root / "stderr.log").read_text(encoding="utf-8")

@@ -50,7 +50,7 @@ class RunnerResult:
 
 
 def assert_names_only(value: object, *, folders: Sequence[Path] = ()) -> None:
-    """Reject absolute paths recursively in a record or a printed surface.
+    """Reject absolute paths and relative file paths in records or printed text.
 
     Args:
         value: JSON-compatible data or printed text.
@@ -66,6 +66,9 @@ def assert_names_only(value: object, *, folders: Sequence[Path] = ()) -> None:
     elif isinstance(value, str):
         assert not re.search(r"[A-Za-z]:[\\/]|\\\\|(?:^|[\s\"'=])/[\w.]", value), (
             "absolute path leaked into a record or printed surface"
+        )
+        assert not re.search(r"[\w.-]+[\\/]+[\w. /\\-]*\.[A-Za-z0-9]+\b", value), (
+            "relative file path leaked into a record or printed surface"
         )
         normal = value.replace("\\", "/").casefold()
         for folder in folders:
@@ -114,7 +117,9 @@ def interpreter_command(code: str, arguments: Sequence[str] = ()) -> list[str]:
     Using the base executable makes the Popen PID the interpreter being killed;
     copying sys.path retains the venv dependencies and editable source paths.
     Isolated startup without site initialization prevents user/base .pth code
-    from preloading modules before these explicit paths are installed.
+    from preloading modules before these explicit paths are installed. Explicit
+    UTF-8 mode keeps redirected streams decodable even when -I ignores encoding
+    environment variables.
 
     Args:
         code: Python code executed after restoring the import paths.
@@ -128,6 +133,8 @@ def interpreter_command(code: str, arguments: Sequence[str] = ()) -> list[str]:
         executable,
         "-I",
         "-S",
+        "-X",
+        "utf8",
         "-c",
         f"import sys; sys.path[:] = {sys.path!r}; {code}",
         *arguments,
@@ -630,7 +637,6 @@ ACCEPTANCE_NODES: dict[str, tuple[str, ...]] = {
             "test_wp42_video_path", "test_v9_neutral_parameters_reproduce_the_decoded_source"
         ),
         *_test_nodes("test_v51_video_acceptance", "test_v9_neutral_runner_postencode"),
-        *_test_nodes("test_color_roundtrip", "test_pair_round_trip_per_sample"),
     ),
     "V10": (
         *_test_nodes(

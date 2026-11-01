@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from acceptance_support import ACCEPTANCE_NODES, ACCEPTANCE_NON_NODE_REASONS
+from acceptance_support import ACCEPTANCE_NODES, ACCEPTANCE_NON_NODE_REASONS, assert_names_only
 
 
 def _assert_matrix(nodes: Mapping[str, Sequence[str]], reasons: Mapping[str, str]) -> None:
@@ -46,6 +46,10 @@ def _assert_matrix(nodes: Mapping[str, Sequence[str]], reasons: Mapping[str, str
             assert inspect.isfunction(function), message
             assert function.__module__ == module.__name__, message
             assert getattr(function, "__test__", True) is not False, message
+            for marker in getattr(function, "pytestmark", ()):
+                assert marker.name not in ("skip", "xfail"), (
+                    f"{message}: unconditional skip/xfail mark {marker.name}"
+                )
 
 
 def test_acceptance_matrix_references_existing_test_functions(
@@ -73,3 +77,30 @@ def test_acceptance_matrix_references_existing_test_functions(
     record_property(
         "module_file_mutation_probe", "same-name module from a different folder rejected"
     )
+    function_name = "test_ancuti_chain_matches_prototype"
+    function = getattr(module, function_name)
+    address = f"tests/test_methods_compensation.py::{function_name}"
+    for marker in (
+        pytest.mark.skip(reason="planted skip"),
+        pytest.mark.xfail(reason="planted xfail"),
+    ):
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                function, "pytestmark", [*getattr(function, "pytestmark", ()), marker.mark]
+            )
+            with pytest.raises(AssertionError, match=re.escape(address)):
+                _assert_matrix(ACCEPTANCE_NODES, ACCEPTANCE_NON_NODE_REASONS)
+    with monkeypatch.context() as patch:
+        patch.setattr(function, "pytestmark", [pytest.mark.skipif(False, reason="available").mark])
+        _assert_matrix(ACCEPTANCE_NODES, ACCEPTANCE_NON_NODE_REASONS)
+    record_property("skip_mark_mutation_probe", "unconditional skip/xfail rejected by node name")
+    for spelling in (r"video\hevc8.mp4", "fixtures/video/x.mp4"):
+        for surface in (
+            {"provenance": {"source": spelling}},
+            {"source": spelling},
+            f"Writing {spelling}",
+        ):
+            with pytest.raises(AssertionError, match="path leaked"):
+                assert_names_only(surface)
+    assert_names_only(["hevc8.mp4", "[1/40] Writing photo.png", "BT.709/limited"])
+    record_property("relative_path_mutation_probe", "backslash and slash file paths rejected")

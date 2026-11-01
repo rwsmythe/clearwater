@@ -1,8 +1,9 @@
 # WP5.1 automated acceptance suite
 
-Status: T10 on candidate `d44db8d1`, 2026-11-01. Development and returned
-seat runs are green; Reviewer A converged at round 2. Reviewer B and the
-final three-leg gate are pending. This report does not claim release acceptance.
+Status: turn 15, Reviewer B cleanup on `7ab7bd39`, 2026-11-01. Reviewer A
+converged at round 2; Reviewer B returned NO_NEW_CRITICAL_MAJOR. Development
+and returned seat evidence is below; the final three-leg gate remains pending.
+This report does not claim release acceptance.
 
 The contract is spec v0.5.7 section 11, plan section 7 and the
 [WP5.1 brief and folded rulings](../briefs/wp5.1-brief.md).
@@ -28,8 +29,10 @@ figures and presence booleans, without footage paths or metadata payloads.
 | Key | Result of record | Evidence under work/wp5.1 / provenance |
 |---|---|---|
 | L13 | 34 passed, 4 deselected, 0 skipped, 114.78 s; exit 0 | t13-light.log/xml; sandbox shim, no cache provider; all four new test modules, excluding gpu/footage/gui/fullclip |
+| L15 | 34 passed, 4 deselected, 0 skipped, 162.53 s; exit 0 | t15-light.log/xml; same four-module sandbox command after Reviewer B cleanup |
 | X13 | Traceability plus the two existing cache-format nodes: 3 passed, 0.87 s | t13-trace.log/xml; supplemental V17 addresses and wrong-module-file control |
 | C13 | Real photo crash: 15/15 isolated passes, no skips | t13-crash-01 through t13-crash-15.log/xml; t13-crash-summary.log; summed pytest suite times 30.422 s, not enclosing-loop wall |
+| C15 | Real photo crash: 15/15 isolated passes, no skips; every cleanup on attempt 1 | t15-crash-01 through t15-crash-15.log/xml; t15-crash-repeat.log; summed XML suite times 37.444 s, not gate delta; UTF-8/package/PID/stability witnesses checked |
 | H12 | GPU N10 plus both shell nodes: 3 passed, 86.69 s; exit 0 | t12-seat.log/xml, seat on 5f75a03a at about 2026-11-01 17:50Z; exact properties summarized in t13-seat-summary.log |
 | M6 | Real-trim V4 metadata: 1 passed, 92.46 s; exit 0 | t6-seat-metadata.log/xml, seat at about 2026-11-01 09:41Z; GPU, libx265, 90 frames |
 | A2 | Reviewer A light run: 34 passed, 2 deselected, 108.09 s | External round-2 review on f059b2e0 against 4ece5183; shell module omitted, hence two fewer deselections than L13 |
@@ -53,14 +56,14 @@ pure traceability node belong to P. The shell warning is gui and belongs to S.
 ## Acceptance matrix
 
 The following function addresses reproduce `ACCEPTANCE_NODES` in
-tests/acceptance_support.py: 20 acceptance ids, 84 addresses, 82 unique
+tests/acceptance_support.py: 20 acceptance ids, 83 addresses, 81 unique
 functions. An address covers all its parameterized instances. P = parallel
 (`not gpu and not footage and not gui and not slow and not fullclip`),
 S = serial (`(gpu or footage or gui or slow) and not fullclip`),
 F = fullclip. Mixed forms list their markers and legs separately.
 `none` means no scheduling marker; usefixtures/parametrize are not leg markers.
 `(gate)` means the current-candidate execution is pending, not a passing claim.
-Existing nodes were preserved and statically checked; L13/H12/M6/X13 identify
+Existing nodes were preserved and statically checked; L15/H12/M6/X13 identify
 actual development or returned-seat results. Figures of record follow the table.
 
 | ID | Node id / non-node disposition | Scheduling markers | Leg | Result / source |
@@ -89,8 +92,8 @@ actual development or returned-seat results. Figures of record follow the table.
 | V3 | `tests/test_wp42_v3_product.py::test_the_lossless_clips_decode_inside_wp39s_envelope` | gpu, slow | S | (gate) |
 | V3 | `tests/test_wp42_v3_product.py::test_ad14_bound_with_the_product_method` | gpu, slow | S | (gate) |
 | V3 | `tests/test_wp42_v3_product.py::test_v3_ratio_on_the_jittering_patch_clip_with_the_product_method` | gpu, slow | S | (gate) |
-| V4 | `tests/test_v51_video_acceptance.py::test_v4_runner_preserves_fixture_fidelity` | slow | S | PASS L13 |
-| V4 | `tests/test_v51_video_acceptance.py::test_v4_truncated_runner_batch_obeys_d86` | slow | S | PASS L13 |
+| V4 | `tests/test_v51_video_acceptance.py::test_v4_runner_preserves_fixture_fidelity` | slow | S | PASS L15 |
+| V4 | `tests/test_v51_video_acceptance.py::test_v4_truncated_runner_batch_obeys_d86` | slow | S | PASS L15 |
 | V4 | `tests/test_v51_video_acceptance.py::test_v4_real_trim_records_best_effort_presence` | footage, slow | S | PASS M6 observation; current gate pending |
 | V4 | `tests/test_wp42_video_path.py::test_v4_through_the_composition_on_the_cpu` | none | P | (gate) |
 | V4 | `tests/test_wp42_video_path.py::test_v4_through_the_composition_on_the_gpu_with_device_frames` | gpu | S | (gate) |
@@ -98,11 +101,11 @@ actual development or returned-seat results. Figures of record follow the table.
 | V4 | `tests/test_jobs_export_video.py::test_v4_synthetic_5k3_8_7_clip` | slow | S | (gate) |
 | V4 | `tests/test_jobs_export_video.py::test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item` | footage, gpu, slow; +fullclip on full | S trim / F full | (gate) |
 | V5 | `tests/test_wp41_photo_path.py::test_v5_bit_depth_icc_exif_and_provenance` | none | P | (gate) |
-| V5 | `tests/test_v51_photo_acceptance.py::test_v5_jpeg_two_readers_and_pose` | none | P | PASS L13 |
-| V5 | `tests/test_v51_photo_acceptance.py::test_v5_heic_two_readers_and_ad24` | none | P | PASS L13 |
-| V6 | `tests/test_v51_video_acceptance.py::test_v6_hdr_refusals_do_not_stop_batch` | slow | S | PASS L13 |
-| V6 | `tests/test_v51_video_acceptance.py::test_v6_untagged_runner_warns_bt709_limited` | slow | S | PASS L13 |
-| V6 | `tests/test_v51_video_acceptance.py::test_v4_truncated_runner_batch_obeys_d86` | slow | S | PASS L13 |
+| V5 | `tests/test_v51_photo_acceptance.py::test_v5_jpeg_two_readers_and_pose` | none | P | PASS L15 |
+| V5 | `tests/test_v51_photo_acceptance.py::test_v5_heic_two_readers_and_ad24` | none | P | PASS L15 |
+| V6 | `tests/test_v51_video_acceptance.py::test_v6_hdr_refusals_do_not_stop_batch` | slow | S | PASS L15 |
+| V6 | `tests/test_v51_video_acceptance.py::test_v6_untagged_runner_warns_bt709_limited` | slow | S | PASS L15 |
+| V6 | `tests/test_v51_video_acceptance.py::test_v4_truncated_runner_batch_obeys_d86` | slow | S | PASS L15 |
 | V6 | `tests/test_v51_shell_acceptance.py::test_v6_real_untagged_shell_warns_bt709_limited` | gui | S | PASS H12 |
 | V6 | `tests/test_headless_export.py::test_refused_items_fail_and_the_batch_continues` | none | P | (gate) |
 | V6 | `tests/test_headless_export.py::test_damaged_photos_are_failed_items_and_the_batch_continues` | none | P | (gate) |
@@ -118,17 +121,16 @@ actual development or returned-seat results. Figures of record follow the table.
 | V8 | `tests/test_methods_assembly_v8.py::test_v8_preview_against_the_downscaled_export` | slow (CPU); gpu (CUDA) | S | (gate); WP4.3 figure cited below |
 | V9 | `tests/test_wp41_photo_path.py::test_v9_neutral_is_the_identity` | none | P | (gate) |
 | V9 | `tests/test_wp42_video_path.py::test_v9_neutral_parameters_reproduce_the_decoded_source` | none | P | (gate) |
-| V9 | `tests/test_v51_video_acceptance.py::test_v9_neutral_runner_postencode` | slow | S | PASS L13 |
-| V9 | `tests/test_color_roundtrip.py::test_pair_round_trip_per_sample` | none | P | (gate) |
+| V9 | `tests/test_v51_video_acceptance.py::test_v9_neutral_runner_postencode` | slow | S | PASS L15 |
 | V10 | `tests/test_wp41_photo_path.py::test_v10_cross_format_clash_is_numbered` | none | P | (gate) |
 | V10 | `tests/test_wp41_photo_path.py::test_v10_an_existing_output_is_never_overwritten` | none | P | (gate) |
 | V10 | `tests/test_wp41_photo_path.py::test_v10_custom_suffix` | none | P | (gate) |
-| V10 | `tests/test_v51_video_acceptance.py::test_v10_repeated_video_exports_are_numbered` | slow | S | PASS L13 |
-| V10 | `tests/test_v51_video_acceptance.py::test_v10_existing_video_output_is_unchanged` | slow | S | PASS L13 |
-| V10 | `tests/test_v51_video_acceptance.py::test_v10_mov_mp4_share_one_numbering_sequence` | slow | S | PASS L13 |
-| V11 | `tests/test_v51_photo_acceptance.py::test_v11_png_disk_full_removes_partial_output` | none | P | PASS L13 |
-| V11 | `tests/test_v51_photo_acceptance.py::test_v11_photo_crash_leftovers_are_cleaned_at_start` | slow | S | PASS L13 / C13 |
-| V11 | `tests/test_v51_photo_acceptance.py::test_d85_same_file_cleanup_preserves_installed_final` | none | P | PASS L13 |
+| V10 | `tests/test_v51_video_acceptance.py::test_v10_repeated_video_exports_are_numbered` | slow | S | PASS L15 |
+| V10 | `tests/test_v51_video_acceptance.py::test_v10_existing_video_output_is_unchanged` | slow | S | PASS L15 |
+| V10 | `tests/test_v51_video_acceptance.py::test_v10_mov_mp4_share_one_numbering_sequence` | slow | S | PASS L15 |
+| V11 | `tests/test_v51_photo_acceptance.py::test_v11_png_disk_full_removes_partial_output` | none | P | PASS L15 |
+| V11 | `tests/test_v51_photo_acceptance.py::test_v11_photo_crash_leftovers_are_cleaned_at_start` | slow | S | PASS L15 / C15 |
+| V11 | `tests/test_v51_photo_acceptance.py::test_d85_same_file_cleanup_preserves_installed_final` | none | P | PASS L15 |
 | V11 | `tests/test_jobs_export_video.py::test_v11_an_encoder_killed_mid_stream_leaves_no_partial_output` | none | P | (gate) |
 | V11 | `tests/test_jobs_export_video.py::test_a_cancel_mid_encode_leaves_nothing_and_keeps_earlier_outputs` | none | P | (gate) |
 | V11 | `tests/test_jobs_export_video.py::test_a_cancel_during_the_product_sinks_close_is_aborted_and_leaves_nothing` | none | P | (gate) |
@@ -150,14 +152,14 @@ actual development or returned-seat results. Figures of record follow the table.
 | N10 | `tests/test_wp41_photo_path.py::test_n10_the_same_still_twice_is_identical` | none | P | (gate) |
 | N10 | `tests/test_wp41_photo_path.py::test_gpu_export_reports_gpu_and_matches_the_cpu` | gpu | S | (gate) |
 | N10 | `tests/test_methods_assembly_prototype.py::test_same_device_twice_is_bit_identical` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| N10 | `tests/test_v51_video_acceptance.py::test_n10_video_cpu_render_digests_repeat` | slow | S | PASS L13 |
+| N10 | `tests/test_v51_video_acceptance.py::test_n10_video_cpu_render_digests_repeat` | slow | S | PASS L15 |
 | N10 | `tests/test_v51_video_acceptance.py::test_n10_video_gpu_render_digests_repeat_and_match_cpu` | gpu, slow | S | PASS H12 |
 | D91 | `tests/test_wp41_photo_path.py::test_v5_bit_depth_icc_exif_and_provenance` | none | P | (gate) |
-| D91 | `tests/test_v51_video_acceptance.py::test_d91_video_provenance` | slow | S | PASS L13 |
+| D91 | `tests/test_v51_video_acceptance.py::test_d91_video_provenance` | slow | S | PASS L15 |
 
 The table's existence check is itself committed as
 `tests/test_v51_traceability.py::test_acceptance_matrix_references_existing_test_functions`
-(none, P, PASS L13/X13). It imports referenced modules without running their
+(none, P, PASS L15/X13). It imports referenced modules without running their
 tests, requires the exact tests/<module>.py file and a locally defined
 function, and rejects stale names and a same-named module from another
 folder. Parameterized function addresses stand for every instance; the
@@ -328,8 +330,11 @@ actual writes, scoped by output path, then requires exit 1, named
 disk-full wording, no final/temporary and unchanged source MD5. It rejects
 an unrelated named failure. The real crash batch uses 40 copies of the
 largest committed fixture (96x64, a maximum-area tie), 10 ms polling,
-the real interpreter with matched worktree package, a PID-file equality
-assertion and the post-wait names/sizes witness. Complete earlier outputs
+the real interpreter with matched worktree package, explicitly proved UTF-8
+mode/stderr encoding, a PID-file equality assertion and the post-wait
+names/sizes witness. A timed-out wait kills/reaps, records the attempt
+and retries within the existing 20-attempt rule; the import probe allows
+60 s. Complete earlier outputs
 are preserved, partial finals are rejected and startup removes surviving
 temporary names. A complete installed final sharing the temporary's hard
 link survives cleanup byte-identically.
@@ -355,7 +360,7 @@ final counts 1, 3, 4, 5 and 7 are race characterisations, not bounds.
 | Serial allowance flagged at mixed-condition 191.68 s before T7/T8 | Same ruling raises package allowance 180 -> 300 s; this sum was not a measured serial delta; gate comparison remains pending. |
 | Reviewer A R1 crash flake | Real venv launcher leaves child alive past wait; fixed with real interpreter, stable-output witness, then R2 PID/package pin. C13 15/15 passed. |
 | Carried V7 (c)/(e) STOPs, DR-98 | WP4.6 accepted; closed on main bbb4ef3e; 39/48 ms figures cited above. |
-| Session-depth yields | Fresh-session boundaries at dispatcher depths 210,098; 194,928; 177,474; 191,275. Procedural yields, not product defects; session 5 continues from the committed ledger. |
+| Session-depth yields | Fresh-session boundaries at dispatcher depths 210,098; 194,928; 177,474; 191,275; 238,374. Procedural yields, not product defects; session 6 continues from the committed ledger. |
 
 No new STOP is open in WP5.1. Historical REDs stayed literal until the
 ruling or owning-package fix; none was hidden with xfail. Reviewer A R1
@@ -366,6 +371,7 @@ conflicting sentence and confirmed 8276adb5's end-state retry/SKIP rule.
 |---|---|
 | New WP5.1 nodes in development/returned seat evidence | **0 observed skips.** L13's four deselections are G2, GPU N10 and two shell nodes, all separately returned PASS, not skipped. |
 | Crash: no surviving temporary in 20 attempts | Allowed SKIP `not observable at this size`; never observed in recorded successful suite runs. C13 attempts were 1,1,1,1,1,1,2,1,1,1,1,1,1,2,2; all 15 reached cleanup, no skip. T12's 15 isolated passes all used attempt 1. |
+| Turn-15 crash observations | C15: 15/15 cleanup on attempt 1, no skips; forced single writer-wait timeout was recorded/retried, then cleanup passed on attempt 2 (t15-timeout-probe.log/xml, 1 passed in 4.39 s). |
 | Hardware/source availability | GPU form can skip if no usable CUDA device; footage fixture can skip without configured footage. Neither occurred in returned seat runs; the final gate must use the configured host. |
 | Prior main gate: standing swscale case | WP-D54 parallel had 1 skip: yuvj is read as full regardless of in_range, so that planted range-misread case is refused; not a new WP5.1 skip. |
 | Prior main gate: archived look-check content | WP-D54 serial had 11 skips: absent frames archived to D:, 1 shell V8 crop, 5+4 method V8 cases, 1 WP4.1 V8 crop. Existing availability guards unchanged; no current-candidate skip count invented. |
@@ -401,9 +407,38 @@ wrong-package and wrong-module controls fail by name, and legitimate local
 nodes pass. No pytest, ruff or mypy was run during this T10 documentation
 turn because an exclusive host measurement window was open.
 
-Reviewer B: **(gate)**, Claude pass at the orchestrator's seat on the final
-candidate, followed by the single whole-set gate below. No completed
-Reviewer B or whole-set result is claimed in this T10 report.
+## Reviewer B
+
+Claude opus, high, at the orchestrator's seat on `7ab7bd39` returned
+**NO_NEW_CRITICAL_MAJOR**: 34 passed, 2 deselected in 139.90 s, including
+the real crash node. All four executed product mutants were caught
+(abort omitted, orientation dropped, 6/8 swapped, D63 Orientation kept);
+claims 1-7 held. The external B/review.txt remains outside the repository.
+The dispatcher's turn-15 adjudication authorizes this terminating cleanup.
+
+| Item | Severity / disposition | Result |
+|---|---|---|
+| B-1 | ADVISORY, no change by binding ruling | Case-sensitive `limited` remains the ruled reading of CHARC f6252e0b. |
+| B-2 | MINOR, accepted / fixed | Real interpreter adds `-X utf8`; the import probe asserts UTF-8 mode and stderr encoding despite `-I`. |
+| B-3 | MINOR, accepted / fixed | Writer wait timeout kills/reaps and records a retry within 20 attempts; import probe allows 60 s. Forced timeout control reaches cleanup on attempt 2. |
+| B-4 | ADVISORY, accepted / fixed | Names-only guard rejects relative file paths with either separator in nested provenance/fidelity data and printed text; controls cover both spellings. |
+| B-5 | ADVISORY, accepted / fixed | Encoder-free colour-pair node removed from V9's matrix and Python roster; its characterisation remains context in the tolerance section. |
+| B-6 | ADVISORY, accepted / fixed | Display-matrix side-data orientation added to the tag-mutation loop; omission mutant fails at the new control. |
+| B-7 | ADVISORY, accepted / fixed | Traceability rejects skip/xfail marks by node name; both controls exercised. Conditional skipif remains allowed. |
+| B-8 | ADVISORY, out of envelope / banked | D85 hard-link witness requires hard-link support: the configured C: NTFS temp root is in envelope; exFAT/FAT is outside it. |
+
+Limit (B-8): the deterministic D85 `os.link` witness requires hard-link
+support and cannot run with a temp root on exFAT/FAT.
+
+After cleanup, **L15 is 34 passed, 4 deselected, no skips in 162.53 s**;
+**C15 is 15/15 isolated crash passes**, no skips. RED controls reproduced
+the prior relative-path and skip-mark gaps; an omission mutant is caught
+by the new display-matrix mutation. The traceability controls then passed.
+Ruff and format-check pass on the support/four modules; mypy passes on
+148 configured source files. Evidence is t15-light.log/xml,
+t15-crash-repeat.log, t15-red-paths.log, t15-red-marks.log,
+t15-red-orientation.log, t15-trace.log, t15-ruff.log, t15-format.log and
+t15-mypy.log. The single whole-set gate and its figures remain pending below.
 
 ## Whole-set gate and serial-leg delta
 
