@@ -1,6 +1,6 @@
 # WP5.3 — Visual review pack for CP5 (dispatch brief)
 
-**Status:** FINAL 2026-11-01 on CHARC commission post `05533fa67a11cee3` (file `20261101T081408Z-...-b488ac53.md`, 2026-11-01T08:14:08Z); drafted by CHARC (generation 10, session `clearwater-charc-20261031-2201`); the dispatch fill (base, lane, GATE_CHECKS, yields) folded in by the orchestrator (generation 28) at the end of this brief.
+**Status:** FINAL 2026-11-01 on CHARC commission post `05533fa67a11cee3` (file `20261101T081408Z-...-b488ac53.md`, 2026-11-01T08:14:08Z); drafted by CHARC (generation 10, session `clearwater-charc-20261031-2201`); the dispatch fill (base, lane, GATE_CHECKS, yields) folded in by the orchestrator (generation 28) at the end of this brief. AMENDED by CHARC's round-0 ruling `f99fca742e060f14` (2026-11-01T08:27:19Z), folded in verbatim as `## Round-0 ruling` before the Dispatch fill; it GOVERNS where it differs from the text above.
 No tripwire (plan section 3): instrument code under `tools/`, no new
 dependency, no product module, no frozen interface. Spec v0.5.7, no clause changes. Owner decisions
 inside: NONE (the look check and V2 are the owner's at CP5; this package only builds what the owner
@@ -153,6 +153,20 @@ work/wp5.3/
 5. RUN REQUESTS to the orchestrator in Q8's order; the cell reads the records and the logs back,
    fixes instrument defects (a PRODUCT defect = STOP to CHARC with the evidence), rebuilds the page.
 6. Report; Reviewer B at the orchestrator's seat; the one gate; accept.
+
+## Round-0 ruling (CHARC `f99fca742e060f14`, verbatim; binding)
+
+RULING on e03fc37c (WP5.3 round 0), PRIMARY: CHARC. All three recommended answers GRANTED, each with one constraint. The brief is amended by this message (fold the four lines below into the brief at the next commit on the wp5.3 branch; Status line cites this id).
+
+R0-1 GRANTED: an instrument-local, name-only photo resolver in tools/reviewpack/select.py for the commissioned photo suffixes (.HEIC, .JPG, case-insensitive) and the exact inventory names; it mirrors find_footage_file's missing / ambiguous refusals and its link / junction pruning; find_footage_file stays the resolver for every video item and tools/local_config.py is not edited. CONSTRAINT: a test plants a root with a duplicate name in two folders and asserts the ambiguous refusal, and one with a junction and asserts the prune (the same two properties the video resolver proves).
+
+R0-2 GRANTED: a rotation-aware viewing adapter inside tools/reviewpack/ for the pair clips and pair stills of rotated items; tools/lookcheck/frames.py is not edited and keeps serving unrotated items. CONSTRAINT: the adapter applies the display orientation by FFmpeg's own default autorotate on BOTH halves (source and corrected read the same way; no hand-written transpose), asserts both halves have equal rotated dimensions before hstack, and is proved on tests/fixtures/video/rotated.mp4 with the oriented dimensions asserted. The product's corrected output stays linked as the item of record; the page says the pair clip is a viewing aid.
+
+R0-3 GRANTED as recommended: every V-P item whole, IMG_6762.MOV (749 s) included and run LAST within V-P; the brief's "all under 2 min" was my error; the schedule estimate for V-P is the measured durations at your seat (about 27 min of 1080p / 1440p footage). No scope change.
+
+Q6 noted: presets.py:42 / :45 / :228 / :478 / :504; pack-local store, both starters exported. R0-4 noted (the CSV copy under the worktree's gitignored work/ is fine).
+
+Codex turn 2 (RED) resumes on this post. Claude figure 84 % noted.
 
 ## Dispatch fill (orchestrator generation 28, 2026-11-01; FINAL)
 
