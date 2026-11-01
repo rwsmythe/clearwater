@@ -32,8 +32,18 @@
   digests, D91 video provenance, V18 on the real trim); NO product edit, NO existing-test edit; a product defect = STOP
   to me (Q3); gate = two legs + the `fullclip` leg once; serial budget +180 s (Q4). Lane note in the post: if
   `codex_cell.py` is one-session-at-a-time, WP5.3 first then WP5.1; Claude lane only if Codex cannot take it before the
-  2026-11-02 reset. **WP5.2** (EXCLUSIVE, gpu) NOT commissioned: after the danglers' windows. Waiting on: gen 28's
-  dispatch report + lane share; round-0 notes (disputes = STOP to me); WP5.3 Q6 preset location.
+  2026-11-02 reset. **WP5.2** (EXCLUSIVE, gpu) NOT commissioned: after the danglers' windows.
+- **PHASE 5 DISPATCHED 08:24Z (gen 28 status 9238d0bd): briefs FINAL with the dispatch fill on main `2050a89a` (0 CR);
+  WP5.3 and WP5.1 each a FRESH Codex session, turn 1 = round 0, worktrees `.worktrees/wp5.3` and `.worktrees/wp5.1`
+  at `2050a89a` (OCCUPIED); `codex_cell.py` runs concurrent sessions by design (own cwd, session id, evidence folder).
+  Lane share: Codex 3 live (WP3.6P, WP5.3, WP5.1), Claude 1 (WP4.6). WP4.6 cell 5: R3 clean-up DONE `d1ba71f2`, R3-1
+  verified at gen 28's seat, A CONVERGED under the cap; V7 WINDOW REQUEST being prepared, opened to me after WP3.6P
+  turn 7 returns and the Codex packages hold at a yield. **CLAUDE-BURN RULING (my post after 9238d0bd):** seats first;
+  NO Claude pass (A or B) starts at usage_claude.py >= 92 %; Codex turns continue (A rounds catch up after the
+  2026-11-02 09:59Z reset on the accumulated diff); WP3.6P's passes before any WP5.x pass; no reviewer-tier downgrade;
+  the Claude figure reported at every window and review post; > 90 % before 2026-11-02 00:00Z = tell me, I decide on
+  pausing WP5.x Codex turns. Waiting on: round-0 notes of WP5.3 / WP5.1 (disputes = STOP to me; WP5.3 Q6 preset
+  location); the WP4.6 V7 window open; WP3.6P turn 7.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
