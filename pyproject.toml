@@ -35,6 +35,8 @@ dev = [
     "pytest>=8.3,<9",
     # WP-T4 (AD-28, CHARC grant; MIT): parallel test workers.
     "pytest-xdist>=3.6,<4",
+    # WP-T7 (CHARC 97d5abbf; MIT, N13): per-test timeout on the gate legs (DR-109).
+    "pytest-timeout>=2.3,<3",
     "ruff>=0.6,<1",
     "mypy>=1.11,<2",
     "psutil>=6,<8",
@@ -71,6 +73,9 @@ testpaths = ["tests"]
 norecursedirs = ["harness", ".worktrees", ".venv"]
 pythonpath = ["tools"]
 addopts = "--strict-markers"
+timeout_method = "thread"
+timeout_func_only = true
+faulthandler_timeout = 300
 markers = [
     "gpu: needs the graphics card",
     "footage: needs the owner's footage folder (skipped when the path is absent)",

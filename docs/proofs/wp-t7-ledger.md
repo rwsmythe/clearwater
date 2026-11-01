@@ -70,6 +70,60 @@ The final byte audit is recorded in `work/wp-t7/turn1-byte-audit.log`; both
 new committed-path candidates have zero CR bytes. No product, dependency,
 lock, ini, existing test, gate document or local configuration was changed.
 
+## Turn 2: offline installation STOP (GREEN not reached)
+
+The dispatcher supplied the end-of-turn-1 depth as **90,664 tokens** for
+session `01a1983a-45de-7530-8ca2-8d53963ad4c7` (475,000-token window).
+
+Added the authorized dev requirement `pytest-timeout>=2.3,<3` with the exact
+commission provenance comment, and only the three authorized pytest ini
+options: `timeout_method = "thread"`, `timeout_func_only = true`, and
+`faulthandler_timeout = 300`. There is no default `timeout` value.
+
+`uv lock --offline` succeeded, exit 0:
+
+```text
+Resolved 63 packages in 42ms
+Added pytest-timeout v2.4.0
+```
+
+Evidence: `work/wp-t7/turn2-lock.log`. `uv.lock` was generated only by uv.
+`git diff --stat -- uv.lock` reports:
+
+```text
+uv.lock | 14 ++++++++++++++
+1 file changed, 14 insertions(+)
+```
+
+Evidence: `work/wp-t7/turn2-lock-stat.log`; the inspected diff adds only the
+pytest-timeout dev-group reference, requirement metadata and 2.4.0 package
+entry. No existing dependency version or artifact moved.
+
+**[MAJOR, operational, in-envelope] STOP:** `uv sync --offline` failed,
+exit 1. Evidence: `work/wp-t7/turn2-sync.log`. The exact error text is:
+
+```text
+Failed to download `pytest-timeout==2.4.0`
+Network connectivity is disabled, but the
+requested data wasn't found in the cache for:
+https://files.pythonhosted.org/packages/fa/b6/3127540ecdf1464a00e5a01ee60a1b09175f6913f0644ac748494d9c4b21/pytest_timeout-2.4.0-py3-none-any.whl
+```
+
+Recommended disposition: at the dispatcher seat, make that exact locked
+wheel artifact available to the cell's shared uv cache, then resume the
+offline sync. Resolution metadata is now accessible, but the artifact is
+not accessible to this sync. No alternative install, manual lock edit,
+network attempt or cache mutation was attempted after the failure.
+
+As explicitly directed by the turn-2 dispatch's "If it still fails, STOP"
+instruction, no GREEN, behavior probe, document update, light runner or
+harness gate was attempted after the sync failed. The proving test is
+unchanged. The dependency/configuration work is retained for the dispatcher
+to commit by pathspec. This is an incomplete installation rung, not a
+completion or review-convergence claim. `git diff --check` exited 0; byte
+counts for all three changed files are recorded in
+`work/wp-t7/turn2-byte-audit.log` (zero CR).
+
 ## Facts research: source-confirmed, execution pending
 
 Research date: 2026-11-01. The primary sources below were inspected this turn.
@@ -160,4 +214,5 @@ and does not open or count a review round.
 
 | Session / turn | Depth supplied by dispatcher | Boundary |
 | --- | --- | --- |
-| 1 / 1 | Pending dispatcher fill; no estimate | RED yield; evaluate near 200K, re-seat boundary near 250K |
+| 1 / 1 | 90,664 tokens (dispatcher supplied at turn 2) | RED yield; evaluate near 200K, re-seat boundary near 250K |
+| 1 / 2 | Pending dispatcher fill; no estimate | Offline sync STOP; remaining GREEN rung held |
