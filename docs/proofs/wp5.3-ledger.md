@@ -289,12 +289,12 @@ Wall times are scheduling estimates, not figures of record.
 
 Q8 order, including candidate/refusal coverage omitted from its shorthand:
 
-| Order | Exact queued command | Expected wall time | Outputs under work/wp5.3/ | Actual receipt / read-back (turn 13) |
+| Order | Exact queued command | Expected wall time | Outputs under work/wp5.3/ | Actual receipt / read-back (turns 13-14) |
 |---|---|---|---|---|
 | 1 | `RUN REQUEST: uv run python -m tools.reviewpack.build photos` | about 1 hour, GPU | photos, thumbnails, P-A/P-Z corrected and neutral records, state, logs | On 6d470028, EXIT 0, 673 s, 2026-11-01 22:00:18Z-22:11:32Z; free 171 -> 167 GB. 73 done (64 P-A / 9 P-Z), failed=0, pending=55. |
 | 2 | `RUN REQUEST: uv run python -m tools.reviewpack.build presets` | <1 minute | both preset JSON files, pack-local store and marker, state/log | EXIT 0, 1 s, 22:12:15Z-22:12:16Z; both exported presets present, two page value tables. |
 | 3 | `RUN REQUEST: uv run python -m tools.reviewpack.build page` followed by `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | <2 minutes | page builds index.html and initial sheet, checks links inside; --check is links only | Initial mistakenly queued --check: EXIT 2, index.html FileNotFoundError. Dispatcher then ran page: EXIT 2 in 1 s (pending 55, not finished); subsequent --check EXIT 0. 73 sheet rows / 74 lines, 295 resolving links. |
-| 4 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-P` | reserve about 2.5 hours, provisional; CHARC's allowance is about 27 minutes of source material | 17 whole product clips, IMG_6762.MOV last, pair clips/stills, thumbnails, V-P record, state/logs/cache | RUNNING at dispatcher: receipt starts 22:12:54Z on 6d470028, free 167 GB; real pack stage lock held. No build stage run by cell. |
+| 4 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-P` | reserve about 2.5 hours, provisional; CHARC's allowance is about 27 minutes of source material | 17 whole product clips, IMG_6762.MOV last, pair clips/stills, thumbnails, V-P record, state/logs/cache | EXIT 1, 2,961 s, receipt 22:12:54Z-23:02:14Z, free 167 -> 165 GB. 17 accounted: 8 done with warnings / 9 product failures; failed=9, pending=38. Receipt names 6d470028; instrument unchanged through ef7cbf15. Product audio failures STOP-routed by dispatcher to CHARC; no workaround/retry. Read-back turn 14: all 56 successful artifacts present; page/sheet still post-photos, publication deferred. |
 | 5 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-S` | about 1.5-2 hours, provisional | 26 clips and aids, excerpts where needed, V-S record, state/logs/cache | Not yet returned. |
 | 6 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-D` | about 40-70 minutes, provisional | 8 clips and aids, excerpts where needed, V-D record, state/logs/cache | Not yet returned. |
 | 7 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-Z` | about 10-20 minutes, provisional | 2 candidate clips and aids, excerpt as needed, V-Z record, state/logs/cache | Not yet returned. |
@@ -383,7 +383,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 4 / turn 10 / A4 terminating clean-up | same session 4 | 217,380 | Dispatcher supplied at turn 11; committed 2a1e15b1; session 4 retired. Reviewer B executed and returned NO_NEW_CRITICAL_MAJOR. |
 | Session 5 / turn 11 / Reviewer B remediation | fresh session 5; dispatcher to fill ID | dispatcher pending | B-F1/B-F2 RED/GREEN, verification and write-audit correction; YIELD for dispatcher-run real build. |
 | Session 5 / turn 12 / B-F1 completion | same session 5 | dispatcher pending | Conflict page/stderr pair identities completed; STOP for ruling on existing failed-excerpt cleanup versus blanket deletion ban. |
-| Session 5 / turn 13 / RUN REQUESTs 1-3 read-back | same session 5 | dispatcher pending | CHARC exemption confirmed; real photo/preset/page text and output existence read-only audit, exemption regression and non-slow checks. |
+| Session 5 / turn 13 / RUN REQUESTs 1-3 read-back | same session 5 | 191,145 | Dispatcher supplied at turn 14; session 5 retired. CHARC exemption confirmed; real photo/preset/page text and output existence read-only audit, exemption regression and non-slow checks. |
+| Session 6 / turn 14 / clips V-P read-back | fresh session 6; dispatcher to fill ID | dispatcher pending | V-P completed records/media-file existence read-only audit; 8 done / 9 product refusals already STOP-routed; non-slow checks only while V-S runs. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -2323,3 +2324,113 @@ earlier STOP is resolved by the confirmed exemption; **no new STOP**. Orders
 3 and 9 now explicitly build with page, then check links with page --check.
 **YIELD for the next dispatcher RUN REQUEST receipt**; V-P and later clips,
 final report/gate and the owner's CP5 judgement remain at their assigned seats.
+
+## Session 6 / Turn 14: read-back of clips V-P
+
+### Boundary and evidence
+
+Fresh **session 6** starts on **ef7cbf15**. Session 5 retired at the
+dispatcher-supplied **191,145 depth_input_tokens**. **Session-6 ID and turn-14
+depth_input_tokens: dispatcher to fill; no estimate.** Reviewer A remains
+CONVERGED at round 4; Reviewer B returned NO_NEW_CRITICAL_MAJOR and its findings
+are closed. This turn changes only this ledger; no instrument or product repair.
+
+**STOP [PRODUCT, already routed by dispatcher; no instrument finding].
+Recommended disposition:** retain all nine failures and the product's exact
+messages, keep the product repair with CHARC, and introduce no workaround,
+retry or product change in WP5.3. The dispatcher reports a PCM audio irregular
+packet-size correlation from its own source probes; this cell did not read
+those sources or independently reproduce that causal hypothesis.
+
+Read-only completed evidence: **records/V-P.json**, the V-P rows of
+**records/pack.json**, **logs/V-P.log**, index.html, README.md, review-sheet.csv,
+and named clip/pair/still/thumbnail existence and nonzero size. Receipts are
+**orch-g32/wp53-runs/summary.txt** and **clips-V-P.log**. No media was opened or
+decoded. No agent judged an image. V-S runs at the dispatcher's seat and holds
+the real pack stage lock; no stage was invoked and no active V-S sidecar/log
+was read. The pack snapshot is read atomically once; V-P rows and the completed
+raw V-P record are unchanged at the end of the audit.
+
+The worktree-only ignored **work/wp5.3/turn14/readback.py** writes
+**readback-final.log/.exit**, **readback-summary.json**, **vp-checks.csv** and
+**readback-findings.json**. Final read-back exit **0**, findings **[]**.
+Snapshot SHA256:
+**754d85619e402e114df9eecad7e4b6a641b41e02c718b3306a9e4140bb155b0f**.
+
+### Per-check results
+
+| Check | Observed result |
+|---|---|
+| Catalog and completed item counts | pack.json retains **128 rows**; V-P has all **17 exact commissioned names**, **8 done / 9 failed**. Raw runner counts are **8 done with warnings / 9 failed / 0 cancelled / 0 not run**. |
+| Completed names | IMG_6702.MOV, IMG_6716.MOV, IMG_6717.MOV, IMG_6727.MOV, IMG_6728.MOV, IMG_6734.MOV, IMG_6745.MOV, IMG_6762.MOV. Each normalized output identity equals its raw product output; record_name=V-P.json, runner_exit_status=1. |
+| Product pose and warnings | c3, shipped defaults, force_cpu=false; all 17 report GPU. Every successful clip reports hevc_nvenc. The eight successful items carry the product's mebx data-track warnings, preserved through _safe_text; no warning is treated as failure. |
+| Successful artifacts | **8 product MP4s + 8 pair MP4s + 24 pair stills + 16 thumbnails = 56 files**, all present and nonempty under the named subfolders. Stills are 10/50/90 percent. Every item is whole, with excerpt=false and actual_start_s=0. **No viewing_aid_failed or aid_message** on any V-P row. |
+| Order and log | Raw indices exactly match select.VIDEO_P; IMG_6762.MOV is **17/17**, confirmed by the final Saved log line. V-P.log records exit_status=1, informal runner wall_s=2706.281, all 17 result lines and all nine failure messages. |
+| Failed identities and messages | All nine pack messages equal **_safe_text(raw failure) and the raw failure verbatim**, including rational timestamp ratios. No failed item has a corrected/pair/still identity, product output file in clips/, sheet row or media link. Exact messages below. |
+| Publication deferred, not an instrument defect | **index.html and review-sheet.csv remain the post-photos snapshot**: Pending 55 (V-P=17 included), **73 photo sheet rows**, zero V-P sheet rows, no V-P media links. Not built lists V-P names as pending, so the new failure text and successful links are **not yet published**. The dispatch expressly permits this stale-page state. Per-item page links, sheet identity and status flags must be read back after the later page stage; they are not claimed verified here. |
+| Published links and answers | All **295 distinct published relative targets resolve** under the pack; no rooted/external/traversal link. All owner/status answer cells in the existing sheet are blank; no agent answer. |
+| Current pending state | **38**: V-S=26, V-D=8, V-R=2, V-Z=2; V-P has no pending row. These are the captured records' counts while V-S runs, distinct from the stale page's 55. No final pack completion or CP5 handoff claimed. |
+| Privacy | Page, sheet, README, captured pack.json and completed V-P.json: **0 full-path candidates, 0 GPS/EXIF mentions**, hence no value-bearing fragment to adjudicate. File names only; no footage traversal or metadata read. Runner logs/seat receipts remain diagnostics outside these publication surfaces. |
+| Seat receipts | clips V-P EXIT **1**, **2,961 s**, 22:12:54Z-23:02:14Z, free **167 -> 165 GB**. Completion text: 17 accounted / failed=9 / pending=38. Receipt head is 6d470028; dispatch confirms unchanged tool through ef7cbf15. These are informal build receipts, not EXCLUSIVE performance figures. |
+
+### Nine product failures, already STOP-routed
+
+Each message below is the product failure string itself, unchanged in the pack
+record. These are **failed**, not HLG-refused rows; "product refusals" in the
+dispatch/commit subject refers to the product declining the finished export.
+There is no instrument retry or silent whole-input fallback.
+
+| Item | Product text (verbatim) |
+|---|---|
+| IMG_6729.MOV | IMG_6729.MOV: The finished video does not match what was written: audio stream 0: packet 119 at 24217/9600 s where the source has 120797/48000 s |
+| IMG_6731.MOV | IMG_6731.MOV: The finished video does not match what was written: audio stream 0: 99 packets in the output where 100 of the source's 100 were to be copied |
+| IMG_6733.MOV | IMG_6733.MOV: The finished video does not match what was written: audio stream 0: packet 72 at 192/125 s where the source has 18247/12000 s |
+| IMG_6735.MOV | IMG_6735.MOV: The finished video does not match what was written: audio stream 0: packet 72 at 192/125 s where the source has 36361/24000 s |
+| IMG_6736.MOV | IMG_6736.MOV: The finished video does not match what was written: audio stream 0: packet 119 at 20191/8000 s where the source has 20143/8000 s |
+| IMG_6738.MOV | IMG_6738.MOV: The finished video does not match what was written: audio stream 0: 77 packets in the output where 78 of the source's 78 were to be copied |
+| IMG_6741.MOV | IMG_6741.MOV: The finished video does not match what was written: audio stream 0: packet 143 at 145277/48000 s where the source has 144989/48000 s |
+| IMG_6742.MOV | IMG_6742.MOV: The finished video does not match what was written: audio stream 0: packet 72 at 192/125 s where the source has 6069/4000 s |
+| IMG_6760.MOV | IMG_6760.MOV: The finished video does not match what was written: audio stream 0: packet 143 at 36289/12000 s where the source has 36217/12000 s |
+
+### Verification loop, light checks and yield
+
+Suspect record/media mismatch -> independently compare raw runner facts,
+normalized V-P rows and 56 named files -> **rejected**, all agree. Suspect loss
+of failure text or denominator -> all nine exact messages retained, no false
+success or failed sheet row, 128 catalog rows / 38 pending -> **rejected**.
+The initial scratch audit expected a failure sentence without its source-name
+prefix; inspecting the actual raw strings rejects that **audit false positive**.
+The scratch assertion now includes the prefix; no committed code changed.
+Suspect unpublished V-P results -> confirmed stale page/sheet, **expected and
+explicitly permitted** until page, recorded as a deferred check rather than a
+defect. Repeat read-back and non-slow checks -> **no instrument finding**.
+
+PowerShell sets PYTHONPATH=scripts and retains the mandatory sandbox mkdir shim.
+No slow node runs while V-S is active. All runner output and exit sidecars stay
+under this worktree's **work/wp5.3/turn14/**:
+
+```text
+uv run pytest -q tests/test_reviewpack.py -m "not slow" --basetemp=work/wp5.3/tmp/t14 -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp5.3/turn14/non-slow.xml
+uv run ruff check tools/reviewpack tests/test_reviewpack.py
+uv run ruff format --check tools/reviewpack tests/test_reviewpack.py
+uv run mypy
+uv run python work/wp5.3/turn14/readback.py
+```
+
+- **non-slow.log/.xml/.exit:** **176 passed, 1 deselected in 44.00 s**, exit 0.
+  The existing slow tiny all-stage test is deselected; no test/marker changed.
+- **ruff.log/.exit:** All checks passed, exit 0.
+  **format.log/.exit:** 6 files already formatted, exit 0.
+  **mypy.log/.exit:** Success: no issues found in 151 source files, exit 0.
+- **readback-final.log/.exit:** 17 evidence rows, 56 successful artifacts,
+  zero instrument findings, exit 0. The inherited VIRTUAL_ENV mismatch warning
+  is ignored by uv; no other environment was targeted.
+- Final diff/byte audit: only this owned ledger changes, **0 CR**, whitespace
+  clean. No code, test, config, dependency, fixture or product edit.
+
+No writes under the main working folder, no real build invocation, no footage
+read, no other-worktree access, media judgement, mailbox post, git mutation or
+commit. The nine product failures remain the dispatcher's existing STOP to
+CHARC; no new instrument STOP. **YIELD after the V-P read-back**. V-S and later
+pieces, page publication read-back, report, final gate and owner CP5 judgement
+remain at their assigned seats.
