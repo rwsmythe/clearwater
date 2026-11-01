@@ -200,7 +200,7 @@ pipe, or PyAV in-process) is WP2.1's, now with Result 1's pipe measurement as it
 | Gain caps (Result 4) | **keep (recommended)** / drop | WP1.4b | **DECIDED 2026-10-20 ~16:00Z: keep** |
 | Chapter handling in v1 | keep / defer | inventory b1fd289 | CLOSED 2026-10-19: deferred to v2, spec v0.5.3, plan v1.1 |
 | Anything relaxing a mandatory requirement | none proposed beyond N6 | -- | none |
-| Photo size limit (Result 2) | only if the largest photo exceeds 16 GB on CPU | Part B photo leg | PENDING photos; not expected |
+| Photo size limit (Result 2) | only if the largest photo exceeds 16 GB on CPU | Part B photo leg | **CLOSED 2026-11-01 (WP3.6P 5d, accept `f1733802`): the largest owner photo (IMG_6690.HEIC, 5712 x 4284, about 24.5 MP) at 16 bits with the c3 defaults: GPU leg device peak 4.11 GB of 8.59, process-tree RSS peak 1.93 GB, 11.3 s; forced-CPU leg RSS peak 3.14 GB, 58.4 s; both under 16 GB RAM and the 8,188 MiB device limit; admission estimate 6.13 GB (1.5x the GPU peak, a WP5.2 question). No photo size limit is needed for the owner's photos; no 48 MP claim is made.** |
 
 ## Design items decided by the architect from this gate (plan section 9)
 

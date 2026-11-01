@@ -179,6 +179,16 @@
   gate, accept. At its accept MINE: AD-13 NOTE (both starter presets value-identical in v1; the owner may diverge
   Scuba at CP5); a row for A2 (uncaught PyCMSError on a mismatched profile) unless caught; then the pack + sheet go
   to the OWNER for CP5 (look check and V2 are OWNER-reserved; I write `docs/proofs/cp5-visual-review.md` after).
+  (5a) **WP3.6P ACCEPTED 20:42Z (main `f1733802`, record `docs/proofs/wp3.6p-accept.md`; gate with WP-T7's flags:
+  parallel 6,255 / 1 in 481 s, serial ALONE 1,231 / 11 in 1,823 s, no timeout, no stall; B executed E1-E3, B-1 /
+  B-2 fixed in `6e4b68cc`). MY QA 20:45Z: 6 paths (no `src/`), 0 CR, record matches the report. MY ROWS (this
+  commit): AD-24 CONFIRMED (decisions.md); DR-42 (a) witness absent / (c) retargeted; DR-43 real-file note (0
+  drops); NEW DR-110 (EXIF ColorSpace 1 read as untagged, 9 owner JPEGs, spurious G10 warning); the Phase 1 gate
+  report's Result 2 photo row CLOSED with the 5d figures (its working copy was CRLF: normalised to LF, blob LF).
+  SPEC ITEMS for the owner's next revision bundle (NOT yet raised; bundle at the Phase 5 close with CP5): D63's
+  'provisional until an owner photo is read' wording -> confirmed (AD-24); the owner-input line 'Photo resolution
+  (24 MP or 48 MP)' -> 24.5 MP max on the owner's photos. Worktree `.worktrees/wp3.6p` released to gen 32.
+  Register through DR-110.
   (5) **WP3.6P** (Codex session 3; A converged R3 (reasoned only; convergence CONDITIONAL on an executing B, my
   88ed545f); 5b-r2 CLOSED 62/62: 50 discriminating, 12 inconclusive, 0 discordant, 7 oracle-rounded; Q4 and 5c-8
   EXIT 0). Owed: 5c-16 (16-bit export, ~45 min / 3.8 GB) and 5d (memory), each EXCLUSIVE, opened / closed to you;
