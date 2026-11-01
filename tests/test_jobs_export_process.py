@@ -689,6 +689,25 @@ def test_a_scratch_folder_that_cannot_be_made_names_the_error_type_only(
             "a progress total too large for a float (B-1)",
             id="total-overflow",
         ),
+        pytest.param(
+            b'{"progress": [2147483648, null, "a"]}',
+            "a done of 2**31 (CHARC bc6847dd)",
+            id="done-2to31",
+        ),
+        pytest.param(
+            b'{"progress": [1, 2147483648, "a"]}',
+            "a total of 2**31 (CHARC bc6847dd)",
+            id="total-2to31",
+        ),
+        pytest.param(
+            b'{"progress": [5, 4, "a"]}', "done over total (CHARC bc6847dd)", id="done-over-total"
+        ),
+        pytest.param(
+            b'{"progress": [-1, 4, "a"]}', "a negative done (CHARC bc6847dd)", id="negative-done"
+        ),
+        pytest.param(
+            b'{"progress": [0, -1, "a"]}', "a negative total (CHARC bc6847dd)", id="negative-total"
+        ),
     ],
 )
 def test_an_invalid_line_is_ignored_and_logged(
@@ -708,6 +727,59 @@ def test_an_invalid_line_is_ignored_and_logged(
     assert result.ok, (why, result.failure)
     assert progress.reports == [(3, 4, "valid")], why
     assert any("ignored" in m for m in _messages(caplog, PROCESS_LOGGER)), why
+
+
+def test_progress_at_the_bound_is_forwarded(tmp_path: Path) -> None:
+    """CHARC bc6847dd: 0 <= done <= total <= 2**31 - 1 is forwarded; a null total bounds done."""
+    command = _child(
+        tmp_path,
+        """\
+        send({"progress": [0, 0, "empty"]})
+        send({"progress": [2147483647, None, "open"]})
+        send({"progress": [2147483647, 2147483647, "full"]})
+        result()
+        """,
+    )
+    result, progress = _run(tmp_path, command)
+    assert result.ok, result.failure
+    assert progress.reports == [
+        (0, 0, "empty"),
+        (2147483647, None, "open"),
+        (2147483647, 2147483647, "full"),
+    ]
+
+
+def test_ignored_progress_lines_are_logged_once_per_job(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """CHARC bc6847dd: a rejected progress line is logged once per job at WARNING, the job goes
+    on; another kind of ignored line is still logged each time."""
+    caplog.set_level(logging.DEBUG)
+    command = _child(
+        tmp_path,
+        """\
+        send({"progress": [5, 4, "over"]})
+        send({"progress": [-1, 4, "negative"]})
+        send({"progress": [1, 2, 3]})
+        send({"bogus": 1})
+        send({"progress": [2, 4, "valid"]})
+        result()
+        """,
+    )
+    jobs = _jobs(tmp_path, command)
+    for _ in range(2):
+        caplog.clear()
+        progress = _Progress()
+        result = jobs.job(_request(tmp_path))(progress)
+        assert result.ok, result.failure
+        assert progress.reports == [(2, 4, "valid")]
+        warnings = [
+            r.getMessage()
+            for r in caplog.records
+            if r.name == PROCESS_LOGGER and r.levelno == logging.WARNING
+        ]
+        assert len([m for m in warnings if "progress line ignored" in m]) == 1, warnings
+        assert len([m for m in warnings if "unknown key" in m]) == 1, warnings
 
 
 def test_an_unknown_key_is_logged_by_its_length_and_first_8_characters(
