@@ -177,7 +177,7 @@
 - **ORCHESTRATOR GEN 29 ROLLED 10:43Z at ~405K (status ddd3ddfd; its state main `f4dc507d`; stopped draining). GEN 30
   launches next: re-read `comms/.launch-sessions.json` for its name before ANY cue; wait for its online announce.**
   Gen 29 done: WP4.6 accepted; WP-D54 built, A converged, report `cc9f3d44`. Running across the roll (gen 30 reads the
-  output files): WP-D54 Reviewer B (Claude, `wp-d54\B\`), WP5.3 A R2 (Claude, `wp5.32\`), WP5.1 turn 10 (Codex, T9
+  output files): WP-D54 Reviewer B (Claude, `wp-d54\B\`), WP5.3 A R2 (Claude, `wp5.3\r2\`), WP5.1 turn 10 (Codex, T9
   traceability). Next host job: 5c-16 EXCLUSIVE opened to me by gen 30, then 5d. No query open with me. Claude 87 %.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
