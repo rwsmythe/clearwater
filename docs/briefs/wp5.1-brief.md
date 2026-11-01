@@ -201,3 +201,35 @@ RE-SEAT CONCURRED: a FRESH Codex session from the committed ledger for T2 onward
 - **Scheduling:** run requests and the gate's three legs run with no EXCLUSIVE window open and no WP5.3 build piece running; the orchestrator schedules.
 - **Concurrent work:** WP3.6P (Codex, `.worktrees/wp3.6p`), WP5.3 (Codex, `.worktrees/wp5.3`) and WP4.6 (Claude, `.worktrees/wp4.6`) are live. Never read or write another worktree; WP3.6P's and WP4.6's accepts land on main during this package and touch no file it owns.
 - **Depth:** the orchestrator reads the turn footer's `depth_input_tokens` and gives it to the cell at the next turn; the ledger keeps a depth table. Evaluate at about 200K; STOP at a step boundary near 250K.
+
+## T6-1 ruling (CHARC `3a1497d6ceb21355`, 2026-11-01T09:41:37Z, verbatim; binding)
+
+> RULING on f5968b21 (WP5.1 T6-1, D54 warning words), PRIMARY: CHARC. (1) and (2) CONCURRED: a PRODUCT defect against spec 5.4 / D54 / V6 (the user-facing warning never says BT.709 or limited range; the probe fault that does is not forwarded). WP5.1's node and its literal assertion stay untouched and red until the fix lands; WP5.1 continues T6 / T7 meanwhile.
+>
+> WP-D54 (you draft the mini-brief from this message; no architecture pass needed, no tripwire; Codex lane; STRONG tier because it is product code; fast reviewer form acceptable for a one-sentence change if the fill allows it, else STRONG):
+> - Files owned: `src/clearwater/io/video/encode.py` (the assumed-tags warning text at :670-674 ONLY) and the unit test(s) that assert that text (`tests/test_io_video_encode.py`, the matching rows only). Nothing else; `probe.py` and `jobs/export.py:864` unchanged (one warning, owned by the encoder layer, as you recommend).
+> - The text, VERBATIM: "The source's colour tags are missing or unexpected; Clearwater assumed BT.709 colours and limited range, and the output is tagged with those values (color_primaries bt709, color_trc bt709, colorspace bt709, color_range tv)." The codes stay for the record; the plain words lead. If the warning is also raised for the "unexpected" case with other assumed values, the sentence names whatever values were assumed, and "BT.709 colours and limited range" appears whenever those are the assumed values.
+> - Done: ruff / format / mypy; the encoder unit rows green; WP5.1's `test_v6_untagged_runner_warns_bt709_limited` green on a WP5.1 candidate rebased over WP-D54 (your seat may run that one node from the wp5.1 worktree after the merge; a figure of nothing, so not a window); Reviewer A one round; Reviewer B the Claude pass (under the 92 % rule; if held, WP-D54 waits at the gate, WP5.1 is not blocked by it); two-leg gate; accept. Register at the accept (mine): NEW DR-102 "D54 warning carried FFmpeg codes, not the spec's words; found by WP5.1 G4; closed by WP-D54".
+> - Shell half: your reading noted (the open path shows the probe's fault text with both words, unverified). T8 proceeds; a STOP there is separate.
+>
+> Depth 120,480 and the G2 footage RUN REQUEST at your seat noted. Claude 86 %.
+>
+> Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
+
+## T6-2 ruling (CHARC `2bd14e3a90ed741d`, 2026-11-01T09:51:05Z, verbatim; binding; it GOVERNS G5's bound and the serial budget)
+
+> RULING on 7fde0ffb (WP5.1 T6-2, V9 post-encode bound), PRIMARY: CHARC. (a), (b), (c) CONCURRED; not owner-reserved (a test characterisation constant of a leg the brief introduced; AD-11's figures untouched; spec V9 for a lossy MP4 reads "within the encoder's quality").
+>
+> - G5's bound = a NEW constant in WP5.1's own module, `RUNNER_POSTENCODE_MEAN = 3.5` (1/255 units), per sample, at the SHIPPED defaults (libx265, quality `standard`, 8-bit except hevc10); max RECORDED, not asserted; the docstring says it is a characterisation bound set from the 2026-11-01 measurement (2.79-2.95 at 8 bits, 2.47 at 10 bits) and names `PAIR_MEAN_SYNTHETIC` 2.5 as the encoder-free pair it sits above. `test_color_roundtrip.py` unchanged.
+> - POSITIVE CONTROL, RED-first: the same decoded output with a planted +4/255 offset on one channel fails the bound by name (a decode-as-full-range control is also acceptable if it is deterministic on these fixtures; one control suffices).
+> - ONE recorded characterisation, not asserted: the hevc8 sample once more at `--quality high`, its mean in the report beside the `standard` figure (evidence that the codec is the share; a few seconds).
+> - AD-11 NOTE at the accept (mine): both figures and the sentence "V9's AD-11 bound binds pre-encode; the runner's post-encode leg is characterised at 3.5/255 mean at the shipped quality".
+> - Brief Q4's "any tolerance change goes in the report" is satisfied by this ruling; the report cites it.
+>
+> Serial-leg budget (the cell's 191.68 s note): the 180 s was for the package's whole serial addition and T6 alone exceeds it. RULED: the budget becomes 300 s for the package (the floor is the serial leg; +300 s on 1,389 is acceptable at the phase end), no node moves behind `fullclip`, every node stays `slow` with its reason; the actual delta is measured at the gate and reported; over 300 s = report and I rule again. No further STOP on sizing.
+>
+> G2 noted: creation time NOT carried (container tag, mvhd, per-stream) = a V4 best-effort item recorded; the report cites where WP3.10 / WP4.4 documented it as a known limitation (D105); if neither did, say so and I add the Limit line at the accept.
+>
+> Session 3 at 143,997 continues. Claude figure with the next post, please.
+>
+> Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
