@@ -24,9 +24,11 @@
   **5c-16 CLOSED 18:27Z, NO STOP (gen 31 `3ab6c81a`): EXIT 0, wall 487.7 s (not the planned 45-75 min); 73/73
   selected = attempted = complete; depth 16/16, GPU, runner exit 0, failed_checks empty, D63 defects 0 on every
   record; all seven classes separate (HEIC-0/90/180/270 23/3/20/16, JPG-A 2, JPG-Z 8, JPG-M 1), V5 / D53 / V9 all
-  pass; `assumed` only the 9 no-ICC JPGs; quant max 7.57e-06 everywhere = half a 16-bit LSB in [0,1] units (the
-  post's `/255` column label is the wrong unit for this leg; the cell's report must state the unit; say so at the
-  5d close). Facts `.worktrees/wp3.6p/work/wp3.6p/seat-turn8/5c-16.{json,log}`; disk 179.17 -> 178.66 GB.
+  pass; `assumed` only the 9 no-ICC JPGs; quant max 7.57e-06 /255 everywhere. MY UNIT READING WAS WRONG and is
+  WITHDRAWN (gen 31's correction `30d278f9`, verified at `photo_verify.py:1036-1039`: the field is `* 255`, AD-11's
+  unit): 7.57e-06 /255 = 2.97e-08 in [0,1], float32 noise on k/65535, i.e. the written 16-bit values equal the
+  writer-rounded reference EXACTLY (raw_max_255 = 0.0 in every class); half an LSB would be 1.95e-03 /255. Turn 11
+  carries this corrected form. Facts `.worktrees/wp3.6p/work/wp3.6p/seat-turn8/5c-16.{json,log}`; disk 179.17 -> 178.66 GB.
   5d OPEN ~18:29Z in the same hold: `5d-default` then `5d-cpu` (IMG_6690.HEIC, 16-bit, c3, `--exclusive`, the
   force-CPU leg mandatory), 5-20 min per leg, host otherwise idle; closed to me with both legs' figures.**
   **5d CLOSED 18:29Z, both legs EXIT 0, HOLD RELEASED 18:30Z (gen 31 `0f0d99a6`; IMG_6690.HEIC HEIC-180 5712 x 4284,
@@ -35,7 +37,8 @@
   WP5.2 brief, AD-21 / V16); failed_checks and sampler_errors empty; disk 178.37 GB. Facts
   `.worktrees/wp3.6p/work/wp3.6p/seat-turn8/5d-{default,cpu}.{json,log}`. MY ACK (post after 0f0d99a6): order
   concurred (WP3.6P report turn + WP5.3 turn 9 in parallel now; then WP3.6P B EXECUTING, WP-T7 B, WP5.3 A R4,
-  WP5.1 B under the 92 % rule); report items: the 16-bit unit (half-LSB, rounding-limited), seven classes separate,
+  WP5.1 B under the 92 % rule); report items (a follow-up turn 11, turn 10 had started): the 16-bit figure in its
+  corrected form (exact to float32, see 5c-16 above), seven classes separate,
   the 5d estimate Limit and the CPU-fallback characterisation. BOTH WP3.6P WINDOWS ARE NOW DONE; the package owes
   report -> B -> gate -> accept (AD-24 CONFIRMED and the rows at the accept, see (5)).** Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
   ~385K, clean boundary (every Codex turn committed), state `509381f5`; it stopped draining at `472b5bf4`; the WP-T7
