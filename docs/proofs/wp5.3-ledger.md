@@ -5,7 +5,9 @@
 - Package: WP5.3, CP5 visual review pack; Codex implementer lane, STRONG.
 - Verified base and current HEAD at round 0: `2050a89a`; initial tracked diff empty.
 - Turn 1 is task 1 only. No instrument or test code is written this turn.
-- State: **Reviewer A round 1 remediated in turn 5; ready for round 2**.
+- State: **Reviewer A round 2 adjudicated in turn 6; remediation not begun**.
+  Round 1 remediation is committed as `03731250`. Turn 6 changes only this
+  ledger; the blocking RED and bounded instrument fixes are planned for turn 7.
   CHARC's complete F1 ruling is committed in the brief at `abeef516`; no ruling
   remains outstanding. CHARC granted R0-1, R0-2
   and R0-3 in `f99fca742e060f14`, folded into the brief at `b7c95a46`.
@@ -352,6 +354,7 @@ DR-99 is handled only under its stated main-alone equivalence condition.
 | 0 (mapping, not Reviewer A) | 0 / 3 / 1 | 4 / 0 | 4 / 0 | 0 | none / none | R0-1..3 granted at turn 2; R0-4 resolved by CSV copy; uv Python probe exit 0 | 118,603 after turn 1 |
 | Session 2 / turn 3 (GREEN verification, not Reviewer A) | 0 / 6 / 0 | 6 / 0 | 6 / 0 | 0 | instrument fixes / regression additions | Six independently reproduced instrument gaps fixed; 70 nodes green; Reviewer A pending | 142,467 after turn 3 |
 | A1 (session 2 / turn 4 adjudication; turn 5 remediation) | 0 / 3 / 3; 6 advisory | 10 / 2 after adjudication | 12 / 0; accepted blocking 3 | 0 | turn 5: 10 instrument behavior fixes with regression controls; no src/ changes | Counted Claude pass; 10 ACCEPTED fixed under F1 ruling; F10 OUT/banked Limit; F11 REJECTED; ready for A2 | turn 3: 142,467; turn 4: 36,709 (dispatcher supplied) |
+| A2 (session 2 / turn 6, adjudication only) | 0 / 1 / 4; 8 advisory | 11 / 2 | 12 / 1 by distinct finding; F1 NEW path reopens R1 F1 pattern, A1 repeats rejected R1 F11 | 0 | none this turn; planned instrument behavior and regression changes, no src/ or frozen-interface changes | Counted claude -p pass; F1-F5 ACCEPTED with narrowed premises; A3/A7 FIX; A2/A5/A6 BANK; A1 REJECT; A4/A8 DECLINE code change | turn 5: 142,541; turn 6 dispatcher pending |
 
 Subsequent Reviewer A turns adjudicate every finding, update this cumulative table
 and yield without remediation. Fixes belong to a separately dispatched turn.
@@ -365,7 +368,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Turn 2 / RED | session 1, same session | 179,868 | Dispatcher supplied at session-2 dispatch; RED commit 10f1f70b; session 1 retired. |
 | Session 2 / turn 3 / GREEN | fresh session; dispatcher to fill ID | 142,467 | Dispatcher supplied in turn 4; GREEN committed as f506b597. |
 | Session 2 / turn 4 / A1 adjudication | same session 2 | 36,709 | Dispatcher supplied in turn 5; adjudication committed as 0553d317. Figure is recorded verbatim despite its decrease from turn 3; no independent counter is available. |
-| Session 2 / turn 5 / A1 remediation | same session 2 | dispatcher pending | Complete ruling at abeef516; RED-first remediation, then yield for A2. |
+| Session 2 / turn 5 / A1 remediation | same session 2 | 142,541 | Dispatcher supplied in turn 6; remediation committed as 03731250. Session window 475,000; evaluate near 200K and stop near 250K remain binding. |
+| Session 2 / turn 6 / A2 adjudication | same session 2 | dispatcher pending | Ledger-only adjudication; no remediation, real-media run or convergence claim. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -1104,3 +1108,162 @@ uv run mypy
   in the return report change. The final report remains at its later yield.
 
 Turn 5 yields for Reviewer A round 2. No STOP remains under the complete ruling.
+
+## Reviewer A round 2 (adjudicated)
+
+### Candidate, transport, depth and round accounting
+
+- Candidate: **03731250**, independently checked; initially clean. This is
+  session 2 / turn 6, adjudication ONLY. No test or implementation edits.
+- Dispatcher supplied turn-5 depth **142,541** (window 475,000). Recorded without
+  revising the earlier supplied figures. Evaluate around 200K, stop at a step
+  boundary near 250K. Turn-6 depth is for the dispatcher to fill.
+- Transport `claude -p --model opus --effort high`, run by the dispatcher.
+  Seat log: exit 0; model claude-opus-5-5; requested high effort; is_error false;
+  37 turns; VERDICT NEW_CRITICAL_MAJOR_FOUND; worktree clean afterwards. No CLI
+  version is named in that log, so none is inferred. Two permission denials are
+  recorded; the findings identify no denied command or dependency on one.
+  The round COUNTS under the dispatcher's explicit ruling.
+- External review.txt, review-prompt-r2.md and review.seat.log were read in
+  place in the dispatcher's wp5.3/r2 evidence folder, never copied into the repo.
+  Reviewer ran the light tests FIRST: 92 passed in 31.23 s, slow node included;
+  its ruff/format/mypy checks were clean. Dispatcher also reported whole-tree
+  ruff/format (293 files), mypy (151) and LF checks clean on this candidate.
+
+Counts retained: **0 critical / 1 major / 4 minor / 8 advisory**, 11 in-envelope /
+2 nominally out (A1, A2); 0 reverts. Seven accepted findings (F1-F5 plus A3/A7);
+A2 out/banked, A5/A6 banked, A1 rejected, A4/A8 declined as code changes.
+F2/F3/F5 have narrowed accepted premises, as detailed below. No fix this turn;
+planned fixes change instrument behavior and tests, never product `src/`, frozen
+interfaces, dependencies or the runner.
+
+**NEW versus REOPENED:** 12 NEW distinct findings / 1 REOPENED finding (A1 repeats
+the R1 F11 matrix-alias claim, again refuted). F1 DOES reopen R1 F1's silent-loss
+PATTERN in a new path. It is a NEW blocking defect in the finding column: R1 F1
+was failed excerpt -> whole-source fallback; R2 F1 is successful product export
+-> failed viewing aid -> unreviewable row with success exit. Its post-export
+exception branch existed unchanged at f506b597; no earlier aid-failure repair or
+RED control has regressed. The repaired excerpt path still behaves as ruled.
+This distinction is explicit so the dispatcher can assess recurrence without
+counting an unchanged, previously unexamined arc branch as a pre-existing external
+defect. A3 likewise concerns orphaned aid artifacts after a later failure, beyond
+R1 F8's repaired empty helper-directory path.
+
+### Own probes, provenance and execution limits
+
+All own scripts/media/logs are in ignored **work/wp5.3/turn6/** inside this
+worktree. Inputs are committed fixtures and planted copies only. No owner footage
+folder was read/listed/probed, no main-tree work path or other worktree accessed,
+and no image was judged.
+
+- `probes.py` / `probes.log`: independently executes F1-F5 and A1, then stops on
+  an incorrect A2 probe expectation. Invalid ICC bytes raised OSError (caught by
+  the instrument), whereas the probe expected PyCMSError. Exit 1 is retained and
+  disclosed; it is a false probe assumption, not a new product/test-suite failure.
+- `probes-followup.py` / `.log`: independent A2 controls plus A3-A8, exit 0.
+  Invalid bytes again produce caught OSError; a structurally valid LAB ICC profile
+  attached to RGB pixels produces uncaught PyCMSError, confirming the narrower
+  out-of-envelope condition. No source change was made to get that result.
+- F1 runs real headless export on the tiny HEVC fixture, then injects only a
+  make_pair failure. A wrapper adds the EXISTING --encoder libx265 flag to this
+  probe's force-CPU invocation; the resulting record says done/libx265. No direct
+  engine composition and no GPU pair encode. The source remains a planted file.
+- `f4-real.py` / `.log`: confirms F4 with a real V-P export and all its CPU viewing
+  aids after an old planted V-S excerpt_failed row. V-P is done and reviewable,
+  but command returns 1 solely because of V-S. Probe again explicitly selects
+  libx265 through the runner; exit 0 of the probe means its assertions held.
+- A3 actually completes a software pair and extracts two PNG stills, then injects
+  failure at the second browser conversion. The three orphaned files remain.
+  A5 creates only a 3 s, 160x90 synthetic open-GOP HEVC using software encoding;
+  its excerpt fails loudly with no whole-source substitution. This proves the
+  conditional mechanism, not the GOP form or failure rate of any owner file.
+- `origins.py` / `.log`: git log -S, with literal arguments rather than shell
+  quoting, attributes aid-state handling, raw matrix interpolation, ICC conversion
+  and sheet writing to **f506b597**; excerpt_failed and displayed-start guards to
+  **03731250**. The runner's cancellation states originate at **f0786c7b**.
+  All challenged instrument paths are introduced by this arc; none is dismissed
+  as pre-existing. Product states and metadata policy are read-only constraints.
+
+### Per-finding adjudication
+
+| Finding | Verdict / severity / envelope | Own evidence | Planned disposition |
+|---|---|---|---|
+| F1 | ACCEPTED MAJOR, in | EXECUTED: real product result done/libx265; injected pair failure sets reviewable=False and aid_message. clips and page both return0; sheet has0 rows; item absent from Not built. Product link and group-level Viewing aid note DO remain visible, and tally coverage reports expected115/available0/missing115. This is false success/incomplete accounting, not a proved preference arithmetic error or total disappearance from HTML. | Blocking RED and bounded plan below. Keep the product's done fact, make the review failure explicit and loud, preserve required headline arithmetic and missing coverage. |
+| F2 | ACCEPTED MINOR in for BOM; CP1252 claim narrowed | EXECUTED: BOM True before page rebuild, False after; decoded UTF-8 cafe note unchanged. Windows-1252 input raises UnicodeDecodeError with byte184 and no row; CLI catches it and returns2 rather than crashing. CP1252 acceptance is OUT of the commissioned UTF-8 contract. | Terminating cleanup at sheet.py:36/:120: preserve an existing BOM on rewrite; keep strict UTF-8, add row context to invalid-encoding errors, never auto-detect CP1252. Add BOM round-trip and encoding-error controls. |
+| F3 | ACCEPTED MINOR in for over-redaction; reject byte-identity premise | EXECUTED: value-free EXIF/GPS sentences become metadata diagnostic withheld, including a planted complete runner-record warning through _invoke; its file bytes change. A planted EXIF GPSLatitude value is correctly withheld. The runner docstring explicitly permits malformed tag values in reader failure texts, so unsanitized byte-identical records are NOT safe or required by the brief. | Terminating cleanup at build.py:39-59/:885-893: preserve allowlisted static/value-free diagnostic forms, still redact values/paths; avoid rewriting a harmless record when sanitization makes no semantic change. Never retain an unsafe raw record in the pack. |
+| F4 | ACCEPTED MINOR, in | EXECUTED twice: controlled clean V-P stage and a real successful/reviewable V-P fixture export both exit1 with an old V-S excerpt_failed in state. A pending-only page says128 items accounted for while all128 remain pending. | Terminating cleanup at build.py:1185-1192: compute media-command failures/counts from this invocation's attempted items; page reports pack-wide built/failed/pending coverage separately. Pending does not count as completed or cause an error by itself. |
+| F5 | ACCEPTED MINOR, in, premise narrowed | EXECUTED: not run with failure=None maps to failed/empty. A producer-compatible cancelled record (failure=cancelled) maps to failed/cancelled, so the claim that normal cancelled records have empty text is refuted. batch.py:38-44 and headless_export.py:1044-1056 establish that real producer constraint. | Terminating cleanup at build.py:259-260: preserve not run/cancelled states and supplied messages; add an accurate runner-state explanation only when text is absent; include these states in the not-built accounting. No invented cancellation cause. |
+| A1 | REJECTED ADVISORY, nominally OUT; REOPENED R1 F11 | EXECUTED: real scale commands with raw bt470bg AND bt2020nc both exit0 on installed FFmpeg, contrary to would refuse. R1 already refuted bt470bg; this probe independently checks both names. Origin f506b597, not external code. | DECLINE matrix expansion; no debt for the disproved rejection claim. |
+| A2 | OUT OF ENVELOPE / BANKED ADVISORY | EXECUTED: invalid ICC bytes give caught OSError; inconsistent LAB ICC on RGB gives PyCMSError outside the catch tuple. Valid commissioned product/fixture profiles do not require malformed-profile support. Origin page.py ICC conversion f506b597. | BANK with instrument maintainer/CHARC; trigger: malformed or inconsistent profile derivatives enter a future commissioned set. No current repair or severity escalation. |
+| A3 | ACCEPTED ADVISORY, in | EXECUTED: failure at the second still conversion leaves source/corrected temporary PNGs and a completed unreferenced pair. Partial NVENC MP4 residue remains REASONED from make_pair's lack of failure cleanup; no GPU failure was executed. | FIX in terminating cleanup at build.py:961-1010/:762: track artifacts created by this attempt, guard and remove only failed-attempt temporary/partial aids, preserve sources, product outputs and earlier successful artifacts. No broad directory prune. |
+| A4 | ACCEPTED observation, ADVISORY in; code change DECLINED | EXECUTED plan arithmetic: duration47 -> start18.8/length30/end48.8. EOF truncation consequence REASONED; follows the literal commissioned rule and actual duration is recorded. | DECLINE changing selection arithmetic. Disclose planned versus actual duration in the later report; only CHARC/owner may amend the commissioned test interval. |
+| A5 | BANKED ADVISORY, in, conditional | EXECUTED synthetic open-GOP excerpt -> excerpt_failed, displayed start differs from retained video start, path is not source. No owner GOP was read, so every GoPro fails is unproved. The displayed-start guard originates at03731250 and enforces the ruling. | BANK with CHARC/orchestrator for first V-S RUN REQUEST: inspect excerpt success/failure counts before scheduling the remaining clip pieces; route failures with evidence. Never relax the guard or silently run whole. |
+| A6 | BANKED ADVISORY, in, conditional future need | EXECUTED CLI help has no named whole override; a long V-S item still plans an excerpt and manifest identities cannot be reassigned. No authorized named whole RUN REQUEST is currently pending. | BANK with CHARC/orchestrator; trigger: an explicitly authorized whole-long-clip request. Obtain a bounded instrument invocation/override commission then; do not bypass the pack or add an unsolicited general override now. |
+| A7 | ACCEPTED ADVISORY, in | EXECUTED: undecided -> judged1/preferred0; page omits that explanation. Yes, leading-space yes and YES each return2 naming row2. Literal lower-case validation and counting are correct under the existing RED controls. | FIX page.py instructions once: blank means unjudged; yes/no/undecided count as judged; only yes preferred; exact lowercase values. Arithmetic and parser stay unchanged. |
+| A8 | ADVISORY noted; code change DECLINED, in | EXECUTED: valid undecided/empty sheets exit0; invalid maybe exits2 naming row2. The original explicit RED node test_tally_cli_valid_scores_exit_zero_and_invalid_sheet_exit_two and Q7 strictness already require this behavior; no score-based pass/fail exit exists. | DECLINE changing invalid-input status. Clarify usage in later report: valid tallies always0; invalid CSV is an input error2. Do not weaken strict validation or alter judgement-free scores. |
+
+### F1 blocking RED for turn 7 and fix boundaries
+
+Planned nodes, not written or run this turn:
+
+1. **test_done_item_with_failed_aid_is_loud[photo/video]**: plant the committed
+   JPEG and tiny HEVC under commissioned names, complete schema-1 done runner
+   results and actual product artifacts. Inject only thumbnail/pair failure at
+   the external viewing boundary. Assert the product result remains done and
+   linked; reviewable=False with the exact safe aid_message; photos/clips returns
+   nonzero; later selected items/groups still run; page writes valid HTML with
+   the item and aid reason under Not built (or its explicit unreviewable bucket)
+   and returns nonzero. No pretend vote or correction failure is introduced.
+2. **test_aid_failure_coverage_preserves_d65_arithmetic**: one valid yes row and
+   one done-but-unreviewable headline item, with no prior owner votes on that
+   failed pair. Assert only the reviewable row is emitted (Q7), headline stays
+   1/1 =100.0 percent, catalog expected115/available1/missing114, and failed-aid
+   inventory/coverage is explicit on the page. Never put unviewable items into
+   judged, preferred or no, never substitute115 for the mandated judged divisor.
+3. **test_page_lists_aid_failure_when_sheet_refuses_stale_pair**: plant an existing
+   answered row, then a current unreviewable item. Assert existing owner CSV bytes
+   remain unchanged, the command is nonzero and the current page clearly exposes
+   the failed aid and retained-sheet condition. The existing sheet-preservation
+   guard must not silently transfer or erase a vote to achieve completeness.
+
+Fix anchors: build.py:1104-1110 keeps the product status separate from review
+readiness; page.py:117-164 makes the failed review state and safe aid reason
+explicit alongside the product link and under Not built; sheet.py:103 continues
+one row per REVIEWABLE item, using the existing missing coverage rather than
+fabricating a denominator. build.py:1185-1192 ties exits to attempt scope (F4).
+Ensure a sheet-preservation error cannot hide the current failed-aid page.
+
+**Subcommand policy to implement and test:** photos/clips/all return nonzero for
+failures among items attempted by that invocation (including failed viewing aids
+and excerpts; expected HLG refusals remain accounted items). A clean later media
+piece does not inherit another piece's old failure exit. Page writes the current
+failure inventory, then returns nonzero when that rendered pack has known build /
+viewing-aid failures; pending-only partial packs remain valid. Page --check stays
+the link-check operation; presets is unaffected; valid tally always returns0.
+This applies the R1 loud-excerpt policy consistently rather than inventing votes
+or substituting whole inputs. The earlier excerpt regression's page-exit0
+expectation will need a **named contract-clarification step**, keeping its existing
+record/skip/link/no-vote checks, rather than an unexplained assertion change.
+No frozen or product interface must change and no STOP is required for this plan.
+
+### Light baseline and yield
+
+Own unchanged-candidate command (PowerShell sets PYTHONPATH=scripts):
+
+```text
+uv run pytest -q tests/test_reviewpack.py --basetemp=work/wp5.3/turn6/baseline-tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 --junitxml=work/wp5.3/turn6/baseline.xml
+```
+
+Result **92 passed in53.03 s**, exit0; JUnit confirms92 nodes, zero failures,
+errors or skips. Largest parallel-node aggregate2.014 s (failed-excerpt/later-group
+control); sole slow integration36.907 s. No marker change is needed. Baseline
+uses the required tiny force-CPU control; its automatic product encoder can use
+NVENC as previously disclosed. Own F1/F4 evidence explicitly pins libx265;
+all direct aid/GOP encodes were software. No real-media/heavy job or new GPU
+quality measurement was run. Baseline/log/status/probe evidence remains ignored.
+
+No tests were added and no remediation occurred. No full gate, new review,
+real-media RUN REQUEST, product/interface/config edit, mailbox post, commit/git
+mutation, footage read, other-worktree access or image judgement. Only this
+ledger changes. Final diff/LF/ownership checks are recorded before return.
+Turn6 YIELDS; turn7 owns the blocking RED and authorized instrument remediation.
