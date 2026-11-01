@@ -170,11 +170,20 @@ candidate rebased onto main, and records the actual output lines):
   full-GX011627 forms of the seven gate tests; the trim forms stay in the serial leg):
   `uv run pytest -q -rs -n 4 --timeout 600 -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/pytest-gate-RUN-parallel`,
   then `uv run pytest -q -rs --timeout 1200 -m "(gpu or footage or gui or slow) and not fullclip" --basetemp=work/pytest-gate-RUN-serial --durations=0 --junitxml=work/pytest-gate-RUN-serial.xml`.
-  STANDING RULE (your fill, effective now): while a gate's SERIAL leg runs, NO other pytest invocation of any size runs on this host, at any seat or in any sandbox (a Codex light suite included); the gui nodes are timing-sensitive and the leg is the figure of record. Codex turns that need their light suite wait for the leg or run before it.
-  A thread timeout dumps stacks and exits the process (under xdist, the worker crash is
+  Capture each leg's stderr as well as stdout (`> work/<log> 2>&1`, or stderr to its
+  own file): under `-n 4`, the earlier core faulthandler dump on stderr is the only stack.
+  STANDING RULE (your fill, effective now): while a gate's SERIAL leg runs, NO other pytest invocation of any size runs on this host, at any seat or in any sandbox (a Codex light suite included); the gui nodes are timing-sensitive and the leg is the figure of record. Codex turns that need their light suite wait for the leg or run before it. (CHARC 97d5abbf, 2026-11-01)
+  A thread timeout dumps stacks and exits the process once its timer can acquire the
+  GIL (a native GIL-holding deadlock defers it; only the 300 s faulthandler dump on stderr
+  and the stall watch catch that case, with the stall watch providing the STOP and the
+  dump its stack); under xdist, the worker crash is
   reported and remaining tests can finish, but the worker's dump may be absent from the
-  parent log, so preserve the earlier core faulthandler dump); a timed-out leg is a STOP
+  parent log, so preserve the earlier core faulthandler dump; a timed-out leg is a STOP
   with the node and the stacks, followed by a re-run of the leg after the fix.
+  `timeout_func_only` leaves every fixture (session and function, setup and teardown)
+  un-timed: a fixture hang gets the faulthandler dump and the stall watch, not a test failure.
+  Faulthandler dumps from legitimately long nodes (fullclip or slow session trims) are
+  diagnostic noise, not failures; a dump alone is not a STOP.
   **FULLCLIP** (`uv run pytest -q -rs --timeout 2400 -m "fullclip" --basetemp=work/pytest-gate-RUN-fullclip --durations=0`, no `-n`,
   about 26 min) runs at least ONCE per phase-end gate report and whenever a package brief asks
   for it; a per-package gate does not run it. The trim forms prove V4 MANDATORY and REQUIRED;

@@ -6,20 +6,32 @@ import os
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
-def _run_inner(root: Path, sleep_seconds: float) -> tuple[subprocess.CompletedProcess[str], float]:
+def _run_inner(
+    root: Path, sleep_seconds: float, *, fixture_sleep_seconds: float = 0.0
+) -> tuple[subprocess.CompletedProcess[str], float]:
     """Run a sleeping test and a following sentinel test with the real gate ini."""
     root.mkdir()
     inner_test = root / "test_planted.py"
+    fixture_source = (
+        "import pytest\n\n\n"
+        "@pytest.fixture(scope='session', autouse=True)\n"
+        "def slow_session():\n"
+        '    """Prove fixture setup is excluded from the function timeout."""\n'
+        f"    time.sleep({fixture_sleep_seconds!r})\n\n\n"
+        if fixture_sleep_seconds
+        else ""
+    )
     inner_test.write_text(
         '"""A planted hang followed by a process-survival sentinel."""\n'
         "import time\n"
         "from pathlib import Path\n\n\n"
-        "def test_planted_sleep():\n"
+        f"{fixture_source}def test_planted_sleep():\n"
         '    """Sleep for the duration chosen by the outer proof."""\n'
         f"    time.sleep({sleep_seconds!r})\n\n\n"
         "def test_after_sleep():\n"
@@ -61,6 +73,9 @@ def _run_inner(root: Path, sleep_seconds: float) -> tuple[subprocess.CompletedPr
     )
     elapsed = time.monotonic() - started
     (root / "pytest-output.txt").write_text(result.stdout + result.stderr, encoding="utf-8")
+    (root / "pytest-result.txt").write_text(
+        f"exit={result.returncode}\nelapsed={elapsed:.3f}s\n", encoding="utf-8"
+    )
     return result, elapsed
 
 
@@ -70,8 +85,14 @@ def test_thread_timeout_exits_with_stack_and_under_bound_control(tmp_path: Path)
     Args:
         tmp_path: Isolated directory for both inner pytest invocations and their logs.
     """
-    control, _ = _run_inner(tmp_path / "control", 0.01)
-    expired, elapsed = _run_inner(tmp_path / "expired", 30.0)
+    # On Windows, omitting timeout_method still falls back to thread (no SIGALRM).
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        control_future = executor.submit(
+            _run_inner, tmp_path / "control", 0.01, fixture_sleep_seconds=2.5
+        )
+        expired_future = executor.submit(_run_inner, tmp_path / "expired", 30.0)
+        control, _ = control_future.result()
+        expired, elapsed = expired_future.result()
     control_output = control.stdout + control.stderr
     expired_output = expired.stdout + expired.stderr
 

@@ -124,6 +124,102 @@ completion or review-convergence claim. `git diff --check` exited 0; byte
 counts for all three changed files are recorded in
 `work/wp-t7/turn2-byte-audit.log` (zero CR).
 
+## Turn 4: Reviewer A round 1 adjudicated; terminating clean-up; report
+
+Started on clean `e4938910`. Dispatcher-supplied end-of-turn-3 depth:
+**147,790 tokens**. Read the entire Reviewer A findings file:
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t7/r1/review.txt`.
+Claude Opus / high returned `VERDICT: NO_NEW_CRITICAL_MAJOR`: three MINOR,
+four ADVISORY, zero blocking findings. Round 1 is converged; the following
+accepted items are the terminating cleanup, not a new review round.
+
+| Finding | Classification | NEW / REOPENED | Adjudication and evidence |
+| --- | --- | --- | --- |
+| F1 | MINOR, in envelope, EXECUTED | NEW | ACCEPTED / FIXED. Added a 2.5 s session fixture to the inner control, retained both sentinels, and ran the isolated subprocesses concurrently. The copied-config func-only ablation now fails. Windows method fallback is explained by one comment. |
+| F2 | MINOR, in envelope, EXECUTED | NEW | ACCEPTED / FIXED. Qualified the thread-timeout claim by GIL availability; a native GIL-holding deadlock needs the diagnostic dump and stall-watch STOP. Reviewer probe: GIL-holding native Sleep 8 s, then Python sleep, timeout 2 s / faulthandler 1 s; exit 1 after 8.5 s, earlier diagnostic on time. Figures attributed to Reviewer A. |
+| F3 | MINOR, in envelope, EXECUTED | NEW | ACCEPTED / FIXED. Required each leg to capture stderr (`2>&1` or a separate file). Reviewer xdist probe: `1 failed, 8 passed`; sleeping frame only on stderr. Own turn-3 combined xdist probe confirms earlier stderr dump survives. |
+| F4 | ADVISORY, in envelope, EXECUTED | NEW | ACCEPTED / FIXED. GATE_CHECKS now states session AND function setup/teardown are un-timed. Reviewer's 3 s session setup, 3 s function setup and 3 s teardown probe: `4 passed in 9.02s`. Installed call-hook source agrees. |
+| F5 | ADVISORY, in envelope, REASONED | NEW | ACCEPTED / FIXED. Legitimately long fullclip/trim dumps are diagnostic noise; a dump alone is not a failure or STOP. Core's timer covers the full protocol, as previously source-confirmed. |
+| F6 | ADVISORY, in envelope, wording | NEW | ACCEPTED / FIXED. Appended `(CHARC 97d5abbf, 2026-11-01)` after the unchanged verbatim rule text. |
+| F7 | ADVISORY, in envelope, REASONED | NEW | ACCEPTED / NOTED. Report/ledger record the authorized 15 s wall assertion and subprocess timeout against AD-30, with measured margins. No bound or marker change. |
+
+### Proof, ablation and margins
+
+The real `pyproject.toml` and `uv.lock` are unchanged this turn. The
+ablation uses a copied project config, copied current test and copied
+existing sandbox shim under `work/wp-t7/turn4-ablation/`. Only the copied
+`timeout_func_only = true` line is removed. Runner:
+`work/wp-t7/run_turn4_ablation.py`; assertion-runner exit 0. Exact lines
+from `work/wp-t7/turn4-ablation.log`:
+
+```text
+Ablation exit=1; missing timeout_func_only fails the control as required.
+>       assert control.returncode == 0, control_output
+FAILED tests/test_gate_timeout.py::test_thread_timeout_exits_with_stack_and_under_bound_control
+1 failed in 2.73s
+```
+
+The failure output contains `Timeout` and the control's `slow_session`
+frame, so this is the intended loss of fixture exclusion, not an import or
+configuration error. The unchanged method setting still selects thread.
+
+| Check | Result | Evidence under `work/wp-t7/` |
+| --- | --- | --- |
+| Required light proof, sandbox shim, `--durations=0` | Exit 0; node call 3.12 s; `1 passed in 3.16s`; command wall 4.028 s | `turn4-green.log`, `turn4-green-result.log` |
+| Same node with `-n 4 --timeout 600` and exact parallel expression | Exit 0; node call 3.13 s; `1 passed in 4.57s`; command wall 5.623 s | `turn4-parallel.log`, `turn4-parallel-result.log` |
+| `uv run ruff check .` | Exit 0, `All checks passed!` | `turn4-ruff.log` |
+| `uv run ruff format --check .` | Exit 0, `293 files already formatted` | `turn4-format.log` |
+| `uv run mypy` | Exit 0, `Success: no issues found in 148 source files` | `turn4-mypy.log` |
+
+The node remains marker-free: its measured parallel **call** is under 5 s;
+command wall includes uv and worker startup. Inner control wall is 3.125 s,
+exit 0 (`2 passed in 2.52s`, including its 2.5 s session setup); expired
+wall is 2.562 s, exit 1, with no later-test sentinel. Measurements are in
+`tmp-turn4-parallel/popen-gw0/test_thread_timeout_exits_with0/{control,expired}/pytest-result.txt`.
+The 15 s expired-run assertion has 12.438 s headroom / 5.85x measured margin;
+the per-subprocess timeout has at least 11.875 s headroom / 4.80x margin
+across these two runs. These bounds are explicitly commissioned planted-hang
+checks in this node, recorded against AD-30 per F7; they are not claimed to
+meet the generic ten-times-margin example or to measure product performance.
+
+### Harness STOP resolved and report delivered
+
+Dispatcher ordinary-seat evidence, as supplied in this turn's binding
+prompt: at `e4938910`, `uv run python -m unittest discover -s tests/harness`
+returned **`Ran 382 tests ... OK (skipped=1)`**. This is dispatcher-provided
+evidence, not a cell execution. The sandbox-related harness STOP from turn 3
+is RESOLVED; the suite was not re-run here.
+
+Created the short report `docs/reports/wp-t7-gate-timeout.md`: resolved
+version and actual +14-line lock stat, three runtime facts with evidence,
+current proof/ablation figures, all seven review dispositions and the
+accepted GIL/fixture/diagnostic-noise limits. Reviewer A's prose calls the
+lock change 16 lines; direct git stat and structured lock comparison establish
+14 added lines, so the report uses that measured value. No extra dependency
+change was made. Reviewer B and the one final candidate gate remain at the
+dispatcher seat; no final gate figure is claimed.
+
+### Verification loop and locks
+
+| Suspected | Confirmation | Disposition |
+| --- | --- | --- |
+| Func-only setting could be removed without breaking proof | Reviewer's original ablation; own amended-node ablation fails in control fixture | FIXED and independently reproduced |
+| Adding slow control might violate the 5 s parallel-node bound | Concurrent inner runs; node call 3.13 s with all assertions passing | REJECTED after qualification; no slow marker needed |
+| Timeout wording overpromises GIL-held or fixture termination | Reviewer's executed GIL/fixture probes and installed timer hooks | FIXED in GATE_CHECKS; accepted limits explicit |
+| Timeout stacks could be lost by stdout-only capture | Own combined xdist probe plus reviewer's separated-stream probe | FIXED by stderr-capture instruction |
+| A diagnostic dump could be misread as automatic failure | Passing diagnostic probe and protocol-hook source | FIXED by explicit non-failure/non-STOP wording |
+| Harness STOP remained unresolved | Dispatcher reports 382 tests, OK with one skip | RESOLVED at ordinary seat |
+
+No reverts; no product-code changes; test and documentation cleanup only.
+Final scope/text/byte audits are recorded in
+`work/wp-t7/turn4-{scope-audit,byte-audit,diff-check}.log`. Only the four
+owned paths listed in the turn's return block changed; every changed file
+has zero CR bytes. CLAUDE.md, the real project config and lock are untouched
+this turn; all gate command selections and flags are retained. No footage,
+local config, existing test, frozen interface or unapproved dependency was
+touched. A final review of the changed source, assertions and gate wording
+found no additional issue. Yield for Reviewer B and the final gate.
+
 ## Turn 3: GREEN
 
 The dispatcher supplied end-of-turn-2 depth **108,375 tokens** and reported
@@ -416,6 +512,7 @@ Reviewer A, Reviewer B and the final gate remain explicitly outstanding.
 | Round | Critical / major / minor | In / out | NEW / REOPENED | Reverts | Product / tests | Reviewer transport | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 0 (grounding, no review) | 0 / 0 / 0 review findings | N/A | N/A | 0 | No product; new test only | Not run | RED rung recorded; yield |
+| 1 | 0 / 0 / 3, plus 4 advisory | 7 / 0 | 7 / 0 | 0 | No product; tests + docs fixed | Dispatcher Claude Opus high process; CLI version not supplied in findings file | NO_NEW_CRITICAL_MAJOR; all seven accepted; terminating cleanup complete |
 
 The operational package-access finding above is not a Reviewer A finding
 and does not open or count a review round.
@@ -426,4 +523,5 @@ and does not open or count a review round.
 | --- | --- | --- |
 | 1 / 1 | 90,664 tokens (dispatcher supplied at turn 2) | RED yield; evaluate near 200K, re-seat boundary near 250K |
 | 1 / 2 | 108,375 tokens (dispatcher supplied at turn 3) | Offline sync STOP; remaining GREEN rung held |
-| 1 / 3 | Pending dispatcher fill; no estimate | GREEN proof/facts yield; harness gate routed to dispatcher seat |
+| 1 / 3 | 147,790 tokens (dispatcher supplied at turn 4) | GREEN proof/facts yield; harness gate routed to dispatcher seat |
+| 1 / 4 | Pending dispatcher fill; no estimate | Reviewer A round 1 terminating cleanup + report; yield for Reviewer B |
