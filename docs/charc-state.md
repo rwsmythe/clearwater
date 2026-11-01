@@ -12,8 +12,11 @@
 ### RESUME HERE (CHARC generation 11 LIVE: `clearwater-charc-20261101-0727`, online 2026-11-01 17:28Z, launched by gen 10 at its roll; gen 10 `clearwater-charc-20261031-2201` ROLLED 2026-11-01 ~17:30Z at ~403K, clean boundary; gen 9 rolled 2026-11-01 ~08:00Z)
 
 - **GEN 11 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 31
-  `clearwater-orchestrator-20261101-0811`** (launched 18:12Z by gen 30 at its roll; ANNOUNCE AWAITED; re-read
-  `comms/.launch-sessions.json` before every cue). Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
+  `clearwater-orchestrator-20261101-0811`** (ONLINE 18:12Z, announce `e611f11e` 18:13Z, gauge 24 ms, sole drainer;
+  my ack `e2965d5f` + cue 18:14Z; re-read `comms/.launch-sessions.json` before every cue). Claude 90 % pace 0.993
+  (2 points to the 92 % line; reset 2026-11-02 09:59Z); Codex 14 %. Claude-pass order under the rule: WP3.6P's
+  (after its windows) -> WP-T7 B -> WP5.3 A R4 -> WP5.1 B; past the line they wait for the reset, Codex continues.
+  NEXT HOST JOB = the WP3.6P 5c-16 EXCLUSIVE window (after WP-T7 turn 4 returns); gates queue behind the windows. Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
   ~385K, clean boundary (every Codex turn committed), state `509381f5`; it stopped draining at `472b5bf4`; the WP-T7
   Reviewer A r1 pass is a CHILD of gen 30's pane (evidence `clearwater-review-evidence\wp-t7\r1\`): keep that pane
   open until gen 31 says the pass returned, else gen 31 re-runs it. WP5.1 turn 13 `d44db8d1` (launcher mutant fails;
@@ -60,7 +63,11 @@
   the stack in the parent log; a serial/fullclip time-out ends the leg = STOP with the node and stacks, re-run;
   func-only leaves fixtures un-timed; faulthandler dumps without failing); GATE_CHECKS + CLAUDE.md lines in; harness
   gate OK at the seat (382, skipped=1; it fails only in the Codex sandbox). Reviewer A round 1 (Claude, STANDARD)
-  started 18:10Z. At its accept MINE: DR-109 CLOSED, CLAUDE.md gate line check.
+  started 18:10Z; CONVERGED at round 1 18:13Z (3 minor accepted: F1 proof pins `timeout_func_only`; F2 a GIL-holding
+  hang defers the thread timer, only the 300 s faulthandler dump and the stall watch catch it = a LIMIT in DR-109's
+  close, stall watch stays standing; F3 under `-n 4` the stack is on stderr only = every gate-leg line captures
+  stderr (`2>&1`), doc lines must say so). Turn 4 (clean-up + report) running. Then B (92 % rule), two-leg gate with
+  the flags + harness gate, accept. At its accept MINE: DR-109 CLOSED with the F2 limit; CLAUDE.md gate line check.
   (4b) WP5.3 turn 8 `a14a25ed`: all seven R3 items adjudicated per my ruling; F1/F2 recorded as the silent-loss class
   reopened by distinct paths; session 3 retired at 182,934; turn 9 (remediation) in a FRESH session 4 from the ledger.
   **ORCHESTRATOR GEN 30 ROLLS SOON (~380K): after WP5.1 turn 13 returns and is committed; state file drafted; the
