@@ -40,16 +40,19 @@ Parent to worker (the worker's stdin):
 Worker to parent (the worker's stdout; its stderr is kept only for the crash tail, which goes
 to the application log, never into a failure text):
 
-- ``{"progress": [done, total or null, message]}``: forwarded to ``progress.report``;
+- ``{"progress": [done, total or null, message]}``: forwarded to ``progress.report`` only when
+  ``0 <= done <= total <= PROGRESS_MAX`` (``0 <= done <= PROGRESS_MAX`` with a null total);
 - ``{"log": {"level": <DEBUG|INFO|WARNING|ERROR|CRITICAL>, "name": <logger>, "message":
   <text>}}``: re-logged under :data:`WORKER_LOGGER` at that level as ``"<name>: <message>"``;
 - ``{"result": {"ok": bool, "outputs": [str], "warnings": [str], "failure": str or null,
   "device": str, "elapsed_s": number}}``: the job's outcome, then the worker exits 0.
 
 The parent is strict: a line that is not UTF-8, not JSON, not an object with exactly one of the
-three keys, of the wrong shape or types, holds a non-finite number, is longer than
-:data:`MAX_LINE_BYTES` or has no ``\n`` at the end of the output is IGNORED and logged by its
-reason (never its content). Only the FIRST result counts (a later one is logged); a result
+three keys, of the wrong shape or types, holds a non-finite number or an integer too large for
+a float, is longer than :data:`MAX_LINE_BYTES` or has no ``\n`` at the end of the output is
+IGNORED and logged by its reason (never its content); a rejected progress line is logged once
+per job (CHARC bc6847dd: the process form is a trust boundary, so no worker can make the
+interface thread's Qt call raise). Only the FIRST result counts (a later one is logged); a result
 followed by a non-zero exit is still the result (the status is logged); a worker still running
 :data:`KILL_AFTER_CANCEL_S` after its result (or after the cancel line, when that came first)
 is killed (logged) and the result kept. The result's ``elapsed_s`` is the parent's own measure,
@@ -123,6 +126,9 @@ The worker's last lines arrive after its exit; a grandchild holding the output o
 hold the job.
 """
 
+PROGRESS_MAX = 2**31 - 1
+"""The largest progress count forwarded: Qt's int (CHARC bc6847dd, a trust boundary)."""
+
 MAX_LINE_BYTES = 64 * 1024
 """The longest protocol line accepted, without its ``\\n``; a longer one is ignored."""
 
@@ -178,6 +184,10 @@ _WORKER_LOG = logging.getLogger(WORKER_LOGGER)
 
 class _InvalidLineError(Exception):
     """A protocol line the parent ignores; the message is the reason (never the content)."""
+
+
+class _InvalidProgressError(_InvalidLineError):
+    """A ``progress`` line the parent ignores (logged once per job, CHARC bc6847dd)."""
 
 
 class _ChildResult(NamedTuple):
@@ -404,7 +414,7 @@ def _converse(
         result_at: float | None = None
         cancel_at: float | None = None
         quiet_since: float | None = None  # the worker has exited: when its output last moved
-        ended = killed = False
+        ended = killed = progress_warned = False
         for target, args, name in (
             (_write_lines, (stdin, writes), "export-worker-stdin"),
             (_read_lines, (stdout, lines), "export-worker-stdout"),
@@ -423,6 +433,12 @@ def _converse(
                 ended = True
             elif kind == "invalid":
                 _LOG.warning("export worker line ignored: %s", payload)
+            elif kind == "invalid progress" and not progress_warned:
+                progress_warned = True  # once per job (CHARC bc6847dd)
+                _LOG.warning(
+                    "export worker progress line ignored: %s (later ones in this job unlogged)",
+                    payload,
+                )
             elif kind == "progress":
                 progress.report(*payload)
             elif kind == "log":
@@ -519,6 +535,8 @@ def _read_lines(stream: IO[bytes], lines: queue.Queue[tuple[str, Any]]) -> None:
                 continue
             try:
                 lines.put(_decode_line(content))
+            except _InvalidProgressError as error:
+                lines.put(("invalid progress", str(error)))
             except _InvalidLineError as error:
                 lines.put(("invalid", str(error)))
             except Exception as error:  # one line never ends the reader: no later line is lost
@@ -595,15 +613,29 @@ def _is_texts(value: object) -> bool:
 
 
 def _decode_progress(value: object) -> tuple[int, int | None, str]:
-    """Check a ``progress`` payload: ``[done, total or null, message]``."""
+    """Check a ``progress`` payload: ``[done, total or null, message]`` within the bound.
+
+    Raises:
+        _InvalidProgressError: The payload is malformed, a count is not float-convertible, or
+            ``0 <= done <= total <= PROGRESS_MAX`` fails (``total`` null: ``0 <= done <=
+            PROGRESS_MAX``).
+    """
     if not isinstance(value, list) or len(value) != 3:
-        raise _InvalidLineError("a progress line that is not [done, total, message]")
+        raise _InvalidProgressError("a progress line that is not [done, total, message]")
     done, total, message = value
     if not _is_int(done) or not (total is None or _is_int(total)) or not isinstance(message, str):
-        raise _InvalidLineError("a progress line with a value of the wrong type")
-    _float_safe(done)
-    if total is not None:
-        _float_safe(total)
+        raise _InvalidProgressError("a progress line with a value of the wrong type")
+    try:
+        _float_safe(done)
+        if total is not None:
+            _float_safe(total)
+    except _InvalidLineError as error:
+        raise _InvalidProgressError(str(error)) from error
+    upper = PROGRESS_MAX if total is None else total
+    if not 0 <= done <= upper <= PROGRESS_MAX:
+        raise _InvalidProgressError(
+            f"a progress count outside 0 <= done <= total <= {PROGRESS_MAX}"
+        )
     return done, total, message
 
 
