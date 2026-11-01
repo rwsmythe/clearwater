@@ -9,6 +9,7 @@ import re
 import sys
 import time
 import uuid
+from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from fractions import Fraction
@@ -280,20 +281,28 @@ def read_runner_record(path: Path, *, group: str, roots: OutputRoots) -> list[di
 
 
 def stream_copy_command(
-    source: Path, destination: Path, *, start_s: float, duration_s: float
+    source: Path,
+    destination: Path,
+    *,
+    start_s: float,
+    duration_s: float,
+    streams: Sequence[Mapping[str, Any]] | None = None,
+    timecode: str | None = None,
 ) -> list[str]:
-    """Build the all-stream, input-seek excerpt command.
+    """Build a stream-copy excerpt, regenerating an existing timecode track.
 
     Args:
         source: Read-only input.
         destination: Guarded excerpt target.
         start_s: Requested source start.
         duration_s: Requested excerpt length.
+        streams: Probed roster; map every non-timecode stream explicitly.
+        timecode: Advanced source timecode for FFmpeg's timecode writer.
 
     Returns:
         FFmpeg subprocess arguments.
     """
-    return [
+    args = [
         "ffmpeg",
         "-nostdin",
         "-hide_banner",
@@ -306,12 +315,19 @@ def stream_copy_command(
         str(source),
         "-t",
         str(duration_s),
-        "-map",
-        "0",
-        "-c",
-        "copy",
-        str(destination),
     ]
+    if streams is None:
+        args += ["-map", "0"]
+    else:
+        for stream in streams:
+            if stream.get("codec_tag_string") != "tmcd":
+                args += ["-map", f"0:{stream['index']}"]
+    args += ["-c", "copy", "-map_metadata", "0", "-avoid_negative_ts", "make_zero"]
+    if timecode is not None:
+        args += ["-timecode", timecode, "-write_tmcd", "1"]
+    else:
+        args += ["-write_tmcd", "0"]
+    return [*args, str(destination)]
 
 
 def validate_stream_copy(
@@ -324,9 +340,8 @@ def validate_stream_copy(
         excerpt_streams: Selected excerpt stream facts.
     """
     keys = ("codec_type", "codec_name", "codec_tag_string")
-    if len(source_streams) != len(excerpt_streams) or any(
-        tuple(a.get(k) for k in keys) != tuple(b.get(k) for k in keys)
-        for a, b in zip(source_streams, excerpt_streams, strict=True)
+    if Counter(tuple(s.get(k) for k in keys) for s in source_streams) != Counter(
+        tuple(s.get(k) for k in keys) for s in excerpt_streams
     ):
         raise ValueError("stream copy changed stream count or codec tags")
 
@@ -359,10 +374,125 @@ def actual_excerpt_start(
     return value
 
 
+def _advance_timecode(value: str, seconds: float, rate: Fraction) -> str:
+    """Advance SMPTE non-drop or 29.97/59.94 drop-frame labels by source frames."""
+    match = re.fullmatch(r"(\d{2}):(\d{2}):(\d{2})([:;])(\d{2})", value)
+    nominal = round(rate)
+    if match is None or nominal <= 0:
+        raise ValueError("invalid source timecode")
+    h, m, s, separator, f = match.groups()
+    hours, minutes, secs, frames = map(int, (h, m, s, f))
+    if hours >= 24 or minutes >= 60 or secs >= 60 or frames >= nominal:
+        raise ValueError("invalid source timecode fields")
+    drop = 0
+    if separator == ";":
+        if rate not in {Fraction(30000, 1001), Fraction(60000, 1001)}:
+            raise ValueError("unsupported drop-frame timecode rate")
+        drop = 2 if nominal == 30 else 4
+        if minutes % 10 and secs == 0 and frames < drop:
+            raise ValueError("invalid dropped timecode label")
+    total_minutes = hours * 60 + minutes
+    count = (
+        (hours * 3600 + minutes * 60 + secs) * nominal
+        + frames
+        - drop * (total_minutes - total_minutes // 10)
+    )
+    count += round(Fraction(str(seconds)) * rate)
+    day = nominal * 86400 - drop * (1440 - 144)
+    count %= day
+    if drop:
+        per_ten = nominal * 600 - drop * 9
+        tens, remainder = divmod(count, per_ten)
+        count += drop * 9 * tens
+        if remainder >= drop:
+            count += drop * ((remainder - drop) // (nominal * 60 - drop))
+    total_seconds, frame = divmod(count, nominal)
+    hour, remaining = divmod(total_seconds, 3600)
+    minute, second = divmod(remaining, 60)
+    return f"{hour:02d}:{minute:02d}:{second:02d}{separator}{frame:02d}"
+
+
+def _packet_facts(source: Path, interval: str | None = None) -> list[dict[str, Any]]:
+    options = ["-read_intervals", interval] if interval else []
+    return list(
+        _probe(
+            source,
+            *options,
+            "-show_packets",
+            "-show_data_hash",
+            "sha256",
+            "-show_entries",
+            "packet=stream_index,codec_type,pts_time,data_hash,pos,flags",
+        ).get("packets", [])
+    )
+
+
+def _matched_streams(
+    before: Sequence[Mapping[str, Any]],
+    after: Sequence[Mapping[str, Any]],
+) -> list[tuple[Mapping[str, Any], Mapping[str, Any]]]:
+    validate_stream_copy(before, after)
+    groups: dict[tuple[str, ...], list[Mapping[str, Any]]] = defaultdict(list)
+    for stream in before:
+        groups[
+            tuple(str(stream.get(k)) for k in ("codec_type", "codec_name", "codec_tag_string"))
+        ].append(stream)
+    result = []
+    for stream in after:
+        key = tuple(str(stream.get(k)) for k in ("codec_type", "codec_name", "codec_tag_string"))
+        result.append((groups[key].pop(0), stream))
+    return result
+
+
+def _verify_payloads(
+    matches: Sequence[tuple[Mapping[str, Any], Mapping[str, Any]]],
+    source_packets: Sequence[Mapping[str, Any]],
+    packets: Sequence[Mapping[str, Any]],
+) -> None:
+    for before, after in matches:
+        if before.get("codec_tag_string") == "tmcd":
+            continue
+        original = [p["data_hash"] for p in source_packets if p["stream_index"] == before["index"]]
+        kept = [p["data_hash"] for p in packets if p["stream_index"] == after["index"]]
+        if not kept or not any(original[i : i + len(kept)] == kept for i in range(len(original))):
+            raise ValueError("excerpt changed non-timecode packet payloads or order")
+
+
+def _displayed_start(source: Path, packets: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
+    """Identify the first actually displayed frame by its packet file position."""
+    frames = _probe(
+        source,
+        "-select_streams",
+        "v:0",
+        "-read_intervals",
+        "%+#32",
+        "-show_frames",
+        "-show_entries",
+        "frame=pkt_pos,best_effort_timestamp_time",
+    ).get("frames", [])
+    if not frames:
+        raise ValueError("excerpt has no displayed frame")
+    first = frames[0]
+    packet = next(
+        (
+            p
+            for p in packets
+            if p.get("codec_type") == "video" and str(p.get("pos")) == str(first.get("pkt_pos"))
+        ),
+        None,
+    )
+    video = [p for p in packets if p.get("codec_type") == "video"]
+    if packet is None or float(first["best_effort_timestamp_time"]) != min(
+        float(p["pts_time"]) for p in video
+    ):
+        raise ValueError("excerpt displayed start differs from retained video start")
+    return packet
+
+
 def prepare_excerpt(
     source: Path, *, start_s: float, duration_s: float, roots: OutputRoots
 ) -> dict[str, Any]:
-    """Copy and validate an excerpt, falling back to the whole input on copy failure.
+    """Copy and validate an excerpt; return a loud item error on any failed check.
 
     Args:
         source: Read-only input.
@@ -371,53 +501,93 @@ def prepare_excerpt(
         roots: Pack and source roots.
 
     Returns:
-        Runtime input path, excerpt status, measured timings and any fallback text.
+        Runtime excerpt path or None, measured timings, status and failure text.
     """
     destination = _fresh(roots.allowed / "excerpts" / source.name, roots)
     roots.mkdir(destination.parent)
-    done = run_tool(
-        stream_copy_command(source, destination, start_s=start_s, duration_s=duration_s)
-    )
-    if done.returncode:
+    planned: dict[str, Any] = {
+        "path": None,
+        "excerpt": False,
+        "status": "excerpt_failed",
+        "planned_start_s": start_s,
+        "actual_start_s": None,
+        "planned_duration_s": duration_s,
+        "duration_s": None,
+    }
+    try:
+        before = _probe(source, "-show_streams")["streams"]
+        packets = _packet_facts(source, f"{max(0, start_s - 30)}%{start_s + duration_s + 30}")
+        video = next(s for s in before if s["codec_type"] == "video")
+        keys = [
+            float(p["pts_time"])
+            for p in packets
+            if p.get("codec_type") == "video"
+            and "K" in p.get("flags", "")
+            and float(p["pts_time"]) <= start_s + 1e-7
+        ]
+        if not keys:
+            raise ValueError("no source keyframe for excerpt seek")
+        selected = max(keys)
+        has_timecode = any(s.get("codec_tag_string") == "tmcd" for s in before)
+        timecode = None
+        if has_timecode:
+            tag = video.get("tags", {}).get("timecode")
+            if tag is None:
+                tag = next(
+                    s.get("tags", {}).get("timecode")
+                    for s in before
+                    if s.get("codec_tag_string") == "tmcd"
+                )
+            timecode = _advance_timecode(str(tag), selected, Fraction(video["avg_frame_rate"]))
+        done = run_tool(
+            stream_copy_command(
+                source,
+                destination,
+                start_s=start_s,
+                duration_s=duration_s,
+                streams=before,
+                timecode=timecode,
+            )
+        )
+        if done.returncode:
+            lines = done.stderr.decode("utf-8", "replace").strip().splitlines()
+            raise ValueError(lines[-1] if lines else "FFmpeg excerpt failed without stderr")
+        after = _probe(destination, "-show_streams")["streams"]
+        matches = _matched_streams(before, after)
+        retained = _packet_facts(destination)
+        _verify_payloads(matches, packets, retained)
+        displayed = _displayed_start(destination, retained)
+        # Repeated encoded packets can occur in a loop or a static scene. Bind
+        # the hash match to the probed seek keyframe instead of choosing an
+        # arbitrary equal payload elsewhere in the source interval.
+        seek_packets = [
+            p
+            for p in packets
+            if p.get("codec_type") == "video" and abs(float(p["pts_time"]) - selected) <= 1e-6
+        ]
+        actual = actual_excerpt_start(seek_packets, [displayed])
+        if abs(actual - selected) > 1e-6:
+            raise ValueError("actual displayed keyframe differs from timecode seek plan")
+        if has_timecode:
+            for stream in after:
+                if (
+                    stream.get("codec_type") == "video" or stream.get("codec_tag_string") == "tmcd"
+                ) and stream.get("tags", {}).get("timecode") != timecode:
+                    raise ValueError("regenerated timecode does not match actual source start")
+        return {
+            **planned,
+            "path": destination,
+            "excerpt": True,
+            "status": "ready",
+            "actual_start_s": actual,
+            "duration_s": _video(destination)["duration_s"],
+            "timecode": timecode,
+            "message": "",
+        }
+    except (ValueError, OSError, ExtractError) as exc:
         if destination.exists():
             roots.check(destination).unlink()
-        return {
-            "path": source,
-            "excerpt": False,
-            "planned_start_s": start_s,
-            "actual_start_s": 0.0,
-            "planned_duration_s": duration_s,
-            "duration_s": _video(source)["duration_s"],
-            "message": "stream copy failed; whole source used",
-        }
-    options = ("-show_entries", "stream=codec_type,codec_name,codec_tag_string")
-    before = _probe(source, *options)["streams"]
-    after = _probe(destination, *options)["streams"]
-    validate_stream_copy(before, after)
-    packet_options = (
-        "-select_streams",
-        "v:0",
-        "-show_packets",
-        "-show_data_hash",
-        "sha256",
-        "-show_entries",
-        "packet=codec_type,pts_time,data_hash",
-    )
-    retained = _probe(destination, "-read_intervals", "%+#1", *packet_options)["packets"]
-    # Seek covers keyframe pre-roll without scanning/hashing the full owner clip.
-    packets = _probe(
-        source, "-read_intervals", f"{max(0, start_s - 30)}%{start_s + 30}", *packet_options
-    )["packets"]
-    actual = actual_excerpt_start(packets, retained)
-    return {
-        "path": destination,
-        "excerpt": True,
-        "planned_start_s": start_s,
-        "actual_start_s": actual,
-        "planned_duration_s": duration_s,
-        "duration_s": _video(destination)["duration_s"],
-        "message": "",
-    }
+        return {**planned, "message": _safe_text(exc, roots)}
 
 
 def extract_view_frame(
@@ -439,11 +609,19 @@ def extract_view_frame(
     stream = _video(source)
     if not _rotated(stream):
         # The shared helper independently checks the decoded PTS and conversion tags.
-        extracted = extract(
-            source, [timestamp_s], target.parent / (".frames-" + uuid.uuid4().hex), roots=roots
-        )[0]
-        roots.write_bytes(target, extracted.path.read_bytes())
-        roots.check(extracted.path).unlink()
+        folder = check_target(target.parent / (".frames-" + uuid.uuid4().hex), roots)
+        try:
+            extracted = extract(source, [timestamp_s], folder, roots=roots)[0]
+            roots.write_bytes(target, extracted.path.read_bytes())
+        finally:
+            if folder.exists():
+                # This unique directory belongs to this extraction only. Remove
+                # only files created by the helper, refusing any shared alias.
+                for created in folder.iterdir():
+                    if created.is_file() and created.suffix == ".png":
+                        roots.remove(created)
+                if not any(folder.iterdir()):
+                    roots.check(folder).rmdir()
         return destination
     pts = _frame_time(source, timestamp_s)
     tags = tags_from_stream(stream)
@@ -528,7 +706,8 @@ def make_pair(
     scale = (
         f"scale={half_w}:{half_h}:in_range={tags.color_range}"
         f":out_range={tags.color_range}:in_color_matrix={tags.color_space}"
-        f":out_color_matrix={tags.color_space},setsar=1,setpts=PTS-STARTPTS"
+        f":out_color_matrix={tags.color_space},setsar=1,"
+        f"settb={source_stream['time_base']},setpts=PTS-STARTPTS"
     )
     filters = (
         f"[0:v:0]{scale},pad=iw+2:ih:0:0:white[left];"
@@ -558,8 +737,10 @@ def make_pair(
         "libx265" if force_cpu else "hevc_nvenc",
         "-pix_fmt",
         "yuv420p",
-        "-r",
-        str(source_stream["avg_frame_rate"]),
+        "-fps_mode",
+        "passthrough",
+        "-enc_time_base",
+        "filter",
         "-color_range",
         tags.color_range,
         "-colorspace",
@@ -573,6 +754,8 @@ def make_pair(
             args += [flag, value]
     if force_cpu:
         args += ["-preset", "ultrafast", "-x265-params", "log-level=error:pools=1"]
+    else:
+        args += ["-preset", "p5", "-tune", "hq", "-rc", "vbr", "-cq", "20", "-b:v", "0"]
     args += ["-tag:v", "hvc1", "-movflags", "+faststart", str(target)]
     done = run_tool(args, timeout=24 * 3600)
     if done.returncode:
@@ -741,13 +924,11 @@ def _view_photo(result: dict[str, Any], roots: OutputRoots) -> None:
 
 
 def _browser_frame(path: Path, stream: Mapping[str, Any], roots: OutputRoots) -> None:
-    """Convert non-BT709 primaries to sRGB for browser JPEG derivatives only."""
+    """Convert explicitly tagged SDR primaries/transfer to sRGB for browser aids."""
     primaries = str(stream.get("color_primaries", "unknown"))
-    if primaries not in {"bt709", "unknown", "unspecified"}:
+    transfer = str(stream.get("color_transfer", "unknown"))
+    if primaries not in {"unknown", "unspecified"} and transfer not in {"unknown", "unspecified"}:
         temporary = check_target(path.with_name(path.stem + "-srgb.png"), roots)
-        transfer = str(stream.get("color_transfer", "bt709"))
-        if transfer in {"unknown", "unspecified"}:
-            transfer = "bt709"
         done = run_tool(
             [
                 "ffmpeg",
@@ -851,6 +1032,8 @@ def _build_groups(
             continue
         sources = []
         preparations = []
+        active_items = []
+        excerpt_records = []
         for item in group_items:
             assert item.path is not None
             source = item.path
@@ -868,8 +1051,31 @@ def _build_groups(
                     prepared = prepare_excerpt(
                         source, start_s=plan.start_s, duration_s=plan.duration_s, roots=roots
                     )
+                    excerpt_record = {
+                        **_pending(item),
+                        "status": prepared["status"],
+                        "message": prepared["message"],
+                        "excerpt": {key: value for key, value in prepared.items() if key != "path"},
+                    }
+                    excerpt_records.append(excerpt_record)
+                    if prepared["status"] == "excerpt_failed":
+                        for position, previous in enumerate(state["items"]):
+                            if previous["item"] == item.stem:
+                                state["items"][position] = excerpt_record
+                                break
+                        continue
             sources.append(prepared["path"])
             preparations.append(prepared)
+            active_items.append(item)
+        if excerpt_records:
+            _json_write(
+                roots.allowed / "records" / f"{group}-excerpts.json",
+                {"schema": 1, "tool": "reviewpack", "group": group, "items": excerpt_records},
+                roots,
+            )
+        if not sources:
+            _json_write(roots.allowed / "records" / "pack.json", state, roots)
+            continue
         results, _ = _invoke(sources, group, roots, neutral=False, force_cpu=force_cpu)
         neutral_results = (
             _invoke(sources, group, roots, neutral=True, force_cpu=force_cpu)[0]
@@ -877,7 +1083,7 @@ def _build_groups(
             else []
         )
         for index, (item, result, prepared) in enumerate(
-            zip(group_items, results, preparations, strict=True)
+            zip(active_items, results, preparations, strict=True)
         ):
             result.update(item=item.stem, source_name=item.name)
             result["excerpt"] = {key: value for key, value in prepared.items() if key != "path"}
@@ -977,6 +1183,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 _build_groups(selected, state, roots, force_cpu=args.force_cpu)
             _json_write(state_path, state, roots)
         print(f"{args.stage}: completed; {len(state['items'])} items accounted for")
+        if args.stage in {"clips", "all"} and any(
+            item["status"] == "excerpt_failed" for item in state["items"]
+        ):
+            print(
+                "reviewpack: excerpt failures recorded; see Not built on the page", file=sys.stderr
+            )
+            return 1
         return 0
     except (ValueError, OSError, LocalConfigError, ExtractError) as exc:
         message = (

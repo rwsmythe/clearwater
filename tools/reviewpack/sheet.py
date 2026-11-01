@@ -33,7 +33,7 @@ def _read(path: Path) -> list[dict[str, str]]:
     expected = {item.stem: item for item in catalog() if item.group != "V-R"}
     seen: set[str] = set()
     rows = []
-    with path.open(encoding="utf-8", newline="") as handle:
+    with path.open(encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
         if tuple(reader.fieldnames or ()) != HEADER:
             raise ValueError("sheet header must match the CP5 columns exactly")
@@ -136,10 +136,16 @@ def tally(path: Path) -> dict[str, Any]:
     """
     rows = _read(path)
 
-    def counts(selected: Sequence[Mapping[str, str]]) -> dict[str, Any]:
+    def counts(groups: set[str] | frozenset[str]) -> dict[str, Any]:
+        selected = [row for row in rows if row["group"] in groups]
         judged = sum(row["preferred"] != "" for row in selected)
         preferred = sum(row["preferred"] == "yes" for row in selected)
+        expected = sum(item.group in groups for item in catalog())
         return {
+            "expected": expected,
+            "available": len(selected),
+            "missing": expected - len(selected),
+            "unjudged": len(selected) - judged,
             "judged": judged,
             "preferred": preferred,
             "fraction": preferred / judged if judged else 0.0,
@@ -148,13 +154,9 @@ def tally(path: Path) -> dict[str, Any]:
         }
 
     return {
-        "groups": {
-            group: counts([row for row in rows if row["group"] == group])
-            for group in GROUPS
-            if group != "V-R"
-        },
-        "headline": counts([row for row in rows if row["group"] in HEADLINE]),
-        "candidates": counts([row for row in rows if row["group"] in {"P-Z", "V-Z"}]),
+        "groups": {group: counts({group}) for group in GROUPS if group != "V-R"},
+        "headline": counts(HEADLINE),
+        "candidates": counts({"P-Z", "V-Z"}),
     }
 
 
@@ -179,6 +181,12 @@ def format_tally(result: Mapping[str, Any]) -> str:
         if label == "headline":
             line += "  (D65 bar 80 %)"
         lines.append(line)
+        lines.append(
+            "  coverage: "
+            + ", ".join(
+                f"{key}={values[key]}" for key in ("expected", "available", "missing", "unjudged")
+            )
+        )
         lines.append(
             "  "
             + ", ".join(f"{key}={values['artifacts'][key]}" for key in ARTIFACTS)

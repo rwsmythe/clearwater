@@ -532,10 +532,10 @@ def test_actual_excerpt_start_uses_source_packet_not_rebased_zero() -> None:
     assert build.actual_excerpt_start(source_packets, excerpt_packets) == pytest.approx(19.2)
 
 
-def test_failed_stream_copy_falls_back_to_whole_source(
+def test_failed_stream_copy_never_falls_back_to_whole_source(
     roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Only the external copy fails; probe and fallback accounting stay real."""
+    """CHARC's A1 ruling supersedes the former whole-source fallback contract."""
     source = roots.footage / "GX011625.mp4"
     shutil.copyfile(FIXTURES / "video" / "hevc8-bt709-full.mp4", source)
     original = source.read_bytes()
@@ -548,9 +548,10 @@ def test_failed_stream_copy_falls_back_to_whole_source(
 
     monkeypatch.setattr(build, "run_tool", failed_copy)
     prepared = build.prepare_excerpt(source, start_s=0.6, duration_s=30.0, roots=roots)
-    assert prepared["path"] == source
+    assert prepared["path"] is None
     assert prepared["excerpt"] is False
-    assert "stream copy" in prepared["message"].lower()
+    assert prepared["status"] == "excerpt_failed"
+    assert prepared["message"] == "stream copy refused"
     assert source.read_bytes() == original
 
 
@@ -965,6 +966,14 @@ def test_all_tiny_set(roots: OutputRoots) -> None:
     with (roots.allowed / "review-sheet.csv").open(encoding="utf-8", newline="") as handle:
         assert len(list(csv.DictReader(handle))) == 3
     assert before == {name: (roots.footage / name).read_bytes() for _, name, _ in inputs}
+    # F2: this non-keyframe copy must be accepted by the unmodified product.
+    prepared = build.prepare_excerpt(
+        roots.footage / "GX011604.mp4", start_s=0.6, duration_s=0.5, roots=roots
+    )
+    arguments = build.runner_arguments([prepared["path"]], group="V-S", roots=roots, force_cpu=True)
+    arguments += ["--encoder", "libx265"]
+    done = media_tool(arguments)
+    assert done.returncode == 0, done.stderr.decode("utf-8", "replace")
 
 
 @pytest.mark.parametrize("module", ["build", "page"])
@@ -1101,3 +1110,397 @@ def test_sheet_write_failure_preserves_original_answers(
     with pytest.raises(OSError, match="planted"):
         sheet.write_sheet([_item(), _item("IMG_6791", "P-Z")], destination, roots=roots)
     assert destination.read_bytes() == before
+
+
+def _facts(path: Path) -> dict:
+    """Probe independent stream identities and packet payloads for excerpt controls."""
+    done = media_tool(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_streams",
+            "-show_packets",
+            "-show_data_hash",
+            "sha256",
+            "-of",
+            "json",
+            str(path),
+        ]
+    )
+    assert done.returncode == 0, done.stderr.decode()
+    return json.loads(done.stdout)
+
+
+def _timecode_source(roots: OutputRoots) -> Path:
+    """Plant video/audio/tmcd plus an opaque synthetic gpmd payload, without decoding."""
+    base = roots.allowed / "tc-template.mp4"
+    video_only = roots.allowed / "video-only.mp4"
+    done = media_tool(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-y",
+            "-i",
+            str(FIXTURES / "video" / "hevc8-bt709-full.mp4"),
+            "-map",
+            "0:v:0",
+            "-c",
+            "copy",
+            str(video_only),
+        ]
+    )
+    assert done.returncode == 0, done.stderr.decode()
+    done = media_tool(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-y",
+            "-stream_loop",
+            "2",
+            "-i",
+            str(video_only),
+            "-stream_loop",
+            "2",
+            "-i",
+            str(FIXTURES / "video" / "hevc8-bt709-full.mp4"),
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c",
+            "copy",
+            "-timecode",
+            "01:00:00:00",
+            str(base),
+        ]
+    )
+    assert done.returncode == 0, done.stderr.decode()
+    opaque = roots.allowed / "opaque-gpmd.mp4"
+    # This is an arbitrary four-byte data payload, not a real telemetry claim.
+    opaque.write_bytes(base.read_bytes().replace(b"tmcd", b"gpmd"))
+    source = roots.allowed / "tmcd-gpmd.mp4"
+    done = media_tool(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-y",
+            "-i",
+            str(base),
+            "-i",
+            str(opaque),
+            "-map",
+            "0:v",
+            "-map",
+            "0:a",
+            "-map",
+            "1:d",
+            "-c",
+            "copy",
+            "-map_metadata",
+            "0",
+            "-write_tmcd",
+            "1",
+            str(source),
+        ]
+    )
+    assert done.returncode == 0, done.stderr.decode()
+    return source
+
+
+@pytest.mark.parametrize(
+    ("start", "actual", "timecode"),
+    [
+        (0.6, 0.0, "01:00:00:00"),
+        (2.1, 1.5015, "01:00:01:15"),
+    ],
+)
+def test_gopro_tmcd_excerpt_preserves_stream_roster_without_whole_fallback(
+    roots: OutputRoots,
+    start: float,
+    actual: float,
+    timecode: str,
+) -> None:
+    """Catch lost data packets, mux-order assumptions and unadvanced timecode."""
+    source = _timecode_source(roots)
+    original = source.read_bytes()
+    before = _facts(source)
+    prepared = build.prepare_excerpt(source, start_s=start, duration_s=0.5, roots=roots)
+    assert prepared["excerpt"] is True
+    assert prepared["path"] != source
+    assert prepared["actual_start_s"] == pytest.approx(actual)
+    after = _facts(prepared["path"])
+
+    def key(s):
+        return (s["codec_type"], s["codec_tag_string"])
+
+    assert Counter(map(key, before["streams"])) == Counter(map(key, after["streams"]))
+    for stream in after["streams"]:
+        match = next(s for s in before["streams"] if key(s) == key(stream))
+        if stream["codec_tag_string"] == "tmcd":
+            assert stream["tags"]["timecode"] == timecode
+            continue
+        kept = [p["data_hash"] for p in after["packets"] if p["stream_index"] == stream["index"]]
+        source_hashes = [
+            p["data_hash"] for p in before["packets"] if p["stream_index"] == match["index"]
+        ]
+        assert kept, stream
+        assert all(h in source_hashes for h in kept)
+    assert source.read_bytes() == original
+
+
+def test_excerpt_copy_failure_is_recorded_skipped_and_exits_nonzero(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Catch silent fallback, accidental runner submission and missing not-built rows."""
+    source = roots.footage / "GX011604.mp4"
+    shutil.copyfile(FIXTURES / "video" / "hevc8-bt709-full.mp4", source)
+    shutil.copyfile(FIXTURES / "video" / "hlg.mp4", roots.footage / "IMG_6704.MOV")
+    config = roots.allowed / "failure.toml"
+    config.write_text(
+        f"footage_path = {json.dumps(str(roots.footage))}\n"
+        f"working_path = {json.dumps(str(roots.allowed.parent))}\n",
+        encoding="utf-8",
+    )
+    manifest = roots.allowed / "failure.json"
+    manifest.write_text(
+        json.dumps(
+            [
+                {"name": source.name, "group": "V-S", "kind": "video"},
+                {"name": "IMG_6704.MOV", "group": "V-R", "kind": "video"},
+            ]
+        )
+    )
+    monkeypatch.setattr(select, "excerpt_plan", lambda *a: select.ExcerptPlan(0.6, 0.5, True))
+
+    def fail_copy(argv, **kwargs):
+        if Path(argv[0]).stem == "ffprobe":
+            return media_tool(argv, **kwargs)
+        if argv[0] == "uv":
+            assert not any("GX011604" in arg for arg in argv), "failed item reached the runner"
+            return media_tool(argv, **kwargs)
+        assert argv[0] == "ffmpeg" and "copy" in argv, "failed item reached a clip piece"
+        return subprocess.CompletedProcess(argv, 1, b"", b"detail\nplanted mux failure\n")
+
+    monkeypatch.setattr(build, "run_tool", fail_copy)
+    args = ["--config", str(config), "--manifest", str(manifest)]
+    assert build.main(["clips", *args]) != 0
+    state = json.loads((roots.allowed / "records" / "pack.json").read_text())
+    assert state["items"][0]["status"] == "excerpt_failed"
+    assert state["items"][0]["message"] == "planted mux failure"
+    assert state["items"][1]["status"] == "refused"  # A later group still runs.
+    group = json.loads((roots.allowed / "records" / "V-S-excerpts.json").read_text())
+    assert group["items"][0]["status"] == "excerpt_failed"
+    assert not list((roots.allowed / "clips").glob("*.mp4"))
+    assert build.main(["page", *args]) == 0
+    html = (roots.allowed / "index.html").read_text()
+    assert "Not built" in html and source.name in html and "planted mux failure" in html
+    assert list(csv.DictReader((roots.allowed / "review-sheet.csv").open())) == []
+
+
+def test_stream_copy_command_rebases_preroll_for_product(roots: OutputRoots) -> None:
+    args = build.stream_copy_command(
+        FIXTURES / "video" / "hevc8-bt709-full.mp4",
+        roots.allowed / "rebased.mp4",
+        start_s=0.6,
+        duration_s=0.5,
+    )
+    assert "-avoid_negative_ts" in args
+    assert args[args.index("-avoid_negative_ts") + 1] == "make_zero"
+
+
+def test_excerpt_recorded_start_is_first_displayed_frame(roots: OutputRoots) -> None:
+    """Packet pre-roll alone must not certify a trimmed-away display head."""
+    source = FIXTURES / "video" / "hevc8-bt709-full.mp4"
+    prepared = build.prepare_excerpt(source, start_s=0.6, duration_s=0.5, roots=roots)
+
+    def first_hash(path, start):
+        done = media_tool(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-ss",
+                str(start),
+                "-i",
+                str(path),
+                "-map",
+                "0:v:0",
+                "-frames:v",
+                "1",
+                "-f",
+                "framemd5",
+                "-",
+            ]
+        )
+        assert done.returncode == 0
+        return done.stdout.decode().splitlines()[-1].split(",")[-1].strip()
+
+    assert first_hash(source, prepared["actual_start_s"]) == first_hash(prepared["path"], 0)
+
+
+def test_gpu_pair_has_explicit_quality_control(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Inspect the real GPU encoder boundary without scheduling a GPU encode."""
+    source = FIXTURES / "video" / "hevc8-bt709-full.mp4"
+
+    class InspectedError(Exception):
+        pass
+
+    def inspect(argv, **kwargs):
+        if "hstack" not in " ".join(argv):
+            return media_tool(argv, **kwargs)
+        assert argv[argv.index("-c:v") + 1] == "hevc_nvenc"
+        for flag, value in (
+            ("-preset", "p5"),
+            ("-tune", "hq"),
+            ("-rc", "vbr"),
+            ("-cq", "20"),
+            ("-b:v", "0"),
+        ):
+            assert flag in argv
+            assert argv[argv.index(flag) + 1] == value
+        raise InspectedError
+
+    monkeypatch.setattr(build, "run_tool", inspect)
+    with pytest.raises(InspectedError):
+        build.make_pair(source, source, roots.allowed / "gpu-pair.mp4", roots=roots)
+
+
+def test_page_names_viewing_aid_quality(roots: OutputRoots) -> None:
+    text = page.write_page([], {}, roots=roots).read_text()
+    assert "NVENC" in text and "CQ 20" in text and "viewing aid" in text
+
+
+def test_stream_identity_validation_allows_mux_reordering() -> None:
+    streams = [
+        {"codec_type": "video", "codec_name": "hevc", "codec_tag_string": "hvc1"},
+        {"codec_type": "data", "codec_name": "bin_data", "codec_tag_string": "tmcd"},
+        {"codec_type": "data", "codec_name": "bin_data", "codec_tag_string": "gpmd"},
+    ]
+    build.validate_stream_copy(streams, [streams[0], streams[2], streams[1]])
+
+
+@pytest.mark.parametrize(
+    ("label", "rate", "expected"),
+    [
+        ("00:00:59:29", Fraction(30), "00:01:00:00"),
+        ("00:00:59;29", Fraction(30000, 1001), "00:01:00;02"),
+        ("00:09:59;29", Fraction(30000, 1001), "00:10:00;00"),
+        ("00:00:59;59", Fraction(60000, 1001), "00:01:00;04"),
+        ("23:59:59;29", Fraction(30000, 1001), "00:00:00;00"),
+    ],
+)
+def test_timecode_advancement_preserves_smpte_boundaries(label, rate, expected) -> None:
+    """Advance one source frame across non-drop, drop-frame and day boundaries."""
+    assert build._advance_timecode(label, float(1 / rate), rate) == expected
+
+
+@pytest.mark.parametrize("kind", ["video", "audio", "data"])
+def test_excerpt_integrity_rejects_changed_non_tmcd_payload(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+) -> None:
+    """A corrupt retained payload must become an item error, never a usable input."""
+    source = _timecode_source(roots)
+
+    def tampered_probe(argv, **kwargs):
+        done = media_tool(argv, **kwargs)
+        if (
+            argv[0] == "ffprobe"
+            and "-show_data_hash" in argv
+            and Path(argv[-1]).parent == roots.allowed / "excerpts"
+        ):
+            value = json.loads(done.stdout)
+            packet = next(p for p in value["packets"] if p["codec_type"] == kind)
+            # The first data packet may be regenerated tmcd: choose gpmd by index.
+            if kind == "data":
+                facts = _facts(Path(argv[-1]))
+                index = next(
+                    s["index"] for s in facts["streams"] if s["codec_tag_string"] == "gpmd"
+                )
+                packet = next(p for p in value["packets"] if p["stream_index"] == index)
+            packet["data_hash"] = "SHA256:planted-corruption"
+            return subprocess.CompletedProcess(argv, 0, json.dumps(value).encode(), done.stderr)
+        return done
+
+    monkeypatch.setattr(build, "run_tool", tampered_probe)
+    prepared = build.prepare_excerpt(source, start_s=0.6, duration_s=0.5, roots=roots)
+    assert prepared["status"] == "excerpt_failed" and prepared["path"] is None
+    assert "packet payloads" in prepared["message"]
+    assert not list((roots.allowed / "excerpts").glob("*.mp4"))
+
+
+def test_bom_sheet_tallies_and_preserves_owner_answers(roots: OutputRoots) -> None:
+    path = roots.allowed / "bom.csv"
+    _csv(path, [_row(_item(), preferred="yes", note="caf\u00e9")])
+    path.write_bytes(b"\xef\xbb\xbf" + path.read_bytes())
+    assert sheet.tally(path)["headline"]["preferred"] == 1
+    sheet.write_sheet([_item()], path, roots=roots)
+    assert "caf\u00e9" in path.read_text(encoding="utf-8-sig")
+
+
+def test_tally_discloses_partial_set_coverage(roots: OutputRoots) -> None:
+    path = roots.allowed / "partial.csv"
+    _csv(path, [_row(_item(), preferred="yes"), _row(_item("IMG_6771"))])
+    result = sheet.tally(path)
+    h = result["headline"]
+    assert (h["expected"], h["available"], h["missing"], h["unjudged"]) == (115, 2, 113, 1)
+    assert "expected=115" in sheet.format_tally(result)
+    assert "headline: 1/1 = 100.0 %  (D65 bar 80 %)" in sheet.format_tally(result)
+
+
+def test_page_shows_escaped_warnings_and_local_captions(roots: OutputRoots) -> None:
+    subject = _item()
+    subject["warnings"] = ["warning <unsafe>"]
+    _plant_page_item(subject, roots)
+    html = page.write_page([subject], {}, roots=roots).read_text()
+    assert "warning &lt;unsafe&gt;" in html and "warning <unsafe>" not in html
+    assert "<figcaption>Source</figcaption>" in html
+    assert "<figcaption>Corrected</figcaption>" in html
+
+
+def test_unrotated_frame_cleans_owned_extraction_directory(roots: OutputRoots) -> None:
+    build.extract_view_frame(
+        FIXTURES / "video" / "hevc8-bt709-full.mp4",
+        0,
+        roots.allowed / "clean.png",
+        roots=roots,
+    )
+    assert list(roots.allowed.glob(".frames-*")) == []
+
+
+def test_browser_sdr_transfer_policy_is_consistent(roots: OutputRoots) -> None:
+    values = []
+    for primary in ("bt709", "smpte432"):
+        path = roots.allowed / f"{primary}.png"
+        Image.new("RGB", (16, 16), (128, 128, 128)).save(path)
+        build._browser_frame(path, {"color_primaries": primary, "color_transfer": "bt709"}, roots)
+        with Image.open(path) as image:
+            values.append(image.getpixel((8, 8)))
+    assert values[0] == values[1] == (121, 121, 121)
+
+
+def test_pair_preserves_variable_presentation_intervals(roots: OutputRoots) -> None:
+    source = FIXTURES / "video" / "vfr.mp4"
+    pair = roots.allowed / "vfr-pair.mp4"
+    build.make_pair(source, source, pair, roots=roots, force_cpu=True)
+
+    def times(path):
+        document = _facts(path)
+        stream = next(s for s in document["streams"] if s["codec_type"] == "video")
+        pts = sorted(
+            Fraction(p["pts"]) * Fraction(stream["time_base"])
+            for p in document["packets"]
+            if p["codec_type"] == "video"
+        )
+        return [p - pts[0] for p in pts]
+
+    assert times(pair) == times(source)

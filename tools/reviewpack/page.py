@@ -86,7 +86,8 @@ def write_page(
         '<!doctype html><html lang="en"><meta charset="utf-8">',
         "<title>CP5 visual review pack</title>",
         "<style>body{font:18px sans-serif;margin:2em;max-width:1500px}"
-        "img{max-width:45%;height:auto}video{max-width:100%}"
+        "figure{display:inline-block;width:45%;margin:1%}figure img{max-width:100%;height:auto}"
+        "video{max-width:100%}"
         "article{border-top:1px solid #aaa;padding:1em 0}td,th{padding:.3em}</style>",
         "<h1>CP5 visual review pack</h1>",
         "<p>Only the owner judges these items. D65 asks whether the corrected result is "
@@ -96,6 +97,10 @@ def write_page(
         "<p>Source is on the left; corrected is on the right. Photo source views use the "
         "product's neutral export with the same orientation, ICC handling and bit depth. "
         "Each pair clip is a viewing aid; the linked product output is the item of record.</p>",
+        "<p>Pair viewing aid encoding: NVENC HEVC, p5/hq, VBR CQ 20 with no bitrate target. "
+        "CPU fixture controls use libx265 ultrafast. Product exports keep shipped defaults.</p>",
+        "<p>Limit: run commands from the worktree root; invocation from another working "
+        "directory is outside this instrument's supported scope.</p>",
     ]
     if (roots.allowed / "review-sheet.csv").is_file():
         parts.append(_link("", "review-sheet.csv", "Owner review sheet (CSV)"))
@@ -119,6 +124,8 @@ def write_page(
             parts.append(
                 f"<p>{escape(str(item['status']))}: {escape(str(item.get('message', '')))}</p>"
             )
+            for warning in item.get("warnings", []):
+                parts.append(f"<p>Warning: {escape(str(warning))}</p>")
             if item["status"] == "done":
                 folder = "photos" if item["kind"] == "photo" else "clips"
                 parts.append(
@@ -130,7 +137,10 @@ def write_page(
                     if item.get(key):
                         name = str(item[key])
                         _link("thumbs", name, label)  # Validate the name before constructing src.
-                        parts.append(f'<img src="{quote("thumbs/" + name)}" alt="{label}">')
+                        parts.append(
+                            f'<figure><img src="{quote("thumbs/" + name)}" alt="{label}">'
+                            f"<figcaption>{label}</figcaption></figure>"
+                        )
                 if item.get("pair_name"):
                     parts.append(_link("pairs", item["pair_name"], "Pair clip (viewing aid)"))
                 for still in item.get("stills", []):
@@ -140,6 +150,15 @@ def write_page(
             if item.get("aid_message"):
                 parts.append(f"<p>Viewing aid: {escape(item['aid_message'])}</p>")
             parts.append("</article>")
+    not_built = [
+        item for item in items if item["status"] in {"excerpt_failed", "failed", "pending"}
+    ]
+    parts.append("<h2>Not built</h2>")
+    for item in not_built:
+        parts.append(
+            f"<p>{escape(str(item['source_name']))}: {escape(str(item['status']))} "
+            f"{escape(str(item.get('message', '')))}</p>"
+        )
     parts.append("</html>")
     return roots.write_text(roots.allowed / "index.html", "\n".join(parts) + "\n")
 
