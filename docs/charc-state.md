@@ -9,46 +9,56 @@
 
 ---
 
-### RESUME HERE (CHARC generation 10: read this block top to bottom; gen 9 `clearwater-charc-20261029-1554` ROLLED 2026-11-01 ~08:00Z at ~410K, clean boundary, no cell at CHARC's seat; gen 8 rolled 2026-10-30 ~01:58Z at ~410K; gen 7 2026-10-29 ~19:00Z; gen 6 2026-10-29 ~14:30Z)
+### RESUME HERE (CHARC generation 10 LIVE: `clearwater-charc-20261031-2201`, online 2026-11-01 08:03Z, launched by gen 9 at its roll; gen 9 rolled 2026-11-01 ~08:00Z at ~410K; gen 8 2026-10-30 ~01:58Z; gen 7 2026-10-29 ~19:00Z)
 
-- **GEN 10 PICKUP (read first).** Orchestrator = **gen 28 `clearwater-orchestrator-20261029-2103`** (online 2026-10-30 07:03Z,
-  PAUSED by the owner until 2026-11-01 ~08:00Z; resumed on my post bc8b1a74 + cue). ALL cues go there; re-read
-  `comms/.launch-sessions.json` before every cue (the launcher rewrites it at each launch). Time the bash launch and record
-  it here. Drain with `read --role charc --all` (gen 9 stopped draining at its announce). Main is FREE. **Subjects under
-  100 chars; see the `posted ->` line before cueing** (memory role-mail-subject-cap-before-cue: gen 9 slipped three times).
-  **OWNER DIRECTION (2026-10-30 ~07:05Z, verbatim, binding):** "When we pick up, we can commission phase 5 in parallel
-  with completing the remaining danglers." Owner said "resume" 2026-11-01 ~08:00Z. **Phase 4 (plan rows WP4.1-4.3) is
-  COMPLETE** (WP4.3 accepted `28c4a75`, my rows `94717423`). **YOUR FIRST JOB: commission Phase 5** = WP5.1 automated
-  acceptance suite (plan: size L, depends WP4.3, flags `gui`, `footage`) and WP5.3 visual review pack for CP5 (size S,
-  depends WP4.3, `footage`; the pack is what the owner reviews at CP5, the look check and V2 are OWNER-reserved), with
-  briefs you write or commission posts the orchestrator drafts; WP5.2 performance and memory runs (M, `gpu`, EXCLUSIVE)
-  AFTER the danglers' windows. Lanes by weekly pace at commission time (gen 28 posts both paces on resume; Codex had
-  headroom: 0.415 vs Claude 1.45 at 06:40Z 2026-10-30; the owner paused for the weekly burn, so prefer Codex where the
-  package is well-specified; never at the cost of quality). One heavy job on the host at a time; windows EXCLUSIVE,
-  opened / closed to you one at a time. Read plan section 6 Phase 5 and the V-table (plan :351-376) before drafting.
-  **DANGLERS (gen 28 runs them; you rule their STOPs):** (1) WP3.6P (Codex, worktree `wp3.6p` head `081f851c`; R1 + R2
-  ruled: byte-level kept-EXIF inventory, inconclusive-and-continue, independent ICC oracle, D63 output structure with the
-  derived Software count; turn 7 = R2 remediation, then A R3, seat runs (`photo_check`, `orientation`, the footage node),
-  two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine: AD-24
-  status (confirmed on the Apple layouts present, tag-only branch unwitnessed: FFmpeg honours irot and ignores EXIF-only),
-  DR-42 (a)/(c) notes, DR-43 note, NEW row EXIF ColorSpace read as untagged, Result 2 photo row closed; spec items for the
-  owner's next revision bundle: D63 'provisional' wording, :567 photo resolution = 24.5 MP max. (2) WP4.6 (Claude
-  opus-high, worktree `wp4.6` head `9fe947fe`; brief FINAL `b6a31b5`; R1, R2, R3 ruled; design change (d): the stderr tail
-  goes to the LOG, the failure text carries no tail (type name + errno at most), redaction deleted; R3 = last full round
-  for the protocol class; R3-1 RED-first + R3-2 MINOR in the terminating clean-up by a FRESH cell 5, verified at gen 28's
-  seat, then the EXCLUSIVE V7 window (modes v7c, v7e, v7d, dr44c-export; WP4.6 driver copy md5
+- **GEN 10 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 28
+  `clearwater-orchestrator-20261029-2103`** (resumed 08:01Z on the owner's "resume"; status 225d1163: paces Codex 0.197,
+  Claude 0.994 = 84 % at 84.5 % of the window, Claude resets 2026-11-02 09:59Z, Codex 2026-11-04 10:07Z). ALL cues go
+  there; re-read `comms/.launch-sessions.json` before every cue. Bash gauge 34 ms. Drain `read --role charc --all`.
+  Main `dd3cf1eb` clean, FREE. C: 179 GB free, D: 2.4 TB. Subjects under 100 chars; see the `posted ->` line before
+  cueing. Codex-built packages: 9. Register through DR-101.
+- **PHASE 5 COMMISSIONED 08:14Z (post b488ac53 + cue; owner-decided parallel with the danglers):** briefs
+  `docs/briefs/wp5.3-brief.md` (165 lines) and `docs/briefs/wp5.1-brief.md` (185 lines), both DRAFT by me on main
+  `dd3cf1eb` (0 CR), FINAL on b488ac53 with the orchestrator's dispatch fill (base, yields, GATE_CHECKS). Both Codex lane,
+  STRONG. **WP5.3** = `tools/reviewpack/` builds the CP5 pack under `work/wp5.3/` through `tools/headless_export.py` at the
+  shipped defaults (source view = `--neutral`, Q1); test set BY NAME (P-A 64 photos, P-Z 9 pre-corrected JPGs own rows,
+  V-S 26, V-D 8, V-P 17 MOVs, V-R 2 HLG refused, V-Z dp_color + edits own rows); excerpt rule whole ≤ 45 s else 30 s at
+  40 % stream copy; sheet + `tally` (D65 80 %); presets shown (AD-13: both = AD-8 defaults in v1, AD-13 NOTE mine at
+  accept); the BUILD is RUN REQUESTS at the orchestrator's seat (~3-4 h GPU in Q8 order, one heavy job at a time, 25 GB
+  free). **WP5.1** = four new test modules + `tests/acceptance_support.py` + report matrix closing gaps G1-G10 (my
+  coverage pass against 928760a7: V5 two-reader orientation, V4 best-effort record on `gx011627_trim` + runner sweep
+  with VFR, V6 runner refusals + untagged BT.709/limited text at export and in the shell, V9 video post-encode at
+  `PAIR_MEAN_SYNTHETIC` 2.5/255, V10 video e2e, V11 ENOSPC on the real PNG writer + photo crash, N10 video render
+  digests, D91 video provenance, V18 on the real trim); NO product edit, NO existing-test edit; a product defect = STOP
+  to me (Q3); gate = two legs + the `fullclip` leg once; serial budget +180 s (Q4). Lane note in the post: if
+  `codex_cell.py` is one-session-at-a-time, WP5.3 first then WP5.1; Claude lane only if Codex cannot take it before the
+  2026-11-02 reset. **WP5.2** (EXCLUSIVE, gpu) NOT commissioned: after the danglers' windows. Waiting on: gen 28's
+  dispatch report + lane share; round-0 notes (disputes = STOP to me); WP5.3 Q6 preset location.
+- **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
+  `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
+  node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
+  AD-24 status (confirmed on the Apple layouts present; tag-only branch unwitnessed: FFmpeg honours irot and ignores
+  EXIF-only), DR-42 (a)/(c) notes, DR-43 note, NEW row EXIF ColorSpace read as untagged, Result 2 photo row closed; spec
+  items for the owner's next revision bundle: D63 'provisional' wording, :567 photo resolution = 24.5 MP max. (2) WP4.6
+  (opus-high cell 5 dispatched 08:01Z, worktree `wp4.6` head `9fe947fe`, brief FINAL `b6a31b5`; R1-R3 ruled; design
+  change (d): stderr tail to the LOG, failure text = type name + errno at most, redaction deleted; R3 = last full round
+  for the protocol class; cell 5 = terminating clean-up (R3-1 RED-first, R3-2 MINOR cancel check), verified at gen 28's
+  seat, then the EXCLUSIVE V7 window (modes v7c, v7e, v7d, dr44c-export; WP4.6 driver md5
   `074cbb62b2a9aa8949ebcf30d803b51a` for v7e / dr44c-export, pinned `0b9ee6cc...` for v7c / v7d), report, B (Codex),
-  gate, accept). STOPs to you: (c)/(e) > 100 ms, child CPU fallback, export wall > +10 % vs 209.1-210.9 s (WP4.3's was a
-  cache-HIT export; the child's analysis is cold: if it trips, the seeding remedy is YOUR `cache/` ruling), spawn > 10 s.
-  At its accept mine: DR-98 CLOSED on figures or its STOP carried to the owner; NEW AD-31 (export in a spawned worker
-  process, the design + figures); AD-23 extended (the Python worker through the helper); NEW rows: F8 (D87 re-check
-  charges cache growth to the output volume, `jobs/export.py:916`, pre-existing WP3.21, widened), F4 (engine OSError texts
-  carry full paths, WP3.14 `export.py:678-685`), GUI cache accounting blind to `export/<uuid>` if material; DR-44 (c)
-  re-confirmed; DR-62 / DR-69 notes; `_HeldSink` / `_ProgressSink` (unused test helpers kept for the pinned driver):
-  removal or a row. Open owner decisions: none. Owner-pending inputs: none. Owner action pending: none. Next owner
-  checkpoint: CP5 (WP5.3 pack). Every owner-facing summary ends with those three lines. Register through DR-101
-  (DR-98..DR-101 opened 2026-10-30; DR-99 = the bench `telemetry_origin` load-sensitive bound, a same-way failure alone on
-  main is recorded under it without a STOP). Codex-built packages: 9.
+  gate, accept). STOPs to me: (c)/(e) > 100 ms, child CPU fallback, export wall > +10 % vs 209.1-210.9 s (WP4.3's was
+  a cache-HIT export; seeding remedy = my `cache/` ruling), spawn > 10 s. At its accept mine: DR-98 CLOSED on figures or
+  its STOP carried to the owner; NEW AD-31 (export in a spawned worker process); AD-23 extended (the Python worker
+  through the helper); NEW rows F8 (D87 re-check charges cache growth to the output volume, `jobs/export.py:916`), F4
+  (engine OSError texts carry full paths, `export.py:678-685`), GUI cache accounting blind to `export/<uuid>` if
+  material; DR-44 (c) re-confirmed; DR-62 / DR-69 notes; `_HeldSink` / `_ProgressSink` removal or a row.
+- **Phase 4 (plan rows WP4.1-4.3) COMPLETE** (WP4.3 accepted `28c4a75`, my rows `94717423`). Worktrees live:
+  `wp3.6p`, `wp4.6` (OCCUPIED), the `brief-*` and `orch-state-g2x` trees (releasable by the orchestrator).
+- Open owner decisions: none. Owner-pending inputs: none. Owner action pending: none. Next owner checkpoint: CP5 (the
+  WP5.3 pack with its sheet; the look check and V2 are OWNER-reserved; CHARC writes `docs/proofs/cp5-visual-review.md`
+  after the owner's sheet). Every owner-facing summary ends with those lines.
+- **Form debt of this file (custodian of FORM, charter 5):** 2,200 lines of generation history under a pointer that the
+  convention says is overwritten each session; a phase-boundary proposal (Phase 5 close) = move gens 2-9 to an
+  append-only `docs/charc-log.md` and keep only the live block here. Not done mid-phase.
 - **(gen 9 history follows; newest facts at the end of its block; then gen 8 and older)**
 - **GEN 9 PICKUP (was; HOLDING line superseded).** Orchestrator = **gen 26 `clearwater-orchestrator-20261029-1612`** (gen 25 rolled 02:12Z; the pickup text below was written against gen 25, online 23:41Z
   2026-10-29; gauge 26 ms). ALL cues go there; re-read `comms/.launch-sessions.json` before every cue. Time the bash
