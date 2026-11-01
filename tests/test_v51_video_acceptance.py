@@ -23,6 +23,7 @@ from numpy.typing import NDArray
 import clearwater
 import video_fidelity as vf
 from acceptance_support import (
+    RenderDigests,
     RunnerResult,
     assert_fidelity,
     assert_names_only,
@@ -34,6 +35,9 @@ from acceptance_support import (
     run_main,
     video_provenance,
 )
+from clearwater import core
+from clearwater.app import composition
+from clearwater.interfaces import Settings
 from clearwater.io.video import probe
 from clearwater.methods import available_methods
 from container_spike import compare
@@ -43,6 +47,14 @@ type RecordProperty = Callable[[str, object], None]
 
 FIXTURES = ("hevc8-bt709-full", "hevc10", "untagged", "vfr", "rotated")
 CPU = ("--force-cpu", "--encoder", "libx265")
+RUNNER_POSTENCODE_MEAN = 3.5
+"""Runner characterisation bound in 1/255 units, set on 2026-11-01 (CHARC 2bd14e3a).
+
+Measured means: 2.79-2.95 at 8 bits, 2.47 at 10 bits, with shipped libx265
+quality standard. This sits above PAIR_MEAN_SYNTHETIC 2.5 for the encoder-free
+pair in test_color_roundtrip.py; it does not change AD-11's pre-encode bound.
+Maximum error is recorded, not bounded.
+"""
 
 pytestmark = pytest.mark.usefixtures("ffmpeg_tools")
 
@@ -262,7 +274,9 @@ def _assert_untagged_warning(warnings: Sequence[str]) -> None:
 def _assert_postencode(source: NDArray[np.float64], output: NDArray[np.float64]) -> None:
     assert source.shape == output.shape, "post-encode frame geometry/count changed"
     mean = float(np.abs(source - output).mean())
-    assert mean <= 2.5, f"PAIR_MEAN_SYNTHETIC exceeded: {mean:.9f}/255 > 2.5/255"
+    assert mean <= RUNNER_POSTENCODE_MEAN, (
+        f"RUNNER_POSTENCODE_MEAN exceeded: {mean:.9f}/255 > {RUNNER_POSTENCODE_MEAN}/255"
+    )
 
 
 def _assert_tags_and_rotation(record: Mapping[str, Any]) -> None:
@@ -280,7 +294,7 @@ def _assert_tags_and_rotation(record: Mapping[str, Any]) -> None:
 def test_v9_neutral_runner_postencode(
     sample: Sample, tmp_path: Path, record_property: RecordProperty, name: str
 ) -> None:
-    """Catch a neutral post-encode RGB error above 2.5/255 or changed colour/rotation tags."""
+    """Catch a neutral post-encode RGB error above 3.5/255 or changed colour/rotation tags."""
     source, root = sample(f"vid-{name}"), tmp_path / "runner"
     result = run_main([source], root, extra=(*CPU, "--neutral"))
     output = only_output(result, root / "out")
@@ -291,19 +305,36 @@ def test_v9_neutral_runner_postencode(
     difference = np.abs(src - out)
     record_property("mean_abs_255", float(difference.mean()))
     record_property("max_abs_255", float(difference.max()))
+    if name == "hevc8-bt709-full":
+        planted = out.copy()
+        planted[..., 0] += 4.0
+        record_property("planted_red_offset_mean_255", float(np.abs(src - planted).mean()))
+        with pytest.raises(AssertionError, match="RUNNER_POSTENCODE_MEAN exceeded"):
+            _assert_postencode(src, planted)
+        record_property(
+            "pixel_mutation_probe", "+4/255 on the decoded output's red channel rejected"
+        )
     _assert_postencode(src, out)
     record = fidelity_record(source, output, tmp_path / "comparison")
     _assert_tags_and_rotation(record)
     if name == "rotated":
         assert probe(output).video.rotation == stream.rotation != 0
-    with pytest.raises(AssertionError, match="PAIR_MEAN_SYNTHETIC exceeded"):
-        _assert_postencode(src, src + 3.0)
     for tag in (*vf.COLOUR_ITEMS, "display orientation: video tkhd matrix"):
         wrong = copy.deepcopy(record)
         _items(wrong)[tag]["status"] = compare.DIFFERENT
         with pytest.raises(AssertionError, match="colour/orientation changed"):
             _assert_tags_and_rotation(wrong)
-    record_property("mutation_probe", "3/255 RGB offset and changed colour/rotation tags rejected")
+    record_property("mutation_probe", "changed colour/rotation tags rejected")
+    if name == "hevc8-bt709-full":
+        # One additional characterisation only: quality high has no numeric bound here.
+        high_root = tmp_path / "quality-high"
+        high_result = run_main([source], high_root, extra=(*CPU, "--neutral", "--quality", "high"))
+        high_output = only_output(high_result, high_root / "out")
+        high = decode_video_rgb(high_output, stream, tmp_path / "quality-high-decode")
+        high_difference = np.abs(src - high)
+        record_property("quality_standard_mean_255", float(difference.mean()))
+        record_property("quality_high_mean_255", float(high_difference.mean()))
+        record_property("quality_high_max_255", float(high_difference.max()))
 
 
 def _assert_output_names(outputs: Sequence[Path], expected: Sequence[str]) -> None:
@@ -428,3 +459,111 @@ def test_d91_video_provenance(
 
 def _assert_no_provenance(value: Mapping[str, Any] | None) -> None:
     assert value is None, "disabled video provenance still present"
+
+
+def _render_run(source: Path, root: Path, *, force_cpu: bool) -> tuple[Path, RenderDigests]:
+    root.mkdir(parents=True, exist_ok=True)
+    recording = RenderDigests(available_methods()["c3"])
+    flags = CPU if force_cpu else ("--encoder", "libx265")
+    # Exclude created-time provenance from the file-byte characterisation on both runs.
+    with composition.proxy_cache(root / "cache") as cache:
+        exports = composition.export_jobs(methods={recording.id: recording}, cache=cache)
+        result = run_main([source], root, extra=(*flags, "--no-provenance"), exports=exports)
+        output = only_output(result, root / "out")
+    assert result.record["items"][0]["device"] == ("CPU: forced" if force_cpu else "GPU")
+    assert recording.devices == ({"cpu"} if force_cpu else {"cuda:0"})
+    return output, recording
+
+
+def _source_ticks(source: Path) -> set[int]:
+    stream = probe(source).video
+    times = vf.gather(source).pts
+    assert times and all(value is not None for value in times), "N10 source pts missing"
+    ticks = [value / stream.time_base for value in times if value is not None]
+    assert all(tick.denominator == 1 for tick in ticks), "N10 source pts are not whole ticks"
+    assert len(ticks) == stream.nb_frames and len(set(ticks)) == len(ticks)
+    return {int(tick) for tick in ticks}
+
+
+def _assert_render_repeat(
+    first: Mapping[int, str], second: Mapping[int, str], expected: set[int]
+) -> None:
+    assert expected and set(first) == set(second) == expected, "N10 render pts coverage differs"
+    assert first == second, "N10 pre-encode render digests differ"
+
+
+def _record_repeat(
+    outputs: tuple[Path, Path],
+    recordings: tuple[RenderDigests, RenderDigests],
+    expected: set[int],
+    record_property: RecordProperty,
+) -> None:
+    first, second = recordings
+    _assert_render_repeat(first.renders, second.renders, expected)
+    record_property("render_frame_count", len(first.renders))
+    record_property("render_digests", json.dumps(first.renders, sort_keys=True))
+    record_property("render_devices", sorted(first.devices))
+    # File identity is observed, never required (N10 binds the pre-encode pixels).
+    record_property(
+        "output_files_byte_identical", outputs[0].read_bytes() == outputs[1].read_bytes()
+    )
+    wrong = dict(second.renders)
+    wrong[min(expected)] = "planted changed digest"
+    with pytest.raises(AssertionError, match="N10 pre-encode render digests differ"):
+        _assert_render_repeat(first.renders, wrong, expected)
+    wrong = dict(second.renders)
+    wrong.pop(min(expected))
+    with pytest.raises(AssertionError, match="N10 render pts coverage differs"):
+        _assert_render_repeat(first.renders, wrong, expected)
+    record_property("mutation_probe", "changed render digest and missing pts rejected")
+
+
+@pytest.mark.slow(reason="FFmpeg encode")
+def test_n10_video_cpu_render_digests_repeat(
+    sample: Sample, tmp_path: Path, record_property: RecordProperty
+) -> None:
+    """Catch per-pts pre-encode pixel changes on repeated identical CPU exports."""
+    source = sample("vid-hevc8-bt709-full")
+    expected = _source_ticks(source)
+    first, recording_a = _render_run(source, tmp_path / "first", force_cpu=True)
+    second, recording_b = _render_run(source, tmp_path / "second", force_cpu=True)
+    _record_repeat((first, second), (recording_a, recording_b), expected, record_property)
+
+
+def _assert_cpu_gpu_first_frame(cpu: NDArray[np.float64], gpu: NDArray[np.float64]) -> None:
+    assert cpu.shape == gpu.shape, "N10 CPU/GPU first-frame geometry differs"
+    difference = np.abs(cpu - gpu) / 255.0
+    assert float(difference.max()) <= 2e-3, "N10 CPU/GPU decoded first-frame max exceeds 2e-3"
+    assert float(difference.mean()) <= 2e-4, "N10 CPU/GPU decoded first-frame mean exceeds 2e-4"
+
+
+@pytest.mark.gpu
+@pytest.mark.slow(reason="FFmpeg encode")
+def test_n10_video_gpu_render_digests_repeat_and_match_cpu(
+    sample: Sample, tmp_path: Path, record_property: RecordProperty
+) -> None:
+    """Catch GPU repeat drift or a decoded first frame outside the CPU/GPU bounds."""
+    pytest.importorskip("cupy")
+    source = sample("vid-hevc8-bt709-full")
+    stream = probe(source).video
+    _, reason = core.select_backend(Settings(), stream.height, stream.width, "c3")
+    if reason != "GPU":
+        pytest.skip(f"no usable CUDA device: {reason}")
+    expected = _source_ticks(source)
+    first, recording_a = _render_run(source, tmp_path / "first", force_cpu=False)
+    second, recording_b = _render_run(source, tmp_path / "second", force_cpu=False)
+    _record_repeat((first, second), (recording_a, recording_b), expected, record_property)
+    cpu_output, _ = _render_run(source, tmp_path / "cpu", force_cpu=True)
+    cpu = decode_video_rgb(cpu_output, stream, tmp_path / "cpu-decode", frames=1)
+    gpu = decode_video_rgb(first, stream, tmp_path / "gpu-decode", frames=1)
+    difference = np.abs(cpu - gpu) / 255.0
+    record_property("cpu_gpu_first_frame_max", float(difference.max()))
+    record_property("cpu_gpu_first_frame_mean", float(difference.mean()))
+    _assert_cpu_gpu_first_frame(cpu, gpu)
+    with pytest.raises(AssertionError, match="N10 CPU/GPU decoded first-frame max exceeds"):
+        _assert_cpu_gpu_first_frame(cpu, cpu + 255.0 * 0.003)
+    sparse = cpu.copy()
+    sparse[..., 0] += 255.0 * 0.001
+    with pytest.raises(AssertionError, match="N10 CPU/GPU decoded first-frame mean exceeds"):
+        _assert_cpu_gpu_first_frame(cpu, sparse)
+    record_property("cpu_gpu_mutation_probe", "above-max and above-mean first frames rejected")

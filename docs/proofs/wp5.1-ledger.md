@@ -445,7 +445,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | 4 / T3-1 amendment | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 178,501 | committed as `0d310b87` (0 CR); CHARC `8276adb56f541a57` resolved T4-1 by end state |
 | 5 / T4 complete; session 2 ends | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 194,928 | retired after `93869f4c`; fresh session 3 starts T5 from this ledger |
 | 6 / T5-T6 product STOP; session 3 starts | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | 120,480 | committed `462d7bb6` (0 CR); CHARC `3a1497d6` permits T6/T7 continuation with T6-1 KNOWN RED, owned by WP-D54 |
-| 7 / T6 validation | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | pending dispatcher | dispatcher reads footer; evaluate near 200K, stop at a step boundary near 250K |
+| 7 / T6 validation | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | 143,997 | committed `7687f564` (ledger, 0 CR); brief amendment `1ed04a21` folds in CHARC's T6-1/T6-2 rulings |
+| 8 / T6-2 remediation and T7 | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | pending dispatcher | dispatcher reads footer; evaluate near 200K, stop at a step boundary near 250K |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -1478,3 +1479,211 @@ fixture, tolerance change, local-config edit, footage-folder read, other
 worktree access, mailbox post, git-index write or commit. No new seat run
 request is needed. Yield at the T6 boundary with T6-2 for CHARC; do not start
 T7 in this turn.
+
+## Session 3 / Turn 8: T6-2 remediation and T7
+
+### Binding ruling, depth and scope
+
+Inspected base `1ed04a21`, containing the committed brief's full T6-2 ruling,
+read in full this turn. CHARC `2bd14e3a90ed741d` (2026-11-01T09:51:05Z)
+governs G5's new post-encode characterisation and the serial budget. Session
+3's dispatcher-supplied depth after turn 7 is **143,997**, now in the depth
+table; this turn's depth is for the dispatcher to fill. No depth estimate.
+
+**Serial-leg budget: 300 s for the package, CHARC 2bd14e3a.** This supersedes
+the historical 180 s limit/risk above. No node moves behind `fullclip` and
+all video nodes retain `slow(reason="FFmpeg encode")`; GPU/footage markers
+are additional. The actual serial-leg delta is measured at the final gate;
+over 300 s is reported to CHARC for another ruling. No sizing STOP this turn.
+
+**KNOWN RED: T6-1, product fix WP-D54 (CHARC 3a1497d6).** Its node and warning
+assertion were left exactly unchanged. The source-text comparison against
+committed HEAD for both the test function and its warning helper passed in
+`work/wp5.1/t8-results.log`. It was deselected in this turn's targeted run,
+not rerun or claimed passing. Rebase over WP-D54 remains a gate prerequisite.
+
+### RED first, then the separate runner bound
+
+T6-2's real-output RED of record remains turn 7's
+`t7-video.log` / `t7-video.xml` / `t7-results.log`: the three failed
+`test_v9_neutral_runner_postencode` instances name `PAIR_MEAN_SYNTHETIC`
+and means 2.953815972, 2.788103781, 2.953815972 against 2.5/255. Those were
+run before the new constant existed; not rerun merely to duplicate that RED.
+
+Before adding the constant, added the ruled planted-output control to the
+hevc8 instance: copy the actual decoded output as float64 in 1/255 units,
+add exactly **4.0 to its red channel only**, do not clip, and call the same
+post-encode bound assertion on that planted output. The initial call was
+uncaught so the RED run demonstrates its actual failure, not a simulated
+pytest result:
+
+```bash
+PYTHONPATH=scripts uv run pytest -q 'tests/test_v51_video_acceptance.py::test_v9_neutral_runner_postencode[hevc8-bt709-full]' --basetemp=work/wp5.1/t8-red-tmp -p sandbox_mkdir_shim -p no:cacheprovider -o junit_family=xunit1 --junitxml=work/wp5.1/t8-red.xml > work/wp5.1/t8-red.log 2>&1
+```
+
+Observed exit **1**, **1 failed in 10.12 s**. The failing source line is
+`_assert_postencode(src, planted)`; message:
+`PAIR_MEAN_SYNTHETIC exceeded: 3.719042052/255 > 2.5/255`.
+The unplanted mean property remains 2.953815972. This RED was collected
+before `RUNNER_POSTENCODE_MEAN` existed.
+
+Then applied the ruling: new **RUNNER_POSTENCODE_MEAN = 3.5** only in the
+owned video module, with its docstring naming the 2026-11-01 measurements
+(2.79-2.95 at 8 bits, 2.47 at 10 bits), shipped libx265 quality standard,
+the encoder-free `PAIR_MEAN_SYNTHETIC` 2.5 below it, and the recorded/unbounded
+maximum. The bound assertion now fails by the new constant's name. The
+planted-red-offset call is retained inside `pytest.raises` matching
+`RUNNER_POSTENCODE_MEAN exceeded`, and passes as a control because the
+planted 3.719042052 still exceeds **3.5**. The earlier artificial +3/255
+all-channel control was replaced by this explicitly ruled +4/255 one-channel
+control; one pixel control suffices. Colour/rotation tag controls remain
+executed for all four V9 instances.
+
+`tests/test_color_roundtrip.py` and AD-11's pre-encode bounds are unchanged.
+T6-2 is resolved by the bound ruling and passing controls, not a product fix.
+T10 must cite CHARC `2bd14e3a` and retain the accept-note sentence:
+"V9's AD-11 bound binds pre-encode; the runner's post-encode leg is
+characterised at 3.5/255 mean at the shipped quality".
+
+### GREEN run: four V9 instances, high characterisation, CPU N10
+
+```bash
+PYTHONPATH=scripts uv run pytest -q -x tests/test_v51_video_acceptance.py --basetemp=work/wp5.1/t8-tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" -k "test_v9_neutral_runner_postencode or test_n10_video_cpu_render_digests_repeat" --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t8-targeted.xml > work/wp5.1/t8-targeted.log 2>&1
+```
+
+Exit **0**, **5 passed, 15 deselected in 41.32 s**. All selected instances
+ran; no skip. Video-module roster is now the planned **20 instances**, with
+two N10 instances added (one seat-only GPU). No extra high-quality test
+instance was added: its one additional runner export and recorded properties
+live in the existing hevc8 V9 instance. All module MD5 guards pass.
+
+| V9 sample / quality | Mean absolute error, 1/255 | Maximum, 1/255 | Result |
+|---|---:|---:|---|
+| hevc8-bt709-full / standard | 2.953815972222 | 183 | PASS <= 3.5 |
+| untagged / standard | 2.788103780864 | 203 | PASS <= 3.5 |
+| rotated / standard | 2.953815972222 | 183 | PASS <= 3.5 |
+| hevc10 / standard | 2.472876682319 | 183 | PASS <= 3.5 |
+| hevc8-bt709-full / high | 2.521328960905 | 125 | characterisation ONLY, no numeric assertion |
+| hevc8 output, planted red +4/255 / standard | 3.719042052469 | not needed | rejected by RUNNER_POSTENCODE_MEAN as required |
+
+The high figure is recorded beside standard (2.521329 vs 2.953816) without
+an asserted improvement or numeric bound. It is one `--quality high` export
+of the unchanged hevc8 fixture, same source decode, neutral parameters,
+CPU/libx265; maximum also recorded. All samples use the full committed
+containers under the R0-4 sizing exception.
+
+JUnit setup + call + teardown seconds from this run (prefix
+`tests/test_v51_video_acceptance.py::`):
+
+| Node | Markers / leg | Result | Seconds |
+|---|---|---|---:|
+| test_v9_neutral_runner_postencode[hevc8-bt709-full] (includes one high export and pixel control) | slow / serial | PASS | 12.104 |
+| test_v9_neutral_runner_postencode[untagged] | slow / serial | PASS | 5.839 |
+| test_v9_neutral_runner_postencode[rotated] | slow / serial | PASS | 5.693 |
+| test_v9_neutral_runner_postencode[hevc10] | slow / serial | PASS | 6.034 |
+| test_n10_video_cpu_render_digests_repeat | slow / serial | PASS | 11.057 |
+| test_n10_video_gpu_render_digests_repeat_and_match_cpu | gpu, slow / serial | NOT RUN: seat-only request below | pending |
+
+### T7 N10 construction and actual CPU result
+
+Reuse the committed `acceptance_support.RenderDigests`: wrap real IF-3
+`c3`, digest its returned pixels (dtype/shape/C-order SHA-256) by input pts
+before the writer encodes them, and delegate all analysis/closed-form/render
+behavior unchanged. Build a composition-root export engine around that method
+and an explicitly owned scratch proxy cache closed on every path. Pass it
+through `headless_export.main(argv, exports=...)`. No oracle CLI is imported.
+
+CPU: two independent scratch invocations with the same source, parameters
+and flags `--force-cpu --encoder libx265 --no-provenance`. Provenance is off
+in both so its creation timestamp does not confound the file-byte
+characterisation. Fresh caches exercise actual complete analysis/render
+passes. Expected pts ticks come independently from the source's exact
+rational timestamps and time base, with integer-tick, frame-count and
+uniqueness checks. Assert both digest maps cover ALL source pts and are
+identical. Assert actual render devices `{cpu}` and item device `CPU: forced`.
+
+Actual CPU result: **45 render digests**, all 45 pts covered, identical
+run-to-run; `render_devices=['cpu']`. Complete output FILES were
+**byte-identical = True**, recorded only, not asserted. All digest values
+are retained in JUnit properties. Planted changed digest and dropped pts
+both rejected by name in the passing node (GREEN-ON-ARRIVAL controls).
+
+GPU form is written but NOT run in the sandbox. It uses the shipped GPU
+selector, skips only if CUDA is unavailable, asserts actual `{cuda:0}`
+rendering and item `GPU` (so CPU fallback cannot count as GPU), compares
+two GPU runs' full-pts digest maps, and records file-byte identity. It then
+does one CPU export with the same encoder/options, decodes the first output
+frame on each side using the existing helper, scales errors from 1/255 to
+[0,1], records and asserts **max <= 2e-3, mean <= 2e-4** unchanged. Separate
+above-max and above-mean first-frame controls are present. These GPU
+assertions/controls await the seat and are not claimed passing here.
+
+### G2 creation-time documentation anchors for T10
+
+Read-only report search found `docs/reports/wp3.10-video-encode.md:145`-`:148`
+explicitly lists **creation date and time** among `not_carried` items when
+the source has GoPro settings (Q10, D105). That documents the general
+best-effort limitation category. Its historical GX011627 measurement at
+`:199` instead recorded creation time SAME. The current G2 three-field loss
+is therefore a new observation, not a repeat of that old figure.
+
+`docs/reports/wp4.4-mov-input.md:123`-`:129` lists lost mebx data tracks and
+an output creation_time key; it does not document this creation-time loss.
+Neither historical report documents the exact current triple loss
+(container tag, mvhd, per-stream tags). T10 must cite the WP3.10 generic
+limitation and this distinction beside turn 7's full G2 presence table;
+do not replace the three observed FALSE rows with the earlier SAME result.
+No preservation assertion or new STOP was added for best-effort loss.
+
+### Light checks and verification-loop record
+
+| Evidence under work/wp5.1/ | Observed summary |
+|---|---|
+| t8-red.log / t8-red.xml | 1 failed in 10.12 s, named old bound on actual planted red-channel offset |
+| t8-targeted.log / t8-targeted.xml | exit 0; 5 passed, 15 deselected in 41.32 s |
+| t8-results.log | per-node times/properties; high/standard figures; 45 CPU digests and file-byte identity; known-red functions exactly unchanged |
+| t8-ruff.log | exit 0; All checks passed! for support and new v51 modules |
+| t8-test-mypy.log | exit 0; Success: no issues found in 2 source files (MYPYPATH=tools;tests) |
+| t8-format.log | only owned video module formatted |
+| t8-format-check.log | exit 0; support/video modules already formatted |
+| t8-lf.log | zero CR bytes in each of the two changed files |
+| t8-diff-check.log | exit 0; diff whitespace check clean |
+
+Verification loop: RED confirmed before introducing the ruled constant;
+three old-bound real-output REDs retained as turn 7's record; GREEN confirmed
+with actual four-sample comparisons and one-channel positive control at the
+new bound. Confirmed CPU N10 full-coverage bit identity and independently
+exercised changed-digest/dropped-pts controls. High quality is observed,
+never bounded. No new product failure or false-positive finding; no product
+fix. GPU validation and the complete suite remain pending. No second full
+run was needed after the selected tests passed; later edits were ledger and
+the constant's explanatory docstring only.
+
+New findings: Critical 0 / Major 0 / Minor 0; NEW 0 / REOPENED 0;
+T6-2 resolved by CHARC ruling; T6-1 remains KNOWN RED under WP-D54. Reverts 0;
+product-code fixes 0; one owned test-code module changed plus this ledger.
+No Reviewer A round ran this turn. The bound/control and N10 builds are
+bundled as explicitly commissioned for turn 8.
+
+Locks: no product/existing-test edit, dependency, committed fixture,
+interface, local configuration, footage-folder read, other-worktree access,
+mailbox post, git-index write or commit. Every export/cache/decode/record
+written by these nodes is below its tmp_path; records/provenance contain
+names only. `tests/acceptance_support.py` and
+`tests/test_color_roundtrip.py` are unchanged. No GPU node ran in the cell.
+
+### T7 GPU RUN REQUEST and yield
+
+Dispatcher's seat from the worktree root, `PYTEST_ADDOPTS` unset, expected
+**20-40 s** (estimate, not a measured figure), no exclusive window or other
+heavy run open:
+
+```bash
+PYTHONPATH=scripts uv run pytest -q -rs tests/test_v51_video_acceptance.py::test_n10_video_gpu_render_digests_repeat_and_match_cpu --basetemp=work/wp5.1/t8-seat-gpu --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t8-seat-gpu.xml > work/wp5.1/t8-seat-gpu.log 2>&1
+```
+
+Return log/XML, actual render device, digest count/file-byte characterisation,
+CPU/GPU first-frame mean/max and executed mutation properties. Any GPU
+failure is adjudicated against the brief's unchanged T7 bounds; no fallback
+or softening. Yield here after T7 for the seat run; T8 shell construction
+is not started in this turn.
