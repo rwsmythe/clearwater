@@ -1103,3 +1103,42 @@ job continues." Added as a follow-on to `fc403cf3` (already committed in the ear
   the probe's `nb_frames` (`jobs/export.py:1085`, `:1112`, `:969`), so a clip decoding more
   frames than its container states would send `done > total`; those lines are now ignored (the
   bar holds, one WARNING) where in-process they reached the panel. The export is unaffected.
+
+### done > total clamp (CHARC 89a98d58)
+
+The ruling (msg `89a98d5847161adc`, binding; supersedes the done > total clause of `bc6847dd`):
+a progress line is forwarded when `done` and `total` (total may be null) are integers with
+0 <= done <= 2**31 - 1 and (total null or 0 <= total <= 2**31 - 1); when total is not null and
+done > total the parent forwards min(done, total) with the message unchanged (the final
+"Saved <name>" rides through); any other violation is logged once per job at WARNING and
+ignored. The orchestrator's reading (cell 6 brief): ONE clamp WARNING per job at the first
+clamped line naming its counts, a budget separate from the ignored-line WARNING's; the bounds
+are checked before the clamp. Cell 6, implementer-opus-high, on `52be44aa`.
+
+- RED `ed62be55` (test-only; on `52be44aa`'s product, `-k "progress or invalid_line or clamp"`:
+  `3 failed, 24 passed, 57 deselected`):
+  `test_progress_over_total_is_forwarded_clamped[done-total-plus-1]` (`assert [] == [(90, 90,
+  'frame 91')]`), `[final-line]` (`assert [] == [(90, 90, 'Saved GX011627_corrected.mp4')]`),
+  `test_a_clamp_is_logged_once_per_job_apart_from_ignored_lines` (`assert [] == [(90, 90,
+  'first'), (90, 90, 'second')]`). Passing before and after (guards): `[null-total]` (1000000
+  with a null total forwarded unchanged) and the ignore row `[done-2to31-over-total]` (2**31
+  with total 90 ignored: the bound before the clamp), which REPLACES the `[done-over-total]`
+  ignore row. `test_ignored_progress_lines_are_logged_once_per_job`'s `[5, 4, "over"]` line
+  became `[2**31, 4, "over the bound"]` (under the clamp `[5, 4]` would be forwarded; the
+  test's intent, a rejected progress line, is kept).
+- Fix `a1df2023` (product): `_decode_progress` bounds each count on its own and lets done >
+  total through; `_read_lines` (one reader per job) puts `(total, total, message)` and logs
+  the first clamp in the job at WARNING ("export worker progress done 91 > total 90 clamped to
+  90 (later ones in this job unlogged)"); the job loop's ignored-progress budget is untouched.
+  Module, `_read_lines` and `_decode_progress` docstrings state the final rule. GREEN: `27
+  passed, 57 deselected`.
+- Run lines at `a1df2023` (Git Bash subshell at the worktree root, `PYTEST_ADDOPTS` unset,
+  `QT_QPA_PLATFORM=offscreen`): `uv run pytest -q -p no:cacheprovider
+  tests/test_jobs_export_process.py tests/test_app_export_worker.py tests/test_app_deps.py
+  tests/test_io_video_spawn.py --basetemp=work/cell6-targeted`: `376 passed in 57.03s`, exit 0
+  (372 + 3 clamp rows + 1 clamp-log test; the replaced row nets 0); `uv run ruff check .`: `All
+  checks passed!`; `uv run ruff format --check .`: `292 files already formatted`; `uv run
+  mypy`: `Success: no issues found in 148 source files`; each exit 0.
+- Report: Limit 12 rewritten by replacement (the clamp hides an over-count from the bar, the
+  one WARNING naming the counts); the Reviewer B paragraph's rule sentence updated to the final
+  rule, its pointer still at Limit 12. Every blob 0 CR.
