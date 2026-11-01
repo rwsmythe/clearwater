@@ -407,7 +407,9 @@ def test_a_cancel_during_the_sweep_spawns_nothing(
     marker = tmp_path / "spawned"
     command = _child(tmp_path, "Path(ARGS[0]).write_text('x')\nresult()\n", str(marker))
     progress = _Progress()
-    monkeypatch.setattr(ProcessExportJobs, "_sweep_once", lambda self: progress._cancel.set())
+    monkeypatch.setattr(
+        ProcessExportJobs, "_sweep_once", lambda self, progress: progress._cancel.set()
+    )
     result, _ = _run(tmp_path, command, progress)
     assert result.failure is CANCELLED
     assert result.device == "none"
@@ -1092,6 +1094,37 @@ def test_the_stale_sweep_runs_once_in_the_first_jobs_run(
     os.utime(old, (stale, stale))
     assert jobs.job(_request(tmp_path))(_Progress()).ok
     assert old.exists()  # once per instance
+
+
+def test_the_stale_sweep_stops_at_a_cancel_before_its_next_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """R3-2: a cancel asked while one stale folder is removed stops the sweep there."""
+    caplog.set_level(logging.DEBUG)
+    export_folder = tmp_path / "cache" / "export"
+    first, second = export_folder / "a_old", export_folder / "b_old"
+    stale = time.time() - STALE_AFTER_S - 600
+    for folder in (first, second):
+        folder.mkdir(parents=True)
+        os.utime(folder, (stale, stale))
+    progress = _Progress()
+    removed: list[str] = []
+    real_rmtree = export_process.shutil.rmtree
+
+    def rmtree_then_cancel(path: Path) -> None:
+        real_rmtree(path)
+        removed.append(path.name)
+        progress._cancel.set()  # asked while the first removal ran
+
+    monkeypatch.setattr(export_process.shutil, "rmtree", rmtree_then_cancel)
+    marker = tmp_path / "spawned"
+    command = _child(tmp_path, "Path(ARGS[0]).write_text('x')\nresult()\n", str(marker))
+    result, _ = _run(tmp_path, command, progress)
+    assert result.failure is CANCELLED
+    assert removed == ["a_old"]
+    assert second.exists()  # left for another instance's first job
+    assert not marker.exists()
+    assert "the stale export scratch sweep stopped at a cancel" in _messages(caplog, PROCESS_LOGGER)
 
 
 # --- job(): photos, malformed requests, no file touched --------------------------------------

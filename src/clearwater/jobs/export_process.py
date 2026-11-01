@@ -13,7 +13,8 @@ One job, one worker. The job's run:
    before the start (nothing is spawned, no folder is made);
 2. on the instance's first run only, removes the scratch folders under ``<cache_dir>/export``
    older than :data:`STALE_AFTER_S` (a worker that was killed leaves its folder behind), then
-   returns ``CANCELLED`` as in step 1 when the cancel was asked during that sweep;
+   returns ``CANCELLED`` as in step 1 when the cancel was asked during that sweep (which stops
+   before its next entry);
 3. encodes the request document, creates the job's scratch folder
    ``<cache_dir>/export/<uuid4 hex>`` (the worker's own proxy cache: two processes never share
    one cache folder) and spawns the worker through AD-23's ``tool_spawn_kwargs()``;
@@ -264,7 +265,7 @@ class ProcessExportJobs:
         start = time.perf_counter()
         if progress.cancelled():
             return _failed(CANCELLED, "none", start)
-        self._sweep_once()
+        self._sweep_once(progress)
         if progress.cancelled():  # asked during the sweep: still nothing spawned
             return _failed(CANCELLED, "none", start)
         scratch = self._cache_dir / SCRATCH_FOLDER / uuid.uuid4().hex
@@ -338,8 +339,13 @@ class ProcessExportJobs:
         }
         return json.dumps(document, ensure_ascii=True, allow_nan=False).encode("ascii") + b"\n"
 
-    def _sweep_once(self) -> None:
-        """Remove stale scratch folders, on this instance's first job only (bounded, logged)."""
+    def _sweep_once(self, progress: Progress) -> None:
+        """Remove stale scratch folders, on this instance's first job only (logged).
+
+        Bounded by the folder's entry count and by a cancel, which is checked before each
+        entry: a removal already begun runs to its end, and the entries left by a cancel stay
+        until another instance's first job.
+        """
         with self._sweep_lock:
             if self._swept:
                 return
@@ -355,6 +361,9 @@ class ProcessExportJobs:
         cutoff = time.time() - STALE_AFTER_S
         removed = 0
         for entry in entries:
+            if progress.cancelled():
+                _LOG.info("the stale export scratch sweep stopped at a cancel")
+                break
             try:
                 if entry.is_symlink() or not entry.is_dir() or entry.stat().st_mtime >= cutoff:
                     continue
