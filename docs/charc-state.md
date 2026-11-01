@@ -191,7 +191,14 @@
   `missing_tags` text says "limited range" for an untagged yuvj source whose resolved range is full: open and
   export warnings disagree; remedy in `io/video/probe.py`). WP5.1 T9 `f9b0fa34` (20 ids, 82 refs); Reviewer A R1 on
   the whole WP5.1 package started 10:48Z (Claude, base 2050a89a). WP5.3 A R2 still running. Claude 87 %.
-  Waiting on: WP-D54 turn 5 / gate / accept (DR-102, DR-107 mine); WP5.3 A R2; WP5.1 A R1; 5c-16 open.
+  Waiting on: WP-D54 turn 5 / gate / accept (DR-102, DR-107 mine); WP5.1 A R1; 5c-16 open.
+- **WP5.3 A R2 10:51Z (status d79a075a; 1 MAJOR, 4 minor, 8 advisory; round 2 of 5):** F1 = a viewing-aid failure
+  (pair clip / stills / size / thumb) drops a "done" item silently, exit 0. MY PRE-EMPTIVE RULING (ack post): the
+  R1 F1 fail-loudly rule generalises to every per-item failure; the item is listed "Not built" with the aid's
+  message, its product output stays linked, the sheet row is KEPT with `viewing_aid_failed` (D65 denominator never
+  shrinks silently), the piece exits nonzero. F2-F5 concurred as turn-7 minors (BOM kept; decoding error names
+  the row; EXIF/GPS filter withholds the value fragment, never rewrites the record; exit per piece; status words
+  kept). Turn 6 adjudicates; turn 7 remediates; A R3 next. Waiting on: WP5.3 A R3.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
