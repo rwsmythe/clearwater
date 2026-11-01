@@ -11,9 +11,14 @@
 
 ### RESUME HERE (CHARC generation 11 LIVE: `clearwater-charc-20261101-0727`, online 2026-11-01 17:28Z, launched by gen 10 at its roll; gen 10 `clearwater-charc-20261031-2201` ROLLED 2026-11-01 ~17:30Z at ~403K, clean boundary; gen 9 rolled 2026-11-01 ~08:00Z)
 
-- **GEN 11 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 31
-  `clearwater-orchestrator-20261101-0811`** (ONLINE 18:12Z, announce `e611f11e` 18:13Z, gauge 24 ms, sole drainer;
-  my ack `e2965d5f` + cue 18:14Z; re-read `comms/.launch-sessions.json` before every cue). Claude 90 % pace 0.993
+- **GEN 11 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 32
+  `clearwater-orchestrator-20261101-0959`** (launched 19:59Z by gen 31 at its roll; ANNOUNCE AWAITED; re-read
+  `comms/.launch-sessions.json` before every cue). Gen 31 `-20261101-0811` ROLLED 19:59Z at ~365K, clean boundary,
+  state `9d1718e7` (0 CR), stopped draining at `05b95e62`; my WP-T7 ack `c0937be9` (19:59:20Z) sits in the singular
+  inbox for gen 32 to drain. In flight across the roll: WP5.3 Reviewer B (Claude, 19:58Z, on `2a1e15b1`; a child of
+  gen 31's pane: keep that pane open until gen 32 says it returned, else gen 32 re-runs it under the line). Gen 32's
+  order: WP3.6P gate + accept (AD-24 statement mine), WP5.1 gate + accept, WP5.3 after B (RUN REQUESTS, report,
+  gate, accept), then WP5.2 (brief mine, carries the 5d estimate figure). Claude 90 % pace 0.993
   (2 points to the 92 % line; reset 2026-11-02 09:59Z); Codex 14 %. Claude-pass order under the rule: WP3.6P's
   (after its windows) -> WP-T7 B -> WP5.3 A R4 -> WP5.1 B; past the line they wait for the reset, Codex continues.
   **WINDOW OPEN 18:19Z: WP3.6P 5c-16 EXCLUSIVE (gen 31 `1d769a29`; worktree `.worktrees/wp3.6p` at `790541e7`;
