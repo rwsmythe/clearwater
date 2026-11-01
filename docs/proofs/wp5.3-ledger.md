@@ -5,7 +5,8 @@
 - Package: WP5.3, CP5 visual review pack; Codex implementer lane, STRONG.
 - Verified base and current HEAD at round 0: `2050a89a`; initial tracked diff empty.
 - Turn 1 is task 1 only. No instrument or test code is written this turn.
-- State: **task 3 GREEN complete; yield before Reviewer A round 1**. CHARC granted R0-1, R0-2
+- State: **Reviewer A round 1 adjudicated; STOP for CHARC's F1 excerpt ruling**.
+  No remediation has been made in turn 4. CHARC granted R0-1, R0-2
   and R0-3 in `f99fca742e060f14`, folded into the brief at `b7c95a46`.
   R0-4 is resolved by the dispatcher-provided inventory CSV. No ruling is pending.
 - The dispatcher reported `uv sync` already run at its seat. It was not repeated.
@@ -348,7 +349,8 @@ DR-99 is handled only under its stated main-alone equivalence condition.
 | Round | Critical / major / minor | In / out envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Disposition / transport | Depth |
 |---|---|---|---|---|---|---|---|
 | 0 (mapping, not Reviewer A) | 0 / 3 / 1 | 4 / 0 | 4 / 0 | 0 | none / none | R0-1..3 granted at turn 2; R0-4 resolved by CSV copy; uv Python probe exit 0 | 118,603 after turn 1 |
-| Session 2 / turn 3 (GREEN verification, not Reviewer A) | 0 / 6 / 0 | 6 / 0 | 6 / 0 | 0 | instrument fixes / regression additions | Six independently reproduced instrument gaps fixed; 70 nodes green; Reviewer A pending | dispatcher pending |
+| Session 2 / turn 3 (GREEN verification, not Reviewer A) | 0 / 6 / 0 | 6 / 0 | 6 / 0 | 0 | instrument fixes / regression additions | Six independently reproduced instrument gaps fixed; 70 nodes green; Reviewer A pending | 142,467 after turn 3 |
+| A1 (session 2 / turn 4, adjudication only) | 0 / 3 / 3; 6 advisory | 10 / 2 after adjudication | 12 / 0; accepted blocking 3 | 0 | none this turn; planned instrument and regression changes, no src/ changes | Counted Claude pass; 10 ACCEPTED, F10 OUT/banked, F11 REJECTED; STOP on F1; no remediation | turn 3: 142,467; turn 4 dispatcher pending |
 
 Subsequent Reviewer A turns adjudicate every finding, update this cumulative table
 and yield without remediation. Fixes belong to a separately dispatched turn.
@@ -360,7 +362,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 |---|---|---|---|
 | Turn 1 / round 0 | dispatcher pending | 118,603 | Dispatcher supplied after turn 1; round-0 ledger committed as e7beee05. |
 | Turn 2 / RED | session 1, same session | 179,868 | Dispatcher supplied at session-2 dispatch; RED commit 10f1f70b; session 1 retired. |
-| Session 2 / turn 3 / GREEN | fresh session; dispatcher to fill ID | dispatcher pending | GREEN implementation and verification; yield before Reviewer A round 1. |
+| Session 2 / turn 3 / GREEN | fresh session; dispatcher to fill ID | 142,467 | Dispatcher supplied in turn 4; GREEN committed as f506b597. |
+| Session 2 / turn 4 / A1 adjudication | same session 2 | dispatcher pending | Adjudication only; STOP at this boundary for F1 ruling; no remediation. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -799,3 +802,154 @@ for this GREEN rung; Reviewer A convergence is not claimed.
   The report remains unwritten at the required pre-report yield boundary.
 - Task 3 is ready for Reviewer A round 1 at the dispatcher's seat. No run request
   is issued ahead of that review boundary. Dispatcher fills this session's depth.
+
+## Reviewer A round 1 (adjudicated)
+
+### Candidate, transport and counted-round assertions
+
+- Candidate independently checked: `f506b597`; initial worktree clean. Session 2 /
+  turn 4 is adjudication ONLY. No implementation or test source changed.
+  Dispatcher-supplied depth after turn 3: **142,467**; turn-4 depth remains for
+  the dispatcher. Evaluation/stop thresholds remain about 200K/250K.
+- Transport: `claude -p --model opus --effort high`, run by the dispatcher.
+  Seat model `claude-opus-5-5`; requested effort high; exit 0; is_error false;
+  38 turns; verdict NEW_CRITICAL_MAJOR_FOUND; worktree clean afterwards.
+  The supplied seat log names no CLI version; none is inferred.
+- The round COUNTS under the dispatcher's ruling. The seat log reports one
+  permission denial (an inline ffprobe fixture loop), although the review's opening
+  paragraph says no command was refused. Adopt the seat log's account. None of
+  these findings rests on that denied loop. Own probes were not denied.
+- The three external evidence files were read in place in the dispatcher's
+  `wp5.3/r1/` evidence folder; none was copied into the repo. Reviewer baseline:
+  70 passed in 16.51 s. Own shim baseline: **70 passed in 17.22 s**, exit 0;
+  JUnit has zero failures/errors/skips.
+
+Round counts: reviewer 0 critical / 3 major / 3 minor / 6 advisory, initially
+11 in-envelope / 1 out. All severity grades are retained; F10 is additionally
+outside the expressly supported invocation envelope. Final: **10 in / 2 out**;
+12 NEW / 0 REOPENED; 0 reverts. Dispositions: 10 ACCEPTED (3 major, 3 minor,
+4 advisory), F10 OUT/banked advisory, F11 REJECTED advisory (also outside the
+commissioned colour tags). No remediation this turn. Planned fixes change
+instrument behavior plus regression controls, not only tests, and never `src/`,
+frozen interfaces or the headless runner.
+
+### Own evidence and execution limits
+
+All own probe scripts, media and output logs are in this worktree's ignored
+`work/wp5.3/turn4-adjudication/`. Inputs were committed fixtures and planted copies;
+the owner footage folder was not opened/listed/probed. No image was judged.
+
+- `probes.py` / `probes.log` exercise F1-F12 on the unchanged candidate. The final
+  assertion expected F11's claimed failure; it exited 1 because FFmpeg SUCCEEDED.
+  This false hypothesis remains in the log. `F11-followup.py` / `.log` independently
+  prove alias equivalence with a saturated testsrc2 positive distinction; exit 0.
+  This is a failed probe expectation, not a failing product/test-suite result.
+- Each external command has separate stdout/stderr files. The actual tmcd mux
+  failure is in `F1-literal.stderr.log`; the literal/candidate product records are
+  in the planted pack's records folder. Only names and selected technical facts
+  are brought into this ledger, not paths or owner metadata.
+- The first two successful product controls used `--force-cpu`. Their records
+  identify processing as `CPU: forced` but encoding as **hevc_nvenc**. This is
+  disclosed in `encoder-audit.log`: force-cpu does not promise software encoding.
+  The baseline uses the same authorized tiny-fixture path. The direct F3 NVENC
+  pair command was intercepted before encoding. To isolate excerpt acceptance
+  from encoder choice, both positive controls were rerun with the existing
+  `--encoder libx265` flag and fresh outputs/records: both exit 0, done, encoder
+  libx265 (`software-controls.py` / `.log`). No real-media/heavy GPU job was run.
+- `ffmpeg-version.log`: installed `9.0.2-full_build-www.gyan.dev`.
+  `nvenc-help.log`: installed defaults include preset p4, rc -1 and cq 0 automatic.
+  F3's 2M default was also checked against primary upstream
+  [FFmpeg encoder defaults](https://raw.githubusercontent.com/FFmpeg/FFmpeg/master/libavcodec/nvenc_hevc.c#L193).
+  This establishes the upstream default, not the measured bitrate or quality of
+  an encoded pair on this seat. No artifact judgement is inferred from it.
+
+### F1-F12 adjudication
+
+| Finding | Verdict / severity / envelope | Own basis | Disposition / fix plan |
+|---|---|---|---|
+| F1 | ACCEPTED MAJOR, in-envelope; STOP for brief mismatch | EXECUTED: planted HEVC + AAC + tmcd source made by copying the committed fixture. prepare_excerpt(0.6, 0.5) returns excerpt=False, whole duration 1.5015 s. Literal copy fails with `Could not find tag for codec none in stream #2`. Scratch regeneration candidate preserves the stream-roster multiset and passes both product encoder controls. | Conditional RED and fix below; selective mapping/regenerated tmcd changes the literal brief and requires CHARC's ruling. |
+| F2 | ACCEPTED MAJOR, in-envelope, introduced excerpt/product mismatch | EXECUTED: literal successful copy has 33 packets, first PTS -0.600600 / KD_, but only 15 displayed frames. Recorded actual_start_s=0.0 names discarded pre-roll; displayed head is source 0.6006. Product exits 1 with the trim-edit-list refusal. Scratch make_zero candidate decodes 33 frames and passes both product encoder controls. | RED and in-envelope timestamp fix below; never change the product's edit-list refusal. |
+| F3 | ACCEPTED MAJOR, in-envelope | REASONED quality consequence, with EXECUTED command inspection: GPU hstack branch specifies hevc_nvenc but no b:v/cq/rc/preset/qp/crf. Installed quality defaults are automatic; primary upstream b default is 2M. Actual artifacts/bitrate were not measured or visually judged. | RED and explicit viewing-aid quality plan below; product runner defaults remain unchanged. |
+| F4 | ACCEPTED MINOR, in-envelope, BOM only | EXECUTED: a valid one-row UTF-8-BOM sheet raises the header error; the plain UTF-8 control tallies. cp1252 with a non-ASCII note raises UnicodeDecodeError, outside the UTF-8 contract. | Terminating cleanup: read with utf-8-sig at sheet.py:36; continue writing UTF-8 and rejecting non-UTF-8. Add BOM tally/preservation control; no cp1252 auto-detection. |
+| F5 | ACCEPTED MINOR, in-envelope | EXECUTED: one yes row prints headline 1/1 = 100.0 %, with no expected/available/missing fields despite the 115-item commissioned headline. Prescribed preferred/judged arithmetic is correct; coverage is absent. | Terminating cleanup at sheet.py:128-187: add catalog-derived available/expected/missing/unjudged counts, plus a coverage line; preserve the prescribed headline line and judgement-free arithmetic. |
+| F6 | ACCEPTED MINOR, in-envelope | EXECUTED: a generated valid done photo item carries a warning sentinel in data but the HTML omits it. | Terminating cleanup at page.py:117-146: display escaped warning text beside the item, with a markup-bearing warning control. Retain existing diagnostic privacy policy. |
+| F7 | ACCEPTED ADVISORY, in-envelope, numeric consistency gap | EXECUTED: grey128 with smpte432/bt709 becomes (121,121,121); bt709/bt709 remains (128,128,128). Both halves use the same path; this does not demonstrate preference bias. Pair-clip perceptual mismatch was not judged. | FIX once in terminating cleanup at build.py:743-777: apply one explicit primary/transfer policy consistently to tagged SDR inputs, with neutral/colour controls. Keep untagged/no-inferred-profile behavior. |
+| F8 | ACCEPTED ADVISORY, in-envelope | EXECUTED: one successful unrotated extraction leaves one empty .frames-* directory after the PNG is moved. | FIX once in terminating cleanup at build.py:440-447: guarded cleanup of the instrument-owned extraction directory after moving its known file; never remove unrelated files. |
+| F9 | ACCEPTED ADVISORY, in-envelope | EXECUTED: VFR fixture has 30 frames with intervals 0.03337 / 0.06673 s; software pair has 30 frames with only 0.04449 s intervals. CFR forcing changes timing even when frame count stays the same. No judder/flicker was visually judged. | FIX once in terminating cleanup at build.py:561-562: remove -r forcing, use passthrough timing and explicit filter time base; assert source-relative PTS against the CPU VFR pair. |
+| F10 | OUT OF ENVELOPE, nominal ADVISORY; BANKED | EXECUTED: runner argument is relative, exists from the worktree root and does not exist from the alternate planted cwd. Dispatch expressly requires RUN REQUESTs runnable from the worktree root; that supported execution passes baseline. | No current fix. Bank with instrument maintainer/CHARC; trigger: a future commission supports execution outside the worktree root. This is introduced code, not a pre-existing-code dismissal. |
+| F11 | REJECTED ADVISORY; nominal trigger also OUT OF ENVELOPE | EXECUTED refutation: raw bt470bg scale succeeds. On saturated testsrc2, its RGB bytes equal shared-helper bt470 and differ from bt709 (positive distinction). Inventory matrices are bt709/smpte170m anyway. | DECLINE; no fix/debt for the refuted failure claim. git log -S identifies f506b597 as origin; not dismissed as pre-existing. No generic colour-format expansion. |
+| F12 | ACCEPTED ADVISORY, in-envelope | EXECUTED HTML inspection: two alt labels Source/Corrected, zero figure captions. The global left/right sentence and neutral-source link exist; this is local-label usability, not mispairing. | FIX once in terminating cleanup at page.py:131-135: add visible adjacent Source/Corrected captions; keep alt text and ordering; assert local visible labels. |
+
+### Blocking RED roster and bounded remediation plan (not implemented)
+
+1. **F1, conditional on ruling:** new node
+   `test_gopro_tmcd_excerpt_preserves_stream_roster_without_whole_fallback`.
+   Plant the committed HEVC/AAC fixture with FFmpeg's timecode track; add a gpmd
+   payload-copy control if required by the ruling. Assert excerpt=True, no whole
+   fallback, equal count/type/codec/tag roster, non-tmcd packet identity, and source
+   bytes unchanged. Fix `build.py:282-331`, `:362-418`: selective non-tmcd mapping,
+   authorized regeneration, integrity verification by stream identity (allow mux
+   reordering). Nonzero source-interval timecode adjustment also needs a control;
+   the current fixture's retained start is zero and does not prove that case.
+2. **F2:** new fast node
+   `test_stream_copy_command_rebases_preroll_for_product` asserts make_zero on the
+   non-keyframe plan. Extend the existing sole slow `test_all_tiny_set` with a
+   non-keyframe excerpt fed through the real runner: assert exit 0 and displayed
+   first-source-frame identity equals recorded actual_start_s. Preserve all
+   existing assertions and the one-slow-node rule. Fix `build.py:282-314`,
+   `:334-418`: `-avoid_negative_ts make_zero`, plus independent displayed-start
+   verification before recording actual start. No product policy change.
+3. **F3:** new node `test_gpu_pair_has_explicit_quality_control`: use a small
+   fixture pair, execute the real command-construction branch but intercept
+   hstack before GPU execution; assert explicit p5/hq/VBR/CQ20/b:v=0 rather than
+   an implicit rate target. Fix options at `build.py:537-576`. CQ20/p5/hq already
+   appears in the repository's WP1.5 container-spike recipe; this is viewing-aid
+   encoding only. A later scheduled synthetic NVENC control must verify the
+   options take effect before real clips. No GPU window requested this turn.
+
+### STOP: F1 scope ruling required before remediation
+
+**Recommended answer first:** CHARC grant an instrument-local amendment to Q3 /
+design step 1: map/copy video, audio and non-tmcd data; regenerate tmcd through
+FFmpeg's timecode writer; verify stream count/codec tags and non-tmcd packet
+identity by stable stream identity rather than mux order. Require regenerated
+timecode to correspond to the actual selected source interval. Retain whole-input
+fallback for genuinely failed copies. Combine with F2's tested make_zero
+normalization and displayed-start verification. No source pixel re-encoding or
+product/interface edit is proposed.
+
+Evidence: WP1.5 container-spike report lines 229-233 records the tmcd-copy refusal
+and regeneration mechanism. WP-T6 gate-sizing report lines 193-204 independently
+uses non-tmcd mapping plus write_tmcd, compares stream identities across mux order
+and records video/audio/tmcd/gpmd. These are precedents, not authorization to alter
+this package's literal `-map 0 -c copy` contract. Scratch candidates show planted
+feasibility only. No universal claim is made that EVERY live GoPro contains tmcd,
+and the reviewer's 12-hour/disk forecasts were not measured here. The proven
+conditional failure is sufficient to stop silently relying on the excerpt-sized
+workload. If regeneration is not granted, CHARC must explicitly approve the
+whole-clip workload/disk/schedule alternative or another selection design.
+
+F2 is an induced bad-input mismatch, not a product defect to fix. Independent
+`git log -S 'an edit list whose media segment starts'` identifies `af11d782`,
+WP3.10 round-2 #2, as the deliberate product guard's origin. Likewise,
+`git log -S 'in_color_matrix={tags.color_space}'` identifies `f506b597` for F11's
+introduced instrument expression. No finding was dismissed with unsupported
+pre-existing provenance.
+
+### Light command and yield
+
+Own baseline used `PYTHONPATH=scripts uv run pytest -q tests/test_reviewpack.py
+--basetemp=work/wp5.3/turn4-adjudication/tmp -p sandbox_mkdir_shim
+-p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip"
+--junitxml=work/wp5.3/turn4-adjudication/baseline.xml` (PowerShell set PYTHONPATH
+before invocation). Output/status files: baseline.log / baseline.exit. Result:
+70 passed in 17.22 s, exit 0; no skipped/error/failure nodes. No full-suite gate,
+format gate, new reviewer or real-media build was run. Probes are ignored scratch
+evidence, not added tests or implementation remediation.
+
+The main probe's false F11 expectation, successful follow-up and actual product
+encoder choices are disclosed above. No mailbox, git mutation/commit, local-config
+edit or other-worktree access occurred. Only this owned ledger changes for the
+dispatcher. No RUN REQUEST is issued. Turn 4 YIELDS with the F1 STOP; turn-5 RED /
+remediation waits for CHARC's complete ruling packet. Accepted minors/advisories
+remain queued for the terminating round's single cleanup and do not drive rounds.
