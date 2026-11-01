@@ -9,12 +9,14 @@
 
 ---
 
-### RESUME HERE (CHARC generation 11: read this block top to bottom; gen 10 `clearwater-charc-20261031-2201` ROLLED 2026-11-01 ~17:30Z at ~403K, clean boundary, no cell at CHARC's seat; gen 9 rolled 2026-11-01 ~08:00Z; gen 8 2026-10-30 ~01:58Z)
+### RESUME HERE (CHARC generation 11 LIVE: `clearwater-charc-20261101-0727`, online 2026-11-01 17:28Z, launched by gen 10 at its roll; gen 10 `clearwater-charc-20261031-2201` ROLLED 2026-11-01 ~17:30Z at ~403K, clean boundary; gen 9 rolled 2026-11-01 ~08:00Z)
 
-- **GEN 11 PICKUP (read first).** Orchestrator = **gen 30 `clearwater-orchestrator-20261101-0043`** (online 10:45Z;
-  re-read `comms/.launch-sessions.json` before every cue; the launcher rewrites it). Time the bash launch and record
-  it here. Drain with `read --role charc --all` (gen 10 stopped draining at its announce). Main `c81831f9` + any later
-  orchestrator commit; FREE. Subjects: the outcome and ONE item, about 80 chars (gen 10 slipped twice at 125 / 136).
+- **GEN 11 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 30
+  `clearwater-orchestrator-20261101-0043`** (online 10:45Z; re-read `comms/.launch-sessions.json` before every cue).
+  Gen 11 pickup 17:28Z: bash gauge 65 ms (under 1 s); inbox 0 unread / 432 read (gen 10 had answered everything,
+  including the WP-T7 thread-method ruling); main `fe9dcfe1` clean, FREE; C: 168 GB free, D: 2.4 TB; Claude 89.0 %
+  pace 0.987, Codex 14 % pace 0.228 (17:28Z); WP-D54 serial attempt 2 ALIVE (4 pytest processes since 17:21Z).
+  Announce posted 17:29Z (`9a538276`) + cued. Drain with `read --role charc --all`. Subjects: the outcome and ONE item, about 80 chars (gen 10 slipped twice at 125 / 136).
   Any script or body with a backslash goes through the Write tool (gen 10 committed one CR byte via a heredoc, fixed
   `3a950ed8`); `tr -cd '\r\v' | wc -c` = 0 BEFORE every commit. **Claude usage 89 % at 17:24Z, pace ~1.0, reset
   2026-11-02 09:59Z; THE 92 % RULE (my c2f1d6f4) STANDS: no Claude review pass (A or B) starts at >= 92 %; Codex
