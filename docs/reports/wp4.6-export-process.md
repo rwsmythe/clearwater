@@ -166,6 +166,14 @@ adjudications: `docs/proofs/wp4.6-ledger.md`, `<evidence>\r1\` .. `<evidence>\r3
 run at `6e7caf1f`: `tests/test_jobs_export_process.py tests/test_app_export_worker.py
 tests/test_app_deps.py tests/test_io_video_spawn.py` 361 passed; ruff, format and mypy clean.
 
+Reviewer B (Codex at the orchestrator's seat, on `c0eedb0e`): 1 major, 2 minor, fixed RED-first
+(RED `d5846415`): B-1, a progress count too large for a float is now an ignored, logged line
+through one helper for every decoded number (`fc403cf3`); B-2, the clean-up covers the
+conversation's whole set-up after the spawn (`1ab92604`); B-3, an overflowing `created` in the
+settings' `last_parameters` is exit 2 (`aaf1f1fa`). Targeted run 365 passed. The window figures
+are unaffected: the fixes change only malformed-line and malformed-request handling and the set-up
+order, never a well-formed export's path.
+
 ## For CHARC at the accept (the cell writes no register row)
 
 - DR-98: CLOSED by the window figures above.

@@ -1035,3 +1035,42 @@ thin margin, not a figure of record.
 
 Report `docs/reports/wp4.6-export-process.md` written (brief task 11). Next: Reviewer B (Codex at
 the orchestrator's seat) on the final head, then the gate.
+
+## Reviewer B remediation (cell 5)
+
+Reviewer B (Codex `gpt-6.1-sol` / high at the orchestrator's seat, read-only) on `c0eedb0e`:
+`NEW_CRITICAL_MAJOR_FOUND`, 1 major + 2 minor, all executed (`<evidence>\reviewB\review-B.txt`).
+The orchestrator's adjudication (binding; the ONE B remediation, then a narrow B re-run): B-1
+MAJOR in envelope; B-2 MINOR; B-3 MINOR out of envelope; all three fixed RED-first.
+
+RED commit `d5846415` (on `c0eedb0e`'s product; `4 failed, 3 passed, 89 deselected`):
+- B-1 `tests/test_jobs_export_process.py::test_an_invalid_line_is_ignored_and_logged[done-overflow]`
+  and `[total-overflow]`: `AssertionError: a progress done too large for a float (B-1)`,
+  `assert [(10000000000..., 4, 'valid')] == [(3, 4, 'valid')]` (and the total's form): the
+  overflowing count reached `progress.report`.
+- B-2 `tests/test_jobs_export_process.py::test_a_failure_in_the_conversations_set_up_kills_the_worker_and_closes_its_stdin`
+  (a `MemoryError` injected at `_Tail`, the R3-1 test's shape): `AssertionError: the worker
+  outlived its job` (`assert None is not None`).
+- B-3 `tests/test_app_export_worker.py::test_a_malformed_request_exits_2_with_one_stderr_line[a created that overflows in the settings' last parameters]`:
+  exit 1 with a traceback (`assert 1 == 2`).
+
+| # | Fix | Commit | GREEN |
+|---|---|---|---|
+| B-1 | ONE helper `_float_safe` applies the strict-ignore rule (CHARC e15d408a) to every number the parent decodes: progress `done` and `total`, the result's `elapsed_s` (R1 F3's rule, now through the helper; its logged reason reads "an integer too large for a float"). `_decode_log` carries no number. In-range values unchanged | `fc403cf3` | the invalid-line test 14 passed |
+| B-2 | `_converse` makes the queues, `_Tail` and the bookkeeping INSIDE the `try`; a `started` count replaces the list: the except path puts the stdin thread's `None` only when it runs and closes every pipe whose thread never started | `1ab92604` | B-2 + the three R3-1 cases 4 passed; the file 73 passed |
+| B-3 | `decode_request` catches `OverflowError` around `Settings.from_json` too (exit 2, one stderr line) | `aaf1f1fa` | the malformed-request test 13 passed |
+
+Record correction: the R3 clean-up entry (and `a1345696`'s message) said "`Settings` has no date
+field, so its clause is unchanged"; wrong: `Settings.last_parameters` nests a `ParameterSet` with
+its `created`. B-3 is that miss.
+
+Run lines at `aaf1f1fa` (Git Bash, `PYTEST_ADDOPTS` unset, `QT_QPA_PLATFORM=offscreen`):
+- `uv run pytest -q -p no:cacheprovider tests/test_jobs_export_process.py tests/test_app_export_worker.py tests/test_app_deps.py tests/test_io_video_spawn.py --basetemp=work/cell5-btargeted`:
+  `365 passed in 52.32s`, exit 0 (361 + 2 B-1 + 1 B-2 + 1 B-3).
+- `uv run ruff check` on the four changed code files: `All checks passed!`; `uv run ruff format
+  --check`: `4 files already formatted`; `uv run mypy`: `Success: no issues found in 148 source
+  files`; each exit 0.
+
+Every blob 0 CR. The window figures are unaffected: these fixes change only how a malformed
+protocol line or request is handled and the order of the conversation's set-up, never a path a
+well-formed export takes. No Codex run here (the orchestrator re-runs B narrowly).
