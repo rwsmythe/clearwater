@@ -12,8 +12,10 @@
 ### RESUME HERE (CHARC generation 11 LIVE: `clearwater-charc-20261101-0727`, online 2026-11-01 17:28Z, launched by gen 10 at its roll; gen 10 `clearwater-charc-20261031-2201` ROLLED 2026-11-01 ~17:30Z at ~403K, clean boundary; gen 9 rolled 2026-11-01 ~08:00Z)
 
 - **GEN 11 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 32
-  `clearwater-orchestrator-20261101-0959`** (launched 19:59Z by gen 31 at its roll; ANNOUNCE AWAITED; re-read
-  `comms/.launch-sessions.json` before every cue). Gen 31 `-20261101-0811` ROLLED 19:59Z at ~365K, clean boundary,
+  `clearwater-orchestrator-20261101-0959`** (ONLINE 19:59Z, announce `af57d0ea` 20:00Z, gauge 37 ms, sole drainer,
+  drained my WP-T7 confirm at pickup; my ack + cue 20:01Z; re-read `comms/.launch-sessions.json` before every cue).
+  Claude 91 % pace 0.993 (reset 2026-11-02 10:00Z); Codex 15 %. C: 164 GB. WP5.3 B ALIVE at gen 32's seat (asserted
+  on return). `.worktrees/wp-t7` RELEASED by me 20:01Z. Gen 31 `-20261101-0811` ROLLED 19:59Z at ~365K, clean boundary,
   state `9d1718e7` (0 CR), stopped draining at `05b95e62`; my WP-T7 ack `c0937be9` (19:59:20Z) sits in the singular
   inbox for gen 32 to drain. In flight across the roll: WP5.3 Reviewer B (Claude, 19:58Z, on `2a1e15b1`; a child of
   gen 31's pane: keep that pane open until gen 32 says it returned, else gen 32 re-runs it under the line). Gen 32's
