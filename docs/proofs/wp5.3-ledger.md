@@ -5,8 +5,9 @@
 - Package: WP5.3, CP5 visual review pack; Codex implementer lane, STRONG.
 - Verified base and current HEAD at round 0: `2050a89a`; initial tracked diff empty.
 - Turn 1 is task 1 only. No instrument or test code is written this turn.
-- State: **STOP for CHARC's round-0 ruling** on R0-1, R0-2 and R0-3 below.
-  The design and run commands below are conditional proposals, not approved departures.
+- State: **task 2 RED complete; yield before GREEN**. CHARC granted R0-1, R0-2
+  and R0-3 in `f99fca742e060f14`, folded into the brief at `b7c95a46`.
+  R0-4 is resolved by the dispatcher-provided inventory CSV. No ruling is pending.
 - The dispatcher reported `uv sync` already run at its seat. It was not repeated.
   The planted reproduction ran successfully using `uv run --no-sync python -c ...`.
 - No owner file or footage folder was opened. Only repository sources, committed
@@ -141,16 +142,17 @@ run. The inventory alone is sufficient to dispute the scheduling premise; curren
 source duration still needs the orchestrator's run. Forty minutes for V-P is not
 an evidence-backed allowance for an almost 12.5-minute source plus the other clips.
 
-### R0-4 [minor, in-envelope, NEW] Baseline CSV is absent in this worktree
+### R0-4 [minor, in-envelope, NEW at round 0] Baseline CSV availability
 
-`Test-Path work/reports/inventory-20261018T235556Z.csv` returned False. No attempt
-was made to search the main tree, another worktree, or footage. The report supplies
-all required names; exact GoPro durations and excerpt starts remain unmeasured.
-The preflight RUN REQUEST below transfers only file names and durations from the
-configured working folder's inventory CSV. Live build probes remain authoritative.
-Disposition: pending dispatcher execution, not a reason to weaken missing-file rules.
+At round 0, `Test-Path work/reports/inventory-20261018T235556Z.csv` returned False.
+At turn 2 the dispatcher supplied that file in this worktree's ignored `work/reports/`.
+It was read for GoPro file names and durations only. No CSV path or other metadata
+is copied into a committed file; the CSV itself is not committed. The duration table
+under Turn 2 records planned intervals, not live probes or actual keyframe starts.
+Disposition: resolved; no inventory-preflight RUN REQUEST is needed. Live build
+probes remain authoritative.
 
-## Conditional implementation design
+## Implementation design (round-0 rulings applied)
 
 ### Modules, CLI and item state
 
@@ -160,7 +162,7 @@ Disposition: pending dispatcher execution, not a reason to weaken missing-file r
   configured roots. `items() -> tuple[Item, ...]` returns the commissioned set.
   An item carries stem, group, kind, source name, runtime source path and excerpt
   eligibility. Probed duration determines the final excerpt bool and plan.
-  Photo resolution is conditional on R0-1; no scene classification or glob-based
+  Photo resolution is authorized by R0-1; no scene classification or glob-based
   expansion of the commissioned list.
 - `build.py`: `photos`, `clips [GROUP]`, `presets`, `page`, `tally SHEET`, `all`.
   `clips` allows V-P, V-S, V-D, V-R and V-Z; absence of GROUP covers all video groups.
@@ -230,7 +232,9 @@ do not attach an existing vote to a changed source/corrected pair.
   failure is distinct from a failed product export and remains visible.
 - Stills at 10/50/90 percent use matching actual PTS, not independent percentage
   rounding of two different timelines. Verify selected timestamps before pairing.
-  Reuse `extract` within its envelope; rotated support awaits R0-2's ruling.
+  Reuse `extract` within its envelope. R0-2 authorizes an owned rotation adapter:
+  FFmpeg default autorotate on both halves, no manual transpose, and equal oriented
+  dimensions checked before hstack. Product output stays linked as the record.
 - `page.py`: Pillow/ImageCms thumbnail conversion from embedded ICC to sRGB;
   strip other metadata, JPEG quality 90, short side 540. Pair still halves use
   short side 1080. Unprofiled images get no inferred ICC transform. Video RGB
@@ -276,16 +280,6 @@ memory windows take precedence. Before every clips piece the dispatcher runs
 root after implementation; configured roots route outputs under `work/wp5.3/`.
 Wall times are scheduling estimates, not figures of record.
 
-Inventory preflight (light, independent of Q8's heavy-job order):
-
-```text
-RUN REQUEST: uv run python -c "import csv,json,sys; from pathlib import Path; sys.path.insert(0,'tools'); from local_config import load_local_config; from lookcheck.frames import OutputRoots; c=load_local_config(); r=OutputRoots(allowed=c.working_path/'wp5.3',footage=c.footage_path); p=c.working_path/'reports'/'inventory-20261018T235556Z.csv'; rows=list(csv.DictReader(p.open(encoding='utf-8-sig',newline=''))); data=[{'name':Path(x['path']).name,'duration_seconds':x['duration_seconds']} for x in rows]; r.write_text(r.allowed/'records'/'inventory-durations.json',json.dumps(data,indent=2)+'\n')"
-```
-
-Expected <1 minute; output `records/inventory-durations.json` (35 name/duration
-rows only). If the CSV is absent at the seat too, return that fact and obtain
-durations through the scheduled build probes; do not search footage in the cell.
-
 Q8 order, including candidate/refusal coverage omitted from its shorthand:
 
 | Order | Exact queued command | Expected wall time | Outputs under work/wp5.3/ |
@@ -293,7 +287,7 @@ Q8 order, including candidate/refusal coverage omitted from its shorthand:
 | 1 | `RUN REQUEST: uv run python -m tools.reviewpack.build photos` | about 1 hour, GPU | photos, thumbnails, P-A/P-Z corrected and neutral records, state, logs |
 | 2 | `RUN REQUEST: uv run python -m tools.reviewpack.build presets` | <1 minute | both preset JSON files, pack-local store and marker, state/log |
 | 3 | `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | <2 minutes | index.html, initial review-sheet.csv, link-check log |
-| 4 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-P` | reserve up to about 2.5 hours pending R0-3 and measured durations | 17 product clips, pair clips/stills, thumbnails, V-P record, state/logs/cache |
+| 4 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-P` | reserve about 2.5 hours, provisional; CHARC's allowance is about 27 minutes of source material | 17 whole product clips, IMG_6762.MOV last, pair clips/stills, thumbnails, V-P record, state/logs/cache |
 | 5 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-S` | about 1.5-2 hours, provisional | 26 clips and aids, excerpts where needed, V-S record, state/logs/cache |
 | 6 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-D` | about 40-70 minutes, provisional | 8 clips and aids, excerpts where needed, V-D record, state/logs/cache |
 | 7 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-Z` | about 10-20 minutes, provisional | 2 candidate clips and aids, excerpt as needed, V-Z record, state/logs/cache |
@@ -353,7 +347,7 @@ DR-99 is handled only under its stated main-alone equivalence condition.
 
 | Round | Critical / major / minor | In / out envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Disposition / transport | Depth |
 |---|---|---|---|---|---|---|---|
-| 0 (mapping, not Reviewer A) | 0 / 3 / 1 | 4 / 0 | 4 / 0 | 0 | none / none | R0-1..3 STOP to CHARC; R0-4 queued preflight; uv Python probe exit 0 | dispatcher pending |
+| 0 (mapping, not Reviewer A) | 0 / 3 / 1 | 4 / 0 | 4 / 0 | 0 | none / none | R0-1..3 granted at turn 2; R0-4 resolved by CSV copy; uv Python probe exit 0 | 118,603 after turn 1 |
 
 Subsequent Reviewer A turns adjudicate every finding, update this cumulative table
 and yield without remediation. Fixes belong to a separately dispatched turn.
@@ -363,6 +357,222 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 
 | Turn / boundary | Session ID | depth_input_tokens (dispatcher read) | Action |
 |---|---|---|---|
-| Turn 1 / round 0 | dispatcher pending | dispatcher pending | Task 1 ledger only; yield for rulings. |
+| Turn 1 / round 0 | dispatcher pending | 118,603 | Dispatcher supplied after turn 1; round-0 ledger committed as e7beee05. |
+| Turn 2 / RED | same session | dispatcher pending | RED tests and raising stubs only; yield before GREEN. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
+
+
+## Turn 2: RED
+
+### Ruling applied and scope
+
+Turn starts from `b7c95a46`, following round-0 ledger commit `e7beee05`.
+CHARC ruling `f99fca742e060f14` governs: owned photo resolution only for the
+commissioned HEIC/JPG names, duplicate refusal and junction pruning; owned video
+viewing adapter with default FFmpeg autorotation on both halves and equality of
+display dimensions checked before hstack; every V-P item whole with IMG_6762.MOV
+last. R0-4 is closed by the provided CSV. The depth after turn 1 is 118,603 tokens.
+
+Built `tests/test_reviewpack.py` and five importable skeleton modules. Skeleton
+functions and properties raise named `NotImplementedError`; their only additional
+code is the two immutable data declarations and imports. No selection, correction,
+file writer, runner invocation, video adapter or tally implementation was added.
+No frozen interface or unowned file was edited. Local configuration was not edited;
+the owner source folder was not traversed and no owner file was read. Synthetic
+roots were passed explicitly; the existing pytest temp-root guard is used unchanged
+with the required sandbox shim (including its normal configuration safety check).
+
+### Roster as built and changes from round 0
+
+The original 14 roster rows are represented by 60 independently collected nodes.
+They cover inventory names/counts and V-P ordering; exact source resolution; missing,
+ambiguous, case-insensitive and unsafe photo lookup; real junction/link pruning;
+whole/excerpt boundaries and invalid durations; output/config refusal; neutral vs
+default runner arguments, provenance and cache; collision-numbered output mapping
+and failed-item retention; stream-copy arguments/integrity, actual source packet
+start and copy-failure fallback; rotated-frame and real pair-video dimensions;
+pre-hstack size refusal; sheet exclusion, preservation and changed-pair rejection;
+empty/filled strict tallies and CLI statuses; planted HTML, link failures and escaping;
+ICC-aware/unprofiled thumbnails and pair-still side order; product preset exports;
+and the one actual-runner/FFmpeg integration node.
+
+Changes from the proposed roster:
+
+- Collection/import failure is replaced by explicit named raising entry points,
+  as turn 2 requires. Each node now reaches the contract entry point it exercises.
+- R0-1 adds the duplicate-in-two-folders and real junction/link negative controls.
+  On this host junction creation succeeded; no capability skip was taken.
+- R0-2 has three nodes: oriented frame size 180x320, real oriented pair size
+  182x160 (two half-width 90x160 views plus separator), and rejecting unequal
+  display sizes before any hstack process. Tests observe real FFmpeg command
+  arguments to exclude noautorotate/manual transpose while checking decoded output.
+- The unequal-size control permits read-only probes/decodes and forbids hstack;
+  it does not incorrectly forbid the probes needed to determine dimensions.
+- Excerpt expectations use literal durations from the supplied baseline CSV.
+- One malformed-row test initially failed in test setup: the keyword `item`
+  collided with the helper argument. Renamed that helper argument and reran; the
+  final run has only intended stub failures. Import/style and regex-literal lint
+  findings were fixed in the owned test/skeleton files before the final checks.
+- Exactly one node carries `slow`, with reason `runs the headless runner and FFmpeg`.
+  There are no footage, gpu, gui or fullclip nodes. The slow node fails immediately
+  at `build.main` in RED, so no headless export or video encoding ran this turn.
+
+### Commands and results
+
+All runner outputs are under this worktree, not the main working folder.
+Final pytest invocation (stdout/stderr captured in `turn2-red-final.log`):
+
+```powershell
+$env:PYTHONPATH='scripts'
+uv run pytest -q tests/test_reviewpack.py --basetemp=work/wp5.3/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m 'not gpu and not footage and not gui and not fullclip' --durations=0 --junitxml=work/wp5.3/turn2-red-final.xml
+```
+
+- Pytest exit 1: `60 failed in 1.29s`. JUnit independently confirms 60 failures,
+  zero collection/setup errors, zero skipped nodes and zero passing nodes. Each
+  failure message is the intended named `NotImplementedError` below. This is RED
+  evidence, not a claim that the behavior assertions passed.
+- `uv run ruff check tools/reviewpack tests/test_reviewpack.py`: exit 0,
+  `All checks passed!` (`turn2-ruff-final.log`).
+- `uv run mypy`: exit 0, `Success: no issues found in 151 source files`
+  (`turn2-mypy-final.log`).
+- `uv run ruff format tools/reviewpack tests/test_reviewpack.py`: exit 0,
+  `1 file reformatted, 5 files left unchanged` on the last format invocation
+  (`turn2-format-final.log`). No format-check gate is claimed; that stays at the
+  dispatcher seat per the dispatch fill.
+- Scope/LF audit: exit 0; seven owned changed files, zero CR bytes and no trailing
+  whitespace. AST audit confirms all 24 skeleton callables contain only a docstring
+  and a named `NotImplementedError`; exactly one slow test is declared.
+  `git diff --check` exits 0. Evidence: `turn2-scope-lf-check.log`.
+
+Evidence file names above are under `work/wp5.3/`; `turn2-red-final.xml` carries
+per-node times and the exact exception locations. Initial development evidence is
+`turn2-red.log` / `turn2-red.xml`; the initial unrelated setup failure is superseded
+by the final run. Full suite, real build, Reviewer A and Reviewer B were not run.
+AD-30 timing here measures RED stub bodies only, not implemented feature cost.
+Re-measure every node on first GREEN execution and move any parallel node over
+five seconds to slow with a reason; the end-to-end node is slow from the outset.
+
+### Observed node failures
+
+| Node ID | Failure line on this candidate | Exception message | RED seconds |
+|---|---|---|---|
+| `tests/test_reviewpack.py::test_inventory_names_and_group_membership` | `tools/reviewpack/select.py:58: NotImplementedError` | `NotImplementedError: catalog` | 0.001 |
+| `tests/test_reviewpack.py::test_items_resolve_exact_names_without_scene_classification` | `tools/reviewpack/select.py:70: NotImplementedError` | `NotImplementedError: items` | 0.080 |
+| `tests/test_reviewpack.py::test_photo_resolver_case_insensitive_exact_commissioned_name` | `tools/reviewpack/select.py:83: NotImplementedError` | `NotImplementedError: find_photo` | 0.003 |
+| `tests/test_reviewpack.py::test_photo_resolver_missing_refusal` | `tools/reviewpack/select.py:83: NotImplementedError` | `NotImplementedError: find_photo` | 0.002 |
+| `tests/test_reviewpack.py::test_photo_resolver_ambiguous_duplicate_in_two_folders` | `tools/reviewpack/select.py:83: NotImplementedError` | `NotImplementedError: find_photo` | 0.003 |
+| `tests/test_reviewpack.py::test_photo_resolver_prunes_directory_junction_or_link` | `tools/reviewpack/select.py:83: NotImplementedError` | `NotImplementedError: find_photo` | 0.028 |
+| `tests/test_reviewpack.py::test_photo_resolver_refuses_uncommissioned_or_path_name[unknown]` | `tools/reviewpack/select.py:83: NotImplementedError` | `NotImplementedError: find_photo` | 0.003 |
+| `tests/test_reviewpack.py::test_photo_resolver_refuses_uncommissioned_or_path_name[path]` | `tools/reviewpack/select.py:83: NotImplementedError` | `NotImplementedError: find_photo` | 0.003 |
+| `tests/test_reviewpack.py::test_photo_resolver_refuses_uncommissioned_or_path_name[suffix]` | `tools/reviewpack/select.py:83: NotImplementedError` | `NotImplementedError: find_photo` | 0.003 |
+| `tests/test_reviewpack.py::test_excerpt_plan_boundaries_and_phone_rule[V-D-6.406-0.0-6.406-False]` | `tools/reviewpack/select.py:96: NotImplementedError` | `NotImplementedError: excerpt_plan` | 0.001 |
+| `tests/test_reviewpack.py::test_excerpt_plan_boundaries_and_phone_rule[V-D-42.342-0.0-42.342-False]` | `tools/reviewpack/select.py:96: NotImplementedError` | `NotImplementedError: excerpt_plan` | 0.001 |
+| `tests/test_reviewpack.py::test_excerpt_plan_boundaries_and_phone_rule[V-S-45.0-0.0-45.0-False]` | `tools/reviewpack/select.py:96: NotImplementedError` | `NotImplementedError: excerpt_plan` | 0.001 |
+| `tests/test_reviewpack.py::test_excerpt_plan_boundaries_and_phone_rule[V-S-45.001-18.0004-30.0-True]` | `tools/reviewpack/select.py:96: NotImplementedError` | `NotImplementedError: excerpt_plan` | 0.001 |
+| `tests/test_reviewpack.py::test_excerpt_plan_boundaries_and_phone_rule[V-D-1046.512-418.6048-30.0-True]` | `tools/reviewpack/select.py:96: NotImplementedError` | `NotImplementedError: excerpt_plan` | 0.001 |
+| `tests/test_reviewpack.py::test_excerpt_plan_boundaries_and_phone_rule[V-Z-179.93-71.972-30.0-True]` | `tools/reviewpack/select.py:96: NotImplementedError` | `NotImplementedError: excerpt_plan` | 0.001 |
+| `tests/test_reviewpack.py::test_excerpt_plan_boundaries_and_phone_rule[V-P-749.033333-0.0-749.033333-False]` | `tools/reviewpack/select.py:96: NotImplementedError` | `NotImplementedError: excerpt_plan` | 0.001 |
+| `tests/test_reviewpack.py::test_excerpt_plan_boundaries_and_phone_rule[V-R-44.0-0.0-44.0-False]` | `tools/reviewpack/select.py:96: NotImplementedError` | `NotImplementedError: excerpt_plan` | 0.001 |
+| `tests/test_reviewpack.py::test_excerpt_plan_rejects_invalid_duration[0.0]` | `tools/reviewpack/select.py:96: NotImplementedError` | `NotImplementedError: excerpt_plan` | 0.001 |
+| `tests/test_reviewpack.py::test_excerpt_plan_rejects_invalid_duration[-1.0]` | `tools/reviewpack/select.py:96: NotImplementedError` | `NotImplementedError: excerpt_plan` | 0.001 |
+| `tests/test_reviewpack.py::test_excerpt_plan_rejects_invalid_duration[nan]` | `tools/reviewpack/select.py:96: NotImplementedError` | `NotImplementedError: excerpt_plan` | 0.001 |
+| `tests/test_reviewpack.py::test_excerpt_plan_rejects_invalid_duration[inf]` | `tools/reviewpack/select.py:96: NotImplementedError` | `NotImplementedError: excerpt_plan` | 0.001 |
+| `tests/test_reviewpack.py::test_output_guard_refuses_footage_and_parent_escape` | `tools/reviewpack/build.py:23: NotImplementedError` | `NotImplementedError: check_target` | 0.004 |
+| `tests/test_reviewpack.py::test_cli_refuses_working_folder_inside_footage_before_write` | `tools/reviewpack/build.py:185: NotImplementedError` | `NotImplementedError: main` | 0.002 |
+| `tests/test_reviewpack.py::test_photo_runner_arguments_pin_pose_and_preserve_defaults[False]` | `tools/reviewpack/build.py:46: NotImplementedError` | `NotImplementedError: runner_arguments` | 0.002 |
+| `tests/test_reviewpack.py::test_photo_runner_arguments_pin_pose_and_preserve_defaults[True]` | `tools/reviewpack/build.py:46: NotImplementedError` | `NotImplementedError: runner_arguments` | 0.002 |
+| `tests/test_reviewpack.py::test_video_runner_arguments_use_checked_cache_and_explicit_cpu_only` | `tools/reviewpack/build.py:46: NotImplementedError` | `NotImplementedError: runner_arguments` | 0.002 |
+| `tests/test_reviewpack.py::test_record_mapping_uses_numbered_product_output_and_retains_failures` | `tools/reviewpack/build.py:60: NotImplementedError` | `NotImplementedError: read_runner_record` | 0.003 |
+| `tests/test_reviewpack.py::test_stream_copy_arguments_preserve_all_streams_and_seek_before_input` | `tools/reviewpack/build.py:77: NotImplementedError` | `NotImplementedError: stream_copy_command` | 0.002 |
+| `tests/test_reviewpack.py::test_stream_copy_integrity_refuses_lost_stream_or_changed_tag[stream-count]` | `tools/reviewpack/build.py:89: NotImplementedError` | `NotImplementedError: validate_stream_copy` | 0.001 |
+| `tests/test_reviewpack.py::test_stream_copy_integrity_refuses_lost_stream_or_changed_tag[codec-tag]` | `tools/reviewpack/build.py:89: NotImplementedError` | `NotImplementedError: validate_stream_copy` | 0.001 |
+| `tests/test_reviewpack.py::test_actual_excerpt_start_uses_source_packet_not_rebased_zero` | `tools/reviewpack/build.py:104: NotImplementedError` | `NotImplementedError: actual_excerpt_start` | 0.000 |
+| `tests/test_reviewpack.py::test_failed_stream_copy_falls_back_to_whole_source` | `tools/reviewpack/build.py:121: NotImplementedError` | `NotImplementedError: prepare_excerpt` | 0.008 |
+| `tests/test_reviewpack.py::test_rotation_adapter_extracts_oriented_fixture_dimensions` | `tools/reviewpack/build.py:138: NotImplementedError` | `NotImplementedError: extract_view_frame` | 0.003 |
+| `tests/test_reviewpack.py::test_rotated_pair_autorotates_both_halves_with_equal_dimensions` | `tools/reviewpack/build.py:161: NotImplementedError` | `NotImplementedError: make_pair` | 0.002 |
+| `tests/test_reviewpack.py::test_pair_refuses_unequal_display_dimensions_before_hstack` | `tools/reviewpack/build.py:161: NotImplementedError` | `NotImplementedError: make_pair` | 0.003 |
+| `tests/test_reviewpack.py::test_sheet_header_rows_exclude_failed_refused_and_not_built` | `tools/reviewpack/sheet.py:25: NotImplementedError` | `NotImplementedError: write_sheet` | 0.002 |
+| `tests/test_reviewpack.py::test_sheet_preserves_answers_when_later_groups_arrive` | `tools/reviewpack/sheet.py:25: NotImplementedError` | `NotImplementedError: write_sheet` | 0.002 |
+| `tests/test_reviewpack.py::test_sheet_refuses_to_transfer_vote_to_regenerated_output` | `tools/reviewpack/sheet.py:25: NotImplementedError` | `NotImplementedError: write_sheet` | 0.004 |
+| `tests/test_reviewpack.py::test_tally_empty_sheet_is_zero_judged_without_verdict` | `tools/reviewpack/sheet.py:37: NotImplementedError` | `NotImplementedError: tally` | 0.003 |
+| `tests/test_reviewpack.py::test_tally_filled_headline_candidates_artifacts_and_above_surface` | `tools/reviewpack/sheet.py:37: NotImplementedError` | `NotImplementedError: tally` | 0.003 |
+| `tests/test_reviewpack.py::test_tally_invalid_value_names_row[preferred-maybe]` | `tools/reviewpack/sheet.py:37: NotImplementedError` | `NotImplementedError: tally` | 0.003 |
+| `tests/test_reviewpack.py::test_tally_invalid_value_names_row[halos-no]` | `tools/reviewpack/sheet.py:37: NotImplementedError` | `NotImplementedError: tally` | 0.003 |
+| `tests/test_reviewpack.py::test_tally_invalid_value_names_row[above_surface-false]` | `tools/reviewpack/sheet.py:37: NotImplementedError` | `NotImplementedError: tally` | 0.003 |
+| `tests/test_reviewpack.py::test_tally_invalid_value_names_row[group-not-a-group]` | `tools/reviewpack/sheet.py:37: NotImplementedError` | `NotImplementedError: tally` | 0.003 |
+| `tests/test_reviewpack.py::test_tally_invalid_value_names_row[item-../secret]` | `tools/reviewpack/sheet.py:37: NotImplementedError` | `NotImplementedError: tally` | 0.003 |
+| `tests/test_reviewpack.py::test_tally_refuses_malformed_sheet[header]` | `tools/reviewpack/sheet.py:37: NotImplementedError` | `NotImplementedError: tally` | 0.003 |
+| `tests/test_reviewpack.py::test_tally_refuses_malformed_sheet[duplicate]` | `tools/reviewpack/sheet.py:37: NotImplementedError` | `NotImplementedError: tally` | 0.003 |
+| `tests/test_reviewpack.py::test_tally_refuses_malformed_sheet[extra-cell]` | `tools/reviewpack/sheet.py:37: NotImplementedError` | `NotImplementedError: tally` | 0.003 |
+| `tests/test_reviewpack.py::test_tally_refuses_malformed_sheet[missing-cell]` | `tools/reviewpack/sheet.py:37: NotImplementedError` | `NotImplementedError: tally` | 0.003 |
+| `tests/test_reviewpack.py::test_tally_cli_valid_scores_exit_zero_and_invalid_sheet_exit_two` | `tools/reviewpack/build.py:185: NotImplementedError` | `NotImplementedError: main` | 0.003 |
+| `tests/test_reviewpack.py::test_page_planted_groups_labels_presets_and_name_only_links` | `tools/reviewpack/page.py:28: NotImplementedError` | `NotImplementedError: write_page` | 0.013 |
+| `tests/test_reviewpack.py::test_page_escapes_refusal_text_instead_of_rendering_markup` | `tools/reviewpack/page.py:28: NotImplementedError` | `NotImplementedError: write_page` | 0.003 |
+| `tests/test_reviewpack.py::test_page_check_detects_missing_escaping_and_nonlocal_links[missing]` | `tools/reviewpack/page.py:41: NotImplementedError` | `NotImplementedError: check_links` | 0.003 |
+| `tests/test_reviewpack.py::test_page_check_detects_missing_escaping_and_nonlocal_links[escape]` | `tools/reviewpack/page.py:41: NotImplementedError` | `NotImplementedError: check_links` | 0.003 |
+| `tests/test_reviewpack.py::test_page_check_detects_missing_escaping_and_nonlocal_links[nonlocal]` | `tools/reviewpack/page.py:41: NotImplementedError` | `NotImplementedError: check_links` | 0.003 |
+| `tests/test_reviewpack.py::test_thumbnail_converts_embedded_p3_to_srgb_and_strips_other_metadata` | `tools/reviewpack/page.py:55: NotImplementedError` | `NotImplementedError: thumbnail` | 0.008 |
+| `tests/test_reviewpack.py::test_thumbnail_without_icc_keeps_rgb_and_drops_text` | `tools/reviewpack/page.py:55: NotImplementedError` | `NotImplementedError: thumbnail` | 0.003 |
+| `tests/test_reviewpack.py::test_pair_still_uses_source_left_corrected_right_and_separator` | `tools/reviewpack/page.py:70: NotImplementedError` | `NotImplementedError: pair_still` | 0.003 |
+| `tests/test_reviewpack.py::test_presets_export_product_starters_without_expanding_serialized_maps` | `tools/reviewpack/build.py:173: NotImplementedError` | `NotImplementedError: export_presets` | 0.002 |
+| `tests/test_reviewpack.py::test_all_tiny_set` | `tools/reviewpack/build.py:185: NotImplementedError` | `NotImplementedError: main` | 0.013 |
+
+Maximum RED per-node time: 0.080 s. All 60 nodes reached their named stubs.
+
+### Supplied CSV: planned GoPro intervals
+
+These numbers are inventory inputs, not a new probe, a performance measurement or
+an actual-start claim. Names only are retained. A planned start of zero denotes
+whole-clip input. Actual keyframe starts remain pending the real orchestrator runs.
+
+| Group | File name | Inventory duration (s) | Planned start (s) | Planned length (s) |
+|---|---|---|---|---|
+| V-D | GX011589.mp4 | 6.406 | 0.0000 | 6.406 |
+| V-D | GX011590.mp4 | 103.170 | 41.2680 | 30.000 |
+| V-D | GX011591.mp4 | 138.205 | 55.2820 | 30.000 |
+| V-D | GX011592.mp4 | 42.342 | 0.0000 | 42.342 |
+| V-D | GX011593.mp4 | 556.456 | 222.5824 | 30.000 |
+| V-D | GX011598.mp4 | 525.325 | 210.1300 | 30.000 |
+| V-D | GX011600.mp4 | 1046.512 | 418.6048 | 30.000 |
+| V-D | GX011601.mp4 | 470.937 | 188.3748 | 30.000 |
+| V-S | GX011603.mp4 | 69.136 | 27.6544 | 30.000 |
+| V-S | GX011604.mp4 | 15.682 | 0.0000 | 15.682 |
+| V-S | GX011605.mp4 | 10.811 | 0.0000 | 10.811 |
+| V-S | GX011606.mp4 | 8.976 | 0.0000 | 8.976 |
+| V-S | GX011607.mp4 | 9.443 | 0.0000 | 9.443 |
+| V-S | GX011608.mp4 | 26.059 | 0.0000 | 26.059 |
+| V-S | GX011609.mp4 | 69.469 | 27.7876 | 30.000 |
+| V-S | GX011610.mp4 | 32.232 | 0.0000 | 32.232 |
+| V-S | GX011611.mp4 | 74.708 | 29.8832 | 30.000 |
+| V-S | GX011612.mp4 | 54.454 | 21.7816 | 30.000 |
+| V-S | GX011613.mp4 | 5.339 | 0.0000 | 5.339 |
+| V-S | GX011614.mp4 | 39.873 | 0.0000 | 39.873 |
+| V-S | GX011615.mp4 | 48.382 | 19.3528 | 30.000 |
+| V-S | GX011616.mp4 | 3.604 | 0.0000 | 3.604 |
+| V-S | GX011617.mp4 | 26.727 | 0.0000 | 26.727 |
+| V-S | GX011618.mp4 | 42.276 | 0.0000 | 42.276 |
+| V-S | GX011619.mp4 | 75.475 | 30.1900 | 30.000 |
+| V-S | GX011620.mp4 | 41.275 | 0.0000 | 41.275 |
+| V-S | GX011621.mp4 | 77.711 | 31.0844 | 30.000 |
+| V-S | GX011622.mp4 | 57.457 | 22.9828 | 30.000 |
+| V-S | GX011623.mp4 | 42.409 | 0.0000 | 42.409 |
+| V-S | GX011624.mp4 | 82.282 | 32.9128 | 30.000 |
+| V-S | GX011625.mp4 | 498.431 | 199.3724 | 30.000 |
+| V-S | GX011626.mp4 | 245.078 | 98.0312 | 30.000 |
+| V-S | GX011627.mp4 | 22.723 | 0.0000 | 22.723 |
+| V-S | GX011628.mp4 | 14.481 | 0.0000 | 14.481 |
+
+Totals: V-S 26 items = 15 whole + 11 excerpts, 1694.493 source seconds and
+671.910 planned input seconds. V-D 8 items = 2 whole + 6 excerpts, 2889.353 source
+seconds and 228.748 planned input seconds. Planned GoPro inputs total 900.658 s.
+All durations/start plans are read or calculated from the copied inventory only;
+no live source duration or actual seek position was measured in the cell.
+
+### Verification-loop record and yield
+
+Suspected unrelated test setup failure -> confirmed by initial JUnit exception ->
+fixed helper argument -> final JUnit confirms only 60 intended raising-stub failures.
+Ruff style/regex findings -> confirmed -> fixed -> final ruff clean. Mypy clean.
+No product-code fix or false-positive review finding is claimed. No agent judged
+an image. Next rung is GREEN; this turn ends at the required committed-RED yield.
