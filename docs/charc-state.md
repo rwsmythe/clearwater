@@ -125,7 +125,12 @@
   (`export.py:864-866`). **WP-D54 commissioned** (orchestrator drafts the mini-brief from my message; Codex lane;
   `encode.py` text + its unit rows only; A one round; B Claude under the 92 % rule; two-leg gate). **Text FINAL (my
   ruling on cb185d46): gen 29's sentence with "for the missing or unexpected ones" (IF-1 carries only `assumed`; the
-  per-field list is the probe's private), parenthesis computed as today; test rows :288 / :412 assert both words.**
+  per-field list is the probe's private), parenthesis computed as today; test rows :288 / :412 assert both words.
+  A R1 clean (`claude-opus-5-5`, executed); F1 yuvj: a full-range source is never range-defaulted (`probe.py:265-275`,
+  `:300-302`), so the sentence is TWO-BRANCH by RESOLVED range (limited: "...BT.709 colours and limited range for the
+  missing or unexpected ones..."; full: "...BT.709 colours for the missing or unexpected ones..."), ruled 10:02Z on
+  76c42964; F2 full computed parenthesis asserted; F3 exactly one warning; yuvj RED-first. Then report, B (Claude), gate
+  after WP4.6's. DR-102 names both branches.**
   WP5.1 continues T6 / T7 with the node red until WP-D54 lands; its candidate rebased over WP-D54 at the end. **Mine at
   WP-D54's accept: NEW DR-102.** Shell half unverified (T8). WP5.1 session 3 `01a19671` at 120,480; G2 footage RUN
   REQUEST at gen 29's seat.
