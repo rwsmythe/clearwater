@@ -58,6 +58,7 @@ DECODABLE = {
     "vid-truncated": 8,
     "vid-vfr": 8,
     "vid-rotated": 8,
+    "vid-pcm-irregular": 8,
 }
 
 
@@ -258,6 +259,76 @@ def test_every_sample_keeps_every_mandatory_and_required_item(
     if sample_id == "vid-truncated":
         assert any("cut short" in w for w in run.report.warnings)
         assert any(n.startswith("D86") for n in record["summary"]["notes"])
+
+
+def test_pcm_irregular_audio_survives_the_real_sink(sample: Sample, runs: Runs) -> None:
+    """The real libx265 NUT-pipe sink carries irregular PCM format, extents and bytes."""
+    source = sample("vid-pcm-irregular")
+    output, _, record = runs.get(source, "libx265", 8)
+    _assert_v4(record)
+    before, after = read_packet_table(source), read_packet_table(output)
+    src, out = before.of_type("audio")[0], after.of_type("audio")[0]
+    durations = before.audio_durations[src.index]
+    assert sum(d != 1024 for d in durations[:-1]) >= 2
+    assert (src.codec_name, src.time_base, src.sample_rate, src.channels, src.sample_fmt) == (
+        "pcm_s16le",
+        Fraction(1, 48000),
+        48000,
+        1,
+        "s16",
+    )
+    assert (out.codec_name, out.time_base, out.sample_rate, out.channels, out.sample_fmt) == (
+        src.codec_name,
+        src.time_base,
+        src.sample_rate,
+        src.channels,
+        src.sample_fmt,
+    )
+    assert before.audio_pts[src.index][0] == after.audio_pts[out.index][0] == 0
+    assert (
+        sum(d for d in durations if d is not None)
+        == sum(d for d in after.audio_durations[out.index] if d is not None)
+        == 72072
+    )
+    assert (
+        sum(s for s in before.audio_sizes[src.index] if s is not None)
+        == sum(s for s in after.audio_sizes[out.index] if s is not None)
+        == 144144
+    )
+
+    def decoded(path: Path) -> bytes:
+        return subprocess.run(
+            [
+                "ffmpeg",
+                "-nostdin",
+                "-v",
+                "error",
+                "-i",
+                str(path),
+                "-map",
+                "0:a:0",
+                "-c:a",
+                "pcm_s16le",
+                "-f",
+                "s16le",
+                "pipe:1",
+            ],
+            capture_output=True,
+            check=True,
+        ).stdout
+
+    source_pcm, output_pcm = decoded(source), decoded(output)
+    assert len(source_pcm) == 144144
+    assert output_pcm == source_pcm
+
+
+def test_planted_pcm_audio_reencode_is_caught(sample: Sample, tmp_path: Path) -> None:
+    """A real PCM-to-AAC re-encode is refused by the PCM format rule."""
+    sink = _Planted(lambda c: _replace(c, "-c:a", "aac"))
+    with pytest.raises(VideoEncodeError) as caught:
+        _write_all(sink, sample("vid-pcm-irregular"), tmp_path / "pcm-reencoded.mp4")
+    assert caught.value.kind == "verify_failed"
+    assert "audio stream 0 (PCM)" in str(caught.value) and "codec" in str(caught.value)
 
 
 def test_vfr_pts_are_exact(sample: Sample, runs: Runs) -> None:

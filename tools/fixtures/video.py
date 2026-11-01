@@ -1,10 +1,11 @@
 """Synthetic video fixtures made with the FFmpeg CLI (WP2.3 item 3).
 
-Eight short clips (320 x 180, 45 frames at 30000/1001 fps except the 30-frame variable-rate
-clip, one AAC sine track each, built from ``testsrc2``), each differing in the one thing it
+Nine short clips (320 x 180, 45 frames at 30000/1001 fps except the 30-frame variable-rate
+clip, built from ``testsrc2``), each differing in the one thing it
 exercises: 8-bit BT.709 full range (the HERO13 tagging), 10-bit, HLG, PQ, untagged (D54),
-truncated (D86), variable frame rate (D95, D115) and rotated by a display matrix (D105). Software
-encoders only (libx265 and libx264, AAC),
+truncated (D86), variable frame rate (D95, D115), rotated by a display matrix (D105), and MOV
+with irregular PCM packets (D20). Each has one sine track: AAC except the PCM MOV. Software
+encoders only (libx265 and libx264, AAC and pcm_s16le),
 so a machine without NVENC regenerates them. The untagged clip is H.264 because x265 always
 writes a video signal type (with an explicit limited-range flag) into the stream; x264 writes
 none. Every sample carries a measured fact record: the ffprobe stream fields, the video
@@ -165,6 +166,8 @@ class Spec:
         vfr: Variable frame rate.
         truncated: The file has its tail cut off.
         codec: ``"hevc"`` (libx265) or ``"h264"`` (libx264).
+        audio_codec: The audio codec (AAC by default).
+        container: The file suffix and manifest kind (MP4 by default).
     """
 
     sample_id: str
@@ -177,6 +180,8 @@ class Spec:
     vfr: bool = False
     truncated: bool = False
     codec: str = "hevc"
+    audio_codec: str = "aac"
+    container: str = "mp4"
 
 
 SPECS = (
@@ -247,6 +252,16 @@ SPECS = (
         ("V4", "D105"),
         "A 90 degree display-matrix rotation on a landscape stream: the output keeps it.",
         rotation=CUT_ROTATION,
+    ),
+    Spec(
+        "vid-pcm-irregular",
+        "yuv420p",
+        BT709_LIMITED,
+        ("V4", "D20", "D94"),
+        "MOV with mono s16le PCM: two short mid-stream packets and exact sample totals; "
+        "a real-sink control for the packet-independent PCM check.",
+        audio_codec="pcm_s16le",
+        container="mov",
     ),
 )
 """The video samples, in generation order (``vid-rotated`` is remuxed from ``vid-hevc8-...``)."""
@@ -491,6 +506,40 @@ def _stts_or_none(path: Path) -> list[int] | None:
         return None
 
 
+def _pcm_facts(path: Path, stream: dict[str, Any]) -> dict[str, Any]:
+    """Measure the fixture's s16le PCM packet extents and independently decoded bytes."""
+    listing, errors = ffprobe_json(
+        path, "-select_streams", str(stream["index"]), "-show_entries", "packet=pts,duration,size"
+    )
+    if errors:
+        raise GenerationError(f"{path.name}: PCM packet read failed: {errors}")
+    packets = [
+        {key: int(packet[key]) for key in ("pts", "duration", "size")}
+        for packet in listing["packets"]
+    ]
+    command = [
+        "ffmpeg", "-nostdin", "-v", "error", "-i", str(path),
+        "-map", f"0:{stream['index']}", "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1",
+    ]  # fmt: skip
+    raw = subprocess.run(command, capture_output=True, check=True).stdout
+    presented = (
+        sum(p["duration"] for p in packets)
+        * Fraction(stream["time_base"])
+        * int(stream["sample_rate"])
+    )
+    if presented.denominator != 1:
+        raise GenerationError(f"{path.name}: non-integral presented PCM samples")
+    return {
+        "sample_fmt": stream["sample_fmt"],
+        "time_base": stream["time_base"],
+        "packets": packets,
+        "presented_samples": int(presented),
+        "stored_samples": sum(p["size"] for p in packets) // (2 * stream["channels"]),
+        "decoded_samples": len(raw) // (2 * stream["channels"]),
+        "decoded_sha256": hashlib.sha256(raw).hexdigest(),
+    }
+
+
 def measure(path: Path) -> dict[str, Any]:
     """Measure a written video: ffprobe fields, VUI syntax, packet pts and decoded hashes.
 
@@ -552,6 +601,7 @@ def measure(path: Path) -> dict[str, Any]:
                 "codec": a["codec_name"],
                 "sample_rate": int(a["sample_rate"]),
                 "channels": a["channels"],
+                **({"pcm": _pcm_facts(path, a)} if a["codec_name"] == "pcm_s16le" else {}),
             }
             for a in audio
         ],
@@ -621,7 +671,7 @@ def expectation(spec: Spec) -> dict[str, Any]:
     return {
         "container": "mov,mp4,m4a,3gp,3g2,mj2",
         "video": video,
-        "audio": [{"codec": "aac", "sample_rate": 48000, "channels": 1}],
+        "audio": [{"codec": spec.audio_codec, "sample_rate": 48000, "channels": 1}],
         "data": [],
     }
 
@@ -658,8 +708,20 @@ def mismatches(spec: Spec, facts: dict[str, Any]) -> list[str]:
     need(
         "audio",
         [(a["codec"], a["sample_rate"], a["channels"]) for a in facts["audio"]],
-        [("aac", 48000, 1)],
+        [(spec.audio_codec, 48000, 1)],
     )
+    if spec.audio_codec == "pcm_s16le":
+        pcm = facts["audio"][0]["pcm"]
+        need("PCM sample format", pcm["sample_fmt"], "s16")
+        need("PCM time base", pcm["time_base"], "1/48000")
+        expected_packets = []
+        pts = 0
+        for duration in ((1024,) * 23 + (472,)) * 3:
+            expected_packets.append({"pts": pts, "duration": duration, "size": 2 * duration})
+            pts += duration
+        need("PCM packets", pcm["packets"], expected_packets)
+        for total in ("presented_samples", "stored_samples", "decoded_samples"):
+            need(f"PCM {total}", pcm[total], 72072)
     need("variable frame rate", facts["pts"]["variable"], spec.vfr)
     need("GPS or location tag", facts["has_location_tag"], False)
     need("data streams", facts["data_streams"], [])
@@ -701,6 +763,39 @@ def mismatches(spec: Spec, facts: dict[str, Any]) -> list[str]:
 # --- Building -----------------------------------------------------------------------------
 
 
+def _build_pcm(guard: WriteGuard, spec: Spec, target: Path, scratch: Path) -> None:
+    """Join three 24024-sample sine segments, preserving their short packet boundaries."""
+    video_path = guard.check(scratch / "pcm-video.mov")
+    run_ffmpeg(
+        guard,
+        ["-f", "lavfi", "-i", f"testsrc2=size={WIDTH}x{HEIGHT}:rate={FRAME_RATE}",
+         "-frames:v", str(FRAMES), "-an", "-c:v", "libx265", "-preset", "ultrafast",
+         "-x265-params", f"{COMMON_X265}:{spec.tags.params}", "-pix_fmt", spec.pix_fmt,
+         "-video_track_timescale", str(TIMESCALE), *BITEXACT, "-map_metadata", "-1"],
+        video_path, scratch,
+    )  # fmt: skip
+    segments = [guard.check(scratch / f"pcm-audio{i}.mov") for i in range(3)]
+    for segment in segments:
+        run_ffmpeg(
+            guard,
+            ["-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",
+             "-af", "atrim=end_sample=24024,asetnsamples=n=1024:p=0",
+             "-c:a", spec.audio_codec, *BITEXACT, "-map_metadata", "-1"],
+            segment, scratch,
+        )  # fmt: skip
+    concat = guard.check(scratch / "pcm-concat.txt")
+    concat.write_text(
+        "".join(f"file '{p.name}'\n" for p in segments), encoding="ascii", newline="\n"
+    )
+    run_ffmpeg(
+        guard,
+        ["-i", str(video_path), "-f", "concat", "-safe", "0", "-i", str(concat),
+         "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-fflags", "+bitexact",
+         "-map_metadata", "-1", "-video_track_timescale", str(TIMESCALE)],
+        target, scratch,
+    )  # fmt: skip
+
+
 def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
     """Write every video sample under ``out/video`` and return the manifest entries.
 
@@ -727,9 +822,11 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
     sources: dict[str, Path] = {}
     try:
         for spec in SPECS:
-            target = folder / f"{spec.sample_id.removeprefix('vid-')}.mp4"
+            target = folder / f"{spec.sample_id.removeprefix('vid-')}.{spec.container}"
             extra: dict[str, Any] = {}
-            if spec.vfr:
+            if spec.audio_codec == "pcm_s16le":
+                _build_pcm(guard, spec, target, scratch)
+            elif spec.vfr:
                 setpts = "setpts=4*floor(N/3)+mod(N\\,3)"
                 run_ffmpeg(
                     guard,
@@ -780,7 +877,7 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
                 manifest.entry(
                     sample_id=spec.sample_id,
                     group="video",
-                    kind="mp4",
+                    kind=spec.container,
                     storage="committed",
                     path=f"video/{target.name}",
                     serves=spec.serves,

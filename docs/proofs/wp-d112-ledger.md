@@ -540,3 +540,218 @@ The dispatcher owns review scheduling, the heavy/fullclip gate and witness.
 | Turn 2 | RED only; no review | 0 / 0 / 0 new; all 3 prior items ruled | 0 / 0 new | 0 / 0 | 0 | 0 product; 24 new unit cases (21 RED, 3 controls) | Dispatcher pending |
 
 Turn 2 YIELD. GREEN, fixture, granted consumers and report remain for later turns.
+
+
+## Session 2 / Turn 3: GREEN and the fixture
+
+Session boundary: session 1 retired at 199,970 (dispatcher-supplied figure).
+Session 2 base: `62fe3caa`, branch `wp-d112`. Depth: PENDING -- dispatcher to
+fill from this transcript; the cell makes no estimate. This turn bundles the
+two expressly ordered steps, GREEN and then fixture/consumer admission, into
+the dispatcher's one commit. No cell commit, mailbox post or subagent.
+
+### GREEN: product rule and node-by-node record
+
+`verify.py` adds defaulted stream codec/rate/channels/sample-format facts and
+aligned packet duration/size mappings. All existing positional constructors
+remain valid. The PCM branch checks format (including codec identity), first
+packet pts, and BOTH totals from the turn-2 ruling. PRESENTED is exact integral
+`duration * time_base * sample_rate`; STORED is payload bytes divided by channel
+count and the packed codec's bytes per sample frame. In particular, packed
+24-bit PCM has three bytes per channel sample although FFmpeg decodes it as
+`s32`. Missing, negative or non-integral evidence refuses with a named PCM
+message; no aggregate fallback. Variants without an exact fixed-byte codec
+width are conservatively refused as unavailable sample evidence.
+
+Cuts count a whole source packet if its start is before the cut. The existing
+`CUT_SLACK_S` admits whole prefix lengths only; the presented/stored pair must
+belong to ONE prefix. Duration/size evidence beyond the latest admissible
+prefix is excluded; every output packet is counted. No sample tolerance.
+The compressed `_audio_problems` function is source-text identical to HEAD:
+SHA-256 `515a9d9883471d7b90ef1c57cb650df787726aac77153a7bdc024ba5392cfb8e`.
+No video/data rule, `encode.py`, interface, dependency or configuration changed.
+
+Initial GREEN: `turn3-green.log` / `turn3-green.xml`, 24 passed, 80 deselected;
+the 21 previous RED cases and three controls follow. Node prefix for every row:
+`tests/test_io_video_encode_units.py::`.
+
+| Node suffix | Before GREEN | Turn 3 |
+| --- | --- | --- |
+| `test_check_output_pcm_accepts_coalesced_packets` | Previously RED | PASS |
+| `test_check_output_pcm_accepts_moved_packet_boundaries` | Previously RED | PASS |
+| `test_check_output_pcm_regular_packets_are_unchanged` | Kept-green control | PASS |
+| `test_check_output_pcm_refuses_one_sample_fewer` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_only_presented_samples_changed` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_only_stored_samples_changed` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_another_sample_rate` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_another_sample_format` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_another_first_pts` | Previously RED | PASS |
+| `test_check_output_pcm_cut_counts_the_whole_straddling_packet[whole]` | Previously RED | PASS |
+| `test_check_output_pcm_cut_counts_the_whole_straddling_packet[at-cut]` | Previously RED | PASS |
+| `test_check_output_pcm_cut_counts_the_whole_straddling_packet[one-fewer]` | Previously RED | PASS |
+| `test_check_output_pcm_cut_slack_allows_only_complete_packet_totals[drop]` | Kept-green control | PASS |
+| `test_check_output_pcm_cut_slack_allows_only_complete_packet_totals[keep]` | Kept-green control | PASS |
+| `test_check_output_pcm_cut_slack_allows_only_complete_packet_totals[partial]` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_another_time_base_or_channel_count[time-base]` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_another_time_base_or_channel_count[channels]` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_missing_sample_evidence[duration]` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_missing_sample_evidence[size]` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_missing_sample_evidence[sample_rate]` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_missing_sample_evidence[time_base]` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_missing_sample_evidence[channels]` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_missing_sample_evidence[sample_fmt]` | Previously RED | PASS |
+| `test_check_output_pcm_refuses_missing_sample_evidence[first_pts]` | Previously RED | PASS |
+
+### Separate step: fixture and four granted consumers
+
+Recipe: `tools/fixtures/video.py::_build_pcm` generates 45 limited BT.709 HEVC
+frames (libx265 ultrafast, no B frames/version SEI, bitexact, timescale 30000)
+and three mono 48000 Hz s16le MOV audio segments, each exactly 24024 samples,
+with `asetnsamples=n=1024:p=0`. The concat demuxer joins the three audio segments
+while stream-copying them and the video to MOV, bitexact and metadata-free.
+All intermediate paths pass the existing write guard and are removed by build.
+Defaulted `Spec.audio_codec`/`container` preserve all eight prior recipes.
+Measurements and intended PCM packets/totals are validated by `mismatches`;
+the manifest's new row was built by `manifest.entry` and `manifest.build`.
+
+Fixture: `tests/fixtures/video/pcm-irregular.mov`, id `vid-pcm-irregular`.
+Size 219463 bytes; SHA-256
+`b06fb7979c6f5e28432f8aa250aa40b247ef197c31ddf6158f08e1422a8cf72b`.
+Two independently built video groups under `fixture-gen-a` / `fixture-gen-b`
+produce byte-identical MOVs and identical measured entries. Every existing
+video entry matches the committed entry exactly. Full manifest regeneration
+also passes byte-for-byte. The manifest leaves cross-build video byte identity
+unclaimed, as for the existing video samples.
+
+Complete compact audio packet table (zero-based):
+
+| Packet indexes | pts | duration | payload bytes |
+| --- | --- | --- | --- |
+| 0..22 | `1024 * i` | 1024 | 2048 |
+| 23 | 23552 | 472 | 944 |
+| 24..46 | `24024 + 1024 * (i - 24)` | 1024 | 2048 |
+| 47 | 47576 | 472 | 944 |
+| 48..70 | `48048 + 1024 * (i - 48)` | 1024 | 2048 |
+| 71 (last) | 71600 | 472 | 944 |
+
+72 packets; PRESENTED = STORED = decoded = 72072 sample frames, 144144 decoded
+bytes, decoded s16le SHA-256
+`086691f53b341fa75ff0765698cb9ae70cd0af370fb1f3cb00282f7b1dfdf6f8`.
+Mid-stream packets 23 and 47 are irregular independently of the last packet.
+Format: pcm_s16le, time base 1/48000, 48000 Hz, one channel, s16, first pts 0.
+Source and libx265 product output have identical complete audio packet tables.
+Full lists/measurements: `fixture-gen-a/entries.json`, `fixture-gen-b/entries.json`,
+`turn3-artifact-facts.json`; generator transcript `turn3-build-fixture.log` and
+completed transfer summary `turn3-build-fixture-final.log`. The initial scratch
+transfer script used a nonexistent manifest loader AFTER both generations;
+corrected to JSON loading and reused the two already-generated groups. No
+committed generator defect or extra generation is hidden by that correction.
+
+Granted consumer edits, with no existing-sample assertion weakened:
+
+| Consumer | Before | After |
+| --- | --- | --- |
+| `test_sample_inventory_matches_the_brief` | Exactly eight explicit video ids | Same eight plus `vid-pcm-irregular` |
+| `test_mp4_user_data_holds_nothing_beyond_the_empty_meta` | All video ids assumed MP4, count eight | Select `.mp4` only, still require exactly eight and the same empty udta/meta assertions |
+| `test_video_has_audio_and_no_data_streams_or_location` | Every video must have AAC | Only the new id must have pcm_s16le; every old id still AAC; every id still no data/location |
+| `test_wp23_fixture_names_keep_output_paths` | VIDEO output keeps source suffix | MOV VIDEO expects `.mp4` under WP4.4; all other extensions and PHOTO expectations retained |
+
+`DECODABLE` now explicitly includes `vid-pcm-irregular: 8`; the two libx265
+8/10-bit V4 cases pass. New real-sink row:
+`tests/test_io_video_encode.py::test_pcm_irregular_audio_survives_the_real_sink`.
+It uses `Runs.get` -> `video_fidelity.encode_file` -> `_RecordingSink`, a real
+`FFmpegVideoSink` with unmodified NUT-pipe two-input command, `-copyts`,
+`-c:a copy`, MP4 flags, open/write/close and mandatory read-back. It asserts
+two non-last irregular packets, exact source/output format/start/totals and
+decoded PCM byte equality. Like its synthetic V4 neighbors it is UNMARKED
+(no slow/gpu/footage/gui/fullclip mark), and was run explicitly by node id:
+`turn3-real-sink.log` / `.xml`, 1 passed. Source/output facts and the complete
+pre-fix `check_output` loaded from HEAD independently return no problems:
+`turn3-artifact-check.log`. This is a CONTROL, not a RED claim. New planted
+PCM-to-AAC re-encode refuses with the PCM codec message; the existing AAC
+planted re-encode row is unchanged and passes.
+
+Limit for the later report: the synthetic fixture keeps all packet boundaries
+through the real sink, while the seat experiment's two owner sources coalesced
+or moved boundaries. Equal decoded bytes and both extent totals establish the
+harmlessness of those owner changes; they do not establish which source or
+full-command detail causes re-chunking. Its cause is unknown and outside this
+package's fix scope. The unit numerical shapes carry the RED; the fixture is
+the commissioned real-sink control. No owner's footage was opened by this cell.
+
+### Light checks and the pre-existing audit failure
+
+All evidence below is relative to this worktree's `work/wp-d112/`. Every pytest
+run sets `PYTHONPATH=scripts`, unsets `PYTEST_ADDOPTS`, loads
+`-p sandbox_mkdir_shim -p no:cacheprovider` and has its own basetemp under
+`work/wp-d112/tmp/`. No heavy/footage/GPU/GUI/fullclip test was run.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Initial PCM GREEN | 24 passed, 80 deselected | `turn3-green.log` / `.xml` |
+| Initial keyword light run | 37 passed, 194 deselected | `turn3-light.log` / `.xml` |
+| Whole unit module after cut-window verification fix | 109 passed | `turn3-units.log` / `.xml` |
+| Final two-module keyword light run (`audio or pcm or check_output`, non-heavy markers) | 42 passed, 194 deselected | `turn3-light-final.log` / `.xml` |
+| Real-sink libx265 control, explicit node | 1 passed | `turn3-real-sink.log` / `.xml` |
+| Fixture roster from round 0 section 5 | 44 passed, 3 failed, 301 deselected | `turn3-fixtures.log` / `.xml` |
+| Naming manifest cases + existing MOV extension/collision rows | 741 passed, 136 deselected | `turn3-naming.log` / `.xml` |
+
+The fixture selection includes validity, serialization, all committed files,
+inventory, faults, cap/missing-file plants, privacy, eight-MP4 udta, all nine
+video fact rows, stream tags, rotation, audio/data/location, full regenerated
+manifest and decoded hashes, static generator scan/plants, and all three I/O
+audit rows. Only those last three audit rows fail:
+
+- `test_generators_write_only_inside_their_output_folders`: extra write `nul`.
+- `test_generators_read_only_their_own_code_and_libraries`: extra read `nul`.
+- `test_ffmpeg_is_told_to_write_only_into_the_output_folders`: 55 allowed
+  ffmpeg/ffprobe processes among 56 subprocesses; extra `cmd.exe /c ver`.
+
+**[major, PRE-EXISTING, OUT OF ENVELOPE]** Independently reproduced WITHOUT
+fixture generation or any call to the new PCM helpers: isolated Python calls
+unchanged `fixtures.flicker.normalisation_spread(flicker.still())`. Its import
+chain is `prototype.pipeline` -> `prototype.backend` -> SciPy ndimage ->
+`numpy.testing._private.utils` -> `platform.machine` -> `win32_ver` ->
+`_syscmd_ver` -> `cmd.exe /c ver`, with Python opening its `nul` device.
+Trace: `turn3-audit-spread-trace.log`; audited event extraction:
+`turn3-audit-finding.log`; initial imports alone have no process:
+`turn3-audit-import-trace.log`. Existing mechanic at
+`tools/fixtures/flicker.py:482`, originated in `e60162c6` (`git log -S
+normalisation_spread`, `turn3-audit-origin.log`); `git diff --quiet` for that
+file exits 0. No additional consumer edit was made and none is proposed as an
+in-envelope fix. Disposition: BANKED to the dispatcher for a seat re-run of
+these three rows before acceptance, or a separately ruled scope if they fail
+there. This turn does NOT claim a fully green fixture roster or package gate.
+
+### Verification loop
+
+| Suspect | Independent confirmation / rejection | Disposition |
+| --- | --- | --- |
+| New check unnecessarily requires duration/size AFTER the source cut | A pure-table row with a valid 1532-sample included prefix and missing facts only in the excluded third packet fails `turn3-window-red.log` (1 failed) | CONFIRMED, FIXED: accumulate only through the latest admissible source prefix; regression passes in 109-unit and 42-light runs |
+| Cut slack might combine totals from different prefixes | Planted output pair `(1024,1624)` has individually admissible totals, but no jointly admissible source prefix; new row refuses by named paired-total rule | REJECTED as a fault in the implementation; retained regression control |
+| Invalid duration/payload fractions could silently round | Negative duration, odd s16 payload byte count and half-sample presentation duration independently refuse; three added parameter rows pass | REJECTED; retained controls |
+| Compressed rule drift or re-encode hole | Exact function-text hash equality, unchanged named cut/mismatch unit rows, existing AAC plant and new real PCM-to-AAC plant | REJECTED |
+| Fixture is accidentally claimed RED | Old complete check accepts measured product output and source/output packet lists are identical | REJECTED; labeled CONTROL throughout |
+| Fixture audit regression from the new recipe | Direct unchanged flicker-only import path reproduces cmd/ver and nul, with origin trace above | CONFIRMED pre-existing outside envelope; BANKED to dispatcher, no unauthorized fix |
+
+The final pass over owned code, fixture measurements, four consumer assertions,
+cut edge cases, message ASCII handling and compressed-rule identity found no
+new issue. The known audit failures remain explicitly open for the seat.
+No reviewer pass has started and no Reviewer A round is credited this turn.
+Reviewer A round 1, Reviewer B, the two-leg/fullclip gate, trim/owner proofs and
+post-merge witness remain COMMISSIONED to the dispatcher under the brief.
+
+Final lint/type and byte checks are recorded in `turn3-ruff-final.log`,
+`turn3-format-final.log`, `turn3-mypy-final.log`, `turn3-byte-qa.log` and
+`turn3-diff-check.log`; the return message quotes their actual summaries.
+All changed text is LF with zero CR. `.gitattributes` already has
+`tests/fixtures/** -text`; `git check-attr text` is unset for the new MOV,
+and `git diff --no-index --numstat NUL <fixture>` reports `- -` (binary).
+The MOV is retained byte-for-byte; zero-CR applies to text, not binary data.
+
+| Turn | Reviewer | Critical / major / minor | In / out | NEW / REOPENED | Reverts | Product / test fixes | Depth |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Session 2 / 3 | Build verification; A pending | 0 / 2 / 0 confirmed verification findings | 1 / 1 | 1 introduced / 0 reopened; 1 pre-existing | 0 | PCM rule and cut-prefix fix / fixture and controls | Dispatcher pending |
+
+YIELD for Reviewer A and the audit disposition. This is turn-3 build evidence,
+not acceptance or the final package report.

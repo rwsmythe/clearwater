@@ -746,7 +746,7 @@ def test_a_cut_audio_stream_must_be_the_source_packets_before_the_cut(
 
 @dataclass(frozen=True)
 class _PcmStreamRow(StreamRow):
-    """Plant additive PCM facts without changing the production stream class for RED."""
+    """Keep the explicit PCM defaults used by the original RED regression tables."""
 
     codec_name: str = "pcm_s16le"
     sample_rate: int | None = 48000
@@ -992,6 +992,50 @@ def test_check_output_pcm_refuses_missing_sample_evidence(
         )
     problems = _pcm_check(monkeypatch, _pcm_table(), output)
     _assert_pcm_refusal(problems)
+
+
+def test_check_output_pcm_cut_ignores_duration_and_size_after_the_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Missing facts in a packet excluded by the cut do not change its included prefix."""
+    source = _pcm_table((1024, 508, 1024))
+    source = replace(
+        source,
+        audio_durations={1: (1024, 508, None)},
+        audio_sizes={1: (2048, 1016, None)},
+    )
+    assert _pcm_check(monkeypatch, source, _pcm_table((1532,)), Fraction(1200, 48000)) == []
+
+
+def test_check_output_pcm_cut_requires_both_totals_from_the_same_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Slack cannot mix a dropped packet's presentation with a kept packet's payload."""
+    source = _pcm_table((1024, 508, 1024))
+    source = replace(source, audio_sizes={1: (2048, 1200, 2048)})
+    output = _pcm_table((1024,), last_stored_samples=1624)
+    problems = _pcm_check(monkeypatch, source, output, Fraction(1024, 48000))
+    _assert_pcm_refusal(problems, "presented/stored", "prefix")
+
+
+@pytest.mark.parametrize("invalid", ["negative-duration", "partial-sample", "fractional-duration"])
+def test_check_output_pcm_refuses_inexact_sample_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    invalid: str,
+) -> None:
+    """Neither negative durations nor fractional sample frames are exact evidence."""
+    source = _pcm_table()
+    output = _pcm_table()
+    if invalid == "negative-duration":
+        output = replace(output, audio_durations={1: (1024,) * 6 + (-1,)})
+    elif invalid == "partial-sample":
+        output = replace(output, audio_sizes={1: (2048,) * 6 + (2047,)})
+    else:
+        source = replace(
+            source, streams=(source.video, replace(source.streams[1], time_base=Fraction(1, 96000)))
+        )
+        output = replace(output, streams=source.streams, audio_durations={1: (1024,) * 6 + (1023,)})
+    _assert_pcm_refusal(_pcm_check(monkeypatch, source, output), "evidence")
 
 
 def test_not_carried_lists_best_effort_items() -> None:

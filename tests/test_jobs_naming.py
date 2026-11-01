@@ -523,11 +523,13 @@ def test_video_extension_stream_is_refused(tmp_path, planner):
     ],
 )
 def test_wp23_fixture_names_keep_output_paths(tmp_path, planner, kind, beside, fixture_path):
-    """Keep every manifest filename's default-suffix path unchanged."""
+    """Keep manifest names, with MOV video written as MP4 under WP4.4."""
     source = tmp_path / "source" / fixture_path
     folder = source.parent if beside else tmp_path / "out"
     settings = Settings(output_folder=None if beside else folder)
     extension = ".png" if kind is MediaKind.PHOTO else source.suffix
+    if kind is MediaKind.VIDEO and source.suffix.lower() == ".mov":
+        extension = ".mp4"
     expected = folder / f"{source.stem}_corrected{extension}"
 
     assert planner(source, settings, kind) == expected

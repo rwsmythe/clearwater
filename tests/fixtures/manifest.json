@@ -4888,6 +4888,623 @@
       "byte_reproducible": false
     },
     {
+      "id": "vid-pcm-irregular",
+      "group": "video",
+      "kind": "mov",
+      "storage": "committed",
+      "path": "video/pcm-irregular.mov",
+      "command": null,
+      "serves": [
+        "V4",
+        "D20",
+        "D94"
+      ],
+      "exercises": "MOV with mono s16le PCM: two short mid-stream packets and exact sample totals; a real-sink control for the packet-independent PCM check.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": null,
+        "probe": {
+          "container": "mov,mp4,m4a,3gp,3g2,mj2",
+          "video": {
+            "codec": "hevc",
+            "width": 320,
+            "height": 180,
+            "bit_depth": 8,
+            "frame_rate": "30000/1001",
+            "time_base": "1/30000",
+            "nb_frames": 45,
+            "rotation": 0,
+            "vfr": false,
+            "color": {
+              "primaries": "bt709",
+              "transfer": "bt709",
+              "matrix": "bt709",
+              "range": "limited",
+              "bit_depth": 8,
+              "assumed": false
+            }
+          },
+          "audio": [
+            {
+              "codec": "pcm_s16le",
+              "sample_rate": 48000,
+              "channels": 1
+            }
+          ],
+          "data": []
+        }
+      },
+      "facts": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "video": {
+          "codec": "hevc",
+          "profile": "Main",
+          "pix_fmt": "yuv420p",
+          "bit_depth": 8,
+          "width": 320,
+          "height": 180,
+          "color_range": "tv",
+          "color_space": "bt709",
+          "color_transfer": "bt709",
+          "color_primaries": "bt709",
+          "r_frame_rate": "30000/1001",
+          "avg_frame_rate": "30000/1001",
+          "time_base": "1/30000",
+          "nb_frames": 45,
+          "rotation": 0,
+          "vui": {
+            "video_signal_type_present_flag": 1,
+            "video_full_range_flag": 0,
+            "colour_description_present_flag": 1,
+            "colour_primaries": 1,
+            "transfer_characteristics": 1,
+            "matrix_coefficients": 1
+          }
+        },
+        "audio": [
+          {
+            "codec": "pcm_s16le",
+            "sample_rate": 48000,
+            "channels": 1,
+            "pcm": {
+              "sample_fmt": "s16",
+              "time_base": "1/48000",
+              "packets": [
+                {
+                  "pts": 0,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 1024,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 2048,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 3072,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 4096,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 5120,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 6144,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 7168,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 8192,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 9216,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 10240,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 11264,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 12288,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 13312,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 14336,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 15360,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 16384,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 17408,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 18432,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 19456,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 20480,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 21504,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 22528,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 23552,
+                  "duration": 472,
+                  "size": 944
+                },
+                {
+                  "pts": 24024,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 25048,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 26072,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 27096,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 28120,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 29144,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 30168,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 31192,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 32216,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 33240,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 34264,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 35288,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 36312,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 37336,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 38360,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 39384,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 40408,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 41432,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 42456,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 43480,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 44504,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 45528,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 46552,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 47576,
+                  "duration": 472,
+                  "size": 944
+                },
+                {
+                  "pts": 48048,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 49072,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 50096,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 51120,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 52144,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 53168,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 54192,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 55216,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 56240,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 57264,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 58288,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 59312,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 60336,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 61360,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 62384,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 63408,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 64432,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 65456,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 66480,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 67504,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 68528,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 69552,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 70576,
+                  "duration": 1024,
+                  "size": 2048
+                },
+                {
+                  "pts": 71600,
+                  "duration": 472,
+                  "size": 944
+                }
+              ],
+              "presented_samples": 72072,
+              "stored_samples": 72072,
+              "decoded_samples": 72072,
+              "decoded_sha256": "086691f53b341fa75ff0765698cb9ae70cd0af370fb1f3cb00282f7b1dfdf6f8"
+            }
+          }
+        ],
+        "data_streams": [],
+        "has_location_tag": false,
+        "pts": {
+          "ticks_per_second": 30000,
+          "count": 45,
+          "ticks": [
+            0,
+            1001,
+            2002,
+            3003,
+            4004,
+            5005,
+            6006,
+            7007,
+            8008,
+            9009,
+            10010,
+            11011,
+            12012,
+            13013,
+            14014,
+            15015,
+            16016,
+            17017,
+            18018,
+            19019,
+            20020,
+            21021,
+            22022,
+            23023,
+            24024,
+            25025,
+            26026,
+            27027,
+            28028,
+            29029,
+            30030,
+            31031,
+            32032,
+            33033,
+            34034,
+            35035,
+            36036,
+            37037,
+            38038,
+            39039,
+            40040,
+            41041,
+            42042,
+            43043,
+            44044
+          ],
+          "sha256": "d3aabc13e90989c19635975bc4e0fbcd9ae8d130b4f0f2c877af7bc0ce46cfa8",
+          "durations": [
+            1001
+          ],
+          "frame_durations": [
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001,
+            1001
+          ],
+          "track_duration_ticks": 45045,
+          "variable": false
+        },
+        "stts_durations": [
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001,
+          1001
+        ],
+        "decoded": {
+          "frames": 45,
+          "frames_sha256": "ff3fcf3560a512567e781702491c717d0ede43a6415c9f29581034a07c15b150",
+          "pts_sha256": "0aed5749fc5d21fc9c72e5a6523b225663010c2b4389701b9696cb58004d5d92",
+          "time_base": "1001/30000"
+        },
+        "ffprobe_errors": []
+      },
+      "size": 219463,
+      "md5": null,
+      "byte_reproducible": false
+    },
+    {
       "id": "vid-pq",
       "group": "video",
       "kind": "mp4",

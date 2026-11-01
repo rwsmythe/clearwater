@@ -6,7 +6,8 @@ does not carry, the audio packets, the sample aspect ratio) and one of the outpu
 closes, and :func:`check_output` compares the MANDATORY items it can see without decoding: the
 frame count and every pts against the pts written, the video start, the video track's edit list
 against the written start and end (its ``media_time`` is checked through its effect: the
-demuxer applies it to every pts compared), the display rotation, and every audio packet's pts.
+demuxer applies it to every pts compared), the display rotation, and the audio: PCM format,
+first pts and presented/stored sample totals, or every compressed audio packet's pts.
 The full item-by-item comparison is the fidelity instrument's (``tools/video_fidelity.py``);
 this check is what every export runs.
 
@@ -55,12 +56,13 @@ point may be kept or dropped."""
 
 _STREAM_ENTRIES = (
     "stream=index,codec_type,codec_tag_string,time_base,start_pts,duration_ts,nb_frames,"
+    "codec_name,sample_rate,channels,sample_fmt,"
     "sample_aspect_ratio:stream_side_data=rotation:format_tags=creation_time,firmware"
 )
 MAX_SAMPLES = 10_000_000
 """The most video samples a sample table may describe (46 hours at 60 fps); more is malformed."""
 
-_PACKET_ENTRIES = "packet=stream_index,pts,flags"
+_PACKET_ENTRIES = "packet=stream_index,pts,flags,duration,size"
 _RATIO = re.compile(r"^(\d+):(\d+)$")
 _HEADER = 8
 _LARGE_HEADER = 16
@@ -121,6 +123,10 @@ class StreamRow:
             whose packets are never listed (a data track).
         frames: The sample count the stream list gives (``nb_frames``, from the container's
             sample table, no packet read), or None.
+        codec_name: FFmpeg's codec name, used to identify raw PCM audio.
+        sample_rate: Audio sample frames per second, or None.
+        channels: Audio channel count, or None.
+        sample_fmt: FFmpeg's decoded audio sample format, or None.
     """
 
     index: int
@@ -133,6 +139,10 @@ class StreamRow:
     rotation: Fraction | None
     packets: int | None
     frames: int | None = None
+    codec_name: str = ""
+    sample_rate: int | None = None
+    channels: int | None = None
+    sample_fmt: str | None = None
 
 
 @dataclass(frozen=True)
@@ -155,6 +165,8 @@ class PacketTable:
             show (the edit list's effect). None when there is no sample table, it disagrees
             with the listed packets, or a listed packet has no pts. On a cut-short file it runs
             past the listing to the samples the cut removed.
+        audio_durations: Per audio index, packet durations in stream ticks, aligned with pts.
+        audio_sizes: Per audio index, packet payload sizes in bytes, aligned with pts.
     """
 
     streams: tuple[StreamRow, ...]
@@ -166,6 +178,8 @@ class PacketTable:
     audio_pts: Mapping[int, tuple[int | None, ...]] = field(default_factory=dict)
     samples: SampleTable | None = None
     sample_pts: tuple[int, ...] | None = None
+    audio_durations: Mapping[int, tuple[int | None, ...]] = field(default_factory=dict)
+    audio_sizes: Mapping[int, tuple[int | None, ...]] = field(default_factory=dict)
 
     @property
     def video(self) -> StreamRow:
@@ -517,6 +531,8 @@ def read_packet_table(path: Path, *, strict: bool = False) -> PacketTable:
         if s.get("codec_type") == "audio" and (index := _int(s.get("index"))) is not None
     }
     counts: dict[int, int] = {video_index: 0}
+    audio_durations: dict[int, list[int | None]] = {index: [] for index in audio_pts}
+    audio_sizes: dict[int, list[int | None]] = {index: [] for index in audio_pts}
     video_pts: list[int] = []
     corrupt: list[int] = []
     missing = 0
@@ -538,6 +554,8 @@ def read_packet_table(path: Path, *, strict: bool = False) -> PacketTable:
             index = _int(packet.get("stream_index"))
             if index is not None and index in audio_pts:
                 audio_pts[index].append(_int(packet.get("pts")))
+                audio_durations[index].append(_int(packet.get("duration")))
+                audio_sizes[index].append(_int(packet.get("size")))
     counts.update({index: len(listed) for index, listed in audio_pts.items()})
     streams = tuple(
         StreamRow(
@@ -553,6 +571,10 @@ def read_packet_table(path: Path, *, strict: bool = False) -> PacketTable:
             rotation=_rotation(s),
             packets=counts.get(index),
             frames=_int(s.get("nb_frames")),
+            codec_name=str(s.get("codec_name", "")),
+            sample_rate=_int(s.get("sample_rate")),
+            channels=_int(s.get("channels")),
+            sample_fmt=str(s["sample_fmt"]) if s.get("sample_fmt") is not None else None,
         )
         for s in raw_streams
         if (index := _int(s.get("index"))) is not None
@@ -577,6 +599,8 @@ def read_packet_table(path: Path, *, strict: bool = False) -> PacketTable:
         audio_pts={index: tuple(listed) for index, listed in audio_pts.items()},
         samples=samples,
         sample_pts=_sample_pts(samples, video_pts, missing, video_time_base),
+        audio_durations={index: tuple(values) for index, values in audio_durations.items()},
+        audio_sizes={index: tuple(values) for index, values in audio_sizes.items()},
     )
 
 
@@ -776,9 +800,10 @@ def check_output(
 ) -> list[str]:
     """Compare a finished output with the source and the frames written (D94).
 
-    Every audio stream's packets must have the source's pts, in order: all of them, or with
-    ``audio_end`` the source's packets before that point (a packet within
-    :data:`CUT_SLACK_S` of it may go either way), never another subset.
+    Compressed audio retains every source packet's pts in order. Raw PCM retains its format,
+    first pts and both presented and stored sample totals, regardless of packet boundaries.
+    With ``audio_end``, compare whole source packets starting before that point; a packet
+    within :data:`CUT_SLACK_S` may go either way, always as a complete prefix.
 
     Args:
         out_path: The output file (its edit list is read from its boxes).
@@ -820,12 +845,126 @@ def check_output(
             f"{len(source_audio)}"
         )
     for number, (src, out) in enumerate(zip(source_audio, output_audio, strict=False)):
+        if src.codec_name.startswith("pcm_"):
+            problems += _pcm_problems(number, src, out, source, output, audio_end)
+            continue
         problems += _audio_problems(
             number,
             _seconds(source.audio_pts.get(src.index, ()), src.time_base),
             _seconds(output.audio_pts.get(out.index, ()), out.time_base),
             audio_end,
         )
+    return problems
+
+
+def _pcm_totals(
+    stream: StreamRow, table: PacketTable, count: int | None = None
+) -> list[tuple[int, int]] | None:
+    """Return cumulative presented/stored sample-frame pairs, or None without exact evidence."""
+    rate, base, channels = stream.sample_rate, stream.time_base, stream.channels
+    if not rate or rate < 0 or base is None or base <= 0 or not channels or channels < 0:
+        return None
+    if stream.sample_fmt not in {
+        "u8",
+        "s16",
+        "s32",
+        "s64",
+        "flt",
+        "dbl",
+        "u8p",
+        "s16p",
+        "s32p",
+        "s64p",
+        "fltp",
+        "dblp",
+    }:
+        return None
+    # Packed 24-bit PCM decodes to s32, but stores three bytes per channel sample.
+    width = re.fullmatch(r"pcm_[suf](8|16|24|32|64)(?:le|be)?(?:_planar)?", stream.codec_name)
+    if width is None:
+        return None  # Block-packed/companded variants need their own exact payload rule.
+    frame_bytes = int(width[1]) // 8 * channels
+    pts = table.audio_pts.get(stream.index, ())[:count]
+    durations = table.audio_durations.get(stream.index, ())[:count]
+    sizes = table.audio_sizes.get(stream.index, ())[:count]
+    if len(pts) != len(durations) or len(pts) != len(sizes) or any(p is None for p in pts):
+        return None
+    totals = [(0, 0)]
+    for duration, size in zip(durations, sizes, strict=True):
+        if duration is None or duration < 0 or size is None or size < 0 or size % frame_bytes:
+            return None
+        presented = duration * base * rate
+        if presented.denominator != 1:
+            return None
+        before_presented, before_stored = totals[-1]
+        totals.append((before_presented + int(presented), before_stored + size // frame_bytes))
+    return totals
+
+
+def _pcm_problems(
+    number: int,
+    src: StreamRow,
+    out: StreamRow,
+    source: PacketTable,
+    output: PacketTable,
+    end: Fraction | None,
+) -> list[str]:
+    """Compare PCM format, first pts and both exact totals for whole source-packet prefixes."""
+    label = f"audio stream {number} (PCM)"
+    problems = []
+    for name, expected, got in (
+        ("codec", src.codec_name, out.codec_name),
+        ("time base", src.time_base, out.time_base),
+        ("sample rate", src.sample_rate, out.sample_rate),
+        ("channel count", src.channels, out.channels),
+        ("sample format", src.sample_fmt, out.sample_fmt),
+    ):
+        if expected != got:
+            problems.append(
+                f"{label}: {name} {ascii_text(str(got))} where the source has "
+                f"{ascii_text(str(expected))}"
+            )
+    if problems:
+        return problems
+    src_pts = source.audio_pts.get(src.index, ())
+    out_pts = output.audio_pts.get(out.index, ())
+    if any(p is None for p in src_pts):
+        return [f"{label}: missing source packet pts for the sample window"]
+    if end is None:
+        low = high = len(src_pts)
+    else:
+        timed = _seconds(src_pts, src.time_base)
+        low = sum(p is not None and p < end - CUT_SLACK_S for p in timed)
+        high = sum(p is not None and p < end + CUT_SLACK_S for p in timed)
+    src_totals, out_totals = _pcm_totals(src, source, high), _pcm_totals(out, output)
+    if src_totals is None or out_totals is None:
+        return [f"{label}: missing or invalid evidence for exact presented/stored samples"]
+    # A straddling packet contributes ALL its duration and payload. Slack admits
+    # whole prefixes only, and both totals must belong to the SAME prefix.
+    wanted = src_totals[low : high + 1]
+    got_totals = out_totals[-1]
+    if got_totals not in wanted:
+        for column, name in enumerate(("presented", "stored")):
+            values = sorted({pair[column] for pair in wanted})
+            if got_totals[column] not in values:
+                expected_text = " or ".join(str(value) for value in values)
+                problems.append(
+                    f"{label}: {got_totals[column]} {name} samples in the output "
+                    f"where the source has {expected_text}"
+                )
+        if not problems:
+            problems.append(
+                f"{label}: presented/stored samples {got_totals} do not match "
+                f"one source packet prefix {wanted}"
+            )
+    if out_pts:
+        if not src_pts or out_pts[0] != src_pts[0]:
+            problems.append(
+                f"{label}: first packet pts {out_pts[0]} where the source has "
+                f"{src_pts[0] if src_pts else None}"
+            )
+    elif low:
+        problems.append(f"{label}: missing first packet pts")
     return problems
 
 

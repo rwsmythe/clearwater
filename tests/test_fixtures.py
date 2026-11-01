@@ -109,6 +109,7 @@ def test_sample_inventory_matches_the_brief() -> None:
         "vid-truncated",
         "vid-vfr",
         "vid-rotated",
+        "vid-pcm-irregular",
     }
     assert [o["what"] for o in MANIFEST["omitted"]] == ["tiff16-*: 16-bit RGB TIFF"]
 
@@ -618,7 +619,7 @@ def _udta_problems(data: bytes) -> list[str]:
 
 def test_mp4_user_data_holds_nothing_beyond_the_empty_meta(sample: Callable[[str], Path]) -> None:
     """Every sample MP4 has a udta that is exactly an empty meta (hdlr and an empty ilst)."""
-    mp4s = [sample(i) for i in VIDEO_IDS]
+    mp4s = [sample(i) for i in VIDEO_IDS if sample(i).suffix == ".mp4"]
     assert len(mp4s) == 8
     for path in mp4s:
         data = path.read_bytes()
@@ -1071,7 +1072,8 @@ def test_truncated_clip_has_a_readable_part_and_a_fault(sample: Callable[[str], 
 def test_video_has_audio_and_no_data_streams_or_location(sample: Callable[[str], Path]) -> None:
     for sample_id in VIDEO_IDS:
         facts = video.measure(sample(sample_id))
-        assert [a["codec"] for a in facts["audio"]] == ["aac"], sample_id
+        codec = "pcm_s16le" if sample_id == "vid-pcm-irregular" else "aac"
+        assert [a["codec"] for a in facts["audio"]] == [codec], sample_id
         assert facts["data_streams"] == [], sample_id  # no gpmd, no tmcd
         assert facts["has_location_tag"] is False, sample_id
 
