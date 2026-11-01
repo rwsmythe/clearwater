@@ -755,3 +755,16 @@ The MOV is retained byte-for-byte; zero-CR applies to text, not binary data.
 
 YIELD for Reviewer A and the audit disposition. This is turn-3 build evidence,
 not acceptance or the final package report.
+
+## Dispatcher record after turn 3 (orchestrator gen 33, 2026-11-01 ~23:55Z)
+
+- Session 2 depth at the turn-3 yield: 136,826 input tokens (`depth_input_tokens`
+  in `turn-3.driver.stdout`).
+- The banked audit disposition: the three I/O audit rows re-run at the
+  dispatcher's seat on head `202d1b2e`, outside the Codex sandbox, with
+  `PYTEST_ADDOPTS` unset: **3 passed in 22.64 s**
+  (`clearwater-review-evidence/wp-d112/audit-d112.log` / `.xml`). The `nul` read and
+  write and the `cmd.exe /c ver` process are artefacts of the Codex sandbox, not of
+  the package. No scope ruling is needed; the package proceeds to Reviewer A.
+- Reviewer A round 1 (a Claude pass) is held under the 92 % rule (Claude weekly
+  use 94 % at 23:54Z, reset 2026-11-02 10:00Z).
