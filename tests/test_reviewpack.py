@@ -1486,6 +1486,40 @@ def test_excerpt_integrity_rejects_changed_non_tmcd_payload(
     assert not list((roots.allowed / "excerpts").glob("*.mp4"))
 
 
+def test_earlier_excerpt_survives_failed_rerun_cleanup(
+    roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only the failed fresh attempt may be removed; an earlier excerpt stays intact."""
+    source = roots.footage / "GX011604.mp4"
+    shutil.copyfile(_timecode_source(roots), source)
+    first = build.prepare_excerpt(source, start_s=0.6, duration_s=0.5, roots=roots)
+    earlier = roots.allowed / "excerpts/GX011604.mp4"
+    assert first["status"] == "ready" and first["path"] == earlier
+    original = earlier.read_bytes()
+    assert original
+
+    def tampered_probe(argv, **kwargs):
+        done = media_tool(argv, **kwargs)
+        if (
+            argv[0] == "ffprobe"
+            and "-show_data_hash" in argv
+            and Path(argv[-1]) == roots.allowed / "excerpts/GX011604-2.mp4"
+        ):
+            value = json.loads(done.stdout)
+            packet = next(p for p in value["packets"] if p["codec_type"] == "video")
+            packet["data_hash"] = "SHA256:planted-corruption"
+            return subprocess.CompletedProcess(argv, 0, json.dumps(value).encode(), done.stderr)
+        return done
+
+    monkeypatch.setattr(build, "run_tool", tampered_probe)
+    failed = build.prepare_excerpt(source, start_s=0.6, duration_s=0.5, roots=roots)
+    assert failed["status"] == "excerpt_failed" and failed["path"] is None
+    assert "packet payloads" in failed["message"]
+    assert earlier.read_bytes() == original
+    assert not (roots.allowed / "excerpts/GX011604-2.mp4").exists()
+    assert list((roots.allowed / "excerpts").glob("*.mp4")) == [earlier]
+
+
 def test_bom_sheet_tallies_and_preserves_owner_answers(roots: OutputRoots) -> None:
     path = roots.allowed / "bom.csv"
     _csv(path, [_row(_item(), preferred="yes", note="caf\u00e9")])

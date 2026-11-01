@@ -6,8 +6,9 @@
 - Verified base and current HEAD at round 0: `2050a89a`; initial tracked diff empty.
 - Turn 1 is task 1 only. No instrument or test code is written this turn.
 - State: **Reviewer A CONVERGED at round 4; executing Reviewer B returned
-  NO_NEW_CRITICAL_MAJOR on `2a1e15b1`; turn 11 remediated B-F1/B-F2 and turn 12
-  completes the conflict display, with a STOP on failed-excerpt cleanup**.
+  NO_NEW_CRITICAL_MAJOR on `2a1e15b1`; B-F1/B-F2 remediation is committed through
+  `6d470028`; CHARC confirmed the failed-fresh-excerpt cleanup exemption. Turn 13
+  reads back successful photo/preset/page runs; V-P is running at dispatcher**.
   Real-build RUN REQUESTS and the final two-leg gate remain at the dispatcher.
   Round 1 remediation is committed as `03731250`.
   CHARC's complete F1 ruling is committed in the brief at `abeef516`; no ruling
@@ -288,18 +289,18 @@ Wall times are scheduling estimates, not figures of record.
 
 Q8 order, including candidate/refusal coverage omitted from its shorthand:
 
-| Order | Exact queued command | Expected wall time | Outputs under work/wp5.3/ |
-|---|---|---|---|
-| 1 | `RUN REQUEST: uv run python -m tools.reviewpack.build photos` | about 1 hour, GPU | photos, thumbnails, P-A/P-Z corrected and neutral records, state, logs |
-| 2 | `RUN REQUEST: uv run python -m tools.reviewpack.build presets` | <1 minute | both preset JSON files, pack-local store and marker, state/log |
-| 3 | `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | <2 minutes | index.html, initial review-sheet.csv, link-check log |
-| 4 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-P` | reserve about 2.5 hours, provisional; CHARC's allowance is about 27 minutes of source material | 17 whole product clips, IMG_6762.MOV last, pair clips/stills, thumbnails, V-P record, state/logs/cache |
-| 5 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-S` | about 1.5-2 hours, provisional | 26 clips and aids, excerpts where needed, V-S record, state/logs/cache |
-| 6 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-D` | about 40-70 minutes, provisional | 8 clips and aids, excerpts where needed, V-D record, state/logs/cache |
-| 7 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-Z` | about 10-20 minutes, provisional | 2 candidate clips and aids, excerpt as needed, V-Z record, state/logs/cache |
-| 8 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-R` | <2 minutes for expected refusals | 2 product refusal records/texts, state/logs; no review rows |
-| 9 | `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | <2 minutes | final index and merged sheet, all links checked |
-| 10 | Config-resolved tally request below | <1 minute | zero-judged tally, console captured by dispatcher under logs |
+| Order | Exact queued command | Expected wall time | Outputs under work/wp5.3/ | Actual receipt / read-back (turn 13) |
+|---|---|---|---|---|
+| 1 | `RUN REQUEST: uv run python -m tools.reviewpack.build photos` | about 1 hour, GPU | photos, thumbnails, P-A/P-Z corrected and neutral records, state, logs | On 6d470028, EXIT 0, 673 s, 2026-11-01 22:00:18Z-22:11:32Z; free 171 -> 167 GB. 73 done (64 P-A / 9 P-Z), failed=0, pending=55. |
+| 2 | `RUN REQUEST: uv run python -m tools.reviewpack.build presets` | <1 minute | both preset JSON files, pack-local store and marker, state/log | EXIT 0, 1 s, 22:12:15Z-22:12:16Z; both exported presets present, two page value tables. |
+| 3 | `RUN REQUEST: uv run python -m tools.reviewpack.build page` followed by `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | <2 minutes | page builds index.html and initial sheet, checks links inside; --check is links only | Initial mistakenly queued --check: EXIT 2, index.html FileNotFoundError. Dispatcher then ran page: EXIT 2 in 1 s (pending 55, not finished); subsequent --check EXIT 0. 73 sheet rows / 74 lines, 295 resolving links. |
+| 4 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-P` | reserve about 2.5 hours, provisional; CHARC's allowance is about 27 minutes of source material | 17 whole product clips, IMG_6762.MOV last, pair clips/stills, thumbnails, V-P record, state/logs/cache | RUNNING at dispatcher: receipt starts 22:12:54Z on 6d470028, free 167 GB; real pack stage lock held. No build stage run by cell. |
+| 5 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-S` | about 1.5-2 hours, provisional | 26 clips and aids, excerpts where needed, V-S record, state/logs/cache | Not yet returned. |
+| 6 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-D` | about 40-70 minutes, provisional | 8 clips and aids, excerpts where needed, V-D record, state/logs/cache | Not yet returned. |
+| 7 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-Z` | about 10-20 minutes, provisional | 2 candidate clips and aids, excerpt as needed, V-Z record, state/logs/cache | Not yet returned. |
+| 8 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-R` | <2 minutes for expected refusals | 2 product refusal records/texts, state/logs; no review rows | Not yet returned. |
+| 9 | `RUN REQUEST: uv run python -m tools.reviewpack.build page` followed by `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | <2 minutes | final index and merged sheet; page checks links inside and exits 2 while pending items/presets or sheet conflicts remain; --check is links only | Queued after clips; no final-pack completion claim. |
+| 10 | Config-resolved tally request below | <1 minute | zero-judged tally, console captured by dispatcher under logs | EXIT 0. Headline 0/0; expected 115 / available 64 / missing 51 / unjudged 64. Candidates expected 11 / available 9 / missing 2 / unjudged 9. Pending 55. |
 
 Order 10 resolves the configured working folder so that invocation from the
 worktree root cannot mistake the worktree's scratch folder for the real pack:
@@ -382,6 +383,7 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 4 / turn 10 / A4 terminating clean-up | same session 4 | 217,380 | Dispatcher supplied at turn 11; committed 2a1e15b1; session 4 retired. Reviewer B executed and returned NO_NEW_CRITICAL_MAJOR. |
 | Session 5 / turn 11 / Reviewer B remediation | fresh session 5; dispatcher to fill ID | dispatcher pending | B-F1/B-F2 RED/GREEN, verification and write-audit correction; YIELD for dispatcher-run real build. |
 | Session 5 / turn 12 / B-F1 completion | same session 5 | dispatcher pending | Conflict page/stderr pair identities completed; STOP for ruling on existing failed-excerpt cleanup versus blanket deletion ban. |
+| Session 5 / turn 13 / RUN REQUESTs 1-3 read-back | same session 5 | dispatcher pending | CHARC exemption confirmed; real photo/preset/page text and output existence read-only audit, exemption regression and non-slow checks. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -2219,3 +2221,105 @@ fixtures, existing assertions, src/, frozen interfaces and dependencies remain
 untouched. No commit, mailbox, real-media RUN REQUEST, owner judgement or
 automatic file recovery. **YIELD with STOP for the cleanup ruling** and the
 completed conflict-display changes; no blanket deletion guarantee is asserted.
+
+## Session 5 / Turn 13: read-back of RUN REQUESTs 1-3
+
+Starts on **6d470028**, turn 12 committed by the dispatcher. **Depth / session
+line: session 5, turn-13 depth_input_tokens and session ID for dispatcher to
+fill; no estimate.** CHARC confirmed the dispatcher's ruling on the turn-12
+STOP: build.py:724 cleanup is **EXEMPT** for the failed fresh destination from
+_fresh in the same call, with the stage lock excluding another writer; this
+attempt has never been a reviewed output. The original cleanup test stands.
+**The STOP is resolved.** No production code or existing assertion changes.
+
+### Read-only evidence and per-check results
+
+Dispatcher receipts are the main working folder's
+**orch-g32/wp53-runs/**: summary.txt, photos.log, presets.log, page.log,
+page-build.log, page-check.log and tally-1.log. Read-only pack evidence is the
+configured working folder's **wp5.3/**: records/pack.json, P-A.json,
+P-A-neutral.json, P-Z.json, P-Z-neutral.json, README.md, index.html,
+review-sheet.csv, both preset JSON file identities and the four photo logs.
+No owner image was decoded or opened. Output checks only stat named files.
+
+The cell's **readback.py** writes evidence only under this worktree's ignored
+**work/wp5.3/turn13/**: readback-final.log/.exit, photo-checks.csv and
+readback-findings.json. The script does not invoke any build stage. The active
+V-P stage holds the real pack lock; the cell never acquires or changes it.
+
+| Check | Observed result |
+|---|---|
+| Named catalog / item accounting | pack.json has **128 rows**. Photos match all commissioned names exactly: **P-A 64 done, P-Z 9 done**, no failed item or failed aid. Remaining rows are pending: V-S 26, V-D 8, V-P 17, V-R 2, V-Z 2. |
+| Corrected and neutral exports | All **146 primary PNGs** named by the four raw records exist and are linked on index.html; each record's source/output identity agrees with pack.json. All 146 thumbnails also exist and are linked. photo-checks.csv carries one row per photo with both output filenames. No pixel inspection or quality judgement. |
+| Shipped parameters and device facts | All four raw records report c3, correct defaults/neutral parameter source, corresponding _corrected/_neutral suffix, 8-bit PNG, provenance on, beside_source false, force_cpu false. **146 exports report GPU, zero warnings, zero failed/cancelled/not-run rows**; no fallback inferred or forced. |
+| Photo logs | All four headers say exit_status=0. Recorded wall_s: P-A **299.813**, P-A-neutral **230.234**, P-Z **39.016**, P-Z-neutral **35.297**. Per-item stdout ends with done; the raw records independently account for every item. These are informal build receipts, not EXCLUSIVE performance figures. |
+| Sheet pair identity / answers | **73 data rows / 74 lines**. Each item's first five identity cells equals its pack row, and its corrected filename equals the raw product output; neutral identity is checked against the neutral runner record and the page link. All owner/status answer cells blank; zero agent answers or judgements. |
+| Page coverage and links | Header explicitly says **Pending: 55** and V-S=26, V-D=8, V-P=17, V-R=2, V-Z=2. **295 distinct relative href/src targets resolve**, no rooted, external or traversal target. Page remains unfinished while video items are pending, as R3-5 requires. |
+| Starter presets | Snorkel (shallow).json and Scuba (deep).json exist, are in state, are linked on the page and have their **two effective-value tables** shown. The exact AD-13 sentence is present. |
+| Privacy lock | Page text, relative links, sheet, README and all five raw JSON records have **zero full-path candidates**. JSON keys/values and displayed text have **zero GPS/EXIF mentions**, hence no value-bearing fragment to adjudicate. No source-folder traversal or metadata read. |
+| Concurrent-read consistency | Photo rows and all four immutable photo invocation records are unchanged across each read-back pass. Captured pack snapshot SHA256 **1a8fd15265b076921d55c68c3d3d0464a570508b959c5ad3bd6e24a953d0773d**. Results describe that snapshot while the dispatcher runs V-P; no later video outcome is claimed. |
+| Receipt reconciliation | Corrected RUN REQUEST table above records orders **1-3 and 10**: photos exit 0 / 673 s / 171 -> 167 GB; presets exit 0 / 1 s; mistaken initial page --check exit 2 for missing index; actual page exit 2 with pending 55, then --check exit 0. Tally exit 0: headline 0/0, expected 115 / available 64 / missing 51 / unjudged 64; candidates expected 11 / available 9 / missing 2 / unjudged 9. |
+
+**No read-back defect or product STOP found.** readback-findings.json is an empty
+list and readback-final.exit is 0. Receipts include the existing module-invocation
+DeprecationWarning; it is not in the page/sheet/record surfaces, does not change
+their exit/status facts, and is not edited in this test/documentation turn.
+
+### Exemption assertion and verification loop
+
+Added **test_earlier_excerpt_survives_failed_rerun_cleanup**. It first makes a
+SUCCESSFUL real stream-copied GX011604.mp4 from the tiny committed fixture with
+timecode/data tracks, then plants packet-hash corruption only in the probe of
+the failed fresh GX011604-2.mp4 attempt. It verifies excerpt_failed/path=None,
+the payload-integrity message, the earlier copy **byte-identical**, the fresh
+failed copy absent, and no other excerpt removed. **RED is not required and was
+not claimed**: it passes on the current unchanged implementation, as CHARC
+requested. Targeted run: **1 passed, 176 deselected in 1.44 s**, exit 0;
+aggregate node time **0.937 s**, full non-slow pass **1.001 s**. Existing cleanup
+and numbered-product preservation tests remain unchanged.
+
+Verification loop: suspect a record/sheet mismatch or privacy leak -> compare
+each of the 73 identities against both immutable product records, file existence,
+page links and sheet cells -> **reject suspect** (all agree). Suspect page
+completion on pending items -> independent receipts and header show exit 2 /
+55 named pending -> **reject suspect**, correct the queued command table rather
+than change working behavior. Suspect failed-rerun cleanup could touch an earlier
+copy -> actual two-run excerpt test -> **reject suspect**; it removes only the
+fresh failed attempt, consistent with the confirmed exemption. Repeat via all
+non-slow tests, strict checks and source/AST audit -> **no new finding**.
+
+### Final light runs, scope and handoff
+
+PowerShell sets PYTHONPATH=scripts. The dispatch's non-slow command retains the
+mandatory sandbox mkdir shim from the cell protocol; no slow node is run while
+the dispatcher is building V-P. Outputs and exit sidecars are under turn13/:
+
+```text
+uv run pytest -q tests/test_reviewpack.py -m "not slow" --basetemp=work/wp5.3/tmp/t13 -p sandbox_mkdir_shim -p no:cacheprovider --durations=0 --junitxml=work/wp5.3/turn13/non-slow-final.xml
+uv run ruff check tools/reviewpack tests/test_reviewpack.py
+uv run ruff format --check tools/reviewpack tests/test_reviewpack.py
+uv run mypy
+uv run python work/wp5.3/turn13/verification.py
+```
+
+- **non-slow-final.log/.xml:** **176 passed, 1 deselected in 50.78 s**, exit 0;
+  zero failures/errors/skips. The sole deselected node is the existing slow
+  tiny all-stage test, reserved for the dispatcher's gate. No node/marker change.
+- **ruff-final.log/.exit:** All checks passed, exit 0.
+  **format-final.log/.exit:** 6 files already formatted, exit 0.
+  **mypy-final.log/.exit:** Success: no issues found in 151 source files, exit 0.
+- **verification-final.log/.exit:** 73 per-item evidence rows / zero findings;
+  source AST comparison proves EVERY pre-existing test function unchanged,
+  exactly one new regression, only the two owned changed paths, whitespace
+  clean and **0 CR** in both changed files. Per-node timings in
+  exemption-nodes.csv / non-slow-final-nodes.csv; no parallel node above 5 s in
+  this light pass. No benchmark or figure of record claimed.
+
+Only **tests/test_reviewpack.py** and this ledger change. No writes anywhere
+under the main working folder; no real build stage, slow node, image judgement,
+footage read, other-worktree access, local-config edit, product/shared-helper/
+fixture/dependency/frozen-interface change, mailbox post or git mutation. The
+earlier STOP is resolved by the confirmed exemption; **no new STOP**. Orders
+3 and 9 now explicitly build with page, then check links with page --check.
+**YIELD for the next dispatcher RUN REQUEST receipt**; V-P and later clips,
+final report/gate and the owner's CP5 judgement remain at their assigned seats.
