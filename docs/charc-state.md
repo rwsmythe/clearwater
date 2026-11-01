@@ -42,8 +42,13 @@
   NO Claude pass (A or B) starts at usage_claude.py >= 92 %; Codex turns continue (A rounds catch up after the
   2026-11-02 09:59Z reset on the accumulated diff); WP3.6P's passes before any WP5.x pass; no reviewer-tier downgrade;
   the Claude figure reported at every window and review post; > 90 % before 2026-11-02 00:00Z = tell me, I decide on
-  pausing WP5.x Codex turns. Waiting on: round-0 notes of WP5.3 / WP5.1 (disputes = STOP to me; WP5.3 Q6 preset
-  location); the WP4.6 V7 window open; WP3.6P turn 7.
+  pausing WP5.x Codex turns.
+- **WP5.3 ROUND 0 RULED 08:30Z (query e03fc37c, turn 1 `e7beee05`, ledger :83-152; my post + cue):** R0-1 GRANTED
+  (name-only photo resolver in `select.py`: `find_footage_file` matches video suffixes only, `local_config.py:19,196`;
+  constraint: ambiguous and junction tests), R0-2 GRANTED (rotation adapter in `tools/reviewpack/` for rotated phone
+  MOVs, FFmpeg default autorotate on both halves, proved on `rotated.mp4`; `frames.py` unchanged), R0-3 = IMG_6762.MOV
+  (749 s; my "under 2 min" was wrong) whole, last in V-P. Q6: `config/presets.py:42/45/228/478/504`, pack-local store.
+  Codex turn 2 (RED) resumes. Waiting on: WP5.1 round 0; the WP4.6 V7 window open; WP3.6P turn 7.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
