@@ -96,6 +96,8 @@ _CHECKS = frozenset(
         "orientation_discrimination",
         "orientation_size",
         "runner_failed",
+        "class_check_failed",
+        "verify_failed",
         "v5_bit_depth",
         "v5_icc_equal",
         "v5_orientation",
@@ -221,6 +223,8 @@ _ENUMS = {
         "unsupported",
         "oracle_failed",
         "runner_failed",
+        "class_check_failed",
+        "verify_failed",
         "invalid_request",
         "output_refused",
         "thumbnail_unavailable",
@@ -720,18 +724,22 @@ def verify_orientation(
         else:
             record["oracle_size"] = [reference.shape[1], reference.shape[0]]
             try:
-                if image.pixels.shape == reference.shape:
+                product_hw = (image.pixels.shape[0], image.pixels.shape[1])
+                # Neither equal decoder sizes nor the oracle rounding exception
+                # may conceal a product size that differs from primary ispe/irot.
+                if _primary_size(source) != product_hw[::-1]:
+                    record.update(
+                        orientation_ok=False,
+                        orientation_status="failed",
+                        failed_checks=["orientation_size", "orientation_upright"],
+                    )
+                elif image.pixels.shape == reference.shape:
                     record.update(compare_poses(image.pixels * 255, reference, max_side=max_side))
                 else:
-                    product_hw = (image.pixels.shape[0], image.pixels.shape[1])
                     oracle_hw = (reference.shape[0], reference.shape[1])
-                    # A corrupted product size must not borrow the oracle's
-                    # exception. The full product size still matches ispe/irot.
                     axis = (
                         _oracle_rounding_axis(product_hw, oracle_hw, source)
-                        if _primary_size(source) == product_hw[::-1]
-                        and reference.ndim == 3
-                        and reference.shape[2] == 3
+                        if reference.ndim == 3 and reference.shape[2] == 3
                         else None
                     )
                     if axis is None:
@@ -817,6 +825,7 @@ def _png_metadata(path: Path) -> tuple[int, bytes | None, bytes | None]:
     return ihdr[8], profile, chunks.get(b"eXIf")
 
 
+@_quiet_logs()
 def _source_icc(source: Path) -> tuple[bytes | None, str]:
     """Read the source colour expectation without any product photo helper.
 
@@ -990,6 +999,8 @@ def _export_checks(
         )
     except (ValueError, struct.error):
         parse_ok = False
+    with _quiet_logs():
+        thumbnail_absent = block is not None and not exif_tools.has_thumbnail(block)
     record.update(
         output_depth=output_depth,
         icc_expected_present=expected is not None or origin in _BUILTIN_ICC,
@@ -997,7 +1008,7 @@ def _export_checks(
         source_icc_present=expected is not None,
         source_icc_parse_ok=icc_parse_ok,
         source_icc_origin=origin,
-        thumbnail_absent=block is not None and not exif_tools.has_thumbnail(block),
+        thumbnail_absent=thumbnail_absent,
         kept_fields_equal=parse_ok and text_parse_ok and not lost,
         kept_exif_parse_ok=parse_ok,
         text_exif_parse_ok=text_parse_ok,
@@ -1366,6 +1377,7 @@ def launch_runner(
     return exit_code, raw if isinstance(raw, dict) else {}
 
 
+@_quiet_logs()
 def _dimensions(source: Path) -> tuple[int, int]:
     data = source.read_bytes()
     if detect_format(data) == "heic":
@@ -1909,15 +1921,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         run_guard = WriteGuard(root=folder, footage=config.footage_path)
         summary_path = guard.check(folder / "summary.json")
         for source, label, representative in selected:
+            code = "class_check_failed"
             try:
                 if not _owner_class_matches(source, label):
                     record = _failure(source, label, "invalid_request", "class_layout")
                     record["observed_class"] = _observed_class(source)
                 elif command == "orientation":
+                    code = "orientation_failed"
                     record = verify_orientation(
                         source, run_guard, photo_class=label, max_side=args.max_side
                     )
                 elif command == "export":
+                    code = "verify_failed"
                     record = verify_export(
                         source,
                         run_guard,
@@ -1927,6 +1942,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         keep=representative and args.bit_depth == 16,
                     )
                 else:
+                    code = "runner_failed"
                     record = verify_memory(
                         source,
                         run_guard,
@@ -1938,7 +1954,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             except OutputRefusedError:
                 raise
             except Exception:
-                code = "orientation_failed" if command == "orientation" else "runner_failed"
                 record = _failure(source, label, code, code)
             records.append(record)
             if (record.get("failed_checks") or not record.get("read_ok")) and not (

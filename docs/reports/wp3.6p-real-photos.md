@@ -1,8 +1,9 @@
 # WP3.6P real-photo verification
 
-Candidate: `790541e7`; report turn 10, amended turn 11, 2026-11-01. Spec v0.5.7, no spec,
-product or interface change. Reviewer B (executing) and the two-leg gate remain
-pending; this report is evidence for acceptance, not an acceptance verdict.
+Seat-run candidate: `790541e7`; Reviewer B reviewed `bf29c8a3`; report turn 10,
+amended through turn 12, 2026-11-01. Spec v0.5.7, no spec, product or interface
+change. Reviewer B returned executing; turn-12 tool remediation awaits dispatcher
+verification, then the two-leg gate. This is evidence, not an acceptance verdict.
 
 All 73 photos read and exported through the product runner. Every class passed
 its measured V5 / D53 / V9 checks at 16 bits; one representative per class also
@@ -141,8 +142,10 @@ The earlier 5b halted after 17 HEIC-0 photos: 7 pass, 9 inconclusive and
 IMG_6764.HEIC oracle_failed. Product/ispe 3213x5712 versus FFmpeg 3212x5712
 was an oracle-size limit, not a product defect. CHARC 2aaa7e0a permits ONLY a
 one-pixel-short oracle dimension when the product dimension is odd, source
-chroma is 4:2:0 and the other dimension is equal. The full product size must
-still match the independent primary size. Both first/last product-edge crops
+chroma is 4:2:0 and the other dimension is equal. After B-1 remediation, the
+full product size is checked against independent primary ispe with irot applied
+before BOTH equal-shape and unequal-shape comparisons. A mismatch fails
+orientation_size even when both decoders lost the same column. Both first/last product-edge crops
 are evaluated before each full pose comparison; the smaller pose-1 distance
 selects the alignment. Two-pixel/tile/other-size differences remain failures.
 
@@ -151,6 +154,10 @@ all HEIC-0, all discriminating passes, all recorded edge last. The initial
 failed file therefore passes with the ruled oracle equivalence; its product
 pixels/dimensions were not changed. Synthetic real grids cover odd width and
 rotated odd height, with both planted crop edges and rejection controls.
+5b-r2 is unaffected: the saved records have zero decoded-size mismatches against
+the rotation-adjusted independent primary size on all 62 photos. The 19 raw
+ispe width/height swaps are exactly HEIC-90 (3) and HEIC-270 (16); they are
+expected quarter-turn transforms. No owner orientation rerun is required.
 
 Thumbnail items are an additional transformed-item witness through libheif,
 not a third independent decoder and never the pass criterion:
@@ -299,6 +306,8 @@ automatic capacity-fallback acceptance remain separate obligations.
   was relaxed. Thumbnail decoding shares libheif with the product and is
   non-gating. Inconclusive texture and the narrow odd-420 equivalence are
   reported explicitly; no visual photo-look judgement is part of this work.
+- B-4 [ADVISORY, out of envelope]: _primary_size ignores clap; clean-aperture crops fail closed as oracle_failed.
+- B-5 [ADVISORY, out of envelope]: these tests call FFmpeg without ffmpeg_tools, so hosts without FFmpeg fail instead of skipping.
 - The independent EXIF inventory fails closed on unsupported types (including
   UTF-8/type 129 and non-pointer type 13); those vendor/type classes are not
   proved preserved. Opaque MakerNote byte fidelity does not establish all
@@ -353,15 +362,43 @@ were identified by the inventory; the seat records independently count the
 assumed classifications. No colour.py grant or product fix was made. CHARC
 owns the new MINOR debt row at accept.
 
+## Reviewer B
+
+Reviewer B (Claude opus/high, executing) on bf29c8a3 returned
+NO_NEW_CRITICAL_MAJOR: 0 critical, 0 major, 2 minor, 3 advisory. Dispatcher
+execution receipts preceded this turn's reading; the complete reviewer record
+was read without copying it into the repository. All required executions ran:
+
+- E1: selected pytest, 117 passed / 1 deselected in 19.07s.
+- E2: three P3 stills passed unpatched. All 18 drop/swap ICC controls, at the
+  product reader, independent source-ICC reader and PNG iCCP read, failed V5 /
+  D53 by name (v5_icc_equal, d53_primaries).
+- E3: correct JPEG ICC-presence classes passed; each mislabel failed class_layout.
+
+B-1 [MINOR, in envelope] is confirmed and fixed: independent transformed
+primary size is now checked in both shape branches. A real odd-4:2:0 grid
+with a planted product crop matching FFmpeg fails orientation_size; the intact
+read still passes with oracle_size_rounded=true, edge last, including the
+quarter-turn control. The owner-seat figures remain valid as checked above.
+B-2 [MINOR, in envelope] is confirmed and fixed: _dimensions, _source_icc and
+has_thumbnail parse under _quiet_logs. A synthetic JPEG DEBUG CLI export's
+private EXIF sentinels no longer reach caplog or raw stderr; V5 still passes.
+B-3 [ADVISORY, in envelope] is confirmed and fixed with step labels:
+class_check_failed for a class-path exception, verify_failed for an unexpected
+export-verification exception; either stops the run. The actual runner-result
+failure keeps runner_failed. B-4 / B-5 [ADVISORY, out of envelope] are accepted
+as the one-line Limits above; no interface, clap support or skip-fixture edit.
+All three code fixes have RED/GREEN controls in the ledger. Dispatcher reruns
+the two required RED nodes on the review base and final candidate before gate.
+
 ## Verification and remaining gate
 
 Reviewer A rounds 1 and 2 were remediated; round 3 returned
 NO_NEW_CRITICAL_MAJOR, nine reasoned advisories after execution refusals.
-CHARC 650bea20 accepts convergence conditionally on Reviewer B executing the
-final pytest selection, planted-reader ICC control and ICC-presence class
-checks. A refused-execution B is not returned: prove its execution path before
-reading findings, repair/rerun if needed. B and the ONE two-leg gate follow
-at dispatcher seat; no fullclip or harness gate is commissioned.
+CHARC 650bea20's executing-B condition is met by the returned E1-E3 executions
+on the reviewed candidate. The turn-12 fixes await dispatcher verification;
+the ONE two-leg gate then follows at dispatcher seat. No fullclip or harness
+gate is commissioned.
 
 Turn-10 light checks: 117 passed / 1 footage deselected in 19.10s with the
 sandbox shim; ruff clean, format 2 files already formatted, mypy clean across
@@ -370,5 +407,10 @@ prohibited matches for source-value assignment keys, drive/UNC/Unix absolute
 source paths, planted private markers or capture-time values. Existing
 review-evidence references are excepted; source metadata values are not.
 Records also equal fresh allow-list projection. Details/patterns in the ledger.
-No source, tool or test code changes in this report turn. All committed report
-and ledger bytes are ASCII/LF, with no private EXIF values or footage paths.
+Turn-12 light checks: 122 passed / 1 footage deselected in 20.57s with the
+sandbox shim; ruff clean, format 2 files already formatted, mypy clean across
+147 files. Six pytest warnings arose from existing record_property calls with
+the optional xunit2 XML receipt. Report/ledger/tool-summary privacy checks and
+0-CR byte checks pass. Only the owned tool, its test, report and ledger changed;
+no src or fixture edit. Report and ledger remain ASCII/LF without private
+EXIF values or footage paths.

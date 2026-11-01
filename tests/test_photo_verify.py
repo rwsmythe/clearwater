@@ -10,8 +10,10 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import logging
 import shutil
 import struct
+import sys
 import time
 import zlib
 from dataclasses import replace
@@ -1792,3 +1794,89 @@ def test_r9_unrounded_summary_and_projection(sample, configured):
     assert row.get("oracle_crop_edge_counts") == {"first": 0, "last": 0}
     safe = pv._safe_record({"oracle_size_rounded": "private", "oracle_crop_edge": "private/path"})
     assert "oracle_size_rounded" not in safe and "oracle_crop_edge" not in safe
+
+
+# Reviewer B: reject shared decoder size loss and silence DEBUG EXIF values.
+@pytest.mark.parametrize("orientation,axis", [(1, 1), (6, 0)])
+def test_b1_product_crop_matching_oracle_still_fails_primary_size(
+    configured, monkeypatch, orientation, axis
+):
+    _, guard = configured
+    source, _ = _r9_odd_grid(guard, orientation=orientation)
+    label = "HEIC-0" if orientation == 1 else "HEIC-270"
+    intact = pv.verify_orientation(source, guard, photo_class=label, max_side=4096)
+    assert intact["orientation_ok"] and intact["oracle_size_rounded"] is True
+    assert intact["oracle_crop_edge"] == "last"
+    image, meta = PhotoReader().read(source)
+    pixels = np.take(image.pixels, range(image.pixels.shape[axis] - 1), axis=axis)
+    monkeypatch.setattr(pv, "read_photo", lambda _: (replace(image, pixels=pixels), meta))
+    damaged = pv.verify_orientation(source, guard, photo_class=label, max_side=4096)
+    assert damaged["decoded_size"] == damaged["oracle_size"]
+    assert not damaged["orientation_ok"], (
+        "product crop matching FFmpeg escaped independent primary-size check"
+    )
+    assert "orientation_size" in damaged["failed_checks"]
+    assert damaged["oracle_size_rounded"] is False
+
+
+def test_b2_debug_export_never_logs_private_exif(configured, tmp_path, capsys, caplog):
+    config, _ = configured
+    _, classes = _class_map(tmp_path)
+    name = classes["JPG-Z"]["representative"]
+    source = config.footage_path / "Phone" / name
+    secrets = {key: "B2_PRIVATE_" + key for key in ("MAKE", "MODEL", "SOFTWARE", "SERIAL", "GPS")}
+    exif = PILImage.Exif()
+    exif[271], exif[272], exif[305] = secrets["MAKE"], secrets["MODEL"], secrets["SOFTWARE"]
+    exif[274] = 1
+    exif[34665] = {42033: secrets["SERIAL"]}
+    exif[34853] = {
+        1: "N",
+        2: (IFDRational(12), IFDRational(34), IFDRational(56)),
+        27: b"ASCII\0\0\0" + secrets["GPS"].encode("ascii"),
+    }
+    PILImage.fromarray(spike.upright_image(8, 96, 64)).save(source, "JPEG", exif=exif)
+    caplog.set_level(logging.DEBUG, logger="PIL.TiffImagePlugin")
+    with caplog.at_level(logging.DEBUG):
+        handler = logging.StreamHandler(sys.stderr)
+        logging.getLogger().addHandler(handler)
+        try:
+            status, _ = _r1_cli(config, tmp_path, "export", lambda c: [name])
+        finally:
+            logging.getLogger().removeHandler(handler)
+    streams = capsys.readouterr()
+    summary = json.loads(streams.out)
+    assert status == 0 and summary["records"][0]["v5_ok"]
+    leaked_channels = [
+        channel
+        for channel, text in (
+            ("caplog", caplog.text),
+            ("raw stderr", streams.err),
+            ("stdout", streams.out),
+        )
+        if any(secret in text for secret in secrets.values())
+    ]
+    assert not leaked_channels, "DEBUG EXIF sentinels reached " + ", ".join(leaked_channels)
+
+
+@pytest.mark.parametrize(
+    "stage,code", [("class", "class_check_failed"), ("verify", "verify_failed")]
+)
+def test_b3_export_exception_names_actual_step(
+    configured, tmp_path, sample, capsys, monkeypatch, stage, code
+):
+    config, _ = configured
+    _, classes = _class_map(tmp_path)
+    names = classes["JPG-Z"]["files"][:2]
+    for name in names:
+        shutil.copyfile(sample("jpeg-gradient-none"), config.footage_path / "Phone" / name)
+
+    def broken(*args):
+        raise RuntimeError("synthetic private error")
+
+    monkeypatch.setattr(pv, "_owner_class_matches" if stage == "class" else "_base", broken)
+    status, _ = _r1_cli(config, tmp_path, "export", lambda c: names)
+    summary = json.loads(capsys.readouterr().out)
+    assert status == 1 and summary["attempted"] == 1 and not summary["complete"]
+    record = summary["records"][0]
+    assert record["failure_code"] == code, "exception attributed to a runner that never ran"
+    assert record["failed_checks"] == [code] and "runner_exit" not in record

@@ -4,11 +4,12 @@
 
 - Package: WP3.6P, CODEX lane, STRONG tier; CHARC's FINAL rulings govern.
 - Dispatch base verified: `c3bf602fe9ac94cd5df25499d97f3a2bc439bb72`.
-- Current boundary: turn 10, session 3. Seat facts/summaries parsed and the
-  real-photo report written. Dispatch head verified:
-  `790541e77c3be3469c5717ac390f3d2efd21ece9`, initial tracked status empty;
-  turn 9 committed as 790541e7 (0 CR, supplied). The new report and this ledger
-  are the only changed files. No owner photo was opened by the cell.
+- Current boundary: turn 12, session 3, after compaction. Dispatch head
+  bf29c8a3 verified, initial tracked status empty. Executing Reviewer B returned
+  NO_NEW_CRITICAL_MAJOR; two MINOR fixes and one ADVISORY label fix now have
+  RED/GREEN controls; two out-of-envelope advisories are report Limits.
+  Owned tool/test/report/ledger only; no owner photo was opened by the cell.
+  Dispatcher remediation verification and the ONE two-leg gate remain pending.
 - `uv sync`: already run by the dispatcher before dispatch, as stated in the
   binding turn-1 instructions. Not repeated: this sandbox cannot reach the index.
 - Initial `git status --short`: empty. The existing isolated worktree is retained.
@@ -1020,6 +1021,7 @@ EXIT 0. No prohibited value was discovered in a committed-facing artifact.
 | A1 / turns 4-5 | 0 | 2 | 6 (+8 advisory) | 15 / 1; #15 out | 16 NEW / 0 REOPENED; #11 rejected, #9/#13 partially rejected | 0 | 13 tool fix groups with RED/GREEN tests; 0 src fixes; 0 test-only fix groups; #16 Limit in ledger | NEW_CRITICAL_MAJOR_FOUND was A1's verdict; adjudication committed f2396b0e; CHARC R1-QA/QB ruled; remediated/committed 7a3810af turn 5; checked A1 fixes HOLD in A2 | Turn 4: 114,259; turn 5: 178,999; previous session 240,970 after turn 3 |
 | A2 / turns 6-7 | 0 | 1 | 1 (+8 advisory) | 7 / 3; a-3/a-7/a-10 out | 10 NEW / 0 REOPENED; a-9 behavior confirmed, defect rejected; a-6 conservative rejection retained | 0 | 4 tool fix groups with RED/GREEN controls; 0 src fixes; 1 test-only group (a-8); 5 advisory Limit/report lines in ledger | NEW_CRITICAL_MAJOR_FOUND was A2's verdict; adjudication committed 081f851c; CHARC R2-QA ruled; remediated turn 7; 87 light cases pass; A3 pending | Turn 5: 178,999 before compaction; turn 6: 101,571 after compaction; turn 7 dispatcher to fill |
 | A3 / turn 8 | 0 | 0 | 0 (+9 advisory) | 6 / 3; #2/#3/#7 out | 9 NEW / 0 REOPENED blocking findings | 0 | 3 tool fix groups (#8/#1/#9), RED/GREEN controls; 0 src fixes; 0 test-only groups; #5 Limit retained | NO_NEW_CRITICAL_MAJOR; all reviewer findings REASONED after refused execution; CHARC accepts convergence CONDITIONALLY on an executing B; terminating clean-up ruled before this turn | Session 2 retired at 187,455; fresh session 3 turn-8 reading for dispatcher to fill |
+| B / turn 12 | 0 | 0 | 2 (+3 advisory) | 3 / 2; B-4/B-5 out | 3 NEW (B-2/B-4/B-5) / 2 REOPENED coverage gaps (B-1 size, B-3 labels) | 0 | 3 tool fix groups with 5 RED/GREEN cases; 0 src fixes; 0 test-only groups; 2 report Limits | NO_NEW_CRITICAL_MAJOR; E1-E3 executed; all 5 findings accepted, in-envelope fixes complete; dispatcher verification/gate pending | Turn 11: 68,484 of 258,400 after compaction; turn-12 reading pending |
 
 | Suspected item | Independent confirmation | Disposition |
 |---|---|---|
@@ -2271,6 +2273,89 @@ are unchanged; no pytest, ruff, format or mypy run in this report-only turn.
 Local check receipt: work/wp3.6p/r11/validation.log. Reviewer B executing and
 the ONE two-leg gate remain pending at the dispatcher seat. YIELD.
 
+## Turn 12: Reviewer B remediation
+
+Dispatch head bf29c8a3 verified. Supplied turn-11 footer depth: **68,484 of a
+258,400-token window**, after session-3 compaction; this supersedes the earlier
+234,009 pre-compaction reading for current-window budgeting. Findings read
+whole, read-only from the B reviewer evidence file; never copied into the repo.
+Dispatcher's binding E1-E3 execution receipts arrived before the findings were
+read. Reviewer B returned NO_NEW_CRITICAL_MAJOR on bf29c8a3, 2 MINOR and
+3 ADVISORY, no refused required execution.
+
+### Returned B executions (dispatcher/reviewer receipts)
+
+- E1 selected pytest: 117 passed / 1 deselected in 19.07s.
+- E2 unpatched P3 PNG16/JPEG/HEIC controls pass. All 18 ICC drop/swap controls
+  across product read, independent source-ICC read and output iCCP read fail
+  V5/D53 by name: v5_icc_equal and d53_primaries.
+- E3 correct ICC-presence labels pass; each wrong JPEG class fails class_layout.
+  These are returned B receipts, not new cell executions or footage reads.
+
+### Dispositions and RED/GREEN evidence
+
+All five findings ACCEPTED as ruled. B-1 and B-3 reopen incomplete coverage of
+previous size-guard and step-label requirements; the other three are NEW.
+No assertion was weakened and no existing test was edited for B-5.
+
+| Finding / classification | RED on bf29c8a3 tool; exact node suffix under tests/test_photo_verify.py:: | Failure line | GREEN / disposition |
+|---|---|---|---|
+| B-1 [MINOR, IN, REOPENED size coverage] CONFIRMED | test_b1_product_crop_matching_oracle_still_fails_primary_size[1-1], [6-0] | AssertionError: product crop matching FFmpeg escaped independent primary-size check | Both pass: real pillow-heif odd-width 420 GRID, real FFmpeg, intact read passes rounded/last; planted product column/rotated-row crop fails orientation_size even with equal decoder shapes. |
+| B-2 [MINOR, IN, NEW] CONFIRMED | test_b2_debug_export_never_logs_private_exif | AssertionError: DEBUG EXIF sentinels reached caplog, raw stderr | Pass: real synthetic JPEG CLI export, Make/Model/Software/serial/GPS sentinels, DEBUG caplog AND raw stderr capture; no sentinel reaches either stream or stdout, export/V5 remains successful. _dimensions and _source_icc are decorated with the existing _quiet_logs context guard; has_thumbnail is evaluated inside that guard. |
+| B-3 [ADVISORY, IN, REOPENED label coverage] CONFIRMED | test_b3_export_exception_names_actual_step[class-class_check_failed], [verify-verify_failed] | AssertionError: exception attributed to a runner that never ran; runner_failed != expected step label | Both pass: one attempted input then STOP, safe class_check_failed or verify_failed labels, no runner_exit. The small staged-handler change retains orientation_failed and actual runner-result runner_failed. New labels explicitly allow-listed. |
+| B-4 [ADVISORY, OUT, NEW] ACCEPTED REASONED limitation | No code probe commissioned | _primary_size ignores clap | One-line report Limit: clean-aperture crop fails closed as oracle_failed; no parser/interface expansion. |
+| B-5 [ADVISORY, OUT, NEW] ACCEPTED REASONED limitation | No absent-FFmpeg host run commissioned | FFmpeg calls lack ffmpeg_tools skip fixture | One-line report Limit: absent FFmpeg causes test failure rather than skip; no skip-fixture edit. |
+
+RED command (tests only added; tool bytes equal bf29c8a3 at execution):
+PYTHONPATH=scripts uv run pytest -q tests/test_photo_verify.py -k "test_b1 or test_b2 or test_b3" -m "not footage" -p sandbox_mkdir_shim -p no:cacheprovider --basetemp=work/wp3.6p/r12/red-tmp
+EXIT 1, **5 failed / 118 deselected in 3.12s**. Same selection after the fix,
+with basetemp r12/green-tmp: EXIT 0, **5 passed / 118 deselected in 2.08s**.
+Logs and exit receipts: work/wp3.6p/r12/red.log/.exit and green.log/.exit.
+Only synthetic temporary inputs were decoded. Logging sentinels in the local
+RED log are test data, never owner values or promoted report content.
+
+### Owner 5b-r2 check: no rerun
+
+Dispatcher supplied a zero-mismatch receipt. Independent cell audit of the
+previously parsed safe 5b-r2 summary confirms zero mismatches on all 62 records
+against the rotation-adjusted primary size. Wording correction: decoded_size
+versus RAW ispe has 19 swapped-dimension differences, precisely HEIC-90 (3)
+and HEIC-270 (16). Applying irot 90/270 swaps ispe width/height, as _primary_size
+does, yielding zero mismatches in every class. The report states the adjusted
+comparison explicitly, not raw-ispe equality. Evidence: owner-size-audit.log
+and owner-size-facts.json under work/wp3.6p/r12/. The added check would pass
+all owner records; their 50 pass / 12 inconclusive / 7 rounded facts stand.
+No footage read and no owner rerun; no product defect is inferred.
+
+### Final light checks and verification loop
+
+PYTHONPATH=scripts uv run pytest -q tests/test_photo_verify.py -m "not footage" -p sandbox_mkdir_shim -p no:cacheprovider --basetemp=work/wp3.6p/tmp --durations=5 --junitxml=work/wp3.6p/r12/final.xml
+EXIT 0, **122 passed / 1 deselected in 20.57s**, 6 existing record_property /
+xunit2 XML-receipt warnings. Five slowest durations are in pytest.log; no GPU,
+footage, owner read or heavy seat run. uv run ruff check tools/photo_verify.py
+tests/test_photo_verify.py: EXIT 0, All checks passed. uv run ruff format
+--check tools/photo_verify.py tests/test_photo_verify.py: EXIT 0, 2 files already
+formatted. uv run mypy: EXIT 0, Success: no issues found in 147 source files.
+Initial ruff/format identified two new-test line lengths and wrapping; ruff
+format corrected them without semantic edits, then both checks passed.
+
+Verification loop: B-1/B-2/B-3 independently reproduced RED, fixed, targeted
+GREEN, full light pass; saved owner-size data checked independently, correcting
+the raw-ispe wording while rejecting any owner-seat impact. B-4/B-5 stay
+accepted Limits, not product findings or fixes. Final scope/byte/privacy
+verification checks all four owned changed files for ASCII/LF/0 CR and reviews
+the tool's projected summaries. Privacy patterns: source-value-key assignments,
+Windows drive/UNC/Unix absolute source paths, planted private markers and
+capture-time value patterns; pre-existing review-evidence paths only excepted.
+Zero prohibited matches; safe summaries equal fresh _safe_record projection.
+Logs/receipts under work/wp3.6p/r12/; final validation.log and privacy-facts.json
+record the result. No src, interface, dependency, config, fixture or other test
+changed. No reverts; 3 tool fixes, 0 product-code fixes, 0 test-only fix groups.
+Report now includes B verdict, E1-E3 receipts, all five dispositions, the precise
+size check and unaffected-seat rationale. Dispatcher reruns the two RED nodes
+on review base and final candidate; the ONE two-leg gate and accept follow.
+No new STOP or question; YIELD as dispatched.
+
 ## Seat-run ledger
 
 | Run | Command / scope | Counts | EXIT | Wall time | Free disk before / after | Evidence / conditions |
@@ -2300,7 +2385,8 @@ the ONE two-leg gate remain pending at the dispatcher seat. YIELD.
 | 8 / Reviewer A round 3 adjudication and terminating clean-up | 152,054 tokens (dispatcher reading; session 3) | 9 advisories adjudicated; 3 tool fix groups with RED/GREEN controls; 102 light cases pass; conditional A convergence; YIELD for seat runs and executing B |
 | 9 / odd-width size equivalence, CHARC 2aaa7e0a | 184,466 tokens (dispatcher reading; session 3) | 7 RED cases on a8c9778d; 15 new controls, 117 light passes; both crop edges and class counts; YIELD for 5b restart |
 | 10 / seat rows and real-photo report | 234,009 tokens (dispatcher reading; session 3) | 5b-r2 / 5c-8 / 5c-16 / both 5d legs parsed; q4 and 5a receipts checked; report delivered; light checks green; YIELD for executing B |
-| 11 / CHARC report items | PENDING dispatcher reading; session 3 | Report units/classes/estimate Limit clarified; docs-only privacy and byte checks; YIELD for executing B |
+| 11 / CHARC report items | 68,484 of 258,400 tokens (dispatcher footer; session 3 compacted) | Report units/classes/estimate Limit clarified; docs-only privacy and byte checks; YIELD for executing B |
+| 12 / Reviewer B remediation | PENDING dispatcher reading; session 3 after compaction | B returned executing; 3 tool fixes / 5 RED-GREEN cases; 2 advisory Limits; 122 light passes; YIELD for dispatcher verification and two-leg gate |
 
 Evaluate near 200K; stop at a step boundary near 250K per this dispatch.
 The supplied readings are 178,999 after turn 5 and 101,571 after turn 6,
