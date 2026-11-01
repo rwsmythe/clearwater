@@ -575,6 +575,18 @@ def _is_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+def _float_safe(value: int | float) -> float:
+    """Return a JSON number as a float; an integer too large for one makes the line invalid.
+
+    The one rule for every number the parent decodes (CHARC e15d408a: such a line is ignored and
+    logged by its reason; R1 F3 for ``elapsed_s``, B-1 for the progress counts).
+    """
+    try:
+        return float(value)
+    except OverflowError as error:
+        raise _InvalidLineError("an integer too large for a float") from error
+
+
 def _is_texts(value: object) -> bool:
     """Whether ``value`` is a JSON array of strings."""
     return isinstance(value, list) and all(isinstance(item, str) for item in value)
@@ -587,6 +599,9 @@ def _decode_progress(value: object) -> tuple[int, int | None, str]:
     done, total, message = value
     if not _is_int(done) or not (total is None or _is_int(total)) or not isinstance(message, str):
         raise _InvalidLineError("a progress line with a value of the wrong type")
+    _float_safe(done)
+    if total is not None:
+        _float_safe(total)
     return done, total, message
 
 
@@ -621,10 +636,7 @@ def _decode_result(value: object) -> _ChildResult:
         or not isinstance(elapsed, int | float)
     ):
         raise _InvalidLineError("a result line with a value of the wrong type")
-    try:
-        seconds = float(elapsed)  # a JSON integer may be too large for a float
-    except OverflowError as error:
-        raise _InvalidLineError("a non-finite number") from error
+    seconds = _float_safe(elapsed)
     return _ChildResult(ok, tuple(outputs), tuple(warnings), failure, device, seconds)
 
 
