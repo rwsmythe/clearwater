@@ -2154,14 +2154,22 @@ path is promoted. Measurement moments are not photo capture times.
 - Export: 5c-16 per-class V5/D53/V9 passes equal n (23,3,20,16,2,8,1 in
   labelled rows); 5c-8 one per class, all three checks pass. Requested/output
   depths match, GPU reasons, runner exits 0, no failed check/D63 defect. Raw
-  max/mean 0 per class at each depth; quantised max worst 7.569789888e-06/255,
-  with individual class means in the report. Tagged ICC byte matches are
+  max/mean 0.0 /255 per class for each of 5c-8 (8-bit) and 5c-16 (16-bit);
+  quantised max worst 7.569789888e-06 /255 in each leg, with individual
+  class means in /255 units in the report. At 16 bits the written values equal
+  the writer-rounded reference exactly up to float32 representation, not a
+  half-LSB error (CHARC e0c7b856). Tagged ICC byte matches are
   distinct from Z/M expected absence; no assertion of ICC present on Z/M.
 - Largest-photo c3-default legs: estimate 6,128,796,496 bytes vs free-before
   8,189,378,560; default GPU with tree RSS 1,926,164,480 and device peak
   4,108,320,768; forced CPU tree RSS 3,138,392,064 and device peak at baseline
   145,752,064. Ratios estimate/tree RSS 3.181866 and 1.952846; default
-  estimate/device peak 1.491801. All recorded limits pass, sample errors empty;
+  estimate/device peak 1.491801. This 6.13 GB admission estimate versus
+  4.11 GB sampled GPU peak is a Limit: conservative by design (V16 / AD-21),
+  with conservatism assessment deferred to WP5.2, not fixed here. The forced
+  CPU characterisation is 3.14 GB tree RSS / 58.4 s for this 24.5 MP HEIC at
+  16 bits, not an automatic capacity-fallback event.
+  All recorded limits pass, sample errors empty;
   actual capacity fallback was not exercised. The approved sampling/race,
   query-instant/scope, cadence and alternate-config Limits are explicit.
 
@@ -2225,6 +2233,44 @@ before reading findings, then the ONE two-leg gate at dispatcher seat. A3's
 conditional convergence is not substituted for returned B/gate. At this
 report boundary near 200K, YIELD as dispatched; dispatcher fills current depth.
 
+## Turn 11: CHARC report items (dbf02ad7, e0c7b856)
+
+Turn 10 is committed as 271b127c; brief fold 6569355c supplied by dispatcher.
+Depth after turn 10 is **234,009 tokens (session 3)**. This is the dispatched
+short report-only turn, ending at this report/handoff boundary before B.
+
+- UNIT, CHARC e0c7b856: 5c-16's written 16-bit values equal the writer-rounded
+  reference exactly, up to float32 representation. Quantised max
+  7.57e-06 /255 = 2.97e-08 in [0,1]; half a 16-bit LSB would be
+  1.95e-03 /255. raw_max_255 is 0.0 /255 in every class. 5c-8's 8-bit
+  quantised max is 7.56979e-06 /255, with raw max/mean 0.0 /255 in every
+  representative. Report headers/prose and the turn-10 figures now state
+  depth and /255 units explicitly; no error is characterised as half an LSB
+  or rounding-limited. AD-11 limits remain max <=2 /255, mean <=0.2 /255
+  for both legs. No numeric measurement changed.
+- CLASSES: all seven rows remain separate, with no pooled statistics row.
+  The report names the eight JPG-Z files and the one JPG-M file from the
+  previously parsed 5c-16 safe records as the class map's no-ICC assumed set.
+  The other classes have zero assumed readings; no class map or footage read.
+- ESTIMATE LIMIT: 6,128,796,496 bytes (6.13 GB) versus sampled GPU peak
+  4,108,320,768 bytes (4.11 GB), ratio 1.491801 (about 1.5x), is explicitly
+  a Limit. The V16 / AD-21 admission estimate is conservative by design;
+  whether it is too conservative is a WP5.2 question, carried by CHARC into
+  that brief. No fix here. Forced CPU is CPU-fallback characterisation for
+  one 24.5 MP HEIC at 16 bits: tree RSS 3,138,392,064 bytes (3.14 GB),
+  wall 58.4 s. It remains an explicitly forced leg, not proof of automatic
+  capacity fallback.
+
+Verification: report/ledger privacy scan repeats the recorded private-value-key,
+Windows drive/UNC/Unix absolute-source-path and planted-marker patterns from
+work/wp3.6p/r10/privacy-facts.json; the existing review-evidence references
+remain excepted. Capture-time key assignments and EXIF date/time-shaped
+values are also checked. Zero prohibited matches. Both changed files are
+ASCII/LF with 0 CR, final newline and no trailing whitespace. Tool/test bytes
+are unchanged; no pytest, ruff, format or mypy run in this report-only turn.
+Local check receipt: work/wp3.6p/r11/validation.log. Reviewer B executing and
+the ONE two-leg gate remain pending at the dispatcher seat. YIELD.
+
 ## Seat-run ledger
 
 | Run | Command / scope | Counts | EXIT | Wall time | Free disk before / after | Evidence / conditions |
@@ -2253,14 +2299,15 @@ report boundary near 200K, YIELD as dispatched; dispatcher fills current depth.
 | 7 / Reviewer A round 2 remediation | 187,455 tokens (dispatcher reading; session 2 retired) | 4 tool fix groups plus RED/GREEN controls, 1 test-only group; 87 light cases pass; 5 Limit/report lines staged; YIELD for A3 |
 | 8 / Reviewer A round 3 adjudication and terminating clean-up | 152,054 tokens (dispatcher reading; session 3) | 9 advisories adjudicated; 3 tool fix groups with RED/GREEN controls; 102 light cases pass; conditional A convergence; YIELD for seat runs and executing B |
 | 9 / odd-width size equivalence, CHARC 2aaa7e0a | 184,466 tokens (dispatcher reading; session 3) | 7 RED cases on a8c9778d; 15 new controls, 117 light passes; both crop edges and class counts; YIELD for 5b restart |
-| 10 / seat rows and real-photo report | PENDING dispatcher reading; session 3 | 5b-r2 / 5c-8 / 5c-16 / both 5d legs parsed; q4 and 5a receipts checked; report delivered; light checks green; YIELD for executing B |
+| 10 / seat rows and real-photo report | 234,009 tokens (dispatcher reading; session 3) | 5b-r2 / 5c-8 / 5c-16 / both 5d legs parsed; q4 and 5a receipts checked; report delivered; light checks green; YIELD for executing B |
+| 11 / CHARC report items | PENDING dispatcher reading; session 3 | Report units/classes/estimate Limit clarified; docs-only privacy and byte checks; YIELD for executing B |
 
 Evaluate near 200K; stop at a step boundary near 250K per this dispatch.
 The supplied readings are 178,999 after turn 5 and 101,571 after turn 6,
 with transcript context compaction between them. Evaluated at this remediation
 boundary; this turn ends here as dispatched. No current cumulative token number
 is invented; turn 7 is 187,455 (session 2), turn 8 is 152,054 (session 3);
-turn 9 is 184,466 (session 3); the dispatcher fills turn 10. Evaluated at this
+turn 9 is 184,466 (session 3); turn 10 is 234,009 (session 3). Evaluated at this
 report/handoff boundary near 200K; STOP/YIELD here as dispatched, before B.
 Historical turn-1 validation was limited to the ledger's ASCII/LF and owned-file diff.
 Observed validation: PASS for ASCII, LF, final newline, no trailing whitespace,

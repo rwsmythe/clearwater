@@ -1,6 +1,6 @@
 # WP3.6P real-photo verification
 
-Candidate: `790541e7`; report turn 10, 2026-11-01. Spec v0.5.7, no spec,
+Candidate: `790541e7`; report turn 10, amended turn 11, 2026-11-01. Spec v0.5.7, no spec,
 product or interface change. Reviewer B (executing) and the two-leg gate remain
 pending; this report is evidence for acceptance, not an acceptance verdict.
 
@@ -104,6 +104,9 @@ JPG-A files. No owner HEIC needs the profile-less nclx built-in branch. For
 JPG-Z and JPG-M, expected/output ICC absence matches (8 and 1 respectively);
 this is not a claim that those untagged outputs embed an ICC. Their assumed
 BT.709 primaries plus sRGB curve preserve the source sample interpretation.
+The nine assumed readings are exactly the class map's no-ICC set, kept in
+separate classes: JPG-Z (8): IMG_6791.JPG, IMG_6793.JPG, IMG_6795.JPG, IMG_6798.JPG, IMG_6799.JPG, IMG_6800.JPG, IMG_6801.JPG, IMG_6802.JPG;
+JPG-M (1): IMG_6794.JPG. No other class has an assumed reading.
 
 ## AD-24 orientation
 
@@ -185,12 +188,16 @@ content or semantic-vendor parsing. The coarser text comparison is secondary.
 5c-8 has one inventory representative per class, requested/output 8/8, default
 GPU, all runner exits 0 and no failed check. Every source is 8-bit; owner runs
 do not witness export below source depth (the P3 PNG16 synthetic tests do).
-V9 uses AD-11 max <=2 and mean <=0.2 in 1/255 units against the writer-rule
-quantised reference, with raw errors also recorded. All raw max/mean errors
-are zero at both export depths. The tiny quantised differences below are
-floating-point representation differences, all far inside AD-11.
+V9 uses AD-11 max <=2 /255 and mean <=0.2 /255 against the writer-rule
+quantised reference for each leg: 5c-8 (8-bit) and 5c-16 (16-bit). All quantised
+and raw errors below use /255 units at both depths; raw max/mean are 0.0 /255
+in every class for both legs, including raw_max_255 = 0.0 at 16 bits.
+For 5c-16, the written 16-bit values equal the writer-rounded reference exactly,
+up to float32 representation (quantised max 7.57e-06 /255 = 2.97e-08 in [0,1];
+half a 16-bit LSB would be 1.95e-03 /255). This is consistent with the zero raw
+errors; the measured quantised error is not a half-LSB error.
 
-| Class | 16-bit n | 16-bit V5/D53/V9 passes | Quantised max worst /255 | Quantised mean worst /255 | 8-bit n=1 V5/D53/V9 passes | 8-bit quantised mean /255 | Raw max (both depths) |
+| Class | 16-bit n | 16-bit V5/D53/V9 passes | 16-bit quantised max worst /255 | 16-bit quantised mean worst /255 | 8-bit n=1 V5/D53/V9 passes | 8-bit quantised mean /255 | 8-bit / 16-bit raw max /255 |
 |---|---|---|---|---|---|---|---|
 | HEIC-0 | 23 | 23/23/23 | 7.56979e-06 | 4.39753e-06 | 1/1/1 | 3.22313e-06 | 0 |
 | HEIC-90 | 3 | 3/3/3 | 7.56979e-06 | 4.66518e-06 | 1/1/1 | 4.66518e-06 | 0 |
@@ -200,8 +207,9 @@ floating-point representation differences, all far inside AD-11.
 | JPG-Z | 8 | 8/8/8 | 7.56979e-06 | 3.4866e-06 | 1/1/1 | 3.48163e-06 | 0 |
 | JPG-M | 1 | 1/1/1 | 7.56979e-06 | 2.57006e-06 | 1/1/1 | 2.57006e-06 | 0 |
 
-8-bit quantised max is 7.56979e-06/255 in each representative, equal to the
-16-bit worst-max value. Per-class means are worst-photo means, not a pooled
+5c-8's 8-bit quantised max is 7.56979e-06 /255 in each representative;
+5c-16's 16-bit worst quantised max is also 7.56979e-06 /255. Both are float32
+representation differences. Per-class means are worst-photo means, not a pooled
 pixel-weighted mean. Z and M have their own denominators and error figures.
 Tagged ICC preservation is proved separately from untagged expected absence;
 no "ICC present on all 73" conclusion follows from the instrument pass flags.
@@ -302,6 +310,14 @@ automatic capacity-fallback acceptance remain separate obligations.
   any ASCII suffix after Clearwater, including tabs; today's product writes
   Clearwater. It is not a general private-text sanitizer and source Software
   is never promoted into that field. These are tool limits, not product gaps.
+- **5d estimate Limit (V16 / AD-21):** the admission estimate is
+  6,128,796,496 bytes (6.13 GB) against the sampled GPU peak of 4,108,320,768
+  bytes (4.11 GB), a ratio of 1.491801 (about 1.5x). The admission check is
+  conservative by design. Whether it is too conservative belongs to WP5.2;
+  CHARC carries these figures into that brief. No estimate fix is made here.
+  The forced-CPU leg characterises the CPU-fallback path for one 24.5 MP HEIC
+  at 16 bits: sampled tree RSS 3,138,392,064 bytes (3.14 GB), wall 58.4 s.
+  It was explicitly forced and does not demonstrate automatic capacity fallback.
 - Memory is sampled, not a continuous instantaneous maximum. The approved
   unlocked attach/background peak-update race can lose a larger observation
   at startup; no such lost owner observation is established. Any unavailable
