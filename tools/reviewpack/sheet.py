@@ -1,12 +1,78 @@
-"""Owner-review CSV writing and judgement-free tallying for WP5.3 (RED skeleton)."""
+"""Owner-review CSV preservation and numeric D65 tallies without a quality verdict."""
 
 from __future__ import annotations
 
+import csv
+import io
+import re
+import uuid
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 from lookcheck.frames import OutputRoots
+
+from .select import GROUPS, catalog
+
+ARTIFACTS = ("halos", "banding", "color_errors", "shimmer", "flicker")
+HEADER = (
+    "item",
+    "group",
+    "kind",
+    "source_name",
+    "corrected_name",
+    "preferred",
+    *ARTIFACTS,
+    "above_surface",
+    "note",
+)
+HEADLINE = frozenset({"P-A", "V-S", "V-D", "V-P"})
+
+
+def _read(path: Path) -> list[dict[str, str]]:
+    expected = {item.stem: item for item in catalog() if item.group != "V-R"}
+    seen: set[str] = set()
+    rows = []
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if tuple(reader.fieldnames or ()) != HEADER:
+            raise ValueError("sheet header must match the CP5 columns exactly")
+        for number, raw in enumerate(reader, 2):
+            if None in raw or any(value is None for value in raw.values()):
+                raise ValueError(f"row {number}: incorrect cell count")
+            row = {key: str(value) for key, value in raw.items()}
+            item = expected.get(row["item"])
+            if (
+                item is None
+                or row["item"] in seen
+                or row["group"] != item.group
+                or row["kind"] != item.kind
+                or row["source_name"].casefold() != item.name.casefold()
+            ):
+                raise ValueError(f"row {number}: unknown, inconsistent or duplicate item identity")
+            name = row["corrected_name"]
+            suffix = ".png" if item.kind == "photo" else ".mp4"
+            if (
+                not name
+                or "/" in name
+                or "\\" in name
+                or ":" in name
+                or Path(name).suffix.lower() != suffix
+                or not re.fullmatch(
+                    re.escape(item.stem) + r"(?:-\d+)?_corrected(?:_\d+)?" + re.escape(suffix),
+                    name,
+                    flags=re.IGNORECASE,
+                )
+            ):
+                raise ValueError(f"row {number}: invalid corrected name")
+            if row["preferred"] not in {"", "yes", "no", "undecided"}:
+                raise ValueError(f"row {number}: invalid preferred value")
+            for key in (*ARTIFACTS, "above_surface"):
+                if row[key] not in {"", "yes"}:
+                    raise ValueError(f"row {number}: invalid {key} value")
+            seen.add(row["item"])
+            rows.append(row)
+    return rows
 
 
 def write_sheet(
@@ -22,7 +88,41 @@ def write_sheet(
     Returns:
         The sheet path.
     """
-    raise NotImplementedError("write_sheet")
+    roots.check(destination)
+    old = _read(destination) if destination.exists() else []
+    by_item = {row["item"]: row for row in old}
+    current = {str(item["item"]): item for item in items}
+    for existing_row in old:
+        item = current.get(existing_row["item"])
+        if item is None or item["status"] != "done" or not item.get("reviewable", True):
+            raise ValueError(
+                f"changed reviewable pair for {existing_row['item']}; owner sheet retained"
+            )
+    rows = list(old)
+    for item in items:
+        if item["status"] != "done" or item["group"] == "V-R" or not item.get("reviewable", True):
+            continue
+        row = dict.fromkeys(HEADER, "")
+        row.update({key: str(item[key]) for key in HEADER[:5]})
+        previous = by_item.get(row["item"])
+        if previous is not None:
+            if any(previous[key] != row[key] for key in HEADER[:5]):
+                raise ValueError(f"changed pair identity for {row['item']}; owner sheet retained")
+        else:
+            rows.append(row)
+            by_item[row["item"]] = row
+    buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(buffer, fieldnames=HEADER, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    temporary = destination.with_name(f".{destination.name}-{uuid.uuid4().hex}.tmp")
+    try:
+        roots.write_text(temporary, buffer.getvalue())
+        roots.rename(temporary, destination)
+    finally:
+        if temporary.exists():
+            roots.remove(temporary)
+    return destination
 
 
 def tally(path: Path) -> dict[str, Any]:
@@ -34,7 +134,28 @@ def tally(path: Path) -> dict[str, Any]:
     Returns:
         Preference, artifact and above-surface counts with no quality verdict.
     """
-    raise NotImplementedError("tally")
+    rows = _read(path)
+
+    def counts(selected: Sequence[Mapping[str, str]]) -> dict[str, Any]:
+        judged = sum(row["preferred"] != "" for row in selected)
+        preferred = sum(row["preferred"] == "yes" for row in selected)
+        return {
+            "judged": judged,
+            "preferred": preferred,
+            "fraction": preferred / judged if judged else 0.0,
+            "artifacts": {key: sum(row[key] == "yes" for row in selected) for key in ARTIFACTS},
+            "above_surface": sum(row["above_surface"] == "yes" for row in selected),
+        }
+
+    return {
+        "groups": {
+            group: counts([row for row in rows if row["group"] == group])
+            for group in GROUPS
+            if group != "V-R"
+        },
+        "headline": counts([row for row in rows if row["group"] in HEADLINE]),
+        "candidates": counts([row for row in rows if row["group"] in {"P-Z", "V-Z"}]),
+    }
 
 
 def format_tally(result: Mapping[str, Any]) -> str:
@@ -46,4 +167,21 @@ def format_tally(result: Mapping[str, Any]) -> str:
     Returns:
         Console-safe tally lines.
     """
-    raise NotImplementedError("format_tally")
+    lines = []
+    for label, values in [
+        *result["groups"].items(),
+        ("headline", result["headline"]),
+        ("candidates", result["candidates"]),
+    ]:
+        line = (
+            f"{label}: {values['preferred']}/{values['judged']} = {100 * values['fraction']:.1f} %"
+        )
+        if label == "headline":
+            line += "  (D65 bar 80 %)"
+        lines.append(line)
+        lines.append(
+            "  "
+            + ", ".join(f"{key}={values['artifacts'][key]}" for key in ARTIFACTS)
+            + f", above_surface={values['above_surface']}"
+        )
+    return "\n".join(lines)

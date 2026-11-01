@@ -5,7 +5,7 @@
 - Package: WP5.3, CP5 visual review pack; Codex implementer lane, STRONG.
 - Verified base and current HEAD at round 0: `2050a89a`; initial tracked diff empty.
 - Turn 1 is task 1 only. No instrument or test code is written this turn.
-- State: **task 2 RED complete; yield before GREEN**. CHARC granted R0-1, R0-2
+- State: **task 3 GREEN complete; yield before Reviewer A round 1**. CHARC granted R0-1, R0-2
   and R0-3 in `f99fca742e060f14`, folded into the brief at `b7c95a46`.
   R0-4 is resolved by the dispatcher-provided inventory CSV. No ruling is pending.
 - The dispatcher reported `uv sync` already run at its seat. It was not repeated.
@@ -348,6 +348,7 @@ DR-99 is handled only under its stated main-alone equivalence condition.
 | Round | Critical / major / minor | In / out envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Disposition / transport | Depth |
 |---|---|---|---|---|---|---|---|
 | 0 (mapping, not Reviewer A) | 0 / 3 / 1 | 4 / 0 | 4 / 0 | 0 | none / none | R0-1..3 granted at turn 2; R0-4 resolved by CSV copy; uv Python probe exit 0 | 118,603 after turn 1 |
+| Session 2 / turn 3 (GREEN verification, not Reviewer A) | 0 / 6 / 0 | 6 / 0 | 6 / 0 | 0 | instrument fixes / regression additions | Six independently reproduced instrument gaps fixed; 70 nodes green; Reviewer A pending | dispatcher pending |
 
 Subsequent Reviewer A turns adjudicate every finding, update this cumulative table
 and yield without remediation. Fixes belong to a separately dispatched turn.
@@ -358,7 +359,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Turn / boundary | Session ID | depth_input_tokens (dispatcher read) | Action |
 |---|---|---|---|
 | Turn 1 / round 0 | dispatcher pending | 118,603 | Dispatcher supplied after turn 1; round-0 ledger committed as e7beee05. |
-| Turn 2 / RED | same session | dispatcher pending | RED tests and raising stubs only; yield before GREEN. |
+| Turn 2 / RED | session 1, same session | 179,868 | Dispatcher supplied at session-2 dispatch; RED commit 10f1f70b; session 1 retired. |
+| Session 2 / turn 3 / GREEN | fresh session; dispatcher to fill ID | dispatcher pending | GREEN implementation and verification; yield before Reviewer A round 1. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -576,3 +578,224 @@ fixed helper argument -> final JUnit confirms only 60 intended raising-stub fail
 Ruff style/regex findings -> confirmed -> fixed -> final ruff clean. Mypy clean.
 No product-code fix or false-positive review finding is claimed. No agent judged
 an image. Next rung is GREEN; this turn ends at the required committed-RED yield.
+
+
+## Session 2 / Turn 3: GREEN
+
+### Session boundary, scope and built behavior
+
+Fresh session 2 starts at RED commit `10f1f70b`, with the task-3-only dispatch.
+Session 1's supplied depth after turn 2 is 179,868; this session's ID and depth
+remain for the dispatcher to read and fill. No depth estimate is made here.
+The round-0 ruling is applied without a new interface or design ruling.
+
+Implemented the five `tools/reviewpack/` modules:
+
+- Selection is the exact 128-name commissioned catalog (64 / 9 / 26 / 8 / 17 /
+  2 / 2 by group). The photo resolver refuses missing/ambiguous names, prunes
+  directory links/junctions, and accepts only commissioned HEIC/JPG names.
+  Videos retain the existing locator. IMG_6762.MOV is whole and last in V-P.
+- The CLI supports `photos`, `clips [GROUP]`, `presets`, `page [--check]`,
+  `tally SHEET`, and `all`, plus guarded config/manifest fixture controls.
+  Direct script commands and the standalone module link checker work.
+- Product correction runs only through the headless-export CLI, once per group
+  and pose. Defaults are not overlaid except the required photo PNG depth and
+  suffix; neutral is a separate photo invocation and record. The CPU switch is
+  explicit and used only on planted test inputs. Product record names, numbered
+  output names, exits, warnings, devices and allowlisted video facts are retained.
+- Pack state and sheets are replaced atomically within guarded pack folders.
+  Reruns use fresh runner-record, excerpt, pair and still names; product output
+  collision names come from the runner record. Existing answers are preserved;
+  a changed or no-longer-reviewable pair is refused before sheet replacement.
+- Excerpts use input seek and all-stream copy, verify count/codec tags, match the
+  first retained video packet hash back to the source PTS, and record planned and
+  measured timings. A failed copy records whole-source fallback; an integrity or
+  packet-identity mismatch is an instrument error, not a labelled successful copy.
+- Viewing clips apply FFmpeg's default autorotation to both inputs, prove equal
+  decoded display dimensions before hstack, halve each view, add the 2-pixel white
+  separator, drop audio, and preserve source colour/rate tags. CPU pair encoding
+  is limited to the explicit fixture flag; normal aids use HEVC NVENC.
+  Unrotated stills reuse the shared extractor; rotated stills independently select
+  exact rational PTS and confirm the decode's showinfo ticks/time base. Pair stills
+  use matched PTS. ICC-bearing photos are converted to sRGB for JPEG derivatives;
+  unprofiled photos receive no inferred transform. Video browser derivatives
+  handle non-BT709 primaries explicitly. No source/product pixels are overwritten.
+- Presets are installed into a fresh pack-local product store and exported by
+  `PresetStore.export_preset`; exported empty parameter maps remain empty.
+  The HTML shows effective schema defaults and the required AD-13 sentence.
+- The page has separate groups, neutral/source and corrected labels, source-left
+  viewing aids, linked product items of record, failure/refusal text, presets and
+  D65 instructions. Local links are checked for existence and containment.
+  Diagnostic text is ASCII-safe and scrubbed for paths/metadata; generated runner
+  record failure/warning strings receive that same policy. HLG refusal text is
+  preserved. Product failures and viewing-aid failures are accounted separately;
+  incomplete aids are explicitly nonreviewable instead of silently entering tally.
+- The CSV has the exact 13 columns. Its strict reader checks header/shape,
+  commissioned identity, duplicate items, corrected-name association and allowed
+  values. Numeric group/headline/candidate tallies count undecided as judged,
+  count all marked artifacts and above-surface flags, and issue no quality verdict.
+
+Only the owned instrument, owned test file and this ledger changed. Every one of
+45 original RED functions (tests, fixture and helpers) is AST-identical to HEAD;
+no original test assertion was changed. Nine additional regression/verification
+functions add ten nodes. No test was declared wrong or weakened, and no separate
+wrong-test correction step was needed. The turn bundles the commissioned GREEN
+rung and its verification fixes as the dispatch requires one commit per turn.
+
+### Commands and final evidence
+
+Runner outputs are files below this worktree's `work/wp5.3/`. Commands are run
+from the worktree root. The final shell removed only its inherited VIRTUAL_ENV
+variable so uv no longer emits the main-environment mismatch warning; no config,
+project environment selection or dependency file changed.
+
+```powershell
+$env:PYTHONPATH='scripts'
+uv run pytest -q tests/test_reviewpack.py --basetemp=work/wp5.3/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m 'not gpu and not footage and not gui and not fullclip' --durations=0 --junitxml=work/wp5.3/turn3-green-final.xml
+uv run ruff check tools/reviewpack tests/test_reviewpack.py
+uv run mypy
+uv run python tools/reviewpack/build.py page --check --config work/wp5.3/tmp/test_all_tiny_set0/working/tiny.toml
+uv run python tools/reviewpack/build.py tally work/wp5.3/tmp/test_all_tiny_set0/working/wp5.3/review-sheet.csv
+uv run python -m tools.reviewpack.page --check --root work/wp5.3/tmp/test_all_tiny_set0/working/wp5.3
+```
+
+| Check | Exit / observed result | Evidence file |
+|---|---|---|
+| Final sandbox-shim pytest, slow node included | 0; `70 passed in 16.21s`; 0 failed/errors/skips in JUnit | `turn3-green-final.log`, `.xml`, `.exit` |
+| Ruff on owned code/tests | 0; `All checks passed!` | `turn3-ruff-final.log` |
+| Strict mypy, whole configured target | 0; `Success: no issues found in 151 source files` | `turn3-mypy-final.log` |
+| Format application on owned code/tests | 0; formatting applied; dispatcher still owns format-check gate | `turn3-format-final.log` |
+| Direct-script page link check on planted pack | 0; no unresolved links | `turn3-cli-link-check.log` |
+| Direct-script tally on planted empty sheet | 0; `headline: 0/0 = 0.0 %  (D65 bar 80 %)`; candidates 0/0 | `turn3-cli-empty-tally.log` |
+| Module page link check on planted pack | 0; no unresolved links | `turn3-module-link-check.log` |
+| Scope / LF / AST / JUnit / planted privacy audit | 0; owned files only, zero CR, original assertions unchanged, docstrings present, no Qt imports, no planted absolute roots/GPS fields in page/sheet/records | `turn3-scope-lf-audit.log` |
+| Diff whitespace check | 0 | `turn3-diff-check.log` |
+
+The first GREEN execution was `60 passed in 16.75s` (`turn3-green-first.log` /
+`.xml`): original slow node 13.32 s, maximum parallel call 1.54 s. Final times below
+include JUnit setup/call/teardown, rounded to milliseconds. Every parallel node
+stays below 5 s; no marker change is needed. There is exactly one slow node with
+reason `runs the headless runner and FFmpeg`; there are no footage/gpu/gui/fullclip
+nodes in this test file. These are informal fixture timings, not figures of record.
+
+### Per-node results on the final candidate
+
+| Node (tests/test_reviewpack.py) | Result | Seconds (JUnit) |
+|---|---|---|
+| `test_inventory_names_and_group_membership` | PASS | 0.001 |
+| `test_items_resolve_exact_names_without_scene_classification` | PASS | 0.259 |
+| `test_photo_resolver_case_insensitive_exact_commissioned_name` | PASS | 0.005 |
+| `test_photo_resolver_missing_refusal` | PASS | 0.002 |
+| `test_photo_resolver_ambiguous_duplicate_in_two_folders` | PASS | 0.003 |
+| `test_photo_resolver_prunes_directory_junction_or_link` | PASS | 0.034 |
+| `test_photo_resolver_refuses_uncommissioned_or_path_name[unknown]` | PASS | 0.002 |
+| `test_photo_resolver_refuses_uncommissioned_or_path_name[path]` | PASS | 0.002 |
+| `test_photo_resolver_refuses_uncommissioned_or_path_name[suffix]` | PASS | 0.002 |
+| `test_excerpt_plan_boundaries_and_phone_rule[V-D-6.406-0.0-6.406-False]` | PASS | 0.000 |
+| `test_excerpt_plan_boundaries_and_phone_rule[V-D-42.342-0.0-42.342-False]` | PASS | 0.000 |
+| `test_excerpt_plan_boundaries_and_phone_rule[V-S-45.0-0.0-45.0-False]` | PASS | 0.000 |
+| `test_excerpt_plan_boundaries_and_phone_rule[V-S-45.001-18.0004-30.0-True]` | PASS | 0.000 |
+| `test_excerpt_plan_boundaries_and_phone_rule[V-D-1046.512-418.6048-30.0-True]` | PASS | 0.000 |
+| `test_excerpt_plan_boundaries_and_phone_rule[V-Z-179.93-71.972-30.0-True]` | PASS | 0.000 |
+| `test_excerpt_plan_boundaries_and_phone_rule[V-P-749.033333-0.0-749.033333-False]` | PASS | 0.000 |
+| `test_excerpt_plan_boundaries_and_phone_rule[V-R-44.0-0.0-44.0-False]` | PASS | 0.000 |
+| `test_excerpt_plan_rejects_invalid_duration[0.0]` | PASS | 0.000 |
+| `test_excerpt_plan_rejects_invalid_duration[-1.0]` | PASS | 0.000 |
+| `test_excerpt_plan_rejects_invalid_duration[nan]` | PASS | 0.000 |
+| `test_excerpt_plan_rejects_invalid_duration[inf]` | PASS | 0.000 |
+| `test_output_guard_refuses_footage_and_parent_escape` | PASS | 0.004 |
+| `test_cli_refuses_working_folder_inside_footage_before_write` | PASS | 0.006 |
+| `test_photo_runner_arguments_pin_pose_and_preserve_defaults[False]` | PASS | 0.005 |
+| `test_photo_runner_arguments_pin_pose_and_preserve_defaults[True]` | PASS | 0.005 |
+| `test_video_runner_arguments_use_checked_cache_and_explicit_cpu_only` | PASS | 0.005 |
+| `test_record_mapping_uses_numbered_product_output_and_retains_failures` | PASS | 0.006 |
+| `test_stream_copy_arguments_preserve_all_streams_and_seek_before_input` | PASS | 0.002 |
+| `test_stream_copy_integrity_refuses_lost_stream_or_changed_tag[stream-count]` | PASS | 0.000 |
+| `test_stream_copy_integrity_refuses_lost_stream_or_changed_tag[codec-tag]` | PASS | 0.000 |
+| `test_actual_excerpt_start_uses_source_packet_not_rebased_zero` | PASS | 0.000 |
+| `test_failed_stream_copy_falls_back_to_whole_source` | PASS | 0.046 |
+| `test_rotation_adapter_extracts_oriented_fixture_dimensions` | PASS | 0.174 |
+| `test_rotated_pair_autorotates_both_halves_with_equal_dimensions` | PASS | 0.541 |
+| `test_pair_refuses_unequal_display_dimensions_before_hstack` | PASS | 0.393 |
+| `test_sheet_header_rows_exclude_failed_refused_and_not_built` | PASS | 0.006 |
+| `test_sheet_preserves_answers_when_later_groups_arrive` | PASS | 0.009 |
+| `test_sheet_refuses_to_transfer_vote_to_regenerated_output` | PASS | 0.005 |
+| `test_tally_empty_sheet_is_zero_judged_without_verdict` | PASS | 0.005 |
+| `test_tally_filled_headline_candidates_artifacts_and_above_surface` | PASS | 0.004 |
+| `test_tally_invalid_value_names_row[preferred-maybe]` | PASS | 0.004 |
+| `test_tally_invalid_value_names_row[halos-no]` | PASS | 0.003 |
+| `test_tally_invalid_value_names_row[above_surface-false]` | PASS | 0.004 |
+| `test_tally_invalid_value_names_row[group-not-a-group]` | PASS | 0.004 |
+| `test_tally_invalid_value_names_row[item-../secret]` | PASS | 0.003 |
+| `test_tally_refuses_malformed_sheet[header]` | PASS | 0.003 |
+| `test_tally_refuses_malformed_sheet[duplicate]` | PASS | 0.004 |
+| `test_tally_refuses_malformed_sheet[extra-cell]` | PASS | 0.004 |
+| `test_tally_refuses_malformed_sheet[missing-cell]` | PASS | 0.004 |
+| `test_tally_cli_valid_scores_exit_zero_and_invalid_sheet_exit_two` | PASS | 0.008 |
+| `test_page_planted_groups_labels_presets_and_name_only_links` | PASS | 0.535 |
+| `test_page_escapes_refusal_text_instead_of_rendering_markup` | PASS | 0.005 |
+| `test_page_check_detects_missing_escaping_and_nonlocal_links[missing]` | PASS | 0.018 |
+| `test_page_check_detects_missing_escaping_and_nonlocal_links[escape]` | PASS | 0.008 |
+| `test_page_check_detects_missing_escaping_and_nonlocal_links[nonlocal]` | PASS | 0.013 |
+| `test_thumbnail_converts_embedded_p3_to_srgb_and_strips_other_metadata` | PASS | 0.035 |
+| `test_thumbnail_without_icc_keeps_rgb_and_drops_text` | PASS | 0.011 |
+| `test_pair_still_uses_source_left_corrected_right_and_separator` | PASS | 0.048 |
+| `test_presets_export_product_starters_without_expanding_serialized_maps` | PASS | 0.029 |
+| `test_all_tiny_set` | PASS | 11.697 |
+| `test_direct_cli_help_runs_without_pythonpath[build]` | PASS | 0.284 |
+| `test_direct_cli_help_runs_without_pythonpath[page]` | PASS | 0.263 |
+| `test_sheet_refuses_stale_row_after_item_becomes_unreviewable` | PASS | 0.006 |
+| `test_viewing_pts_uses_ticks_instead_of_rounded_decimal` | PASS | 0.116 |
+| `test_stream_copy_success_records_a_matched_source_packet` | PASS | 0.206 |
+| `test_rotated_frame_at_nonzero_pts` | PASS | 0.170 |
+| `test_refused_fixture_is_recorded_without_a_review_row` | PASS | 1.058 |
+| `test_tally_refuses_unrelated_corrected_filename` | PASS | 0.005 |
+| `test_non_hlg_failure_in_refused_group_is_not_mislabelled` | PASS | 0.006 |
+| `test_sheet_write_failure_preserves_original_answers` | PASS | 0.009 |
+
+
+### Verification loop: suspect, independently confirm, fix, repeat
+
+These are self-verification findings before Reviewer A, not reviewer rounds.
+All six confirmed gaps are [major, in-envelope, NEW] relative to this instrument's
+role in CP5 evidence; none is a product defect or an owner visual judgement.
+There are no reopened findings or reverts. All fixes are instrument fixes with
+regression additions; none is a test-only weakening.
+
+| Item | Suspect and independent confirmation | Disposition / fix | Evidence |
+|---|---|---|---|
+| V-1 [major] CLI import path | Direct `build.py --help` exited 1 with ModuleNotFoundError; two subprocess tests with PYTHONPATH removed failed for build/page | Confirmed; bootstrap the tools package for direct-script and tools-module entry points | `turn3-cli-probe.log`; `turn3-verification-red.log` -> `turn3-verification-green.log` |
+| V-2 [major] Rounded timestamps | Independent ffprobe integer ticks on vfr.mp4 gave 1001/30000; instrument returned 33367/1000000, which can select the next frame | Confirmed; use integer ticks times exact time base; rotated showinfo verification also compares exact ticks | Same RED/GREEN logs; nonzero rotated and real-copy verification nodes also pass |
+| V-3 [major] Stale owner row | Planted existing yes row plus a now-failed item did not raise | Confirmed; refuse absent/nonreviewable pairs before touching the sheet | Same RED/GREEN logs; original sheet bytes preserved |
+| V-4 [major] Unrelated corrected file | A safe basename from another commissioned item passed strict tally | Confirmed; validate association with the item's corrected export name, allowing actual collision/excerpt variants | `turn3-verification-second-red.log` -> final pytest |
+| V-5 [major] Mislabelled refusal | A planted unrelated input-read error in V-R was incorrectly labelled refused | Confirmed; V-R is labelled refused only when the product's failure text identifies HLG; other errors stay failed | `turn3-verification-third-red.log` -> final pytest |
+| V-6 [major] Interrupted sheet write | Independent injected partial write replaced the original owner's CSV bytes | Confirmed; guarded temporary sibling plus atomic replacement, with temporary cleanup; state JSON uses the same guarded replacement discipline | Same third RED log -> final pytest |
+
+Rejected-as-false-positive suspicions: none claimed. Independent positive checks
+also confirmed a real all-stream excerpt with a matched source packet, rotated
+extraction at nonzero PTS, and the actual runner's HLG refusal reaching the page
+with zero owner rows. Initial style/type findings were fixed (including optional
+ICC return typing and a reused loop variable); final lint and mypy outputs above
+are clean. The final requirement/code pass plus the full 70-node targeted rerun,
+CLI checks and scope/AST/privacy audit found no new issue. Verification converged
+for this GREEN rung; Reviewer A convergence is not claimed.
+
+### Locks, deviations and yield
+
+- No owner footage folder/file was opened or traversed by the cell; all media
+  checks used planted inputs or committed fixtures. Sources remain byte-identical
+  in the end-to-end test. The real build remains RUN REQUESTs at the dispatcher.
+- No local configuration edit, main-tree work output, other worktree access,
+  frozen-interface edit, product/helper edit, dependency change, Qt import,
+  mailbox post or git mutation/commit occurred. All output guards use explicit
+  pack/footage roots. No new OS-specific product code was introduced.
+- No agent judged an image. Pixel/size assertions are mechanical fixture controls.
+- No STOP, unresolved question, product defect or new design deviation is raised.
+  The authorized round-0 amendments remain the only design departures from the
+  original brief. Diagnostic redaction and atomic replacement implement its
+  privacy/preservation locks; they do not change product exports.
+- Full-suite/two-leg gate, dispatcher format-check, actual owner-media build,
+  Reviewer A, Reviewer B and the final report are not run/claimed this turn.
+  The report remains unwritten at the required pre-report yield boundary.
+- Task 3 is ready for Reviewer A round 1 at the dispatcher's seat. No run request
+  is issued ahead of that review boundary. Dispatcher fills this session's depth.

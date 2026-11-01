@@ -13,7 +13,9 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from collections import Counter
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -963,3 +965,139 @@ def test_all_tiny_set(roots: OutputRoots) -> None:
     with (roots.allowed / "review-sheet.csv").open(encoding="utf-8", newline="") as handle:
         assert len(list(csv.DictReader(handle))) == 3
     assert before == {name: (roots.footage / name).read_bytes() for _, name, _ in inputs}
+
+
+@pytest.mark.parametrize("module", ["build", "page"])
+def test_direct_cli_help_runs_without_pythonpath(module: str) -> None:
+    """The dispatcher's CLI must be runnable from the worktree root."""
+    environment = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+    done = subprocess.run(
+        [sys.executable, f"tools/reviewpack/{module}.py", "--help"],
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+    assert done.returncode == 0, done.stderr.decode("utf-8", "replace")
+    assert "usage:" in done.stdout.decode("utf-8", "replace")
+
+
+def test_sheet_refuses_stale_row_after_item_becomes_unreviewable(roots: OutputRoots) -> None:
+    """A failed rerun must not leave a vote linked to an absent page pair."""
+    destination = roots.allowed / "review-sheet.csv"
+    _csv(destination, [_row(_item(), preferred="yes")])
+    before = destination.read_bytes()
+    with pytest.raises(ValueError, match=r"changed|identity|pair|reviewable"):
+        sheet.write_sheet([_item(status="failed")], destination, roots=roots)
+    assert destination.read_bytes() == before
+
+
+def test_viewing_pts_uses_ticks_instead_of_rounded_decimal() -> None:
+    """Decimal ffprobe time strings can round across a frame-selection boundary."""
+    source = FIXTURES / "video" / "vfr.mp4"
+    done = media_tool(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_frames",
+            "-show_streams",
+            "-show_entries",
+            "stream=time_base:frame=best_effort_timestamp",
+            "-of",
+            "json",
+            str(source),
+        ]
+    )
+    assert done.returncode == 0
+    value = json.loads(done.stdout)
+    time_base = Fraction(value["streams"][0]["time_base"])
+    pts = [int(frame["best_effort_timestamp"]) * time_base for frame in value["frames"]]
+    # Select a frame whose exact rational timestamp has a repeating decimal.
+    expected = next(p for p in pts if p > 0 and Fraction(f"{float(p):.6f}") != p)
+    assert build._frame_time(source, float(expected) - 0.0001) == expected
+
+
+def test_stream_copy_success_records_a_matched_source_packet(roots: OutputRoots) -> None:
+    """Check the real copy/probe join rather than only a planted packet mapping."""
+    source = FIXTURES / "video" / "hevc8-bt709-full.mp4"
+    prepared = build.prepare_excerpt(source, start_s=0.6, duration_s=1.0, roots=roots)
+    assert prepared["excerpt"] is True
+    assert prepared["planned_start_s"] == 0.6
+    assert 0.0 <= prepared["actual_start_s"] <= 0.6
+    assert prepared["duration_s"] > 0
+    assert prepared["path"].is_relative_to(roots.allowed / "excerpts")
+
+
+def test_rotated_frame_at_nonzero_pts(roots: OutputRoots) -> None:
+    """Showinfo's exact ticks must confirm a nonzero oriented extraction."""
+    frame = build.extract_view_frame(
+        FIXTURES / "video" / "rotated.mp4",
+        0.6,
+        roots.allowed / "later.png",
+        roots=roots,
+    )
+    with Image.open(frame) as image:
+        assert image.size == (180, 320)
+
+
+def test_refused_fixture_is_recorded_without_a_review_row(roots: OutputRoots) -> None:
+    """A real HLG refusal must reach the page and stay outside the owner tally."""
+    shutil.copyfile(FIXTURES / "video" / "hlg.mp4", roots.footage / "IMG_6704.MOV")
+    config = roots.allowed / "refused.toml"
+    config.write_text(
+        f"footage_path = {json.dumps(str(roots.footage))}\n"
+        f"working_path = {json.dumps(str(roots.allowed.parent))}\n",
+        encoding="utf-8",
+    )
+    manifest = roots.allowed / "refused.json"
+    manifest.write_text(json.dumps([{"name": "IMG_6704.MOV", "group": "V-R", "kind": "video"}]))
+    args = ["--config", str(config), "--manifest", str(manifest), "--force-cpu"]
+    assert build.main(["clips", "V-R", *args]) == 0
+    assert build.main(["page", *args]) == 0
+    state = json.loads((roots.allowed / "records" / "pack.json").read_text())
+    assert len(state["items"]) == 1
+    assert state["items"][0]["status"] == "refused"
+    assert "hlg" in state["items"][0]["message"].lower()
+    assert "HLG" in (roots.allowed / "index.html").read_text()
+    with (roots.allowed / "review-sheet.csv").open(encoding="utf-8", newline="") as handle:
+        assert list(csv.DictReader(handle)) == []
+
+
+def test_tally_refuses_unrelated_corrected_filename(roots: OutputRoots) -> None:
+    """A syntactically safe name must still belong to the named item's export."""
+    path = roots.allowed / "wrong-pair.csv"
+    _csv(path, [_row(_item(), corrected_name="IMG_6771_corrected.png")])
+    with pytest.raises(ValueError, match="row 2"):
+        sheet.tally(path)
+
+
+def test_non_hlg_failure_in_refused_group_is_not_mislabelled(roots: OutputRoots) -> None:
+    """Group membership cannot turn an unrelated export error into an HLG refusal."""
+    path = roots.allowed / "V-R.json"
+    path.write_text(json.dumps(_runner_record("IMG_6704.MOV", failure="Cannot read input.")))
+    result = build.read_runner_record(path, group="V-R", roots=roots)
+    assert result[0]["status"] == "failed"
+    assert result[0]["message"] == "Cannot read input."
+
+
+def test_sheet_write_failure_preserves_original_answers(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed write of the replacement CSV must preserve the existing owner's file."""
+    destination = roots.allowed / "review-sheet.csv"
+    _csv(destination, [_row(_item(), preferred="yes")])
+    before = destination.read_bytes()
+    original = OutputRoots.write_text
+
+    def interrupted(self, target, text):
+        original(self, target, "partial")
+        raise OSError("planted write interruption")
+
+    monkeypatch.setattr(OutputRoots, "write_text", interrupted)
+    with pytest.raises(OSError, match="planted"):
+        sheet.write_sheet([_item(), _item("IMG_6791", "P-Z")], destination, roots=roots)
+    assert destination.read_bytes() == before
