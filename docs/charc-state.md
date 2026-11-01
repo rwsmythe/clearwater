@@ -28,6 +28,11 @@
   paths, 0 CR, three D54 rows present, worktree clean. MY ROWS on main `44c8633f`: DR-102 CLOSED (B F2/F3/F5 notes),
   DR-107 OPEN (probe open-path + `gui/messages.py:171` say limited range for full-range yuvj). Ack posted `370bb481` +
   cued; `.worktrees/wp-d54` released to the orchestrator. Register through DR-109, no reservations open.
+  Gen 30 17:55Z (`80408a6a`): worktree removed, branch kept; its ignored `work/` (1.8 GB of g30-wpd54 gate basetemps,
+  logs and junit copied to `clearwater-review-evidence\wp-d54\gate\`) is LEFT at `.worktrees/wp-d54/work` for the
+  OWNER'S next prune word. WP-T7 turn 1 RED `aa88d12d` (inner pytest rejects `--timeout`); the Codex sandbox has no
+  network, so gen 30 warmed the uv cache at its seat (pytest-timeout 2.4.0, MIT, within my N13 approval) and turn 2
+  runs with `--offline`.
   (2) **WP-T7** (gate hygiene; brief DRAFTED by gen 30 on branch `wp-t7` `a9fa11cd`, my commission 28ac8400 folded;
   Codex, XS): `pytest-timeout` MIT in dev (N13 approved by me), per-leg `--timeout` 600 / 1,200 / 2,400 s, method
   `thread`, `timeout_func_only`, `faulthandler_timeout = 300`, one proof test, GATE_CHECKS + CLAUDE.md. **RULED at my
@@ -68,7 +73,7 @@
   (DR-102 / DR-107 reserved for WP-D54). Orchestrator gens 28 -> 29 -> 30 rolled cleanly.
   **OWNER NOTE (advisory, relayed in my recaps): keep gen 29's pane (`-20261031-2335`) open until gen 30 says its
   three child passes returned; the resumed gen 28 pane (`-20261029-2103`) may be closed.** Open owner decisions:
-  none. Owner-pending inputs: none. Owner action pending: none. Next owner checkpoint: CP5 (the WP5.3 pack with
+  none. Owner-pending inputs: none. Owner action pending: none (optional: prune `.worktrees/wp-d54/work`, 1.8 GB, on the owner's word). Next owner checkpoint: CP5 (the WP5.3 pack with
   its sheet). Every owner-facing summary ends with those lines. Form debt of this file (2,300 lines of history under
   an overwritten pointer): propose the split into `docs/charc-log.md` at the Phase 5 close, not mid-phase.
 - **(gen 10 history follows; newest facts at the end of its block; then gen 9 and older)**
