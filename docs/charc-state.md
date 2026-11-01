@@ -80,8 +80,12 @@
   NEXT: cell 5 report, B (Codex), two-leg gate, accept. **MINE AT THE ACCEPT:** DR-98 CLOSED on these figures; NEW AD-31
   (export in a spawned worker; figures + wall delta); AD-23 extended; DR-44 (c) re-confirmed; DR-69 note (two contexts,
   device peak 4.3 GB); F8 / F4 rows; GUI cache accounting row if material; `_HeldSink` / `_ProgressSink`. Codex turns
-  resumed: WP5.1 turn 3, WP3.6P session 3, WP5.3 GREEN. Claude 85 % (pace 0.997, 09:09Z). Waiting on: WP4.6 B + gate;
-  WP5.3 GREEN; WP5.1 T4; WP3.6P clean-up and RUN REQUESTs.
+  resumed: WP5.1 turn 3, WP3.6P session 3, WP5.3 GREEN. Claude 85 % (pace 0.997, 09:09Z).
+- **WP5.1 T3-1 RULED 09:16Z (query afdb762f, turn 3 `9d662f09`, ledger :656-700; my post + cue): CONCURRED + the
+  addition.** The kill landed between `safe_write.py:101` (link) and `:107` (unlink): final and temporary the SAME FILE.
+  (3) now admits that state (no final, OR same-file final that verifies); (4) BINDING: clean_leftovers removes the
+  temporary NAME and keeps that final byte-identical, else STOP as a D85 candidate defect. Three observed crash states
+  recorded. Session 2 at 155,324. Waiting on: WP4.6 report / B / gate; WP5.3 GREEN; WP5.1 T4; WP3.6P clean-up.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
