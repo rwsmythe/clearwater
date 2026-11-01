@@ -4,15 +4,11 @@
 
 - Package: WP3.6P, CODEX lane, STRONG tier; CHARC's FINAL rulings govern.
 - Dispatch base verified: `c3bf602fe9ac94cd5df25499d97f3a2bc439bb72`.
-- Current boundary: turn 7, Reviewer A round 2 REMEDIATED in the owned tool,
-  tests and ledger. Reviewer A round 3 is NOT RUN. Turn 6's adjudication was
-  committed as `081f851c`.
-  Reviewer A found one new MAJOR, one MINOR and eight ADVISORY findings at
-  `7a3810af`; the four tool fix groups and one test-only group are recorded
-  below with RED/GREEN evidence. Turn 5's round-1
-  remediation was committed as `7a3810af`. Turn 4's adjudication was
-  committed as `f2396b0e`. Turn 1's ledger was committed
-  as `6cc7cdb`; RED as `a66eea6`.
+- Current boundary: turn 8, fresh session 3. Reviewer A round 3 adjudicated
+  and the CHARC-ruled terminating clean-up implemented in the owned tool/tests.
+  Dispatch head verified: `649b5662d8c983ce9dbd53c875e9437832e8de48`;
+  initial tracked status empty. Turn 7 was committed as `649b5662`.
+  Prior turns/rulings and their evidence remain historical records below.
   No owner photo was opened by the cell in any turn.
 - `uv sync`: already run by the dispatcher before dispatch, as stated in the
   binding turn-1 instructions. Not repeated: this sandbox cannot reach the index.
@@ -21,14 +17,15 @@
   (2026-10-30T04:46:00Z)
   RE-RULES Q3: FFmpeg default composed primary as delivered is the oracle.
   The thumbnail is a recorded second witness, never the pass criterion.
-- Current handoff: YIELD for Reviewer A round 3. CHARC resolved R2-QA in
-  `688ef40fca871a0d`; its verbatim ruling below supersedes the turn-6 proposal's
-  pinned Software count. The found Software value determines its count.
-  CHARC resolved R1-QA/QB in `d9133089b58091d8`; round-1 ruling/remediation
-  and round-2 synthetic confirmation evidence are recorded below.
-  No product defect is asserted from a planted instrument control.
-- No real-photo acceptance claim, measurement, review convergence or gate pass is
-  made at this boundary. All requests below are NOT RUN by this cell.
+- Current handoff: YIELD for the remaining seat runs and an EXECUTING
+  Reviewer B on the final candidate. CHARC `650bea20b811947c` accepts A3 as
+  convergence on that condition; this is not an unconditional B/gate pass.
+  R1-QA/QB `d9133089b58091d8`, R2-QA `688ef40fca871a0d` and replacement Q3
+  `e40b0d7b06ee9af8` remain governing. No product defect is asserted from a
+  planted instrument control. Report wording / Limits are staged below.
+- No real-photo acceptance claim, new owner measurement, returned Reviewer B
+  or gate pass is made at this boundary. Remaining seat requests are NOT RUN
+  by this cell. The final report is still owed after those results arrive.
 
 ## Round-0 source map on c3bf602
 
@@ -1022,6 +1019,7 @@ EXIT 0. No prohibited value was discovered in a committed-facing artifact.
 | Build turn 3 (not A) | - | - | - | Owned tool/ledger | - | 0 | New tool; no test fix | GREEN: 33 passed, 1 footage deselected; ruff/mypy green; Reviewer A PENDING | 168,789 after turn 2; turn-3 reading pending |
 | A1 / turns 4-5 | 0 | 2 | 6 (+8 advisory) | 15 / 1; #15 out | 16 NEW / 0 REOPENED; #11 rejected, #9/#13 partially rejected | 0 | 13 tool fix groups with RED/GREEN tests; 0 src fixes; 0 test-only fix groups; #16 Limit in ledger | NEW_CRITICAL_MAJOR_FOUND was A1's verdict; adjudication committed f2396b0e; CHARC R1-QA/QB ruled; remediated/committed 7a3810af turn 5; checked A1 fixes HOLD in A2 | Turn 4: 114,259; turn 5: 178,999; previous session 240,970 after turn 3 |
 | A2 / turns 6-7 | 0 | 1 | 1 (+8 advisory) | 7 / 3; a-3/a-7/a-10 out | 10 NEW / 0 REOPENED; a-9 behavior confirmed, defect rejected; a-6 conservative rejection retained | 0 | 4 tool fix groups with RED/GREEN controls; 0 src fixes; 1 test-only group (a-8); 5 advisory Limit/report lines in ledger | NEW_CRITICAL_MAJOR_FOUND was A2's verdict; adjudication committed 081f851c; CHARC R2-QA ruled; remediated turn 7; 87 light cases pass; A3 pending | Turn 5: 178,999 before compaction; turn 6: 101,571 after compaction; turn 7 dispatcher to fill |
+| A3 / turn 8 | 0 | 0 | 0 (+9 advisory) | 6 / 3; #2/#3/#7 out | 9 NEW / 0 REOPENED blocking findings | 0 | 3 tool fix groups (#8/#1/#9), RED/GREEN controls; 0 src fixes; 0 test-only groups; #5 Limit retained | NO_NEW_CRITICAL_MAJOR; all reviewer findings REASONED after refused execution; CHARC accepts convergence CONDITIONALLY on an executing B; terminating clean-up ruled before this turn | Session 2 retired at 187,455; fresh session 3 turn-8 reading for dispatcher to fill |
 
 | Suspected item | Independent confirmation | Disposition |
 |---|---|---|
@@ -1669,6 +1667,282 @@ depth and cumulative entries. The ledger and 73 safe record/summary JSON files
 were scanned without planted private markers or absolute synthetic input roots.
 Supporting scope/diff evidence: final-scope.log and final-diff-check.log.
 
+## Reviewer A round 3: turn-8 adjudication and terminating clean-up
+
+Read in the dispatched order: this full ledger, the owned tool/tests, then
+clearwater-review-evidence/wp3.6p/r3/review.txt. Product/test code was inspected
+only for cited findings. The review was Claude opus/high, read-only, 34 turns;
+VERDICT NO_NEW_CRITICAL_MAJOR, nine ADVISORY findings, all REASONED because
+execution was refused. Dispositions: six in envelope, three out; no critical,
+major or minor finding, no blocking REOPENED finding, no revert. This turn
+bundles adjudication and the three ruled remediation groups in one logical
+change, authorised before dispatch. No product defect on owner data is proved.
+
+### Governing ruling, verbatim
+
+CHARC 650bea20b811947c (2026-11-01T08:32:58Z):
+
+> RULING: R3 counts as CONVERGENCE on the condition you already set: Reviewer B on the final candidate EXECUTES (the pytest selection, the planted-reader control and the ICC-presence class check at least), with the execution path proved by one `^ succeeded`-style line before B's findings are read; a B that is again refused execution is NOT a returned B (re-run with the path fixed, and tell me). Reason: a clean round with eight refused executions is a reasoned read of fixes that rounds 1 and 2 saw executed; acceptable as the last A round, not as the only execution of the final tree.
+>
+> Clean-up list CONCURRED: #8 (ICC-presence class check against Q7's pooling risk), #1 (failure labels), #9 (JPEG refusal in `orientation --files`); #4 / #6 report wording; the three out-of-envelope advisories as report Limits (the Software prefix allow-list: the product writes the constant "Clearwater", so note it as a tool limit, not a product gap).
+
+### All nine dispositions and synthetic confirmations
+
+Evidence root: work/wp3.6p/rA3-adj/. Six report-only probes ran against the
+UNCHANGED 649b5662 tool in test_advisories.py: probes.xml/probes.log,
+**6 passed in 0.81s**. All readings/runners in those probes are stubs except
+the runtime clock-description query; no host peak, footage or GPU measurement.
+The other three advisories are confirmed by the baseline regression REDs below.
+
+| Finding | Classification / adjudication | Executed evidence and disposition |
+|---|---|---|
+| #1 | [ADVISORY, IN] CONFIRMED labels, not a new product defect | r3 product nan/rgba/runtime, comparison, output-parse and command-exception controls fail on the baseline. FIXED: invalid product pixels -> product_pixels_failed; unexpected _base exception -> product_read_failed/read_failed; comparison exception -> orientation_comparison_failed; unexpected orientation-command exception -> orientation_failed; output-check parse exception -> output_parse_failed. Genuine FFmpeg errors retain oracle_failed; failed runner execution retains runner_failed. All remain failures/STOPs. |
+| #2 | [ADVISORY, OUT] CONFIRMED conditional tool Limit | test_2_prefix_projection_limit retains a synthetic ASCII/tab suffix following the permitted Software prefix. Existing R2 version/tab controls also establish the ruled acceptance. Product exif.py:20 writes the constant Clearwater; no product privacy gap is proved. No tighter Software rule is authorised; report Limit below. |
+| #3 | [ADVISORY, OUT] CONFIRMED conditional tool Limit | test_3_unparseable_ifd1_is_reported_absent builds a valid empty IFD0 with a nonzero out-of-range next-IFD pointer; has_thumbnail returns False while the independently read raw pointer is nonzero. Pillow warnings captured locally. This is not an owner-file defect; no new independent thumbnail parser in this terminating clean-up. |
+| #4 | [ADVISORY, IN] CONFIRMED runtime fact | test_4_clock_resolution_fact records Python 3.12.13, monotonic=True, adjustable=False, resolution_s=0.015625 in clock-facts.json. This confirms the cited 15.625 ms clock granularity here; it does not measure a sampler cadence or peak. Report wording below; no OS-specific code added. |
+| #5 | [ADVISORY, IN] CONFIRMED interleaving mechanism; Limit | test_5_reentrant_peak_update_loses_larger_reading deterministically interleaves a 9,000-byte stub reading during a 2,000-byte max operation after a 1,000-byte baseline: recorded peak becomes 2,000. This models the unlocked read/max/write race without scheduling or real readings. A correct lock covers shared update regions in both sampling methods (and is not a two-line change); it also affects existing reentrant cadence controls. Under the dispatched two-line/no-risk restriction, no lock fix is made. Report the limitation beside memory figures. |
+| #6 | [ADVISORY, IN] CONFIRMED distinct-query semantics | test_6_prerun_fit_is_not_backend_choice uses the real select_backend with a fake GPU: wrapper free=estimate+1, backend free=estimate-1. Record retains fits=True alongside the actual CPU capacity reason. No CUDA context cost is measured; report the separate sources/instants, not the review's approximate context figure as a new measurement. |
+| #7 | [ADVISORY, OUT] CONFIRMED alternate-config limitation | test_7_subprocess_does_not_forward_wrapper_config captures launch_runner's guarded argv using fake Popen; no --config is forwarded. headless_export.py:725-744/:1369 consults its default local config. Tool output boundaries remain guarded. Default-config seat requests below avoid this alternate-config case; no launch interface expansion here. |
+| #8 | [ADVISORY, IN] CONFIRMED class-map pooling risk | Three real synthetic JPEG CLI controls swap the ICC-presence classification relative to the map, and all pass the old class gate. FIXED using independently read embedded ICC presence. The source fixtures establish P3 JPEG has ICC and untagged JPEG has none. Mismatch refuses by name, declared class and observed compatible class, with class_layout; never exports into a misleading row. |
+| #9 | [ADVISORY, IN] CONFIRMED explicit-input omission | The baseline mixed HEIC/JPEG --files control runs the HEIC and silently omits the JPEG. FIXED: preflight refusal before any per-photo decode/export, status 2, named JPEG/class and fixed message 'orientation requires HEIC; explicitly selected JPEG refused'. Implicit all-photo orientation still selects only the 62 HEICs. |
+
+#8 checks precisely the commissioned FORMAT distinction: JPG-A must have an
+embedded ICC; JPG-Z and JPG-M must have none. It does not infer camera/editor
+strings, scenes, correction history or Z versus M from absent ICC. Accordingly,
+observed_class is JPG-A or JPG-Z/M (the latter is a compatible set, never a
+pooled statistics row). The declared class remains separate in the refusal.
+The inventory's finer Z/M split still depends on the names-only map. An
+ICC-bearing JPEG of another profile is not independently proved to be Apple's
+A provenance by this presence-only check. No owner file/map was read to test it.
+
+### RED on 649b5662, then GREEN
+
+Added the controls BEFORE editing the tool. The corrected baseline run red2.xml
+was 11 failed, 4 passed, 88 deselected in 1.41s. The first scratch #9 stub
+returned None and raised before the intended assertion; corrected it to a valid
+record and reran BEFORE any tool change. No tool fix is credited for that
+control correction. All other initial REDs were the intended assertions.
+
+For an explicit exit-code receipt after formatting, repeated against a byte-exact
+ignored copy from `git show 649b5662:tools/photo_verify.py`, loaded as photo_verify
+by baseline_override (never overwrote/reverted the tracked tool):
+
+`PYTHONPATH=scripts;work/wp3.6p/rA3-adj/baseline uv run pytest -q tests/test_photo_verify.py -k r3_ --basetemp=work/wp3.6p/rA3-adj/baseline-red-tmp -p sandbox_mkdir_shim -p no:cacheprovider -p baseline_override -o junit_family=legacy --junitxml=work/wp3.6p/rA3-adj/baseline-red.xml`
+
+Observed pytest EXIT **1** (baseline-red.exit): **11 failed, 4 passed,
+88 deselected in 1.13s**. Tool baseline content is unchanged 649b5662.
+The four supporting positives already pass: correct ICC-presence classes (3)
+and genuine oracle failure attribution (1); they are not claimed REDs.
+Common node prefix in this table: tests/test_photo_verify.py::.
+
+| Fix | RED node id(s) on 649b5662 | RED failure line | Final GREEN |
+|---|---|---|---|
+| #8 | test_r3_jpeg_icc_class_mismatch_is_refused[JPG-A-jpeg-gradient-none-JPG-Z/M], [JPG-Z-jpeg-gradient-display-p3-JPG-A], [JPG-M-jpeg-gradient-display-p3-JPG-A] | AssertionError: ICC-mislabelled JPEG was pooled into its declared class | All 3 PASSED |
+| #1 product pixels | test_r3_orientation_product_failure_labels[nan], [rgba] | AssertionError: product failure blamed on oracle or runner | Both PASSED |
+| #1 unexpected read | test_r3_orientation_product_failure_labels[runtime] | Failed: unexpected product-read exception escaped its step | PASSED |
+| #1 comparison | test_r3_orientation_step_failure_labels[compare_poses-orientation_comparison_failed] | AssertionError: comparison failure blamed on oracle | PASSED; ffmpeg_decode-oracle_failed positive also PASSED |
+| #1 output parsing | test_r3_output_parse_failure_label[_png_metadata], [read_photo] | AssertionError: output parse blamed on runner | Both PASSED; runner EXIT remains 0 and failed PNG retained |
+| #1 command | test_r3_orientation_command_unexpected_failure_label | AssertionError: orientation command exception blamed on runner | PASSED; exit remains 1 |
+| #9 | test_r3_orientation_explicit_jpeg_is_refused | AssertionError: explicit JPEG was silently skipped | PASSED; preflight exit 2, no orientation adapter call |
+
+New safe keys observed_class and refusal_reason are finite enums; the new
+failure codes/checks are explicit allow-lists. No exception string is projected.
+The source-ICC expectation, V9 rules, D63 checks, byte fidelity, pose thresholds,
+inconclusive continuation, sampler semantics and deletion policy are unchanged.
+
+### Report staging: round-3 wording / Limits
+
+Carry these into the later report beside the applicable evidence, in addition
+to the earlier round-1/2 limitations:
+
+- **#2 LIMIT:** software_seen permits any ASCII suffix after Clearwater under
+  R2-QA, including tabs. It is an output-Software reporting exception, not a
+  general private-text sanitizer. Today's product writes only Clearwater;
+  no product gap is inferred. Never promote source Software into this field.
+- **#3 LIMIT:** thumbnail_absent uses the product's Pillow-based has_thumbnail
+  witness. It does not independently prove a zero raw next-IFD pointer or
+  exclude a malformed/unparseable retained IFD1. No such owner defect is proved.
+- **#4 WORDING:** observed start-gap and elapsed figures use time.monotonic;
+  Python 3.12.13 here reports 15.625 ms resolution. Those statistics are coarse,
+  successful-sample observations, not continuous or exact instantaneous peaks.
+- **#5 LIMIT:** attach and background sampling have unlocked peak updates;
+  an interleaving at runner startup can lose a larger observation. Reported
+  sampled peaks carry that limitation as well as ordinary sampling gaps.
+  The cell did not establish that an owner measurement loses an observation.
+- **#6 WORDING:** pre-run free bytes / estimate_fits_free_before come from
+  nvidia-smi before runner CUDA-context creation (whole MiB); backend selection
+  uses its later CuPy reading. These can disagree. The actual reason is the
+  runner's record, and a forced CPU leg is not an automatic capacity event.
+- **#7 LIMIT:** a wrapper --config is not forwarded to the memory subprocess's
+  own footage-refusal config; it reads the default config. Outputs still stay
+  under the wrapper's guard. The commissioned seat runs use the default config.
+- **#1 supersedes R2 a-7 label wording:** invalid RGB product arrays now have
+  product_pixels_failed rather than oracle_failed/orientation_size; comparison,
+  unexpected product-read, unexpected command and output-parse failures have
+  separate fixed labels. Labels identify the instrument step, not a diagnosis
+  or proof of a product defect on an owner photo. Every such result still STOPs.
+- **#8 LIMIT:** ICC presence separates A from the compatible Z/M set only;
+  the names-only inventory map determines the individual Z and M rows. No
+  combined Z/M metric or scene/provenance inference is introduced.
+
+### Verification loop and final light results
+
+Executed all nine confirmations, traced the three fix groups through CLI and
+safe projection, and ran the complete selected synthetic file. Suspected
+privacy leakage via new diagnostics was rejected by the existing planted
+GPS/Make/path and guarded CLI tests plus final safe-JSON scan. Suspected
+class-reclassification of Z versus M was rejected: only ICC presence is read;
+the rows remain separate. #5's race was confirmed and retained as an explicit
+Limit under the dispatched size/risk restriction. No other issue found in the
+final scope/privacy/step-label pass. No new product bug or scope grant needed.
+
+All logs under work/wp3.6p/rA3-adj/; final counts are from the final tree.
+PowerShell spells PYTHONPATH=scripts as $env:PYTHONPATH = 'scripts'.
+
+| Check | Exact command | Result / evidence |
+|---|---|---|
+| Selected tests | PYTHONPATH=scripts uv run pytest -q tests/test_photo_verify.py --basetemp=work/wp3.6p/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not slow and not fullclip" -o junit_family=legacy --junitxml=work/wp3.6p/rA3-adj/final.xml | EXIT 0; 102 passed, 1 deselected in 9.89s; final-pytest.log/final.xml |
+| Ruff | uv run ruff check tools/photo_verify.py tests/test_photo_verify.py | EXIT 0; All checks passed!; final-ruff.log |
+| Strict typing | uv run mypy | EXIT 0; Success: no issues found in 147 source files; final-mypy.log |
+
+15 new cases supplement 87 prior cases; ONE footage node remains deselected.
+All actual exports force CPU; samplers/device reads in memory tests are stubs.
+No footage/gpu/gui/slow/fullclip, owner run, full suite or hardware measurement
+ran. Ruff initially found N818 on the private refusal exception; renamed it to
+_SelectionRefusedError and reran. Formatting applied locally (2 reformatted);
+the dispatcher's format --check remains owed. Existing uv environment notice
+is unchanged. No test warning or product failure was suppressed.
+
+Only tool, owned test and ledger changed; all committed-facing bytes are ASCII
+and LF. No src/frozen interface, dependency/lockfile, shared fixture/conftest,
+other test, local config or other-worktree edit. No footage read/write, scene
+judgement, mailbox post, .git write, commit or evidence pruning. The later
+report, remaining seat runs, executing Reviewer B and ONE two-leg gate are owed.
+
+Observed final validation: EXIT 0, final-validation.log. Exact three-file
+tracked scope, ASCII/LF/final newline/whitespace, Python syntax, ledger/depth,
+11 baseline REDs and 102 final passes confirmed. Privacy scan of the tool,
+ledger and 83 final safe record/summary JSON artifacts found no planted private
+markers or synthetic input root; the report is not yet written. New diagnostic
+fields remain finite enums. git diff --check EXIT 0 (diff-check.log).
+PowerShell AST parsing of the request wrapper plus five request blocks passed
+(request-syntax.log); none was executed. No claim of seat/B/gate completion.
+
+### Remaining RUN REQUESTs, in execution order (NOT RUN by cell)
+
+Run from this worktree root, one heavy job at a time. Verify privately that the
+default local config's working folder is under this worktree's work/; no source
+path/config value goes into the return. CLI outputs use its configured
+<working>/wp3.6p/{orientation,export,memory}/<name>/ guard; wrapper logs/facts
+below use work/wp3.6p/seat-turn8/. Stop below 20,000,000,000 free bytes before
+each run. The tool additionally checks header-derived output budgets. R0's
+51,873,583-byte PNG sizes seven retained plus one transient at about 415 MB;
+that is a planning allowance, not a new measured output total. No prune.
+
+Use this PowerShell wrapper once at the seat to capture exact command, EXIT,
+wall time and free disk before/after. It does not print photo/config metadata.
+The Id/log/facts targets must be fresh; do not overwrite a previous run.
+
+```powershell
+function Invoke-WP36PSeatRun {
+    param([string]$Id, [string[]]$UvArgs, [switch]$UsesClassMap)
+    $runRoot = Join-Path (Get-Location) 'work/wp3.6p/seat-turn8'
+    New-Item -ItemType Directory -Force $runRoot | Out-Null
+    $runLog = Join-Path $runRoot ($Id + '.log')
+    $runFacts = Join-Path $runRoot ($Id + '.json')
+    if ((Test-Path -LiteralPath $runLog) -or (Test-Path -LiteralPath $runFacts)) {
+        throw 'STOP: use fresh run identifiers'
+    }
+    if ($UsesClassMap) {
+        $mapHash = (Get-FileHash -Algorithm MD5 -LiteralPath 'work/wp3.6p/class-map.json').Hash
+        if ($mapHash -ne '07ef683ee2b5a5275a31cdc2597f2fbd') { throw 'STOP: class map mismatch' }
+    }
+    $runDrive = [System.IO.DriveInfo]::new((Get-Location).Drive.Root)
+    $freeBefore = $runDrive.AvailableFreeSpace
+    if ($freeBefore -lt 20000000000) { throw 'STOP: below 20 GB free' }
+    $runAt = [DateTime]::UtcNow.ToString('o')
+    $runTimer = [Diagnostics.Stopwatch]::StartNew()
+    & uv @UvArgs *> $runLog
+    $runExit = $LASTEXITCODE
+    $runTimer.Stop()
+    $runDrive = [System.IO.DriveInfo]::new((Get-Location).Drive.Root)
+    [ordered]@{
+        id = $Id; command = (@('uv') + $UvArgs); measured_at_utc = $runAt
+        exit = $runExit; wall_seconds = $runTimer.Elapsed.TotalSeconds
+        disk_free_before_bytes = $freeBefore
+        disk_free_after_bytes = $runDrive.AvailableFreeSpace
+    } | ConvertTo-Json -Depth 4 | Set-Content -Encoding ascii -LiteralPath $runFacts
+    if ($runExit -ne 0) { throw ('STOP: run failed: ' + $Id) }
+}
+```
+
+1. **5b orientation:** planning 10-30 minutes (not a measurement), 62 HEICs;
+   needs the class map. Return per-class pass/inconclusive/fail counts, named
+   inconclusives and thumbnail counts, not raw metadata. Nonzero is a STOP for
+   review; the tool itself continues only ruled discrimination inconclusives.
+
+```powershell
+Invoke-WP36PSeatRun -Id '5b' -UsesClassMap -UvArgs @('run', 'python', 'tools/photo_verify.py', 'orientation', '--class-map', 'work/wp3.6p/class-map.json', '--name', 'wp3.6p-5b')
+```
+
+2. **Q4 footage node:** planning 1-3 minutes, four named HEICs; no class map.
+   Run at the seat, with its unrestricted temp handling (no sandbox shim).
+   It must execute and pass, not skip, when footage is available. Keep basetemp.
+
+```powershell
+Invoke-WP36PSeatRun -Id 'q4' -UvArgs @('run', 'pytest', '-q', 'tests/test_photo_verify.py::test_owner_heic_orientation_four_irot_classes', '--basetemp=work/wp3.6p/seat-q4-tmp', '-p', 'no:cacheprovider')
+```
+
+3. **5c-8 export:** planning 3-8 minutes, seven representatives; needs class
+   map. Neutral is intrinsic to this subcommand; default device, no force flag.
+   Return V5/D53/V9 and bit-depth/error/device facts by each of seven classes.
+   Successful PNGs are measured/hashed then removed (none retained at 8 bits).
+
+```powershell
+Invoke-WP36PSeatRun -Id '5c-8' -UsesClassMap -UvArgs @('run', 'python', 'tools/photo_verify.py', 'export', '--class-map', 'work/wp3.6p/class-map.json', '--name', 'wp3.6p-5c-8', '--bit-depth', '8', '--representatives-only')
+```
+
+4. **5c-16 export, EXCLUSIVE:** planning 45-75 minutes from R0's one-photo
+   37.14 s, not a total timing claim. Needs class map; all 73, intrinsic neutral,
+   default device. Open/close the window with CHARC at dispatcher seat; no other
+   heavy work, including WP4.6. Keep seven successful representatives; other
+   successful PNGs removed. Failed-check diagnostic PNGs retained. Return all
+   seven class rows separately; no Z/M pooling. Return safe counts and EXIT.
+
+```powershell
+Invoke-WP36PSeatRun -Id '5c-16' -UsesClassMap -UvArgs @('run', 'python', 'tools/photo_verify.py', 'export', '--class-map', 'work/wp3.6p/class-map.json', '--name', 'wp3.6p-5c-16', '--bit-depth', '16')
+```
+
+5. **5d memory, EXCLUSIVE:** planning 5-20 minutes per leg (CPU defaults may
+   be longer; the neutral timing is not its estimate). Needs class map for both.
+   Same largest-size IMG_6690.HEIC, c3 DEFAULTS, fresh runner each time. Keep
+   exclusive scheduling through both legs; record conditions/moment. Return
+   estimate, independently sampled pre-run free/total, actual reason, sampled
+   tree RSS/optional individual OS peak, device-wide baseline/peak, cadence,
+   active counts/errors and limits, retaining the staged #4/#5/#6 limitations.
+   Default leg first; force-CPU leg is mandatory regardless of first selection.
+
+```powershell
+Invoke-WP36PSeatRun -Id '5d-default' -UsesClassMap -UvArgs @('run', 'python', 'tools/photo_verify.py', 'memory', '--class-map', 'work/wp3.6p/class-map.json', '--name', 'wp3.6p-5d-default', '--file', 'IMG_6690.HEIC', '--bit-depth', '16', '--exclusive')
+Invoke-WP36PSeatRun -Id '5d-cpu' -UsesClassMap -UvArgs @('run', 'python', 'tools/photo_verify.py', 'memory', '--class-map', 'work/wp3.6p/class-map.json', '--name', 'wp3.6p-5d-cpu', '--file', 'IMG_6690.HEIC', '--bit-depth', '16', '--exclusive', '--force-cpu')
+```
+
+All requests use the default config (no alternate-config #7 case), no
+beside-source target, and only Phone-relative names appear above. Cell did not
+read class-map.json; the dispatcher's supplied md5 is the request precondition.
+Every seat run needs command/counts/EXIT/wall/free-before/free-after in the
+seat-run table. Stop on a refused/unreadable photo, actual defect or unexpected
+AD-24 result; no source fix is owned. No scene judgement is added.
+
+Before reading B's findings, the dispatcher must prove B's execution path with
+one `^ succeeded`-style receipt. B must EXECUTE the final synthetic selection,
+the planted-reader ICC control (test_r2_source_icc_is_independent_of_reader),
+and the ICC-presence class checks (test_r3_jpeg_icc_class_mismatch_is_refused
+and test_r3_jpeg_icc_class_positive), at least. A refused-execution B is not a
+returned B: repair the execution path, rerun B, notify CHARC. The cell's green
+runs and forthcoming owner runs do not substitute for that B condition.
+No further Reviewer A pass is requested by this ruled terminating clean-up.
+
 ## Seat-run ledger
 
 | Run | Command / scope | Counts | EXIT | Wall time | Free disk before / after | Evidence / conditions |
@@ -1692,13 +1966,14 @@ Supporting scope/diff evidence: final-scope.log and final-diff-check.log.
 | 4 / Reviewer A round 1 adjudication | 114,259 tokens (dispatcher reading after turn 4; FRESH session) | Ledger committed f2396b0e; 16 dispositions; no remediation; R1-QA/QB ruled before turn 5 |
 | 5 / Reviewer A round 1 remediation | 178,999 tokens (dispatcher reading after turn 5) | 13 tool fix groups plus RED/GREEN controls; committed 7a3810af; #16 Limit staged in ledger; all light checks green; A2 dispatched on turn 6 |
 | 6 / Reviewer A round 2 adjudication | 101,571 tokens (dispatcher reading after turn 6; transcript context compaction) | Adjudication committed 081f851c; 10 dispositions, 21 passing probes; R2-QA ruled before turn 7; turn-5 reading 178,999 was before compaction |
-| 7 / Reviewer A round 2 remediation | PENDING dispatcher reading | 4 tool fix groups plus RED/GREEN controls, 1 test-only group; 87 light cases pass; 5 Limit/report lines staged; YIELD for A3 |
+| 7 / Reviewer A round 2 remediation | 187,455 tokens (dispatcher reading; session 2 retired) | 4 tool fix groups plus RED/GREEN controls, 1 test-only group; 87 light cases pass; 5 Limit/report lines staged; YIELD for A3 |
+| 8 / Reviewer A round 3 adjudication and terminating clean-up | PENDING dispatcher reading; fresh session 3 | 9 advisories adjudicated; 3 tool fix groups with RED/GREEN controls; 102 light cases pass; conditional A convergence; YIELD for seat runs and executing B |
 
 Evaluate near 200K; stop at a step boundary near 250K per this dispatch.
 The supplied readings are 178,999 after turn 5 and 101,571 after turn 6,
 with transcript context compaction between them. Evaluated at this remediation
 boundary; this turn ends here as dispatched. No current cumulative token number
-is invented; the dispatcher fills the turn-7 row from its reading.
+is invented; turn 7 is now supplied as 187,455 and the dispatcher fills turn 8.
 Historical turn-1 validation was limited to the ledger's ASCII/LF and owned-file diff.
 Observed validation: PASS for ASCII, LF, final newline, no trailing whitespace,
 both embedded Python RUN REQUEST snippets parsing, seven-class example JSON

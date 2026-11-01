@@ -1487,3 +1487,159 @@ def test_r2_overlapping_sample_completions_keep_chronological_cadence(monkeypatc
     assert cadence["min"] == cadence["mean"] == cadence["max"] == 0.5, (
         "completion order corrupted chronological sample gaps"
     )
+
+
+# Reviewer A round 3 terminating clean-up controls.
+@pytest.mark.parametrize(
+    "label,fixture,observed",
+    [
+        ("JPG-A", "jpeg-gradient-none", "JPG-Z/M"),
+        ("JPG-Z", "jpeg-gradient-display-p3", "JPG-A"),
+        ("JPG-M", "jpeg-gradient-display-p3", "JPG-A"),
+    ],
+)
+def test_r3_jpeg_icc_class_mismatch_is_refused(
+    configured, tmp_path, capsys, sample, label, fixture, observed
+):
+    config, _ = configured
+    _, classes = _class_map(tmp_path)
+    name = classes[label]["representative"]
+    shutil.copyfile(sample(fixture), config.footage_path / "Phone" / name)
+    status, _ = _r1_cli(config, tmp_path, "export", lambda c: [c[label]["representative"]])
+    record = json.loads(capsys.readouterr().out)["records"][0]
+    assert status == 1, "ICC-mislabelled JPEG was pooled into its declared class"
+    assert record["file"] == name and record["class"] == label
+    assert record.get("observed_class") == observed, "refusal omitted both class facts"
+    assert record["failed_checks"] == ["class_layout"]
+
+
+@pytest.mark.parametrize(
+    "label,fixture",
+    [
+        ("JPG-A", "jpeg-gradient-display-p3"),
+        ("JPG-Z", "jpeg-gradient-none"),
+        ("JPG-M", "jpeg-gradient-none"),
+    ],
+)
+def test_r3_jpeg_icc_class_positive(sample, label, fixture):
+    assert pv._owner_class_matches(sample(fixture), label)
+
+
+@pytest.mark.parametrize("damage", ["nan", "rgba", "runtime"])
+def test_r3_orientation_product_failure_labels(sample, configured, monkeypatch, damage):
+    _, guard = configured
+    original = pv.read_photo
+
+    def broken(path):
+        if damage == "runtime":
+            raise RuntimeError("private synthetic read error")
+        image, meta = original(path)
+        pixels = image.pixels.copy()
+        if damage == "nan":
+            pixels[0, 0, 0] = np.nan
+        else:
+            pixels = np.concatenate([pixels, pixels[:, :, :1]], axis=2)
+        return replace(image, pixels=pixels), meta
+
+    monkeypatch.setattr(pv, "read_photo", broken)
+    try:
+        record = pv.verify_orientation(sample("heic-ad24-both"), guard, photo_class="HEIC-270")
+    except RuntimeError:
+        pytest.fail("unexpected product-read exception escaped its step")
+    expected = "product_read_failed" if damage == "runtime" else "product_pixels_failed"
+    assert record.get("failure_code") == expected, "product failure blamed on oracle or runner"
+    assert record["failed_checks"] == (["read_failed"] if damage == "runtime" else [expected])
+    assert not record.get("orientation_ok", False)
+
+
+@pytest.mark.parametrize(
+    "step,code",
+    [
+        ("ffmpeg_decode", "oracle_failed"),
+        ("compare_poses", "orientation_comparison_failed"),
+    ],
+)
+def test_r3_orientation_step_failure_labels(sample, configured, monkeypatch, step, code):
+    _, guard = configured
+
+    def broken(*args, **kwargs):
+        raise ValueError("private synthetic step error")
+
+    monkeypatch.setattr(pv, step, broken)
+    record = pv.verify_orientation(sample("heic-ad24-both"), guard, photo_class="HEIC-270")
+    assert record.get("failure_code") == code, "comparison failure blamed on oracle"
+    assert record["failed_checks"] == [code]
+
+
+@pytest.mark.parametrize("step", ["_png_metadata", "read_photo"])
+def test_r3_output_parse_failure_label(sample, configured, monkeypatch, step):
+    _, guard = configured
+    original = getattr(pv, step)
+
+    def broken(path):
+        if step == "_png_metadata" or Path(path).suffix.lower() == ".png":
+            raise ValueError("private synthetic output parse error")
+        return original(path)
+
+    monkeypatch.setattr(pv, step, broken)
+    record = pv.verify_export(
+        sample("jpeg-gradient-none"), guard, photo_class="JPG-Z", bit_depth=8, force_cpu=True
+    )
+    assert record.get("failure_code") == "output_parse_failed", "output parse blamed on runner"
+    assert record["runner_exit"] == 0 and record["retained"]
+    assert record["failed_checks"] == ["output_parse_failed"]
+    assert not record["v5_ok"] and not record["v9_ok"] and not record["d53_ok"]
+
+
+def test_r3_orientation_command_unexpected_failure_label(
+    sample, configured, tmp_path, capsys, monkeypatch
+):
+    config, _ = configured
+    _, classes = _class_map(tmp_path)
+    name = classes["HEIC-0"]["representative"]
+    shutil.copyfile(sample("heic-ad24-neither"), config.footage_path / "Phone" / name)
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("private synthetic orientation error")
+
+    monkeypatch.setattr(pv, "verify_orientation", broken)
+    status, _ = _r1_cli(config, tmp_path, "orientation", lambda c: [name])
+    record = json.loads(capsys.readouterr().out)["records"][0]
+    assert status == 1 and record.get("failure_code") == "orientation_failed", (
+        "orientation command exception blamed on runner"
+    )
+    assert record["failed_checks"] == ["orientation_failed"]
+
+
+def test_r3_orientation_explicit_jpeg_is_refused(sample, configured, tmp_path, capsys, monkeypatch):
+    config, _ = configured
+    _, classes = _class_map(tmp_path)
+    heic = classes["HEIC-0"]["representative"]
+    jpeg = classes["JPG-Z"]["representative"]
+    shutil.copyfile(sample("heic-ad24-neither"), config.footage_path / "Phone" / heic)
+    shutil.copyfile(sample("jpeg-gradient-none"), config.footage_path / "Phone" / jpeg)
+    seen = []
+    monkeypatch.setattr(
+        pv,
+        "verify_orientation",
+        lambda *a, **k: (
+            seen.append(a[0].name)
+            or {
+                "file": a[0].name,
+                "class": k["photo_class"],
+                "read_ok": True,
+                "orientation_ok": True,
+                "failed_checks": [],
+            }
+        ),
+    )
+    status, _ = _r1_cli(config, tmp_path, "orientation", lambda c: [heic, jpeg])
+    summary = json.loads(capsys.readouterr().out)
+    assert status == 2 and not seen, "explicit JPEG was silently skipped"
+    record = summary["records"][0]
+    assert record["file"] == jpeg and record["class"] == "JPG-Z"
+    assert (
+        record.get("refusal_reason")
+        == "orientation requires HEIC; explicitly selected JPEG refused"
+    )
+    assert record["failed_checks"] == ["invalid_request"]

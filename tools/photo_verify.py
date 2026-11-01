@@ -88,6 +88,10 @@ _CHECKS = frozenset(
     {
         "read_failed",
         "oracle_failed",
+        "product_pixels_failed",
+        "orientation_comparison_failed",
+        "orientation_failed",
+        "output_parse_failed",
         "orientation_upright",
         "orientation_discrimination",
         "orientation_size",
@@ -198,6 +202,8 @@ _ENUMS = {
     "command": {"orientation", "export", "memory"},
     "class": set(_CLASSES),
     "candidate_group": {"none", "Z", "M"},
+    "observed_class": set(_CLASSES) | {"JPG-Z/M", "png", "tiff", "unknown"},
+    "refusal_reason": {"orientation requires HEIC; explicitly selected JPEG refused"},
     "source_format": {"heic", "jpeg", "png", "tiff"},
     "primaries": {"bt709", "display-p3", "bt2020", "unknown"},
     "transfer": {"srgb", "bt709", "unknown"},
@@ -216,6 +222,11 @@ _ENUMS = {
         "invalid_request",
         "output_refused",
         "thumbnail_unavailable",
+        "product_read_failed",
+        "product_pixels_failed",
+        "orientation_comparison_failed",
+        "orientation_failed",
+        "output_parse_failed",
     },
 }
 _CPU_REASONS = {
@@ -656,25 +667,39 @@ def verify_orientation(
         record, image, _, _ = _base(source, photo_class)
     except (PhotoReadError, OSError, ValueError):
         return _failure(source, photo_class, "unreadable", "read_failed")
+    except Exception:
+        return _failure(source, photo_class, "product_read_failed", "read_failed")
     record["oracle_kind"] = "ffmpeg-default"
     record["command"] = "orientation"
-    try:
-        reference = ffmpeg_decode(source, folder / "oracle.png", guard)
-        record["oracle_size"] = [reference.shape[1], reference.shape[0]]
-        if image.pixels.shape != reference.shape:
-            record.update(
-                orientation_ok=False,
-                orientation_status="failed",
-                failed_checks=["orientation_size", "orientation_upright"],
-            )
+    failure = None
+    if image.pixels.ndim != 3 or image.pixels.shape[2] != 3 or not np.isfinite(image.pixels).all():
+        failure = "product_pixels_failed"
+    else:
+        try:
+            reference = ffmpeg_decode(source, folder / "oracle.png", guard)
+        except OutputRefusedError:
+            raise
+        except Exception:
+            failure = "oracle_failed"
         else:
-            record.update(compare_poses(image.pixels * 255, reference, max_side=max_side))
-    except (OSError, ValueError, subprocess.SubprocessError):
+            record["oracle_size"] = [reference.shape[1], reference.shape[0]]
+            if image.pixels.shape != reference.shape:
+                record.update(
+                    orientation_ok=False,
+                    orientation_status="failed",
+                    failed_checks=["orientation_size", "orientation_upright"],
+                )
+            else:
+                try:
+                    record.update(compare_poses(image.pixels * 255, reference, max_side=max_side))
+                except Exception:
+                    failure = "orientation_comparison_failed"
+    if failure is not None:
         record.update(
             orientation_ok=False,
             orientation_status="failed",
-            failure_code="oracle_failed",
-            failed_checks=["oracle_failed"],
+            failure_code=failure,
+            failed_checks=[failure],
         )
     witness: Record = {"available": False}
     try:
@@ -1027,8 +1052,16 @@ def verify_export(
         )
         try:
             _export_checks(record, image, meta, raw, output, bit_depth, source)
-        except (OSError, ValueError, PhotoReadError, zlib.error):
-            record.update(v5_ok=False, v9_ok=False, d53_ok=False, failed_checks=["runner_failed"])
+        except OutputRefusedError:
+            raise
+        except Exception:
+            record.update(
+                v5_ok=False,
+                v9_ok=False,
+                d53_ok=False,
+                failure_code="output_parse_failed",
+                failed_checks=["output_parse_failed"],
+            )
         record["retained"] = keep or bool(record["failed_checks"])
         if not record["retained"]:
             guard.check(output).unlink()
@@ -1665,6 +1698,13 @@ def print_summary(summary: Mapping[str, Any]) -> None:
     print(json.dumps(clean, ensure_ascii=True, allow_nan=False))
 
 
+class _SelectionRefusedError(ValueError):
+    def __init__(self, source: Path, label: str) -> None:
+        self.source = source
+        self.label = label
+        super().__init__("orientation requires HEIC")
+
+
 class _UsageError(ValueError):
     pass
 
@@ -1708,7 +1748,7 @@ def _selection(
         raise ValueError("unlisted input")
     phone = config.footage_path / "Phone"
     for label, group in mapping["classes"].items():
-        if args.command == "orientation" and not label.startswith("HEIC"):
+        if args.command == "orientation" and not requested and not label.startswith("HEIC"):
             continue
         for file in group["files"]:
             representative = file == group["representative"]
@@ -1725,12 +1765,21 @@ def _selection(
     return chosen
 
 
-def _owner_class_matches(source: Path, label: str) -> bool:
+def _observed_class(source: Path) -> str:
+    """Identify only the format facts that distinguish commissioned classes."""
     data = source.read_bytes()
     kind = detect_format(data)
-    if label.startswith("HEIC-"):
-        return kind == "heic" and (read_layout(data).irot or 0) == int(label[5:])
-    return kind == "jpeg"
+    if kind == "heic":
+        return f"HEIC-{read_layout(data).irot or 0}"
+    if kind == "jpeg":
+        profile, _ = _source_icc(source)
+        return "JPG-A" if profile is not None else "JPG-Z/M"
+    return kind or "unknown"
+
+
+def _owner_class_matches(source: Path, label: str) -> bool:
+    observed = _observed_class(source)
+    return observed == label or (label in {"JPG-Z", "JPG-M"} and observed == "JPG-Z/M")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1757,6 +1806,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         before = _disk_check(guard.root)
         mapping = load_class_map(args.class_map)
         selected = _selection(args, mapping, config)
+        if command == "orientation":
+            for source, label, _ in selected:
+                if not label.startswith("HEIC-"):
+                    raise _SelectionRefusedError(source, label)
         if command == "memory" and not args.exclusive:
             raise ValueError("memory requires exclusive window")
         if command == "orientation" and not 1 <= args.max_side <= 4096:
@@ -1783,6 +1836,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             try:
                 if not _owner_class_matches(source, label):
                     record = _failure(source, label, "invalid_request", "class_layout")
+                    record["observed_class"] = _observed_class(source)
                 elif command == "orientation":
                     record = verify_orientation(
                         source, run_guard, photo_class=label, max_side=args.max_side
@@ -1808,7 +1862,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             except OutputRefusedError:
                 raise
             except Exception:
-                record = _failure(source, label, "runner_failed", "runner_failed")
+                code = "orientation_failed" if command == "orientation" else "runner_failed"
+                record = _failure(source, label, code, code)
             records.append(record)
             if (record.get("failed_checks") or not record.get("read_ok")) and not (
                 record.get("orientation_status") == "inconclusive"
@@ -1822,6 +1877,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             and all(not r.get("failed_checks") and r.get("read_ok") for r in records)
             else 1
         )
+    except _SelectionRefusedError as refusal:
+        record = _failure(refusal.source, refusal.label, "invalid_request", "invalid_request")
+        record["refusal_reason"] = "orientation requires HEIC; explicitly selected JPEG refused"
+        records.append(record)
+        status = 2
     except OutputRefusedError:
         status = 3
     except Exception:  # never expose local-config paths or tag values through CLI tracebacks
