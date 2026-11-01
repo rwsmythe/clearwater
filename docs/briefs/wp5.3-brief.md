@@ -224,3 +224,17 @@ Codex turn 2 (RED) resumes on this post. Claude figure 84 % noted.
 > R3-7 (F7, advisory): ACCEPTED AS IS, documented. A BT.1886 -> sRGB conversion applied alike to both halves is a fair viewing aid for stills; add one sentence to the pack README and the page footer ("video stills are converted BT.1886 -> sRGB for display; both halves alike; the player's rendering differs") so the owner does not read a still's tone as the export's. No frame change.
 >
 > Rounds: round 4 (Claude pass) follows the remediation turn under the 92 % rule; Claude 89 % now. If 92 % is reached before round 4 can start, HOLD the pass (Codex turns continue). Round 5 remains the cap; convergence needs an executing pass.
+
+Reviewer A round 4 ruling (CHARC e4d56665, 2026-11-01T19:09:59Z, verbatim; binding)
+
+> RULING on ece255eb (WP5.3 Reviewer A round 4). PRIMARY: CHARC.
+>
+> R4-1: NOT the STOP; your recommendation is adopted. The STOP in my round-3 ruling was for a fourth loss path in the STATE OF RECORD (pack.json, the page, the sheet, the D65 denominator), because a fourth there would have meant the state model itself was wrong. The reviewer's independent re-audit confirms that state intact (replace-or-append only, pending from the catalogue, atomic writes), and R4-1 is a diagnostic sidecar rewritten whole. Round 4 is CONVERGED. Two conditions on the clean-up, so this class ends here:
+>   (a) the fix is the ONE rule applied to EVERY JSON file the pack writes, not to the excerpt record alone: the turn lists every `_json_write` call site in the ledger and classifies each as either "by-item record: replace-or-append, never shrinks" (pack.json, the excerpt records, any per-group record) or "derived view: regenerated whole from the state of record" (the page, the sheet, tally); a file that is neither is a defect. The excerpt record merges by item with a two-run RED row, as you wrote.
+>   (b) Reviewer B's prompt names this classification as a claim to check (every write site, both classes), executing a two-manifest sequence on a fixture state.
+> R4-2: CONCUR. Missing presets are pending: the header names it, `page` exits 2 (the same form as my R3-5), the AD-13 sentence appears only when the preset tables are present.
+> R4-3: CONCUR. `page` is read-only on the state; one lock file (exclusive create, loud refusal with the holder's pid and start time, removed on exit, stale lock = refusal with the instruction to delete it, never auto-broken) around every state-writing stage; one RED row that a second stage is refused while the lock is held.
+> R4-4: CONCUR. Collapse only path-like tokens (rooted, or separator + a known extension); RED rows from the four product strings and the three R3-6 path rows together, all in one parametrised test so the two rules are proved against each other.
+> Advisories R4-7, R4-8, R4-9, R4-10: IN, as you listed. R4-5 and R4-6: Limits in the report.
+>
+> Then Reviewer B (Claude, EXECUTING, 92 % rule; Claude 90 % now) on the final candidate, then the RUN REQUESTS in Q8 order (photos, presets, page, then clips; 25 GB free; never inside a window or a serial / fullclip leg; one heavy job at a time). Session 4 at 140,647 may take the clean-up; evaluate at ~200K as the Codex rule says.
