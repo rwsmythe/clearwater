@@ -4,12 +4,13 @@
 
 - Package: WP3.6P, CODEX lane, STRONG tier; CHARC's FINAL rulings govern.
 - Dispatch base verified: `c3bf602fe9ac94cd5df25499d97f3a2bc439bb72`.
-- Current boundary: turn 8, fresh session 3. Reviewer A round 3 adjudicated
-  and the CHARC-ruled terminating clean-up implemented in the owned tool/tests.
-  Dispatch head verified: `649b5662d8c983ce9dbd53c875e9437832e8de48`;
-  initial tracked status empty. Turn 7 was committed as `649b5662`.
-  Prior turns/rulings and their evidence remain historical records below.
-  No owner photo was opened by the cell in any turn.
+- Current boundary: turn 9, session 3. CHARC-ruled odd-dimension 4:2:0
+  oracle size equivalence implemented with both crop edges and RED/GREEN tests.
+  Dispatch head verified: `a8c9778d07bcdf3e8391351b629869550ade48f3`;
+  initial tracked status empty. Turn 8 committed as `a8c9778d` (0 CR, supplied).
+  Seat 5b stopped at the oracle-size limit; supplied evidence/ruling below.
+  Prior turns/rulings remain historical records. No owner photo was opened by
+  the cell in any turn.
 - `uv sync`: already run by the dispatcher before dispatch, as stated in the
   binding turn-1 instructions. Not repeated: this sandbox cannot reach the index.
 - Initial `git status --short`: empty. The existing isolated worktree is retained.
@@ -23,8 +24,9 @@
   R1-QA/QB `d9133089b58091d8`, R2-QA `688ef40fca871a0d` and replacement Q3
   `e40b0d7b06ee9af8` remain governing. No product defect is asserted from a
   planted instrument control. Report wording / Limits are staged below.
-- No real-photo acceptance claim, new owner measurement, returned Reviewer B
-  or gate pass is made at this boundary. Remaining seat requests are NOT RUN
+- No real-photo acceptance claim, cell hardware measurement, returned Reviewer B
+  or gate pass is made at this boundary. Seat 5b evidence is supplied, not read
+  or rerun by the cell. Remaining seat requests and the 5b restart are NOT RUN
   by this cell. The final report is still owed after those results arrive.
 
 ## Round-0 source map on c3bf602
@@ -1943,6 +1945,160 @@ returned B: repair the execution path, rerun B, notify CHARC. The cell's green
 runs and forthcoming owner runs do not substitute for that B condition.
 No further Reviewer A pass is requested by this ruled terminating clean-up.
 
+## Turn 9: odd-width size equivalence (CHARC 2aaa7e0a)
+
+Dispatch head a8c9778d verified, tracked status empty. Dispatcher-supplied turn-8
+seat checks: format --check 2 files already formatted, ruff all passed, light
+pytest 102 passed / 1 deselected. These are supplied receipts, not new cell runs.
+Depth after turn 8 is **152,054 tokens, session 3**; depth table updated. This
+turn bundles RED tests and the ruled fix in one logical change; no commit by
+cell. No footage/class-map/local-config file was opened.
+
+### Supplied seat STOP and governing ruling
+
+Seat 5b at 2026-11-01T09:22:07Z: selected 62, attempted 17, complete false.
+All attempted were HEIC-0: 7 discriminating passes, 9 inconclusive (pose 1
+wins, nearest mirror under 10/255; discrimination-only), 1 oracle_failed on
+IMG_6764.HEIC. Its stored/product size is 3213x5712, grid primary, ispe
+3213x5712, irot 0; FFmpeg 9.0.2 default composition delivered 3212x5712,
+empty stderr. The old strict-size check correctly halted. EXIT 1, wall 52.6 s,
+free 189,399,732,224 -> 188,959,887,360 bytes. This is supplied evidence only;
+the cell did not inspect any owner input or stopped-run artifact. Row below
+records the counts and name, without private metadata or a source path.
+
+CHARC 2aaa7e0a705f2191 (2026-11-01T09:25:03Z), verbatim:
+
+> RULING on 88f61e06 (WP3.6P 5b STOP, IMG_6764 odd width), PRIMARY: CHARC. (a) GRANTED with one addition; oracle LIMIT confirmed as the reading (FFmpeg rounds an odd 4:2:0 composed dimension down by one; the product keeps the HEIF's ispe 3213: nothing in the product is implicated).
+>
+> (a) as recommended: the narrow size equivalence applies ONLY when the product dimension is odd, the source chroma is 4:2:0, FFmpeg's matching dimension is exactly ONE less and the other dimension is equal; any other difference still fails as today. ADDITION: which edge FFmpeg dropped is not known a priori, so the common-region crop of the product image is tried at BOTH alignments (drop the first column/row, drop the last), the pose comparison is taken on the alignment with the smaller pose-1 distance, and the record carries `oracle_size_rounded: true` AND `oracle_crop_edge: first|last`; the per-class counts report both. The fixture (pillow-heif, odd-width 4:2:0 grid) proves: the equivalence passes, a 2-pixel difference fails, a tile-sized difference fails, and the recorded edge matches the planted construction. One RED-first turn in session 3 (152,054), then 5b re-runs from the start.
+>
+> Characterisation (9 of 17 irot-0 INCONCLUSIVE, mirror pose within 10/255): recorded, not a STOP, per QB. For my AD-24 status at the accept the report states, per irot class: discriminating photos (pass), inconclusive, oracle-rounded, failed, with the sentence that an inconclusive is a limit of the scene's texture against the oracle's two-pose discrimination, never a pass and never a product finding. If the irot 90 / 180 / 270 classes also come out mostly inconclusive, tell me in the 5b close post: I may then ask for ONE extra discriminator (an asymmetric-content check on the EXIF thumbnail witness) as a follow-on, not inside this package.
+
+### RED first on unchanged a8c9778d
+
+Evidence root work/wp3.6p/r9/. Test-local pillow-heif CtxEncode HEVC quality
+100 / chroma 420 / tile_size 128 creates a real grid primary at 257x192.
+Seeded asymmetric grayscale RGB content makes either one-pixel shift very
+visible without chroma-conversion noise. Assertions independently require
+primary grid and source chroma 420; these are not hvc1 or RGB-format guesses.
+A quarter-turn control makes the delivered dimensions 192x257, covering a
+lost row as well as a column. Every fixture/output is synthetic and guarded.
+
+Initial light characterisation (probe.log / probe-facts.json): FFmpeg EXIT 0
+and empty stderr; outputs 256x192 / 192x256. The generated-content independent
+crop means are **last 0.137980/255, first 74.655111/255** for both orientations.
+This establishes LAST for these fixtures only; the tool never assumes that
+edge on another file. No owner-photo edge has been measured by the cell.
+
+Added tests before editing tools/photo_verify.py, then executed:
+
+`PYTHONPATH=scripts uv run pytest -q tests/test_photo_verify.py -k r9_ --basetemp=work/wp3.6p/r9/red-tmp -p sandbox_mkdir_shim -p no:cacheprovider -o junit_family=legacy --junitxml=work/wp3.6p/r9/red.xml`
+
+Observed pytest EXIT **1**, **7 failed, 7 passed, 103 deselected in 7.51s**;
+red.exit / red.log / red.xml / red-lines.txt. The seven passing negative
+controls already fail closed on the baseline; they are not claimed REDs.
+Common node prefix below is tests/test_photo_verify.py::.
+
+| Node(s), on a8c9778d | RED failure line | Final GREEN |
+|---|---|---|
+| test_r9_real_odd_420_grid_uses_last_edge[1-1], [6-0] | AssertionError: odd 4:2:0 grid refused as oracle_failed | Both PASSED, real FFmpeg, recorded edge last |
+| test_r9_both_crop_edges_before_all_poses[first-1-1], [first-0-6], [last-1-1], [last-0-6] | AssertionError: permitted one-pixel crop did not compare | All 4 PASSED; planted first/last on columns/rows, all 8 scores, pose 1 winner, class counts |
+| test_r9_unrounded_summary_and_projection | AssertionError: assert (True and None is False) | PASSED; exact-size read has rounded false, zero first/last counts; invalid flag/edge excluded |
+
+Supporting controls test_r9_decode_rejects_larger_size_difference[two-pixels]
+and [tile] run the real FFmpeg decode, then independently crop its emitted
+PNG to 255x192 or 128x128 before its header is checked. Both remain
+oracle_failed before pose comparison; no size equivalence is recorded.
+The five original test_r9_near_misses_still_fail cases (444 / even / two-axes /
+larger / unknown-chroma) retain orientation_size failures for independently
+planted oracle arrays. They passed before and after the fix.
+
+### Ruled implementation and owner verification loop
+
+- Source transformed primary size still comes from the independent fixture-side
+  box parser, applying only the same existing irot dimension swap. FFmpeg
+  command/default stream/decode pixels are unchanged. The header gate admits
+  only a single exactly-one-short odd dimension with its other dimension equal
+  AND primary source chroma reported as integer 420 by pillow-heif. Absent,
+  different or unverifiable chroma gets no equivalence. No source RGB/chroma
+  inference, resize, padding or general size tolerance is introduced.
+- Full product size must still match that independent primary size before the
+  crop exception can apply. Both first-edge and last-edge common regions of
+  the product are compared with the delivered oracle. Each crop is made BEFORE
+  its complete eight-pose comparison. Select the alignment by smaller pose-1
+  mean alone, preserving all original bounds, other-pose scores, shape
+  mismatches and pass/inconclusive/failure policy. Ties deterministically keep
+  first. The thumbnail remains a non-gating witness and is unchanged.
+- Records include allow-listed boolean oracle_size_rounded and, for an applied
+  equivalence, finite enum oracle_crop_edge (first/last). Each class row adds
+  oracle_size_rounded_count and oracle_crop_edge_counts with first/last counts.
+  Reprojection/stdout derives these counts from the same safe records. Z and M
+  remain separate. Original product and oracle dimensions remain in the record.
+- Verification suspect: a product padded from an even source size to an odd
+  size could otherwise borrow the oracle exception. Added
+  test_r9_near_misses_still_fail[product-extra] as an independent adversarial
+  control; it passes with orientation_size, not an equivalence. This is a new
+  supporting control, not a claimed baseline RED or a found product defect.
+- Verification suspect: permitting one crop edge could hide the other or
+  alter pose discrimination. Rejected on the four planted edge/axis cases,
+  all-eight-score and fixed-bound assertions, and all prior orientation
+  controls. Both alignments are actually evaluated before min(pose-1).
+- Verification suspect: new diagnostic fields might publish arbitrary text.
+  Rejected by explicit bool/enum projection, its planted invalid-field test,
+  existing GPS/Make/path controls and final safe-JSON scan. No new EXIF value,
+  source path, dependency, product/source/interface or shared fixture change.
+
+Final pass traced both header and product size gates, crop-before-transform,
+pose-1 selection, all eight scores, per-class counts and privacy projection;
+then ran the final light checks. No additional issue found. No new review round,
+product defect, acceptance or owner orientation pass is claimed. Prior A3
+convergence remains conditional on an executing Reviewer B under 650bea20.
+
+### Final light checks
+
+All outputs captured under work/wp3.6p/r9/. PowerShell sets PYTHONPATH=scripts.
+
+| Check | Exact command | Observed result |
+|---|---|---|
+| Tests | PYTHONPATH=scripts uv run pytest -q tests/test_photo_verify.py --basetemp=work/wp3.6p/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not slow and not fullclip" -o junit_family=legacy --junitxml=work/wp3.6p/r9/final.xml | EXIT 0; 117 passed, 1 deselected in 17.98s; final-pytest.log |
+| Ruff | uv run ruff check tools/photo_verify.py tests/test_photo_verify.py | EXIT 0; All checks passed!; final-ruff.log |
+| Strict typing | uv run mypy | EXIT 0; Success: no issues found in 147 source files; final-mypy.log |
+
+15 new cases supplement the prior 102; ONE footage node remains deselected.
+JUnit records both real last-edge facts in final-edge-facts.json. Every new
+case is synthetic/parallel-leg. Existing exports force CPU, memory readings
+are stubs; no owner/GPU/heavy/exclusive measurement ran. Formatting applied
+locally (2 files reformatted); dispatcher format --check is still owed for
+this tree. No test warning; existing uv environment-mismatch notice unchanged.
+No full suite, B or two-leg gate run by the cell.
+
+Observed final scope/privacy validation: EXIT 0, final-validation.log.
+Exact three-file tracked scope; ASCII/LF/final newline/whitespace; Python
+syntax; ruling/depth/seat entries; seven baseline REDs; 117 final passing
+cases; both real last-edge facts; tool/ledger and 98 safe JSON artifacts scanned
+without planted private markers or synthetic input roots. git diff --check
+EXIT 0 (diff-check.log). Report remains unwritten pending owner-run results.
+
+### Report staging and restart handoff
+
+Per irot class the later report must show discriminating passes, inconclusive,
+oracle-rounded and failed, plus first/last edge counts. Rounded is an
+independent flag and may overlap a pose outcome; never add it as a separate
+pass. Use: "An inconclusive is a limit of the scene's texture against the
+oracle's two-pose discrimination, never a pass and never a product finding."
+All eight pose scores remain measured; the mirror is the cited nearest-other
+pose on these supplied inconclusives. If the restarted 90/180/270 classes are
+also mostly inconclusive, tell CHARC in the dispatcher's 5b close post. Any
+extra asymmetric thumbnail discriminator is a possible follow-on, not owned
+or implemented here. AD-24 status stays CHARC's accept decision.
+
+**5b unchanged, re-run from the start.** No flags/selection/threshold change to
+request 1. Use fresh run identifiers/output name under the existing
+no-overwrite rule; keep the stopped evidence. Needs the same class map with
+supplied md5 07ef683ee2b5a5275a31cdc2597f2fbd, not read by the cell. No request
+2-5 change. Remaining seat runs/report/executing B/two-leg gate remain owed.
+No new STOP or question. YIELD after this one logical turn as ruled.
+
 ## Seat-run ledger
 
 | Run | Command / scope | Counts | EXIT | Wall time | Free disk before / after | Evidence / conditions |
@@ -1950,7 +2106,8 @@ No further Reviewer A pass is requested by this ruled terminating clean-up.
 | R0-O | Historical request above, psutil str fix; two HEICs | 2 probed; 61 HEVC streams each; mapped stream 0 was a tile | 0 | 2 s | 189,229,633,536 / 189,228,720,128 bytes | 2026-10-30T04:42:08Z; oracle-facts.json; mapped tile pose scores VOID |
 | R0-E | Historical request above, psutil str fix; IMG_6690 neutral PNG16/default device | done 1, others 0; one PNG 51,873,583 bytes; GPU | 0 | 37.14 s | 189,175,160,832 / 189,113,147,392 bytes | 2026-10-30T04:43:51Z; export-facts.json; dispatcher-seat timing observation |
 | 5a | uv run python tools/photo_check.py --name wp3.6p-io; configured folder, all 73 | photos 73; read_ok 73; refused 0; round_trip_problems 0; verdict ok 73; gps_kept and maker_note_kept each 73/73 | 0 | 309 s | 188,759,597,056 / 186,750,087,168 bytes | Dispatcher supplied: 2026-10-30T05:20:40Z-05:25:50Z; work/wp3.6/photo-check/wp3.6p-io/ in main tree; unchanged instrument's existing root; NOT opened/rerun by cell |
-| 5b | photo_verify orientation, all 62 HEICs | PENDING | NOT RUN | PENDING | PENDING | FFmpeg DEFAULT primary; thumbnail is recorded witness |
+| 5b / stopped | Invoke-WP36PSeatRun -Id 5b; photo_verify orientation, selected 62 | attempted 17, all HEIC-0: 7 passed, 9 inconclusive (discrimination only), 1 failed IMG_6764.HEIC oracle_failed; complete false | 1 | 52.6 s | 189,399,732,224 / 188,959,887,360 bytes | Dispatcher seat, 2026-11-01T09:22:07Z; size limit, not product finding; not opened/rerun by cell; restart owed |
+| 5b / restart | Same orientation command, from start, fresh run identifiers | PENDING | NOT RUN | PENDING | PENDING | CHARC 2aaa7e0a size equivalence; thumbnail remains non-gating |
 | 5c-16 | photo_verify export, all 73, neutral/depth 16 | PENDING | NOT RUN | PENDING | PENDING | EXCLUSIVE window opened/closed to CHARC; WP4.6 cannot run heavy work; seven retained representative PNGs |
 | 5c-8 | photo_verify export, seven representatives, neutral/depth 8 | PENDING | NOT RUN | PENDING | PENDING | PNGs measured then removed by tool |
 | 5d-default | photo_verify memory, IMG_6690.HEIC/default device/c3 defaults | PENDING | NOT RUN | PENDING | PENDING | EXCLUSIVE; default processing, not neutral |
@@ -1967,13 +2124,15 @@ No further Reviewer A pass is requested by this ruled terminating clean-up.
 | 5 / Reviewer A round 1 remediation | 178,999 tokens (dispatcher reading after turn 5) | 13 tool fix groups plus RED/GREEN controls; committed 7a3810af; #16 Limit staged in ledger; all light checks green; A2 dispatched on turn 6 |
 | 6 / Reviewer A round 2 adjudication | 101,571 tokens (dispatcher reading after turn 6; transcript context compaction) | Adjudication committed 081f851c; 10 dispositions, 21 passing probes; R2-QA ruled before turn 7; turn-5 reading 178,999 was before compaction |
 | 7 / Reviewer A round 2 remediation | 187,455 tokens (dispatcher reading; session 2 retired) | 4 tool fix groups plus RED/GREEN controls, 1 test-only group; 87 light cases pass; 5 Limit/report lines staged; YIELD for A3 |
-| 8 / Reviewer A round 3 adjudication and terminating clean-up | PENDING dispatcher reading; fresh session 3 | 9 advisories adjudicated; 3 tool fix groups with RED/GREEN controls; 102 light cases pass; conditional A convergence; YIELD for seat runs and executing B |
+| 8 / Reviewer A round 3 adjudication and terminating clean-up | 152,054 tokens (dispatcher reading; session 3) | 9 advisories adjudicated; 3 tool fix groups with RED/GREEN controls; 102 light cases pass; conditional A convergence; YIELD for seat runs and executing B |
+| 9 / odd-width size equivalence, CHARC 2aaa7e0a | PENDING dispatcher reading; session 3 | 7 RED cases on a8c9778d; 15 new controls, 117 light passes; both crop edges and class counts; YIELD for 5b restart |
 
 Evaluate near 200K; stop at a step boundary near 250K per this dispatch.
 The supplied readings are 178,999 after turn 5 and 101,571 after turn 6,
 with transcript context compaction between them. Evaluated at this remediation
 boundary; this turn ends here as dispatched. No current cumulative token number
-is invented; turn 7 is now supplied as 187,455 and the dispatcher fills turn 8.
+is invented; turn 7 is 187,455 (session 2), turn 8 is 152,054 (session 3);
+the dispatcher fills turn 9. Evaluate again at the next step boundary near 200K.
 Historical turn-1 validation was limited to the ledger's ASCII/LF and owned-file diff.
 Observed validation: PASS for ASCII, LF, final newline, no trailing whitespace,
 both embedded Python RUN REQUEST snippets parsing, seven-class example JSON

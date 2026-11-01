@@ -129,6 +129,7 @@ _BOOL_FIELDS = frozenset(
         "icc_present",
         "icc_valid",
         "orientation_ok",
+        "oracle_size_rounded",
         "v5_ok",
         "d53_ok",
         "v9_ok",
@@ -208,6 +209,7 @@ _ENUMS = {
     "primaries": {"bt709", "display-p3", "bt2020", "unknown"},
     "transfer": {"srgb", "bt709", "unknown"},
     "oracle_kind": {"ffmpeg-default"},
+    "oracle_crop_edge": {"first", "last"},
     "orientation_status": {"passed", "inconclusive", "failed"},
     "rss_scope": {"tool-runner-tree-including-sampler-children"},
     "source_icc_origin": {"embedded", "nclx-srgb", "nclx-display-p3", "untagged", "unverifiable"},
@@ -331,6 +333,35 @@ def load_class_map(path: Path) -> Record:
     return dict(data)
 
 
+def _primary_size(source: Path) -> tuple[int, int]:
+    """Read the transformed primary dimensions independently of the product read."""
+    props = heif_primary_properties(source.read_bytes())
+    width, height = (int(value) for value in props["ispe"])
+    return (height, width) if props["irot"] in (90, 270) else (width, height)
+
+
+def _oracle_rounding_axis(
+    product_hw: tuple[int, int], oracle_hw: tuple[int, int], source: Path
+) -> int | None:
+    """Allow exactly one lost odd 4:2:0 dimension, with the other unchanged.
+
+    Returns the array axis to crop, or None for every other difference. Source
+    chroma is read from the HEIF primary metadata, never inferred from RGB.
+    """
+    axes = [
+        axis
+        for axis in (0, 1)
+        if product_hw[axis] % 2 == 1
+        and oracle_hw[axis] == product_hw[axis] - 1
+        and oracle_hw[1 - axis] == product_hw[1 - axis]
+    ]
+    if not axes:
+        return None
+    container = pillow_heif.open_heif(source)
+    chroma = container[container.primary_index].info.get("chroma")
+    return axes[0] if type(chroma) is int and chroma == 420 else None
+
+
 def ffmpeg_decode(source: Path, out_png: Path, guard: WriteGuard) -> Pixels:
     """Decode FFmpeg's default composed HEIC primary, without another transform.
 
@@ -343,16 +374,14 @@ def ffmpeg_decode(source: Path, out_png: Path, guard: WriteGuard) -> Pixels:
         RGB pixels in 0..255, exactly in FFmpeg's delivered pose.
 
     Raises:
-        ValueError: Decoding failed or did not deliver the primary dimensions.
+        ValueError: Decode failed or dimensions differ beyond the ruled odd-420 equivalence.
         OutputRefusedError: The output is outside the write guard.
     """
     guard.check(out_png)
     if out_png.exists():
         raise ValueError("oracle output exists")
     guard.check(out_png.parent).mkdir(parents=True, exist_ok=True)
-    props = heif_primary_properties(source.read_bytes())
-    width, height = props["ispe"]
-    expected = (height, width) if props["irot"] in (90, 270) else (width, height)
+    expected = _primary_size(source)
     args = [
         "ffmpeg",
         "-nostdin",
@@ -377,7 +406,13 @@ def ffmpeg_decode(source: Path, out_png: Path, guard: WriteGuard) -> Pixels:
     if done.returncode != 0:
         raise ValueError("oracle decode failed")
     with PILImage.open(out_png) as image:
-        if image.size != expected:
+        if (
+            image.size != expected
+            and _oracle_rounding_axis(
+                (expected[1], expected[0]), (image.height, image.width), source
+            )
+            is None
+        ):
             raise ValueError("oracle primary size mismatch")
         return np.asarray(image.convert("RGB")).copy()
 
@@ -671,6 +706,7 @@ def verify_orientation(
         return _failure(source, photo_class, "product_read_failed", "read_failed")
     record["oracle_kind"] = "ffmpeg-default"
     record["command"] = "orientation"
+    record["oracle_size_rounded"] = False
     failure = None
     if image.pixels.ndim != 3 or image.pixels.shape[2] != 3 or not np.isfinite(image.pixels).all():
         failure = "product_pixels_failed"
@@ -683,17 +719,49 @@ def verify_orientation(
             failure = "oracle_failed"
         else:
             record["oracle_size"] = [reference.shape[1], reference.shape[0]]
-            if image.pixels.shape != reference.shape:
-                record.update(
-                    orientation_ok=False,
-                    orientation_status="failed",
-                    failed_checks=["orientation_size", "orientation_upright"],
-                )
-            else:
-                try:
+            try:
+                if image.pixels.shape == reference.shape:
                     record.update(compare_poses(image.pixels * 255, reference, max_side=max_side))
-                except Exception:
-                    failure = "orientation_comparison_failed"
+                else:
+                    product_hw = (image.pixels.shape[0], image.pixels.shape[1])
+                    oracle_hw = (reference.shape[0], reference.shape[1])
+                    # A corrupted product size must not borrow the oracle's
+                    # exception. The full product size still matches ispe/irot.
+                    axis = (
+                        _oracle_rounding_axis(product_hw, oracle_hw, source)
+                        if _primary_size(source) == product_hw[::-1]
+                        and reference.ndim == 3
+                        and reference.shape[2] == 3
+                        else None
+                    )
+                    if axis is None:
+                        record.update(
+                            orientation_ok=False,
+                            orientation_status="failed",
+                            failed_checks=["orientation_size", "orientation_upright"],
+                        )
+                    else:
+                        candidates = []
+                        for edge in ("first", "last"):
+                            crop = [slice(None)] * 3
+                            crop[axis] = slice(1, None) if edge == "first" else slice(None, -1)
+                            # Crop in the delivered pose before each complete
+                            # eight-pose comparison, then choose pose-1 distance.
+                            comparison = compare_poses(
+                                image.pixels[tuple(crop)] * 255, reference, max_side=max_side
+                            )
+                            candidates.append((edge, comparison))
+                        edge, comparison = min(
+                            candidates,
+                            key=lambda item: (
+                                item[1]["upright_mean_255"]
+                                if item[1]["upright_mean_255"] is not None
+                                else math.inf
+                            ),
+                        )
+                        record.update(comparison, oracle_size_rounded=True, oracle_crop_edge=edge)
+            except Exception:
+                failure = "orientation_comparison_failed"
     if failure is not None:
         record.update(
             orientation_ok=False,
@@ -1614,6 +1682,14 @@ def summarise(
                 )
                 for r in group
             )
+        row["oracle_size_rounded_count"] = sum(r.get("oracle_size_rounded") is True for r in group)
+        row["oracle_crop_edge_counts"] = {
+            edge: sum(
+                r.get("oracle_size_rounded") is True and r.get("oracle_crop_edge") == edge
+                for r in group
+            )
+            for edge in ("first", "last")
+        }
         row["orientation_inconclusive_count"] = sum(
             r.get("orientation_status") == "inconclusive" for r in group
         )

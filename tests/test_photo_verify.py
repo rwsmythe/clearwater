@@ -1643,3 +1643,152 @@ def test_r3_orientation_explicit_jpeg_is_refused(sample, configured, tmp_path, c
         == "orientation requires HEIC; explicitly selected JPEG refused"
     )
     assert record["failed_checks"] == ["invalid_request"]
+
+
+# CHARC 2aaa7e0a: one-pixel odd 4:2:0 oracle equivalence, no wider tolerance.
+def _r9_odd_grid(guard, *, orientation=1, chroma="420", width=257, height=192):
+    stored = np.repeat(
+        np.random.default_rng(921).integers(16, 240, (height, width, 1), dtype=np.uint8),
+        3,
+        axis=2,
+    )
+    path = guard.check(guard.root / "odd-grid.heic")
+    encoder = CtxEncode(HeifCompressionFormat.HEVC, quality=100, chroma=chroma)
+    encoder.add_image(
+        (width, height),
+        "RGB",
+        stored.tobytes(),
+        image_orientation=orientation,
+        primary=True,
+        tile_size=128,
+        exif=spike.source_exif(orientation, width, height),
+    )
+    encoder.save(str(path))
+    container = pillow_heif.open_heif(path)
+    assert container[container.primary_index].info["chroma"] == int(chroma)
+    layout = pv.read_layout(path.read_bytes())
+    assert layout.is_grid and layout.item_type == "grid"
+    return path, stored if orientation == 1 else np.rot90(stored, -1)
+
+
+@pytest.mark.parametrize("orientation,axis", [(1, 1), (6, 0)])
+def test_r9_real_odd_420_grid_uses_last_edge(configured, orientation, axis, record_property):
+    _, guard = configured
+    source, known = _r9_odd_grid(guard, orientation=orientation)
+    record = pv.verify_orientation(
+        source, guard, photo_class="HEIC-0" if axis == 1 else "HEIC-270", max_side=4096
+    )
+    assert record.get("orientation_ok"), "odd 4:2:0 grid refused as " + str(
+        record.get("failure_code")
+    )
+    oracle = np.asarray(
+        PILImage.open(next(guard.root.rglob("oracle.png"))).convert("RGB"), dtype=float
+    )
+    first = np.take(known, range(1, known.shape[axis]), axis=axis).astype(float)
+    last = np.take(known, range(known.shape[axis] - 1), axis=axis).astype(float)
+    first_error, last_error = float(abs(first - oracle).mean()), float(abs(last - oracle).mean())
+    assert last_error < 6 and first_error > 10
+    assert record["oracle_size_rounded"] is True
+    assert record["oracle_crop_edge"] == "last", "real FFmpeg drop-edge disagrees with construction"
+    assert record["oracle_size"][1 - axis] == record["decoded_size"][1 - axis] - 1
+    record_property(
+        "odd_420_real_edge",
+        {"edge": "last", "first_mean_255": first_error, "last_mean_255": last_error},
+    )
+
+
+@pytest.mark.parametrize("axis,orientation", [(1, 1), (0, 6)])
+@pytest.mark.parametrize("edge", ["first", "last"])
+def test_r9_both_crop_edges_before_all_poses(configured, monkeypatch, axis, orientation, edge):
+    _, guard = configured
+    source, _ = _r9_odd_grid(guard, orientation=orientation)
+    image, _ = PhotoReader().read(source)
+    pixels = image.pixels * 255
+    indices = range(1, pixels.shape[axis]) if edge == "first" else range(pixels.shape[axis] - 1)
+    planted = np.take(pixels, indices, axis=axis)
+    monkeypatch.setattr(pv, "ffmpeg_decode", lambda *a: planted)
+    record = pv.verify_orientation(source, guard, photo_class="HEIC-0", max_side=4096)
+    assert record.get("orientation_ok"), "permitted one-pixel crop did not compare"
+    assert record.get("oracle_size_rounded") is True
+    assert record.get("oracle_crop_edge") == edge, "wrong planted crop edge selected"
+    assert len(record["scores_by_pose"]) == 8 and len(record["shape_mismatches"]) == 4
+    assert record["winning_pose"] == 1 and record["upright_mean_255"] < 0.01
+    assert record["nearest_other_mean_255"] > 10
+    row = pv.summarise([record], command="orientation")["classes"]["HEIC-0"]
+    assert row.get("oracle_size_rounded_count") == 1
+    assert row.get("oracle_crop_edge_counts") == {
+        "first": int(edge == "first"),
+        "last": int(edge == "last"),
+    }
+
+
+@pytest.mark.parametrize("damage", ["two-pixels", "tile"])
+def test_r9_decode_rejects_larger_size_difference(configured, monkeypatch, damage):
+    _, guard = configured
+    source, _ = _r9_odd_grid(guard)
+    run = pv.subprocess.run
+
+    def corrupted(args, **kwargs):
+        done = run(args, **kwargs)
+        if args[0] == "ffmpeg" and "-i" in args:
+            path = Path(args[-1])
+            with PILImage.open(path) as opened:
+                pixels = np.asarray(opened.convert("RGB"))
+            # The real decode is 256 wide; source is 257. Make it two short
+            # or one 128x128 tile, independently of the instrument's size gate.
+            pixels = pixels[:, :255] if damage == "two-pixels" else pixels[:128, :128]
+            PILImage.fromarray(pixels).save(path)
+        return done
+
+    monkeypatch.setattr(pv.subprocess, "run", corrupted)
+    record = pv.verify_orientation(source, guard, photo_class="HEIC-0")
+    assert record.get("failure_code") == "oracle_failed"
+    assert record["failed_checks"] == ["oracle_failed"] and not record["orientation_ok"]
+    assert record.get("oracle_size_rounded") is not True
+
+
+@pytest.mark.parametrize(
+    "damage", ["444", "even", "two-axes", "larger", "unknown-chroma", "product-extra"]
+)
+def test_r9_near_misses_still_fail(configured, monkeypatch, damage):
+    _, guard = configured
+    source, _ = _r9_odd_grid(
+        guard,
+        chroma="444" if damage == "444" else "420",
+        width=256 if damage in {"even", "product-extra"} else 257,
+    )
+    image, meta = PhotoReader().read(source)
+    pixels = image.pixels * 255
+    reference = pixels[:, :-1]
+    if damage == "product-extra":
+        reference = pixels
+        image = replace(image, pixels=np.pad(image.pixels, ((0, 0), (0, 1), (0, 0))))
+    elif damage == "two-axes":
+        reference = reference[:-1]
+    elif damage == "larger":
+        reference = np.pad(pixels, ((0, 0), (0, 1), (0, 0)))
+    if damage == "unknown-chroma":
+        open_heif = pillow_heif.open_heif
+
+        def unknown(*args, **kwargs):
+            container = open_heif(*args, **kwargs)
+            container[container.primary_index].info.pop("chroma", None)
+            return container
+
+        monkeypatch.setattr(pillow_heif, "open_heif", unknown)
+    monkeypatch.setattr(pv, "read_photo", lambda _: (image, meta))
+    monkeypatch.setattr(pv, "ffmpeg_decode", lambda *a: reference)
+    record = pv.verify_orientation(source, guard, photo_class="HEIC-0")
+    assert not record["orientation_ok"] and "orientation_size" in record["failed_checks"]
+    assert record.get("oracle_size_rounded") is not True
+
+
+def test_r9_unrounded_summary_and_projection(sample, configured):
+    _, guard = configured
+    record = pv.verify_orientation(sample("heic-ad24-both"), guard, photo_class="HEIC-270")
+    assert record["orientation_ok"] and record.get("oracle_size_rounded") is False
+    row = pv.summarise([record], command="orientation")["classes"]["HEIC-270"]
+    assert row.get("oracle_size_rounded_count") == 0
+    assert row.get("oracle_crop_edge_counts") == {"first": 0, "last": 0}
+    safe = pv._safe_record({"oracle_size_rounded": "private", "oracle_crop_edge": "private/path"})
+    assert "oracle_size_rounded" not in safe and "oracle_crop_edge" not in safe
