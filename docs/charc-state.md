@@ -9,9 +9,48 @@
 
 ---
 
-### RESUME HERE (CHARC generation 9, HOLDING: EXECUTION PAUSED BY THE OWNER 2026-10-30 ~07:05Z, see the PAUSE bullet at the end of the gen 9 block; read this block top to bottom; gen 8 `clearwater-charc-20261029-0859` ROLLED 2026-10-30 ~01:58Z at ~410K, clean boundary, no cell at CHARC's seat; gen 7 `clearwater-charc-20261029-0428` rolled 2026-10-29 ~19:00Z at ~405K; gen 6 `clearwater-charc-20261028-1443` ROLLED 2026-10-29 ~14:30Z at ~410K at a clean boundary, no cell at CHARC's seat; gen 5 rolled ~00:45Z at ~402K)
+### RESUME HERE (CHARC generation 10: read this block top to bottom; gen 9 `clearwater-charc-20261029-1554` ROLLED 2026-11-01 ~08:00Z at ~410K, clean boundary, no cell at CHARC's seat; gen 8 rolled 2026-10-30 ~01:58Z at ~410K; gen 7 2026-10-29 ~19:00Z; gen 6 2026-10-29 ~14:30Z)
 
-- **GEN 9 PICKUP (read first).** Orchestrator = **gen 26 `clearwater-orchestrator-20261029-1612`** (gen 25 rolled 02:12Z; the pickup text below was written against gen 25, online 23:41Z
+- **GEN 10 PICKUP (read first).** Orchestrator = **gen 28 `clearwater-orchestrator-20261029-2103`** (online 2026-10-30 07:03Z,
+  PAUSED by the owner until 2026-11-01 ~08:00Z; resumed on my post bc8b1a74 + cue). ALL cues go there; re-read
+  `comms/.launch-sessions.json` before every cue (the launcher rewrites it at each launch). Time the bash launch and record
+  it here. Drain with `read --role charc --all` (gen 9 stopped draining at its announce). Main is FREE. **Subjects under
+  100 chars; see the `posted ->` line before cueing** (memory role-mail-subject-cap-before-cue: gen 9 slipped three times).
+  **OWNER DIRECTION (2026-10-30 ~07:05Z, verbatim, binding):** "When we pick up, we can commission phase 5 in parallel
+  with completing the remaining danglers." Owner said "resume" 2026-11-01 ~08:00Z. **Phase 4 (plan rows WP4.1-4.3) is
+  COMPLETE** (WP4.3 accepted `28c4a75`, my rows `94717423`). **YOUR FIRST JOB: commission Phase 5** = WP5.1 automated
+  acceptance suite (plan: size L, depends WP4.3, flags `gui`, `footage`) and WP5.3 visual review pack for CP5 (size S,
+  depends WP4.3, `footage`; the pack is what the owner reviews at CP5, the look check and V2 are OWNER-reserved), with
+  briefs you write or commission posts the orchestrator drafts; WP5.2 performance and memory runs (M, `gpu`, EXCLUSIVE)
+  AFTER the danglers' windows. Lanes by weekly pace at commission time (gen 28 posts both paces on resume; Codex had
+  headroom: 0.415 vs Claude 1.45 at 06:40Z 2026-10-30; the owner paused for the weekly burn, so prefer Codex where the
+  package is well-specified; never at the cost of quality). One heavy job on the host at a time; windows EXCLUSIVE,
+  opened / closed to you one at a time. Read plan section 6 Phase 5 and the V-table (plan :351-376) before drafting.
+  **DANGLERS (gen 28 runs them; you rule their STOPs):** (1) WP3.6P (Codex, worktree `wp3.6p` head `081f851c`; R1 + R2
+  ruled: byte-level kept-EXIF inventory, inconclusive-and-continue, independent ICC oracle, D63 output structure with the
+  derived Software count; turn 7 = R2 remediation, then A R3, seat runs (`photo_check`, `orientation`, the footage node),
+  two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine: AD-24
+  status (confirmed on the Apple layouts present, tag-only branch unwitnessed: FFmpeg honours irot and ignores EXIF-only),
+  DR-42 (a)/(c) notes, DR-43 note, NEW row EXIF ColorSpace read as untagged, Result 2 photo row closed; spec items for the
+  owner's next revision bundle: D63 'provisional' wording, :567 photo resolution = 24.5 MP max. (2) WP4.6 (Claude
+  opus-high, worktree `wp4.6` head `9fe947fe`; brief FINAL `b6a31b5`; R1, R2, R3 ruled; design change (d): the stderr tail
+  goes to the LOG, the failure text carries no tail (type name + errno at most), redaction deleted; R3 = last full round
+  for the protocol class; R3-1 RED-first + R3-2 MINOR in the terminating clean-up by a FRESH cell 5, verified at gen 28's
+  seat, then the EXCLUSIVE V7 window (modes v7c, v7e, v7d, dr44c-export; WP4.6 driver copy md5
+  `074cbb62b2a9aa8949ebcf30d803b51a` for v7e / dr44c-export, pinned `0b9ee6cc...` for v7c / v7d), report, B (Codex),
+  gate, accept). STOPs to you: (c)/(e) > 100 ms, child CPU fallback, export wall > +10 % vs 209.1-210.9 s (WP4.3's was a
+  cache-HIT export; the child's analysis is cold: if it trips, the seeding remedy is YOUR `cache/` ruling), spawn > 10 s.
+  At its accept mine: DR-98 CLOSED on figures or its STOP carried to the owner; NEW AD-31 (export in a spawned worker
+  process, the design + figures); AD-23 extended (the Python worker through the helper); NEW rows: F8 (D87 re-check
+  charges cache growth to the output volume, `jobs/export.py:916`, pre-existing WP3.21, widened), F4 (engine OSError texts
+  carry full paths, WP3.14 `export.py:678-685`), GUI cache accounting blind to `export/<uuid>` if material; DR-44 (c)
+  re-confirmed; DR-62 / DR-69 notes; `_HeldSink` / `_ProgressSink` (unused test helpers kept for the pinned driver):
+  removal or a row. Open owner decisions: none. Owner-pending inputs: none. Owner action pending: none. Next owner
+  checkpoint: CP5 (WP5.3 pack). Every owner-facing summary ends with those three lines. Register through DR-101
+  (DR-98..DR-101 opened 2026-10-30; DR-99 = the bench `telemetry_origin` load-sensitive bound, a same-way failure alone on
+  main is recorded under it without a STOP). Codex-built packages: 9.
+- **(gen 9 history follows; newest facts at the end of its block; then gen 8 and older)**
+- **GEN 9 PICKUP (was; HOLDING line superseded).** Orchestrator = **gen 26 `clearwater-orchestrator-20261029-1612`** (gen 25 rolled 02:12Z; the pickup text below was written against gen 25, online 23:41Z
   2026-10-29; gauge 26 ms). ALL cues go there; re-read `comms/.launch-sessions.json` before every cue. Time the bash
   launch and record it here. Drain with `read --role charc --all` (gen 8 stopped draining at its announce). Main is FREE
   (no HOLD); last state commit is this one. The gen 8 block below is HISTORY, newest facts at its end; the live picture:
