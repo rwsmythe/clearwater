@@ -424,9 +424,10 @@ No footage, GPU or GUI run was attempted. No other worktree was accessed.
 Round 0 is a mapping/premise audit, not a counted Reviewer A round. Severity is
 relative to the acceptance brief: a false acceptance oracle blocks its build.
 
-| Round | Critical | Major | Minor | In / out envelope | NEW / REOPENED | Reverts | Fix surface | Transport / model | Verdict |
-|---|---:|---:|---:|---|---|---:|---|---|---|
-| 0 / T1 | 0 | 4 | 0 | 4 / 0 | 4 / 0 | 0 | ledger only; no test/product fix | no external reviewer yet | STOP for R0-1 through R0-4; yield before T2 |
+| Round | Critical | Major | Minor | Advisory | In / out envelope | NEW / REOPENED | Reverts | Fix surface | Transport / model | Verdict |
+|---|---:|---:|---:|---:|---|---|---:|---|---|---|
+| 0 / T1 | 0 | 4 | 0 | 0 | 4 / 0 | 4 / 0 | 0 | ledger only; no test/product fix | no external reviewer yet | STOP for R0-1 through R0-4; yield before T2 |
+| 1 / Reviewer A, adjudicated | 0 | 1 | 2 | 5 | 8 / 0 reviewed | 8 / 0 reviewed | 0 | ledger only this turn; planned fixes tests/support only, product-code fixes 0 | claude -p; claude-opus-5-5; requested high | NEW_CRITICAL_MAJOR_FOUND; accepted 1 major, 1 minor, 5 advisories; rejected 1 minor under CHARC 8276adb5; remediation pending |
 
 For every future Reviewer A round, adjudicate every finding in a ledger-only
 turn and yield before remediation. Track product-code versus test-only fixes
@@ -448,7 +449,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | 7 / T6 validation | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | 143,997 | committed `7687f564` (ledger, 0 CR); brief amendment `1ed04a21` folds in CHARC's T6-1/T6-2 rulings |
 | 8 / T6-2 remediation and T7; session 3 ends | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | 177,474 | retired after `2f1c0954`; fresh session 4 starts T8 from this ledger |
 | 9 / T8; session 4 starts | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | 91,630 | committed `84a030a1` (0 CR); seat format check and both GUI nodes pass |
-| 10 / T8 seat result and T9 | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | pending dispatcher | read footer; Reviewer A round 1 at the seat follows this yield; evaluate near 200K, stop near 250K at a step boundary |
+| 10 / T8 seat result and T9 | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | 147,709 | committed `f9b0fa34` (0 CR); seat ruff/format clean; Reviewer A round 1 returned 1 major, 2 minor, 5 advisories |
+| 11 / Reviewer A round 1 adjudication | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | pending dispatcher | ledger-only adjudication; yield before remediation; evaluate near 200K, stop near 250K at a step boundary |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -2018,3 +2020,237 @@ gate measurements; this light-only run supplies neither.
 
 Yield after T9 for Reviewer A round 1. T10 report waits for convergence,
 as commissioned. No new RUN REQUEST is needed this turn.
+
+## Reviewer A round 1 (adjudicated)
+
+### Packet, mechanical status and depth
+
+Turn 11, session 4, inspected clean HEAD **f9b0fa34** against brief base
+2050a89a. The dispatcher supplied depth **147,709** after turn 10;
+recorded above. This turn's depth remains dispatcher-owned. No estimate.
+Turn 10's committed blobs had zero CR; the seat reported ruff check clean
+and ruff format --check: 292 files formatted.
+
+Read, in place and read-only, the round-1 `review.txt`,
+`review-prompt-r1.md` and `review.seat.log` in the dispatcher's external
+review-evidence folder. None was copied into the repository. Durable
+review transcript and driver evidence remain there. Transport **claude -p**,
+model **claude-opus-5-5**, effort requested **high**, exit 0, is_error false,
+39 turns, verdict **NEW_CRITICAL_MAJOR_FOUND**, worktree clean afterwards.
+The driver's assertions confirm one denied Write-tool attempt, redone
+inline; no Bash command refused. The CLI version was not supplied and is
+not inferred from the model string. This round COUNTS, as ruled by the
+dispatcher. The review prompt withheld the ledger and did not convey
+CHARC's earlier T4-1 skip amendment, relevant to rejected finding 3.
+
+Reviewed severity counts: **Critical 0 / Major 1 / Minor 2 / Advisory 5**.
+All eight concern the in-envelope package; none is banked as outside the
+envelope or pre-existing product code. NEW 8 / REOPENED 0 reviewed;
+reverts 0. Adjudication accepts **1 major, 1 minor and 5 advisory
+observations**, rejects **1 minor** under the prior ruling. Accepted
+advisories 4 and 5 are banked for CHARC's report, not code changes.
+No remediation this turn. Planned fixes touch only owned tests/support;
+product-code fixes **0**, applied test-code fixes **0**.
+
+### Independent probes and light run
+
+All probes run on f9b0fa34's unchanged test code. Scratch outputs are under
+work/wp5.1; no GUI, GPU or footage node was run, and no footage folder or
+other worktree was read. The existing psutil development dependency is
+available; no dependency was added. The two actual pytest nodes ran with
+sandbox_mkdir_shim and no cache provider.
+
+| Evidence under work/wp5.1/ | Own observed result |
+|---|---|
+| t11-pid-probe.log | exit 0; three real sys.executable subprocesses self-report a child writer PID; all three writers still running immediately after killed launcher wait returns |
+| t11-photo.log / t11-photo.xml | exit 0; crash node and disk-full node both pass, 2 passed in 4.87 s, no skip |
+| t11-oracles.log | F2 AST/projection and F3 rule/source checks completed; probe then stopped on a video-manifest dimension lookup KeyError; no product failure inferred |
+| t11-oracles-continued.log | exit 0; F4 actual retained decode-array measurement; F5 quantization probe; F6 uppercase warning; F7 unrelated named failure; F8 renamed/missing metadata rows |
+| t11-lf.log | zero CR and no trailing whitespace in the changed ledger; all owned Python files unchanged from HEAD |
+| t11-diff-check.log | exit 0; diff whitespace check clean |
+
+Actual light command:
+
+```bash
+PYTHONPATH=scripts uv run pytest -q -rs tests/test_v51_photo_acceptance.py::test_v11_photo_crash_leftovers_are_cleaned_at_start tests/test_v51_photo_acceptance.py::test_v11_png_disk_full_removes_partial_output --basetemp=work/wp5.1/t11-photo-tmp -p sandbox_mkdir_shim -p no:cacheprovider -o junit_family=xunit1 --junitxml=work/wp5.1/t11-photo.xml > work/wp5.1/t11-photo.log 2>&1
+```
+
+This isolated pass does not refute an intermittent crash failure. The
+reviewer's real crash-node RED remains **2 failed, 32 passed, 2 deselected
+in 137.92 s**, the other failure being known T6-1; one of its 15 isolated
+runs also failed. Those are reviewer results, not a whole-light run made
+by this cell in turn 11. Turn 10's own whole-light result remains 33
+passed, 1 known T6-1 failed, 4 deselected in 152.91 s. The differing
+deselection counts reflect that the review command omitted the shell
+module. A new whole-light run is deferred until remediation changes code.
+
+### Finding-by-finding verdicts and turn-12 plans
+
+**1. ACCEPTED, MAJOR, in envelope, NEW, EXECUTED (own PID mechanism probe;
+intermittent assertion RED executed by the reviewer).**
+At `tests/acceptance_support.py:110` / `:119`, runner_command uses
+sys.executable. At `tests/test_v51_photo_acceptance.py:357` / `:365`,
+Popen and kill address that launched PID; wait at `:368` does not identify
+or join the actual interpreter before the first final snapshot at `:373`.
+The own portable Python/psutil probe launches the same sys.executable with
+a tiny scratch writer that self-reports os.getpid()/os.getppid(), kills
+only Popen.pid and tests the actual writer handle immediately after wait:
+
+| Trial | Popen launcher PID | Self-reported writer PID | Writer parent PID | Writer running after launcher wait |
+|---|---:|---:|---:|---|
+| 1 | 11980 | 32460 | 11980 | True |
+| 2 | 27888 | 35472 | 27888 | True |
+| 3 | 9628 | 33332 | 9628 | True |
+
+Each writer was subsequently waited for, and the probe's finally also
+kills/reaps it if necessary; no probe child is intentionally left running.
+This independently establishes the missing writer-exit barrier. It does
+not claim to reproduce the exact post-wait os.link race in this sandbox;
+that exact assertion failure is the reviewer's executed RED. The isolated
+real node passed once here, consistent with the race being intermittent.
+No particular Windows job-object teardown timing is assumed from this
+probe. The first-snapshot assumption fails whenever the real child can
+still commit or unlink after the launcher has been reaped.
+
+**Turn-12 RED:** preserve the reviewer's two real assertion failures as
+stability evidence. Before fixing, add self-reported writer identity to
+the crash subprocess and check that the actual kill target equals that
+identity. Retaining today's process.kill() targets Popen.pid and gives a
+deterministic identity RED on this environment, without a writer hold or
+product edit. The RED must clean up and join the real child in finally.
+Record both the PID mismatch and its named assertion, not just a rerun
+that happens to pass. The three own topology trials above are the cheap
+pre-remediation reproduction of the same cause.
+
+**Fix plan, tests/support only:** extend the test helper near
+`acceptance_support.py:110` with an optional identity-reporting bootstrap
+for this crash node. The bootstrap writes actual interpreter PID/parent
+PID atomically below the attempt's tmp_path, then immediately executes
+the unchanged shipped headless_export.py as __main__, with the original
+argv and script-directory import path. It introduces no product flag,
+environment override or writer hold. Keep the existing default command
+for callers that do not need identity reporting.
+
+In `test_v51_photo_acceptance.py:357`-`:373`, retain a psutil handle to
+that self-reported interpreter (identity/parent/creation-time checks;
+the direct-PID form also works where no launcher child exists). At the
+FIRST observed temporary, kill that interpreter handle, not the launcher,
+and wait for that same writer to exit. Assert its exit before ANY final
+or leftover snapshot; record writer PID, actual kill target and confirmed
+exit. If it exits in the observation-to-kill interval, handle only the
+actual process-gone race and verify termination before inspecting output.
+Then reap the launcher too. Every finally path must stop and join any
+surviving writer before returning or raising. Existing D85 end-state
+checks and startup cleanup remain unchanged. This uses portable stdlib
+and already-declared psutil APIs, no Windows-only termination API, shell
+tree-kill, new dependency, folder-quiescence heuristic or arbitrary sleep
+as proof of death. A quiet folder alone would not establish the brief's
+requested killed-writer state. Run the deterministic RED/green identity
+control, real crash node, then light modules after the change.
+
+**2. ACCEPTED, MINOR confirmed, in envelope, NEW, REASONED for the real
+GUI behavior (own AST and array projection executed).**
+At `test_v51_shell_acceptance.py:111` the provisional after_image must
+exist, but no before_image is read. AST probe counts **0 before_image
+references** in the node. With original = zeros, provisional = original
+and later corrected = 3, the current not-None and nonzero-update checks
+both accept an uncorrected provisional. The checked running phase,
+None statistics and final smoothed record do not exclude that state.
+`gui/preview.py:193` exposes the displayed original; the sandbox may not
+execute the real GUI/footage mutant, so no real-shell mutant pass is
+claimed. Fix plan: while held, compare displayed before_image against
+provisional after_image at matching geometry and require a nonzero
+pixel difference for this non-neutral real trim; record it and reject a
+planted identical provisional copy, then request the real GUI seat run.
+Leave the existing GUI test unchanged.
+
+**3. REJECTED, nominal MINOR, in envelope, NEW, REASONED from binding
+CHARC ruling and exact source branch (own source/rule probe executed).**
+The observation is accurate relative to the original brief sentence:
+`test_v51_photo_acceptance.py:412` retries when no temporary survives,
+including an observed-but-committed attempt. However CHARC
+**8276adb56f541a57** explicitly amended that disposition in this ledger's
+Session 2 / Turn 5, Final ruling applied: "Twenty attempts without a
+surviving crash temporary still skip"; observed no-survivor attempts are
+recorded and retried. `git log -S` independently locates its introduction
+in **93869f4c**, `T4 complete -- crash oracle by end state (CHARC 8276adb5)`.
+The current branch follows that ruling. It does not claim startup cleanup
+on a clean folder, and the deterministic D85 witness is separate. No
+remediation or new narrowing of the skip is planned; that would undo the
+authorized end-state amendment. The reviewer was denied the ledger and
+its prompt did not supply this ruling. T10 will state the amended skip
+semantics and cite CHARC 8276adb5 so this limitation is visible.
+
+**4. ACCEPTED observation, ADVISORY, in envelope, NEW, EXECUTED; BANK
+for CHARC's AD-11 report note, no code/tolerance change.**
+Own probe reread turn 10's retained raw source/output arrays, using the
+source's probed dimensions and the same GBR-to-RGB plane order. Mean
+**2.9538159722222224**, max **183**, planted red +4 mean
+**3.7190420524691357**, bound **3.5**, margin **0.21904205246913566**.
+The actual _assert_postencode rejected the planted output by the bound's
+name. CHARC 2bd14e3a expressly chose that bound and control; sparse or
+smaller defects can remain below a mean bound. Report the limited margin
+and the existing high-quality 2.521 figure to CHARC; do not widen bounds,
+add a maximum bound or change the ruled positive control here.
+
+**5. ACCEPTED observation, ADVISORY, in envelope, NEW, EXECUTED numerical
+probe / REASONED risk for a future GPU encode; BANK for CHARC, unchanged.**
+`test_v51_video_acceptance.py:533` scales decoded RGB8 differences by 255.
+**1/255 = 0.00392156862745098 > 0.002**; the max bound is **0.51 code**,
+so any one-code difference fails. Own helper call with two synthetic
+first frames differing by one code is rejected by the max-bound name.
+No GPU node was run here. The risk is a false RED from quantization;
+it does not weaken the GPU repeat digest check or produce a false green.
+The brief expressly assigns this post-encode comparison these bounds.
+Keep it unchanged and bank the quantization sensitivity and the seat's
+actual 0.0/0.0 result for CHARC through T10.
+
+**6. ACCEPTED observation, ADVISORY, in envelope, NEW, EXECUTED; FIX.**
+Own call to `test_v51_shell_acceptance._assert_assumption_warning` accepts
+"BT.709 LIMITED range assumed". Plan at `:41`-`:42`: match literal
+lowercase limited, consistently with the runner and brief, and add the
+uppercase-only sentence to the rejected controls; actual seat warning
+already contains lowercase limited. No product warning text is changed.
+
+**7. ACCEPTED observation, ADVISORY, in envelope, NEW, EXECUTED; FIX.**
+Own _assert_disk_full call with failed status, no outputs, an empty output
+folder and "input.png: unrelated method error" passes. This helper checks
+the name only; the whole node separately proves ENOSPC after 1 KiB, so
+this is optional diagnostic strengthening rather than a broken injection.
+The actual node passed here. `jobs/export.py:678` _describe explicitly
+formats "disk full while writing" for the caused-by-ENOSPC branch.
+Plan at `test_v51_photo_acceptance.py:180`: also require disk full in the
+failure text and reject an unrelated named error with the same helper;
+retain the existing injection, names-only and cleanup checks.
+
+**8. ACCEPTED observation, ADVISORY, in envelope, NEW, EXECUTED helper
+probe / REASONED future rename risk; FIX.**
+The current seven canonical best-effort rows yield seven presence entries;
+renaming all prefixes yields **{}**. Dropping only creation-time rows
+leaves **four** entries, so asserting non-empty alone would still miss
+part of the required record. Current prefixes match the instrument;
+this is a prospective coverage guard, not an observed missing real-clip
+record. Also _assert_gpmd at video `:171` independently rejects absent
+GPMF comparisons, so the all-renamed helper probe is not claimed to pass
+the entire real-clip node. Plan near support `:351` / video `:194`:
+assert that all seven expected presence rows (three creation-time, GPMF,
+two timecode, camera atoms) are recorded, and reject an empty or missing-
+category dict. Do not assert any best-effort metadata value is preserved;
+False remains valid, and mandatory fidelity/GPMF checks remain intact.
+The actual footage node is seat-only and was not run in this adjudication.
+
+### Disposition and yield
+
+Round 1 is NOT converged: accepted finding 1 requires a test/support fix
+and a further reviewer round. Finding 2 and advisory fixes 6-8 are planned
+once as the same remediation's cleanup. Finding 3 is rejected under the
+prior ruling. Advisories 4/5 go to CHARC in T10 unchanged. None of these
+plans requires a product fix, frozen-interface change or new dependency;
+no new STOP is needed to adjudicate them. Known T6-1 remains owned by
+WP-D54 and was not rerun or edited this turn.
+
+Only this ledger is changed. Review files remain outside the repository;
+all owned Python code is unchanged from f9b0fa34. No remediation, commit,
+rebase, mailbox post or write outside the worktree. Yield before turn 12,
+as the dispatch requires; the dispatcher owns the next depth reading and
+commit. The full report remains T10 after review convergence.
