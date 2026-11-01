@@ -4,13 +4,11 @@
 
 - Package: WP3.6P, CODEX lane, STRONG tier; CHARC's FINAL rulings govern.
 - Dispatch base verified: `c3bf602fe9ac94cd5df25499d97f3a2bc439bb72`.
-- Current boundary: turn 9, session 3. CHARC-ruled odd-dimension 4:2:0
-  oracle size equivalence implemented with both crop edges and RED/GREEN tests.
-  Dispatch head verified: `a8c9778d07bcdf3e8391351b629869550ade48f3`;
-  initial tracked status empty. Turn 8 committed as `a8c9778d` (0 CR, supplied).
-  Seat 5b stopped at the oracle-size limit; supplied evidence/ruling below.
-  Prior turns/rulings remain historical records. No owner photo was opened by
-  the cell in any turn.
+- Current boundary: turn 10, session 3. Seat facts/summaries parsed and the
+  real-photo report written. Dispatch head verified:
+  `790541e77c3be3469c5717ac390f3d2efd21ece9`, initial tracked status empty;
+  turn 9 committed as 790541e7 (0 CR, supplied). The new report and this ledger
+  are the only changed files. No owner photo was opened by the cell.
 - `uv sync`: already run by the dispatcher before dispatch, as stated in the
   binding turn-1 instructions. Not repeated: this sandbox cannot reach the index.
 - Initial `git status --short`: empty. The existing isolated worktree is retained.
@@ -18,16 +16,16 @@
   (2026-10-30T04:46:00Z)
   RE-RULES Q3: FFmpeg default composed primary as delivered is the oracle.
   The thumbnail is a recorded second witness, never the pass criterion.
-- Current handoff: YIELD for the remaining seat runs and an EXECUTING
+- Current handoff: YIELD for an EXECUTING
   Reviewer B on the final candidate. CHARC `650bea20b811947c` accepts A3 as
   convergence on that condition; this is not an unconditional B/gate pass.
   R1-QA/QB `d9133089b58091d8`, R2-QA `688ef40fca871a0d` and replacement Q3
   `e40b0d7b06ee9af8` remain governing. No product defect is asserted from a
   planted instrument control. Report wording / Limits are staged below.
-- No real-photo acceptance claim, cell hardware measurement, returned Reviewer B
-  or gate pass is made at this boundary. Seat 5b evidence is supplied, not read
-  or rerun by the cell. Remaining seat requests and the 5b restart are NOT RUN
-  by this cell. The final report is still owed after those results arrive.
+- No acceptance verdict, cell hardware measurement, returned Reviewer B or gate
+  pass is claimed. Seat receipts/safe tool summaries were read locally; no
+  footage was read or seat run rerun by the cell. The report is now delivered
+  for B and the ONE two-leg gate. A3 convergence remains conditional on B execution.
 
 ## Round-0 source map on c3bf602
 
@@ -2099,6 +2097,134 @@ supplied md5 07ef683ee2b5a5275a31cdc2597f2fbd, not read by the cell. No request
 2-5 change. Remaining seat runs/report/executing B/two-leg gate remain owed.
 No new STOP or question. YIELD after this one logical turn as ruled.
 
+## Turn 10: seat runs recorded; report
+
+Dispatch head 790541e7 verified, initial tracked status empty. Turn-9 depth
+**184,466 tokens (session 3)** recorded. Supplied gen-29 checks on turn 9:
+117 passed / 1 deselected; ruff/format/mypy clean; 0 CR in committed blobs.
+Keep this report turn bounded: only the local wrapper facts, safe tool summaries,
+seat-5a receipt and prior staged Limits were read; no footage/config/map/other
+worktree read, tool/test/source edit, commit, mailbox post or hardware rerun.
+
+### Receipt parsing, cross-check and 5c-8 provenance
+
+Read every seat-turn8/<id>.json receipt and extracted each tool summary directly
+from its .log bytes. Byte detection found UTF-8 JSON in 5b, 5b-r2 and 5c-8;
+UTF-16 LE JSON in 5c-16, 5d-default and 5d-cpu. In the latter, locate the
+UTF-16 JSON schema marker after any differently encoded warning prefix and
+raw-decode one JSON object from that aligned suffix. UTF-8 logs similarly use
+the schema marker. No replacement character is accepted within the parsed
+object; warnings are not copied into the committed report/summary. q4.log is
+UTF-8: 1 passed in 10.74s. Local parser evidence: work/wp3.6p/r10/parse.log,
+parse-methods.json, parsed *-summary.json and compact-facts.json.
+
+The 5a .meta and .stdout read-only receipts confirm EXIT 0, wall 309s, moment
+2026-10-30T05:20:40Z-05:25:50Z and disk 188,759,597,056 -> 186,750,087,168.
+The existing 5a ledger row retains its previously supplied 73-read / zero
+refusal / zero round-trip-problem / kept-boolean counts; its output directory
+and owner records were NOT opened. Per-class runner read/fidelity in the new
+report comes independently from 5c-16. No permissive-test success was substituted
+for the actual read counts. Every newly supplied receipt now has a command,
+counts, EXIT, wall, disk before/after and measurement moment in the table.
+
+5c-8 ran on a8c9778d at 09:24:33Z, before turn 9 committed 790541e7 at
+09:33:36Z. It STANDS: ASTs of verify_export / _export_checks / _source_icc /
+_d63_output / _png_metadata / _base / _owner_class_matches / _observed_class /
+_selection / load_class_map / _safe_record are identical across those commits.
+Turn 9's only reachable export-summary difference is additional orientation
+flags/zero class counters; no existing export figure or selection can change.
+Its orientation decoder/crop helpers are not called by export. Audit evidence:
+work/wp3.6p/r10/audit.log and report-facts.json. No STOP/rerun recommendation.
+
+### Recorded results and delivered report
+
+NEW docs/reports/wp3.6p-real-photos.md contains per-class read/fidelity, HEIC
+layout, colour/ICC, AD-24 outcomes and thumbnail counts, neutral 16-bit/8-bit
+runner V5/D53/V9 figures, both largest-photo memory records and separately
+labelled estimate/tree-RSS/device-peak ratios. Z and M retain their own rows
+and denominators. No scene/look assessment, source metadata value or footage
+path is promoted. Measurement moments are not photo capture times.
+
+- 5b-r2: all 62 attempted; 0 read/orientation/oracle failures; HEIC-0 14 pass /
+  9 inconclusive / 7 rounded last / 0 failed; HEIC-90 3/0/0/0; HEIC-180
+  20/0/0/0; HEIC-270 13/3/0/0. Rounded is independent of pose outcome, not an
+  extra pass. Designed EXIT 1 remains for 12 inconclusives, never a product
+  finding or hidden pass. The 90/180/270 classes are not mostly inconclusive;
+  no further thumbnail discriminator is commissioned. All first-edge counts 0.
+- Export: 5c-16 per-class V5/D53/V9 passes equal n (23,3,20,16,2,8,1 in
+  labelled rows); 5c-8 one per class, all three checks pass. Requested/output
+  depths match, GPU reasons, runner exits 0, no failed check/D63 defect. Raw
+  max/mean 0 per class at each depth; quantised max worst 7.569789888e-06/255,
+  with individual class means in the report. Tagged ICC byte matches are
+  distinct from Z/M expected absence; no assertion of ICC present on Z/M.
+- Largest-photo c3-default legs: estimate 6,128,796,496 bytes vs free-before
+  8,189,378,560; default GPU with tree RSS 1,926,164,480 and device peak
+  4,108,320,768; forced CPU tree RSS 3,138,392,064 and device peak at baseline
+  145,752,064. Ratios estimate/tree RSS 3.181866 and 1.952846; default
+  estimate/device peak 1.491801. All recorded limits pass, sample errors empty;
+  actual capacity fallback was not exercised. The approved sampling/race,
+  query-instant/scope, cadence and alternate-config Limits are explicit.
+
+For CHARC: Q3 says confirmed on the Apple layouts present with the bounded
+50-pass / 12-inconclusive / 7-rounded / zero-failure evidence; identity 23 and
+agreeing nonzero-irot/tag 39, no owner tag-only/irot-only witness. AD-24 status
+is CHARC's accept decision; D63/spec :567 edits are the owner's. Q6's Result 2
+photo row is ready for accept on about 24.5 MP, subject to Limits/B/gate; no
+48 MP or V15 closure. Q8 DR-42(a)/(c) lack the relevant real PNG/TIFF missing-
+ICC/tiff.py-touch witness; DR-43 zero sanitise drops per class and no IF-6 or
+io.photo change. The new MINOR ColorSpace-1-as-untagged observation is JPG-Z
+8 and JPG-M 1, each in its own row, no colour change or product fix. Register
+rulings remain CHARC's. No debt/spec/source edit is made by this report turn.
+
+### Verification loop and final light checks
+
+Suspected 5c-8 staleness was independently rejected by the AST/call-path audit.
+Suspected encoding corruption was rejected by byte-based suffix detection,
+JSON decoding and no U+FFFD inside summaries. Cross-checked the extracted
+class counts, depths, devices, errors, rounded edges, memory values and all
+seat moments/disk receipts against the dispatch; they agree. Corrected the
+first report draft's blanket UTF-16 statement using the actual parser-method
+facts: 5b/5b-r2 are UTF-8. This was a report wording correction, not a tool fix.
+Final report/ledger claims and privacy/scope are verified below; no new issue
+or STOP found in the last pass. No new Reviewer A round is claimed.
+
+Outputs captured under work/wp3.6p/r10/; no full suite/hardware/gate rerun.
+PowerShell sets PYTHONPATH=scripts; the sandbox shim remains mandatory for
+cell pytest despite the seat request's shorter command spelling.
+
+| Check | Exact command | Observed result |
+|---|---|---|
+| Selected light tests | PYTHONPATH=scripts uv run pytest -q tests/test_photo_verify.py -m "not footage" -p sandbox_mkdir_shim -p no:cacheprovider --basetemp=work/wp3.6p/tmp -o junit_family=legacy --junitxml=work/wp3.6p/r10/final.xml | EXIT 0; 117 passed, 1 deselected in 19.10s; pytest.log / final.xml |
+| Ruff | uv run ruff check tools/photo_verify.py tests/test_photo_verify.py | EXIT 0; All checks passed!; ruff.log |
+| Format | uv run ruff format --check tools/photo_verify.py tests/test_photo_verify.py | EXIT 0; 2 files already formatted; format.log |
+| Strict typing | uv run mypy | EXIT 0; Success: no issues found in 147 source files; mypy.log |
+
+No test warning; existing uv environment mismatch notice is unchanged. Actual
+light exports force CPU and memory samplers are stubs. No owner/GPU node ran.
+Privacy grep (privacy.log / privacy-facts.json): PASS, zero prohibited
+matches across report, ledger, tool and six extracted commitment-facing safe
+summaries (161 records, including repeated runs). Patterns: quoted source-value
+assignment keys Make / Model / GPSLatitude / GPSLongitude / GPSAltitude /
+GPSDateStamp / GPSTimeStamp / MakerNote / body-camera-lens serial / original-
+digitized capture time; drive-absolute paths, UNC paths and absolute Unix
+source-style roots; the planted private camera/GPS markers and synthetic input
+root. Only existing review-evidence absolute references are excepted, not any
+footage path. Every summary record equals the tool's fresh explicit allow-list
+projection. Owner ICC descriptions are Display P3/absent, output Software is
+Clearwater/absent; timestamp-valued record strings occur only as measured_at_utc,
+never capture time. Source field NAMES and presence/kept booleans are permitted.
+
+Final byte/scope/report-claim verification is recorded in final-validation.log:
+report and ledger only, tool/tests unchanged; 0 CR, ASCII/LF/final newline,
+no trailing whitespace; parsed receipt counts/commands/disk/moments and report
+tables/ratios checked against local summaries. No private source path/value
+was introduced or committed; no raw runner/EXIF data is copied to the report.
+
+Reviewer B must EXECUTE (650bea20), with the succeeded-style execution receipt
+before reading findings, then the ONE two-leg gate at dispatcher seat. A3's
+conditional convergence is not substituted for returned B/gate. At this
+report boundary near 200K, YIELD as dispatched; dispatcher fills current depth.
+
 ## Seat-run ledger
 
 | Run | Command / scope | Counts | EXIT | Wall time | Free disk before / after | Evidence / conditions |
@@ -2106,12 +2232,13 @@ No new STOP or question. YIELD after this one logical turn as ruled.
 | R0-O | Historical request above, psutil str fix; two HEICs | 2 probed; 61 HEVC streams each; mapped stream 0 was a tile | 0 | 2 s | 189,229,633,536 / 189,228,720,128 bytes | 2026-10-30T04:42:08Z; oracle-facts.json; mapped tile pose scores VOID |
 | R0-E | Historical request above, psutil str fix; IMG_6690 neutral PNG16/default device | done 1, others 0; one PNG 51,873,583 bytes; GPU | 0 | 37.14 s | 189,175,160,832 / 189,113,147,392 bytes | 2026-10-30T04:43:51Z; export-facts.json; dispatcher-seat timing observation |
 | 5a | uv run python tools/photo_check.py --name wp3.6p-io; configured folder, all 73 | photos 73; read_ok 73; refused 0; round_trip_problems 0; verdict ok 73; gps_kept and maker_note_kept each 73/73 | 0 | 309 s | 188,759,597,056 / 186,750,087,168 bytes | Dispatcher supplied: 2026-10-30T05:20:40Z-05:25:50Z; work/wp3.6/photo-check/wp3.6p-io/ in main tree; unchanged instrument's existing root; NOT opened/rerun by cell |
-| 5b / stopped | Invoke-WP36PSeatRun -Id 5b; photo_verify orientation, selected 62 | attempted 17, all HEIC-0: 7 passed, 9 inconclusive (discrimination only), 1 failed IMG_6764.HEIC oracle_failed; complete false | 1 | 52.6 s | 189,399,732,224 / 188,959,887,360 bytes | Dispatcher seat, 2026-11-01T09:22:07Z; size limit, not product finding; not opened/rerun by cell; restart owed |
-| 5b / restart | Same orientation command, from start, fresh run identifiers | PENDING | NOT RUN | PENDING | PENDING | CHARC 2aaa7e0a size equivalence; thumbnail remains non-gating |
-| 5c-16 | photo_verify export, all 73, neutral/depth 16 | PENDING | NOT RUN | PENDING | PENDING | EXCLUSIVE window opened/closed to CHARC; WP4.6 cannot run heavy work; seven retained representative PNGs |
-| 5c-8 | photo_verify export, seven representatives, neutral/depth 8 | PENDING | NOT RUN | PENDING | PENDING | PNGs measured then removed by tool |
-| 5d-default | photo_verify memory, IMG_6690.HEIC/default device/c3 defaults | PENDING | NOT RUN | PENDING | PENDING | EXCLUSIVE; default processing, not neutral |
-| 5d-cpu | photo_verify memory, same photo/force CPU/c3 defaults | PENDING | NOT RUN | PENDING | PENDING | EXCLUSIVE; 16 GB and 8188 MiB comparisons |
+| 5b | `uv run python tools/photo_verify.py orientation --class-map work/wp3.6p/class-map.json --name wp3.6p-5b` | selected 62 / attempted 17, HEIC-0: 7 pass, 9 inconclusive, 1 oracle_failed IMG_6764.HEIC; incomplete | 1 | 52.6347192 s | 189,399,732,224 / 188,959,887,360 bytes | 2026-11-01T09:22:07.2291929Z; a8c9778d; old strict oracle size STOP; CHARC 2aaa7e0a granted narrow equivalence; seat-turn8/5b.json/.log |
+| 5b-r2 | `uv run python tools/photo_verify.py orientation --class-map work/wp3.6p/class-map.json --name wp3.6p-5b-r2` | selected/attempted 62; read failed 0; HEIC-0 pass/inc/rounded/fail 14/9/7/0; HEIC-90 3/0/0/0; HEIC-180 20/0/0/0; HEIC-270 13/3/0/0; incomplete solely due to inconclusives | 1 | 227.1362275 s | 188,824,584,192 / 187,323,396,096 bytes | 2026-11-01T09:42:38.0493140Z; 790541e7; restarted from start; 7 rounded all last, no orientation/oracle failure; 50 pass / 12 inconclusive accounting; seat-turn8/5b-r2.json/.log |
+| q4 | `uv run pytest -q tests/test_photo_verify.py::test_owner_heic_orientation_four_irot_classes --basetemp=work/wp3.6p/seat-q4-tmp -p no:cacheprovider` | 1 passed in 10.74s; four named HEICs, not skipped | 0 | 11.9233379 s | 188,957,294,592 / 188,924,227,584 bytes | 2026-11-01T09:24:21.8867497Z; unrestricted dispatcher seat, no sandbox shim; receipt q4.log; seat-turn8/q4.json/.log |
+| 5c-8 | `uv run python tools/photo_verify.py export --class-map work/wp3.6p/class-map.json --name wp3.6p-5c-8 --bit-depth 8 --representatives-only` | 7 selected/attempted, complete; one per class, V5/D53/V9 1/1/1 each; depth 8/8, GPU, no failed check | 0 | 55.4948595 s | 188,924,223,488 / 188,923,252,736 bytes | 2026-11-01T09:24:33.9033965Z; a8c9778d before turn 9; export evidence stands by AST audit; seven successful PNGs measured/removed; seat-turn8/5c-8.json/.log |
+| 5c-16 | `uv run python tools/photo_verify.py export --class-map work/wp3.6p/class-map.json --name wp3.6p-5c-16 --bit-depth 16` | 73 selected/attempted, complete; class n HEIC-0 23, HEIC-90 3, HEIC-180 20, HEIC-270 16, JPG-A 2, JPG-Z 8, JPG-M 1: V5/D53/V9 all n; depth 16/16, GPU, no failed check | 0 | 487.7224381 s | 179,173,720,064 / 178,657,312,768 bytes | 2026-11-01T18:19:13.2348080Z; EXCLUSIVE 18:19:13Z-18:27:21Z; seven representatives retained, 66 others removed; Z/M separate; seat-turn8/5c-16.json/.log |
+| 5d-default | `uv run python tools/photo_verify.py memory --class-map work/wp3.6p/class-map.json --name wp3.6p-5d-default --file IMG_6690.HEIC --bit-depth 16 --exclusive` | 1 HEIC-180; GPU; estimate 6,128,796,496; RSS peak 1,926,164,480; device peak 4,108,320,768 bytes; within limits, no fallback/errors | 0 | 11.3000835 s | 178,652,057,600 / 178,511,532,032 bytes | 2026-11-01T18:28:34.6247676Z; seat-declared EXCLUSIVE, c3 defaults / fresh runner / no neutral; sampler_errors empty; seat-turn8/5d-default.json/.log |
+| 5d-cpu | `uv run python tools/photo_verify.py memory --class-map work/wp3.6p/class-map.json --name wp3.6p-5d-cpu --file IMG_6690.HEIC --bit-depth 16 --exclusive --force-cpu` | 1 HEIC-180; CPU: forced; RSS peak 3,138,392,064; device peak 145,752,064 bytes (baseline); within limits, no errors | 0 | 58.4422013 s | 178,511,527,936 / 178,369,970,176 bytes | 2026-11-01T18:28:45.9751258Z; seat-declared EXCLUSIVE, same photo/c3 defaults / fresh forced-CPU runner; sampler_errors empty; seat-turn8/5d-cpu.json/.log |
 
 ## Depth and handoff
 
@@ -2125,14 +2252,16 @@ No new STOP or question. YIELD after this one logical turn as ruled.
 | 6 / Reviewer A round 2 adjudication | 101,571 tokens (dispatcher reading after turn 6; transcript context compaction) | Adjudication committed 081f851c; 10 dispositions, 21 passing probes; R2-QA ruled before turn 7; turn-5 reading 178,999 was before compaction |
 | 7 / Reviewer A round 2 remediation | 187,455 tokens (dispatcher reading; session 2 retired) | 4 tool fix groups plus RED/GREEN controls, 1 test-only group; 87 light cases pass; 5 Limit/report lines staged; YIELD for A3 |
 | 8 / Reviewer A round 3 adjudication and terminating clean-up | 152,054 tokens (dispatcher reading; session 3) | 9 advisories adjudicated; 3 tool fix groups with RED/GREEN controls; 102 light cases pass; conditional A convergence; YIELD for seat runs and executing B |
-| 9 / odd-width size equivalence, CHARC 2aaa7e0a | PENDING dispatcher reading; session 3 | 7 RED cases on a8c9778d; 15 new controls, 117 light passes; both crop edges and class counts; YIELD for 5b restart |
+| 9 / odd-width size equivalence, CHARC 2aaa7e0a | 184,466 tokens (dispatcher reading; session 3) | 7 RED cases on a8c9778d; 15 new controls, 117 light passes; both crop edges and class counts; YIELD for 5b restart |
+| 10 / seat rows and real-photo report | PENDING dispatcher reading; session 3 | 5b-r2 / 5c-8 / 5c-16 / both 5d legs parsed; q4 and 5a receipts checked; report delivered; light checks green; YIELD for executing B |
 
 Evaluate near 200K; stop at a step boundary near 250K per this dispatch.
 The supplied readings are 178,999 after turn 5 and 101,571 after turn 6,
 with transcript context compaction between them. Evaluated at this remediation
 boundary; this turn ends here as dispatched. No current cumulative token number
 is invented; turn 7 is 187,455 (session 2), turn 8 is 152,054 (session 3);
-the dispatcher fills turn 9. Evaluate again at the next step boundary near 200K.
+turn 9 is 184,466 (session 3); the dispatcher fills turn 10. Evaluated at this
+report/handoff boundary near 200K; STOP/YIELD here as dispatched, before B.
 Historical turn-1 validation was limited to the ledger's ASCII/LF and owned-file diff.
 Observed validation: PASS for ASCII, LF, final newline, no trailing whitespace,
 both embedded Python RUN REQUEST snippets parsing, seven-class example JSON
