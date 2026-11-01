@@ -444,7 +444,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | 3 / T2-1 amendment | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 155,324 | committed as `9d662f09` (0 CR); CHARC `da72ec040fc4de35` resolved T3-1 |
 | 4 / T3-1 amendment | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 178,501 | committed as `0d310b87` (0 CR); CHARC `8276adb56f541a57` resolved T4-1 by end state |
 | 5 / T4 complete; session 2 ends | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 194,928 | retired after `93869f4c`; fresh session 3 starts T5 from this ledger |
-| 6 / T5-T6 product STOP; session 3 starts | pending dispatcher | pending dispatcher | dispatcher reads footer; route T6-1 to CHARC before further exports |
+| 6 / T5-T6 product STOP; session 3 starts | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | 120,480 | committed `462d7bb6` (0 CR); CHARC `3a1497d6` permits T6/T7 continuation with T6-1 KNOWN RED, owned by WP-D54 |
+| 7 / T6 validation | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | pending dispatcher | dispatcher reads footer; evaluate near 200K, stop at a step boundary near 250K |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -1271,3 +1272,209 @@ PYTHONPATH=scripts uv run pytest -q -rs tests/test_v51_video_acceptance.py::test
 Return the log/XML plus the best-effort presence and device properties for the
 later report. No heavy seat run is started here. This is the binding T6 yield;
 await CHARC's T6-1 disposition and the dispatcher's next-turn instructions.
+
+## Session 3 / Turn 7: T6 complete
+
+### Ruling, scope and depth
+
+Base is `462d7bb6` (dispatcher: all three committed files have zero CR).
+Session 3 is `01a19671-ba33-7f71-a3ee-47dd1c74f2db`; dispatcher-supplied
+depth after turn 6 is **120,480**, now recorded in the depth table. Turn 7's
+depth remains for the dispatcher to fill. Evaluate near 200K and stop at a
+step boundary near 250K.
+
+CHARC `3a1497d6ceb21355` (2026-11-01T09:41:37Z) concurs that the missing
+D54 words are a product defect and authorizes WP5.1 to continue T6/T7 with
+that node unchanged. WP-D54 owns only the encoder's assumed-tags warning
+text and its unit tests; it is a separate package. The candidate must be
+rebased over that fix before the gate. T8's shell half proceeds independently.
+
+**KNOWN RED: T6-1, product fix WP-D54 (CHARC 3a1497d6).**
+
+`test_v6_untagged_runner_warns_bt709_limited` and its literal assertion remain
+EXACTLY as committed: no code edit, xfail, skip or softened assertion. No
+support or video-module code changed in this turn. "T6 complete" here means
+the full T6 roster has now been exercised across cell and seat; acceptance
+is NOT green. The additional V9 failures below require a new STOP.
+
+### T6-2 [MAJOR, NEW, in envelope]: neutral post-encode mean exceeds 2.5/255
+
+**STOP. Recommended: CHARC adjudicates/routes the three post-encode bound
+failures before further build work; retain all failing nodes, the unchanged
+2.5/255 bound and the commissioned libx265/standard runner settings.** No
+product change, tolerance proposal applied, quality override, shorter sample
+or weakened assertion was made.
+
+All nodes have prefix `tests/test_v51_video_acceptance.py::`:
+
+| Failing node | Mean absolute error, 1/255 | Maximum, 1/255 | Bound |
+|---|---:|---:|---:|
+| test_v9_neutral_runner_postencode[hevc8-bt709-full] | 2.953815972222 | 183 | mean <= 2.5 |
+| test_v9_neutral_runner_postencode[untagged] | 2.788103780864 | 203 | mean <= 2.5 |
+| test_v9_neutral_runner_postencode[rotated] | 2.953815972222 | 183 | mean <= 2.5 |
+
+Failure is `_assert_postencode` at
+`tests/test_v51_video_acceptance.py:265`: `PAIR_MEAN_SYNTHETIC exceeded`.
+The three assertions fail on the real shipped runner's outputs. Each source
+and output contains 45 decoded frames at 320 x 180 RGB (7,776,000 samples),
+and their shapes agree. The actual runner records say `parameters_from=neutral`,
+method `c3`, encoder `libx265`, quality `standard`. Exit status for each export
+is 0; this is a numeric acceptance failure after successful export.
+
+Cheap independent confirmation, without another encode or the acceptance
+array-conversion helper: `t7-results.log` reads the saved source/output
+`decoded.raw` files directly with NumPy, subtracts flattened uint8 samples as
+float64 and recomputes both mean and maximum. It independently confirms all
+three values above. The same direct calculation for the passing hevc10 case
+uses little-endian uint16 scaled by 255/65535; mean **2.472876682319**, max
+**183**, agreeing with its JUnit properties. Both sides use the same FFmpeg
+decode command/filter as committed. No encoder setting or bound was varied
+after this STOP. The evidence establishes the over-bound figures, not a
+root-cause attribution between product encoding and the commissioned
+post-encode acceptance bound (the older WP3.5 pair characterization excludes
+the encoder, as its existing docstring says). That adjudication belongs to CHARC.
+
+The V9 three failed before their later colour/rotation assertions and planted
+controls; those steps are NOT claimed executed for these three instances.
+The pre-existing V4 nodes separately pass mandatory colour/rotation comparisons.
+
+### Whole T6 sandbox run and per-node table
+
+Authorized run WITHOUT `-x` (PowerShell set `PYTHONPATH=scripts`; command below
+is the equivalent runnable Git Bash form):
+
+```bash
+PYTHONPATH=scripts uv run pytest -q tests/test_v51_video_acceptance.py --basetemp=work/wp5.1/t7-tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t7-video.xml > work/wp5.1/t7-video.log 2>&1
+```
+
+Exit **1**: **4 failed, 13 passed, 1 deselected in 99.22 s**. One failure is
+KNOWN RED T6-1; three are new T6-2. Every sandbox-eligible instance ran; the
+one deselected footage instance was already run at the dispatcher's seat.
+No skipped instance and no additional export run after the completed batch.
+All MD5 guards and names-only runner/fidelity/provenance checks that were
+reached passed. This is not the whole-suite gate.
+
+Every node below has prefix `tests/test_v51_video_acceptance.py::`. Sandbox
+seconds are JUnit setup + call + teardown. G2's seat seconds are total wall
+time, with call time separately recorded below. Markers remain provisional
+as in turn 6, pending the owner's isolated/leg measurements.
+
+| Node | Marker / leg | Result | Seconds |
+|---|---|---|---:|
+| test_v4_runner_preserves_fixture_fidelity[hevc8-bt709-full] | slow / serial provisional | PASS | 6.087 |
+| test_v4_runner_preserves_fixture_fidelity[hevc10] | slow / serial provisional | PASS | 5.251 |
+| test_v4_runner_preserves_fixture_fidelity[untagged] | slow / serial provisional | PASS | 5.165 |
+| test_v4_runner_preserves_fixture_fidelity[vfr] | slow / serial provisional | PASS | 4.349 |
+| test_v4_runner_preserves_fixture_fidelity[rotated] | slow / serial provisional | PASS | 5.308 |
+| test_v4_truncated_runner_batch_obeys_d86 | slow / serial provisional | PASS | 8.121 |
+| test_v4_real_trim_records_best_effort_presence | footage, slow / serial | PASS at dispatcher seat | 92.460 |
+| test_v6_hdr_refusals_do_not_stop_batch | slow / serial provisional | PASS | 5.084 |
+| test_v6_untagged_runner_warns_bt709_limited | slow / serial provisional | KNOWN RED T6-1 / WP-D54 | 4.895 |
+| test_v9_neutral_runner_postencode[hevc8-bt709-full] | slow / serial provisional | FAIL T6-2 | 4.870 |
+| test_v9_neutral_runner_postencode[untagged] | slow / serial provisional | FAIL T6-2 | 4.992 |
+| test_v9_neutral_runner_postencode[rotated] | slow / serial provisional | FAIL T6-2 | 5.022 |
+| test_v9_neutral_runner_postencode[hevc10] | slow / serial provisional | PASS | 7.631 |
+| test_v10_repeated_video_exports_are_numbered | slow / serial provisional | PASS | 9.014 |
+| test_v10_existing_video_output_is_unchanged | slow / serial provisional | PASS | 4.363 |
+| test_v10_mov_mp4_share_one_numbering_sequence | slow / serial provisional | PASS | 9.504 |
+| test_d91_video_provenance[default] | slow / serial provisional | PASS | 4.280 |
+| test_d91_video_provenance[off] | slow / serial provisional | PASS | 4.465 |
+
+### Executed planted-failure controls
+
+All 13 passing sandbox instances and G2's passing seat instance exercised
+their controls; JUnit properties retain the execution evidence:
+
+| Node family / instances | Wrong result actually rejected |
+|---|---|
+| V4 fixture fidelity x5 | mandatory frame-count difference and missing roster |
+| V4 VFR (additional) | a single rational pts changed by 1 us; actual 30-frame exact sequence compared and variable steps checked |
+| V4 truncated | same fidelity controls; dropped D86 warning; following item marked not run |
+| V4 real trim at seat | same fidelity controls; dropped GPMF telemetry |
+| V6 HDR batch | generic HLG refusal, generic PQ refusal, following SDR item marked not run |
+| V9 hevc10 | 3/255 RGB offset; each changed colour tag; changed tkhd display orientation |
+| V10 repeated | reusing the first output name instead of numbering |
+| V10 pre-existing file | selecting the planted first output instead of `_2` |
+| V10 MOV/MP4 | using `.mov` as the second output extension instead of the shared `.mp4` sequence |
+| D91 default | wrong app_version, empty/wrong parameters, full path in source name |
+| D91 off | unwanted embedded provenance |
+
+The known-red V6 untagged node fails before its empty-warning mutation;
+the three new failing V9 instances fail before their controls, as stated
+above. Their real failures already demonstrate the assertions reject the
+shipped results; no claim that their later controls ran.
+
+### G2 seat result and V4 best-effort observations
+
+Dispatcher-returned evidence (not a cell footage-folder read): from this
+worktree root at approximately **2026-11-01 09:41Z**, `PYTEST_ADDOPTS` unset:
+
+```bash
+PYTHONPATH=scripts uv run pytest -q -rs tests/test_v51_video_acceptance.py::test_v4_real_trim_records_best_effort_presence --basetemp=work/wp5.1/t6-seat-metadata --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t6-seat-metadata.xml
+```
+
+Exit **0**, **1 passed, 1 warning in 92.46 s**, call **90.61 s**. The warning
+is CuPy's `CUDA path could not be detected` UserWarning. Device property is
+`GPU`; video facts are `device_backend=cuda:0`, `frame_device=cuda:0`,
+`encoder=libx265`, `decode_passes=2`. Both the mandatory-frame-count/roster
+control and dropped-telemetry control were recorded as rejected. All
+mandatory/required comparisons and GPMF carry assertions passed.
+
+Names/presence only, as returned by the dispatcher:
+
+| Best-effort item | Source present | Output present |
+|---|---|---|
+| GPMF gpmd | true | true |
+| Camera atoms | true | true |
+| Timecode track tmcd | true | true |
+| Timecode value | true | true |
+| Creation time: container tag | true | **false** |
+| Creation time: mvhd | true | **false** |
+| Creation time: per-stream tags | true | **false** |
+
+The three creation-time FALSE rows are observations, with no preservation
+assertion and no STOP: they belong to the brief's best-effort set. T10 must
+carry this exact table and the three observed losses into the report's V4
+best-effort section. The report has not yet been authored; the binding yield
+before T10 still applies. Seat evidence files are
+`work/wp5.1/t6-seat-metadata.log` and `work/wp5.1/t6-seat-metadata.xml`.
+
+Budget planning flag: mixed-condition observed totals 99.22 s (this sandbox
+module) + 92.46 s (seat G2) = **191.68 s**, already above 180 s before T7 and
+shell work. This sum is NOT the required same-seat serial-leg delta: final
+isolated measurements, marker classification and leg measurement remain
+pending. Disclose it to CHARC as a budget risk; no node or marker was moved
+to an exclusion, and no budget was raised.
+
+### Light checks, verification loop and yield
+
+| Evidence under work/wp5.1/ | Observed result |
+|---|---|
+| t7-video.log / t7-video.xml | exit 1; 13 pass, 4 fail, 1 deselected; 99.22 s |
+| t7-results.log | per-node times/properties/failure messages; independent saved-raw mean/max confirmation |
+| t7-ruff.log | exit 0; All checks passed! for support/video modules |
+| t7-format.log | exit 0; 2 files already formatted |
+| t7-mypy.log | exit 0; Success: no issues found in 2 source files (MYPYPATH=tools;tests) |
+| t7-lf.log | zero CR bytes in the changed ledger |
+| t7-code-unchanged.log / t7-diff-check.log | exit 0 for unchanged support/video modules and diff whitespace check |
+
+Verification loop: confirmed the authorized known red without editing its
+node; exercised all nine previously unrun sandbox instances; discovered
+three real numeric failures at the commissioned bound; independently
+confirmed their figures directly from saved raw samples. No false positive
+is claimed for those figures and no product root cause is presumed. No
+test/product fix was attempted. Every green-on-arrival node has an executed
+negative control; T6-2 now goes to CHARC. Full acceptance, reviews, serial-leg
+budget measurement and final gate remain pending.
+
+New build findings: Critical 0 / Major 1 / Minor 0; in-envelope 1 / out 0;
+NEW 1 (T6-2, three node instances) / REOPENED 0. One existing known-red
+Major (T6-1) remains open under WP-D54, not a new or reopened finding.
+Reverts 0; product fixes 0; test-code fixes 0; Reviewer A rounds 0 this turn.
+
+Only this owned ledger changed. The support and video modules, particularly
+the known-red node, are untouched. No product/existing-test edit, dependency,
+fixture, tolerance change, local-config edit, footage-folder read, other
+worktree access, mailbox post, git-index write or commit. No new seat run
+request is needed. Yield at the T6 boundary with T6-2 for CHARC; do not start
+T7 in this turn.
