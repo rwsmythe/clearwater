@@ -478,10 +478,212 @@ class RenderDigests:
         return result
 
 
-# T9 fills the node addresses alongside the report, after those modules exist.
-# An empty tuple is explicitly pending; it is never evidence of a passing test.
+def _test_nodes(module: str, *functions: str) -> tuple[str, ...]:
+    return tuple(f"tests/{module}.py::{function}" for function in functions)
+
+
+# Function addresses represent every parameterized instance of that function.
+# T9 validates these without executing the referenced tests or spawning pytest.
+# The final gate checks expanded collection identity; T10 uses this same roster.
 ACCEPTANCE_NODES: dict[str, tuple[str, ...]] = {
-    **{f"V{number}": () for number in range(1, 19)},
-    "N10": (),
-    "D91": (),
+    "V1": (
+        *_test_nodes(
+            "test_methods_compensation",
+            "test_ancuti_chain_matches_prototype",
+            "test_ancuti_render_matches_prototype_on_supplied_values",
+            "test_c3_matches_prototype",
+            "test_c3_matches_prototype_off_default",
+            "test_uniform_image",
+            "test_near_zero_red_cap_binds_and_none_compensates",
+            "test_cap_binding_not_binding_and_none",
+            "test_blue_off_leaves_blue_and_green_unchanged",
+            "test_c3_mask_below_at_and_above_threshold",
+        ),
+        *_test_nodes(
+            "test_methods_white_balance",
+            "test_measure_closed_form_and_render_match_prototype",
+            "test_near_zero_red_hits_the_floor_and_the_clamp",
+            "test_clamp_binds_as_d99_says",
+        ),
+        *_test_nodes(
+            "test_methods_fusion_prototype",
+            "test_fusion_inputs_with_supplied_bounds",
+            "test_weights",
+            "test_multiscale_fusion",
+        ),
+        *_test_nodes("test_methods_fusion", "test_v1_edge_cases"),
+        *_test_nodes(
+            "test_methods_assembly", "test_v1_stage_measured_with_the_supplied_earlier_records"
+        ),
+        *_test_nodes(
+            "test_methods_assembly_prototype",
+            "test_analyze_against_statistics_of",
+            "test_render_against_correct_with_the_same_record",
+            "test_cpu_against_gpu_within_ad11",
+        ),
+    ),
+    "V2": (),
+    "V3": _test_nodes(
+        "test_wp42_v3_product",
+        "test_the_lossless_clips_decode_inside_wp39s_envelope",
+        "test_ad14_bound_with_the_product_method",
+        "test_v3_ratio_on_the_jittering_patch_clip_with_the_product_method",
+    ),
+    "V4": (
+        *_test_nodes(
+            "test_v51_video_acceptance",
+            "test_v4_runner_preserves_fixture_fidelity",
+            "test_v4_truncated_runner_batch_obeys_d86",
+            "test_v4_real_trim_records_best_effort_presence",
+        ),
+        *_test_nodes(
+            "test_wp42_video_path",
+            "test_v4_through_the_composition_on_the_cpu",
+            "test_v4_through_the_composition_on_the_gpu_with_device_frames",
+        ),
+        *_test_nodes(
+            "test_jobs_export_video",
+            "test_v4_every_decodable_sample_through_the_engine",
+            "test_v4_synthetic_5k3_8_7_clip",
+            "test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item",
+        ),
+    ),
+    "V5": (
+        *_test_nodes("test_wp41_photo_path", "test_v5_bit_depth_icc_exif_and_provenance"),
+        *_test_nodes(
+            "test_v51_photo_acceptance",
+            "test_v5_jpeg_two_readers_and_pose",
+            "test_v5_heic_two_readers_and_ad24",
+        ),
+    ),
+    "V6": (
+        *_test_nodes(
+            "test_v51_video_acceptance",
+            "test_v6_hdr_refusals_do_not_stop_batch",
+            "test_v6_untagged_runner_warns_bt709_limited",
+            "test_v4_truncated_runner_batch_obeys_d86",
+        ),
+        *_test_nodes(
+            "test_v51_shell_acceptance", "test_v6_real_untagged_shell_warns_bt709_limited"
+        ),
+        *_test_nodes(
+            "test_headless_export",
+            "test_refused_items_fail_and_the_batch_continues",
+            "test_damaged_photos_are_failed_items_and_the_batch_continues",
+        ),
+        *_test_nodes(
+            "test_app_wiring",
+            "test_g10_damaged_unsupported_and_untagged_inputs_get_a_readable_message",
+        ),
+    ),
+    "V7": _test_nodes(
+        "test_app_v7",
+        "test_v7_a_b_analysis_and_scrubbing",
+        "test_v7_c_e_export_and_a_full_render_during_it",
+        "test_v7_d_a_batch_of_300_stills",
+        "test_v7_f_start_up_with_a_slow_cache_open",
+    ),
+    "V8": (
+        *_test_nodes(
+            "test_app_v8_v18",
+            "test_v8_photo_preview_at_1_1_and_k_2_and_4_against_the_downscaled_export",
+            "test_v8_photo_k_above_1_on_real_sized_content",
+            "test_dr75_an_nclx_only_p3_photo_is_displayed_through_the_profile_its_export_embeds",
+            "test_v8_video_pre_encode_through_the_harness_on_the_shells_frame",
+        ),
+        *_test_nodes("test_methods_assembly_v8", "test_v8_preview_against_the_downscaled_export"),
+    ),
+    "V9": (
+        *_test_nodes("test_wp41_photo_path", "test_v9_neutral_is_the_identity"),
+        *_test_nodes(
+            "test_wp42_video_path", "test_v9_neutral_parameters_reproduce_the_decoded_source"
+        ),
+        *_test_nodes("test_v51_video_acceptance", "test_v9_neutral_runner_postencode"),
+        *_test_nodes("test_color_roundtrip", "test_pair_round_trip_per_sample"),
+    ),
+    "V10": (
+        *_test_nodes(
+            "test_wp41_photo_path",
+            "test_v10_cross_format_clash_is_numbered",
+            "test_v10_an_existing_output_is_never_overwritten",
+            "test_v10_custom_suffix",
+        ),
+        *_test_nodes(
+            "test_v51_video_acceptance",
+            "test_v10_repeated_video_exports_are_numbered",
+            "test_v10_existing_video_output_is_unchanged",
+            "test_v10_mov_mp4_share_one_numbering_sequence",
+        ),
+    ),
+    "V11": (
+        *_test_nodes(
+            "test_v51_photo_acceptance",
+            "test_v11_png_disk_full_removes_partial_output",
+            "test_v11_photo_crash_leftovers_are_cleaned_at_start",
+            "test_d85_same_file_cleanup_preserves_installed_final",
+        ),
+        *_test_nodes(
+            "test_jobs_export_video",
+            "test_v11_an_encoder_killed_mid_stream_leaves_no_partial_output",
+            "test_a_cancel_mid_encode_leaves_nothing_and_keeps_earlier_outputs",
+            "test_a_cancel_during_the_product_sinks_close_is_aborted_and_leaves_nothing",
+            "test_v11_a_killed_export_process_leaves_only_a_temporary_that_is_cleaned_up",
+        ),
+        *_test_nodes(
+            "test_jobs_export",
+            "test_cancel_at_each_phase_leaves_nothing",
+            "test_disk_full_from_the_sink_is_named_and_leaves_nothing",
+        ),
+        *_test_nodes(
+            "test_app_leftovers", "test_v11_leftovers_of_a_crash_are_removed_at_the_next_start"
+        ),
+    ),
+    "V12": (),
+    "V13": _test_nodes("test_config_presets", "test_v13_export_then_import_reproduces_the_set"),
+    "V14": (),
+    "V15": (),
+    "V16": (),
+    "V17": (
+        *_test_nodes(
+            "test_wp42_video_path", "test_v17_a_reopen_skips_the_decode_and_renders_the_same_frames"
+        ),
+        *_test_nodes(
+            "test_analysis_engine",
+            "test_a_complete_entry_skips_the_decode_pass_and_gives_the_same_statistics",
+        ),
+    ),
+    "V18": (
+        *_test_nodes(
+            "test_v51_shell_acceptance", "test_v18_real_trim_preview_precedes_analysis_and_updates"
+        ),
+        *_test_nodes(
+            "test_app_v8_v18",
+            "test_v18_a_corrected_frame_shows_before_the_analysis_completes_and_updates_after",
+        ),
+    ),
+    "N10": (
+        *_test_nodes(
+            "test_wp41_photo_path",
+            "test_n10_the_same_still_twice_is_identical",
+            "test_gpu_export_reports_gpu_and_matches_the_cpu",
+        ),
+        *_test_nodes("test_methods_assembly_prototype", "test_same_device_twice_is_bit_identical"),
+        *_test_nodes(
+            "test_v51_video_acceptance",
+            "test_n10_video_cpu_render_digests_repeat",
+            "test_n10_video_gpu_render_digests_repeat_and_match_cpu",
+        ),
+    ),
+    "D91": (
+        *_test_nodes("test_wp41_photo_path", "test_v5_bit_depth_icc_exif_and_provenance"),
+        *_test_nodes("test_v51_video_acceptance", "test_d91_video_provenance"),
+    ),
+}
+
+ACCEPTANCE_NON_NODE_REASONS: dict[str, str] = {
+    "V2": "Owner visual review at CP5 is pending; no automated preference oracle.",
+    "V12": "Chapter grouping is deferred to v2 (spec 0.5.3).",
+    "V14": "Six prototype results and decisions are cited in docs/reports/wp1.6-gate-report.md.",
+    "V15": "Memory figures belong to WP5.2 and are pending; no WP5.1 measurement node.",
+    "V16": "Performance figures belong to WP5.2 and are pending; no WP5.1 measurement node.",
 }

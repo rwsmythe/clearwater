@@ -447,7 +447,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | 6 / T5-T6 product STOP; session 3 starts | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | 120,480 | committed `462d7bb6` (0 CR); CHARC `3a1497d6` permits T6/T7 continuation with T6-1 KNOWN RED, owned by WP-D54 |
 | 7 / T6 validation | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | 143,997 | committed `7687f564` (ledger, 0 CR); brief amendment `1ed04a21` folds in CHARC's T6-1/T6-2 rulings |
 | 8 / T6-2 remediation and T7; session 3 ends | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | 177,474 | retired after `2f1c0954`; fresh session 4 starts T8 from this ledger |
-| 9 / T8; session 4 starts | pending dispatcher | pending dispatcher | dispatcher reads footer and runs both GUI nodes at its seat; yield after T8 |
+| 9 / T8; session 4 starts | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | 91,630 | committed `84a030a1` (0 CR); seat format check and both GUI nodes pass |
+| 10 / T8 seat result and T9 | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | pending dispatcher | read footer; Reviewer A round 1 at the seat follows this yield; evaluate near 200K, stop near 250K at a step boundary |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -1821,3 +1822,199 @@ result, and any skips/failures. A real-product failure stays red and is a
 STOP to CHARC under Q3; no softening or product repair is authorized here.
 The 300 s package serial-leg budget remains in force, measured at the gate;
 these pending durations are not yet a serial delta. Yield after T8.
+
+## Session 4 / Turn 10: T8 seat result and T9
+
+### Depth, base and carried state
+
+Turn 9 was committed as `84a030a1`, with zero CR and the seat's
+ruff format --check passing. The dispatcher supplied session 4 id
+`01a1968e-ac9f-7f81-aecc-78a4b492c479` and depth **91,630** after that
+turn (context window 475,000); the depth table records them. This turn's
+depth is left for the dispatcher, never estimated. Evaluate near 200K and
+stop at a step boundary near 250K.
+
+This turn owns T9 only: support's function-address table, the one pure
+traceability node and this ledger. No report is created yet; T10 follows
+Reviewer A's convergence. No rebase is performed. The candidate will be
+rebased by the dispatcher over WP4.6 and WP-D54 before its gate. Known
+T6-1 is unchanged and remains a failing acceptance assertion until WP-D54
+lands; its failure is not a new STOP or a reason to relax the test.
+
+### T8 seat result: both shell legs PASS
+
+Returned by the dispatcher: 2026-11-01 about 10:09Z, from this worktree,
+PYTEST_ADDOPTS unset, offscreen QPA, the exact turn-9 RUN REQUEST.
+Exit **0**, **2 passed in 80.94 s**, no skip. The local XML was also read
+for its names/counts/properties, not rerun; summary evidence is
+`work/wp5.1/t10-seat-summary.log`. Source names and record values below
+contain no absolute paths. The original log/XML are
+`work/wp5.1/t9-seat-shell.log` / `work/wp5.1/t9-seat-shell.xml`.
+
+| Node (tests/test_v51_shell_acceptance.py::) | Markers / leg | Seat result | XML setup + call + teardown seconds |
+|---|---|---|---:|
+| test_v6_real_untagged_shell_warns_bt709_limited | gui / serial | PASS | 0.815 |
+| test_v18_real_trim_preview_precedes_analysis_and_updates | gui, footage, slow / serial | PASS | 79.344 |
+
+G4 / V6 on **untagged.mp4** records exactly:
+
+> The video's colour tags are missing or unexpected (range missing; primaries missing; transfer missing; matrix missing). Clearwater assumes BT.709 colours and limited range for those.
+
+Its recorded mutation probe is "absent warning and either missing word
+rejected". The shell half of G4 PASSES on the shipped product: the shell
+shows the probe's own fault text. No shell STOP. The old
+`test_app_wiring.py` empty-word row is unchanged and is still only weaker
+coverage, not contrary evidence. This new node's measured time is below
+5 s, so it retains gui without an extra slow marker.
+
+G10 / V18 on **GX011627-trim.mp4** records provisional_analysis_phase
+**running**, provisional_render_count **1**, analysis_frame_count **90**,
+shown_pts_ticks **0**, preview_pixel_change_max_255 **3** and
+preview_pixel_change_mean_255 **0.578** (XML unrounded
+0.5784706147119342). shown_statistics is "equal to smoothed_record at
+the unchanged pts". Thus the running shell shows a corrected provisional
+frame before completion, then visibly changes its pixels and uses exactly
+the smoothed statistics at the same pts. MD5 and all in-node assertions
+passed. The matrix's V6 and V18 rows include these exact function addresses;
+these results are the T10 report's input, not pending GUI outcomes.
+
+### V7 figure-of-record update supplied by the dispatcher
+
+WP4.6 was accepted on main **bbb4ef3e**, 2026-11-01 10:38Z. The returned
+window figures are **(c) 39.0 ms PASS** and **(e) 48.0 ms PASS**; DR-98's
+STOPs are closed at CHARC's accept commit. T10 cites WP4.3 window 5 for
+(a) 18, (b) 19, (d) 56 and (f) 50.6 ms PASS, then WP4.6's window for
+(c)/(e), using `docs/proofs/wp4.6-accept.md` and
+`docs/reports/wp4.6-export-process.md`. Those later-main documents are
+read on the final rebased candidate, never in another worktree. These
+returned figures replace the historical pending DR-98 status for T10;
+WP5.1 does not remeasure them. V7's table still references the existing
+four automated workload functions as well as those report citations.
+
+### T9 matrix and validation form
+
+`acceptance_support.ACCEPTANCE_NODES` now explicitly contains all **20**
+ids: V1-V18, N10 and D91, with **82 function-address references**. Each
+address is `tests/test_module.py::test_function`; parameterized function
+addresses represent every instance. T10 uses this same roster for its
+matrix. The table includes existing unit/composition/shell coverage and
+every new WP5.1 acceptance function (the D85 hard-link witness under V11),
+without duplicating any existing implementation test. V1 names individual
+compensation, cap, mask, white-balance/clamp, fusion and ordering checks;
+the compensation image fixtures include their 10-bit grid. V3 names the
+product-method jitter ratio and AD-14 nodes; no real static clip is
+invented. V4 names mandatory and best-effort runner legs and existing
+10-bit/GPU/real-container coverage. V17's existing reopen node also checks
+cache-format mismatch re-analysis. D91's photo node already checks default
+and disabled provenance; the new video node covers both modes.
+
+`ACCEPTANCE_NON_NODE_REASONS` explicitly accounts for the five empty
+automated rows: **V2 CP5 owner review pending; V12 v2; V14 the six-result
+wp1.6 gate report; V15 and V16 WP5.2 pending**. An empty reason, a missing
+id or an empty node list without its own reason fails the traceability
+assertion. An empty tuple is no longer a silent placeholder.
+
+The new parallel-leg node is
+`tests/test_v51_traceability.py::test_acceptance_matrix_references_existing_test_functions`.
+It imports each module with importlib and inspects each named function;
+it requests no GUI/footage/GPU fixture, executes none of those referenced
+tests and spawns no subprocess. It rejects malformed addresses, missing
+modules/functions, non-functions, imported aliases and __test__=False
+functions. No pre-produced collection file is required. This is the
+brief's module-import/function-name form; parameter ids and fixture
+expansion remain the final gate's collection-identity check.
+
+### Stale-node RED then GREEN
+
+First ran the traceability node with a planted stale V1 address passed to
+the validator without catching its error:
+
+```bash
+PYTHONPATH=scripts uv run pytest -q tests/test_v51_traceability.py --basetemp=work/wp5.1/t10-red-tmp -p sandbox_mkdir_shim -p no:cacheprovider -o junit_family=xunit1 --junitxml=work/wp5.1/t10-red.xml > work/wp5.1/t10-red.log 2>&1
+```
+
+Exit **1**, **1 failed in 1.97 s**, specifically:
+`stale acceptance node for V1: tests/test_v51_traceability.py::test_planted_stale_acceptance_node`.
+The valid table completed first, so this RED is the intentional stale
+address, not a typo in the real roster. Then retained the same planted
+table inside pytest.raises matching the stale node's escaped full name.
+
+```bash
+PYTHONPATH=scripts uv run pytest -q tests/test_v51_traceability.py --basetemp=work/wp5.1/t10-trace-tmp -p sandbox_mkdir_shim -p no:cacheprovider -o junit_family=xunit1 --junitxml=work/wp5.1/t10-trace.xml > work/wp5.1/t10-trace.log 2>&1
+```
+
+Exit **0**, **1 passed in 1.13 s**; XML node time **0.241 s**, no markers,
+parallel leg. Properties list all 20 ids, function_addresses **82**, all
+five reasons and mutation_probe
+"stale node rejected by name: tests/test_v51_traceability.py::test_planted_stale_acceptance_node".
+The RED record and executed passing control prove a stale function cannot
+silently count as acceptance coverage. Summary:
+`work/wp5.1/t10-trace-summary.log`.
+
+### Whole light command and checks
+
+```bash
+PYTHONPATH=scripts uv run pytest -q -rs tests/test_v51_photo_acceptance.py tests/test_v51_video_acceptance.py tests/test_v51_shell_acceptance.py tests/test_v51_traceability.py --basetemp=work/wp5.1/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t10-light.xml > work/wp5.1/t10-light.log 2>&1
+```
+
+Exit **1**, **1 failed, 33 passed, 4 deselected in 152.91 s (0:02:32)**.
+No skips. The roster is now **38 instances**: photo 15, video 20, shell 2,
+traceability 1. The light selection contains photo 15, video 18 and
+traceability 1; the two shell nodes, the real-trim metadata node and GPU
+N10 are deselected. XML confirms **photo 15 PASS; video 17 PASS / 1 known
+FAIL; traceability 1 PASS**. Traceability's node time in this full run is
+0.088 s. The extra photo D85 witness accounts for the increase from
+round 0's provisional 37-instance total.
+
+The ONLY failing node is unchanged
+`tests/test_v51_video_acceptance.py::test_v6_untagged_runner_warns_bt709_limited`.
+Its actual assertion remains **D54 BT.709/limited warning missing from
+untagged item**. The returned encoder text still says only the assumed
+codes (color_primaries bt709, color_trc bt709, colorspace bt709,
+color_range tv), without the required literal words. This repeats known
+T6-1 on the pre-WP-D54 base; not a new defect, not xfailed, no test softened.
+Its node time is 6.252 s. No additional failing node or new STOP arose.
+The original failure is retained in t10-light.log/XML; summary by module
+and status is `work/wp5.1/t10-light-summary.log`.
+
+| Evidence under work/wp5.1/ | Observed final-state summary |
+|---|---|
+| t10-red.log / t10-red.xml | exit 1; 1 failed in 1.97 s, planted stale node named in AssertionError |
+| t10-trace.log / t10-trace.xml | exit 0; 1 passed in 1.13 s; 20 ids, 82 references, five non-node reasons; stale-name control executed |
+| t10-light.log / t10-light.xml | exit 1; 33 passed, 1 known T6-1 failed, 4 deselected in 152.91 s; no skips |
+| t10-seat-summary.log | returned T8 XML: warning and control, real-trim running phase and nonzero pixel update, exact smoothed statistics; both PASS |
+| t10-ruff.log | exit 0; All checks passed! for ruff check . |
+| t10-mypy.log | exit 0; Success: no issues found in 146 source files, normal strict project check |
+| t10-test-mypy.log | exit 0; Success: no issues found in 2 source files, strict owned support/traceability check with --follow-imports=silent and MYPYPATH=tools;tests |
+| t10-format.log / t10-format-final.log | owned support formatted initially; final formatter left both owned Python files unchanged; seat format --check remains for the dispatcher |
+| t10-lf.log | zero CR and no trailing whitespace in all three changed files; known-red video module unchanged |
+| t10-diff-check.log | exit 0; git diff --check clean |
+
+### Verification, scope and handoff
+
+Verification loop: confirmed all real function references before the
+planted stale address failed by exact name; retained the same control in
+the passing node and saw it execute again in the whole light run. Confirmed
+every empty automated row has its reason, and all required acceptance ids
+are present. Checked the T8 returned properties against its local XML;
+shell V6 has both words and V18 has a nonzero pixel delta at unchanged pts.
+All allowed light nodes ran, including the known RED; no unrelated failure
+was hidden by a selector or a skip. New suspected product defects 0;
+confirmed new defects 0; rejected false positives 0; product fixes 0.
+The stale-node failure is an intentional test-control RED, not a product
+STOP. NEW 0 / REOPENED 0, reverts 0. No Reviewer A round was run here;
+the dispatcher runs round 1 on the package after this yield.
+
+Locks: only support, the new traceability module and this ledger changed.
+No product/existing-test edit, dependency, committed fixture, interface,
+configuration, footage-folder read, GUI/GPU/footage execution, other-worktree
+access, mailbox post, git-index write, commit or rebase. Scratch logs and
+test writes stayed under work/ and tmp_path. Existing acceptance behavior
+was not edited; the whole-light known RED remains literal. V2, V12,
+V14, V15/V16 are explicit dispositions, not claimed automated passes.
+V7's later-main figures are attributed to the dispatcher, not remeasured.
+The 300 s serial-leg delta and final three-leg collection identity remain
+gate measurements; this light-only run supplies neither.
+
+Yield after T9 for Reviewer A round 1. T10 report waits for convergence,
+as commissioned. No new RUN REQUEST is needed this turn.
