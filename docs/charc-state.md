@@ -150,6 +150,18 @@
   pin the F1 fix by pid-file == process.pid and `clearwater.__file__` == the parent's; V17 traceability row names the
   format-version-mismatch nodes. Then T10 report, Reviewer B (Claude, 92 % rule), gate = parallel + serial + ONE
   fullclip leg (~26 min) with the stall watch and a quiet host. No ruling needed from me.
+  (4d) **WP5.3 B CLEAN (on `2a1e15b1`, executed the two-manifest sequence: 128 rows stay 128, by-item records
+  never shrink, `page` leaves pack.json sha-identical, `presets` refused under the lock). B-F1 fixed `b4416bd7`
+  (judged row never changed or dropped; changed / unreviewable pair = CONFLICT kept byte-identical; sheet written
+  for every other row; `page` exit 2 while one stands) + my addition `6d470028` (each conflict named on the page
+  and stderr with the item, the judged output, the current `_corrected_2` and the recovery sentence; both outputs
+  proved to exist). GEN 32 RULING 20:59Z, CONFIRMED by my silence: `build.py:724` (unlink of a FAILED excerpt
+  attempt whose name came from `_fresh()` in the same call, under the stage lock, never on the page or sheet) is
+  EXEMPT from 'the tool never deletes a numbered output'; condition: one assertion that an earlier run's excerpt
+  survives a failed re-run attempt. Session 5 at 159,243. Next: the RUN REQUESTS (photos, presets, page, clips)
+  after WP5.1's legs, one heavy job at a time. WP5.1 GATE: static clean, collection 7,543, PARALLEL 6,270 / 1 in
+  491 s; SERIAL ALONE since 20:58Z; then FULLCLIP alone (~26 min). Released worktrees `wp3.6p`, `wp-t7` (1.8 GB
+  basetemps) and `wp-d54` are KEPT by gen 32 until the OWNER'S prune word (work/ is never pruned otherwise).
   (4c) **WP5.3 A ROUND 4 RULED 19:10Z (gen 31 query `ece255eb`; A on `de884f7d` NO_NEW_CRITICAL_MAJOR, 136 passed,
   the reviewer's independent state-write audit CONFIRMS the cell's). R4-1 (the per-group excerpt record rewritten
   whole on a targeted re-run; pack.json / page / sheet intact) = NOT the STOP: my round-3 STOP was for the state of
@@ -204,7 +216,7 @@
   (DR-102 / DR-107 reserved for WP-D54). Orchestrator gens 28 -> 29 -> 30 rolled cleanly.
   **OWNER NOTE (advisory, relayed in my recaps): keep gen 29's pane (`-20261031-2335`) open until gen 30 says its
   three child passes returned; the resumed gen 28 pane (`-20261029-2103`) may be closed.** Open owner decisions:
-  none. Owner-pending inputs: none. Owner action pending: none (optional: prune `.worktrees/wp-d54/work`, 1.8 GB, on the owner's word). Next owner checkpoint: CP5 (the WP5.3 pack with
+  none. Owner-pending inputs: none. Owner action pending: none (optional: one prune word covering `.worktrees/wp-d54/work`, `.worktrees/wp-t7/work` (1.8 GB) and `.worktrees/wp3.6p/work`, then the three worktrees are removed, branches kept). Next owner checkpoint: CP5 (the WP5.3 pack with
   its sheet). Every owner-facing summary ends with those lines. Form debt of this file (2,300 lines of history under
   an overwritten pointer): propose the split into `docs/charc-log.md` at the Phase 5 close, not mid-phase.
 - **(gen 10 history follows; newest facts at the end of its block; then gen 9 and older)**
