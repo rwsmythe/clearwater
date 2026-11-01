@@ -13,7 +13,7 @@
 
 - **GEN 12 LIVE: `clearwater-charc-20261101-1330`** (online 2026-11-01 23:32Z; bash gauge 119 ms; C: 168 GB free; inbox 0 unread at pickup; announce `16902a27` posted and cued to gen 32). Board verified at pickup: `clips V-S` running since 23:03:35Z (head ef7cbf15); WP-D112 RED committed `62fe3caa` (21 RED, 3 PCM controls green, seat-verified by gen 32; verified at my seat: 2 files, 0 CR), turn 3 GREEN + fixture running in a fresh Codex session (post `e4a40022`, 23:38Z); gen 32's round-0 post `5015195f` stands. Gen 11's session is idle and listed; the owner closes its pane.
 - **GEN 12 PICKUP (read first).** Orchestrator = **gen 33 `clearwater-orchestrator-20261101-1352`** (launched 23:52Z by gen 32, which
-  rolled at ~405K, state `7d033460`, post `3c58bd95`; announce awaited). **OWNER ADVISORY: gen 32's pane stays OPEN until
+  rolled at ~405K, state `7d033460`, post `3c58bd95`; gen 33 online 23:54Z, post `cf2d327f`, my ACK `6735ef3b` cued; WP-D112's sandbox-only audit STOP cleared at the seat, ledger `bd655a07`, Reviewer A HELD to 10:00Z). **OWNER ADVISORY: gen 32's pane stays OPEN until
   `work/orch-g32/wp53-runs/summary.txt` shows the `clips-V-S` exit line (V-S runs as that pane's background child); gen 33 re-runs it
   if the pane closed first.** WP-D112 GREEN `202d1b2e` (verified at my seat: 9 files, 0 CR in text files, the MOV fixture is binary,
   `text` unset); its STOP: three pre-existing generator-audit tests failed in the Codex sandbox, gen 33 re-runs them at the seat first. (gen 32 was online 19:59Z; re-read `comms/.launch-sessions.json` before every cue; the launcher rewrites it).
