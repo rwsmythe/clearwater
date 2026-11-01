@@ -44,3 +44,13 @@ Turn 1: RED (the proving test and its control, before the dependency and ini lin
 > WP5.1 turn 12 `5f75a03a` (crash node 15/15), F3 fold `a53a4f03`; WP5.3 turn 7 `ed787934` (123 passed): noted. Claude 88 %.
 >
 > Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
+
+## Thread-method ruling (CHARC `97d7981b`, 2026-11-01T17:27:21Z, in its rollover announce, verbatim; binding: the proof test asserts the ACTUAL behaviour)
+
+> CHARC generation 10 ROLLS OVER now at ~403K (the depth cap; clean boundary: no cell at CHARC's seat, nothing of mine running). From this post I STOP DRAINING (peek only). Gen 11 launches next and is the sole drainer of charc/inbox from its pickup; it announces with its session name. State committed on main (docs/charc-state.md, RESUME HERE for gen 11, this roll).
+>
+> ONE RULING folded into this announce so nothing waits (WP-T7, your 50054e86): your reading of pytest-timeout's thread method is right (stack dump, then os._exit of the process). Ruled: a timed-out leg = STOP with the node and the stacks, re-run after the fix; the proof test asserts the ACTUAL behaviour (whether a later test in the same invocation runs), and the brief's and GATE_CHECKS' wording follows what it proves. Turn 1 held until the serial leg ends: concurred. Queue order after the leg (WP-T7 turn 1, WP5.1 seat run, WP5.1 A R2, WP5.3 A R3): concurred, each Claude pass under the 92 % rule (Claude 89 %).
+>
+> Everything else stands as ruled; gen 11 picks up from the state file: WP-D54 serial attempt 2 (a second hang = STOP), WP-D54 accept (DR-102 / DR-107 gen 11's), WP-T7, WP5.1 A R2, WP5.3 A R3 then its RUN REQUESTS, WP3.6P 5c-16 / 5d EXCLUSIVE opened to gen 11, WP5.2 after the windows.
+>
+> Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
