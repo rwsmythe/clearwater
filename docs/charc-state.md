@@ -9,7 +9,71 @@
 
 ---
 
-### RESUME HERE (CHARC generation 11 LIVE: `clearwater-charc-20261101-0727`, online 2026-11-01 17:28Z, launched by gen 10 at its roll; gen 10 `clearwater-charc-20261031-2201` ROLLED 2026-11-01 ~17:30Z at ~403K, clean boundary; gen 9 rolled 2026-11-01 ~08:00Z)
+### RESUME HERE (CHARC generation 12: read this block top to bottom; gen 11 `clearwater-charc-20261101-0727` ROLLED 2026-11-01 ~23:35Z at ~411K, clean boundary, no cell at CHARC's seat; gen 10 rolled 17:30Z; gen 9 08:00Z)
+
+- **GEN 12 PICKUP (read first).** Orchestrator = **gen 32 `clearwater-orchestrator-20261101-0959`** (online 19:59Z; at
+  ~? K, it rolls at its own cap; re-read `comms/.launch-sessions.json` before every cue; the launcher rewrites it).
+  Time the bash launch and record it here. Drain with `read --role charc --all` (gen 11 stopped draining at its
+  announce). Main = gen 11's last commit + any later orchestrator commit; FREE. Subjects under 100 chars; see the
+  `posted ->` line before cueing. Any script or body with a backslash goes through the Write tool; `tr -cd '\r\v' |
+  wc -c` = 0 BEFORE every commit, and the committed blob re-checked (`git cat-file -p HEAD:<file>`). A `cd` into a
+  worktree as the FIRST word of a command moves the session cwd: use `git -C`, absolute paths, or `cd` back.
+  **CLAUDE 92 % = THE LINE (reached 22:01Z): no Claude pass (A or B) of any package starts before 2026-11-02 10:00Z;
+  Codex turns, RUN REQUESTS and windows continue; no reviewer-tier downgrade.** Codex 15 % / 0.238 (resets 11-04).
+  **LIVE BOARD (verify in `docs/orchestrator-state.md` and gen 32's last posts):**
+  (1) **WP5.3 review pack BUILD** (Codex session 6; brief `2050a89a` + my rulings R0 0a962acc, R1 bc6da3fe, R2
+  e6a66c87, R3 c25ff7a9 / 9f2af865, R4 6afde87e; A converged R4, B clean on `2a1e15b1`; B-F1 fixed `b4416bd7` +
+  `6d470028`; gen 32's exemption of the failed-excerpt unlink CONFIRMED). Photos 73 done / 0 failed; presets written;
+  `clips V-P` 8 done / 9 REFUSED by the product (DR-112, below), rows loud; `clips V-S` running since 23:03Z, then
+  V-D, V-Z, V-R, `page` (exit 2 while pending), `page --check`, tally, the report turn, the gate (B-F4 timed under
+  `-n 4`), the accept. At its accept MINE: AD-13 NOTE (both starter presets value-identical in v1); the A2 PyCMSError
+  row is in envelope (R3-3), none needed. **CP5 GATE (mine): the pack + sheet go to the OWNER only at pending = 0
+  AND failed = 0, i.e. after WP-D112 lands and `clips V-P` re-runs; WP5.3's accept may land first. If WP-D112 slips
+  past 2026-11-03, put the choice to the owner (review with 8 of 17 phone clips now, or wait). After the owner's
+  review I write `docs/proofs/cp5-visual-review.md`.**
+  (2) **WP-D112** (Codex, STRONG, S; brief `docs/briefs/wp-d112-brief.md` on branch `wp-d112`, FINAL on my fold
+  4c057feb + gen 32's round-0 rulings 61ea2e39, confirmed by my silence): `verify.py` compares a raw PCM audio
+  stream by its decoded sample extent, BOTH totals (presented = sum of packet durations; stored = payload bytes /
+  (channels x bytes per sample)), first pts, rate / channels / format; the packet-list rule kept for compressed
+  codecs; a committed MOV fixture with two irregular PCM packets (a CONTROL: the real sink keeps its packetization;
+  the unit rows carry the RED; the report's Limit says why the owner's files re-chunk and it does not); four manifest
+  consumers edited to admit the new sample only; four+2 refusal rows; kept-green rows named in the brief. Gate =
+  THREE legs (the fullclip forms reach the changed check). Turn 2 (RED) was running at my roll. Then GREEN, A after
+  10:00Z, B, gate, accept, then WP5.3's `clips V-P` re-run. At its accept MINE: DR-112 CLOSED with the facts (samples
+  byte-identical on IMG_6731 / IMG_6729; only chunking moves); AD-30 NOTE for the new sample.
+  (3) **WP5.2** (performance and memory, EXCLUSIVE, gpu): brief DRAFTED `docs/briefs/wp5.2-brief.md` (main `35735965`;
+  Codex, STANDARD, M; R1 `export_bench.py v16`, R2 the first real D111 fallback witness via a new `tools/device_hold.py`,
+  R3 a synthetic 48 MP photo leg, R4 the owner's 24.5 MP cited; DR-72 fix; four Questions with recommended answers).
+  COMMISSION it after WP-D112 and WP5.3's accept, when the host is free of the pack build; FINAL after the
+  orchestrator's dispatch fill. At its accept MINE: the N6 proposal to the OWNER (spec D106 / N6, owner-reserved),
+  AD-21 closed, DR-72 closed, DR-70 note, plan section 7 pointer for V15 / V16.
+  (4) **Phase 5 close (after the three above):** the phase-end gate report (the fullclip leg already ran once today
+  in WP5.1's gate `g32-w51f`, and runs again in WP-D112's); the owner's spec revision bundle: N6 final figure (WP5.2),
+  D63 'provisional' wording -> confirmed (AD-24), the owner-input line 'Photo resolution (24 MP or 48 MP)' -> 24.5 MP
+  max on the owner's photos (and the 48 MP figure from WP5.2 R3), DR-64-style errata if any; then WP5.5 release
+  preparation (plan) and the form-debt proposal: split this file's history into `docs/charc-log.md`.
+  **DONE THIS GENERATION (all on main, each with my QA and rows):** WP-D54 accepted `4ece5183` (DR-102 closed, DR-107);
+  WP-T7 accepted `5b922662` (DR-109 closed with the timeout limits; every gate now runs `--timeout` and captures
+  stderr; the stall watch defined in GATE_CHECKS); WP3.6P accepted `f1733802` (AD-24 CONFIRMED on real HEICs; DR-42 /
+  DR-43 notes; DR-110 EXIF ColorSpace read as untagged; the Phase 1 gate report's Result 2 photo row closed); WP5.1
+  accepted `0e8f0e00` (plan section 7 completion pointer; AD-11 and AD-30 notes; DR-111 creation time not carried);
+  WP5.3 rounds 3 and 4 ruled; the PCM STOP ruled (DR-112 MAJOR, WP-D112 commissioned); the WP5.2 brief drafted;
+  the OWNER'S PRUNE executed 21:16Z-21:42Z (record `docs/proofs/prune-2026-11-01.md`: facts of record to D: with
+  verified manifests, 8.3 GB of basetemps deleted, worktrees wp-t7 / wp3.6p / wp4.6 removed, wp-d54's folder removed;
+  C: 171 GB free). Register through DR-112. Orchestrator gens 30 -> 31 -> 32 rolled cleanly.
+  **GEN 11 LESSONS:** (a) verify a figure's UNIT in the code before ruling on it (my 5c-16 half-LSB reading was wrong;
+  gen 31 caught it; withdrawn); (b) pytest `*current` junctions and the harness tests' symlinked inboxes DOUBLE a
+  robocopy: archive with `/XJ` and verify source = manifest = destination counts; (c) the built-in removal check
+  refuses `rm` with plain variable expansions: write `"${var:?}/${f:?}"`; (d) the gate report's working copy was
+  CRLF (checkout trap): normalise to LF in the edit script and re-check the blob.
+  **OWNER LINES (every owner-facing summary ends with these):** Open owner decisions: none now (coming at the Phase 5
+  close: the N6 final figure; conditional: the CP5 timing if WP-D112 slips past 2026-11-03). Owner-pending inputs:
+  none. Owner action pending: none (the 2026-11-01 prune is done; `.worktrees/wp5.1` and `wp5.3` stay until a later
+  prune word). Advisory: orchestrator panes for gens 29, 30 and 31 may be closed; gen 32's stays. Next owner
+  checkpoint: CP5 (the WP5.3 pack with its sheet, after WP-D112 and the V-P re-run).
+- **(gen 11 history follows, newest facts at the top of its block; then gen 10 and older)**
+
+### GEN 11 (was LIVE: `clearwater-charc-20261101-0727`, online 2026-11-01 17:28Z; ROLLED 2026-11-01 ~23:35Z at ~411K, clean boundary, no cell at CHARC's seat)
 
 - **GEN 11 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 32
   `clearwater-orchestrator-20261101-0959`** (ONLINE 19:59Z, announce `af57d0ea` 20:00Z, gauge 37 ms, sole drainer,
