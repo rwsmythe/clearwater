@@ -22,6 +22,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -961,6 +962,50 @@ def test_an_exception_from_the_progress_kills_the_worker(tmp_path: Path) -> None
     before = _read_beat(beat)
     time.sleep(0.4)
     assert _read_beat(beat) == before  # the worker is gone, not left running
+
+
+@pytest.mark.parametrize("failing", [1, 2, 3])
+def test_an_io_thread_that_cannot_start_kills_the_worker_and_closes_its_stdin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failing: int
+) -> None:
+    """R3-1: the I/O threads start inside the clean-up, so a failed start never leaves the
+    worker running (waiting for its request) or its stdin open."""
+    spawned: list[subprocess.Popen[bytes]] = []
+    real_popen = subprocess.Popen
+
+    def popen(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+        process = real_popen(*args, **kwargs)
+        spawned.append(process)
+        return process
+
+    real_start = threading.Thread.start
+    starts: list[str] = []
+
+    def start(self: threading.Thread) -> None:
+        if self.name.startswith("export-worker-"):
+            starts.append(self.name)
+            if len(starts) == failing:
+                raise RuntimeError("can't start new thread")
+        real_start(self)
+
+    monkeypatch.setattr(export_process.subprocess, "Popen", popen)
+    monkeypatch.setattr(threading.Thread, "start", start)
+    waiting = "import sys, time; sys.stdin.buffer.readline(); time.sleep(30)"
+    command = [sys.executable, "-c", waiting]
+    try:
+        with pytest.raises(RuntimeError, match="can't start new thread"):
+            _run(tmp_path, command)
+        (process,) = spawned
+        assert process.poll() is not None, "the worker outlived its job"
+        assert process.stdin is not None
+        deadline = time.monotonic() + 5  # a started stdin thread closes it on its own
+        while not process.stdin.closed and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert process.stdin.closed
+    finally:
+        for process in spawned:
+            process.kill()
+            process.wait()
 
 
 # --- the child's log records -----------------------------------------------------------------
