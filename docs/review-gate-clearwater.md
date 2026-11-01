@@ -168,10 +168,10 @@ candidate rebased onto main, and records the actual output lines):
   (`uv run python -c "import psutil; assert psutil.virtual_memory().available >= 5*2**30"`).
   Run, one heavy job at a time (WP-T6, from 2026-10-29: the `fullclip` marker names the
   full-GX011627 forms of the seven gate tests; the trim forms stay in the serial leg):
-  `uv run pytest -q -rs -n 4 --timeout 600 -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/pytest-gate-RUN-parallel`,
-  then `uv run pytest -q -rs --timeout 1200 -m "(gpu or footage or gui or slow) and not fullclip" --basetemp=work/pytest-gate-RUN-serial --durations=0 --junitxml=work/pytest-gate-RUN-serial.xml`.
-  Capture each leg's stderr as well as stdout (`> work/<log> 2>&1`, or stderr to its
-  own file): under `-n 4`, the earlier core faulthandler dump on stderr is the only stack.
+  `uv run pytest -q -rs -n 4 --timeout 600 -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/pytest-gate-RUN-parallel > work/pytest-gate-RUN-parallel.log 2>&1`,
+  then `uv run pytest -q -rs --timeout 1200 -m "(gpu or footage or gui or slow) and not fullclip" --basetemp=work/pytest-gate-RUN-serial --durations=0 --junitxml=work/pytest-gate-RUN-serial.xml > work/pytest-gate-RUN-serial.log 2>&1`.
+  Under `-n 4`, the earlier core faulthandler dump on stderr is the only stack,
+  so each leg's log must retain both streams.
   STANDING RULE (your fill, effective now): while a gate's SERIAL leg runs, NO other pytest invocation of any size runs on this host, at any seat or in any sandbox (a Codex light suite included); the gui nodes are timing-sensitive and the leg is the figure of record. Codex turns that need their light suite wait for the leg or run before it. (CHARC 97d5abbf, 2026-11-01)
   A thread timeout dumps stacks and exits the process once its timer can acquire the
   GIL (a native GIL-holding deadlock defers it; only the 300 s faulthandler dump on stderr
@@ -184,7 +184,7 @@ candidate rebased onto main, and records the actual output lines):
   un-timed: a fixture hang gets the faulthandler dump and the stall watch, not a test failure.
   Faulthandler dumps from legitimately long nodes (fullclip or slow session trims) are
   diagnostic noise, not failures; a dump alone is not a STOP.
-  **FULLCLIP** (`uv run pytest -q -rs --timeout 2400 -m "fullclip" --basetemp=work/pytest-gate-RUN-fullclip --durations=0`, no `-n`,
+  **FULLCLIP** (`uv run pytest -q -rs --timeout 2400 -m "fullclip" --basetemp=work/pytest-gate-RUN-fullclip --durations=0 > work/pytest-gate-RUN-fullclip.log 2>&1`, no `-n`,
   about 26 min) runs at least ONCE per phase-end gate report and whenever a package brief asks
   for it; a per-package gate does not run it. The trim forms prove V4 MANDATORY and REQUIRED;
   three best-effort container items are proved by the fullclip forms only (WP-T6 report, Limits).

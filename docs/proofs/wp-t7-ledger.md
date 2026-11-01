@@ -124,6 +124,36 @@ completion or review-convergence claim. `git diff --check` exited 0; byte
 counts for all three changed files are recorded in
 `work/wp-t7/turn2-byte-audit.log` (zero CR).
 
+## Turn 5: F3 redirect in the leg commands (CHARC 823921b8)
+
+Dispatcher-supplied end-of-turn-4 depth: **171,971 tokens**. Turn 4 was
+committed as `e78d9bfb`; this turn began on clean HEAD `3855f12e`.
+CHARC's binding condition `823921b8` (2026-11-01T18:14:25Z) requires
+stderr capture in each gate-leg command itself, rather than only in prose.
+
+Added separate `> work/pytest-gate-RUN-<parallel|serial|fullclip>.log 2>&1`
+redirects to the three GATE_CHECKS leg commands and the equivalent
+`> work/<run>-<parallel|serial|fullclip>.log 2>&1` redirects to CLAUDE.md's
+Tests convention line. The fullclip fragment in that line retains its
+existing form and gains the requested redirect. All timeout bounds,
+selection expressions, basetemps and other command options are unchanged.
+The fill's capture sentence is shortened to the reason: under xdist the
+earlier core dump on stderr is the only stack, so both streams must be kept.
+Nothing else in either gate-instruction file was changed this turn.
+
+The report's F3 row now records the explicit command redirects and CHARC
+`823921b8`, plus CHARC's recording of F2 as a LIMIT in DR-109's close.
+No register or decision-log edit was made. This completes the accepted F3
+cleanup condition; it does not open a new Reviewer A round.
+
+This is a documentation-only turn during the host's EXCLUSIVE measurement
+window. **No pytest, ruff, mypy or harness invocation was run.** A direct
+Python byte read counts `b"\r"` in all four written files; final results
+are recorded in `work/wp-t7/turn5-byte-audit.log` (all zero). The text diff
+was inspected for the precise scope above; no code, dependency, config,
+existing test, footage path or other worktree was touched. Reviewer B
+remains at the dispatcher seat after the window.
+
 ## Turn 4: Reviewer A round 1 adjudicated; terminating clean-up; report
 
 Started on clean `e4938910`. Dispatcher-supplied end-of-turn-3 depth:
@@ -524,4 +554,5 @@ and does not open or count a review round.
 | 1 / 1 | 90,664 tokens (dispatcher supplied at turn 2) | RED yield; evaluate near 200K, re-seat boundary near 250K |
 | 1 / 2 | 108,375 tokens (dispatcher supplied at turn 3) | Offline sync STOP; remaining GREEN rung held |
 | 1 / 3 | 147,790 tokens (dispatcher supplied at turn 4) | GREEN proof/facts yield; harness gate routed to dispatcher seat |
-| 1 / 4 | Pending dispatcher fill; no estimate | Reviewer A round 1 terminating cleanup + report; yield for Reviewer B |
+| 1 / 4 | 171,971 tokens (dispatcher supplied at turn 5) | Reviewer A round 1 terminating cleanup + report; yield for Reviewer B |
+| 1 / 5 | Pending dispatcher fill; no estimate | Docs-only F3 command redirects; exclusive window honored; yield for Reviewer B |

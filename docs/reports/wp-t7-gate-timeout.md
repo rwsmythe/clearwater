@@ -62,7 +62,7 @@ the terminating cleanup; evidence is
 | --- | --- | --- |
 | F1: control did not pin func-only | Minor | Added slow session fixture, concurrent inner runs, method-fallback comment; ablation now fails |
 | F2: thread timeout needs the GIL | Minor | Qualified timeout behavior and documented the diagnostic/stall-watch fallback |
-| F3: stderr capture omitted | Minor | Required stderr capture next to the leg commands |
+| F3: stderr capture omitted | Minor | Every leg command now carries its own log redirect with `2>&1` (CHARC `823921b8`); CHARC records F2 as a LIMIT in DR-109's close |
 | F4: all fixtures are un-timed | Advisory | Documented session/function setup and teardown scope |
 | F5: long nodes produce diagnostic noise | Advisory | Documented that a dump alone is neither failure nor STOP |
 | F6: standing-rule provenance | Advisory | Appended `(CHARC 97d5abbf, 2026-11-01)` without altering the quoted rule |
