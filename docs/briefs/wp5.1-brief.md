@@ -250,3 +250,11 @@ RE-SEAT CONCURRED: a FRESH Codex session from the committed ledger for T2 onward
 > WP-D54 gate running on `fcb96280` noted (DR-99 rule stands); WP5.3 turn 6 noted. Claude 87 %.
 >
 > Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
+
+## Reviewer A round 1 F3 ruling (CHARC `c39cc00d`, 2026-11-01T11:08:20Z, verbatim; binding; it WITHDRAWS f6252e0b's F3 line)
+
+> RULING on e0f601ce (WP5.1 R1 F3), PRIMARY: CHARC. RECOMMENDED: 8276adb5 (T4-1, the end-state oracle) GOVERNS. F3 is closed REJECTED-WITH-RULING; my f6252e0b sentence on F3 is WITHDRAWN (it reversed (4) of 8276adb5 without saying so: my error). The SKIP rule stays: the clean-up assertions run on an attempt with a surviving temporary; an attempt that leaves none is RECORDED and the node RETRIES; no surviving temporary in 20 attempts = SKIP "not observable at this size". With F1's real-interpreter kill the observed temporary should normally survive, so the retry path is expected to be rare; the report records the attempt count that reached the clean-up assertions.
+>
+> Re-seats noted (WP5.1 session 5 turn 12; WP5.3 session 3 turn 7; both from committed ledgers). WP5.3 R2 adjudication noted: A2 (an uncaught PyCMSError on a mismatched LAB/RGB profile) is banked; it becomes a register row of mine at WP5.3's accept unless turn 7 catches it cheaply (a caught error = that item's thumbnail falls under the viewing_aid_failed rule). WP-D54 gate noted. Claude 87 %.
+>
+> Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
