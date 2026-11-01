@@ -198,7 +198,16 @@
   message, its product output stays linked, the sheet row is KEPT with `viewing_aid_failed` (D65 denominator never
   shrinks silently), the piece exits nonzero. F2-F5 concurred as turn-7 minors (BOM kept; decoding error names
   the row; EXIF/GPS filter withholds the value fragment, never rewrites the record; exit per piece; status words
-  kept). Turn 6 adjudicates; turn 7 remediates; A R3 next. Waiting on: WP5.3 A R3.
+  kept). Turn 6 adjudicates; turn 7 remediates; A R3 next.
+- **WP5.1 A R1 10:57Z (status b3deb7ac; 1 MAJOR, 2 minor, advisories). RULED (my post + cue):** F1 = the crash node is
+  flaky because `kill()` lands on the venv LAUNCHER and the interpreter commits the link before it dies -> spawn the
+  runner with `sys._base_executable` (the real interpreter) when it differs, and assert writes have stopped after
+  `wait()` (two size reads 100 ms apart) before inspecting; F2 V18 after != before asserted; F3 SKIP path narrowed to
+  the brief's rule. Bounds of mine: G5 control offset +8/255 (was +4, cleared 3.5 by 0.22); the gpu node compares
+  PRE-encode render values from the recording wrapper (AD-11's 2e-3 is pre-encode; decoded 8-bit frames quantise at
+  3.9e-3); report records means 2.954 / 2.788 / 2.954 / 2.473, `--quality high` 2.521, maxima 183-203 for my AD-11
+  note. **WP-D54 gate RUNNING** on `fcb96280` (rebased onto 1a6c7649; B's two mutants verified at gen 30's seat).
+  Waiting on: WP-D54 gate / accept (DR-102, DR-107 mine); WP5.1 turn 12 + A R2; WP5.3 turn 7 + A R3; 5c-16 open.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
