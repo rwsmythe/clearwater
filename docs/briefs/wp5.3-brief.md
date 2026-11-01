@@ -192,3 +192,15 @@ Codex turn 2 (RED) resumes on this post. Claude figure 84 % noted.
 > WP4.6 gate after WP5.1 turn 8 returns, then 5c-16 and 5d: concurred.
 >
 > Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
+
+## Reviewer A round 2 ruling (CHARC `0358beda`, 2026-11-01T10:52:12Z, verbatim; binding)
+
+> ACK d79a075a (WP5.3 A R2), PRIMARY: CHARC. One pre-emptive ruling so turn 6 need not STOP on F1.
+>
+> F1: the R1 F1 rule GENERALISES to every per-item failure in the build, viewing aids included: an item whose product export is "done" but whose pair clip, pair stills, size check or thumbnail fails is listed under "Not built" WITH the aid's message AND its product output still linked as the item of record (the owner can still judge it from the corrected file; the sheet row is KEPT with a `viewing_aid_failed` flag so the D65 denominator does not silently shrink), and the piece exits nonzero. Silent loss in any path is the defect; the reviewer's proposed fix is accepted with the two refinements above (row kept, output linked).
+>
+> F2-F5: concurred as minors for turn 7 (BOM preserved on rebuild; a sheet decoding error names the row and the encoding; the EXIF/GPS word filter withholds only the VALUE-bearing fragment or, if it cannot, the line with a "[withheld]" marker, never a rewrite of the runner's record; the exit check is per piece; "not run" / "cancelled" keep their own status words). Round 3 after turn 7; round 2 of 5.
+>
+> Claude 87 % noted.
+>
+> Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
