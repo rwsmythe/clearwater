@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import re
 import uuid
 from collections.abc import Mapping, Sequence
@@ -12,7 +13,7 @@ from typing import Any
 
 from lookcheck.frames import OutputRoots
 
-from .select import GROUPS, catalog
+from .select import GROUPS, catalog, pending_items
 
 ARTIFACTS = ("halos", "banding", "color_errors", "shimmer", "flicker")
 HEADER = (
@@ -155,13 +156,21 @@ def write_sheet(
 def tally(path: Path) -> dict[str, Any]:
     """Strictly read the filled CSV and count groups, headline and candidates.
 
+    Pending coverage uses the companion records/pack.json, including refused-group
+    results. A detached sheet has unknown pack coverage; votes still tally normally.
+
     Args:
         path: Owner sheet to read without modifying it.
 
     Returns:
-        Preference, artifact and above-surface counts with no quality verdict.
+        Preference, artifact, above-surface and pending counts with no quality verdict.
     """
     rows = _read(path)
+    state_path = path.parent / "records" / "pack.json"
+    pending = None
+    if state_path.exists():
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        pending = pending_items(state["items"])
 
     def counts(groups: set[str] | frozenset[str]) -> dict[str, Any]:
         selected = [row for row in rows if row["group"] in groups]
@@ -182,6 +191,16 @@ def tally(path: Path) -> dict[str, Any]:
         }
 
     return {
+        "pending": None
+        if pending is None
+        else {
+            "total": len(pending),
+            "groups": {
+                group: sum(item.group == group for item in pending)
+                for group in GROUPS
+                if any(item.group == group for item in pending)
+            },
+        },
         "groups": {group: counts({group}) for group in GROUPS if group != "V-R"},
         "headline": counts(HEADLINE),
         "candidates": counts({"P-Z", "V-Z"}),
@@ -197,7 +216,17 @@ def format_tally(result: Mapping[str, Any]) -> str:
     Returns:
         Console-safe tally lines.
     """
-    lines = []
+    pending = result.get("pending")
+    lines = [
+        "pack pending: unknown (pack.json unavailable)"
+        if pending is None
+        else f"pack pending: {pending['total']}"
+        + (
+            "; " + ", ".join(f"{group}={count}" for group, count in pending["groups"].items())
+            if pending["groups"]
+            else ""
+        )
+    ]
     for label, values in [
         *result["groups"].items(),
         ("headline", result["headline"]),

@@ -355,7 +355,7 @@ DR-99 is handled only under its stated main-alone equivalence condition.
 | Session 2 / turn 3 (GREEN verification, not Reviewer A) | 0 / 6 / 0 | 6 / 0 | 6 / 0 | 0 | instrument fixes / regression additions | Six independently reproduced instrument gaps fixed; 70 nodes green; Reviewer A pending | 142,467 after turn 3 |
 | A1 (session 2 / turn 4 adjudication; turn 5 remediation) | 0 / 3 / 3; 6 advisory | 10 / 2 after adjudication | 12 / 0; accepted blocking 3 | 0 | turn 5: 10 instrument behavior fixes with regression controls; no src/ changes | Counted Claude pass; 10 ACCEPTED fixed under F1 ruling; F10 OUT/banked Limit; F11 REJECTED; ready for A2 | turn 3: 142,467; turn 4: 36,709 (dispatcher supplied) |
 | A2 (session 2 / turn 6 adjudication; session 3 / turn 7 remediation) | 0 / 1 / 4; 8 advisory | 11 / 2 | 12 / 1 by distinct finding; F1 NEW path reopens R1 F1 pattern, A1 repeats rejected R1 F11 | 0 | turn 7: seven accepted instrument behavior fixes and regression controls; zero src/ or frozen-interface changes | Counted claude -p pass; F1-F5 and A3/A7 FIXED under CHARC 0358beda; A2/A5/A6 BANK; A1 REJECT; A4/A8 DECLINE code change; ready for A3, not converged | turn 5: 142,541; turn 6: 198,059; turn 7 dispatcher pending |
-| A3 (session 3 / turn 8, adjudication only) | 0 / 1 / 3; 3 advisory | reviewer: 6 / 1; effective: 7 / 0 under c25ff7a9 R3-3 | 5 NEW / 2 REOPENED distinct findings; F1/F2 also REOPEN silent-loss class | 0 | no remediation; instrument/tests-only plans, no src/ or interface change | Counted claude -p pass; all observations independently reproduced; F1-F6 ACCEPTED to fix; F7 ACCEPTED AS IS, document; CHARC ruling governs turn 9 | turn 7: 143,373; turn 8 dispatcher pending |
+| A3 (session 3 / turn 8 adjudication; session 4 / turn 9 remediation) | 0 / 1 / 3; 3 advisory | reviewer: 6 / 1; effective: 7 / 0 under c25ff7a9 R3-3 | 5 NEW / 2 REOPENED distinct findings; F1/F2 also REOPEN silent-loss class | 0 | turn 9: F1-F6 instrument fixes and 13 regression nodes; F7 display documentation; no src/ or interface change | Counted claude -p pass; remediated under c25ff7a9; state audit finds no fourth shrinking path; ready for A4, not converged | turn 7: 143,373; turn 8: 182,934; turn 9 dispatcher pending |
 
 Subsequent Reviewer A turns adjudicate every finding, update this cumulative table
 and yield without remediation. Fixes belong to a separately dispatched turn.
@@ -372,7 +372,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 2 / turn 5 / A1 remediation | same session 2 | 142,541 | Dispatcher supplied in turn 6; remediation committed as 03731250. Session window 475,000; evaluate near 200K and stop near 250K remain binding. |
 | Session 2 / turn 6 / A2 adjudication | same session 2 | 198,059 | Dispatcher supplied at turn 7; session 2 retired at the evaluation boundary before multi-finding remediation. |
 | Session 3 / turn 7 / A2 remediation | fresh session 3; dispatcher to fill ID | 143,373 | Dispatcher supplied at turn 8; remediation committed ed787934, all five blobs 0 CR; seat format check 293 files clean. |
-| Session 3 / turn 8 / A3 adjudication | same session 3 | dispatcher pending | Ledger only; independent planted probes, no remediation; YIELD for turn 9. |
+| Session 3 / turn 8 / A3 adjudication | same session 3 | 182,934 | Dispatcher supplied at turn 9; ledger committed a14a25ed; session 3 retired at the evaluation boundary before seven-item remediation. |
+| Session 4 / turn 9 / A3 remediation | fresh session 4; dispatcher to fill ID | dispatcher pending | All seven ruled items remediated; state audit and final light runs recorded below; YIELD for A4. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -1621,3 +1622,172 @@ new reviewer invocation, dependency/config/product/interface edit, mailbox post,
 commit/git mutation, other-worktree access or owner image judgement. The final
 scope/LF/diff checks are retained in turn8/scope-lf-audit.log. **YIELD**; turn 9
 owns RED and the bounded fixes under c25ff7a9.
+
+
+## Session 4 / Turn 9: round 3 remediation
+
+### Session boundary, ruling and scope
+
+Session 3 retired at **182,934 depth_input_tokens** (dispatcher supplied).
+This is fresh session 4, dispatched at **a14a25ed**. The dispatcher fills this
+session's ID and depth; no estimate is made here. CHARC **c25ff7a9** governs all
+seven fixes, reusing **0358beda** for the failed-viewing-aid form. This is one
+logical round-3 remediation turn, bundling the seven expressly commissioned
+items; it is not an additional review round. Reviewer A round 4 remains at the
+dispatcher's seat under its 92-percent hold rule. Convergence is not claimed.
+
+The dispatch protocol, application conventions, predecessor's turn-7/turn-8
+ledger, round-3 findings and current instrument/tests were re-grounded. The
+external review was read in place and not copied into the repository. All
+runtime evidence below is ignored **work/wp5.3/turn9/** inside this worktree;
+pytest used **work/wp5.3/tmp/** with the required sandbox shim. Only committed
+fixtures and planted inputs were opened. No owner footage or another worktree
+was accessed.
+
+### Per-finding RED / GREEN
+
+| Finding / classification | RED evidence | Remediation and GREEN evidence |
+|---|---|---|
+| R3-1 / F1 MAJOR, in | r3-1-red.log/.xml: 3 failed, 123 deselected, 0.81 s. A full 128-row state plus one-name manifest saves 1 row; a state missing the selected product or excerpt-error item never appends it. | Selection filters only inputs. Shared _store_item replaces by identity or appends; it never filters saved rows. Catalog-based pending includes missing rows. r3-1-green.log/.xml: 3 passed, 123 deselected, 0.35 s. Full-state rerun retains 128 rows, exactly one replaced, 127 unchanged and pending=127; missing-product case appends to 128; missing-excerpt-error case preserves the old row and appends the error. These are the already-ruled replacement-only gaps, not a newly found fourth loss path. |
+| R3-2 / F2 MINOR, in | Neutral-export node in r3-2-4-red.log/.xml confirms corrected status changes to failed despite the successful PNG. | Keep status done and corrected_name; mark viewing_aid_failed=True, reviewable=False, and record a neutral-source aid message without a leading separator. Skip unavailable neutral thumbnails/link. Sheet keeps the flagged row, page links the product under Not built, photos exits 1, healthy next photo completes. |
+| R3-3 / F3 MINOR, brought in envelope | ICC node in r3-2-4-red.log/.xml raises actual ImageCms.PyCMSError from a LAB profile attached to RGB product pixels. | Catch PyCMSError at the viewing-aid boundary, retain done product and flagged row, clean partial aid files, continue healthy next photo; no product edit or broad Exception catch. |
+| R3-4 / F4 MINOR, in | Probe ValueError node returns 2 instead of 1; packet KeyError node escapes prepare_excerpt. Both in r3-2-4-red.log/.xml. | Per-item probe/prepare catches ValueError, KeyError, StopIteration and TypeError (plus existing I/O/tool faults), writes a safe failed/excerpt_failed row and continues. Later V-R item reaches the runner and is refused; failed clip never reaches correction. prepare_excerpt normalizes packet faults into the existing excerpt-error record. |
+| R3-5 / F5 ADVISORY, fix ordered | Pending page node in r3-5-6-red.log/.xml returns 1 despite 4 catalog items pending (three absent rows and one explicit pending row). | Page header names count and groups; page/all returns 2 while pending, even when failures also exist; link-only --check remains independent. Tally reads companion pack.json for catalog pending including V-R; a detached CSV reports unknown pack coverage rather than inventing it. V-R refusals are accounted results and have no review row. The control reduces pending from 4 to 2 after both V-R refusals, with V-Z still pending. |
+| R3-6 / F6 ADVISORY, fix ordered | Five path controls in r3-5-6-red.log/.xml fail: relative Phone token, configured-root tail, quoted Windows space, unquoted Windows space, quoted extensionless POSIX space. | After root stripping, quoted spans and known-extension rooted paths retain only their last component; every remaining separator token also collapses to its last component. All five controls pass without opening a diagnostic path. Existing metadata-redaction and immutable runner-record controls remain green. |
+| R3-7 / F7 ADVISORY, accepted as is | No prose-only regression test; prior numeric transfer-policy control retained unchanged. | Generated pack README.md and page footer both explain: Video stills are converted BT.1886 -> sRGB for display; both halves alike; the player's rendering differs. The independent complete-pack control verifies both outputs. No frame/transfer behavior changed. |
+
+The combined R3-2/3/4 RED was **4 failed, 126 deselected in 0.78 s**;
+GREEN **4 passed, 126 deselected in 1.06 s**. The R3-5/6 RED was **6 failed,
+130 deselected in 0.98 s**; GREEN **6 passed, 130 deselected in 0.65 s**.
+All thirteen new regression nodes failed at the intended behavior assertion or
+uncaught instrument exception; there were no collection errors. All thirteen
+are in the parallel leg and measured below five seconds. No finding is rejected,
+banked or downgraded this turn; prior review classifications remain in the
+cumulative row, with zero reverts and no product/test-only substitute fix.
+
+### State inventory audit -- every mutation and derived filter
+
+`rg -n 'state\[' tools/reviewpack`, the filtered-selection search, the scoped
+diff and an independent AST traversal in verification.py enumerate every site.
+The AST rejects whole-list assignment/deletion, slices and list methods other
+than append. It finds **one index replacement and one append**, both in the
+shared writer. There is **no fourth path that can shrink persisted state**.
+
+| Final site (file:line) | Operation | Cannot shrink: evidence |
+|---|---|---|
+| tools/reviewpack/build.py:1271 | Load existing state or initialize all 128 catalog rows (:1274). | Existing list loaded unchanged; new list is complete catalog. No manifest applied to state. |
+| tools/reviewpack/build.py:1097 | Enumerate saved items for identity lookup. | Read only; caller cannot filter through this iterator. |
+| tools/reviewpack/build.py:1099 | Replace one indexed item. | List length unchanged; full-state regression proves exactly one row replaced and 127 unchanged. |
+| tools/reviewpack/build.py:1101 | Append absent item. | Length increases by one; missing product and missing excerpt-error regressions both pass. |
+| tools/reviewpack/build.py:1158 | Save excerpt failure through _store_item. | Uses only replacement/append above, including an item absent from old state. |
+| tools/reviewpack/build.py:1161 | Save per-item probe/prepare fault through _store_item. | Same nonshrinking writer; continuation controls retain failed item and later refusal. |
+| tools/reviewpack/build.py:1225 | Save product/aid result through _store_item. | Same nonshrinking writer; neutral/ICC and full-state controls retain product rows. |
+| tools/reviewpack/build.py:1299 | Select manifest inputs; kind/group comprehensions at :1300/:1308. | Filters only new selected list, never aliases or assigns saved items. Persistent manifest comprehension removed. |
+| tools/reviewpack/build.py:1284 | Pass saved items to sheet writer. | Read-only input projection; rows/answers are written to a separate CSV, never assigned back. |
+| tools/reviewpack/build.py:1289 | Pass saved items to page writer. | Read-only rendering; pending/header/not-built lists never assigned back. |
+| tools/reviewpack/build.py:1312 | Filter attempted items into exit-scope list. | Temporary comprehension, no state assignment; old unrelated failures do not poison clean pieces. |
+| tools/reviewpack/build.py:1314 | Alias full items for page exit scope. | Scope is only iterated for counts; no mutation through alias. |
+| tools/reviewpack/build.py:1316 | Read items for catalog pending. | select.pending_items (:170/:179-180) builds a separate accounted set and returns missing/pending catalog identities; never alters input. |
+| tools/reviewpack/sheet.py:173 | Read companion saved items for pending tally. | Same pure pending projection; no pack write from tally. |
+| tools/reviewpack/build.py:1180 | Persist all current state (also :1226/:1311). | _json_write serializes entire state; no item projection/filter. No state slices anywhere. |
+
+### Named contract/control adaptation step
+
+**full1.log/.xml: 127 passed / 9 failed in 26.07 s**, solely at obsolete
+manifest-row positions/counts or the now-ruled pending-page exit. These nine
+existing nodes were adapted in a separate named step after inspecting their
+failure output, without weakening their product/link/sheet/source assertions:
+
+- Tiny all-stage control now expects 2 for its 125 pending catalog items;
+  asserts all 128 saved rows and exactly 125 pending, then looks up GX011604 by
+  identity instead of assuming the first video row was selected.
+- Real HLG control retains all 128 rows; exactly one nonpending result is
+  IMG_6704 refused with the product HLG text. Page expects 2 for 127 pending;
+  sheet remains empty and the refusal remains visible.
+- Excerpt-failure and two photo/video aid-failure nodes look up their selected
+  rows by identity in the 128-row state. Failed/skipped submission guards,
+  later-group success/refusal, product links and blank/flagged rows remain.
+  Their page/all calls now return 2 while catalog items are pending; media
+  pieces still return 1 for their own failures.
+- Clean-piece, initial-pending-page and two BOM-preservation nodes now expect
+  page exit 2 for catalog pending. Clean clips still exit 0, --check still 0,
+  accounted remains zero for pending-only, and BOM/Unicode/multiline owner
+  answers remain unchanged.
+
+**full2.log/.xml: 136 passed in 30.86 s**, exit 0. This strengthens inventory
+checks while aligning completion statuses with c25ff7a9; it does not relax a
+failure, pixel, identity, source-protection or vote-preservation assertion.
+
+### Verification loop: suspect / confirm independently / fix / repeat
+
+1. **Confirmed / fixed [MAJOR, R3-1]:** persisted selection and absent-result
+   branches were the ruled loss sites. Three RED controls, shared replacement/
+   append, GREEN, then the independent AST/mutation audit above. No additional
+   shrinking path found; no fourth-path STOP is triggered.
+2. **Confirmed / fixed [MINOR, R3-2/3/4]:** successful products were hidden by
+   neutral failure, real ICC exceptions escaped, and malformed probe/packet
+   facts aborted later work. Independent boundary controls distinguish all four
+   defects; state/product/sheet continuity is verified, not only exit status.
+3. **Confirmed / fixed [ADVISORY, R3-5/6]:** pending absence and unsafe path
+   tails reproduced in six RED nodes; GREEN proves counted missing rows, V-R
+   accounting and name-only text. No diagnostic path was opened.
+4. **Confirmed / fixed, mechanical:** first ruff found one E501 after wrapping
+   preparation in a per-item try block; owned-file format fixed it. Mypy was
+   clean on its first run. The lexical docstring audit also flagged the new
+   nested basename helper; a one-line descriptive docstring was added. The same
+   audit incorrectly classified the existing nested create closure as public;
+   rejected that audit assumption and checked module-level public APIs instead.
+   No implementation hypothesis was discarded and no
+   existing behavior assertion was weakened; contract adaptations are separate
+   above. The rejected nested-closure audit assumption is the only false positive;
+   no reviewer finding was dismissed.
+5. **Independent terminal controls / no new finding:** verification.py builds
+   a fully planted 128-item pack (126 done plus 2 refused), then page exits 0,
+   pending=0, headline available=115, candidates=11. One failed aid then keeps
+   all rows and product links with page exit 1 and pending=0. The README and
+   footer contain the ruled display sentence. AST inventory, scoped diff,
+   public docstrings/comments, output checks, preserved runner bytes and source
+   checks find no further issue. Final test/style/type/byte checks below are
+   the full repeat pass with no new finding. No product defect found or fixed.
+
+### Final light verification / AD-30
+
+PowerShell sets PYTHONPATH=scripts. Exact commands from this worktree root:
+
+```text
+uv run pytest -q tests/test_reviewpack.py --basetemp=work/wp5.3/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 --junitxml=work/wp5.3/turn9/final.xml
+uv run ruff check tools/reviewpack tests/test_reviewpack.py
+uv run ruff format --check tools/reviewpack tests/test_reviewpack.py
+uv run mypy
+```
+
+- Final pytest: **136 passed in 30.60 s**, exit 0; final.xml has zero failures,
+  errors or skips. Exactly one existing slow node, no marker changes, no
+  footage/fullclip/GPU node added. Source immutability and real headless runner
+  plus FFmpeg remain exercised by the tiny force-CPU integration control.
+- Slow integration aggregate **17.366 s**. Slowest parallel node:
+  test_excerpt_copy_failure_is_recorded_skipped_and_exits_nonzero,
+  **1.096 s** including setup/teardown. Every parallel node stays below 5 s.
+  All 136 measured node times/statuses are in per-node-final.csv; summary.log
+  joins RED/GREEN/final JUnit counts and maximum times. No figure of record.
+- Ruff: **All checks passed**, exit 0 (ruff-final.log/.exit). Owned-file format:
+  **6 files already formatted**, exit 0 (format-final.log/.exit). Mypy:
+  **Success: no issues found in 151 source files**, exit 0 (mypy-final.log/.exit).
+  uv reports inherited VIRTUAL_ENV ignored and uses this project's environment;
+  no --active or other-worktree read. Two-leg/whole-tree gate stays with dispatcher.
+- verification-final.log/.exit: independent complete-state, terminal page exits,
+  display documentation and AST audit, exit 0. scope-lf-audit.log records six
+  owned changed files, zero CR, public instrument docstrings and diff whitespace
+  check. Git's worktree CRLF warnings are conversion advice; byte checks are
+  against actual worktree bytes. Dispatcher commits LF blobs.
+
+**Locks / remaining work:** all changes are in the owned instrument, tests and
+ledger. Every new production output uses OutputRoots guards. No source pixel,
+product module, frozen interface, shared helper, existing other test, local
+configuration or dependency changed. No Qt or OS-specific behavior added; no
+owner footage, main-tree working folder or another worktree opened; no git
+mutation, commit, mailbox post, real-media build or image judgement. Successful
+product exports remain authoritative and linked; runner records retain their
+bytes under the prior ruling. No open question or STOP. No real-build/report/
+gate claim is made; those remain later ladder tasks. **YIELD for Reviewer A
+round 4 at the dispatcher's seat.**

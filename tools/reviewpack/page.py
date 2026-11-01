@@ -20,7 +20,7 @@ from PIL import Image, ImageCms
 
 from lookcheck.frames import OutputPathError, OutputRoots
 
-from .select import GROUPS
+from .select import GROUPS, pending_items
 
 PRESET_SENTENCE = (
     "In v1 both starter presets carry AD-8's defaults, so the corrected items on this page "
@@ -69,7 +69,7 @@ def write_page(
     roots: OutputRoots,
     sheet_message: str = "",
 ) -> Path:
-    """Write the grouped CP5 page with escaped labels and pack-relative links.
+    """Write the grouped CP5 page and display README with pack-relative links.
 
     Args:
         items: Persisted item results.
@@ -84,6 +84,7 @@ def write_page(
     from clearwater.app.composition import correction_methods
 
     methods = correction_methods()
+    pending = pending_items(items)
     parts = [
         '<!doctype html><html lang="en"><meta charset="utf-8">',
         "<title>CP5 visual review pack</title>",
@@ -92,6 +93,13 @@ def write_page(
         "video{max-width:100%}"
         "article{border-top:1px solid #aaa;padding:1em 0}td,th{padding:.3em}</style>",
         "<h1>CP5 visual review pack</h1>",
+        f"<p>Pending: {len(pending)}; "
+        + ", ".join(
+            f"{group}={sum(item.group == group for item in pending)}"
+            for group in GROUPS
+            if any(item.group == group for item in pending)
+        )
+        + (". Pack is not ready for CP5.</p>" if pending else ".</p>"),
         "<p>Only the owner judges these items. D65 asks whether the corrected result is "
         "preferred on at least 80 % of the headline set. Record halos, banding, color errors, "
         "shimmer and flicker, and flag above-surface items in the sheet. "
@@ -140,7 +148,7 @@ def write_page(
                 parts.append(
                     _link(folder, item["corrected_name"], "Product: " + item["corrected_name"])
                 )
-                if item["kind"] == "photo":
+                if item["kind"] == "photo" and item.get("source_view_name"):
                     parts.append(_link("photos", item["source_view_name"], "Source (neutral)"))
                 for key, label in (("source_thumb", "Source"), ("corrected_thumb", "Corrected")):
                     if item.get(key):
@@ -179,7 +187,12 @@ def write_page(
             parts.append(
                 _link(folder, item["corrected_name"], "Product: " + item["corrected_name"])
             )
-    parts.append("</html>")
+    display_note = (
+        "Video stills are converted BT.1886 -> sRGB for display; both halves alike; "
+        "the player's rendering differs."
+    )
+    roots.write_text(roots.allowed / "README.md", display_note + "\n")
+    parts.append(f"<footer><p>{escape(display_note)}</p></footer></html>")
     return roots.write_text(roots.allowed / "index.html", "\n".join(parts) + "\n")
 
 

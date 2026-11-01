@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import math
 import os
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any
 
 from local_config import FootageLookupError, find_footage_file, load_local_config
 
@@ -163,6 +165,19 @@ def catalog() -> tuple[Item, ...]:
         )
         for name in names
     )
+
+
+def pending_items(results: Sequence[Mapping[str, Any]]) -> tuple[Item, ...]:
+    """Find commissioned items without an accounted result, including absent rows.
+
+    Args:
+        results: Saved item facts; selection never restricts this inventory.
+
+    Returns:
+        Catalog items whose row is absent or still pending. Refusals are results.
+    """
+    accounted = {row["item"] for row in results if row["status"] != "pending"}
+    return tuple(item for item in catalog() if item.stem not in accounted)
 
 
 def items(root: Path | None = None) -> tuple[Item, ...]:

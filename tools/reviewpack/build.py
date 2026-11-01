@@ -84,8 +84,29 @@ def _safe_text(value: object, roots: OutputRoots) -> str:
     for root in (roots.footage, roots.allowed, Path(__file__).resolve().parents[2]):
         for spelling in (str(root), root.as_posix(), str(root).replace("\\", "\\\\")):
             text = re.sub(re.escape(spelling), "", text, flags=re.IGNORECASE)
-    text = re.sub(r"(?:[A-Za-z]:[\\/]|\\\\)[^\s\"'<>]+", "[path]", text)
-    text = re.sub(r"(?<![\w])/(?:[^\s/\"'<>]+/)+([^\s/\"'<>]+)", r"\1", text)
+
+    def basename(match: re.Match[str]) -> str:
+        """Return the last component of a matched diagnostic path."""
+        return re.split(r"[\\/]+", match.group())[-1] or "[path]"
+
+    # A quoted span supplies a reliable boundary even for extensionless tools.
+    text = re.sub(
+        r"""(["'])([^"'\r\n]*[\\/][^"'\r\n]*)\1""",
+        lambda match: match[1] + (re.split(r"[\\/]+", match[2])[-1] or "[path]") + match[1],
+        text,
+    )
+    # Unquoted rooted paths can contain spaces; known file extensions bound them.
+    text = re.sub(
+        r"""(?:[A-Za-z]:[\\/]|\\\\|(?<!\w)/)[^\r\n"'<>]*?"""
+        r"\.(?:heic|jpe?g|png|tiff?|mov|mp4|mkv|dll|exe|json|toml|log|py|csv|txt|dat|tmp)"
+        r"(?=$|[\s:;,\)\]])",
+        basename,
+        text,
+        flags=re.IGNORECASE,
+    )
+    # Root stripping can leave relative folders. Every remaining separator token
+    # is reduced as well, so a removed root never exposes its folder tail.
+    text = re.sub(r"""[^\s"'<>]*[\\/][^\s"'<>]*""", basename, text)
     return (
         "\n".join(_metadata_text(line) for line in text.splitlines())
         .encode("ascii", "backslashreplace")
@@ -653,7 +674,7 @@ def prepare_excerpt(
             "timecode": timecode,
             "message": "",
         }
-    except (ValueError, OSError, ExtractError) as exc:
+    except (ValueError, KeyError, StopIteration, TypeError, OSError, ExtractError) as exc:
         if destination.exists():
             roots.check(destination).unlink()
         return {**planned, "message": _safe_text(exc, roots)}
@@ -1071,6 +1092,15 @@ def _view_video(
                 roots.check(frame).unlink()
 
 
+def _store_item(state: dict[str, Any], result: dict[str, Any]) -> None:
+    """Replace one saved item or append it; never filter the persisted inventory."""
+    for position, previous in enumerate(state["items"]):
+        if previous["item"] == result["item"]:
+            state["items"][position] = result
+            return
+    state["items"].append(result)
+
+
 def _build_groups(
     items: Sequence[select.Item],
     state: dict[str, Any],
@@ -1106,27 +1136,37 @@ def _build_groups(
                 "actual_start_s": 0.0,
                 "planned_start_s": 0.0,
             }
-            if item.kind == "video" and group != "V-R":
-                plan = select.excerpt_plan(group, _video(source)["duration_s"])
-                prepared["duration_s"] = plan.duration_s
-                prepared["planned_duration_s"] = plan.duration_s
-                if plan.excerpt:
-                    prepared = prepare_excerpt(
-                        source, start_s=plan.start_s, duration_s=plan.duration_s, roots=roots
-                    )
-                    excerpt_record = {
+            try:
+                if item.kind == "video" and group != "V-R":
+                    plan = select.excerpt_plan(group, _video(source)["duration_s"])
+                    prepared["duration_s"] = plan.duration_s
+                    prepared["planned_duration_s"] = plan.duration_s
+                    if plan.excerpt:
+                        prepared = prepare_excerpt(
+                            source, start_s=plan.start_s, duration_s=plan.duration_s, roots=roots
+                        )
+                        excerpt_record = {
+                            **_pending(item),
+                            "status": prepared["status"],
+                            "message": prepared["message"],
+                            "excerpt": {
+                                key: value for key, value in prepared.items() if key != "path"
+                            },
+                        }
+                        excerpt_records.append(excerpt_record)
+                        if prepared["status"] == "excerpt_failed":
+                            _store_item(state, excerpt_record)
+                            continue
+            except (ValueError, KeyError, StopIteration, TypeError, OSError, ExtractError) as exc:
+                _store_item(
+                    state,
+                    {
                         **_pending(item),
-                        "status": prepared["status"],
-                        "message": prepared["message"],
-                        "excerpt": {key: value for key, value in prepared.items() if key != "path"},
-                    }
-                    excerpt_records.append(excerpt_record)
-                    if prepared["status"] == "excerpt_failed":
-                        for position, previous in enumerate(state["items"]):
-                            if previous["item"] == item.stem:
-                                state["items"][position] = excerpt_record
-                                break
-                        continue
+                        "status": "failed",
+                        "message": _safe_text(exc, roots),
+                    },
+                )
+                continue
             sources.append(prepared["path"])
             preparations.append(prepared)
             active_items.append(item)
@@ -1158,24 +1198,31 @@ def _build_groups(
                 result["neutral_exit_status"] = neutral["runner_exit_status"]
                 if neutral["status"] == "done":
                     result["source_view_name"] = neutral["corrected_name"]
-                else:
-                    result["status"] = "failed"
-                    result["message"] += "; neutral source view: " + neutral["message"]
-            if result["status"] == "done":
+                elif result["status"] == "done":
+                    result["aid_message"] = "neutral source view: " + neutral["message"]
+                    result["source_view_name"] = ""
+                    result["reviewable"] = False
+                    result["viewing_aid_failed"] = True
+            if result["status"] == "done" and not result.get("viewing_aid_failed"):
                 try:
                     if item.kind == "photo":
                         _view_photo(result, roots)
                     else:
                         _view_video(result, prepared["path"], roots, force_cpu=force_cpu)
-                except (ValueError, OSError, ExtractError) as exc:
+                except (
+                    ValueError,
+                    KeyError,
+                    StopIteration,
+                    TypeError,
+                    OSError,
+                    ExtractError,
+                    ImageCms.PyCMSError,
+                ) as exc:
                     result["aid_message"] = _safe_text(exc, roots)
                     # Keep product success distinct from an incomplete viewing aid.
                     result["reviewable"] = False
                     result["viewing_aid_failed"] = True
-            for position, previous in enumerate(state["items"]):
-                if previous["item"] == item.stem:
-                    state["items"][position] = result
-                    break
+            _store_item(state, result)
         _json_write(roots.allowed / "records" / "pack.json", state, roots)
 
 
@@ -1192,7 +1239,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: CLI arguments, or the process arguments when absent.
 
     Returns:
-        Zero for a valid completed command, or an instrument error status.
+        Zero for completion, one for item failures, or two for pending pages or input errors.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stage", choices=("photos", "clips", "presets", "page", "tally", "all"))
@@ -1259,11 +1306,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                     if stage != "clips" or args.subject not in select.GROUPS[2:]:
                         raise ValueError("clips requires a commissioned video group")
                     selected = [item for item in selected if item.group == args.subject]
-                if args.manifest is not None:
-                    names = {item.name for item in _selection(args.manifest, roots)}
-                    state["items"] = [
-                        item for item in state["items"] if item["source_name"] in names
-                    ]
                 _build_groups(selected, state, roots, force_cpu=args.force_cpu)
                 attempted.update(item.stem for item in selected)
             _json_write(state_path, state, roots)
@@ -1271,7 +1313,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.stage == "page":
             scope = state["items"]
         accounted = sum(item["status"] != "pending" for item in scope)
-        pending = sum(item["status"] == "pending" for item in state["items"])
+        pending = len(select.pending_items(state["items"]))
         failures = sum(_failed(item) for item in scope)
         print(
             f"{args.stage}: completed; {accounted} items accounted for; "
@@ -1282,6 +1324,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "reviewpack: build/viewing-aid failures recorded; see Not built on the page",
                 file=sys.stderr,
             )
+        if "page" in stages and pending:
+            return 2
+        if failures:
             return 1
         return 0
     except (ValueError, OSError, LocalConfigError, ExtractError) as exc:

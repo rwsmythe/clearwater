@@ -946,7 +946,7 @@ def test_all_tiny_set(roots: OutputRoots) -> None:
                 "--force-cpu",
             ]
         )
-        == 0
+        == 2  # R3-5: the three-item fixture leaves 125 commissioned items pending.
     )
     assert page.check_links(roots.allowed / "index.html", roots=roots) == []
     for stem in ("IMG_6751", "IMG_6791"):
@@ -961,7 +961,9 @@ def test_all_tiny_set(roots: OutputRoots) -> None:
         assert record["parameters_from"] == "defaults"
         assert record["items"][0]["state"] in {"done", "done with warnings"}
     state = json.loads((roots.allowed / "records" / "pack.json").read_text())
-    video = next(item for item in state["items"] if item["kind"] == "video")
+    assert len(state["items"]) == 128
+    assert sum(item["status"] == "pending" for item in state["items"]) == 125
+    video = next(item for item in state["items"] if item["item"] == "GX011604")
     assert [still["fraction"] for still in video["stills"]] == [0.1, 0.5, 0.9]
     assert all(still["source_pts_s"] == still["corrected_pts_s"] for still in video["stills"])
     tally = sheet.tally(roots.allowed / "review-sheet.csv")
@@ -1068,11 +1070,13 @@ def test_refused_fixture_is_recorded_without_a_review_row(roots: OutputRoots) ->
     manifest.write_text(json.dumps([{"name": "IMG_6704.MOV", "group": "V-R", "kind": "video"}]))
     args = ["--config", str(config), "--manifest", str(manifest), "--force-cpu"]
     assert build.main(["clips", "V-R", *args]) == 0
-    assert build.main(["page", *args]) == 0
+    assert build.main(["page", *args]) == 2
     state = json.loads((roots.allowed / "records" / "pack.json").read_text())
-    assert len(state["items"]) == 1
-    assert state["items"][0]["status"] == "refused"
-    assert "hlg" in state["items"][0]["message"].lower()
+    assert len(state["items"]) == 128
+    results = [item for item in state["items"] if item["status"] != "pending"]
+    assert len(results) == 1 and results[0]["item"] == "IMG_6704"
+    assert results[0]["status"] == "refused"
+    assert "hlg" in results[0]["message"].lower()
     assert "HLG" in (roots.allowed / "index.html").read_text()
     with (roots.allowed / "review-sheet.csv").open(encoding="utf-8", newline="") as handle:
         assert list(csv.DictReader(handle)) == []
@@ -1293,13 +1297,15 @@ def test_excerpt_copy_failure_is_recorded_skipped_and_exits_nonzero(
     args = ["--config", str(config), "--manifest", str(manifest)]
     assert build.main(["clips", *args]) != 0
     state = json.loads((roots.allowed / "records" / "pack.json").read_text())
-    assert state["items"][0]["status"] == "excerpt_failed"
-    assert state["items"][0]["message"] == "planted mux failure"
-    assert state["items"][1]["status"] == "refused"  # A later group still runs.
+    results = {item["item"]: item for item in state["items"]}
+    assert len(results) == 128
+    assert results["GX011604"]["status"] == "excerpt_failed"
+    assert results["GX011604"]["message"] == "planted mux failure"
+    assert results["IMG_6704"]["status"] == "refused"  # A later group still runs.
     group = json.loads((roots.allowed / "records" / "V-S-excerpts.json").read_text())
     assert group["items"][0]["status"] == "excerpt_failed"
     assert not list((roots.allowed / "clips").glob("*.mp4"))
-    assert build.main(["page", *args]) == 1
+    assert build.main(["page", *args]) == 2  # R3-5: pending takes precedence.
     html = (roots.allowed / "index.html").read_text()
     assert "Not built" in html and source.name in html and "planted mux failure" in html
     assert list(csv.DictReader((roots.allowed / "review-sheet.csv").open())) == []
@@ -1591,11 +1597,13 @@ def test_done_item_with_failed_aid_is_loud(
     )
     assert build.main(["photos" if kind == "photo" else "clips", *args]) == 1
     state = json.loads((roots.allowed / "records/pack.json").read_text())
-    failed = state["items"][0]
+    results = {item["item"]: item for item in state["items"]}
+    assert len(results) == 128
+    failed = results[first["item"]]
     assert failed["status"] == "done" and failed["viewing_aid_failed"] is True
     assert failed["aid_message"] == "planted aid failure"
-    assert state["items"][1]["status"] == ("done" if kind == "photo" else "refused")
-    assert build.main(["page", *args]) == 1
+    assert results[later["item"]]["status"] == ("done" if kind == "photo" else "refused")
+    assert build.main(["page", *args]) == 2
     html = (roots.allowed / "index.html").read_text()
     not_built = html.split("<h2>Not built</h2>")[1]
     assert first["source_name"] in not_built and "planted aid failure" in not_built
@@ -1608,7 +1616,7 @@ def test_done_item_with_failed_aid_is_loud(
     assert rows[0]["item"] == first["item"] and rows[0]["viewing_aid_failed"] == "yes"
     assert rows[0]["preferred"] == ""
     # all must also finish its page and report the same attempted-item failure.
-    assert build.main(["all", *args]) == 1
+    assert build.main(["all", *args]) == 2  # Page reports the remaining catalog items.
 
 
 def test_judged_aid_failure_keeps_votes_and_counts_normally(roots: OutputRoots) -> None:
@@ -1669,7 +1677,7 @@ def test_clean_piece_does_not_inherit_old_failures(
     assert build.main(["clips", "V-R", *args]) == 0
     assert "1 items accounted for" in capsys.readouterr().out
     # The rendered pack still reports its known failure, without running any item.
-    assert build.main(["page", *args]) == 1
+    assert build.main(["page", *args]) == 2  # Known failure plus unbuilt catalog items.
     assert build.main(["page", "--check", *args]) == 0
 
 
@@ -1678,7 +1686,7 @@ def test_pending_pack_is_not_reported_as_accounted_for(
 ) -> None:
     """An initial page must distinguish pending inventory from completed attempts."""
     args = _selection_args(roots, [_item()])
-    assert build.main(["page", *args]) == 0
+    assert build.main(["page", *args]) == 2
     text = capsys.readouterr().out
     assert "0 items accounted for" in text and "pending=128" in text
 
@@ -1697,7 +1705,7 @@ def test_page_rebuild_preserves_existing_bom_and_unicode_answers(
         destination.write_bytes(b"\xef\xbb\xbf" + destination.read_bytes())
     (roots.allowed / "records").mkdir()
     (roots.allowed / "records/pack.json").write_text(json.dumps({"schema": 1, "items": [item]}))
-    assert build.main(["page", *args]) == 0
+    assert build.main(["page", *args]) == 2
     assert destination.read_bytes().startswith(b"\xef\xbb\xbf") is bom
     with destination.open(encoding="utf-8-sig", newline="") as handle:
         row = next(csv.DictReader(handle))
@@ -1937,3 +1945,237 @@ def test_original_sheet_header_migrates_without_losing_owner_answers(roots: Outp
         assert tuple(reader.fieldnames) == HEADER
     assert migrated["preferred"] == "undecided" and migrated["note"] == "owner's earlier answer"
     assert migrated["viewing_aid_failed"] == "yes"
+
+
+@pytest.mark.parametrize("missing", [False, True])
+def test_manifest_replaces_or_appends_without_pruning_catalog_state(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    missing: bool,
+) -> None:
+    """A one-item rerun must preserve all other rows and catalog-wide pending coverage."""
+    selected = _item()
+    args = _selection_args(roots, [selected])
+    shutil.copyfile(
+        FIXTURES / "stills/jpeg/jpeg-gradient-srgb.jpg", roots.footage / selected["source_name"]
+    )
+    original = [build._pending(item) for item in select.catalog()]
+    position = next(i for i, item in enumerate(original) if item["item"] == "IMG_6751")
+    if missing:
+        original.pop(position)
+    else:
+        original[position] = {**selected, "old_attempt": True}
+    records = roots.allowed / "records"
+    records.mkdir()
+    (records / "pack.json").write_text(json.dumps({"schema": 1, "items": original}))
+    monkeypatch.setattr(build, "run_tool", _fake_product)
+    assert build.main(["photos", *args]) == 0
+    actual = json.loads((records / "pack.json").read_text())["items"]
+    assert len(actual) == 128
+    by_name = {item["item"]: item for item in actual}
+    assert by_name["IMG_6751"]["status"] == "done"
+    assert "old_attempt" not in by_name["IMG_6751"]
+    unchanged = [item for item in original if item["item"] != "IMG_6751"]
+    assert all(by_name[item["item"]] == item for item in unchanged)
+    assert len(unchanged) == 127
+    assert "pending=127" in capsys.readouterr().out
+
+
+def test_missing_excerpt_error_is_appended_without_dropping_saved_rows(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An excerpt failure must be saved even when its item is absent in old state."""
+    subject = _item("GX011604", "V-S", "video")
+    args = _selection_args(roots, [subject])
+    (roots.footage / subject["source_name"]).write_bytes(b"planted")
+    saved = _item("IMG_6771", status="failed")
+    records = roots.allowed / "records"
+    records.mkdir()
+    (records / "pack.json").write_text(json.dumps({"schema": 1, "items": [saved]}))
+    monkeypatch.setattr(build, "_video", lambda source: {"duration_s": 60.0})
+    monkeypatch.setattr(
+        build,
+        "prepare_excerpt",
+        lambda *a, **kw: {
+            "path": None,
+            "excerpt": False,
+            "status": "excerpt_failed",
+            "message": "copy failed",
+        },
+    )
+    assert build.main(["clips", "V-S", *args]) == 1
+    rows = json.loads((records / "pack.json").read_text())["items"]
+    assert len(rows) == 2 and rows[0] == saved
+    assert rows[1]["item"] == "GX011604" and rows[1]["status"] == "excerpt_failed"
+
+
+@pytest.mark.parametrize("fault", ["neutral", "icc"])
+def test_photo_source_or_icc_aid_failure_keeps_product_and_continues(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+    fault: str,
+) -> None:
+    """Neutral export and real ICC transform failures must preserve done exports and rows."""
+    first, later = _item(), _item("IMG_6771")
+    args = _selection_args(roots, [first, later])
+    for item in (first, later):
+        shutil.copyfile(
+            FIXTURES / "stills/jpeg/jpeg-gradient-srgb.jpg", roots.footage / item["source_name"]
+        )
+
+    def product(argv, **kwargs):
+        done = _fake_product(argv, **kwargs)
+        if argv[0] != "uv":
+            return done
+        neutral = "--neutral" in argv
+        folder = Path(argv[argv.index("--out") + 1])
+        if fault == "neutral" and neutral:
+            record_path = Path(argv[argv.index("--record") + 1])
+            document = json.loads(record_path.read_text())
+            document["items"][0].update(
+                state="failed", output_name=None, failure="neutral export failed"
+            )
+            document["counts"] = {"failed": 1, "done": 1}
+            record_path.write_text(json.dumps(document))
+            (folder / "IMG_6751_neutral.png").unlink()
+            return subprocess.CompletedProcess(argv, 1, b"", b"")
+        if fault == "icc" and not neutral:
+            profile = ImageCms.ImageCmsProfile(ImageCms.createProfile("LAB")).tobytes()
+            Image.new("RGB", (16, 12), "blue").save(
+                folder / "IMG_6751_corrected.png",
+                icc_profile=profile,
+            )
+        return done
+
+    monkeypatch.setattr(build, "run_tool", product)
+    assert build.main(["photos", *args]) == 1
+    rows = json.loads((roots.allowed / "records/pack.json").read_text())["items"]
+    by_name = {row["item"]: row for row in rows}
+    failed = by_name["IMG_6751"]
+    assert failed["status"] == "done" and failed["viewing_aid_failed"] is True
+    assert failed["reviewable"] is False and failed["aid_message"]
+    assert not failed["aid_message"].startswith("; ")
+    assert failed["corrected_name"] == "IMG_6751_corrected.png"
+    assert (roots.allowed / "photos" / failed["corrected_name"]).is_file()
+    assert by_name["IMG_6771"]["status"] == "done"
+    assert by_name["IMG_6771"].get("viewing_aid_failed", False) is False
+    assert build.main(["page", *args]) != 0
+    html = (roots.allowed / "index.html").read_text()
+    assert 'href="photos/IMG_6751_corrected.png"' in html.split("<h2>Not built</h2>")[1]
+    if fault == "neutral":
+        assert 'href="photos/IMG_6751_neutral.png"' not in html
+        assert "neutral source view: neutral export failed" in html
+    assert page.check_links(roots.allowed / "index.html", roots=roots) == []
+    with (roots.allowed / "review-sheet.csv").open(encoding="utf-8-sig") as handle:
+        sheet_rows = list(csv.DictReader(handle))
+    assert len(sheet_rows) == 2
+    assert sheet_rows[0]["item"] == "IMG_6751"
+    assert sheet_rows[0]["viewing_aid_failed"] == "yes"
+
+
+@pytest.mark.parametrize("fault", ["probe", "prepare"])
+def test_clip_item_probe_or_prepare_fault_is_a_row_and_later_group_runs(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+    fault: str,
+) -> None:
+    """One malformed item's probe or packet facts must not abort later selected items."""
+    first = _item("GX011604", "V-S", "video")
+    later = _item("IMG_6704", "V-R", "video", "refused")
+    args = _selection_args(roots, [first, later])
+    for item in (first, later):
+        shutil.copyfile(
+            FIXTURES / "video/hevc8-bt709-full.mp4", roots.footage / item["source_name"]
+        )
+
+    def video(source):
+        if fault == "probe":
+            raise ValueError(f'"{source}": invalid duration')
+        return {"duration_s": 60.0}
+
+    monkeypatch.setattr(build, "run_tool", _fake_product)
+    monkeypatch.setattr(build, "_video", video)
+    monkeypatch.setattr(
+        build,
+        "_packet_facts",
+        lambda *a: [
+            {"codec_type": "video", "flags": "K"},
+        ],
+    )
+    assert build.main(["clips", *args]) == 1
+    rows = json.loads((roots.allowed / "records/pack.json").read_text())["items"]
+    by_name = {row["item"]: row for row in rows}
+    failed = by_name["GX011604"]
+    assert failed["status"] == ("failed" if fault == "probe" else "excerpt_failed")
+    assert failed["message"] and str(roots.footage) not in failed["message"]
+    assert by_name["IMG_6704"]["status"] == "refused"
+    assert not (roots.allowed / "clips/GX011604_corrected.mp4").exists()
+    if fault == "prepare":
+        excerpt_rows = json.loads((roots.allowed / "records/V-S-excerpts.json").read_text())
+        assert excerpt_rows["items"][0]["status"] == "excerpt_failed"
+
+
+def test_page_and_tally_expose_catalog_pending_including_absent_refusals(
+    roots: OutputRoots,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Missing saved rows and unrun HLG results must prevent a finished-pack exit."""
+    args = _selection_args(roots, [_item()])
+    records = roots.allowed / "records"
+    records.mkdir()
+    rows = [
+        dict(build._pending(item), status="failed")
+        for item in select.catalog()
+        if item.group not in {"V-R", "V-Z"}
+    ]
+    rows.append(build._pending(next(item for item in select.catalog() if item.group == "V-Z")))
+    state_path = records / "pack.json"
+    state_path.write_text(json.dumps({"schema": 1, "items": rows}))
+    assert build.main(["page", *args]) == 2
+    assert "pending=4" in capsys.readouterr().out
+    html = (roots.allowed / "index.html").read_text()
+    header = html.split("<h2>Starter presets</h2>")[0]
+    assert "Pending: 4" in header and "V-R=2" in header and "V-Z=2" in header
+    assert page.check_links(roots.allowed / "index.html", roots=roots) == []
+    assert build.main(["page", "--check", *args]) == 0
+    assert build.main(["tally", str(roots.allowed / "review-sheet.csv")]) == 0
+    text = capsys.readouterr().out
+    assert "pack pending: 4" in text and "V-R=2" in text
+    # V-R refusals are accounted results, not pending or review-sheet rows.
+    for item in select.catalog():
+        if item.group == "V-R":
+            rows.append(dict(build._pending(item), status="refused", message="HLG refused"))
+    state_path.write_text(json.dumps({"schema": 1, "items": rows}))
+    assert build.main(["page", *args]) == 2
+    assert "Pending: 2" in (roots.allowed / "index.html").read_text()
+    assert build.main(["tally", str(roots.allowed / "review-sheet.csv")]) == 0
+    text = capsys.readouterr().out
+    assert "pack pending: 2" in text and "V-R=2" not in text
+    with (roots.allowed / "review-sheet.csv").open() as handle:
+        assert list(csv.DictReader(handle)) == []
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        (r"\Phone\IMG_6702.MOV: probe failed", "IMG_6702.MOV: probe failed"),
+        ('"C:\\Program Files\\ffmpeg\\bin\\x.dll": load failed', '"x.dll": load failed'),
+        ('"/opt/media tools/bin/ffmpeg": load failed', '"ffmpeg": load failed'),
+        (r"C:\Program Files\ffmpeg\bin\x.dll: load failed", "x.dll: load failed"),
+    ],
+)
+def test_diagnostics_collapse_folder_tokens_and_paths_with_spaces(
+    roots: OutputRoots,
+    text: str,
+    expected: str,
+) -> None:
+    """External tool paths must reduce to file names without leaking folder tails."""
+    assert build._safe_text(text, roots) == expected
+
+
+def test_root_stripping_still_collapses_remaining_relative_folders(roots: OutputRoots) -> None:
+    """Removing a configured root must not leave its Phone subfolder in a diagnostic."""
+    text = str(roots.footage) + r"\Phone\IMG_6702.MOV: probe failed"
+    assert build._safe_text(text, roots) == "IMG_6702.MOV: probe failed"
