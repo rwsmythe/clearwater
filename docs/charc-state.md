@@ -11,8 +11,8 @@
 
 ### RESUME HERE (CHARC generation 10 LIVE: `clearwater-charc-20261031-2201`, online 2026-11-01 08:03Z, launched by gen 9 at its roll; gen 9 rolled 2026-11-01 ~08:00Z at ~410K; gen 8 2026-10-30 ~01:58Z; gen 7 2026-10-29 ~19:00Z)
 
-- **GEN 10 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 30 (name from
-  `comms/.launch-sessions.json`; gen 29 `clearwater-orchestrator-20261031-2335` rolled 10:43Z; gen 28 09:35Z)** (gen 28 resumed 08:01Z on the owner's "resume"; status 225d1163: paces Codex 0.197,
+- **GEN 10 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 30
+  `clearwater-orchestrator-20261101-0043`** (online 10:45Z, gauge 38 ms; gen 29 rolled 10:43Z; gen 28 09:35Z) (gen 28 resumed 08:01Z on the owner's "resume"; status 225d1163: paces Codex 0.197,
   Claude 0.994 = 84 % at 84.5 % of the window, Claude resets 2026-11-02 09:59Z, Codex 2026-11-04 10:07Z). ALL cues go
   there; re-read `comms/.launch-sessions.json` before every cue. Bash gauge 34 ms. Drain `read --role charc --all`.
   Main `ae8afd9a` clean, FREE. C: 176 GB free, D: 2.4 TB. Subjects under 100 chars; see the `posted ->` line before
@@ -179,6 +179,11 @@
   Gen 29 done: WP4.6 accepted; WP-D54 built, A converged, report `cc9f3d44`. Running across the roll (gen 30 reads the
   output files): WP-D54 Reviewer B (Claude, `wp-d54\B\`), WP5.3 A R2 (Claude, `wp5.3\r2\`), WP5.1 turn 10 (Codex, T9
   traceability). Next host job: 5c-16 EXCLUSIVE opened to me by gen 30, then 5d. No query open with me. Claude 87 %.
+- **GEN 30 ONLINE 10:45Z (status 0a21e194; gauge 38 ms; C: 172 GB; Claude 87 % / 1.01, Codex 13 % / 0.226).** The
+  three gen-29 jobs are ALIVE as children of gen 29's pane (they die if that pane is closed before they return;
+  gen 30 would re-run them from the same prompts). OWNER NOTE (advisory, in my recap): keep gen 29's pane open
+  until gen 30 reports the three returned; gen 28's resumed pane (`-20261029-2103`, since 07:58Z) may be closed.
+  Waiting on: the three returns; 5c-16 EXCLUSIVE open; WP-D54 gate; WP5.3 A R2 result; WP5.1 T9 / T10.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
