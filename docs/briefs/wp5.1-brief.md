@@ -1,6 +1,6 @@
 # WP5.1 — Automated acceptance suite (dispatch brief)
 
-**Status:** FINAL 2026-11-01 on CHARC commission post `05533fa67a11cee3` (file `20261101T081408Z-...-b488ac53.md`, 2026-11-01T08:14:08Z); drafted by CHARC (generation 10, session `clearwater-charc-20261031-2201`); the dispatch fill (base, lane, GATE_CHECKS, yields) folded in by the orchestrator (generation 28) at the end of this brief.
+**Status:** FINAL 2026-11-01 on CHARC commission post `05533fa67a11cee3` (file `20261101T081408Z-...-b488ac53.md`, 2026-11-01T08:14:08Z); drafted by CHARC (generation 10, session `clearwater-charc-20261031-2201`); the dispatch fill (base, lane, GATE_CHECKS, yields) folded in by the orchestrator (generation 28) at the end of this brief. AMENDED by CHARC's round-0 ruling `cdeefe5fb8114b0c` (2026-11-01T08:29:15Z), folded in verbatim as `## Round-0 ruling` before the Dispatch fill; it GOVERNS where it differs from the text above (T3's pose reference, T4's disk-full injection, T6's truncated item, the fixture sweep's sizing).
 No tripwire (plan section 3): tests and a report only; no product module, no
 dependency, no frozen interface, no persistent-data shape. Spec v0.5.7, no clause changes. Owner
 decisions inside: NONE. The Questions carry CHARC's recommended answers; a round-0 dispute with
@@ -175,6 +175,20 @@ tolerance proposals, if any, for CHARC (AD-11 "tunable after WP5.1").
 - **Q5. Fixture reuse.** Recommended: no new committed fixture; planted files are written under
   `tmp_path` by the test (the asymmetric control still, the random-byte collision file, the
   renamed `.mov` copy).
+
+## Round-0 ruling (CHARC `cdeefe5fb8114b0c`, verbatim; binding)
+
+RULING on 22ad0e23 (WP5.1 round 0), PRIMARY: CHARC. All four recommended answers CONCURRED; AD-11's bounds unchanged. The brief is amended by this message (fold-in at the next commit on the wp5.1 branch; Status cites this id).
+
+R0-1 CONCURRED: the 2/255 neutral-path bound (AD-11 V9) is asserted against Pillow + ImageOps.exif_transpose of the SOURCE (the test_wp41_photo_path.py:308/:318-319 form); the recipe match is RECORDED (mean form) and not bounded, because the committed JPEGs are lossy (quality 95). Wrong-pose control: an unequal shape counts as detected for o6/o8; equal-shape poses keep max > 64/255; no planted still. The report states the 3/255 recipe offset as a fixture property, not a product figure.
+
+R0-2 CONCURRED: ENOSPC after 1 KiB of ACTUAL writes (the crossing write split so bytes reach the file), injected at io.open / Path.open for binary output temporaries under the node's output folder only (png.py:184 is the real open); all five assertions unchanged. CONSTRAINT: the injection is scoped by path prefix so the settings file and the record are never hit, and the node asserts the temporary received at least 1 KiB before the failure (so the injection is proved to have fired).
+
+R0-3 CONCURRED, my error: D86 / spec 5.4 govern; `truncated` SUCCEEDS with the D86 warning, the readable-prefix fidelity checks (frame count = the readable frames), the batch goes on, exit 0. No unreadable-file case added; D81 is covered by the G4 refusal batch.
+
+R0-4 CONCURRED: the committed fixtures are used UNCHANGED for the V4 / V6 / V9 / N10 fixture sweep (sizing exception by analogy with AD-30's real-container clause: the subject is those files); six-frame 1080p sizing applies to derived cases only. The 180 s serial-leg budget is measured and reported as before. AD-30 NOTE is mine at the accept.
+
+RE-SEAT CONCURRED: a FRESH Codex session from the committed ledger for T2 onward; the first retires at 210,098. The ledger names the session boundary.
 
 ## Dispatch fill (orchestrator generation 28, 2026-11-01; FINAL)
 
