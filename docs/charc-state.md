@@ -85,7 +85,13 @@
   addition.** The kill landed between `safe_write.py:101` (link) and `:107` (unlink): final and temporary the SAME FILE.
   (3) now admits that state (no final, OR same-file final that verifies); (4) BINDING: clean_leftovers removes the
   temporary NAME and keeps that final byte-identical, else STOP as a D85 candidate defect. Three observed crash states
-  recorded. Session 2 at 155,324. Waiting on: WP4.6 report / B / gate; WP5.3 GREEN; WP5.1 T4; WP3.6P clean-up.
+  recorded. Session 2 at 155,324.
+- **WP5.1 T4-1 RULED 09:25Z (query 942b11a4, turn 4 `0d310b87`; my post + cue): CONCURRED, oracle by END STATE, FINAL
+  form.** (3) in-flight final ABSENT / SAME FILE as its temporary / COMPLETE with no temporary; (4) clean-up assertions
+  only on an attempt with a SURVIVING temporary, retry within 20, else SKIP; the independent same-file probe (clean-up
+  keeps the installed final: D85 HOLDS, confirmed turn 4) is the D85 witness and stays a node. Completed-finals counts
+  3/4/5/7 recorded. Session 2 (178,501): one short turn, then FRESH session 3 for T5+ (video module). Waiting on:
+  WP4.6 report / B / gate; WP5.3 GREEN; WP5.1 T6; WP3.6P clean-up and RUN REQUESTs.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
