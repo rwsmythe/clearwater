@@ -28,6 +28,26 @@ PRESET_SENTENCE = (
 )
 
 
+def pending_presets(
+    presets: Mapping[str, Mapping[str, Any]], *, roots: OutputRoots
+) -> tuple[str, ...]:
+    """Find starter presets without both saved values and a product-exported file.
+
+    Args:
+        presets: Preset objects in the state of record.
+        roots: Pack and source roots.
+
+    Returns:
+        Missing AD-13 names, without changing preset files or pack state.
+    """
+    return tuple(
+        name
+        for name in ("Snorkel (shallow)", "Scuba (deep)")
+        if name not in presets
+        or not roots.check(roots.allowed / "presets" / f"{name}.json").is_file()
+    )
+
+
 def _link(folder: str, name: str, label: str) -> str:
     if not name or Path(name).name != name or any(c in name for c in ("/", "\\", ":")):
         raise ValueError("artifact must have a bare file name")
@@ -85,6 +105,7 @@ def write_page(
 
     methods = correction_methods()
     pending = pending_items(items)
+    missing_presets = pending_presets(presets, roots=roots)
     parts = [
         '<!doctype html><html lang="en"><meta charset="utf-8">',
         "<title>CP5 visual review pack</title>",
@@ -117,12 +138,22 @@ def write_page(
         "<p>Limit: run commands from the worktree root; invocation from another working "
         "directory is outside this instrument's supported scope.</p>",
     ]
+    if missing_presets:
+        parts.append(
+            "<p>Pending presets: "
+            + escape(", ".join(missing_presets))
+            + ". Pack is not ready for CP5.</p>"
+        )
     if (roots.allowed / "review-sheet.csv").is_file():
         parts.append(_link("", "review-sheet.csv", "Owner review sheet (CSV)"))
     if sheet_message:
         parts.append(f"<p>Sheet: {escape(sheet_message)}</p>")
-    parts.extend(["<h2>Starter presets</h2>", f"<p>{PRESET_SENTENCE}</p>"])
+    parts.append("<h2>Starter presets</h2>")
+    if not missing_presets:
+        parts.append(f"<p>{PRESET_SENTENCE}</p>")
     for name, preset in presets.items():
+        if name in missing_presets:
+            continue
         parts.append(f"<h3>{escape(name)}</h3>" + _link("presets", name + ".json", name + ".json"))
         method_id = str(preset["method"])
         schema = methods[method_id].parameters
@@ -166,6 +197,8 @@ def write_page(
                     )
             if item.get("aid_message"):
                 parts.append(f"<p>Viewing aid: {escape(item['aid_message'])}</p>")
+            if item.get("refusal_message"):
+                parts.append(f"<p>{escape(item['refusal_message'])}</p>")
             parts.append("</article>")
     not_built = [
         item
@@ -173,12 +206,16 @@ def write_page(
         if item["status"] in {"excerpt_failed", "failed", "pending", "not run", "cancelled"}
         or item.get("viewing_aid_failed")
         or item.get("aid_message")
+        or item.get("expected_refusal_failed")
     ]
     parts.append("<h2>Not built</h2>")
     for item in not_built:
         aid_failed = item.get("viewing_aid_failed") or item.get("aid_message")
         status = "viewing_aid_failed" if aid_failed else str(item["status"])
         message = item.get("aid_message", "") if aid_failed else item.get("message", "")
+        if item.get("expected_refusal_failed"):
+            status = "expected_refusal_failed"
+            message = item["refusal_message"] + " " + str(message)
         parts.append(
             f"<p>{escape(str(item['source_name']))}: {escape(status)} {escape(str(message))}</p>"
         )
@@ -191,8 +228,17 @@ def write_page(
         "Video stills are converted BT.1886 -> sRGB for display; both halves alike; "
         "the player's rendering differs."
     )
-    roots.write_text(roots.allowed / "README.md", display_note + "\n")
-    parts.append(f"<footer><p>{escape(display_note)}</p></footer></html>")
+    check_note = 'page --check is a link check, not "finished"; use plain page for completion.'
+    limits = (
+        "Limits: unquoted paths with spaces and unlisted extensions may retain folder words. "
+        "Untagged video still halves can differ in tone; every commissioned source is tagged."
+    )
+    roots.write_text(
+        roots.allowed / "README.md", display_note + "\n" + check_note + "\n" + limits + "\n"
+    )
+    parts.append(
+        f"<footer><p>{escape(display_note)}</p><p>{escape(check_note)}</p></footer></html>"
+    )
     return roots.write_text(roots.allowed / "index.html", "\n".join(parts) + "\n")
 
 

@@ -355,7 +355,9 @@ DR-99 is handled only under its stated main-alone equivalence condition.
 | Session 2 / turn 3 (GREEN verification, not Reviewer A) | 0 / 6 / 0 | 6 / 0 | 6 / 0 | 0 | instrument fixes / regression additions | Six independently reproduced instrument gaps fixed; 70 nodes green; Reviewer A pending | 142,467 after turn 3 |
 | A1 (session 2 / turn 4 adjudication; turn 5 remediation) | 0 / 3 / 3; 6 advisory | 10 / 2 after adjudication | 12 / 0; accepted blocking 3 | 0 | turn 5: 10 instrument behavior fixes with regression controls; no src/ changes | Counted Claude pass; 10 ACCEPTED fixed under F1 ruling; F10 OUT/banked Limit; F11 REJECTED; ready for A2 | turn 3: 142,467; turn 4: 36,709 (dispatcher supplied) |
 | A2 (session 2 / turn 6 adjudication; session 3 / turn 7 remediation) | 0 / 1 / 4; 8 advisory | 11 / 2 | 12 / 1 by distinct finding; F1 NEW path reopens R1 F1 pattern, A1 repeats rejected R1 F11 | 0 | turn 7: seven accepted instrument behavior fixes and regression controls; zero src/ or frozen-interface changes | Counted claude -p pass; F1-F5 and A3/A7 FIXED under CHARC 0358beda; A2/A5/A6 BANK; A1 REJECT; A4/A8 DECLINE code change; ready for A3, not converged | turn 5: 142,541; turn 6: 198,059; turn 7 dispatcher pending |
-| A3 (session 3 / turn 8 adjudication; session 4 / turn 9 remediation) | 0 / 1 / 3; 3 advisory | reviewer: 6 / 1; effective: 7 / 0 under c25ff7a9 R3-3 | 5 NEW / 2 REOPENED distinct findings; F1/F2 also REOPEN silent-loss class | 0 | turn 9: F1-F6 instrument fixes and 13 regression nodes; F7 display documentation; no src/ or interface change | Counted claude -p pass; remediated under c25ff7a9; state audit finds no fourth shrinking path; ready for A4, not converged | turn 7: 143,373; turn 8: 182,934; turn 9 dispatcher pending |
+| A3 (session 3 / turn 8 adjudication; session 4 / turn 9 remediation) | 0 / 1 / 3; 3 advisory | reviewer: 6 / 1; effective: 7 / 0 under c25ff7a9 R3-3 | 5 NEW / 2 REOPENED distinct findings; F1/F2 also REOPEN silent-loss class | 0 | turn 9: F1-F6 instrument fixes and 13 regression nodes; F7 display documentation; no src/ or interface change | Counted claude -p pass; remediated under c25ff7a9; state audit finds no fourth shrinking path; ready for A4, not converged | turn 7: 143,373; turn 8: 182,934; turn 9: 140,647 |
+
+| A4 (session 4 / turn 10, terminating clean-up) | 0 / 0 / 4; 6 advisory | reviewer nominal 7 / 3; effective 8 / 2 under e4d56665 (R4-9 IN) | 10 NEW / 0 REOPENED distinct findings; R4-1 diagnostic-sidecar loss, not another state-of-record loss | 0 | Six instrument behavior fixes; R4-8 coverage-only; R4-10 and Limits documented; no src/ change | NO_NEW_CRITICAL_MAJOR, CONVERGED at round 4 by CHARC; terminating clean-up verified; executing Reviewer B next | turn 9: 140,647; turn 10 dispatcher pending |
 
 Subsequent Reviewer A turns adjudicate every finding, update this cumulative table
 and yield without remediation. Fixes belong to a separately dispatched turn.
@@ -373,7 +375,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 2 / turn 6 / A2 adjudication | same session 2 | 198,059 | Dispatcher supplied at turn 7; session 2 retired at the evaluation boundary before multi-finding remediation. |
 | Session 3 / turn 7 / A2 remediation | fresh session 3; dispatcher to fill ID | 143,373 | Dispatcher supplied at turn 8; remediation committed ed787934, all five blobs 0 CR; seat format check 293 files clean. |
 | Session 3 / turn 8 / A3 adjudication | same session 3 | 182,934 | Dispatcher supplied at turn 9; ledger committed a14a25ed; session 3 retired at the evaluation boundary before seven-item remediation. |
-| Session 4 / turn 9 / A3 remediation | fresh session 4; dispatcher to fill ID | dispatcher pending | All seven ruled items remediated; state audit and final light runs recorded below; YIELD for A4. |
+| Session 4 / turn 9 / A3 remediation | fresh session 4; dispatcher to fill ID | 140,647 | Dispatcher supplied at turn 10; committed de884f7d; A4 converged, terminating clean-up commissioned under e4d56665. |
+| Session 4 / turn 10 / A4 terminating clean-up | same session 4 | dispatcher pending | RED/GREEN and write classification below; YIELD for executing Reviewer B, not another A round. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -1791,3 +1794,179 @@ product exports remain authoritative and linked; runner records retain their
 bytes under the prior ruling. No open question or STOP. No real-build/report/
 gate claim is made; those remain later ladder tasks. **YIELD for Reviewer A
 round 4 at the dispatcher's seat.**
+
+
+## Session 4 / Turn 10: Reviewer A round 4 terminating clean-up (CHARC e4d56665)
+
+### Candidate, convergence, ruling and depth
+
+- Turn 9 is committed **de884f7d**. The dispatcher reports its blobs have 0 CR
+  and ruff/format clean. Supplied session-4 turn-9 depth: **140,647 tokens**;
+  recorded in the depth table without estimation. The turn-10 starting HEAD is
+  **07876a8e**, folding CHARC **e4d56665**. Session ID and turn-10 depth remain
+  for the dispatcher to fill. Evaluate around 200K; stop near 250K at a boundary.
+- Reviewer A round 4: **Claude opus, high**, executing at the dispatcher's seat
+  on de884f7d. Findings read whole, in place in its external r4 evidence folder,
+  never copied into the repository. Executed first: **136 passed in 34.56 s**.
+  No other transport metadata was supplied and none is inferred.
+- Verdict **NO_NEW_CRITICAL_MAJOR**: **CONVERGED at round 4**, explicitly ruled
+  by CHARC. Four MINOR and six ADVISORY; effective remediation envelope 8 IN /
+  2 OUT (R4-9 brought IN). Ten NEW distinct findings, zero reopened concrete
+  findings and zero reverts. The slash-text issue is a regression introduced by
+  R3-6; the diagnostic-sidecar loss repeats the broad loss pattern but is NOT a
+  fourth state-of-record path. R4-8 newly examines coverage of the already
+  working R3-4 TypeError catch. These are disclosed rather than reclassified as
+  critical/major or treated as grounds for another A round.
+- CHARC's two conditions govern: ONE replace-or-append rule on every item JSON
+  write, with the complete write classification below; Reviewer B must check
+  that classification and execute a two-manifest sequence on a fixture state.
+  This is the terminating clean-up, not a new review round or a final acceptance.
+
+### Per-finding adjudication and RED / GREEN
+
+All evidence is ignored **work/wp5.3/turn10/** inside this worktree. Pytest uses
+**work/wp5.3/tmp/** and the sandbox shim. Only planted files and committed tiny
+fixtures were opened; no owner footage was read, classified or judged.
+
+| Finding | Classification / RED | Terminating disposition / GREEN |
+|---|---|---|
+| R4-1 | ACCEPTED MINOR, IN. Two clips then a one-clip manifest leaves one excerpt row instead of two; RED assertion at the retained-count check. | _json_write centrally merges old item rows by identity through _store_item before atomic replacement. Both pack and excerpt files use it. The two-run control retains GX011603 unchanged and replaces only GX011604 with attempt-2 facts; pack stays 128 rows. Raw runner records stay immutable, using fresh names to append invocation history. |
+| R4-2 | ACCEPTED MINOR, IN. Both no-preset and one-preset complete-media states return 0 rather than 2 and make the unconditional AD-13 assertion. | Missing starter state/file identities are pending; page header names them, page returns 2, incomplete tables do not carry the AD-13 sentence. After presets, both tables and sentence appear and the complete planted page returns 0. |
+| R4-3 | ACCEPTED MINOR, IN. Page creates an absent pack.json and rewrites a deliberately spaced existing one. A held-lock presets command runs instead of refusing. | Page no longer writes pack.json. One exclusive-create .reviewpack.lock covers all mutating CLI stages, including all as one transaction; page also takes it to serialize derived writes. Acquire precedes state load, holder pid/start are reported, stale locks require manual deletion, and only the holder removes its lock on exit. Both absent/existing page-state controls and held-lock refusal pass. A separate error-exit control verifies release. |
+| R4-4 | ACCEPTED MINOR, IN. Four slash-bearing product strings fail preservation; the three path rows already pass and remain in the SAME parameterized control. | Collapse only rooted paths or separator tokens with a known extension. time base 1/90000 is not 1/N ticks., (ipco/ipma), (moov/udta), 30000/1001 fps remain unchanged; relative Phone, quoted spaced Windows and quoted spaced POSIX paths collapse to their last component. Existing path and metadata guards stay unchanged. |
+| R4-5 | LIMIT ADVISORY, OUT. Executed by reviewer; no commissioned path has this form. | Retain and disclose: an unquoted spaced path with an unlisted extension may retain folder words. README Limits text added; carry forward to the later real-build report. No broader path parser commissioned or claimed. |
+| R4-6 | LIMIT ADVISORY, OUT. Reviewer reasoning; all commissioned files are tagged. | Retain and disclose: untagged video still halves can differ in tone because the product defaults missing tags but the viewing adapter converts only explicit tags. README Limits text added; carry forward to report. No pixel/transfer change. |
+| R4-7 | ACCEPTED ADVISORY, IN. Done V-R returns 0; unrelated failures have no expected-refusal flag, and merely mentioning HLG mislabels one as refused. Three RED rows. | Recognize the actual product HLG refusal sentence (plus the existing literal fixture form), rather than any HLG substring. Keep actual done/failed state and product message; unexpected V-R results get expected_refusal_failed, appear under Not built with an explanation, and clips exits 1. V-R remains outside the review sheet. |
+| R4-8 | ACCEPTED ADVISORY, IN, coverage only. New control is GREEN first: actual _video reaches float(None), existing _build_groups TypeError catch already handles it. | Preserve the working catch. The new row proves a failed item with NoneType text is persisted and the later V-R group still runs. No fictitious RED or code repair claimed. Removing TypeError from that boundary would break this control. |
+| R4-9 | ACCEPTED ADVISORY, brought IN. Actual Fraction(0/0) from tmcd average rate and raw subprocess.TimeoutExpired each escape as a traceback; two RED rows. | Normalize ZeroDivisionError and TimeoutExpired at item prepare/view boundaries. _invoke also maps runner launch/timeout faults to failed rows for the batch, with safe diagnostics and nonzero status, so later groups continue. Both controls retain the failed item plus later refusal and exit 1; no whole-source fallback. |
+| R4-10 | ACCEPTED ADVISORY, IN, documentation only. Existing link-check exit behavior is intentional. | README and page state: page --check is a link check, not finished; use plain page for completion. Link-only checks retain their previous statuses. Independent output inspection verifies both texts. |
+
+- **r4-1-4-red.log/.xml:** 10 failed, 3 passed, 136 deselected in **6.63 s**.
+  The three passing nodes are the already-fixed R3 path cases, intentionally
+  paired with the four new product-text cases. No collection error.
+- **r4-1-4-green.log/.xml:** **13 passed**, 136 deselected in **9.37 s**.
+- **r4-7-9-red.log/.xml:** 5 failed, 3 passed, 149 deselected in **2.47 s**.
+  Passing controls are the existing TypeError behavior, immutable fresh runner
+  records, and lock release after error (R4-3's implementation already applied).
+- **r4-7-9-green.log/.xml:** **8 passed**, 149 deselected in **2.12 s**.
+- No existing assertion was changed, removed or weakened. Twenty-one new nodes
+  exercise the requested behavior and persistence boundaries. No new marker or
+  test-only substitute for a required instrument repair.
+
+### Complete JSON / text-state write classification -- condition (a)
+
+**By-item record** means replace an existing identity or append a new identity;
+never discard another identity. For invocation snapshots this is append to a
+fresh filename: the original product bytes are never rewritten, as required by
+CHARC 0358beda. A preset file has ONE identity (its AD-13 filename), so exporting
+that same preset replaces that singleton without affecting its sibling. **Derived
+view** means regenerated whole from the authoritative state/facts; it is not used
+as an alternative item inventory. Product caches are explicitly derived and
+evictable, never a review tally or state of record.
+
+The source/AST enumeration is retained in **write-audit.log** (write_audit.py).
+It finds all FOUR _json_write call sites below, and the JSON/text writes and
+delegations. The helper's temporary JSON and atomic rename are the same logical
+record write, not an extra inventory. No unclassified persistent state write
+remains. Binary media derivatives are not JSON/text state.
+
+| Final file:line / call | File written | Class | Why it cannot shrink, or source of whole regeneration |
+|---|---|---|---|
+| tools/reviewpack/build.py:126 (:141/:144) | Atomic JSON temporary then destination | by-item record: replace-or-append, never shrinks | Shared helper copies previous items, replaces/appends incoming identities through _store_item, then atomically renames. Used by ALL four sites below; independent three-path control proves both rows remain and incoming state is not mutated. |
+| tools/reviewpack/build.py:1237 | records/<group>-excerpts.json | by-item record: replace-or-append, never shrinks | Same helper; executed two-manifest regression preserves other clip's timings/error facts and replaces rerun clip. |
+| tools/reviewpack/build.py:1243 | records/pack.json (no runnable sources) | by-item record: replace-or-append, never shrinks | Same helper; per-item error rows retained even when a whole group fails preparation. |
+| tools/reviewpack/build.py:1291 | records/pack.json (finished group) | by-item record: replace-or-append, never shrinks | Same helper and identity writer; old groups remain alongside current results. |
+| tools/reviewpack/build.py:1371 | records/pack.json (non-page stage) | by-item record: replace-or-append, never shrinks | Same helper; page excluded from this write. One CLI lock spans load through save. |
+| tools/reviewpack/build.py:294 / :1015 | records/<group>[-neutral][-N].json, through runner --record | by-item record: append-only invocation history, never shrinks | _fresh allocates a new name; product _write_record (headless_export.py:1413) opens exclusively and refuses overwrite. Two-manifest regression proves both prior two-item records remain byte-identical while two new one-item snapshots append. Never merge/rewrite product record bytes. |
+| tools/reviewpack/build.py:927 | settings/starter-store[-N]/<preset>.json, via install_starters | by-item record: append singleton preset identities, never shrinks | Store folder is fresh; product installs both fixed named records. No previous store or preset record is removed. |
+| tools/reviewpack/build.py:932 | presets/<AD-13 name>.json, via export_preset | by-item record: replace same singleton identity, never shrinks | Each call replaces only its one preset file; both commissioned identities are always exported. Product AD-13 schema/values preserved. Missing output is pending, not quietly omitted. |
+| tools/reviewpack/build.py:927 | fresh store's .starters-installed marker | derived view: regenerated whole from product store state | Product marker 1 is written only after the two starter records exist; it is operational installation state, not a review inventory. |
+| tools/reviewpack/build.py:1308 / :1321 | .reviewpack.lock | by-item record: exclusive singleton holder record (transient) | Append one immutable holder record by exclusive create; never overwrite another holder. Intentional removal by its owner on exit is the R4-3 release protocol, not item-state pruning. A stale holder is never removed by the instrument. |
+| tools/reviewpack/build.py:1025 | logs/<fresh runner-record stem>.log | derived view: regenerated whole from invocation facts | Safe stdout/stderr, exit and elapsed facts for that immutable invocation; fresh record stem keeps old logs. No item selection is reconstructed from logs. |
+| tools/reviewpack/page.py:236 | README.md | derived view: regenerated whole from state-of-record display/usage policy | Display conversion, link-check meaning and Limits; no item inventory or owner votes. |
+| tools/reviewpack/page.py:242 | index.html | derived view: regenerated whole from pack state | All saved rows, catalog pending and starter presence; HTML escaping and relative links; never written back to state. |
+| tools/reviewpack/sheet.py:148 / :149 | review-sheet.csv, atomic temporary then rename | derived view: regenerated whole from pack state plus preserved owner answers | Existing answer identities/votes retained; guarded refusal on unavailable or changed pairs. All available rows/flags projected; D65 votes are never inferred. Module unchanged this turn. |
+| tools/reviewpack/build.py:1418 | tally console text, no file write | derived view: regenerated whole from sheet and companion state | Votes/artifacts from strict CSV; pending from full catalog minus accounted state. No preference judgement or state mutation. |
+| tools/reviewpack/build.py:1015, runner --cache-dir delegation | cache/<key>/meta.json and JSON completeness marker | derived view: regenerated whole from product cache state/source and parameters | Product cache stamps and completion index (cache/store.py:471/:689); evictable acceleration data, never CP5 item records. No product edit; real tiny all-stage test exercises it. |
+
+**Condition (b), acceptance transfer:** Reviewer B must explicitly check EVERY
+site/class above and EXECUTE the two-manifest sequence against a fixture state.
+The excerpt-record and immutable-runner-snapshot regressions provide the two
+sequences: first two commissioned items, then one; untouched item row/record
+must remain, rerun identity must update, pack count stays 128, and page must not
+rewrite pack.json. Do not substitute a static read for this execution. Reviewer
+B is at the dispatcher's seat; no reviewer or mailbox action was started here.
+
+### Verification loop: suspect / confirm independently / fix / repeat
+
+1. **Confirmed and fixed [MINOR]:** excerpt sidecar shrinks on targeted rerun.
+   RED proves count loss; shared JSON merge fixes every item-record site, not
+   only excerpts. Independent verification.py then exercises three record
+   filenames with two old identities and one update: both rows survive, only
+   rerun facts change, and caller's one-row input remains unchanged.
+2. **Confirmed and fixed [MINOR]:** missing presets falsely complete the page;
+   page write-back permits stale state; lock absence permits overlap. RED/GREEN
+   proves missing presets are pending, page retains existing bytes (or creates
+   no state), held-lock refusal and release on normal/error exit. Independent
+   stale-holder control uses an inactive-looking pid and old timestamp, verifies
+   refusal with both fields/manual-delete instruction, and identical lock bytes.
+3. **Confirmed and fixed [MINOR]:** slash redaction changes actual product
+   diagnostics. The paired seven-row test proves safe paths and unchanged
+   ratios/box names together. Metadata and name-only controls remain green.
+4. **Confirmed and fixed / preserved [ADVISORY]:** V-R done/unrelated-HLG
+   failures and zero-rate/timeout escapes are RED then GREEN. Actual float(None)
+   already reaches the right catch; its previously missing coverage is added.
+   README/page output inspection verifies link-check wording and both Limits.
+5. **Rejected suspect [false positive, no code change]:** raw per-group runner
+   records might shrink on a one-item rerun. _fresh, the runner's exclusive
+   record writer, and an executed two-manifest test independently show old
+   bytes remain and new snapshots append. Preserve their immutability under
+   the earlier ruling instead of treating an invocation snapshot as an
+   aggregate. This is the explicit append-only classification above.
+6. **Repeat pass / no new finding:** full **157-node** suite, write-site AST
+   enumeration, scoped diff/docstrings/comments, output guards and independent
+   merge/lock/documentation controls find no additional defect. Formatting
+   corrected only mechanical layout; first ruff and mypy are clean. No public
+   interface, owner-input ambiguity, product defect or new STOP surfaced.
+
+### Final light runs / AD-30 / locks
+
+PowerShell sets PYTHONPATH=scripts; commands from this worktree root:
+
+```text
+uv run pytest -q tests/test_reviewpack.py --basetemp=work/wp5.3/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 --junitxml=work/wp5.3/turn10/full1.xml
+uv run ruff check tools/reviewpack tests/test_reviewpack.py
+uv run ruff format --check tools/reviewpack tests/test_reviewpack.py
+uv run mypy
+```
+
+- **157 passed in 47.43 s**, exit 0; full1.xml has zero failures/errors/skips.
+  No existing assertion changed. Exactly one existing slow node; no new
+  slow/GPU/footage/fullclip marker. The real tiny headless/FFmpeg integration
+  remains force-CPU; its pre-existing automatic product encoder policy is
+  unchanged, and no owner-media/performance figure or visual judgement is run.
+- Sole slow integration aggregate **22.759 s**. Slowest parallel node:
+  test_missing_starter_presets_are_pending_until_both_tables_exist[0],
+  **3.281 s** in the full pass. First measured RED **2.632 s**, targeted GREEN
+  **4.748 s**; each under five seconds, so no marker change required. All 157
+  node statuses/times are in per-node-final.csv. verification.log joins counts,
+  independent checks and write sites; timings1.log preserves first measurements.
+- Final ruff **All checks passed**, format **6 files already formatted**, mypy
+  **Success: no issues found in 151 source files**, all exit 0, retained in
+  ruff-final.log/.exit, format-final.log/.exit and mypy-final.log/.exit.
+  Inherited VIRTUAL_ENV is ignored by uv; no --active or other-worktree access.
+- verification.log/.exit: independent merge, stale-lock and documentation
+  checks plus JSON-site enumeration, exit 0. scope-lf-audit.log/.exit records
+  the four owned changed paths, zero CR, public docstrings, whitespace and no
+  unowned edit. Whole-tree/two-leg gate remains at the dispatcher's seat.
+
+Only owned build.py, page.py, tests/test_reviewpack.py and this ledger change.
+Every new production write, including lock and JSON temporary, is guarded under
+the configured pack root. Footage and source pixels remain untouched; no main
+working tree, other worktree, local config, frozen interface, src/, shared
+helper, other test, dependency, Qt import or OS-specific behavior was changed.
+No git mutation/commit, mailbox post, real-media RUN REQUEST or owner judgement.
+R4-5/R4-6 remain OUT Limits and must be carried to the later real-build report;
+no out-of-envelope support is claimed. Reviewer A remains CONVERGED at round 4.
+**YIELD for executing Reviewer B at the dispatcher's seat**, then the scheduled
+RUN REQUEST ladder; no further A round requested.

@@ -2179,3 +2179,280 @@ def test_root_stripping_still_collapses_remaining_relative_folders(roots: Output
     """Removing a configured root must not leave its Phone subfolder in a diagnostic."""
     text = str(roots.footage) + r"\Phone\IMG_6702.MOV: probe failed"
     assert build._safe_text(text, roots) == "IMG_6702.MOV: probe failed"
+
+
+def test_excerpt_records_merge_two_manifest_runs_by_item(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A targeted rerun must retain the other excerpt row and replace its own facts."""
+    items = [_item("GX011603", "V-S", "video"), _item("GX011604", "V-S", "video")]
+    for item in items:
+        (roots.footage / item["source_name"]).write_bytes(b"planted")
+    monkeypatch.setattr(build, "_video", lambda source: {"duration_s": 60.0})
+    attempt = 1
+
+    def excerpt(source, **kwargs):
+        return {
+            "path": None,
+            "excerpt": False,
+            "status": "excerpt_failed",
+            "message": f"copy attempt {attempt}",
+            "planned_start_s": 24.0,
+        }
+
+    monkeypatch.setattr(build, "prepare_excerpt", excerpt)
+    assert build.main(["clips", "V-S", *_selection_args(roots, items)]) == 1
+    path = roots.allowed / "records/V-S-excerpts.json"
+    first = json.loads(path.read_text())["items"]
+    assert [row["item"] for row in first] == ["GX011603", "GX011604"]
+    attempt = 2
+    assert build.main(["clips", "V-S", *_selection_args(roots, items[1:])]) == 1
+    second = json.loads(path.read_text())["items"]
+    assert len(second) == 2 and second[0] == first[0]
+    assert second[1]["item"] == "GX011604" and second[1]["message"] == "copy attempt 2"
+    state = json.loads((roots.allowed / "records/pack.json").read_text())
+    assert len(state["items"]) == 128
+
+
+def _complete_pack(roots: OutputRoots) -> tuple[dict, list[str]]:
+    """Plant every commissioned result and its link targets without processing media."""
+    rows = []
+    for item in select.catalog():
+        row = _item(item.stem, item.group, item.kind, "refused" if item.group == "V-R" else "done")
+        row["source_name"] = item.name
+        _plant_page_item(row, roots)
+        rows.append(row)
+    state = {"schema": 1, "items": rows}
+    (roots.allowed / "records").mkdir()
+    (roots.allowed / "records/pack.json").write_text(json.dumps(state))
+    return state, _selection_args(roots, [_item()])
+
+
+@pytest.mark.parametrize("present", [0, 1])
+def test_missing_starter_presets_are_pending_until_both_tables_exist(
+    roots: OutputRoots,
+    present: int,
+) -> None:
+    """Accounted media alone must not make a finished page without both starter tables."""
+    state, args = _complete_pack(roots)
+    if present:
+        presets = _presets(roots)
+        state["presets"] = {"Snorkel (shallow)": presets["Snorkel (shallow)"]}
+        (roots.allowed / "records/pack.json").write_text(json.dumps(state))
+    assert build.main(["page", *args]) == 2
+    html = (roots.allowed / "index.html").read_text()
+    assert "Pending presets:" in html.split("<h2>Starter presets</h2>")[0]
+    assert "Scuba (deep)" in html.split("<h2>Starter presets</h2>")[0]
+    assert PRESET_SENTENCE not in html
+    assert page.check_links(roots.allowed / "index.html", roots=roots) == []
+    assert build.main(["presets", *args]) == 0
+    assert build.main(["page", *args]) == 0
+    html = (roots.allowed / "index.html").read_text()
+    assert html.count("<table>") == 2 and PRESET_SENTENCE in html
+
+
+@pytest.mark.parametrize("saved", [False, True])
+def test_page_never_creates_or_rewrites_pack_state(roots: OutputRoots, saved: bool) -> None:
+    """Rendering may regenerate views but cannot write back a stale state snapshot."""
+    args = _selection_args(roots, [_item()])
+    path = roots.allowed / "records/pack.json"
+    before = b'{ "schema": 1, "items": [] }\n'
+    if saved:
+        path.parent.mkdir()
+        path.write_bytes(before)
+    assert build.main(["page", *args]) == 2
+    assert path.exists() is saved
+    if saved:
+        assert path.read_bytes() == before
+
+
+def test_second_stage_refuses_held_lock_and_never_breaks_it(
+    roots: OutputRoots,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A second writer must identify the holder and leave even an old lock untouched."""
+    args = _selection_args(roots, [_item()])
+    path = roots.allowed / ".reviewpack.lock"
+    body = f"pid={os.getpid()}\nstarted=2026-01-01T00:00:00+00:00\n"
+    with path.open("x", encoding="utf-8", newline="") as held:
+        held.write(body)
+        held.flush()
+        assert build.main(["presets", *args]) == 2
+        text = capsys.readouterr().err
+        assert f"pid={os.getpid()}" in text and "2026-01-01T00:00:00+00:00" in text
+        assert "stale" in text and "delete .reviewpack.lock" in text
+        assert path.read_text() == body
+        assert not (roots.allowed / "records/pack.json").exists()
+        assert not (roots.allowed / "presets").exists()
+    path.unlink()  # This test owns the planted lock; the instrument never broke it.
+    assert build.main(["presets", *args]) == 0
+    assert not path.exists()
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("time base 1/90000 is not 1/N ticks.", "time base 1/90000 is not 1/N ticks."),
+        ("(ipco/ipma)", "(ipco/ipma)"),
+        ("(moov/udta)", "(moov/udta)"),
+        ("30000/1001 fps", "30000/1001 fps"),
+        (r"\Phone\IMG_6702.MOV: probe failed", "IMG_6702.MOV: probe failed"),
+        ('"C:\\Program Files\\ffmpeg\\bin\\x.dll": load failed', '"x.dll": load failed'),
+        ('"/opt/media tools/bin/ffmpeg": load failed', '"ffmpeg": load failed'),
+    ],
+)
+def test_path_privacy_preserves_product_ratios_and_box_names(
+    roots: OutputRoots,
+    text: str,
+    expected: str,
+) -> None:
+    """Path redaction must distinguish real paths from product ratios and box names."""
+    assert build._safe_text(text, roots) == expected
+
+
+@pytest.mark.parametrize(
+    "failure", [None, "Cannot read input.", "HLG decoder could not read input."]
+)
+def test_unexpected_refused_group_result_is_flagged_without_inventing_refusal(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str | None,
+) -> None:
+    """Done or unrelated failed V-R results must expose an expected-refusal regression."""
+    subject = _item("IMG_6772", "V-R", "video")
+    args = _selection_args(roots, [subject])
+    shutil.copyfile(FIXTURES / "video/hevc8-bt709-full.mp4", roots.footage / subject["source_name"])
+
+    def product(argv, **kwargs):
+        done = _fake_product(argv, **kwargs)
+        if argv[0] == "uv" and failure:
+            path = Path(argv[argv.index("--record") + 1])
+            record = json.loads(path.read_text())
+            record["items"][0].update(state="failed", outputs=[], failure=failure)
+            record["counts"] = {"failed": 1}
+            path.write_text(json.dumps(record))
+            return subprocess.CompletedProcess(argv, 1, b"", b"")
+        return done
+
+    monkeypatch.setattr(build, "run_tool", product)
+    monkeypatch.setattr(build, "_view_video", lambda *a, **kw: None)
+    assert build.main(["clips", "V-R", *args]) == 1
+    rows = json.loads((roots.allowed / "records/pack.json").read_text())["items"]
+    result = next(row for row in rows if row["item"] == "IMG_6772")
+    assert result["status"] == ("failed" if failure else "done")
+    assert result.get("expected_refusal_failed") is True
+    assert result["message"] == (failure or "")
+    assert build.main(["page", *args]) == 2
+    assert "Expected HLG refusal" in (roots.allowed / "index.html").read_text()
+    with (roots.allowed / "review-sheet.csv").open() as handle:
+        assert list(csv.DictReader(handle)) == []
+
+
+def test_missing_video_duration_type_error_is_caught_by_group_boundary(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An actual float(None) from _video must become a row and allow the next group."""
+    first, later = _item("GX011604", "V-S", "video"), _item("IMG_6704", "V-R", "video")
+    for item in (first, later):
+        (roots.footage / item["source_name"]).write_bytes(b"planted")
+    monkeypatch.setattr(build, "_probe", lambda *a: {"streams": [{"duration": None}]})
+    monkeypatch.setattr(build, "run_tool", _fake_product)
+    assert build.main(["clips", *_selection_args(roots, [first, later])]) == 1
+    rows = json.loads((roots.allowed / "records/pack.json").read_text())["items"]
+    by_item = {row["item"]: row for row in rows}
+    assert by_item["GX011604"]["status"] == "failed"
+    assert "NoneType" in by_item["GX011604"]["message"]
+    assert by_item["IMG_6704"]["status"] == "refused"
+
+
+@pytest.mark.parametrize("fault", ["zero_rate", "timeout"])
+def test_zero_timecode_rate_or_runner_timeout_is_an_item_error_and_continues(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+    fault: str,
+) -> None:
+    """A zero-rate tmcd or raw subprocess timeout must not lose this or later groups."""
+    first, later = _item("GX011604", "V-S", "video"), _item("IMG_6704", "V-R", "video")
+    for item in (first, later):
+        shutil.copyfile(
+            FIXTURES / "video/hevc8-bt709-full.mp4", roots.footage / item["source_name"]
+        )
+    if fault == "zero_rate":
+        monkeypatch.setattr(build, "_video", lambda source: {"duration_s": 60.0})
+        monkeypatch.setattr(
+            build,
+            "_probe",
+            lambda *a: {
+                "streams": [
+                    {
+                        "codec_type": "video",
+                        "avg_frame_rate": "0/0",
+                        "tags": {"timecode": "01:00:00:00"},
+                    },
+                    {"codec_type": "data", "codec_tag_string": "tmcd"},
+                ]
+            },
+        )
+        monkeypatch.setattr(
+            build,
+            "_packet_facts",
+            lambda *a: [
+                {"codec_type": "video", "flags": "K", "pts_time": "0"},
+            ],
+        )
+
+    def product(argv, **kwargs):
+        if fault == "timeout" and argv[0] == "uv" and any("GX011604" in arg for arg in argv):
+            raise subprocess.TimeoutExpired(argv, 1)
+        return _fake_product(argv, **kwargs)
+
+    monkeypatch.setattr(build, "run_tool", product)
+    assert build.main(["clips", *_selection_args(roots, [first, later])]) == 1
+    rows = json.loads((roots.allowed / "records/pack.json").read_text())["items"]
+    by_item = {row["item"]: row for row in rows}
+    failed = by_item["GX011604"]
+    assert failed["status"] == ("excerpt_failed" if fault == "zero_rate" else "failed")
+    assert failed["message"] and str(roots.footage) not in failed["message"]
+    assert by_item["IMG_6704"]["status"] == "refused"
+
+
+def test_runner_records_append_fresh_snapshots_across_two_manifests(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Raw product records remain byte-identical while targeted reruns append new records."""
+    items = [_item(), _item("IMG_6771")]
+    for item in items:
+        shutil.copyfile(
+            FIXTURES / "stills/jpeg/jpeg-gradient-srgb.jpg", roots.footage / item["source_name"]
+        )
+    monkeypatch.setattr(build, "run_tool", _fake_product)
+    assert build.main(["photos", *_selection_args(roots, items)]) == 0
+    records = roots.allowed / "records"
+    before = {name: (records / name).read_bytes() for name in ("P-A.json", "P-A-neutral.json")}
+    assert build.main(["photos", *_selection_args(roots, items[1:])]) == 0
+    for name, data in before.items():
+        assert (records / name).read_bytes() == data
+        assert len(json.loads(data)["items"]) == 2
+    for name in ("P-A-2.json", "P-A-neutral-2.json"):
+        rows = json.loads((records / name).read_text())["items"]
+        assert len(rows) == 1 and rows[0]["source"] == "IMG_6771.JPG"
+    assert len(json.loads((records / "pack.json").read_text())["items"]) == 128
+
+
+def test_stage_lock_releases_after_stage_exception(
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The owning stage must remove its lock on an error as well as a normal return."""
+    args = _selection_args(roots, [_item()])
+
+    def fail(*a, **kw):
+        assert (roots.allowed / ".reviewpack.lock").is_file()
+        raise ValueError("planted stage failure")
+
+    monkeypatch.setattr(build, "_build_groups", fail)
+    assert build.main(["photos", *args]) == 2
+    assert not (roots.allowed / ".reviewpack.lock").exists()

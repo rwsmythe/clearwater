@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import re
+import subprocess
 import sys
 import time
 import uuid
@@ -13,6 +15,7 @@ from collections import Counter, defaultdict
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import replace
+from datetime import UTC, datetime
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -36,6 +39,8 @@ from lookcheck.frames import (
 from lookcheck.frames import run_tool as run_tool
 
 from . import page, select, sheet
+
+_PATH_EXTENSION = r"(?:heic|jpe?g|png|tiff?|mov|mp4|mkv|dll|exe|json|toml|log|py|csv|txt|dat|tmp)"
 
 
 def _metadata_text(line: str) -> str:
@@ -85,28 +90,32 @@ def _safe_text(value: object, roots: OutputRoots) -> str:
         for spelling in (str(root), root.as_posix(), str(root).replace("\\", "\\\\")):
             text = re.sub(re.escape(spelling), "", text, flags=re.IGNORECASE)
 
-    def basename(match: re.Match[str]) -> str:
-        """Return the last component of a matched diagnostic path."""
-        return re.split(r"[\\/]+", match.group())[-1] or "[path]"
+    def basename(token: str) -> str:
+        """Collapse path-like text while preserving ratios and container box names."""
+        if not re.match(r"(?:[A-Za-z]:[\\/]|[\\/])", token) and not re.search(
+            rf"[\\/].*\.{_PATH_EXTENSION}(?=$|[\s:;,\)\]])", token, re.I
+        ):
+            return token
+        return re.split(r"[\\/]+", token)[-1] or "[path]"
 
     # A quoted span supplies a reliable boundary even for extensionless tools.
     text = re.sub(
         r"""(["'])([^"'\r\n]*[\\/][^"'\r\n]*)\1""",
-        lambda match: match[1] + (re.split(r"[\\/]+", match[2])[-1] or "[path]") + match[1],
+        lambda match: match[1] + basename(match[2]) + match[1],
         text,
     )
     # Unquoted rooted paths can contain spaces; known file extensions bound them.
     text = re.sub(
         r"""(?:[A-Za-z]:[\\/]|\\\\|(?<!\w)/)[^\r\n"'<>]*?"""
-        r"\.(?:heic|jpe?g|png|tiff?|mov|mp4|mkv|dll|exe|json|toml|log|py|csv|txt|dat|tmp)"
+        rf"\.{_PATH_EXTENSION}"
         r"(?=$|[\s:;,\)\]])",
-        basename,
+        lambda match: basename(match.group()),
         text,
         flags=re.IGNORECASE,
     )
-    # Root stripping can leave relative folders. Every remaining separator token
-    # is reduced as well, so a removed root never exposes its folder tail.
-    text = re.sub(r"""[^\s"'<>]*[\\/][^\s"'<>]*""", basename, text)
+    # Root stripping can leave relative folders. Collapse only path-like tails;
+    # product ratios and container box names must remain verbatim.
+    text = re.sub(r"""[^\s"'<>]*[\\/][^\s"'<>]*""", lambda match: basename(match.group()), text)
     return (
         "\n".join(_metadata_text(line) for line in text.splitlines())
         .encode("ascii", "backslashreplace")
@@ -114,8 +123,19 @@ def _safe_text(value: object, roots: OutputRoots) -> str:
     )
 
 
-def _json_write(path: Path, value: object, roots: OutputRoots) -> None:
+def _json_write(path: Path, value: dict[str, Any], roots: OutputRoots) -> None:
+    """Atomically persist item records with the same replace-or-append rule everywhere."""
     roots.check(path)
+    if not isinstance(value.get("items"), list):
+        raise ValueError("JSON item records require an items list")
+    if path.exists():
+        previous = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(previous, dict) or not isinstance(previous.get("items"), list):
+            raise ValueError(f"{path.name}: invalid existing item record")
+        merged = {**previous, **value, "items": list(previous["items"])}
+        for item in value["items"]:
+            _store_item(merged, item)
+        value = merged
     temporary = path.with_name(f".{path.name}-{uuid.uuid4().hex}.tmp")
     try:
         roots.write_text(
@@ -300,6 +320,17 @@ def runner_arguments(
     return args
 
 
+def _hlg_refusal(message: str) -> bool:
+    """Recognize the product's HLG refusal, rather than any diagnostic mentioning HLG."""
+    return any(
+        text in message.lower()
+        for text in (
+            "this video uses hlg hdr, which clearwater does not support.",
+            "unsupported hlg transfer.",
+        )
+    )
+
+
 def read_runner_record(path: Path, *, group: str, roots: OutputRoots) -> list[dict[str, Any]]:
     """Map runner facts into pack items without guessing numbered output names.
 
@@ -346,7 +377,7 @@ def read_runner_record(path: Path, *, group: str, roots: OutputRoots) -> list[di
                 else (
                     raw["state"]
                     if raw["state"] in {"not run", "cancelled"}
-                    else ("refused" if group == "V-R" and "hlg" in message.lower() else "failed")
+                    else ("refused" if group == "V-R" and _hlg_refusal(message) else "failed")
                 ),
                 "message": message,
                 "warnings": [_safe_text(v, roots) for v in raw["warnings"]],
@@ -367,6 +398,11 @@ def read_runner_record(path: Path, *, group: str, roots: OutputRoots) -> list[di
                 "stills": [],
             }
         )
+        if group == "V-R" and result[-1]["status"] != "refused":
+            result[-1]["expected_refusal_failed"] = True
+            result[-1]["refusal_message"] = (
+                f"Expected HLG refusal; product reported {result[-1]['status']}."
+            )
     return result
 
 
@@ -674,7 +710,16 @@ def prepare_excerpt(
             "timecode": timecode,
             "message": "",
         }
-    except (ValueError, KeyError, StopIteration, TypeError, OSError, ExtractError) as exc:
+    except (
+        ValueError,
+        KeyError,
+        StopIteration,
+        TypeError,
+        ZeroDivisionError,
+        subprocess.TimeoutExpired,
+        OSError,
+        ExtractError,
+    ) as exc:
         if destination.exists():
             roots.check(destination).unlink()
         return {**planned, "message": _safe_text(exc, roots)}
@@ -965,7 +1010,16 @@ def _invoke(
     )
     record = Path(arguments[arguments.index("--record") + 1])
     started = time.monotonic()
-    done = run_tool(arguments, timeout=24 * 3600)
+    invocation_error = ""
+    try:
+        done = run_tool(arguments, timeout=24 * 3600)
+    except (subprocess.TimeoutExpired, OSError, ExtractError) as exc:
+        invocation_error = (
+            f"runner timed out after {exc.timeout} seconds"
+            if isinstance(exc, subprocess.TimeoutExpired)
+            else _safe_text(exc, roots)
+        )
+        done = subprocess.CompletedProcess(arguments, 1, b"", invocation_error.encode("ascii"))
     # Never persist argument vectors (which carry source paths) or raw diagnostics.
     diagnostic = (done.stdout + b"\n" + done.stderr).decode("utf-8", "replace")
     roots.write_text(
@@ -974,7 +1028,7 @@ def _invoke(
         + _safe_text(diagnostic, roots)
         + "\n",
     )
-    if record.exists():
+    if record.exists() and not invocation_error:
         # CHARC R2 F3: retain the product's authoritative bytes; read_runner_record
         # projects safe diagnostics into the pack state, sheet and HTML instead.
         results = read_runner_record(record, group=group, roots=roots)
@@ -990,7 +1044,7 @@ def _invoke(
                     select.Item(source.name, group, "photo" if group.startswith("P-") else "video")
                 ),
                 "status": "failed",
-                "message": "runner produced no record; see the group log",
+                "message": invocation_error or "runner produced no record; see the group log",
             }
             for source in sources
         ]
@@ -1157,7 +1211,16 @@ def _build_groups(
                         if prepared["status"] == "excerpt_failed":
                             _store_item(state, excerpt_record)
                             continue
-            except (ValueError, KeyError, StopIteration, TypeError, OSError, ExtractError) as exc:
+            except (
+                ValueError,
+                KeyError,
+                StopIteration,
+                TypeError,
+                ZeroDivisionError,
+                subprocess.TimeoutExpired,
+                OSError,
+                ExtractError,
+            ) as exc:
                 _store_item(
                     state,
                     {
@@ -1214,6 +1277,8 @@ def _build_groups(
                     KeyError,
                     StopIteration,
                     TypeError,
+                    ZeroDivisionError,
+                    subprocess.TimeoutExpired,
                     OSError,
                     ExtractError,
                     ImageCms.PyCMSError,
@@ -1228,8 +1293,104 @@ def _build_groups(
 
 def _failed(item: Mapping[str, Any]) -> bool:
     return item["status"] in {"failed", "excerpt_failed", "not run", "cancelled"} or bool(
-        item.get("viewing_aid_failed") or item.get("aid_message")
+        item.get("viewing_aid_failed")
+        or item.get("aid_message")
+        or item.get("expected_refusal_failed")
     )
+
+
+@contextmanager
+def _stage_lock(roots: OutputRoots) -> Iterator[None]:
+    """Serialize stage writers; a held or stale lock is never automatically broken."""
+    path = check_target(roots.allowed / ".reviewpack.lock", roots)
+    roots.mkdir(path.parent)
+    try:
+        handle = path.open("x", encoding="utf-8", newline="\n")
+    except FileExistsError:
+        with path.open(encoding="utf-8", errors="replace") as held:
+            holder = held.read(256)
+        pid = re.search(r"^pid=(\d+)$", holder, re.M)
+        started = re.search(r"^started=([0-9T:.+Z-]+)$", holder, re.M)
+        raise ValueError(
+            f"pack locked by pid={pid[1] if pid else 'unknown'} "
+            f"started={started[1] if started else 'unknown'}; if stale, "
+            "delete .reviewpack.lock manually before retrying"
+        ) from None
+    try:
+        with handle:
+            handle.write(f"pid={os.getpid()}\nstarted={datetime.now(UTC).isoformat()}\n")
+        yield
+    finally:
+        roots.remove(path)
+
+
+def _run_stages(args: argparse.Namespace, roots: OutputRoots) -> int:
+    """Run stages under the single command lock; page never writes pack state."""
+    stages = ("photos", "presets", "clips", "page") if args.stage == "all" else (args.stage,)
+    state_path = roots.allowed / "records" / "pack.json"
+    check_target(state_path, roots)
+    state: dict[str, Any] = (
+        json.loads(state_path.read_text(encoding="utf-8"))
+        if state_path.exists()
+        else {"schema": 1, "items": [_pending(item) for item in select.catalog()]}
+    )
+    attempted: set[str] = set()
+    for stage in stages:
+        if stage == "presets":
+            state["presets"] = export_presets(roots=roots)
+        elif stage == "page":
+            sheet_error = None
+            try:
+                sheet.write_sheet(state["items"], roots.allowed / "review-sheet.csv", roots=roots)
+            except (ValueError, OSError) as exc:
+                sheet_error = exc
+            page.write_page(
+                state["items"],
+                state.get("presets", {}),
+                roots=roots,
+                sheet_message=_safe_text(sheet_error, roots) if sheet_error else "",
+            )
+            if page.check_links(roots.allowed / "index.html", roots=roots):
+                raise ValueError("generated page contains unresolved links")
+            if sheet_error is not None:
+                raise sheet_error
+        else:
+            selected = _selection(args.manifest, roots)
+            selected = [
+                item
+                for item in selected
+                if item.kind == ("photo" if stage == "photos" else "video")
+            ]
+            if args.subject:
+                if stage != "clips" or args.subject not in select.GROUPS[2:]:
+                    raise ValueError("clips requires a commissioned video group")
+                selected = [item for item in selected if item.group == args.subject]
+            _build_groups(selected, state, roots, force_cpu=args.force_cpu)
+            attempted.update(item.stem for item in selected)
+        if stage != "page":
+            _json_write(state_path, state, roots)
+    scope = [item for item in state["items"] if item["item"] in attempted]
+    if args.stage == "page":
+        scope = state["items"]
+    accounted = sum(item["status"] != "pending" for item in scope)
+    pending = len(select.pending_items(state["items"]))
+    failures = sum(_failed(item) for item in scope)
+    print(
+        f"{args.stage}: completed; {accounted} items accounted for; "
+        f"failed={failures}, pending={pending}"
+    )
+    if failures:
+        print(
+            "reviewpack: build/viewing-aid failures recorded; see Not built on the page",
+            file=sys.stderr,
+        )
+    if "page" in stages and (
+        pending or page.pending_presets(state.get("presets", {}), roots=roots)
+    ):
+        return 2
+    if failures:
+        return 1
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1265,70 +1426,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             for error in errors:
                 print(_safe_text(error, roots))
             return 2 if errors else 0
-        stages = ("photos", "presets", "clips", "page") if args.stage == "all" else (args.stage,)
-        state_path = roots.allowed / "records" / "pack.json"
-        check_target(state_path, roots)
-        state: dict[str, Any] = (
-            json.loads(state_path.read_text(encoding="utf-8"))
-            if state_path.exists()
-            else {"schema": 1, "items": [_pending(item) for item in select.catalog()]}
-        )
-        attempted: set[str] = set()
-        for stage in stages:
-            if stage == "presets":
-                state["presets"] = export_presets(roots=roots)
-            elif stage == "page":
-                sheet_error = None
-                try:
-                    sheet.write_sheet(
-                        state["items"], roots.allowed / "review-sheet.csv", roots=roots
-                    )
-                except (ValueError, OSError) as exc:
-                    sheet_error = exc
-                page.write_page(
-                    state["items"],
-                    state.get("presets", {}),
-                    roots=roots,
-                    sheet_message=_safe_text(sheet_error, roots) if sheet_error else "",
-                )
-                if page.check_links(roots.allowed / "index.html", roots=roots):
-                    raise ValueError("generated page contains unresolved links")
-                if sheet_error is not None:
-                    raise sheet_error
-            else:
-                selected = _selection(args.manifest, roots)
-                selected = [
-                    item
-                    for item in selected
-                    if item.kind == ("photo" if stage == "photos" else "video")
-                ]
-                if args.subject:
-                    if stage != "clips" or args.subject not in select.GROUPS[2:]:
-                        raise ValueError("clips requires a commissioned video group")
-                    selected = [item for item in selected if item.group == args.subject]
-                _build_groups(selected, state, roots, force_cpu=args.force_cpu)
-                attempted.update(item.stem for item in selected)
-            _json_write(state_path, state, roots)
-        scope = [item for item in state["items"] if item["item"] in attempted]
-        if args.stage == "page":
-            scope = state["items"]
-        accounted = sum(item["status"] != "pending" for item in scope)
-        pending = len(select.pending_items(state["items"]))
-        failures = sum(_failed(item) for item in scope)
-        print(
-            f"{args.stage}: completed; {accounted} items accounted for; "
-            f"failed={failures}, pending={pending}"
-        )
-        if failures:
-            print(
-                "reviewpack: build/viewing-aid failures recorded; see Not built on the page",
-                file=sys.stderr,
-            )
-        if "page" in stages and pending:
-            return 2
-        if failures:
-            return 1
-        return 0
+        with _stage_lock(roots):
+            return _run_stages(args, roots)
     except (ValueError, OSError, LocalConfigError, ExtractError) as exc:
         message = (
             _safe_text(exc, roots)
