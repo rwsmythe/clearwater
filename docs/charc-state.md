@@ -67,7 +67,12 @@
   (query 69b2b64c; my post + cue): CONCURRED, the crash oracle = every final COMPLETE and preserved, NO partial final,
   the in-flight item has NO final, clean_leftovers removes every temporary and touches no final, sources unchanged;
   my "nothing else new" sentence WITHDRAWN (completed batch items are not partials, V11 / D81); completed-finals-per-run
-  recorded as the race characterisation. Session 2 at 136,776. Waiting on: V7 window open / figures; WP5.3 RED; WP5.1 T4.
+  recorded as the race characterisation. Session 2 at 136,776.
+- **WP4.6 V7 EXCLUSIVE WINDOW OPEN 08:46Z (status 6393275f; chain `window-commands.sh` md5 c18ba54d..., head `1563da2a`,
+  src/tests = `d1ba71f2`; of record v7c / v7d pinned driver, v7e / dr44c-export the copy; ~25-35 min; outputs
+  `work/wp4.6-window/`). ALL Codex held at yields (WP5.3 RED `10f1f70b`; WP5.1 T2 `087892d8`, turn 3 staged; WP3.6P
+  waiting for session 3). NOTHING HEAVY AT THIS SEAT until the close post. Claude 85 % (pace 1.000). Waiting on: the
+  close post with exits and figures (STOPs: (c)/(e) > 100 ms, child CPU fallback, wall > +10 %, spawn > 10 s).
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
