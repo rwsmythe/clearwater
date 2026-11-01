@@ -16,18 +16,18 @@
   Gen 11 pickup 17:28Z: bash gauge 65 ms (under 1 s); inbox 0 unread / 432 read (gen 10 had answered everything,
   including the WP-T7 thread-method ruling); main `fe9dcfe1` clean, FREE; C: 168 GB free, D: 2.4 TB; Claude 89.0 %
   pace 0.987, Codex 14 % pace 0.228 (17:28Z); WP-D54 serial attempt 2 ALIVE (4 pytest processes since 17:21Z).
-  Announce posted 17:29Z (`9a538276`) + cued. Drain with `read --role charc --all`. Subjects: the outcome and ONE item, about 80 chars (gen 10 slipped twice at 125 / 136).
+  Announce posted 17:29Z (`9a538276`) + cued. Drain with `read --role charc --all`. Main `44c8633f` FREE. Gen 30's
+  queue at 17:52Z: WP-T7 turn 1 (Codex), WP5.3 A r3 and WP5.1 A r2 (Claude passes, 89 %); then the WP3.6P 5c-16 window. Subjects: the outcome and ONE item, about 80 chars (gen 10 slipped twice at 125 / 136).
   Any script or body with a backslash goes through the Write tool (gen 10 committed one CR byte via a heredoc, fixed
   `3a950ed8`); `tr -cd '\r\v' | wc -c` = 0 BEFORE every commit. **Claude usage 89 % at 17:24Z, pace ~1.0, reset
   2026-11-02 09:59Z; THE 92 % RULE (my c2f1d6f4) STANDS: no Claude review pass (A or B) starts at >= 92 %; Codex
   turns continue; WP3.6P's passes before WP5.x; no reviewer-tier downgrade.** Codex 14 % / 0.228.
   **LIVE BOARD (verify in `docs/orchestrator-state.md` and gen 30's last posts):**
-  (1) **WP-D54** (Codex; `encode.py` D54 warning two-branch text by resolved range, my 26f0d3d0; A clean, B clean, test-only
-  turn 5 with B's mutants verified): gate on `fcb96280`; parallel GREEN; SERIAL attempt 2 running ALONE since 17:21Z
-  after attempt 1 HUNG 6 h on `test_gui_export_panel.py::test_failure_is_an_error_naming_the_file_with_owner_export`
-  (DR-108). A second hang = STOP to you with the node. At its accept MINE: DR-102 (D54 wording defect CLOSED, both
-  branches; F2/F3/F5 notes) and DR-107 (probe open-path `missing_tags` text says limited range for an untagged
-  yuvj full-range source; remedy in `io/video/probe.py`); then WP5.1's T6-1 witness node on a rebased candidate.
+  (1) **WP-D54 ACCEPTED 17:52Z (main `4ece5183`, record `docs/proofs/wp-d54-accept.md`; serial attempt 2 ALONE 1,230 / 11 /
+  0 in 1,606 s; witness `test_v6_untagged_runner_warns_bt709_limited` GREEN on the rebased wp5.1). My QA at 17:53Z: 6
+  paths, 0 CR, three D54 rows present, worktree clean. MY ROWS on main `44c8633f`: DR-102 CLOSED (B F2/F3/F5 notes),
+  DR-107 OPEN (probe open-path + `gui/messages.py:171` say limited range for full-range yuvj). Ack posted `370bb481` +
+  cued; `.worktrees/wp-d54` released to the orchestrator. Register through DR-109, no reservations open.
   (2) **WP-T7** (gate hygiene; brief DRAFTED by gen 30 on branch `wp-t7` `a9fa11cd`, my commission 28ac8400 folded;
   Codex, XS): `pytest-timeout` MIT in dev (N13 approved by me), per-leg `--timeout` 600 / 1,200 / 2,400 s, method
   `thread`, `timeout_func_only`, `faulthandler_timeout = 300`, one proof test, GATE_CHECKS + CLAUDE.md. **RULED at my
