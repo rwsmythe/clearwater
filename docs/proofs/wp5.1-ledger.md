@@ -427,7 +427,7 @@ relative to the acceptance brief: a false acceptance oracle blocks its build.
 | Round | Critical | Major | Minor | Advisory | In / out envelope | NEW / REOPENED | Reverts | Fix surface | Transport / model | Verdict |
 |---|---:|---:|---:|---:|---|---|---:|---|---|---|
 | 0 / T1 | 0 | 4 | 0 | 0 | 4 / 0 | 4 / 0 | 0 | ledger only; no test/product fix | no external reviewer yet | STOP for R0-1 through R0-4; yield before T2 |
-| 1 / Reviewer A, adjudicated | 0 | 1 | 2 | 5 | 8 / 0 reviewed | 8 / 0 reviewed | 0 | ledger only this turn; planned fixes tests/support only, product-code fixes 0 | claude -p; claude-opus-5-5; requested high | NEW_CRITICAL_MAJOR_FOUND; accepted 1 major, 1 minor, 5 advisories; rejected 1 minor under CHARC 8276adb5; remediation pending |
+| 1 / Reviewer A, adjudicated and remediated T12 | 0 | 1 | 2 | 5 | 8 / 0 reviewed | 8 / 0 reviewed | 0 | tests/support fixes for F1/F2/F4-F8 (7); product-code fixes 0 | claude -p; claude-opus-5-5; requested high | NEW_CRITICAL_MAJOR_FOUND; F1/F2/F4-F8 remediated per CHARC f6252e0b; F3 HOLD per turn-12 dispatch pending reconciliation of 8276adb5; GUI/GPU seat validation and round 2 pending |
 
 For every future Reviewer A round, adjudicate every finding in a ledger-only
 turn and yield before remediation. Track product-code versus test-only fixes
@@ -450,7 +450,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | 8 / T6-2 remediation and T7; session 3 ends | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | 177,474 | retired after `2f1c0954`; fresh session 4 starts T8 from this ledger |
 | 9 / T8; session 4 starts | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | 91,630 | committed `84a030a1` (0 CR); seat format check and both GUI nodes pass |
 | 10 / T8 seat result and T9 | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | 147,709 | committed `f9b0fa34` (0 CR); seat ruff/format clean; Reviewer A round 1 returned 1 major, 2 minor, 5 advisories |
-| 11 / Reviewer A round 1 adjudication | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | pending dispatcher | ledger-only adjudication; yield before remediation; evaluate near 200K, stop near 250K at a step boundary |
+| 11 / Reviewer A round 1 adjudication; session 4 retires | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | 191,275 | committed `6d8689b3`; retired at the evaluation point before multi-finding remediation; fresh session 5 starts T12 |
+| 12 / Reviewer A round 1 remediation; session 5 starts | pending dispatcher | pending dispatcher | tests/support remediation and ledger; yield for GUI/GPU seat run, F3 reconciliation and Reviewer A round 2; evaluate near 200K, stop near 250K at a step boundary |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -2254,3 +2255,262 @@ all owned Python code is unchanged from f9b0fa34. No remediation, commit,
 rebase, mailbox post or write outside the worktree. Yield before turn 12,
 as the dispatch requires; the dispatcher owns the next depth reading and
 commit. The full report remains T10 after review convergence.
+
+## Session 5 / Turn 12: round 1 remediation
+
+### Session boundary, binding scope and disposition
+
+Fresh session 5 starts from committed HEAD **6e5fbd19**. Session 4
+`01a1968e-ac9f-7f81-aecc-78a4b492c479` retired after turn 11 at the
+dispatcher-supplied **191,275** depth_input_tokens; its adjudication commit
+is **6d8689b3**. Those figures are now in the depth table. Session 5's id
+and depth remain for the dispatcher to fill; neither is estimated here.
+
+Read the required dispatch protocol, application/conventions, prompting
+standard and review/gate fill, the round-1 adjudication and latest ledger
+sections, and the external round-1 `review.txt` read-only, without copying
+it into the repository. This turn follows CHARC **f6252e0b** and the more
+specific turn-12 dispatch: **F3 is HOLD, with no change**, and advisory 6
+requires case-sensitive lowercase `limited` with an uppercase control.
+The historical turn-11 plans to leave advisories 4/5 unchanged are
+superseded by the binding round-1 ruling's explicit remediation.
+
+One logical round-1 remediation turn bundles F1/F2 and the five ruled
+advisories F4-F8. No new review round or finding is counted: round 1
+remains C0/Major1/Minor2/Advisory5, all 8 in envelope, NEW8/REOPENED0,
+reverts0, product-code fixes0, tests/support findings remediated7. F3 is
+awaiting the dispatcher's ruling reconciliation. Reviewer A round 2 is
+the next reviewer pass, run at the dispatcher's seat. No new STOP.
+
+### F1 [MAJOR]: deterministic launcher RED, real-interpreter GREEN
+
+Pre-change probe **t12-red.py** invokes the old runner command's executable
+with a small identity-reporting Python program under work/wp5.1. The
+program records its own PID atomically, with no product flag or writer
+hold added to the application. The actual named assertion
+`kill target is not the writing interpreter` goes RED:
+
+| Launcher Popen PID | Writing interpreter PID | Writer running after killed launcher wait |
+|---:|---:|---|
+| 23400 | 34820 | True |
+
+The probe then explicitly kills and joins the writing interpreter and
+reaps the launcher in finally. This reproduces the mechanism independently
+of the reviewer's two intermittent real crash-node assertion failures;
+it does not claim a new reproduction of the exact link-after-wait race.
+
+`acceptance_support.interpreter_command` now selects
+`sys._base_executable` when available (otherwise sys.executable; identical
+executables naturally coincide on POSIX), restoring the parent's sys.path
+in the child so the venv dependencies and editable source remain reachable.
+`runner_command` uses that same setup, restores the shipped script's argv
+and script-directory import path, then runs the unchanged headless runner
+as `__main__` with runpy. There is no new product flag, environment hook,
+writer delay, tree-kill or OS-specific termination code.
+
+Before the crash attempts, the committed node executes
+`interpreter_command("import clearwater")`, requires exit 0, and records
+`real_interpreter_import = clearwater import succeeded`. The runner's
+Popen PID now owns the interpreter that writes the output. Every kill is
+followed by wait, including finally. Before inspecting ANY final/temporary
+state, `_assert_writes_stopped` compares every output name/size in two
+reads 100 ms apart; a change raises
+`crash writer changed output names or sizes after wait`. The existing
+complete-final, hard-link identity, startup cleanup and source/sentinel
+MD5 assertions are retained. The module docstring names the venv launcher
+lag and its relationship to WP4.6 Limit 1.
+
+Independent post-change identity trials self-report PIDs **27956, 2368,
+24192**, each equal to its Popen PID; all import clearwater successfully
+and no writer PID survives kill/wait. A stable scratch file passes the
+new size witness, while an injected size change between its two reads
+fails by the witness's name. These are stdlib/psutil probes, not GUI/GPU
+or footage runs; no dependency was added.
+
+Actual crash node repeated **15 times in isolation**, each with the sandbox
+shim, fresh basetemp, XML and log: **15 passed, 0 failed, 0 skipped**.
+Every trial succeeds on crash attempt **1**, records successful base-import
+and writes-stopped witnesses, and reaches real startup cleanup with a
+surviving temporary. Sum of the 15 pytest suite times **25.236 s** (not
+the enclosing launch-loop wall time, and not the serial gate delta).
+The combined crash/disk-full run also passes **2 in 2.39 s**. The final
+whole-light run passes the crash node again on attempt 1.
+
+Evidence under work/wp5.1: **t12-red.log**, **t12-green.log**,
+**t12-photo.log/xml**, **t12-crash-01.log/xml** through
+**t12-crash-15.log/xml**, **t12-crash-repeat.log**, and
+**t12-crash-summary.log**. The loop stopped on any nonzero exit and
+returned 0 only after all 15 runs. The XML summary independently checks
+zero failures/errors/skips and both new witnesses for every run.
+
+### F2 [MINOR]: provisional corrected pixels versus original
+
+RED probe: the old V18 node has zero before_image references; original =
+zeros, provisional = original, eventual corrected = 3 satisfies both
+old pixel checks. This is an executed array/AST reproduction, not a
+real-shell mutant run in the sandbox.
+
+While the real analysis is held, V18 now requires before_image as well
+as after_image, converts each with the same image_bytes function, and
+calls `_assert_corrected_provisional`: equal geometry and max absolute
+RGB8 difference **> 0**. It records
+`provisional_original_pixel_change_max_255`. An unchanged original copy
+must fail by `V18: provisional corrected frame is identical to the original`.
+The later same-pts update and exact smoothed-statistics checks are intact.
+Pure GREEN probe rejects the unchanged original and accepts a corrected
+copy differing by 3. The changed real GUI/footage node remains **seat-run
+pending**, included in the single RUN REQUEST below.
+
+`tests/test_app_v8_v18.py:421` retains its weaker not-None check and is
+NOT edited; T10 must name that existing coverage gap and the stronger new
+WP5.1 node. The report is deliberately not authored this turn.
+
+### F3 [MINOR]: HOLD, no remediation this turn
+
+The turn-12 dispatch explicitly holds F3 pending CHARC reconciliation of
+**8276adb5** (twenty attempts with no surviving temporary may SKIP) with
+**f6252e0b** (narrow the SKIP). The retry branch
+`if not observed or not leftovers: continue` and final skip reason are
+unchanged; an AST comparison to HEAD confirms the retry branch identity.
+This is a pending disposition, not a claim that the review's concern has
+been fixed. No new interpretation of the SKIP rule is introduced here.
+
+### Ruled advisories F4-F8: RED/GREEN and figures
+
+**F4 [ADVISORY], G5 positive control:** the planted decoded red offset is
+now **+8/255**, with RUNNER_POSTENCODE_MEAN still **3.5/255**. Both the
+planted mean and its excess over the bound are recorded. The actual
+whole-light run rejects the control by the bound's name: mean
+**4.837543595679012/255**, margin **1.337543595679012/255**. The prior
++4 control's measured 3.7190420524691357 and 0.21904205246913566 margin
+remain historical RED/weak-margin evidence, not the new control figure.
+
+Actual current standard-quality figures for T10 / CHARC's AD-11 note:
+
+| Sample | Mean absolute error (1/255) | Maximum (1/255, recorded only) |
+|---|---:|---:|
+| hevc8-bt709-full | 2.9538159722222224 | 183 |
+| untagged | 2.7881037808641977 | 203 |
+| rotated | 2.9538159722222224 | 183 |
+| hevc10 | 2.472876682318937 | 183 |
+| hevc8-bt709-full, quality high (characterisation only) | 2.52132896090535 | 125 |
+
+These are unchanged encoder characterisation figures. AD-11's pre-encode
+bounds and test_color_roundtrip.py's encoder-free 2.5 bound are untouched.
+
+**F5 [ADVISORY], CPU/GPU comparison:** RED probe shows the old decoded-unit
+helper accepts pre-encode values with a .003 maximum difference because
+it divides by 255. `RenderDigests` now retains an independent host copy
+of the render RESULT at the smallest rendered pts, under its existing
+lock, while still hashing every result exactly as before. No rendered
+image or algorithm is altered. Only this first frame is retained, not
+every frame's array. A separate executed capture probe uses out-of-order
+pts 6, 0, 3: the stored frame remains pts 0, its copy survives subsequent
+result-buffer mutations, its values reproduce the same-pts stored digest,
+and the original result objects are returned unchanged.
+
+The GPU node captures the CPU run too, requires both captured pts equal
+the source's first pts, and applies AD-11 max **2e-3** / mean **2e-4** to
+the PRE-ENCODE values in [0, 1]. Properties explicitly say preencode.
+GREEN pure controls accept uniform .0001 and reject .003 by max and
+.001 in one channel by mean. The decoded RGB8 pair is retained only for
+recorded max/mean, exact equality and within-one-code (1/255) observations;
+no sub-code tolerance is asserted post-encode. GPU repeat digests still
+must match at every pts. Actual GPU values remain **seat-run pending**.
+Evidence: **t12-green.log**, **t12-render-capture.log**; the whole light
+run's CPU N10 still passes for all **45** rendered pts and records file
+byte identity True (characterisation only).
+
+**F6 [ADVISORY], shell warning:** the old helper accepts
+`BT.709 LIMITED range assumed` (executed RED). Matching now requires
+literal lowercase `limited`, following this turn's explicit dispatch;
+an uppercase-only control joins the missing-word and missing-warning
+controls. Pure GREEN accepts the actual lowercase form and rejects
+uppercase-only. The real changed GUI node is in the seat RUN REQUEST.
+
+**F7 [ADVISORY], disk-full wording:** the old helper accepts
+`input.png: unrelated method error` (executed RED). The failure must now
+name the source AND contain `disk full while writing`; an unrelated
+named failure is explicitly rejected by the same oracle. Pure GREEN
+and both actual ENOSPC node runs pass. Path-scoped injection, at least
+1 KiB actual writes, exit 1, names-only record, empty output directory
+and unchanged source MD5 remain asserted as before.
+
+**F8 [ADVISORY], presence roster:** the old helper accepts an empty
+presence dict (executed RED). The helper now requires all seven canonical
+row names, normalizing only the instrument's keyed-track suffix ` [key]`.
+It still records False values, never requires best-effort preservation.
+The real-trim node includes controls removing each presence row in turn
+and accepts an all-False presence set. A pure GREEN probe reconstructs
+the seven comparison rows from the seat's previously returned names and
+presence booleans in **t6-seat-metadata.xml**: the real returned set passes,
+each of seven missing rows and the empty set fails by name, and all seven
+False/False rows pass. No footage folder, clip or frame is opened for
+this check. The real G2 node is not rerun in this sandbox; its existing
+returned figures remain the record until the gate.
+
+### Final light verification and verification-loop record
+
+Actual command from PowerShell used PYTHONPATH=scripts and the sandbox
+plugins (the following is its Git Bash equivalent):
+
+```bash
+PYTHONPATH=scripts uv run pytest -q -rs tests/test_v51_photo_acceptance.py tests/test_v51_video_acceptance.py tests/test_v51_shell_acceptance.py tests/test_v51_traceability.py --basetemp=work/wp5.1/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t12-light.xml > work/wp5.1/t12-light.log 2>&1
+```
+
+Exit **1**, **1 failed, 33 passed, 4 deselected in 104.04 s**. No skips
+or errors. The ONLY failure is the unchanged known T6-1 node
+`test_v6_untagged_runner_warns_bt709_limited`, pending WP-D54 and the
+dispatcher's rebase; it still lacks BT.709/limited in the real record.
+Both that node and its warning assertion helper are byte-identical
+source segments to HEAD (checked in **t12-results.log**). No xfail,
+softened assertion or product fix. All four V9 instances, CPU N10,
+photo failure/crash legs and T9 traceability pass. Node count remains
+**38** total, with 4 excluded GUI/GPU/footage instances.
+
+| Check | Result / evidence under work/wp5.1 |
+|---|---|
+| Own pre-change RED reproductions | t12-red.log: deterministic F1 PID mismatch and still-live writer; F2/F5-F8 acceptance gaps confirmed |
+| Pure GREEN controls | t12-green.log: exit 0; identity/death, stable-write witness, F2/F5-F8 rejected mutants; no hardware fixtures invoked |
+| Captured render-value independence | t12-render-capture.log: exit 0; earliest pts, unmodified return, independent values and digest agree |
+| Real photo failure/crash pair | t12-photo.log/xml: 2 passed in 2.39 s |
+| Crash isolation stability | t12-crash-summary.log: 15 passed / 0 skipped, all attempt 1, summed pytest seconds 25.236 |
+| Whole light suite | t12-light.log/xml: 33 pass / 1 known D54 failure / 4 deselected, 104.04 s |
+| Ruff on support and all four new test modules | t12-ruff.log: exit 0, All checks passed! |
+| Mypy (configured src/clearwater and tools scope) | t12-mypy.log: exit 0, Success: no issues found in 146 source files |
+| Owned-file formatting | t12-format.log: ruff format, 3 reformatted / 1 unchanged; format --check remains the dispatcher's check |
+| Protected D54 / held F3 regions | t12-results.log: protected node/helper source and retry AST unchanged |
+
+Verification loop: suspected launcher-lifetime barrier, missing provisional
+comparison, weak control margin, incorrect CPU/GPU comparison stage,
+case-insensitive warning, generic named failure and missing presence rows;
+confirmed independently as above; fixed only within owned test/support
+files. F3 remains held under the direct dispatch. Rechecked the resulting
+diff and actual run summaries: no additional finding or false positive
+in this pass. Real GUI/GPU outcomes, Reviewer A round 2, full three-leg
+gate, collection identity and serial-leg delta are **pending at the
+dispatcher's seat**, not claimed here. The 300 s ruled serial budget is
+unchanged; these development-run times are not a serial gate delta.
+
+Only the four owned Python files and this ledger change. No report,
+product, existing package test, tool, fixture, dependency, local config,
+register, mailbox or git metadata is edited. All scratch writes and
+runner outputs are under work/wp5.1 or pytest tmp_path inside this
+worktree. No footage-folder read, other-worktree access, GUI/GPU run,
+commit, stash or rebase. Final LF/whitespace evidence is t12-lf.log and
+t12-diff-check.log: every changed file has 0 CR and diff --check exit 0.
+
+### Single seat RUN REQUEST and yield
+
+From the worktree root in Git Bash, with no exclusive window or WP5.3
+build piece running; expected about **100-120 s** from the previous GPU
+19.37 s and shell pair 80.94 s. No sandbox plugin at the seat:
+
+```bash
+env -u PYTEST_ADDOPTS QT_QPA_PLATFORM=offscreen uv run pytest -q -rs tests/test_v51_video_acceptance.py::test_n10_video_gpu_render_digests_repeat_and_match_cpu tests/test_v51_shell_acceptance.py::test_v6_real_untagged_shell_warns_bt709_limited tests/test_v51_shell_acceptance.py::test_v18_real_trim_preview_precedes_analysis_and_updates --basetemp=work/wp5.1/t12-seat --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t12-seat.xml > work/wp5.1/t12-seat.log 2>&1
+```
+
+Return summary counts and the recorded pre-encode/decoded CPU-GPU values,
+provisional/original difference, and mutation controls. Yield after this
+remediation; the dispatcher owns the F3 ruling, seat runs, commit and
+Reviewer A round 2. T10 waits for its authorized boundary.

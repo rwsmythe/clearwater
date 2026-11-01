@@ -16,6 +16,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from numpy.typing import NDArray
 
 import gui_support
 from acceptance_support import assert_names_only, file_md5
@@ -39,7 +40,7 @@ pytestmark = [pytest.mark.gui, pytest.mark.usefixtures("ffmpeg_tools")]
 
 
 def _assert_assumption_warning(texts: Sequence[str]) -> None:
-    assert any("BT.709" in text and "limited" in text.lower() for text in texts), (
+    assert any("BT.709" in text and "limited" in text for text in texts), (
         "V6: real untagged video must show a BT.709 / limited warning",
         texts,
     )
@@ -72,12 +73,29 @@ def test_v6_real_untagged_shell_warns_bt709_limited(
         record_property("warning_texts", texts)
         _assert_assumption_warning(texts)
 
-        for wrong in ([], ["BT.709 assumed"], ["limited range assumed"]):
+        for wrong in (
+            [],
+            ["BT.709 assumed"],
+            ["limited range assumed"],
+            ["BT.709 LIMITED range assumed"],
+        ):
             with pytest.raises(AssertionError, match="V6: real untagged video"):
                 _assert_assumption_warning(wrong)
-        record_property("mutation_probe", "absent warning and either missing word rejected")
+        record_property(
+            "mutation_probe",
+            "absent warning, either missing word and uppercase-only LIMITED rejected",
+        )
     finally:
         assert file_md5(path) == digest, f"source changed: {path.name}"
+
+
+def _assert_corrected_provisional(
+    original: NDArray[np.uint8], provisional: NDArray[np.uint8]
+) -> int:
+    assert provisional.shape == original.shape, "V18: provisional/original geometry differs"
+    maximum = int(np.abs(provisional.astype(np.int16) - original.astype(np.int16)).max())
+    assert maximum > 0, "V18: provisional corrected frame is identical to the original"
+    return maximum
 
 
 @pytest.mark.footage
@@ -111,6 +129,16 @@ def test_v18_real_trim_preview_precedes_analysis_and_updates(
             provisional = window.preview_widget.after_image()
             assert provisional is not None, "V18: no corrected provisional frame shown"
             before_pixels = image_bytes(provisional)
+            original = window.preview_widget.before_image()
+            assert original is not None, "V18: no original frame shown for provisional comparison"
+            original_pixels = image_bytes(original)
+            provisional_max = _assert_corrected_provisional(original_pixels, before_pixels)
+            record_property("provisional_original_pixel_change_max_255", provisional_max)
+            with pytest.raises(
+                AssertionError, match="V18: provisional corrected frame is identical"
+            ):
+                _assert_corrected_provisional(original_pixels, original_pixels.copy())
+            record_property("provisional_mutation_probe", "uncorrected provisional copy rejected")
             before_count = len(rendered)
             before_pts = getattr(window.session.current_image(), "pts_ticks", None)
             assert isinstance(before_pts, int)

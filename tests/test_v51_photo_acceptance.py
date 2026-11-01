@@ -3,6 +3,11 @@
 The independent pose oracles follow CHARC's round-0 ruling: oriented source
 decode for JPEG, the existing AD-24 landscape recipe for HEIC. A dropped pose,
 pending output Orientation, missing ENOSPC handling or leftover partial fails.
+
+The crash subprocess uses the real interpreter with the venv import paths: on
+Windows the venv launcher can return from kill/wait before its writer child
+stops (also the mechanism behind WP4.6's Limit 1). A post-wait size snapshot
+checks that output writes have stopped before any crash end-state inspection.
 """
 
 from __future__ import annotations
@@ -31,6 +36,7 @@ from acceptance_support import (
     assert_output_orientation,
     ffmpeg_png_rgb,
     file_md5,
+    interpreter_command,
     only_output,
     pillow_rgb,
     run_main,
@@ -184,6 +190,7 @@ def _assert_disk_full(result: RunnerResult, output: Path, source: Path) -> None:
     assert item["failure"] and source.name in item["failure"], (
         "disk-full failure did not name its source"
     )
+    assert "disk full while writing" in item["failure"], "disk-full wording missing"
     assert item["outputs"] == [], "disk-full item reported a final output"
     assert list(output.iterdir()) == [], "disk-full export left a final or temporary output"
 
@@ -222,7 +229,19 @@ def test_v11_png_disk_full_removes_partial_output(
         only_output(control, control_root / "out")
         with pytest.raises(AssertionError, match="disk-full export did not fail"):
             _assert_disk_full(control, control_root / "out", source)
-        record_property("mutation_probe", "missing ENOSPC rejected")
+        unrelated = RunnerResult(
+            1,
+            {
+                "items": [
+                    {"state": "failed", "failure": f"{source.name}: unrelated error", "outputs": []}
+                ]
+            },
+            "",
+            "",
+        )
+        with pytest.raises(AssertionError, match="disk-full wording missing"):
+            _assert_disk_full(unrelated, output, source)
+        record_property("mutation_probe", "missing ENOSPC and unrelated named failure rejected")
     finally:
         assert file_md5(source) == before, "disk-full export changed its source"
 
@@ -231,6 +250,14 @@ def _assert_no_new_outputs(output: Path, before: Mapping[str, str]) -> None:
     assert {path.name: file_md5(path) for path in output.iterdir()} == before, (
         "crash cleanup left a new output or changed an existing output"
     )
+
+
+def _assert_writes_stopped(output: Path) -> None:
+    """Witness stable names and sizes across two reads 100 ms after writer wait."""
+    before = {path.name: path.stat().st_size for path in output.iterdir()}
+    time.sleep(0.1)
+    after = {path.name: path.stat().st_size for path in output.iterdir()}
+    assert after == before, "crash writer changed output names or sizes after wait"
 
 
 def _assert_complete_finals(
@@ -342,6 +369,17 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
         shutil.copyfile(source, copy)
     hashes = {path: file_md5(path) for path in [source, *sources]}
     try:
+        # Prove the base interpreter can reach the same editable package/dependencies.
+        with (tmp_path / "interpreter-import.log").open("wb") as log:
+            imported = subprocess.run(
+                interpreter_command("import clearwater"),
+                stdout=log,
+                stderr=log,
+                timeout=10,
+                check=False,
+            )
+        assert imported.returncode == 0, "real interpreter cannot import clearwater"
+        record_property("real_interpreter_import", "clearwater import succeeded")
         for attempt in range(1, 21):
             root = tmp_path / f"attempt-{attempt:02d}"
             args = runner_arguments(sources, root, extra=("--force-cpu", "--bit-depth", "16"))
@@ -368,6 +406,8 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
                     if process.poll() is None:
                         process.kill()
                     process.wait(timeout=10)
+            _assert_writes_stopped(output)
+            record_property(f"attempt_{attempt:02d}_writes_stopped", True)
             finals = _assert_complete_finals(output, sentinels, expected_size)
             record_property(f"attempt_{attempt:02d}_completed_finals", len(finals))
             leftovers = {p for p in output.iterdir() if is_temporary_name(p.name)}

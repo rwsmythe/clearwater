@@ -107,8 +107,26 @@ def runner_arguments(
     ]
 
 
+def interpreter_command(code: str, arguments: Sequence[str] = ()) -> list[str]:
+    """Run code in the real interpreter with this environment's import paths.
+
+    A venv executable can be a launcher whose child outlives its ``wait()``.
+    Using the base executable makes the Popen PID the interpreter being killed;
+    copying sys.path retains the venv dependencies and editable source paths.
+
+    Args:
+        code: Python code executed after restoring the import paths.
+        arguments: Arguments following ``-c`` in the child.
+
+    Returns:
+        A shell-independent command vector, also valid without a venv launcher.
+    """
+    executable = getattr(sys, "_base_executable", None) or sys.executable
+    return [executable, "-c", f"import sys; sys.path[:] = {sys.path!r}; {code}", *arguments]
+
+
 def runner_command(arguments: Sequence[str]) -> list[str]:
-    """Return the shipped script's subprocess command using this interpreter.
+    """Return the shipped script's command with the writing interpreter as its PID.
 
     Args:
         arguments: Arguments from ``runner_arguments``.
@@ -116,7 +134,13 @@ def runner_command(arguments: Sequence[str]) -> list[str]:
     Returns:
         A shell-independent command vector.
     """
-    return [sys.executable, str(Path(he.__file__).resolve()), *arguments]
+    script = Path(he.__file__).resolve()
+    return interpreter_command(
+        "import runpy; sys.argv = sys.argv[1:]; "
+        f"sys.path.insert(0, {str(script.parent)!r}); "
+        "runpy.run_path(sys.argv[0], run_name='__main__')",
+        [str(script), *arguments],
+    )
 
 
 def _result(status: int, sources: Sequence[Path], root: Path, out: Path | None) -> RunnerResult:
@@ -356,6 +380,9 @@ def best_effort_presence(record: Mapping[str, Any]) -> dict[str, dict[str, bool]
 
     Returns:
         Creation-time, GPMF, timecode and camera-atom rows with source/output presence.
+
+    Raises:
+        AssertionError: Any of the seven expected comparison rows is missing or renamed.
     """
 
     def present(value: Any) -> bool:
@@ -366,11 +393,24 @@ def best_effort_presence(record: Mapping[str, Any]) -> dict[str, dict[str, bool]
         return bool(value) and value != "absent"
 
     prefixes = ("creation time:", vf.TELEMETRY_ITEM, "timecode", "camera atoms:")
-    return {
+    presence = {
         item["name"]: {side: present(item[side]) for side in ("source", "output")}
         for item in record["items"]
         if item["class"] == compare.BEST_EFFORT and item["name"].startswith(prefixes)
     }
+    expected = {
+        "creation time: container tag",
+        "creation time: mvhd (seconds since 1904)",
+        "creation time: per-stream tags",
+        "GPMF track gpmd (pts, duration, size, MD5)",
+        "timecode track tmcd (pts, duration, size, MD5)",
+        "timecode value (stream tags)",
+        "camera atoms: moov/udta children (type, bytes, MD5)",
+    }
+    assert {name.partition(" [")[0] for name in presence} == expected, (
+        "best-effort presence must contain all seven expected rows"
+    )
+    return presence
 
 
 def png_provenance(path: Path) -> dict[str, Any] | None:
@@ -432,6 +472,7 @@ class RenderDigests:
     Attributes:
         renders: Pts ticks to dtype/shape/C-order SHA-256.
         devices: Devices actually used to render.
+        first_frame: Smallest rendered pts and an independent host copy of its pre-encode values.
     """
 
     def __init__(self, inner: CorrectionMethod) -> None:
@@ -441,6 +482,7 @@ class RenderDigests:
         self.parameters, self.stages = inner.parameters, inner.stages
         self.renders: dict[int, str] = {}
         self.devices: set[str] = set()
+        self.first_frame: tuple[int, NDArray[np.float32]] | None = None
         self._lock = threading.Lock()
 
     def analyze(
@@ -475,6 +517,8 @@ class RenderDigests:
             assert int(pts) not in self.renders, "N10 rendered duplicate pts"
             self.renders[int(pts)] = digest.hexdigest()
             self.devices.add(result.device)
+            if self.first_frame is None or int(pts) < self.first_frame[0]:
+                self.first_frame = (int(pts), host.copy())
         return result
 
 

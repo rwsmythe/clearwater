@@ -192,6 +192,21 @@ def test_v4_real_trim_records_best_effort_presence(
         output = only_output(result, root / "out")
         record = fidelity_record(source, output, tmp_path / "comparison")
         presence = best_effort_presence(record)
+        for name in presence:
+            wrong_presence = copy.deepcopy(record)
+            wrong_presence["items"] = [
+                item for item in wrong_presence["items"] if item["name"] != name
+            ]
+            with pytest.raises(AssertionError, match="best-effort presence must contain all seven"):
+                best_effort_presence(wrong_presence)
+        absent = copy.deepcopy(record)
+        for item in absent["items"]:
+            if item["name"] in presence:
+                item.update(source=False, output=False)
+        assert all(not any(row.values()) for row in best_effort_presence(absent).values())
+        record_property(
+            "presence_mutation_probe", "each missing row rejected; all-False rows accepted"
+        )
         record_property("best_effort_presence", json.dumps(presence, sort_keys=True))
         record_property("device", result.record["items"][0]["device"])
         record_property("video", result.record["items"][0]["video"])
@@ -307,12 +322,14 @@ def test_v9_neutral_runner_postencode(
     record_property("max_abs_255", float(difference.max()))
     if name == "hevc8-bt709-full":
         planted = out.copy()
-        planted[..., 0] += 4.0
-        record_property("planted_red_offset_mean_255", float(np.abs(src - planted).mean()))
+        planted[..., 0] += 8.0
+        planted_mean = float(np.abs(src - planted).mean())
+        record_property("planted_red_offset_mean_255", planted_mean)
+        record_property("planted_red_offset_margin_255", planted_mean - RUNNER_POSTENCODE_MEAN)
         with pytest.raises(AssertionError, match="RUNNER_POSTENCODE_MEAN exceeded"):
             _assert_postencode(src, planted)
         record_property(
-            "pixel_mutation_probe", "+4/255 on the decoded output's red channel rejected"
+            "pixel_mutation_probe", "+8/255 on the decoded output's red channel rejected"
         )
     _assert_postencode(src, out)
     record = fidelity_record(source, output, tmp_path / "comparison")
@@ -530,11 +547,11 @@ def test_n10_video_cpu_render_digests_repeat(
     _record_repeat((first, second), (recording_a, recording_b), expected, record_property)
 
 
-def _assert_cpu_gpu_first_frame(cpu: NDArray[np.float64], gpu: NDArray[np.float64]) -> None:
+def _assert_cpu_gpu_first_frame(cpu: NDArray[np.float32], gpu: NDArray[np.float32]) -> None:
     assert cpu.shape == gpu.shape, "N10 CPU/GPU first-frame geometry differs"
-    difference = np.abs(cpu - gpu) / 255.0
-    assert float(difference.max()) <= 2e-3, "N10 CPU/GPU decoded first-frame max exceeds 2e-3"
-    assert float(difference.mean()) <= 2e-4, "N10 CPU/GPU decoded first-frame mean exceeds 2e-4"
+    difference = np.abs(cpu.astype(np.float64) - gpu.astype(np.float64))
+    assert float(difference.max()) <= 2e-3, "N10 CPU/GPU pre-encode first-frame max exceeds 2e-3"
+    assert float(difference.mean()) <= 2e-4, "N10 CPU/GPU pre-encode first-frame mean exceeds 2e-4"
 
 
 @pytest.mark.gpu
@@ -542,7 +559,7 @@ def _assert_cpu_gpu_first_frame(cpu: NDArray[np.float64], gpu: NDArray[np.float6
 def test_n10_video_gpu_render_digests_repeat_and_match_cpu(
     sample: Sample, tmp_path: Path, record_property: RecordProperty
 ) -> None:
-    """Catch GPU repeat drift or a decoded first frame outside the CPU/GPU bounds."""
+    """Catch GPU repeat drift or pre-encode first-frame values outside AD-11 bounds."""
     pytest.importorskip("cupy")
     source = sample("vid-hevc8-bt709-full")
     stream = probe(source).video
@@ -553,17 +570,34 @@ def test_n10_video_gpu_render_digests_repeat_and_match_cpu(
     first, recording_a = _render_run(source, tmp_path / "first", force_cpu=False)
     second, recording_b = _render_run(source, tmp_path / "second", force_cpu=False)
     _record_repeat((first, second), (recording_a, recording_b), expected, record_property)
-    cpu_output, _ = _render_run(source, tmp_path / "cpu", force_cpu=True)
-    cpu = decode_video_rgb(cpu_output, stream, tmp_path / "cpu-decode", frames=1)
-    gpu = decode_video_rgb(first, stream, tmp_path / "gpu-decode", frames=1)
-    difference = np.abs(cpu - gpu) / 255.0
-    record_property("cpu_gpu_first_frame_max", float(difference.max()))
-    record_property("cpu_gpu_first_frame_mean", float(difference.mean()))
+    cpu_output, cpu_recording = _render_run(source, tmp_path / "cpu", force_cpu=True)
+    assert cpu_recording.first_frame is not None and recording_a.first_frame is not None
+    cpu_pts, cpu = cpu_recording.first_frame
+    gpu_pts, gpu = recording_a.first_frame
+    assert cpu_pts == gpu_pts == min(expected), "N10 CPU/GPU captured different first-frame pts"
+    difference = np.abs(cpu.astype(np.float64) - gpu.astype(np.float64))
+    record_property("cpu_gpu_preencode_first_frame_pts_ticks", cpu_pts)
+    record_property("cpu_gpu_preencode_first_frame_max", float(difference.max()))
+    record_property("cpu_gpu_preencode_first_frame_mean", float(difference.mean()))
     _assert_cpu_gpu_first_frame(cpu, gpu)
-    with pytest.raises(AssertionError, match="N10 CPU/GPU decoded first-frame max exceeds"):
-        _assert_cpu_gpu_first_frame(cpu, cpu + 255.0 * 0.003)
+    with pytest.raises(AssertionError, match="N10 CPU/GPU pre-encode first-frame max exceeds"):
+        _assert_cpu_gpu_first_frame(cpu, cpu + 0.003)
     sparse = cpu.copy()
-    sparse[..., 0] += 255.0 * 0.001
-    with pytest.raises(AssertionError, match="N10 CPU/GPU decoded first-frame mean exceeds"):
+    sparse[..., 0] += 0.001
+    with pytest.raises(AssertionError, match="N10 CPU/GPU pre-encode first-frame mean exceeds"):
         _assert_cpu_gpu_first_frame(cpu, sparse)
     record_property("cpu_gpu_mutation_probe", "above-max and above-mean first frames rejected")
+    decoded_cpu = decode_video_rgb(cpu_output, stream, tmp_path / "cpu-decode", frames=1)
+    decoded_gpu = decode_video_rgb(first, stream, tmp_path / "gpu-decode", frames=1)
+    assert decoded_cpu.shape == decoded_gpu.shape, (
+        "N10 CPU/GPU decoded first-frame geometry differs"
+    )
+    decoded_difference = np.abs(decoded_cpu - decoded_gpu) / 255.0
+    record_property("cpu_gpu_decoded_first_frame_max", float(decoded_difference.max()))
+    record_property("cpu_gpu_decoded_first_frame_mean", float(decoded_difference.mean()))
+    record_property(
+        "cpu_gpu_decoded_first_frame_equal", bool(np.array_equal(decoded_cpu, decoded_gpu))
+    )
+    record_property(
+        "cpu_gpu_decoded_first_frame_within_one_code", bool(decoded_difference.max() <= 1.0 / 255.0)
+    )
