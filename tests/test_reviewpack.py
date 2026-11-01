@@ -2332,6 +2332,8 @@ def test_sheet_rerun_conflict_never_blocks_later_rows(
     if available:
         current["corrected_name"] = "IMG_6751_corrected_2.png"
         _plant_page_item(current, roots)
+        assert (roots.allowed / "photos/IMG_6751_corrected.png").is_file()
+        assert (roots.allowed / "photos/IMG_6751_corrected_2.png").is_file()
     else:
         current.update(status="failed", corrected_name="", reviewable=False)
     path = roots.allowed / "records/pack.json"
@@ -2340,6 +2342,9 @@ def test_sheet_rerun_conflict_never_blocks_later_rows(
 
     assert build.main(["page", *args]) == (2 if answered else (0 if available else 1))
     output = capsys.readouterr()
+    if available:
+        assert (roots.allowed / "photos/IMG_6751_corrected.png").is_file()
+        assert (roots.allowed / "photos/IMG_6751_corrected_2.png").is_file()
     with destination.open(encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
     assert len(rows) == 126
@@ -2370,6 +2375,111 @@ def test_sheet_rerun_conflict_never_blocks_later_rows(
         assert recovery not in html
     assert path.read_bytes() == pack_before
     assert page.check_links(roots.allowed / "index.html", roots=roots) == []
+
+
+@pytest.mark.parametrize("available", [False, True])
+def test_page_conflict_section_and_stderr_identify_both_outputs(
+    roots: OutputRoots, capsys: pytest.CaptureFixture[str], available: bool
+) -> None:
+    """Owner conflicts must expose judged/current output identities on both surfaces."""
+    state, args = _complete_pack(roots)
+    state["presets"] = _presets(roots)
+    destination = roots.allowed / "review-sheet.csv"
+    _csv(destination, [_row(_item(), preferred="yes")])
+    before = destination.read_bytes()
+    current = next(row for row in state["items"] if row["item"] == "IMG_6751")
+    if available:
+        current["corrected_name"] = "IMG_6751_corrected_2.png"
+        _plant_page_item(current, roots)
+    else:
+        current.update(status="failed", corrected_name="", reviewable=False)
+    (roots.allowed / "records/pack.json").write_text(json.dumps(state))
+    assert build.main(["page", *args]) == 2
+    stderr = capsys.readouterr().err
+    line = next(line for line in stderr.splitlines() if "conflict" in line.lower())
+    assert "IMG_6751_corrected.png" in line
+    if available:
+        assert "IMG_6751_corrected_2.png" in line
+    else:
+        assert "failed" in line and "(none)" in line
+    assert "blank that row's owner cells" in line and "restore the earlier output" in line
+    html = (roots.allowed / "index.html").read_text()
+    assert '<section id="sheet-conflicts">' in html
+    section = unescape(html.split('<section id="sheet-conflicts">', 1)[1].split("</section>", 1)[0])
+    assert "IMG_6751" in section and "IMG_6751_corrected.png" in section
+    if available:
+        assert "IMG_6751_corrected_2.png" in section
+        assert (roots.allowed / "photos/IMG_6751_corrected.png").is_file()
+        assert (roots.allowed / "photos/IMG_6751_corrected_2.png").is_file()
+    else:
+        assert "failed" in section and "(none)" in section
+    assert "blank that row's owner cells" in section and "restore the earlier output" in section
+    assert before in destination.read_bytes()
+    assert page.check_links(roots.allowed / "index.html", roots=roots) == []
+
+
+def test_sheet_conflict_details_carry_judged_current_names_and_status(roots: OutputRoots) -> None:
+    """A conflict exception must carry pair facts without changing its item-name API."""
+    destination = roots.allowed / "review-sheet.csv"
+    _csv(destination, [_row(_item(), preferred="yes"), _row(_item("IMG_6771"), note="keep")])
+    changed = {**_item(), "corrected_name": "IMG_6751_corrected_2.png"}
+    unavailable = {**_item("IMG_6771"), "status": "cancelled", "reviewable": False}
+    with pytest.raises(sheet.SheetConflictError) as error:
+        sheet.write_sheet([changed, unavailable], destination, roots=roots)
+    assert set(error.value.items) == {"IMG_6751", "IMG_6771"}
+    assert {row["item"]: dict(row) for row in error.value.details} == {
+        "IMG_6751": {
+            "item": "IMG_6751",
+            "judged_name": "IMG_6751_corrected.png",
+            "current_name": "IMG_6751_corrected_2.png",
+            "current_status": "done",
+        },
+        "IMG_6771": {
+            "item": "IMG_6771",
+            "judged_name": "IMG_6771_corrected.png",
+            "current_name": "IMG_6771_corrected.png",
+            "current_status": "cancelled",
+        },
+    }
+
+
+def test_page_has_visible_conflict_section_for_every_stale_item(roots: OutputRoots) -> None:
+    """A generic item listing or README must not substitute for visible conflict entries."""
+    items = [_item(), _item("IMG_6771")]
+    destination = roots.allowed / "review-sheet.csv"
+    _csv(destination, [_row(item, preferred="yes") for item in items])
+    for item in items:
+        item["corrected_name"] = item["item"] + "_corrected_2.png"
+        _plant_page_item(item, roots)
+    (roots.allowed / "records").mkdir()
+    (roots.allowed / "records/pack.json").write_text(json.dumps({"schema": 1, "items": items}))
+    assert build.main(["page", *_selection_args(roots, items)]) == 2
+    html = (roots.allowed / "index.html").read_text()
+    assert '<section id="sheet-conflicts">' in html
+    section = unescape(html.split('<section id="sheet-conflicts">', 1)[1].split("</section>", 1)[0])
+    assert section.count("<li>") == 2
+    for name in ("IMG_6751", "IMG_6771"):
+        assert name in section
+        assert name + "_corrected.png" in section
+        assert name + "_corrected_2.png" in section
+    assert "blank that row's owner cells" in section and "restore the earlier output" in section
+
+
+def test_conflict_section_escapes_every_displayed_fact(roots: OutputRoots) -> None:
+    """Conflict facts must remain text even when a planted value contains HTML."""
+    detail = {
+        "item": "<item>",
+        "judged_name": "<judged.png>",
+        "current_name": "<current.png>",
+        "current_status": "<cancelled>",
+    }
+    path = page.write_page([], {}, roots=roots, sheet_conflicts=[detail])
+    section = (
+        path.read_text().split('<section id="sheet-conflicts">', 1)[1].split("</section>", 1)[0]
+    )
+    for value in detail.values():
+        assert value not in section
+        assert value in unescape(section)
 
 
 @pytest.mark.parametrize("present", [0, 1])

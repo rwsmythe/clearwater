@@ -40,21 +40,40 @@ class SheetConflictError(ValueError):
 
     Attributes:
         items: Conflicting item names whose existing rows were preserved.
+        details: Judged/current output names and the current status for each item.
     """
 
-    def __init__(self, items: Sequence[str]) -> None:
+    def __init__(self, items: Sequence[str], *, details: Sequence[Mapping[str, str]] = ()) -> None:
         """Keep conflict identities and a name-only recovery message.
 
         Args:
             items: Conflicting item names whose owner rows were retained.
+            details: Pair identities and status for the same conflicting items.
         """
         self.items = tuple(items)
+        self.details = tuple(dict(detail) for detail in details)
         super().__init__(
             "sheet conflict: changed reviewable pair for "
             + ", ".join(items)
             + "; owner sheet retained for these items. "
             + CONFLICT_RECOVERY
         )
+
+
+def format_conflict(detail: Mapping[str, str]) -> str:
+    """Describe both output identities and owner-side recovery for one conflict.
+
+    Args:
+        detail: Item, judged/current output names and current status.
+
+    Returns:
+        A diagnostic naming both outputs, or explicitly naming an absent output.
+    """
+    return (
+        f"sheet conflict for {detail['item']}: judged output {detail['judged_name']}; "
+        f"current output {detail['current_name'] or '(none)'}; "
+        f"current status {detail['current_status']}. Owner sheet retained. {CONFLICT_RECOVERY}"
+    )
 
 
 def _read(path: Path) -> list[dict[str, str]]:
@@ -213,7 +232,18 @@ def write_sheet(
         if temporary.exists():
             roots.remove(temporary)
     if conflicts:
-        raise SheetConflictError(conflicts)
+        details = []
+        for name in conflicts:
+            item = current.get(name, {})
+            details.append(
+                {
+                    "item": name,
+                    "judged_name": old_by_item[name]["corrected_name"],
+                    "current_name": str(item.get("corrected_name", "")),
+                    "current_status": str(item.get("status", "missing")),
+                }
+            )
+        raise SheetConflictError(conflicts, details=details)
     return destination
 
 

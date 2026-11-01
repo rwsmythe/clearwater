@@ -6,7 +6,8 @@
 - Verified base and current HEAD at round 0: `2050a89a`; initial tracked diff empty.
 - Turn 1 is task 1 only. No instrument or test code is written this turn.
 - State: **Reviewer A CONVERGED at round 4; executing Reviewer B returned
-  NO_NEW_CRITICAL_MAJOR on `2a1e15b1`; turn 11 remediates B-F1/B-F2**.
+  NO_NEW_CRITICAL_MAJOR on `2a1e15b1`; turn 11 remediated B-F1/B-F2 and turn 12
+  completes the conflict display, with a STOP on failed-excerpt cleanup**.
   Real-build RUN REQUESTS and the final two-leg gate remain at the dispatcher.
   Round 1 remediation is committed as `03731250`.
   CHARC's complete F1 ruling is committed in the brief at `abeef516`; no ruling
@@ -380,6 +381,7 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 4 / turn 9 / A3 remediation | fresh session 4; dispatcher to fill ID | 140,647 | Dispatcher supplied at turn 10; committed de884f7d; A4 converged, terminating clean-up commissioned under e4d56665. |
 | Session 4 / turn 10 / A4 terminating clean-up | same session 4 | 217,380 | Dispatcher supplied at turn 11; committed 2a1e15b1; session 4 retired. Reviewer B executed and returned NO_NEW_CRITICAL_MAJOR. |
 | Session 5 / turn 11 / Reviewer B remediation | fresh session 5; dispatcher to fill ID | dispatcher pending | B-F1/B-F2 RED/GREEN, verification and write-audit correction; YIELD for dispatcher-run real build. |
+| Session 5 / turn 12 / B-F1 completion | same session 5 | dispatcher pending | Conflict page/stderr pair identities completed; STOP for ruling on existing failed-excerpt cleanup versus blanket deletion ban. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -2094,3 +2096,126 @@ and B-F6 Limits above are staged for the later real-build report, alongside
 the retained R4-5/R4-6 Limits. The report and real-build evidence are not claimed
 complete in this turn. **YIELD for the dispatcher's RUN REQUEST sequence**;
 the final two-leg gate and CP5 owner judgement remain at their assigned seats.
+
+### Turn 12: B-F1 completion
+
+Starts on **b4416bd7**, turn 11's five files committed unchanged by the
+dispatcher. CHARC **79a4f1c7** and the turn-12 dispatch require an explicit
+conflict section, both judged/current output identities, current unavailable
+status, and an audit of every removal/rename. Session 5 continues; **turn-12
+depth_input_tokens: dispatcher to fill**. No self-estimated depth.
+
+**STOP [MINOR, IN; ruling needed on cleanup scope]. Recommended ruling:** retain
+the existing cleanup only for a **fresh failed excerpt attempt**, while keeping
+all successful excerpts and every existing product output immutable. If the new
+ban is intended to include failed attempts, a ruling must also supersede the
+existing cleanup assertion before it can be changed. No such assertion was
+weakened or changed here. The literal turn-12 requirement ("no path ... removes
+... an excerpt copy") is contradicted by build.py:724: an unsuccessful excerpt
+validation unlinks its newly written destination, which can be numbered. The
+existing **test_excerpt_integrity_rejects_changed_non_tmcd_payload**, final
+**tests/test_reviewpack.py:1486**, explicitly asserts that no excerpt MP4 remains
+after validation fails. This is an instrument cleanup rule conflict, not a
+product defect; no footage or owner decision is involved.
+
+**Cheap independent reproduction:** `uv run python
+work/wp5.3/turn12/verification.py` uses only the committed tiny HEVC fixture and
+planted worktree files. It plants an earlier accepted GX011604.mp4, runs the
+real FFmpeg stream copy into fresh GX011604-2.mp4, and deliberately rejects the
+post-copy payload verification. A wrapper around Path.unlink observes the
+**21,744-byte GX011604-2.mp4 present immediately before unlink**; afterward it
+is absent, the result is excerpt_failed/path=None, and the earlier accepted
+copy is byte-identical. Recorded in **verification-final.log/.exit**, exit 0
+means the reproduction and its assertions executed, not that the blanket ban
+holds. No cleanup behavior was changed. The requested commit subject's blanket
+"no numbered output is ever deleted" must not be treated as an audited claim
+while this STOP stands.
+
+The independent portions of the turn are complete:
+
+- **[MINOR, IN, fixed] Explicit visible conflicts:** index.html now has an
+  escaped `<section id="sheet-conflicts">`, one list entry per conflicting
+  item, before the starter tables. A generic item listing is not the assertion
+  surface. The section names each conflict and carries the owner recovery step.
+- **[MINOR, IN, fixed] Both output identities:** SheetConflictError retains its
+  existing items tuple and adds details per item: item, judged_name from the
+  preserved CSV row, current_name from state, and current_status. The shared
+  format_conflict renders the same facts on the page and on each stderr line;
+  absent current output is explicitly `(none)` and absent current state is
+  `missing`. Build applies name-only diagnostic sanitizing; page escapes all
+  fact values. The sheet row remains verbatim; new details are computed only
+  after the guarded sheet replacement and do not alter votes or identities.
+- **[MINOR, IN, verified] Existing product outputs:** the rerun construction now
+  asserts BOTH IMG_6751_corrected.png and IMG_6751_corrected_2.png exist before
+  and after page, while a judged stale row stays byte-identical. The recovery
+  sentence is unchanged: it instructs the owner to blank owner cells or restore
+  an earlier output, and executes no file deletion/restoration. There is no
+  automatic recovery action or numbered product overwrite.
+
+#### Every filesystem remove / unlink / rename site on the turn-12 candidate
+
+Source grep is **delete-overwrite-audit.log**; independent AST enumeration is
+**verification-final.log**. String replace at build.py:64/:90 and dataclasses
+replace at select.py:194/build.py:1175 are not filesystem operations. No rmtree,
+truncate or filesystem replace call exists in tools/reviewpack/. These twelve
+sites exhaust the actual filesystem removal/rename calls:
+
+| Site | Operation | What it can touch in the commissioned CLI |
+|---|---|---|
+| tools/reviewpack/build.py:144 | roots.rename | Guarded atomic JSON temporary to pack.json or a group excerpt JSON sidecar, at the four known _json_write calls; no media destination. |
+| tools/reviewpack/build.py:147 | roots.remove | Only that JSON write's unique `.tmp` sibling, if still present. |
+| tools/reviewpack/build.py:187 | roots.remove | _aid_files' registered fresh JPEG thumbnails/pair stills, pair MP4s and private scratch PNGs; never a product PNG/MP4 or excerpt path. A thumbnail name can contain _corrected but is a JPEG derivative under thumbs/. |
+| tools/reviewpack/build.py:724 | guarded unlink | **STOP EXCEPTION:** the fresh excerpts/ destination after this attempt's failure, including numbered copies. Earlier existing copies remain protected by _fresh. Executed reproduction above; cleanup left unchanged pending ruling. |
+| tools/reviewpack/build.py:757 | roots.remove | PNGs inside this extraction's unique `.frames-UUID` scratch directory only. |
+| tools/reviewpack/build.py:759 | guarded rmdir | That same scratch directory, only when empty. |
+| tools/reviewpack/build.py:836 | guarded unlink | Private `.size-UUID-index.png` frame used to check each half's displayed dimensions. |
+| tools/reviewpack/build.py:1091 | guarded unlink | This browser conversion's newly allocated sRGB scratch PNG, after copying to the viewing frame. |
+| tools/reviewpack/build.py:1146 | guarded unlink | Temporary source/corrected PNG frames under pairs/ after making the JPEG pair still and thumbnail. |
+| tools/reviewpack/build.py:1325 | roots.remove | Only this stage's exclusive `.reviewpack.lock` on owning exit. Never an output or another holder's lock. |
+| tools/reviewpack/sheet.py:230 | roots.rename | Guarded atomic CSV temporary to the requested review sheet; no media file. |
+| tools/reviewpack/sheet.py:233 | roots.remove | Only that sheet write's unique `.tmp` sibling, if still present. |
+
+**Overwrite audit:** excerpt stream-copy uses fresh names and FFmpeg -n
+(build.py:632/:437). Product writes remain delegated to the shipped runner
+(build.py:294/:1015), whose safe numbered-output behavior is unchanged.
+FFmpeg -y at build.py:768/:860/:1077 targets new scratch frames, fresh pair aids
+or browser scratch; page.py:82 JPEG save and build.py:1097 ICC save target fresh
+viewing derivatives. Preset overwrite=True (build.py:932) replaces only the
+commissioned preset JSON. JSON/CSV renames replace only their records/views.
+The audit confirms no commissioned path removes or overwrites an existing
+product output or successful earlier excerpt, but it CANNOT confirm the
+stronger statement including fresh failed excerpts.
+
+#### RED / GREEN, verification loop and final checks
+
+All runner output is ignored **work/wp5.3/turn12/**. Same prescribed pytest
+command and sandbox shim as turn 11, with --durations=0 and JUnit XML; the sole
+existing slow real headless/FFmpeg node is included. No old assertion changed.
+
+| Evidence | Result |
+|---|---|
+| conflict-red.log/.xml, unchanged tool on b4416bd7 | **3 failed, 171 deselected in 3.83 s**, exit 1. Two real page cases show stderr lacks the judged filename; the exception lacks details. |
+| section-red.log/.xml, unchanged tool | **1 failed, 174 deselected in 1.07 s**, exit 1. Direct section-surface assertion fails because the visible conflict section is absent. |
+| conflict-green.log/.xml | **8 passed, 167 deselected in 9.58 s**, exit 0. Both current-output states, both stderr output names, unavailable status, exception details, two simultaneous visible conflicts, and four earlier rerun cases. |
+| full-final.log/.xml | **176 passed in 54.20 s**, exit 0. Five new nodes plus all 171 earlier nodes; zero failures/errors/skips. Existing assertions retained; rerun assertions strengthened for both files. |
+| ruff-final.log/.exit | **All checks passed**, exit 0. |
+| format-final.log/.exit | **6 files already formatted**, exit 0. First format check requested two purely mechanical layouts, fixed with ruff format; no behavior/assertion change. |
+| mypy-final.log/.exit | **Success: no issues found in 151 source files**, exit 0. |
+| verification-final.log/.exit | Independent product/CSV preservation, executed failed-excerpt deletion reproduction, complete delete-site audit, scope, public production docstrings, whitespace and **0 CR on all five changed files**, exit 0. |
+
+Verification loop: **suspect -> confirm** the generic item list/README hides the
+actual conflict section and the stderr lacks output names (separate REDs);
+**fix** the exception facts plus shared formatted entry and render section;
+**repeat** all original preservation/identity tests, the full suite, an explicit
+HTML-escaping test on every conflict fact, and the independent two-file/CSV-byte
+probe. No additional defect found in the changed paths. The deletion suspicion
+was independently **confirmed** by real stream copy plus unlink observation and
+is **STOPPED**, not downgraded to a Limit or claimed fixed. The repeat audit
+finds exactly the one existing exception and no product-output removal path.
+
+Only owned build.py, page.py, sheet.py, tests/test_reviewpack.py and this ledger
+change. Footage, other worktrees, main work/, local config, shared helpers,
+fixtures, existing assertions, src/, frozen interfaces and dependencies remain
+untouched. No commit, mailbox, real-media RUN REQUEST, owner judgement or
+automatic file recovery. **YIELD with STOP for the cleanup ruling** and the
+completed conflict-display changes; no blanket deletion guarantee is asserted.

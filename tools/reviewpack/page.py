@@ -21,7 +21,7 @@ from PIL import Image, ImageCms
 from lookcheck.frames import OutputPathError, OutputRoots
 
 from .select import GROUPS, pending_items
-from .sheet import CONFLICT_RECOVERY
+from .sheet import CONFLICT_RECOVERY, format_conflict
 
 PRESET_SENTENCE = (
     "In v1 both starter presets carry AD-8's defaults, so the corrected items on this page "
@@ -89,6 +89,7 @@ def write_page(
     *,
     roots: OutputRoots,
     sheet_message: str = "",
+    sheet_conflicts: Sequence[Mapping[str, str]] = (),
 ) -> Path:
     """Write the grouped CP5 page and display README with pack-relative links.
 
@@ -97,6 +98,7 @@ def write_page(
         presets: Product-exported preset objects.
         roots: Pack and source roots.
         sheet_message: Safe explanation if the existing owner sheet was retained.
+        sheet_conflicts: Judged/current output identities and status for each conflict.
 
     Returns:
         The written index path.
@@ -149,6 +151,11 @@ def write_page(
         parts.append(_link("", "review-sheet.csv", "Owner review sheet (CSV)"))
     if sheet_message:
         parts.append(f"<p>Sheet: {escape(sheet_message)}</p>")
+    if sheet_conflicts:
+        parts.append('<section id="sheet-conflicts"><h2>Sheet conflicts</h2><ul>')
+        for detail in sheet_conflicts:
+            parts.append(f"<li>{escape(format_conflict(detail))}</li>")
+        parts.append("</ul></section>")
     parts.append("<h2>Starter presets</h2>")
     if not missing_presets:
         parts.append(f"<p>{PRESET_SENTENCE}</p>")

@@ -1346,20 +1346,29 @@ def _run_stages(args: argparse.Namespace, roots: OutputRoots) -> int:
                 sheet.write_sheet(state["items"], roots.allowed / "review-sheet.csv", roots=roots)
             except (ValueError, OSError) as exc:
                 sheet_error = exc
+            conflict_details = (
+                [
+                    {key: _safe_text(value, roots) for key, value in detail.items()}
+                    for detail in sheet_error.details
+                ]
+                if isinstance(sheet_error, sheet.SheetConflictError)
+                else []
+            )
             page.write_page(
                 state["items"],
                 state.get("presets", {}),
                 roots=roots,
                 sheet_message=_safe_text(sheet_error, roots) if sheet_error else "",
+                sheet_conflicts=conflict_details,
             )
             if page.check_links(roots.allowed / "index.html", roots=roots):
                 raise ValueError("generated page contains unresolved links")
             if sheet_error is not None:
                 if isinstance(sheet_error, sheet.SheetConflictError):
                     sheet_conflicts = sheet_error.items
-                    for name in sheet_conflicts:
+                    for detail in conflict_details:
                         print(
-                            f"reviewpack: sheet conflict for {name}. {sheet.CONFLICT_RECOVERY}",
+                            "reviewpack: " + sheet.format_conflict(detail),
                             file=sys.stderr,
                         )
                 else:
