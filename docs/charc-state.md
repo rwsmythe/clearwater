@@ -184,6 +184,14 @@
   gen 30 would re-run them from the same prompts). OWNER NOTE (advisory, in my recap): keep gen 29's pane open
   until gen 30 reports the three returned; gen 28's resumed pane (`-20261029-2103`, since 07:58Z) may be closed.
   Waiting on: the three returns; 5c-16 EXCLUSIVE open; WP-D54 gate; WP5.3 A R2 result; WP5.1 T9 / T10.
+- **WP-D54 B CLEAN 10:48Z (status ddef4528; Claude pass, executed): F1 MINOR = no sink-level row reaches the FULL
+  branch (a planted sink wrapper passed) -> one test-only Codex turn 5 adds two sink-path rows proved RED by B's own
+  mutants, verified at gen 30's seat; MY ACK: no B re-run for a test-only turn; then gate, accept, the WP5.1 witness.
+  F2 / F3 / F5 banked as notes in DR-102; **F4 = NEW DR-107 mine at the accept** (the probe's open-path
+  `missing_tags` text says "limited range" for an untagged yuvj source whose resolved range is full: open and
+  export warnings disagree; remedy in `io/video/probe.py`). WP5.1 T9 `f9b0fa34` (20 ids, 82 refs); Reviewer A R1 on
+  the whole WP5.1 package started 10:48Z (Claude, base 2050a89a). WP5.3 A R2 still running. Claude 87 %.
+  Waiting on: WP-D54 turn 5 / gate / accept (DR-102, DR-107 mine); WP5.3 A R2; WP5.1 A R1; 5c-16 open.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
