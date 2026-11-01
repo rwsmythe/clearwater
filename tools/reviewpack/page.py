@@ -21,6 +21,7 @@ from PIL import Image, ImageCms
 from lookcheck.frames import OutputPathError, OutputRoots
 
 from .select import GROUPS, pending_items
+from .sheet import CONFLICT_RECOVERY
 
 PRESET_SENTENCE = (
     "In v1 both starter presets carry AD-8's defaults, so the corrected items on this page "
@@ -234,7 +235,8 @@ def write_page(
         "Untagged video still halves can differ in tone; every commissioned source is tagged."
     )
     roots.write_text(
-        roots.allowed / "README.md", display_note + "\n" + check_note + "\n" + limits + "\n"
+        roots.allowed / "README.md",
+        display_note + "\n" + check_note + "\n" + CONFLICT_RECOVERY + "\n" + limits + "\n",
     )
     parts.append(
         f"<footer><p>{escape(display_note)}</p><p>{escape(check_note)}</p></footer></html>"

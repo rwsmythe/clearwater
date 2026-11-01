@@ -29,6 +29,32 @@ HEADER = (
     "viewing_aid_failed",
 )
 HEADLINE = frozenset({"P-A", "V-S", "V-D", "V-P"})
+CONFLICT_RECOVERY = (
+    "To recover, blank that row's owner cells in the sheet to accept the new output "
+    "(it then follows the current pair at the next page), or restore the earlier output."
+)
+
+
+class SheetConflictError(ValueError):
+    """Report answered stale pairs after the rest of the sheet has been written.
+
+    Attributes:
+        items: Conflicting item names whose existing rows were preserved.
+    """
+
+    def __init__(self, items: Sequence[str]) -> None:
+        """Keep conflict identities and a name-only recovery message.
+
+        Args:
+            items: Conflicting item names whose owner rows were retained.
+        """
+        self.items = tuple(items)
+        super().__init__(
+            "sheet conflict: changed reviewable pair for "
+            + ", ".join(items)
+            + "; owner sheet retained for these items. "
+            + CONFLICT_RECOVERY
+        )
 
 
 def _read(path: Path) -> list[dict[str, str]]:
@@ -111,19 +137,24 @@ def write_sheet(
 
     Returns:
         The sheet path.
+
+    Raises:
+        SheetConflictError: After writing, if an answered pair changed or is unavailable.
+        ValueError: Before writing, if the existing sheet is invalid.
     """
     roots.check(destination)
     bom = destination.exists() and destination.read_bytes().startswith(b"\xef\xbb\xbf")
     old = _read(destination) if destination.exists() else []
-    by_item = {row["item"]: row for row in old}
+    rows = [dict(row) for row in old]
+    by_item = {row["item"]: row for row in rows}
     current = {str(item["item"]): item for item in items}
+    conflicts = []
     for existing_row in old:
         item = current.get(existing_row["item"])
-        if item is None or not _available(item):
-            raise ValueError(
-                f"changed reviewable pair for {existing_row['item']}; owner sheet retained"
-            )
-    rows = list(old)
+        if (item is None or not _available(item)) and any(
+            existing_row[key] for key in HEADER[5:-1]
+        ):
+            conflicts.append(existing_row["item"])
     for item in items:
         if not _available(item):
             continue
@@ -133,16 +164,47 @@ def write_sheet(
         flag = "yes" if item.get("viewing_aid_failed") or item.get("aid_message") else ""
         row["viewing_aid_failed"] = flag
         if previous is not None:
-            if any(previous[key] != row[key] for key in HEADER[:5]):
-                raise ValueError(f"changed pair identity for {row['item']}; owner sheet retained")
+            if any(previous[key] != row[key] for key in HEADER[:5]) and any(
+                previous[key] for key in HEADER[5:-1]
+            ):
+                conflicts.append(row["item"])
+                continue
+            previous.update({key: row[key] for key in HEADER[:5]})
             previous["viewing_aid_failed"] = flag
         else:
             rows.append(row)
             by_item[row["item"]] = row
     buffer = io.StringIO(newline="")
     writer = csv.DictWriter(buffer, fieldnames=HEADER, lineterminator="\n")
-    writer.writeheader()
-    writer.writerows(rows)
+    # Reuse unchanged CSV records verbatim, including quoting and embedded CRLF.
+    # Legacy sheets still migrate to the current header and its added status flag.
+    raw_records = {}
+    header = ""
+    if destination.exists():
+        text = destination.read_bytes().decode("utf-8-sig")
+        original = io.StringIO(text, newline="")
+        reader = csv.reader(original)
+        if tuple(next(reader)) == HEADER:
+            offset = original.tell()
+            header = text[:offset]
+            for cells in reader:
+                end = original.tell()
+                if cells:
+                    raw_records[cells[0]] = text[offset:end]
+                offset = end
+    if header:
+        buffer.write(header)
+    else:
+        writer.writeheader()
+    old_by_item = {row["item"]: row for row in old}
+    for row in rows:
+        if buffer.tell() and not buffer.getvalue().endswith(("\r", "\n")):
+            buffer.write("\n")
+        raw = raw_records.get(row["item"])
+        if raw is not None and row == old_by_item[row["item"]]:
+            buffer.write(raw)
+        else:
+            writer.writerow(row)
     temporary = destination.with_name(f".{destination.name}-{uuid.uuid4().hex}.tmp")
     try:
         roots.write_bytes(temporary, buffer.getvalue().encode("utf-8-sig" if bom else "utf-8"))
@@ -150,6 +212,8 @@ def write_sheet(
     finally:
         if temporary.exists():
             roots.remove(temporary)
+    if conflicts:
+        raise SheetConflictError(conflicts)
     return destination
 
 

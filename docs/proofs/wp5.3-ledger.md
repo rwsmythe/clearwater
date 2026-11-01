@@ -5,9 +5,10 @@
 - Package: WP5.3, CP5 visual review pack; Codex implementer lane, STRONG.
 - Verified base and current HEAD at round 0: `2050a89a`; initial tracked diff empty.
 - Turn 1 is task 1 only. No instrument or test code is written this turn.
-- State: **Reviewer A round 2 adjudicated in turn 6; remediation not begun**.
-  Round 1 remediation is committed as `03731250`. Turn 6 changes only this
-  ledger; the blocking RED and bounded instrument fixes are planned for turn 7.
+- State: **Reviewer A CONVERGED at round 4; executing Reviewer B returned
+  NO_NEW_CRITICAL_MAJOR on `2a1e15b1`; turn 11 remediates B-F1/B-F2**.
+  Real-build RUN REQUESTS and the final two-leg gate remain at the dispatcher.
+  Round 1 remediation is committed as `03731250`.
   CHARC's complete F1 ruling is committed in the brief at `abeef516`; no ruling
   remains outstanding. CHARC granted R0-1, R0-2
   and R0-3 in `f99fca742e060f14`, folded into the brief at `b7c95a46`.
@@ -358,6 +359,7 @@ DR-99 is handled only under its stated main-alone equivalence condition.
 | A3 (session 3 / turn 8 adjudication; session 4 / turn 9 remediation) | 0 / 1 / 3; 3 advisory | reviewer: 6 / 1; effective: 7 / 0 under c25ff7a9 R3-3 | 5 NEW / 2 REOPENED distinct findings; F1/F2 also REOPEN silent-loss class | 0 | turn 9: F1-F6 instrument fixes and 13 regression nodes; F7 display documentation; no src/ or interface change | Counted claude -p pass; remediated under c25ff7a9; state audit finds no fourth shrinking path; ready for A4, not converged | turn 7: 143,373; turn 8: 182,934; turn 9: 140,647 |
 
 | A4 (session 4 / turn 10, terminating clean-up) | 0 / 0 / 4; 6 advisory | reviewer nominal 7 / 3; effective 8 / 2 under e4d56665 (R4-9 IN) | 10 NEW / 0 REOPENED distinct findings; R4-1 diagnostic-sidecar loss, not another state-of-record loss | 0 | Six instrument behavior fixes; R4-8 coverage-only; R4-10 and Limits documented; no src/ change | NO_NEW_CRITICAL_MAJOR, CONVERGED at round 4 by CHARC; terminating clean-up verified; executing Reviewer B next | turn 9: 140,647; turn 10 dispatcher pending |
+| B (session 5 / turn 11 remediation) | 0 / 0 / 1; 5 advisory | 5 IN / 1 OUT (B-F5) | 6 NEW / 0 REOPENED | 0 | Two instrument fixes plus 14 regression/coverage nodes; write-audit corrections; no product or existing-test change | EXECUTED at dispatcher, NO_NEW_CRITICAL_MAJOR; B-F1/F2 fixed, F3 corrected, F4 measured, F5/F6 Limits staged; YIELD for RUN REQUESTS | session 4 retired at 217,380; turn 11 dispatcher pending |
 
 Subsequent Reviewer A turns adjudicate every finding, update this cumulative table
 and yield without remediation. Fixes belong to a separately dispatched turn.
@@ -376,7 +378,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 3 / turn 7 / A2 remediation | fresh session 3; dispatcher to fill ID | 143,373 | Dispatcher supplied at turn 8; remediation committed ed787934, all five blobs 0 CR; seat format check 293 files clean. |
 | Session 3 / turn 8 / A3 adjudication | same session 3 | 182,934 | Dispatcher supplied at turn 9; ledger committed a14a25ed; session 3 retired at the evaluation boundary before seven-item remediation. |
 | Session 4 / turn 9 / A3 remediation | fresh session 4; dispatcher to fill ID | 140,647 | Dispatcher supplied at turn 10; committed de884f7d; A4 converged, terminating clean-up commissioned under e4d56665. |
-| Session 4 / turn 10 / A4 terminating clean-up | same session 4 | dispatcher pending | RED/GREEN and write classification below; YIELD for executing Reviewer B, not another A round. |
+| Session 4 / turn 10 / A4 terminating clean-up | same session 4 | 217,380 | Dispatcher supplied at turn 11; committed 2a1e15b1; session 4 retired. Reviewer B executed and returned NO_NEW_CRITICAL_MAJOR. |
+| Session 5 / turn 11 / Reviewer B remediation | fresh session 5; dispatcher to fill ID | dispatcher pending | B-F1/B-F2 RED/GREEN, verification and write-audit correction; YIELD for dispatcher-run real build. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -1868,26 +1871,35 @@ The source/AST enumeration is retained in **write-audit.log** (write_audit.py).
 It finds all FOUR _json_write call sites below, and the JSON/text writes and
 delegations. The helper's temporary JSON and atomic rename are the same logical
 record write, not an extra inventory. No unclassified persistent state write
-remains. Binary media derivatives are not JSON/text state.
+remains. Binary media derivatives are not JSON/text state. **B-F3 correction
+(turn 11):** the table below is relocated to the turn-11 candidate and extended
+to include non-JSON media outputs; mkdir and stdout are explicitly not file
+writes. The turn-11 source/AST lists are in `work/wp5.3/turn11/`.
 
 | Final file:line / call | File written | Class | Why it cannot shrink, or source of whole regeneration |
 |---|---|---|---|
 | tools/reviewpack/build.py:126 (:141/:144) | Atomic JSON temporary then destination | by-item record: replace-or-append, never shrinks | Shared helper copies previous items, replaces/appends incoming identities through _store_item, then atomically renames. Used by ALL four sites below; independent three-path control proves both rows remain and incoming state is not mutated. |
-| tools/reviewpack/build.py:1237 | records/<group>-excerpts.json | by-item record: replace-or-append, never shrinks | Same helper; executed two-manifest regression preserves other clip's timings/error facts and replaces rerun clip. |
-| tools/reviewpack/build.py:1243 | records/pack.json (no runnable sources) | by-item record: replace-or-append, never shrinks | Same helper; per-item error rows retained even when a whole group fails preparation. |
-| tools/reviewpack/build.py:1291 | records/pack.json (finished group) | by-item record: replace-or-append, never shrinks | Same helper and identity writer; old groups remain alongside current results. |
-| tools/reviewpack/build.py:1371 | records/pack.json (non-page stage) | by-item record: replace-or-append, never shrinks | Same helper; page excluded from this write. One CLI lock spans load through save. |
+| tools/reviewpack/build.py:1238 | records/<group>-excerpts.json | by-item record: replace-or-append, never shrinks | Same helper; executed two-manifest regression preserves other clip's timings/error facts and replaces rerun clip. B-F2 adds its actual fresh excerpt file name. |
+| tools/reviewpack/build.py:1244 | records/pack.json (no runnable sources) | by-item record: replace-or-append, never shrinks | Same helper; per-item error rows retained even when a whole group fails preparation. |
+| tools/reviewpack/build.py:1292 | records/pack.json (finished group) | by-item record: replace-or-append, never shrinks | Same helper and identity writer; old groups remain alongside current results. |
+| tools/reviewpack/build.py:1381 | records/pack.json (non-page stage) | by-item record: replace-or-append, never shrinks | Same helper; page excluded from this write. One CLI lock spans load through save. |
 | tools/reviewpack/build.py:294 / :1015 | records/<group>[-neutral][-N].json, through runner --record | by-item record: append-only invocation history, never shrinks | _fresh allocates a new name; product _write_record (headless_export.py:1413) opens exclusively and refuses overwrite. Two-manifest regression proves both prior two-item records remain byte-identical while two new one-item snapshots append. Never merge/rewrite product record bytes. |
 | tools/reviewpack/build.py:927 | settings/starter-store[-N]/<preset>.json, via install_starters | by-item record: append singleton preset identities, never shrinks | Store folder is fresh; product installs both fixed named records. No previous store or preset record is removed. |
 | tools/reviewpack/build.py:932 | presets/<AD-13 name>.json, via export_preset | by-item record: replace same singleton identity, never shrinks | Each call replaces only its one preset file; both commissioned identities are always exported. Product AD-13 schema/values preserved. Missing output is pending, not quietly omitted. |
 | tools/reviewpack/build.py:927 | fresh store's .starters-installed marker | derived view: regenerated whole from product store state | Product marker 1 is written only after the two starter records exist; it is operational installation state, not a review inventory. |
-| tools/reviewpack/build.py:1308 / :1321 | .reviewpack.lock | by-item record: exclusive singleton holder record (transient) | Append one immutable holder record by exclusive create; never overwrite another holder. Intentional removal by its owner on exit is the R4-3 release protocol, not item-state pruning. A stale holder is never removed by the instrument. |
+| tools/reviewpack/build.py:1309 / :1322 / :1325 | .reviewpack.lock | by-item record: exclusive singleton holder record (transient) | Exclusive create, holder pid/time write, removal on owning exit; never overwrite another holder. Intentional removal is the R4-3 release protocol, not item-state pruning. A stale holder is never removed by the instrument. |
 | tools/reviewpack/build.py:1025 | logs/<fresh runner-record stem>.log | derived view: regenerated whole from invocation facts | Safe stdout/stderr, exit and elapsed facts for that immutable invocation; fresh record stem keeps old logs. No item selection is reconstructed from logs. |
-| tools/reviewpack/page.py:236 | README.md | derived view: regenerated whole from state-of-record display/usage policy | Display conversion, link-check meaning and Limits; no item inventory or owner votes. |
-| tools/reviewpack/page.py:242 | index.html | derived view: regenerated whole from pack state | All saved rows, catalog pending and starter presence; HTML escaping and relative links; never written back to state. |
-| tools/reviewpack/sheet.py:148 / :149 | review-sheet.csv, atomic temporary then rename | derived view: regenerated whole from pack state plus preserved owner answers | Existing answer identities/votes retained; guarded refusal on unavailable or changed pairs. All available rows/flags projected; D65 votes are never inferred. Module unchanged this turn. |
-| tools/reviewpack/build.py:1418 | tally console text, no file write | derived view: regenerated whole from sheet and companion state | Votes/artifacts from strict CSV; pending from full catalog minus accounted state. No preference judgement or state mutation. |
-| tools/reviewpack/build.py:1015, runner --cache-dir delegation | cache/<key>/meta.json and JSON completeness marker | derived view: regenerated whole from product cache state/source and parameters | Product cache stamps and completion index (cache/store.py:471/:689); evictable acceleration data, never CP5 item records. No product edit; real tiny all-stage test exercises it. |
+| tools/reviewpack/page.py:237 | README.md | derived view: regenerated whole from state-of-record display/usage policy | Display conversion, link-check meaning, sheet-conflict recovery and Limits; no item inventory or owner votes. |
+| tools/reviewpack/page.py:244 | index.html | derived view: regenerated whole from pack state | All saved rows, catalog pending, starter presence and sheet conflicts; HTML escaping and relative links; never written back to state. |
+| tools/reviewpack/sheet.py:210 / :211 | review-sheet.csv, atomic temporary then rename | derived view: regenerated whole from pack state plus preserved owner answers | B-F1: answered stale rows retained verbatim, blank rows follow available pairs or stay if unavailable; other rows updated/appended even on conflict. Conflict raised only AFTER guarded replacement. No inferred votes. |
+| tools/reviewpack/build.py:1428 | tally stdout print; no file write | stdout only, not persistent state | Votes/artifacts from strict CSV; pending from catalog minus accounted state. No state mutation. Earlier :1418 was a print, not a file-write site. |
+| tools/reviewpack/build.py:1007 | output-folder mkdir loop, including cache | mkdir only, not a cache-file write | Earlier cache/write attribution to the invocation region was imprecise. This call creates guarded directories, not JSON or item records. |
+| tools/reviewpack/build.py:315 / :1015 | runner --cache-dir argument / subprocess delegation | derived view: product regenerates cache from source and parameters | Product cache stamps and completion index (cache/store.py:471/:689); evictable acceleration data, never CP5 item records. No product edit; real tiny all-stage test exercises it. |
+| tools/reviewpack/page.py:82, callers build.py:1059 / :1128 / :1135 | thumbnail and pair-still JPEGs | fresh name or scratch, not state | _aid_files/create allocates fresh guarded names; page._save writes the derived JPEG. Item state links only completed aids. |
+| tools/reviewpack/build.py:750 / :763 / :798 | extracted PNG frame, rotated FFmpeg frame and stripped PNG | fresh name or scratch, not state | Fresh aid frames or private .frames-UUID scratch; source pixels unchanged. Unrotated helper scratch removed after guarded copy; rotated command writes guarded target. |
+| tools/reviewpack/build.py:1071 / :1090 / :1097 | browser sRGB scratch PNG, copied frame and ICC-tagged frame | fresh name or scratch, not state | A fresh scratch target is normalized then removed; only the fresh viewing frame is overwritten. Product output and source are not edited. |
+| tools/reviewpack/build.py:632 / :668 | excerpt MP4/MOV, FFmpeg stream copy | fresh name or scratch, not state | _fresh names every attempt before guarded FFmpeg output; two-run control proves GX011604-2.mp4 is recorded. No source mutation or re-encode. |
+| tools/reviewpack/build.py:825 / :898, caller :1105 | pair MP4, FFmpeg hstack encode | fresh name or scratch, not state | Fresh guarded viewing-aid target; failed owned attempt cleaned by _aid_files. Corrected product remains the item of record. |
 
 **Condition (b), acceptance transfer:** Reviewer B must explicitly check EVERY
 site/class above and EXECUTE the two-manifest sequence against a fixture state.
@@ -1970,3 +1982,115 @@ R4-5/R4-6 remain OUT Limits and must be carried to the later real-build report;
 no out-of-envelope support is claimed. Reviewer A remains CONVERGED at round 4.
 **YIELD for executing Reviewer B at the dispatcher's seat**, then the scheduled
 RUN REQUEST ladder; no further A round requested.
+
+## Session 5 / Turn 11: Reviewer B remediation
+
+### Boundary, adjudication and scope
+
+Fresh session 5 starts on **2a1e15b1**. Session 4 retired at dispatcher-supplied
+**217,380 depth_input_tokens**. This session's ID and depth remain for the
+dispatcher to fill; no estimate is made. Reviewer A remains **CONVERGED at round
+4**, under CHARC e4d56665. Reviewer B was an **EXECUTING Claude pass** at the
+dispatcher on that candidate, including two manifests, page-state SHA and stage
+lock; its verdict is **NO_NEW_CRITICAL_MAJOR**. Read-only findings source:
+`C:\Users\rwsmy\clearwater-review-evidence\wp5.3\B\review.txt`. It was not copied
+into this repository. The turn-11 dispatch adjudicates all six findings; no
+ruling, owner input or product/interface decision remains outstanding here.
+
+This turn bundles the TWO explicitly commissioned instrument repairs (B-F1 and
+B-F2) and their proof/ledger updates into the required one logical remediation
+commit. No existing test assertion was changed, removed or weakened. All new
+evidence is ignored **work/wp5.3/turn11/** in this worktree; tests use the
+prescribed **work/wp5.3/tmp/** plus sandbox shim. Only planted sources and
+committed tiny fixtures were opened, never the owner footage folder.
+
+### Per-finding RED / GREEN and disposition
+
+| Finding | Classification / RED evidence | GREEN / disposition |
+|---|---|---|
+| B-F1 | ACCEPTED MINOR, IN. Four cases cross blank/answered rows with changed/unavailable outputs. Unchanged code: blank cases return 2 instead of 0/1; answered cases leave 1 row instead of 126. b-f1-red.log/.xml: **4 failed, 157 deselected in 6.46 s**, exit 1. | Blank rows follow the current available identity; blank unavailable rows stay unchanged. Any owner cell protects a stale identity; the status-only viewing_aid_failed cell does not count as an answer. Conflicts preserve the full old record, while every other row updates/appends. **SheetConflictError is raised only AFTER the guarded temp-and-rename write** and carries the conflicting item names. page prints each name to stderr, renders their message plus recovery, and exits 2; ordinary item failures remain 1. README repeats the one-sentence recovery: blank that row's owner cells to accept the current pair at the next page, or restore the earlier output. |
+| B-F1 controls | Targeted b-f1-green.log/.xml: **9 passed, 152 deselected in 14.11 s**, exit 0 (includes existing preservation and migration controls). | Four new CLI cases assert later IMG_6702 row added, 126 sheet rows, unchanged pack.json bytes, relative links resolve, stale row bytes/quoting/CRLF survive, conflicts name IMG_6751, and clearing the answer permits the next rebuild. Nine further nodes cover each of eight owner columns and the status-only aid flag. No owner answer transfers to a regenerated output. Existing voted-row byte-preservation, BOM, legacy-header migration, aid failure, and interrupted atomic-write controls remain green. |
+| B-F2 | ACCEPTED ADVISORY, IN. Two-item clip run then one-item rerun: the persisted sidecar lacks excerpt.name (None instead of GX011603.mp4). b-f2-red.log/.xml: **1 failed, 161 deselected in 1.40 s**, exit 1. | Every excerpt sidecar row now has name from the actual prepared path (empty only on a failed excerpt with no file). The successful two-manifest control proves GX011603.mp4 retained, GX011604-2.mp4 recorded on rerun, and both names equal pack.json; sidecar stays 2 rows and pack stays 128. b-f2-green.log/.xml: **11 passed, 160 deselected in 1.32 s**, exit 0, including nine owner-cell controls and the earlier failed-excerpt merge regression. |
+| B-F3 | ACCEPTED ADVISORY, IN, ledger correction only. | The turn-10 write-site table above is explicitly corrected/relocated to this head, including ALL four _json_write calls and all non-JSON outputs. Thumbnails, extracted/browser frames, pair stills, pair MP4s and excerpt containers are **fresh name or scratch, not state**. tally :1428 is a stdout print; :1007 is a directory-creation loop; actual cache delegation is :315 / :1015. write-audit.log, write-delegations.log and verification-final.log retain the source/AST enumeration. No persistent write lacks a class. |
+| B-F4 | ACCEPTED ADVISORY, IN, MEASURE ONLY. | No test/marker change. The two existing missing-starter cases take **4.467 / 4.468 s** in full1 and **4.152 / 4.403 s** on the final code (JUnit setup+call+teardown aggregates). Both below 5 s in these serial light runs; dispatcher still measures under -n 4 at the gate. |
+| B-F5 | LIMIT ADVISORY, OUT OF ENVELOPE; staged for report. | A hand-built pack.json with no catalog row counts the missing item as pending without listing its name. Commissioned CLI initialization seeds all 128 catalog rows. No support for a hand-built alternate inventory is claimed; do not edit product or widen this turn. |
+| B-F6 | LIMIT ADVISORY, IN, retained for real-build report. | The pair clip relies on the product retaining the source's colour description; stills rely on retaining excerpt timestamps. A violated adapter check becomes viewing_aid_failed, retains the product link/sheet row, and fails the piece loudly. Only fixtures prove this here; the real-build logs/records remain to be inspected at the dispatcher's seat. |
+
+**State accounting:** full catalog **128**, headline **115**, candidates **11**,
+expected refused **2**, owner sheet **126** when all items are accounted for.
+The four new page regressions start with 128 accounted state rows and one saved
+sheet row; rebuild adds the other 125 sheet rows despite any conflict and never
+changes pack.json bytes. The excerpt rerun keeps 128 state rows / two sidecar
+rows; only the targeted item's excerpt identity changes. No denominator loss.
+
+### Verification loop: suspect / confirm independently / fix / repeat
+
+1. **Confirmed and fixed [MINOR]:** a stale or unavailable pair blocks all CSV
+   updates, including a blank row. Four pre-fix failures distinguish the old and
+   new behavior. The fix separates answered conflicts from blank identities,
+   completes the atomic write, then reports conflicts. An independent planted
+   two-conflict sequence (not the pytest helper) verifies an absent item and a
+   changed item simultaneously, a later P-Z row still appended, byte-identical
+   quoted/multiline records with BOM retained, artifact-only/above-surface-only
+   answers protected, and blank recovery accepted. All controls pass.
+2. **Confirmed and fixed [ADVISORY]:** the excerpt sidecar omits the fresh file
+   identity. RED observes None; GREEN independently compares literal filenames
+   GX011603.mp4 / GX011604-2.mp4 with both sidecar and state, and checks existence.
+   Existing failed-excerpt replace-or-append controls still pass; no excerpt
+   policy, stream mapping or fallback is changed.
+3. **Rejected suspect [false positive]:** status-only viewing_aid_failed could
+   be mistaken for an owner answer. The explicit ninth owner-column control
+   proves it is excluded and the blank row follows its new pair. Existing
+   aid-failure vote/denominator controls still pass. No extra repair required.
+4. **Static cleanup, fixed:** first ruff found N818 (new exception needed Error
+   suffix) and SIM102 (nested condition); renamed SheetConflictError and combined
+   the condition. Format was already clean; mypy was already green. The full
+   suite was repeated on the resulting final code. No assertion was weakened.
+5. **Repeat pass / no new finding:** final full 171-node suite, independent
+   persistence/CSV-byte/BOM checks, scoped diff, write-site enumeration, public
+   production docstrings and LF audit find no additional issue. Initial audit
+   script overreached into inherited test functions and nested local helpers;
+   narrowed its public-API check to module/class production declarations, with
+   no edit to inherited code. The instrument writes only guarded destinations;
+   no new state inventory or shrinking assignment is introduced.
+
+### Final light checks and measured nodes
+
+PowerShell sets PYTHONPATH=scripts. Each command's output and exit are retained
+under **work/wp5.3/turn11/**; only summary facts are reported here.
+
+```text
+uv run pytest -q tests/test_reviewpack.py --basetemp=work/wp5.3/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 --junitxml=work/wp5.3/turn11/full-final.xml
+uv run ruff check tools/reviewpack tests/test_reviewpack.py
+uv run ruff format --check tools/reviewpack tests/test_reviewpack.py
+uv run mypy
+uv run python work/wp5.3/turn11/verification.py
+```
+
+- **full1.log/.xml:** 171 passed in **84.40 s**, exit 0, before mechanical lint
+  cleanup. **full-final.log/.xml:** **171 passed in 74.49 s**, exit 0, on final
+  code; zero failures, errors or skips. This includes the sole existing slow
+  real headless/FFmpeg integration, aggregate **27.685 s** (first run 35.490 s).
+- Fourteen new nodes, all parallel-leg; none measured above 5 s in either full
+  light pass. All node identities and aggregate times are retained in
+  **full1-nodes.csv / full-final-nodes.csv**. The two B-F4 node measurements are
+  given above; no marker or timing-bound assertion was added. This is not an
+  EXCLUSIVE run or a product performance figure of record.
+- **ruff-final.log/.exit:** All checks passed, exit 0.
+  **format-final.log/.exit:** 6 files already formatted, exit 0.
+  **mypy-final.log/.exit:** Success: no issues found in 151 source files, exit 0.
+- **verification-final.log/.exit:** independent checks, complete write/delegation
+  enumeration, public production docstrings, whitespace and scope, exit 0.
+  All five changed paths have **0 CR**. No source or shared-interface edit.
+  uv ignores the inherited VIRTUAL_ENV mismatch as before; no --active or
+  other-worktree environment is used.
+
+Only owned build.py, page.py, sheet.py, tests/test_reviewpack.py and this ledger
+change. No dependency, Qt, OS-specific behavior, src/, frozen interface, shared
+helper, fixture, existing test, local config or brief was edited. No footage
+folder, other worktree or main working folder was accessed. No git mutation,
+commit, mailbox post, real-media build or image judgement was performed. B-F5
+and B-F6 Limits above are staged for the later real-build report, alongside
+the retained R4-5/R4-6 Limits. The report and real-build evidence are not claimed
+complete in this turn. **YIELD for the dispatcher's RUN REQUEST sequence**;
+the final two-leg gate and CP5 owner judgement remain at their assigned seats.

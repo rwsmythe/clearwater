@@ -17,6 +17,7 @@ import subprocess
 import sys
 from collections import Counter
 from fractions import Fraction
+from html import unescape
 from pathlib import Path
 
 import pytest
@@ -689,6 +690,44 @@ def test_sheet_refuses_to_transfer_vote_to_regenerated_output(roots: OutputRoots
     with pytest.raises(ValueError, match=r"changed|identity|pair"):
         sheet.write_sheet([changed], dest, roots=roots)
     assert dest.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "column",
+    [
+        "preferred",
+        "halos",
+        "banding",
+        "color_errors",
+        "shimmer",
+        "flicker",
+        "above_surface",
+        "note",
+        "viewing_aid_failed",
+    ],
+)
+def test_any_owner_cell_protects_pair_but_aid_flag_is_not_an_answer(
+    roots: OutputRoots, column: str
+) -> None:
+    """Artifact-only or note-only answers protect identity just like preference votes."""
+    destination = roots.allowed / "review-sheet.csv"
+    first = _item()
+    _csv(destination, [_row(first, **{column: "yes"})])
+    before = destination.read_bytes()
+    changed = {**first, "corrected_name": "IMG_6751_corrected_2.png"}
+    if column == "viewing_aid_failed":
+        changed["viewing_aid_failed"] = True
+        sheet.write_sheet([changed, _item("IMG_6771")], destination, roots=roots)
+        with destination.open(newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        assert rows[0]["corrected_name"] == "IMG_6751_corrected_2.png"
+        assert rows[0]["viewing_aid_failed"] == "yes"
+    else:
+        with pytest.raises(sheet.SheetConflictError) as conflict:
+            sheet.write_sheet([changed, _item("IMG_6771")], destination, roots=roots)
+        assert conflict.value.items == ("IMG_6751",)
+        assert before in destination.read_bytes()
+    assert sheet.tally(destination)["headline"]["available"] == 2
 
 
 def test_tally_empty_sheet_is_zero_judged_without_verdict(roots: OutputRoots) -> None:
@@ -2215,6 +2254,44 @@ def test_excerpt_records_merge_two_manifest_runs_by_item(
     assert len(state["items"]) == 128
 
 
+def test_excerpt_sidecar_names_fresh_file_after_targeted_rerun(
+    roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Excerpt sidecars must identify the same fresh media file as pack.json."""
+    items = [_item("GX011603", "V-S", "video"), _item("GX011604", "V-S", "video")]
+    for item in items:
+        (roots.footage / item["source_name"]).write_bytes(b"planted excerpt input")
+    monkeypatch.setattr(build, "_video", lambda source: {"duration_s": 60.0})
+
+    def excerpt(source, *, roots, start_s, duration_s):
+        target = build._fresh(roots.allowed / "excerpts" / source.name, roots)
+        roots.mkdir(target.parent)
+        roots.write_bytes(target, source.read_bytes())
+        return {
+            "path": target,
+            "excerpt": True,
+            "status": "ready",
+            "message": "",
+            "planned_start_s": start_s,
+            "actual_start_s": start_s,
+            "duration_s": duration_s,
+        }
+
+    monkeypatch.setattr(build, "prepare_excerpt", excerpt)
+    monkeypatch.setattr(build, "run_tool", _fake_product)
+    monkeypatch.setattr(build, "_view_video", lambda *a, **kw: None)
+    assert build.main(["clips", "V-S", *_selection_args(roots, items)]) == 0
+    assert build.main(["clips", "V-S", *_selection_args(roots, items[1:])]) == 0
+    sidecar = json.loads((roots.allowed / "records/V-S-excerpts.json").read_text())["items"]
+    state = json.loads((roots.allowed / "records/pack.json").read_text())["items"]
+    assert len(sidecar) == 2 and len(state) == 128
+    for row, expected in zip(sidecar, ("GX011603.mp4", "GX011604-2.mp4"), strict=True):
+        assert row["excerpt"].get("name") == expected
+        packed = next(item for item in state if item["item"] == row["item"])
+        assert row["excerpt"]["name"] == packed["excerpt"]["name"]
+        assert (roots.allowed / "excerpts" / expected).is_file()
+
+
 def _complete_pack(roots: OutputRoots) -> tuple[dict, list[str]]:
     """Plant every commissioned result and its link targets without processing media."""
     rows = []
@@ -2227,6 +2304,72 @@ def _complete_pack(roots: OutputRoots) -> tuple[dict, list[str]]:
     (roots.allowed / "records").mkdir()
     (roots.allowed / "records/pack.json").write_text(json.dumps(state))
     return state, _selection_args(roots, [_item()])
+
+
+@pytest.mark.parametrize("answered", [False, True])
+@pytest.mark.parametrize("available", [False, True])
+def test_sheet_rerun_conflict_never_blocks_later_rows(
+    roots: OutputRoots,
+    capsys: pytest.CaptureFixture[str],
+    answered: bool,
+    available: bool,
+) -> None:
+    """Only answered stale pairs conflict; every rebuild still adds later items."""
+    state, args = _complete_pack(roots)
+    state["presets"] = _presets(roots)
+    destination = roots.allowed / "review-sheet.csv"
+    original = _item()
+    # Preserve noncanonical CSV quoting and CRLF, including a multiline answer.
+    with destination.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=HEADER, quoting=csv.QUOTE_ALL)
+        writer.writeheader()
+        writer.writerow(
+            _row(original, note='owner says "keep",\r\nthis answer' if answered else "")
+        )
+    before = destination.read_bytes()
+    original_record = before[before.index(b"\n") + 1 :]
+    current = next(row for row in state["items"] if row["item"] == "IMG_6751")
+    if available:
+        current["corrected_name"] = "IMG_6751_corrected_2.png"
+        _plant_page_item(current, roots)
+    else:
+        current.update(status="failed", corrected_name="", reviewable=False)
+    path = roots.allowed / "records/pack.json"
+    path.write_text(json.dumps(state))
+    pack_before = path.read_bytes()
+
+    assert build.main(["page", *args]) == (2 if answered else (0 if available else 1))
+    output = capsys.readouterr()
+    with destination.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 126
+    assert any(row["item"] == "IMG_6702" for row in rows)
+    retained = next(row for row in rows if row["item"] == "IMG_6751")
+    if answered or not available:
+        assert retained == _row(
+            original, note='owner says "keep",\r\nthis answer' if answered else ""
+        )
+        assert original_record in destination.read_bytes()
+    else:
+        assert retained["corrected_name"] == "IMG_6751_corrected_2.png"
+    html = unescape((roots.allowed / "index.html").read_text())
+    recovery = "blank that row's owner cells in the sheet to accept the new output"
+    if answered:
+        assert "IMG_6751" in output.err and "conflict" in output.err.lower()
+        assert "IMG_6751" in html and "conflict" in html.lower()
+        assert recovery in html and "restore the earlier output" in html
+        assert recovery in (roots.allowed / "README.md").read_text()
+        # Clearing owner answers accepts a regenerated pair on the next page.
+        retained["note"] = ""
+        _csv(destination, rows)
+        assert build.main(["page", *args]) == (0 if available else 1)
+        assert "conflict" not in capsys.readouterr().err.lower()
+        assert recovery not in (roots.allowed / "index.html").read_text()
+    else:
+        assert "conflict" not in output.err.lower()
+        assert recovery not in html
+    assert path.read_bytes() == pack_before
+    assert page.check_links(roots.allowed / "index.html", roots=roots) == []
 
 
 @pytest.mark.parametrize("present", [0, 1])

@@ -1204,7 +1204,8 @@ def _build_groups(
                             "status": prepared["status"],
                             "message": prepared["message"],
                             "excerpt": {
-                                key: value for key, value in prepared.items() if key != "path"
+                                **{key: value for key, value in prepared.items() if key != "path"},
+                                "name": prepared["path"].name if prepared["path"] else "",
                             },
                         }
                         excerpt_records.append(excerpt_record)
@@ -1335,6 +1336,7 @@ def _run_stages(args: argparse.Namespace, roots: OutputRoots) -> int:
         else {"schema": 1, "items": [_pending(item) for item in select.catalog()]}
     )
     attempted: set[str] = set()
+    sheet_conflicts: tuple[str, ...] = ()
     for stage in stages:
         if stage == "presets":
             state["presets"] = export_presets(roots=roots)
@@ -1353,7 +1355,15 @@ def _run_stages(args: argparse.Namespace, roots: OutputRoots) -> int:
             if page.check_links(roots.allowed / "index.html", roots=roots):
                 raise ValueError("generated page contains unresolved links")
             if sheet_error is not None:
-                raise sheet_error
+                if isinstance(sheet_error, sheet.SheetConflictError):
+                    sheet_conflicts = sheet_error.items
+                    for name in sheet_conflicts:
+                        print(
+                            f"reviewpack: sheet conflict for {name}. {sheet.CONFLICT_RECOVERY}",
+                            file=sys.stderr,
+                        )
+                else:
+                    raise sheet_error
         else:
             selected = _selection(args.manifest, roots)
             selected = [
@@ -1385,7 +1395,7 @@ def _run_stages(args: argparse.Namespace, roots: OutputRoots) -> int:
             file=sys.stderr,
         )
     if "page" in stages and (
-        pending or page.pending_presets(state.get("presets", {}), roots=roots)
+        pending or sheet_conflicts or page.pending_presets(state.get("presets", {}), roots=roots)
     ):
         return 2
     if failures:
