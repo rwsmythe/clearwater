@@ -24,9 +24,11 @@ the wp4.6 worktree's `work\wp4.6-window\` (the window's outputs; gitignored, not
   cancel and the result, and returns the IF-8 `JobResult`. Three daemon threads do the blocking
   I/O (stdin, stdout lines, the 4 KiB stderr tail), so the job thread only waits on a queue for
   at most `POLL_S` (50 ms). The parent is strict: a line that is not UTF-8 JSON, has a
-  wrong-typed value or an unknown key, or is over 64 KiB is logged and ignored; only an exit
-  without a result fails the job. The first job of an instance sweeps `cache_dir/export/*`
-  folders older than one hour.
+  wrong-typed value or an unknown key, holds an integer too large for a float, or is over 64 KiB
+  is logged and ignored; a progress line is forwarded only within `0 <= done <= total <=
+  2**31 - 1` (a null total bounds `done` alone), a rejected one logged once per job (CHARC
+  `bc6847dd`: the process form is a trust boundary); only an exit without a result fails the
+  job. The first job of an instance sweeps `cache_dir/export/*` folders older than one hour.
 - `src/clearwater/app/export_worker.py`: `python -m clearwater.app.export_worker`. It takes over
   its original stdout as the protocol channel before anything runs (fd 1 and `sys.stdout` then
   point at stderr), decodes ONE request line with the frozen types' own decoders
@@ -168,11 +170,13 @@ tests/test_app_deps.py tests/test_io_video_spawn.py` 361 passed; ruff, format an
 
 Reviewer B (Codex at the orchestrator's seat, on `c0eedb0e`): 1 major, 2 minor, fixed RED-first
 (RED `d5846415`): B-1, a progress count too large for a float is now an ignored, logged line
-through one helper for every decoded number (`fc403cf3`); B-2, the clean-up covers the
-conversation's whole set-up after the spawn (`1ab92604`); B-3, an overflowing `created` in the
-settings' `last_parameters` is exit 2 (`aaf1f1fa`). Targeted run 365 passed. The window figures
-are unaffected: the fixes change only malformed-line and malformed-request handling and the set-up
-order, never a well-formed export's path.
+through one helper for every decoded number (`fc403cf3`), and by CHARC's ruling `bc6847dd` a
+progress line is forwarded only within `0 <= done <= total <= 2**31 - 1`, a rejected one logged
+once per job at WARNING and the job continuing (RED `bf76ab00`, fix `1e3f5836`); B-2, the
+clean-up covers the conversation's whole set-up after the spawn (`1ab92604`); B-3, an
+overflowing `created` in the settings' `last_parameters` is exit 2 (`aaf1f1fa`). Targeted run
+372 passed. The window figures are unaffected by B-2, B-3 and B-1's overflow rule (malformed
+lines and requests, the set-up order); for the bound see Limit 12.
 
 ## For CHARC at the accept (the cell writes no register row)
 
@@ -240,3 +244,10 @@ order, never a well-formed export's path.
 11. **Measurement runs are not of record.** The spawn, teardown, memory and scratch figures come
     from `wp46_measure.py` runs with hooks and a sampler in the measured process, after the runs
     of record in the same window.
+12. **A real worker can send `done > total`.** The engine reports each written frame against
+    the probe's `nb_frames` (`jobs/export.py:1085`, `:1112`, `:969`) and the analysis its own
+    decode count against its total; a clip whose decoded frame count exceeds the container's
+    `nb_frames` would send `done > total`. Under CHARC's bound (`bc6847dd`) those progress lines
+    are ignored, the bar holds its last forwarded value and one WARNING is logged; the export
+    itself is unaffected. In-process the same reports reached the panel unchanged. Not checked
+    on GX011627: the window ran before the bound (`1563da2a`), so its logs cannot show it.

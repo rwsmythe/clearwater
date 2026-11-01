@@ -1074,3 +1074,32 @@ Run lines at `aaf1f1fa` (Git Bash, `PYTEST_ADDOPTS` unset, `QT_QPA_PLATFORM=offs
 Every blob 0 CR. The window figures are unaffected: these fixes change only how a malformed
 protocol line or request is handled and the order of the conversation's set-up, never a path a
 well-formed export takes. No Codex run here (the orchestrator re-runs B narrowly).
+
+### B-1 bound (CHARC `bc6847dd789bedd4`, relayed in the orchestrator's consolidation; latest wins)
+
+The ruling, verbatim: "a progress line is forwarded only when `done` and `total` (when not null)
+are integers with 0 <= done <= total <= 2**31 - 1; anything else (non-integer, negative, done >
+total, over the bound, not float-convertible) is logged once per job at WARNING and IGNORED, the
+job continues." Added as a follow-on to `fc403cf3` (already committed in the earlier form).
+
+- RED `bf76ab00` (on `d713c079`'s product; `6 failed, 15 passed, 59 deselected`):
+  `test_an_invalid_line_is_ignored_and_logged[done-2to31]`, `[total-2to31]`, `[done-over-total]`,
+  `[negative-done]`, `[negative-total]` (each forwarded, e.g. `assert [(5, 4, 'a'), (3, 4,
+  'valid')] == [(3, 4, 'valid')]`) and `test_ignored_progress_lines_are_logged_once_per_job`
+  (`assert [(5, 4, 'over..., 4, 'valid')] == [(2, 4, 'valid')]`). The accepted row
+  `test_progress_at_the_bound_is_forwarded` (0/0, 2**31 - 1 with a null total, 2**31 - 1 /
+  2**31 - 1) passes before and after. The 401-digit rows are B-1's.
+- Fix `1e3f5836`: `PROGRESS_MAX = 2**31 - 1`; `_decode_progress` raises `_InvalidProgressError`
+  (a subclass of `_InvalidLineError`) for a malformed payload, a count that is not
+  float-convertible (through `_float_safe`) or one outside the bound; `_read_lines` tags it
+  `"invalid progress"`; `_converse` logs the first per job at WARNING ("export worker progress
+  line ignored: <reason> (later ones in this job unlogged)") and ignores the rest; every other
+  ignored line is still logged each time (the once-per-job test pins both). The module docstring
+  states the bound. GREEN: 21 passed (the strictness rows and both new tests); the file 80 passed.
+- Run lines at `1e3f5836`: the four-file targeted run `372 passed in 53.52s`, exit 0 (365 + 5
+  rows + 2 tests); ruff `All checks passed!`, format `4 files already formatted`, mypy `Success:
+  no issues found in 148 source files`, each exit 0.
+- Consequence named for CHARC (report Limit 12, not changed): the engine reports frames against
+  the probe's `nb_frames` (`jobs/export.py:1085`, `:1112`, `:969`), so a clip decoding more
+  frames than its container states would send `done > total`; those lines are now ignored (the
+  bar holds, one WARNING) where in-process they reached the panel. The export is unaffected.
