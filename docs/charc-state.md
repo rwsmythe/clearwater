@@ -47,7 +47,21 @@
   ICC-presence check; report in scope). WP-T7 Reviewer B STARTED 18:50Z on `1d541378` (incl. collection check of the
   three `--timeout` GATE_CHECKS lines). WP5.3 turn 9 `de884f7d` (fresh session 4): all seven R3 items remediated,
   15 `state["items"]` sites audited none can shrink, 136 passed; A round 4 (with an independent re-audit of every
-  state write) after the two Bs. WP5.1 `7ab7bd39` T10 report; B after WP5.3 R4. Claude 90.0 % pace 0.990.** Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
+  state write) after the two Bs. WP5.1 `7ab7bd39` T10 report; B after WP5.3 R4. Claude 90.0 % pace 0.990.**
+  **18:58Z (gen 31 `348b3770`): WP3.6P B RETURNED NO_NEW_CRITICAL_MAJOR, EXECUTED (E1 117 passed; E2 planted reader
+  fails v5_icc_equal + d53_primaries 18/18 patched; E3 class check fails each mislabel): convergence condition
+  (88ed545f) MET. B-1 MINOR product size vs independent primary size when product = FFmpeg shape (gen 31 checked the
+  62 5b-r2 records: decoded_size = ispe on all 62, no owner result affected); B-2 MINOR privacy lock: three EXIF
+  parses outside `_quiet_logs` print Make/Model/serial under DEBUG logging (default 0 bytes); B-3 label; B-4 `clap`
+  fails closed, B-5 skip fixture = Limits. Turn 12 (compacted session) fixing; gen 31 verifies RED nodes at its seat;
+  no second B unless the fix grows. WP-T7 B RETURNED NO_NEW_CRITICAL_MAJOR on `1d541378` (collection 7,377 = all
+  with the flags); five minor doc-truth items in turn 6, F1 = GATE_CHECKS DEFINES the stall watch (5 min no log
+  change, 15 for fullclip; investigate; 5 more = STOP with the node and the dump); the xdist worker's own timeout dump
+  is ABSENT (parent faulthandler dump only, no node id; the node comes from xdist's crash line), hangs outside the
+  test protocol get neither, `os._exit` orphans Windows children (end them, fresh basetemp). At WP-T7's accept I
+  check these sentences are in GATE_CHECKS and that DR-109's close carries the F2 and xdist limits. WP5.3 A R4 and
+  WP5.1 B STARTED (all four queued Claude passes started under 92 %). GATES next, one at a time: WP-T7, WP3.6P,
+  WP5.1 (rebased onto WP-T7's merge, three legs).** Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
   ~385K, clean boundary (every Codex turn committed), state `509381f5`; it stopped draining at `472b5bf4`; the WP-T7
   Reviewer A r1 pass is a CHILD of gen 30's pane (evidence `clearwater-review-evidence\wp-t7\r1\`): keep that pane
   open until gen 31 says the pass returned, else gen 31 re-runs it. WP5.1 turn 13 `d44db8d1` (launcher mutant fails;
