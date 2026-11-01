@@ -143,7 +143,7 @@ def decode_request(line: bytes) -> WorkerRequest:
         raise RequestError(f"the request's parameters are not a parameter set: {error}") from error
     try:
         settings = Settings.from_json(json.dumps(data["settings"]))
-    except ValueError as error:
+    except (ValueError, OverflowError) as error:  # B-3: the same, in its last_parameters
         raise RequestError(f"the request's settings are not settings: {error}") from error
     return WorkerRequest(
         request=ExportRequest(
