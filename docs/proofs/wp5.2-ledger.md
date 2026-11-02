@@ -9,8 +9,8 @@ is made by the cell. The dispatcher owns commits, reviews and EXCLUSIVE windows.
 ## Round 0
 
 Status: **STOP to CHARC through the dispatcher; T1 mapped, YIELD before T2.**
-Depth: **dispatcher to fill from transcript** (evaluate around 200K; stop near
-250K at a step boundary). No cell estimate substituted.
+Depth: **169,581** (session 1, supplied by the dispatcher at session 2 dispatch).
+Session 1 retired after round 0; no cell estimate substituted.
 
 ### Findings requiring a ruling
 
@@ -234,55 +234,58 @@ Only this DR-72 change is owned; no pipeline or schema redesign.
 | Q3 fallback clip | DISPUTE literal first-30-s GX011627 premise (F4). Recommended revised answer: full 22.7227-s GX011627, not the 90-frame session trim; requires CHARC ruling. No invented/duplicated frames. |
 | Q4 libx265 | TAKE recommended existing plan leg; encoder fallback characterisation, not N6 target. |
 
-### 5. RUN REQUESTS (not executed; blocked changes clearly identified)
+### 5. Revised RUN REQUESTS (CHARC 6e0128fd; seat only, NOT executed)
 
-All commands below are for the ORCHESTRATOR seat from this worktree root in
-Git Bash, with `unset PYTEST_ADDOPTS`. Do not run them until rulings resolve the
-STOPs and T2/T3 tool review is green. No EXCLUSIVE window is being requested
-open by this turn. Each future window: `df -h /c`, stop below 25 GB free, RAM /
-GPU conditions and strays before/after, no other heavy job, no WP-DR113 activity,
-open/close to CHARC. Conditions logs and names include W52-N. Only R2 export
-outputs need retention through the comparison. R1 omits --keep. Headless/photo
-runner outputs are retained without a --keep option; their cleanup must follow
-the dispatcher's explicit keep/delete grant, not an invented cleanup policy.
+R0-F1-F5 are ruled, as folded into `docs/briefs/wp5.2-brief.md` under
+"Round 0 ruling". The seat's configured working folder remains the main tree's
+work. The cell never opens or writes that folder; seat records must be supplied
+back to the cell through a subsequent authorised read-back. Commands below run
+at the ORCHESTRATOR seat from the repo root in Git Bash, after Reviewer A and
+the WP-DR113 gate. No window is opened by this turn.
 
-**R1 / W52-1 (after F1/F2 ruling).** Proposed corrected command:
+Before EACH window: `df -h /c` (STOP below 25 GB free), available RAM,
+`nvidia-smi --query-gpu=clocks.sm,clocks.mem,temperature.gpu,memory.free,memory.used --format=csv`,
+and the process strays. Repeat conditions/strays at close. Open/close to CHARC;
+no tests, reviewer, V4 witness or other heavy work during a window. GX011625 is
+last in W52-1. A failed leg is retried once in a later window before STOP.
+Every run log and record carries W52-1 or W52-2. Export failures retain records.
+Cleanup of retained evidence follows an explicit keep/delete grant.
+
+Shared seat setup (reads configuration; do not substitute this cell's cwd):
 
 ```bash
 unset PYTEST_ADDOPTS
-mkdir -p work/wp5.2/v16/W52-1
-uv run python tools/export_bench.py v16 --device-frames --subdir wp5.2/v16/W52-1 > work/wp5.2/v16/W52-1/W52-1-v16.log 2>&1
+WORK52=$(uv run python -c "import sys; sys.path.insert(0,'tools'); from local_config import load_local_config; print((load_local_config().working_path/'wp5.2').as_posix())")
+export WORK52
+mkdir -p "$WORK52/v16/W52-1" "$WORK52/W52-2"
 ```
 
-This writes below `<configured-working>/wp5.2/v16/W52-1`, which must first equal
-this worktree's `work/wp5.2/v16/W52-1` (F2). Do not substitute `--subdir
-work/wp5.2/...` (that would add another work component). About 108-115 min;
-eight run records, final sustained row last. No --keep; bench deletes per-run
-cache/output directories, retains JSON and synthetic input. Read back all keys
-in section 1, confirm eight runs and resolved encoders/cache states, then read
-the cold median, sustained ratio, 5.3K peaks, every memory verdict and both
-estimate ratios. The benchmark auto-names its JSON without a window token
-(`export_bench.py:857`); seat can prefix the completed record filename with
-`W52-1-` within this same directory, byte-preserving, after capturing its printed
-RECORD path. This needs no bench edit. Keep failed prefixes/records as evidence.
-
-**R2 preparation / W52-2 (F4 ruling needed).** There is no valid command that
-creates a 30-second stream-copied GX011627 from the recorded 22.7227-second
-source. The following exact proposed seat command caps at 30 s but copies the
-whole available clip; it MUST be described as 22.7227 s if this is ruled in.
-It follows `tests/conftest.py:786-821`'s mapping/metadata form, excluding tmcd
-from explicit data mappings and regenerating timecode as that helper does.
+**R1 / W52-1 alone, about 115 min.** Eight exports in the six unchanged legs
+mapped in section 1, device frames enabled, no --keep:
 
 ```bash
-mkdir -p work/wp5.2/W52-2
-uv run python - > work/wp5.2/W52-2/W52-2-cut.log 2>&1 <<'PY'
-import subprocess, sys
+uv run python tools/export_bench.py v16 --device-frames --subdir wp5.2/v16/W52-1 > "$WORK52/v16/W52-1/W52-1-v16.log" 2>&1
+```
+
+Read exit status immediately (3 means memory breach; never continue the plan).
+Use the exact printed RECORD path to rename that JSON byte-preserving with
+the `W52-1-` prefix, beside the original location, recording pre/post SHA256.
+Keep prior failed attempts too; do not select an arbitrary glob result. Require
+eight records on success, read memory checks, resolved encoders and all keys
+in section 1. No benchmark edit beyond DR-72 is commissioned.
+
+**R2 preparation / W52-2.** WHOLE GX011627: 681 frames / about 22.7 s.
+No time cap, frame duplication, or session-trim substitution. Exact stream copy:
+
+```bash
+uv run python - > "$WORK52/W52-2/W52-2-copy.log" 2>&1 <<'PY'
+import os, subprocess, sys
 from pathlib import Path
 sys.path.insert(0, 'tools')
 from local_config import load_local_config, find_footage_file
 from clearwater.io.video import find_tool, probe
 cfg = load_local_config()
-root = Path.cwd() / 'work/wp5.2/W52-2'
+root = Path(os.environ['WORK52']) / 'W52-2'
 assert root.is_relative_to(cfg.working_path.resolve())
 source = find_footage_file('GX011627', cfg.footage_path)
 info = probe(source)
@@ -292,160 +295,125 @@ for stream in info.audio:
 for stream in info.data:
     if stream.codec_tag != 'tmcd':
         maps += ['-map', f'0:{stream.index}']
-output = root / 'W52-2-GX011627-cap30.mp4'
+output = root / 'W52-2-GX011627-whole.mp4'
 command = [str(find_tool('ffmpeg')), '-nostdin', '-hide_banner', '-v', 'error',
            '-n', '-i', str(source), *maps, '-c', 'copy', '-map_metadata', '0',
            '-map_metadata:s:v:0', '0:s:v:0', '-write_tmcd', '1',
            '-video_track_timescale', str(info.video.time_base.denominator),
-           '-t', '30', '-movflags', 'use_metadata_tags', '-f', 'mp4', str(output)]
+           '-movflags', 'use_metadata_tags', '-f', 'mp4', str(output)]
 subprocess.run(command, check=True)
 copied = probe(output).video
-print('CUT', output.name, 'frames', copied.nb_frames, 'fps', str(copied.frame_rate))
+assert copied.nb_frames == 681
+print('WHOLE', output.name, 'frames', copied.nb_frames, 'fps', str(copied.frame_rate))
 PY
 ```
 
-Preparation expected seconds, not a benchmark. The session trim's automatic
-keyframe choice is at >=3 seconds (`tests/conftest.py:782`); that helper cannot
-be presented unchanged as a 30 s helper. Seat should record actual copied frame
-count/duration and packet identity if the revised full-clip choice is approved.
-
-**R2 (a).** Under the future W52-2 window, get free MiB AFTER card initialisation,
-choose a positive integer HOLD_MIB = floor(free_before/2**20) - 1500, record
-the input reading, and ensure the stop file is fresh/absent. Proposed invocation
-(HOLD_MIB is a measured seat value, never a cell guess):
+**R2 holder and exports / W52-2.** Seat reads free bytes after CUDA initialisation
+and sets `HOLD_MIB=floor(free_bytes/2**20)-1500` (positive integer). Log that
+reading; ensure stop file is absent; wait for flushed readiness JSON and prove
+actual remaining free bytes below the 4K base estimate. The holder must stay
+alive through the first export. Install the cleanup trap before starting it:
 
 ```bash
-uv run python tools/device_hold.py --mib "$HOLD_MIB" --stop-file work/wp5.2/W52-2/W52-2-hold.stop --timeout-s 3600 > work/wp5.2/W52-2/W52-2-holder.jsonl 2> work/wp5.2/W52-2/W52-2-holder.stderr &
+STOP52="$WORK52/W52-2/W52-2-hold.stop"
+test ! -e "$STOP52" || exit 2
+trap 'touch "$STOP52"; if [ -n "${HOLDER_PID:-}" ]; then wait "$HOLDER_PID"; fi' EXIT
+uv run python tools/device_hold.py --mib "$HOLD_MIB" --stop-file "$STOP52" --timeout-s 3600 > "$WORK52/W52-2/W52-2-holder.jsonl" 2> "$WORK52/W52-2/W52-2-holder.stderr" &
 HOLDER_PID=$!
-```
-
-Wait for flushed readiness JSON and verify actual free-after below the base
-4K estimate; context overhead means nominal subtraction is not proof. Keep
-holder alive through (b), with cleanup trap in the seat driver so an export
-failure cannot strand it. Holder can also expire; record reason/exit.
-
-**R2 (b)-(d).** Corrected parser-complete commands, pending F2/F4. Separate
-outputs and caches avoid suffix collisions and warm-cache comparisons; no
---force-cpu anywhere in this witness. Expected CPU wall is uncertain: brief's
-20 min was based on 900 frames that this clip does not have. Reserve about
-20 min provisionally, validate actual rate; GPU about 3.6-3.8 min at prior rate.
-
-```bash
-mkdir -p work/wp5.2/W52-2/fallback-cpu/out work/wp5.2/W52-2/fallback-cpu/cache work/wp5.2/W52-2/fallback-gpu/out work/wp5.2/W52-2/fallback-gpu/cache
-uv run python tools/headless_export.py work/wp5.2/W52-2/W52-2-GX011627-cap30.mp4 --out work/wp5.2/W52-2/fallback-cpu/out --cache-dir work/wp5.2/W52-2/fallback-cpu/cache --method c3 --encoder auto --quality standard --record work/wp5.2/W52-2/W52-2-fallback-cpu.json > work/wp5.2/W52-2/W52-2-fallback-cpu.log 2>&1
-touch work/wp5.2/W52-2/W52-2-hold.stop
+# Wait for and inspect the readiness JSON; do not proceed on early exit.
+mkdir -p "$WORK52/W52-2/fallback-cpu/out" "$WORK52/W52-2/fallback-cpu/cache" "$WORK52/W52-2/fallback-gpu/out" "$WORK52/W52-2/fallback-gpu/cache"
+uv run python tools/headless_export.py "$WORK52/W52-2/W52-2-GX011627-whole.mp4" --out "$WORK52/W52-2/fallback-cpu/out" --cache-dir "$WORK52/W52-2/fallback-cpu/cache" --method c3 --encoder auto --quality standard --record "$WORK52/W52-2/W52-2-fallback-cpu.json" > "$WORK52/W52-2/W52-2-fallback-cpu.log" 2>&1
+# Record exit status and require 0 before continuing.
+touch "$STOP52"
 wait "$HOLDER_PID"
-uv run python tools/headless_export.py work/wp5.2/W52-2/W52-2-GX011627-cap30.mp4 --out work/wp5.2/W52-2/fallback-gpu/out --cache-dir work/wp5.2/W52-2/fallback-gpu/cache --method c3 --encoder auto --quality standard --record work/wp5.2/W52-2/W52-2-fallback-gpu.json > work/wp5.2/W52-2/W52-2-fallback-gpu.log 2>&1
+trap - EXIT
+# Prove holder exit and free-memory recovery before the free-card run.
+uv run python tools/headless_export.py "$WORK52/W52-2/W52-2-GX011627-whole.mp4" --out "$WORK52/W52-2/fallback-gpu/out" --cache-dir "$WORK52/W52-2/fallback-gpu/cache" --method c3 --encoder auto --quality standard --record "$WORK52/W52-2/W52-2-fallback-gpu.json" > "$WORK52/W52-2/W52-2-fallback-gpu.log" 2>&1
 ```
 
-Before (d), prove holder exit/free recovery. Read both exit codes and records:
-`counts`, `cancelled`, settings.force_cpu=false, method=c3,
-parameters_from=defaults, items[0].state/outputs/device/elapsed_s/video. Quote
-capacity reason verbatim and `GPU` on free card; no CPU-forced surrogate.
+Quote `items[0].device` in both records: capacity CPU reason then GPU, never
+`CPU: forced`. Require 681 frames, exit 0, matching settings and completed
+outputs. Retain both MP4s through comparison. CPU provisionally about 20 min;
+GPU about 3.6-3.8 min from the historical rate; neither is a new measurement.
 
-**R2 (e), proposed comparison request.** Use WP5.1's `decode_video_rgb`
-(`tests/acceptance_support.py:298-335`) colour-pair/deep-sample conventions,
-leading 30 frames. Choose the brief's explicitly permitted POST-ENCODE branch:
-report mean <=3.5/255 as characterisation, with measured max separately, NOT
-as proof of AD-11 pre-encode 2e-3 max / 2e-4 mean. WP5.1's 3.5/255 value was a
-neutral/libx265 characterisation (`tests/test_v51_video_acceptance.py:50-55`),
-so disclose this comparison's corrected/NVENC context. If the dispatcher wants
-strict pre-encode AD-11 on THIS memory-pressure leg, it needs a seat observer
-driver; the existing headless CLI emits no pre-encode frame records.
-
-Exact proposed comparison command (first 30 frames, raw on disk / framewise
-numeric reduction to avoid simultaneously holding two 30-frame float64 arrays):
+**R2 first 30 decoded frames / W52-2.** Uses WP5.1 support's explicit colour
+mapping and 8-bit planar decode, with a 30-frame prefix instead of its sparse
+checks. This is POST-ENCODE characterisation (mean <=3.5/255), not an AD-11
+pre-encode claim (max 2e-3 / mean 2e-4). Exact comparison request:
 
 ```bash
-uv run python - > work/wp5.2/W52-2/W52-2-compare.log 2>&1 <<'PY'
-import json, subprocess, sys
+uv run python - > "$WORK52/W52-2/W52-2-compare.log" 2>&1 <<'PY'
+import json, os, subprocess, sys
 from pathlib import Path
 import numpy as np
 sys.path.insert(0, 'tools')
 from clearwater.io.video import find_tool, probe
 from clearwater.color import decode_filter
-root = Path('work/wp5.2/W52-2')
-source = root / 'W52-2-GX011627-cap30.mp4'
-stream = probe(source).video
-assert stream.bit_depth == 8
-arrays = []
+root = Path(os.environ['WORK52']) / 'W52-2'
+arrays, sizes = [], []
 for label in ('cpu', 'gpu'):
-    record = json.loads((root / f'W52-2-fallback-{label}.json').read_text())
-    output = root / f'fallback-{label}/out' / record['items'][0]['outputs'][0]
-    raw = root / f'W52-2-{label}-first30.raw'
-    command = [str(find_tool('ffmpeg')), '-nostdin', '-hide_banner', '-v', 'error',
-               '-noautorotate', '-i', str(output), '-map', '0:v:0', '-an', '-sn',
-               '-dn', '-vf', decode_filter(stream), '-frames:v', '30',
-               '-fps_mode', 'passthrough', '-f', 'rawvideo', 'pipe:1']
-    with raw.open('xb') as dst:
-        subprocess.run(command, stdout=dst, check=True)
+    rec = json.loads((root / f'W52-2-fallback-{label}.json').read_text())
+    video = Path(rec['items'][0]['outputs'][0])
+    stream = probe(video).video
+    assert stream.bit_depth == 8
+    sizes.append((stream.height, stream.width))
+    raw = root / f'W52-2-{label}-first30.rgb'
+    subprocess.run([str(find_tool('ffmpeg')), '-nostdin', '-v', 'error', '-n',
+                    '-noautorotate', '-i', str(video), '-map', '0:v:0', '-frames:v', '30',
+                    '-vf', decode_filter(stream), '-pix_fmt', 'gbrp',
+                    '-fps_mode', 'passthrough', '-f', 'rawvideo', str(raw)], check=True)
     assert raw.stat().st_size == 30 * 3 * stream.height * stream.width
     arrays.append(np.memmap(raw, dtype=np.uint8, mode='r',
                             shape=(30, 3, stream.height, stream.width)))
+assert sizes[0] == sizes[1]
 largest, total, count = 0.0, 0.0, 0
 for left, right in zip(*arrays, strict=True):
-    difference = np.abs(left.astype(np.float32) - right.astype(np.float32))
-    largest = max(largest, float(difference.max()))
-    total += float(difference.sum(dtype=np.float64))
-    count += difference.size
+    diff = np.abs(left.astype(np.float32) - right.astype(np.float32))
+    largest = max(largest, float(diff.max()))
+    total += float(diff.sum(dtype=np.float64))
+    count += diff.size
 result = dict(window='W52-2', comparison='post-encode CPU vs GPU', frames=30,
               max_abs_255=largest, mean_abs_255=total/count,
               max_abs_unit=largest/255, mean_abs_unit=total/count/255,
               characterisation_mean_limit_255=3.5, passes=total/count <= 3.5)
-(root / 'W52-2-fallback-compare.json').write_text(json.dumps(result, indent=2))
+with (root / 'W52-2-fallback-compare.json').open('x', encoding='ascii') as dst:
+    dst.write(json.dumps(result, indent=2))
 print(json.dumps(result))
 raise SystemExit(0 if result['passes'] else 1)
 PY
 ```
 
-Comparison expected seconds to a few minutes; seat records its actual wall but
-it is not an export target. Verify identical dimensions/count/settings and no
-sampler/runner errors. Keep both MP4s through comparison; only after read-back
-and the explicit keep/delete grant remove them. No --keep switch exists on
-headless_export. No comparison driver is committed or executed by this turn.
-
-**R3 / W52-2 (F3 ruling needed).** There is NO valid current
-`photo_verify.py memory` CLI satisfying synthetic PNG input AND wp5.2-only
-outputs. Thus no falsely executable measurement command is supplied. Proposed
-generator, for the seat ONLY after a ruling, using existing WP2.3 PNG16 form:
+**R3 / W52-2.** Generate the synthetic under the configured working folder,
+then measure through the commissioned adapter. No full-size input is created
+by the cell; no generated image/output is committed. Recipe:
 
 ```bash
-uv run python - > work/wp5.2/W52-2/W52-2-generate48.log 2>&1 <<'PY'
-import sys
+uv run python - > "$WORK52/W52-2/W52-2-generate48.log" 2>&1 <<'PY'
+import os, sys
 from pathlib import Path
 sys.path.insert(0, 'tools')
 from fixtures.stills import unit_content, quantize, png16_bytes, srgb_profile
 from local_config import load_local_config
-root = Path.cwd() / 'work/wp5.2/W52-2'
-assert root.is_relative_to(load_local_config().working_path.resolve())
-output = root / 'W52-2-synthetic-48mp.png'
-assert not output.exists()
+from spike_io.guard import WriteGuard
+cfg = load_local_config()
+guard = WriteGuard(cfg.working_path.resolve() / 'wp5.2', cfg.footage_path)
+output = Path(os.environ['WORK52']) / 'W52-2/W52-2-synthetic-48mp.png'
 pixels = quantize(unit_content('lowred', width=8064, height=6048), 16)
-with output.open('xb') as dst:
+with guard.check(output).open('xb') as dst:
     dst.write(png16_bytes(pixels, srgb_profile(), 'sRGB'))
 print(output.name, '8064x6048', 'RGB16', 'seeded lowred', 'no EXIF')
 PY
+uv run python tools/photo_memory.py measure "$WORK52/W52-2/W52-2-synthetic-48mp.png" --name W52-2 --exclusive > "$WORK52/W52-2/W52-2-photo-memory.log" 2>&1
 ```
 
-This is a PROPOSED replacement for the missing WP3.6P recipe, not an assertion
-of a commissioned generator. Never run fixture generation at this size during
-a light turn. After CHARC commissions the measurement mechanism, request two
-fresh-runner legs, c3 defaults/PNG16, default then force CPU, exclusive=true,
-roots `work/wp5.2/W52-2/photo48-default` and `photo48-cpu`, named W52-2 JSON.
-Reuse `MemorySampler` and `launch_runner` (`photo_verify.py:1181`, `:1315`) with
-a wp5.2 WriteGuard and assemble equivalent memory facts without mislabeling a
-PNG as HEIC. Exact adapter/CLI commands remain a STOP item, not silently guessed.
-Allow about 10 min for generation and both photo legs provisionally; prior owner
-24.5 MP CPU 58.4 s is a different size/decoder and not a 48 MP prediction.
-Read back stored_size, input/output depth, base estimate/free/reason, tree and
-OS RSS peaks, full device peak, samples/active counts/gaps/errors and limits.
-Ratios for a CPU-selected leg must say graphics-work ratio N/A. Neither photo
-leg needs --keep; current memory tool retains output by default.
-
-**R4.** Citation only, no run: owner 5d records and moments in section 1. No read
-of the MAIN tree's old work outputs is authorised to this cell; committed report
-and ledger receipts supply this round's citations, and seat supplies any later
-record copy needed for audit.
+Records are `<working>/wp5.2/photo/W52-2-{default,cpu}-<unique>/record.json`.
+Both legs are fresh runners, c3 defaults, PNG16; the first is default device,
+the second explicit forced CPU. Read every 5d memory key mapped in section 1
+and section 2 below. Expected base admission about 12.21 GB on an 8 GB card
+means default CPU fallback is a RESULT, never a failed GPU attempt. Record
+device/RAM peaks on both, but graphics-work estimate ratios are N/A on CPU.
+Allow about 10 min provisionally for generation plus the two legs. GUI margin
+and 24.5 MP owner photo remain CITED (Q1/R4), no re-run.
 
 ### 6. Fullclip consumers / gate mapping
 
@@ -491,6 +459,157 @@ moved DR-99/B-F4 nodes. New breach test is parallel (<5 s); holder is gpu/serial
 
 | Round | Critical / major / minor | Envelope | NEW / REOPENED | Reverts | Fix surface | Transport / depth | Outcome |
 |---|---|---|---|---|---|---|---|
-| 0 (T1, not Reviewer A) | 0 / 4 / 1 dispatch-premise findings | 5 in / 0 out | 5 / 0 | 0 | Documentation only; no tool/product/test edits | Fresh Codex exec; depth dispatcher to fill | STOP for F1-F4 ruling; F5 planning correction; YIELD |
+| 0 (T1, not Reviewer A) | 0 / 4 / 1 dispatch-premise findings | 5 in / 0 out | 5 / 0 | 0 | Documentation only; no tool/product/test edits | Session 1 Codex exec; depth 169,581 | STOP for F1-F4 ruling; F5 planning correction; YIELD |
 
 Reviewer A/B, their executed witnesses, both gate legs and T4/T5 remain pending.
+
+## Session 2 / Turn 2: T2, T3 and the photo adapter
+
+Status: tools built; light validation green; **STOP for the holder's
+hardware verification retry**. Recommended disposition: permit ONE fresh
+node-id run with the now-pinned per-test CuPy cache before Reviewer A / windows.
+No Reviewer A round has run and no EXCLUSIVE window is open.
+Depth: **dispatcher to fill from this session's transcript** (evaluate about
+200K; STOP near 250K). Prior session retired at **169,581**, dispatcher-supplied.
+
+### 1. Build and RED/GREEN evidence
+
+One logical instrument-build change bundles T2/T3 and the R0-F3 adapter, as
+ordered for this turn. No commit is attempted by the cell. Logs below are
+under this worktree's ignored `work/wp5.2/turn2/`.
+
+| Nodes / control | Before | After | Evidence |
+|---|---|---|---|
+| `test_v16_stops_on_memory_breach_and_keeps_records[0,1,2]` | All three FAIL: exit 0 instead of 3; pre-change plan runs onward. | PASS in first GREEN run. | `red-light-2.log`, `green-light.log` |
+| `test_v16_continues_without_a_memory_breach[memory_check0,memory_check1]`; `test_v16_preserves_job_failure_status` | All three PASS (positive / compatibility controls). | PASS in first GREEN run. | Same logs. |
+| Initial seven photo-adapter nodes | Seven setup ERRORs from explicit missing-module assertion; no production adapter exists. This is missing-feature RED, not a runtime result. | All seven PASS in first GREEN run. Later location tests use valid existing PNG16 outside the allowed root, so missing-file refusal cannot satisfy them. | Same logs. |
+| Holder CLI absence control | `python tools/device_hold.py ...` exits 2: executable absent, before any CUDA import/allocation. | Built CLI; hardware node result is STALLED, not GREEN. | `red-holder.log`, `green-holder.log` |
+| `tests/test_device_hold.py::test_device_hold_releases_on_stop_file` | GPU node not invoked in RED, reserving the dispatch's ONCE-only invocation for hardware GREEN; the CLI absence control above is the disclosed substitution. | Invoked exactly ONCE by node id; stalled in parent backend probe, before holder subprocess/readiness. Killed own pytest PID 43224 after the 300 s stack dump identified the cache write. No passed/failed pytest summary. | `green-holder.log` stack, `holder-stop.log`; tool wrapper observed exit -1. |
+
+The first RED invocation (`red-light.log`) had 13 temp-setup ERRORs because
+the basetemp's parent did not exist. Created `work/wp5.2/tmp`, then used a
+NEW basetemp for the distinguishing RED above: **3 failed, 3 passed, 7 errors
+in 1.06 s**. First GREEN: **13 passed in 1.00 s**. Temp-parent errors are not
+counted as regression evidence. Hardware RED/GREEN remains incomplete.
+
+### 2. Rules implemented and record schema
+
+- T2: `tools/export_bench.py:890` checks an explicitly false
+  `memory_check.passes` after append/write/row output; returns 3 immediately,
+  exiting both loops. Inapplicable checks lacking `passes` continue. Earlier
+  records AND the breached record stay on disk. Module exit-status docstring
+  at `:55` names 3 beside 0/1/2. No other bench behaviour was edited.
+- T3: `tools/device_hold.py:37` parses finite positive timeout and positive
+  integral MiB, requires an absent stop file in an existing parent, selects
+  device 0, establishes context, reads free-before, holds ONE CuPy byte buffer,
+  touches/synchronises, and flushes ONE JSON readiness line. `held_bytes` is
+  the actual allocator block size; `free_after` is while still holding. The
+  50 ms monotonic loop observes the stop file or timeout; finally drops the
+  buffer and frees the pool. It only inspects the stop file. No OS-specific
+  API/dependency is added; external hard kill relies on process CUDA cleanup.
+- Holder test at `tests/test_device_hold.py:15` uses a parent backend
+  `free_device_bytes()` before/during/after the subprocess, checks >=256 MiB
+  drop, stop-file exit AND full free recovery inside 2 s, and reaps on failure.
+  `gpu` module marker places this node in serial. At `:21`, the test now pins
+  `CUPY_CACHE_DIR` to its own tmp folder before backend import, inherited by
+  the child. This remedy has NOT been hardware-retried under the ONCE lock.
+- R3 adapter: `tools/photo_memory.py:137` requires `--exclusive`, validates
+  the name, resolves input through `WriteGuard` before reading it, refuses
+  footage/outside/root-directory/missing/non-PNG16 inputs, and checks RGB16
+  IHDR before creating outputs. Output guard is `<working>/wp5.2/photo`.
+  It runs default then forced CPU (`:178`) in fresh isolated runner folders.
+  It imports `photo_verify.MemorySampler` (`:71`) and `launch_runner` (`:77`)
+  with the existing caller guard/sampler contexts (`:72-90`), never copies
+  either implementation. `photo_verify.py` is untouched. Existing private
+  header/disk/version/reason/name helpers are imported through that module;
+  no new shared or frozen API is introduced. The 48 MP generator is the
+  documented recipe through `fixtures.stills`, not a fixture/blob or cell run.
+- Photo summary keys match 5d: `schema`, `command`, `file`, `class`,
+  `stored_size`, `method`, `force_cpu`, `forced_cpu`, `exclusive`,
+  `estimate_bytes`, `device_free_before_bytes`, `device_total_bytes`,
+  `estimate_exceeds_free_before`, `estimate_fits_free_before`, `rss_scope`,
+  `decoder_versions`, `ram_limit_bytes`, `device_limit_bytes`,
+  `measured_at_utc`, all keys of imported `MemorySampler.record()`
+  (`rss_baseline_bytes`, `rss_tree_peak_bytes`, `os_peak_working_set_bytes`,
+  `device_used_baseline_bytes`, `device_used_peak_bytes`, `rss_samples`,
+  `device_samples`, `rss_active_samples`, `device_active_samples`,
+  `sample_intervals_s`, `sample_interval_kind`, `sampling_cadence_s`,
+  `sampler_elapsed_s`, `sampler_errors`, `rss_scope`), `runner_exit`,
+  `device_reason`, `read_ok`, `automatic_fallback`,
+  `memory_capacity_fallback`, `ram_within_limit`, `device_within_limit`,
+  `failed_checks`. `class` is honestly `synthetic-png16`; no owner HEIC/JPEG
+  class is fabricated. RSS cap is 16,000,000,000 B and device cap 8188 MiB,
+  as 5d. Inactive/missing samples cannot pass, and a known peak breach cannot
+  be erased by missing active samples. Both legs' summaries persist even if
+  one reports failed checks. Runner exceptions stop with exit 1.
+
+### 3. Verification loop, deviations and open items
+
+| Suspect | Independently confirmed / rejected | Disposition |
+|---|---|---|
+| DR-72 ignores memory breach | Confirmed by three planted prefixes through existing `run_once` and persisted JSON, with passing and job-failure controls. | FIXED in owned bench control; GREEN above. |
+| New location controls might pass just because outside inputs are absent | Confirmed from initial test fixture setup; no product failure inferred. | Test inputs now include valid existing RGB16 copies outside/root sibling/fake footage. No real footage accessed. |
+| GPU test stalled in parent before the holder | Confirmed by 300 s faulthandler stack: `backend_for` -> `_probe_gpu` -> CuPy arange compiler -> `_compiler_cache._write_encoded` -> `tempfile._mkstemp_inner`. No holder files/subprocess had been created. | Own stalled pytest killed; no further GPU invocation. |
+| CuPy cache defaults outside sandbox writable roots | Confirmed independently by installed `_compiler_cache.py:27,93,140`: default `~/.cupy/kernel_cache`, overridden by `CUPY_CACHE_DIR`, temporary cache write uses that directory. Actual failed outside write effect is NOT claimed or inspected. | Test pins cache under tmp; confirmation by hardware rerun is STOP / dispatcher decision, not a claimed fix. |
+| Photo adapter could silently pass missing samples, RAM breach or failed runner | Controlled light cases at runner/sampler seam, plus literal capacity-reason check, all passed in final regression. | Rejected as a remaining fault; protected by tests. |
+| Fullclip exposure / product changes | Rejected by round-0 consumer map and current owned-file diff; no src/interface/fixture/dependency change. | Existing fullclip exclusion stands; collection identity belongs to seat gate. |
+
+RUN REQUESTS in round-0 section 5 have been REPLACED with the ruled,
+seat-only configured-working-root commands: R1 W52-1 (~115 min) and R2+R3
+W52-2, whole GX011627 (no `-t`), decoded prefix comparison, 48 MP recipe,
+and `photo_memory.py measure`. No measured figure, N6 proposal or report
+table is invented; T4/T5 await seat windows/read-back. No reviewer, gate,
+mailbox post, commit, footage/media read, MAIN-work read or other-worktree
+read was performed by the cell. No local config or unowned source edited.
+All deliberate cell file writes stay in this worktree/work/uv cache. The
+stalled CuPy probe attempted its default external compiler-cache write;
+no successful external effect is asserted. No footage-derived bytes or
+GPS/IMU values are in the changed files.
+
+### 4. Final light validation and cumulative status
+
+Final targeted light command, with `PYTHONPATH=scripts`, `PYTEST_ADDOPTS`
+unset and `CUPY_CACHE_DIR` under this worktree's work folder:
+
+```text
+uv run pytest -q -rs tests/test_export_bench_breach.py tests/test_photo_memory.py tests/test_export_bench.py tests/test_photo_verify.py -m "not gpu and not footage and not slow and not fullclip" --basetemp=work/wp5.2/tmp/green-regression -p sandbox_mkdir_shim -p no:cacheprovider
+```
+
+Result: **156 passed, 1 deselected in 90.70 s**, exit 0, no skips/failures/errors;
+log `work/wp5.2/turn2/green-regression.log`. Only the existing footage-marked
+photo node was deselected. New breach controls were already included in the
+1.00 s first GREEN, within their <5 s envelope; no wall bound is added to a
+parallel test. No GPU test is included in this regression command.
+The single GPU node command was:
+
+```text
+uv run pytest -q -rs tests/test_device_hold.py::test_device_hold_releases_on_stop_file --basetemp=work/wp5.2/tmp/green-holder -p sandbox_mkdir_shim -p no:cacheprovider
+```
+
+That invocation is STALLED/terminated, not passed, as section 1 records. No
+GPU retry has been run. All pytest basetemps are fresh under the required tmp
+root and every invocation loaded both mandated plugin switches. Full suite,
+Reviewer A/B, collection identity and both gate legs remain at the dispatcher
+seat; no full suite is authorised for this turn.
+
+Static checks on all six changed Python files: `ruff-final.log` **All checks
+passed!**; `format-final.log` **6 files already formatted**. Full `uv run mypy`
+in `mypy-first.log`: **Success: no issues found in 156 source files**. Final
+post-documentation checks: `ruff-handoff.log` **All checks passed!**, exit 0;
+`format-handoff.log` **6 files already formatted**, exit 0;
+`mypy-handoff.log` **Success: no issues found in 156 source files**, exit 0.
+`audit-handoff.log` exits 0: all seven owned paths ASCII/LF/zero CR,
+all three seat-only Python recipe bodies syntax-valid (NOT executed), exact
+seven-path scope, and `git diff --check` clean.
+No dependency manifests changed. Final source/contract pass found no new
+in-envelope implementation issue beyond the explicitly unverified holder
+hardware control. The executable generator lives in section 5; the tool
+docstring points there, avoiding a shell-quoted multiline `python -c` recipe.
+
+| Round / turn | Critical / major / minor | Envelope | NEW / REOPENED | Reverts | Fix surface | Transport / depth | Outcome |
+|---|---|---|---|---|---|---|---|
+| Session 2 / turn 2 (build; not Reviewer A) | 0 / 1 / 0 validation blocker | 1 in / 0 out | 1 / 0 | 0 | Tools + tests + ledger; no product module | Codex exec; depth dispatcher to fill | T2 light GREEN; adapter light GREEN; holder hardware STALLED; STOP for one cache-pinned retry; YIELD |
+
+The validation blocker is the once-only holder run, not a measured D111
+product failure. Recommended next dispatch: authorise one GPU-node retry
+with the writable cache, then Reviewer A before any EXCLUSIVE window.

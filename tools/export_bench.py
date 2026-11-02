@@ -50,8 +50,10 @@ where OPTIONS, after the subcommand, are ``--config FILE``, ``--keep``, ``--forc
 
 ``v16`` runs :data:`V16_PLAN` in order, or only the legs of the clips named by ``--clip`` (each
 footage window covers one clip: GX011627 first, GX011625 last). Exit status 0 when every run
-finished with an ok result; 1 when a run failed (the record says which and why); 2 on a usage,
-configuration, footage-lookup or disk-space error before any run.
+finished with an ok result and no memory breach; 1 when a run failed (the record says which
+and why); 2 on a usage, configuration, footage-lookup or disk-space error before any run;
+3 on a recorded memory-check
+breach (the plan stops after preserving the breached run and all earlier records).
 """
 
 from __future__ import annotations
@@ -885,6 +887,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             record["runs"].append(run)
             _write(record_path, record)
             print(row_line(run), flush=True)
+            if run.get("memory_check", {}).get("passes") is False:
+                print(f"RECORD {record_path}")
+                return 3
             if not run["ok"]:
                 record["failed"] = {"leg": asdict(leg), "error": run["failure"]}
                 _write(record_path, record)
