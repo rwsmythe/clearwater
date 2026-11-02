@@ -31,7 +31,16 @@ index 95. Nine BEST-EFFORT differences remained. These are the supplied seat
 results in `docs/briefs/wp-dr113-brief.md:14`; this cell did not read that
 record or owner footage.
 
-GREEN witness: PENDING (orchestrator seat, after the accept)
+GREEN witness (orchestrator seat, 2026-11-02 ~12:50Z, on the gated candidate
+`2ef05dd9`): `tools/video_fidelity.py compare` over the same pair, out
+`work\wp3.10\dr113-green`: EXIT 0; 46 items; DIFFERENT by class MANDATORY 0,
+REQUIRED 0, BEST-EFFORT 9; MANDATORY + REQUIRED all SAME. Against the RED, the
+item names are identical and exactly two statuses changed, both DIFFERENT ->
+SAME: `audio packets passed through (pts, duration, size, MD5) [soun#0]` and
+`audio priming and packet side data`, each with the note `PCM: compared by
+sample extent and timeline runs; packets 100 -> 99`; the record's `notes` carry
+it with its stream key `[soun#0]`. The nine BEST-EFFORT differences are
+unchanged.
 
 ## Tests
 
@@ -79,9 +88,16 @@ A8's measurements required no marker change. Round 1 is converged with its
 terminating cleanup (ledger, Session 2 / Turn 4, Every finding and its
 disposition).
 
-Reviewer B: PENDING (orchestrator seat)
+Reviewer B (Claude, the orchestrator's seat, on `fc167059`) returned
+`NO_NEW_CRITICAL_MAJOR`: 0 MINOR, 5 ADVISORY, all banked (accept record
+`docs/proofs/wp-dr113-accept.md`). Base-versus-head on the committed AAC
+fixtures read identical items, notes and records; on `pcm-irregular.mov` only
+the two target items changed.
 
-Gate: PENDING (orchestrator seat)
+Gate (three legs, on the rebased candidate `2ef05dd9`): parallel 6,572 passed,
+1 skipped; serial 1,260 passed, 11 skipped; fullclip 7 passed; 0 failed;
+collection 7,851 with identity; ruff, format, mypy and the harness gate clean
+(accept record).
 
 ## Limits
 
@@ -90,6 +106,12 @@ CONTENT; decoded-sample MD5 is a possible later item, not built here. A3:
 stored samples moved between packets while durations, totals and runs stay
 equal read SAME in both readers; this needs a container whose `stts` and
 `stsz` disagree (ledger, Session 2 / Turn 4, ADVISORY 3).
+
+B-A3 (Reviewer B): for a cut source the side-data rule reads only the
+source packets inside the readable window, so a discard flag or side data on a
+source packet after the readable end does not send the item back to the
+per-packet rule; that packet is never copied, and the per-packet rule trimmed
+the source rows the same way.
 
 A6: the instrument's preexisting D86 window is strictly `pts < end`, while
 the product admits whole prefixes within `CUT_SLACK_S`. A D86 cap yielding a
