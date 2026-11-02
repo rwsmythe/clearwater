@@ -289,14 +289,14 @@ Wall times are scheduling estimates, not figures of record.
 
 Q8 order, including candidate/refusal coverage omitted from its shorthand:
 
-| Order | Exact queued command | Expected wall time | Outputs under work/wp5.3/ | Actual receipt / read-back (turns 13-15) |
+| Order | Exact queued command | Expected wall time | Outputs under work/wp5.3/ | Actual receipt / read-back (turns 13-16) |
 |---|---|---|---|---|
 | 1 | `RUN REQUEST: uv run python -m tools.reviewpack.build photos` | about 1 hour, GPU | photos, thumbnails, P-A/P-Z corrected and neutral records, state, logs | On 6d470028, EXIT 0, 673 s, 2026-11-01 22:00:18Z-22:11:32Z; free 171 -> 167 GB. 73 done (64 P-A / 9 P-Z), failed=0, pending=55. |
 | 2 | `RUN REQUEST: uv run python -m tools.reviewpack.build presets` | <1 minute | both preset JSON files, pack-local store and marker, state/log | EXIT 0, 1 s, 22:12:15Z-22:12:16Z; both exported presets present, two page value tables. |
 | 3 | `RUN REQUEST: uv run python -m tools.reviewpack.build page` followed by `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | <2 minutes | page builds index.html and initial sheet, checks links inside; --check is links only | Initial mistakenly queued --check: EXIT 2, index.html FileNotFoundError. Dispatcher then ran page: EXIT 2 in 1 s (pending 55, not finished); subsequent --check EXIT 0. 73 sheet rows / 74 lines, 295 resolving links. |
 | 4 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-P` | reserve about 2.5 hours, provisional; CHARC's allowance is about 27 minutes of source material | 17 whole product clips, IMG_6762.MOV last, pair clips/stills, thumbnails, V-P record, state/logs/cache | EXIT 1, 2,961 s, receipt 22:12:54Z-23:02:14Z, free 167 -> 165 GB. 17 accounted: 8 done with warnings / 9 product failures; failed=9, pending=38. Receipt names 6d470028; instrument unchanged through ef7cbf15. Product audio failures STOP-routed by dispatcher to CHARC; no workaround/retry. Read-back turn 14: all 56 successful artifacts present; page/sheet still post-photos, publication deferred. |
 | 5 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-S` | about 1.5-2 hours, provisional | 26 clips and aids, excerpts where needed, V-S record, state/logs/cache | First attempt LOST after generation-32 pane closed: 23:03:35Z to about 00:36:53Z, ef7cbf15, no exit receipt; dispatcher moved 33 orphans and archived the stale lock before removing it. Re-run on 0b04e372 EXIT 0, 8,740 s, 2026-11-02 00:39:08Z-03:04:48Z, free 161 -> 155 GB; 26 done, failed=0, pending=12. Turn-15 read-back: all 182 product/aid files and 11 excerpts present; no numbered/partial/unreferenced V-S output. Page/sheet still post-photos. |
-| 6 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-D` | about 40-70 minutes, provisional | 8 clips and aids, excerpts where needed, V-D record, state/logs/cache | Not yet returned. |
+| 6 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-D` | about 40-70 minutes, provisional | 8 clips and aids, excerpts where needed, V-D record, state/logs/cache | On 1f8b036a, EXIT 0, 3,162 s, 2026-11-02 04:31:56Z-05:24:38Z, free 155 -> 152 GB. 8 done, failed=0, pending=4 (V-Z 2 / V-R 2). Turn-16 read-back: all 56 product/aid files and 6 excerpts present; no numbered/partial/unreferenced V-D output; earlier groups unchanged. Page/sheet still post-photos. |
 | 7 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-Z` | about 10-20 minutes, provisional | 2 candidate clips and aids, excerpt as needed, V-Z record, state/logs/cache | Not yet returned. |
 | 8 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-R` | <2 minutes for expected refusals | 2 product refusal records/texts, state/logs; no review rows | Not yet returned. |
 | 9 | `RUN REQUEST: uv run python -m tools.reviewpack.build page` followed by `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | <2 minutes | final index and merged sheet; page checks links inside and exits 2 while pending items/presets or sheet conflicts remain; --check is links only | Queued after clips; no final-pack completion claim. |
@@ -385,7 +385,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 5 / turn 12 / B-F1 completion | same session 5 | dispatcher pending | Conflict page/stderr pair identities completed; STOP for ruling on existing failed-excerpt cleanup versus blanket deletion ban. |
 | Session 5 / turn 13 / RUN REQUESTs 1-3 read-back | same session 5 | 191,145 | Dispatcher supplied at turn 14; session 5 retired. CHARC exemption confirmed; real photo/preset/page text and output existence read-only audit, exemption regression and non-slow checks. |
 | Session 6 / turn 14 / clips V-P read-back | fresh session 6; dispatcher to fill ID | 81,940 | Dispatcher supplied at turn 15; committed 0b04e372. V-P completed records/media-file existence read-only audit; 8 done / 9 product refusals already STOP-routed; non-slow checks only while V-S runs. |
-| Session 6 / turn 15 / clips V-S read-back | same session 6 | dispatcher pending | Complete V-S re-run read-back, orphan listing and interruption-contract assessment; full module checks; only ledger changed. |
+| Session 6 / turn 15 / clips V-S read-back | same session 6 | 116,597 | Dispatcher supplied at turn 16; committed 1f8b036a. Complete V-S re-run read-back, orphan listing and interruption-contract assessment; full module checks; only ledger changed. |
+| Session 6 / turn 16 / clips V-D read-back | same session 6 | dispatcher pending | Eight V-D outputs/aid sets, six excerpts and unchanged earlier groups verified; full module checks; only ledger changed. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -2601,3 +2602,108 @@ real-pack build, mailbox post, commit/git mutation or image judgement.
 **YIELD after the V-S read-back**. The earlier V-P product STOP remains routed;
 later clips, page/sheet publication, report, final gate and CP5 owner judgement
 remain at their assigned seats.
+
+## Session 6 / Turn 16: read-back of clips V-D
+
+### Boundary and completed receipt
+
+Session 6 resumes on **1f8b036a**, with dispatcher-supplied **turn-15 depth
+116,597 depth_input_tokens**. **Turn-16 depth_input_tokens: dispatcher to fill;
+no estimate.** The tool remains unchanged since 6d470028. No build stage is
+running at the seat; no real-pack stage is invoked by the cell. This turn
+changes only the ledger, with no code or test change and no new instrument STOP.
+
+Seat receipts **orch-g33/wp53-runs/summary.txt** and **clips-V-D.log** agree:
+**EXIT 0**, **3,162 s**, **2026-11-02 04:31:56Z-05:24:38Z**, free
+**155 -> 152 GB**, **8 items accounted for; failed=0, pending=4**. These are
+informal build receipts, not EXCLUSIVE performance figures.
+
+Read-only evidence is **records/V-D.json**, **records/V-D-excerpts.json**,
+**records/pack.json**, **logs/V-D.log**, the named product/aid/excerpt files,
+index.html, review-sheet.csv and README.md. Other completed JSON records are
+read for the privacy scan. No owner source, image or video was opened or
+decoded, no source timestamps were re-probed, and no agent judged a correction.
+File presence and nonzero byte sizes are checked without media inspection.
+
+The ignored, worktree-only **work/wp5.3/turn16/readback.py** writes
+**readback-final.log/.exit**, **readback-summary.json**,
+**readback-findings.json**, **vd-checks.csv**, **excerpt-checks.csv**,
+**whole-checks.csv** and a local **pack-snapshot.json** for later read-backs.
+Final read-back exit **0**; instrument findings **[]**. Current pack SHA256:
+**4a53346cb498f694e22a232090bea346f378b3198f0382d1faac09766cd1897f**.
+
+### Per-check results
+
+| Check | Observed result |
+|---|---|
+| Catalog, named group and order | pack.json retains **128 rows**. The V-D rows and raw invocation both follow select.VIDEO_D exactly: **GX011589, GX011590, GX011591, GX011592, GX011593, GX011598, GX011600, GX011601**. All **8** pack rows are done; raw counts **6 done / 2 done with warnings / 0 failed / 0 cancelled / 0 not run**. |
+| Output identity and product pose | Each corrected_name equals the raw product's sole output; record_name=V-D.json, runner_exit_status=0. c3, shipped defaults, force_cpu=false, **8 GPU / hevc_nvenc**. Each warning array equals the raw warnings through _safe_text, including camera firmware/settings warnings on the whole items. |
+| Product files and viewing aids | **8 product MP4s + 8 pair MP4s + 24 stills + 16 thumbnails = 56 named nonempty files**. Every item has 10/50/90 percent stills. **Zero viewing_aid_failed flags or aid_message values**. Names are bare filenames under the required output folders. |
+| Excerpt accounting | **6 ready excerpt rows**, whose complete excerpt dictionaries equal the matching pack rows, with present nonempty excerpt files, finite planned/actual starts and durations, planned duration=30 s, regenerated timecode and empty message. Whole items are **GX011589.mp4 (6.4064 s)** and **GX011592.mp4 (42.3423 s)**, start=0 and no excerpt row. Timings below are recorded facts, not new source probes. |
+| Earlier groups unchanged | Exactly **116 earlier-group rows** remain: P-A=64, P-Z=9, V-P=17, V-S=26. Undoing only the eight V-D replacements to the unchanged _pending catalog form reproduces **the entire turn-15 pack's SHA256**, a8611f7fe7ca4c12e05190839c3c75690f652d02db74213a415e3ad6fa7a1a8c. Thus all other **120 rows** (including V-R/V-Z pending rows), row order, preset state and other top-level data are unchanged. |
+| Pending counts | **4 pending: V-R=2 and V-Z=2**, no V-D pending rows. V-P's nine already STOP-routed product failures remain failed and unchanged; this successful piece does not retry or fix them. |
+| Clean current output set | clips/ contains exactly the **8 saved V-D output names** for the commissioned stems, no numbered _corrected-2 / _corrected_2 variant, no unreferenced V-D product and no clearwater-partial file. The excerpts folder is exactly the **17 referenced files: 11 V-S + 6 V-D**. No stage lock remains. |
+| Page/sheet publication deferred | Page and sheet still show the **post-photos** snapshot: Pending 55 (including V-D=8), **73 photo rows**, zero V-D sheet rows and zero V-D product links. All owner/status answer cells are blank. Current V-D sheet identity, aid flags and product/pair/still links await page and are **not claimed checked** on a rebuilt page. All **295 existing distinct relative targets** still resolve safely under the pack. |
+| Log and receipt reconciliation | The sole group log is **V-D.log**, exit_status=0, wall_s=**2367.250**. Raw elapsed_s=**2366.1107716999977**. All 8 summary result lines agree with raw statuses, with **GX011601_corrected.mp4** saved as 8/8 last. Seat wall time includes preparation and viewing aids. |
+| Privacy | Page, sheet, README and **all 10 current JSON records** have **zero full-path candidates and zero GPS/EXIF mentions**, hence no value-bearing fragment to adjudicate. Published links have no external, rooted or traversal target. No source-folder traversal or metadata read. |
+
+### Excerpt timing record (seconds)
+
+| Item | Planned start | Actual start | Planned duration | Actual duration |
+|---|---:|---:|---:|---:|
+| GX011590.mp4 | 41.2678932 | 41.041 | 30 | 30.230200 |
+| GX011591.mp4 | 55.2818932 | 55.055 | 30 | 30.230200 |
+| GX011593.mp4 | 222.5823600 | 222.222 | 30 | 30.363667 |
+| GX011598.mp4 | 210.1299200 | 209.209 | 30 | 30.930900 |
+| GX011600.mp4 | 418.6048532 | 418.418 | 30 | 30.196833 |
+| GX011601.mp4 | 188.3748532 | 188.188 | 30 | 30.196833 |
+
+Actual timings and keyframe offsets are retained; no excerpt was regenerated,
+trimmed or rewritten by this turn. Stream/payload/timecode verification is the
+instrument's completed prepare path, not a fresh source-media verification here.
+
+### Verification loop, light checks and yield
+
+Suspect missing or mismatched output -> independently join the raw runner
+record, normalized pack and **56 named nonempty files** -> **rejected**.
+Suspect excerpt fact loss -> six complete sidecar dictionaries match pack rows
+and files -> **rejected**. Suspect earlier group mutation -> restore only the
+eight V-D pending rows in a local serialization and compare to turn 15's
+previously recorded whole-pack digest -> **rejected**, exact historical hash
+match. The first scratch serialization used LF whereas the seat JSON has CRLF;
+using the observed seat newline spelling resolves that **audit false positive**.
+No committed code, assertion or historical digest changed. Suspect hidden stale
+outputs or privacy leakage -> exact current filename sets and completed-surface
+scan -> **rejected**. Repeat full module/static checks and final read-back ->
+**no instrument finding**, no new STOP.
+
+PowerShell sets PYTHONPATH=scripts and retains the mandatory sandbox mkdir shim.
+No build is running, so the full module includes its sole existing slow tiny
+headless/FFmpeg integration. All runner output and exit sidecars remain under
+the worktree's **work/wp5.3/turn16/**:
+
+```text
+uv run pytest -q tests/test_reviewpack.py --basetemp=work/wp5.3/tmp/t16 -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp5.3/turn16/full.xml
+uv run ruff check tools/reviewpack tests/test_reviewpack.py
+uv run ruff format --check tools/reviewpack tests/test_reviewpack.py
+uv run mypy
+uv run python work/wp5.3/turn16/readback.py
+```
+
+- **full.log/.xml/.exit:** **177 passed in 48.01 s**, exit 0; no failures,
+  skips or deselected nodes. No test/marker change.
+- **ruff.log/.exit:** All checks passed, exit 0.
+  **format.log/.exit:** 6 files already formatted, exit 0.
+  **mypy.log/.exit:** Success: no issues found in 151 source files, exit 0.
+- **readback-final.log/.exit:** 8 per-item rows, 6 excerpt rows, exact prior
+  snapshot reconstruction, zero instrument findings, exit 0.
+- Final diff/byte audit: only this owned ledger changes, whitespace clean and
+  **0 CR**. uv ignores the inherited VIRTUAL_ENV mismatch; no other environment
+  is targeted. The seat's JSON newlines are read-only and are not normalized.
+
+No product, interface, instrument, test, dependency, fixture or local-config
+edit; no main-working-folder write, real-pack stage, source/other-worktree read,
+media judgement, mailbox post, commit or git mutation. **YIELD after the V-D
+read-back**. V-Z and V-R, page/sheet publication read-back, the report and final
+gate remain outstanding; the earlier V-P product STOP remains routed to CHARC.
+The owner alone makes the CP5 judgement.
