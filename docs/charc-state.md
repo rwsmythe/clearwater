@@ -45,8 +45,17 @@
   pack `work/wp5.3/index.html`, sheet `work/wp5.3/review-sheet.csv` (126 rows, judgement columns blank), 128 items = 126
   done + 2 expected HLG refusals, failed 0, pending 0; D65 headline set 115 items (P-A 64 + V-S 26 + V-D 8 + V-P 17; bar:
   corrected preferred on at least 80 %); P-Z 9 and V-Z 2 are candidates. The owner fills the sheet; gen 34 runs the strict
-  tally from .worktrees/wp5.3; then I write `docs/proofs/cp5-visual-review.md`.** Gen 34 next: the DR-113 brief (Codex, V4
-  PCM reading; my no-tripwire check before dispatch) then the WP5.2 dispatch fill, CONCURRED.**
+  tally from .worktrees/wp5.3; then I write `docs/proofs/cp5-visual-review.md`.** WP-DR113 brief `ee59bf45` (branch brief-dr113): MY RULING `001d01e4` NO TRIPWIRE, dispatched
+  on the Codex lane (independence lock + F-B2 out concurred; the owner record = V4 over IMG_6731.MOV MANDATORY all SAME
+  after, 2 DIFFERENT before). WP5.2 brief FINAL `70c3a5db` on brief-wp5.2 (gen 34 fill `f70ad027`); BOTH DISPATCHED 10:19Z (post `f5bcb939`): WP-DR113 brief FINAL `dc018f25`,
+  worktree `.worktrees/wp-dr113`, round 0 running; WP5.2 worktree `.worktrees/wp5.2` at `70c3a5db`, round 0 / T1 running,
+  light only; Codex share 2 of 2 live cells; every EXCLUSIVE window named to me before it opens.**
+  **TEMPLATE REVIEW ADJUDICATED 2026-11-02 ~10:20Z:** swing 15 findings (12 fixed, 1 OPEN MAJOR: cell_depth lacks
+  --sessions / --live, second pass), coa 19 findings (14 fixed incl. the CRITICAL root-discover-runs-0-tests, 2 to the
+  OWNER: the early-roll exception vs the 2026-09-25 operator direction; 3 declined / limits). Remediation commit `8031617`
+  on the template branch (suite 382 OK, 1 skip); the kernel-doc subset mirrored to main `15d1c828` (hazards renumbered
+  (4)-(7)). Record `docs/proofs/harness-upstream-2026-11-02.md`. OWNER: push after ruling the early-roll text; a second
+  pass (cell_depth from swing) is recommended, not commissioned.
   **HARNESS TEMPLATE PORT DONE (owner in chat 2026-11-02, "I am ready to update the comms harness template ... including
   the codex development addition"; chose: CHARC ports on a branch):** `C:/Users/rwsmy/harness-template` branch
   `clearwater-upstream-2026-11-02`, 5 commits on origin/master `6488556` (layer 1 `fc9f4b5` the coa-chess comms core as
