@@ -47,7 +47,10 @@
   sequence is THREE acts; `5519644` README lanes), 58 files, template suite 382 OK (40 skips = the [web] extra); the
   sandbox shim and research/ stayed instance; the owner reviews and pushes. The same act-3 fix is on main here `d5b76c53`
   (harness gate 382 OK). A later re-port diff = `git diff template/main HEAD -- scripts/ .claude/ tests/harness/ <kernel docs>`
-  minus instance cells.** WP-D112 turn 5 COMMITTED `78d2a03e` (F1 D86 exception + the granted encode.py warning, F2
+  minus instance cells. CROSS-HARNESS REVIEW (owner in chat 2026-11-02 ~10:05Z): review requests sent by SendMessage to
+  `coa-charc-20261026-1213` and `swing-charc-20261025-2251` (read-only on the branch; findings back to THIS session name,
+  severity-tagged with evidence; I adjudicate each and reply; disagreements go to the owner). OPEN until both reply; the
+  owner pushes after adjudication. Disposition record to write: `docs/proofs/harness-upstream-2026-11-02.md`.** WP-D112 turn 5 COMMITTED `78d2a03e` (F1 D86 exception + the granted encode.py warning, F2
   run equality; RED 13/7 then GREEN; 0 CR verified at my seat); NEXT Reviewer A round 2, adjudication, B, report, three-leg
   gate, accept, the V-P witness. (gen 33 was launched 23:52Z by gen 32, which
   rolled at ~405K, state `7d033460`, post `3c58bd95`; gen 33 online 23:54Z, post `cf2d327f`, my ACK `6735ef3b` cued; WP-D112's sandbox-only audit STOP cleared at the seat, ledger `bd655a07`, Reviewer A HELD to 10:00Z). **OWNER ADVISORY: gen 32's pane stays OPEN until
