@@ -160,7 +160,9 @@ authority; the mailbox stays the record; the drain still gates the send. A cue t
 rolled lands nowhere and the successor drains at pickup.
 
 **The Monitor form survives as a NAMED EXCEPTION**: re-arm only on the operator's word or while a
-gate of yours is imminent; the tool caps at 30 min, and every wake costs a full-depth turn. Example
+gate of yours is imminent; the tool caps at 30 min, and every wake costs a full-depth turn. A seat
+that armed one under this exception `TaskStop`s it BEFORE it posts a rollover announcement (the
+rollover sequence below has no monitor act of its own). Example
 (swap the role and path for your own inbox):
 
     Monitor(persistent=true, description="new mail in comms/<role>/inbox", command=
@@ -196,11 +198,10 @@ handed over if the previous generation was still working"): NOTHING YOU STARTED 
 no cell in flight, no build piece, gate leg or footage run spawned from your pane (it dies with the
 pane; gen 32 lost a 95-minute piece that way on 2026-11-01). At the cap with a job running, wait for
 its exit line and record it, then roll; near the cap, start no long job you cannot see finish.
-Four acts, in this order, nothing between them: (1) overwrite and COMMIT
+Three acts, in this order, nothing between them: (1) overwrite and COMMIT
 `docs/orchestrator-state.md` -- the successor reads it at HEAD; (2) post the rollover announcement
 and STOP DRAINING -- `peek` only from here, and the stop hook's "drain now" is VOID for an outgoing
-generation; (3) `TaskStop` the inbox Monitor if the named exception above left one armed (ordinarily
-none is -- post + cue is the default wake); (4) LAST ACT, launch your
+generation; (3) LAST ACT, launch your
 successor yourself with the web UI button's own fixed command, FRESH mode, from the repo root:
 
     powershell -NoProfile -File scripts/launch_role.ps1 -Role orchestrator

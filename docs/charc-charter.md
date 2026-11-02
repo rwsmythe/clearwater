@@ -110,7 +110,7 @@ few tens of thousands of tokens. The prompt hook reports the depth every turn; r
 role's own act under this convention.
 
 **THE ROLLOVER SEQUENCE (added 2026-09-07, operator-directed; every generation of every role).**
-Four acts, in this order, nothing between them -- **after ONE precondition: NOTHING THE
+Three acts, in this order, nothing between them -- **after ONE precondition: NOTHING THE
 GENERATION STARTED IS STILL RUNNING** -- no cell in flight, and no background job of its own
 (a build piece, a gate leg, a footage run, any process spawned from its pane). **Operator-directed
 2026-11-02, verbatim: "the generations should not have handed over if the previous generation was
@@ -164,11 +164,11 @@ from memory.
 2. **Post the rollover announcement and STOP DRAINING.** From this line on, `peek` only, never
    `read`. The stop hook's "drain now" instruction is VOID for an outgoing generation -- obeying
    it would swallow mail meant for the successor.
-3. **Stop the inbox monitor, if one is armed** (`TaskStop` on it). Since 2026-09-15 no seat arms a
-   Monitor at bring-up (post + cue wakes the recipient; the persistent-Monitor form is a named
-   exception -- the project's orchestrator context, "Comms routing", carries the rule), so this act is
-   usually a no-op; when the exception left one armed, stop it here so nothing can wake this session again.
-4. **LAST ACT: launch the successor yourself** -- the same fixed command the web UI's launch
+   (No seat arms an inbox Monitor since 2026-09-15: post + cue wakes the recipient. A seat that
+   armed one under the named exception in the project's orchestrator context, "Comms routing",
+   stops it BEFORE act 2, as that exception says; the sequence itself has no monitor act --
+   the former act 3 was removed 2026-11-02 after two months as a no-op.)
+3. **LAST ACT: launch the successor yourself** -- the same fixed command the web UI's launch
    button runs, from the repo root, FRESH mode (resume would reopen the context being left):
 
        powershell -NoProfile -File scripts/launch_role.ps1 -Role <role>
