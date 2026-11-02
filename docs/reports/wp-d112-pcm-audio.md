@@ -2,8 +2,9 @@
 
 Executable rule at `78d2a03e`: Reviewer A CONVERGED in round 2. Turn 7 adds
 the adopted test-only control and report limits on parent `7e9f1e12`.
-Reviewer B is PENDING. The final gate and post-merge WP5.3 witness belong
-to the orchestrator. This is not an acceptance record.
+Reviewer B returned NO_NEW_CRITICAL_MAJOR on `f7f2cce9`. The gate, the
+accept and the post-merge WP5.3 witness are recorded in
+`docs/proofs/wp-d112-accept.md`; this report is not the acceptance record.
 
 ## Changes
 
@@ -259,8 +260,22 @@ distinct from the cell's light selections above.
 | 4, IN: no real-sink regression for a final packet storing more than it presents | ADOPTED: the parametrized test-only row above passes both reviewer shapes. |
 | 5, IN: aligned short D86 tail has only the generic warning | Report-only note below; conforms to the warning grant, no code change. |
 
-Reviewer B: PENDING. Final gate and acceptance: PENDING at the orchestrator's
-seat. No further Reviewer A round is requested by this clean-up.
+No further Reviewer A round is requested by this clean-up.
+
+## Reviewer B
+
+Claude Opus/high at the orchestrator's seat on `f7f2cce9`:
+**NO_NEW_CRITICAL_MAJOR** (0 critical, 0 major, 1 minor, 3 advisories).
+Evidence: `C:/Users/rwsmy/clearwater-review-evidence/wp-d112/B/review.txt`.
+It rebuilt the fixture byte-identical and passed every packed PCM width it
+tried through the real sink. Dispositions (CHARC):
+
+| Finding | Disposition |
+| --- | --- |
+| F-B1 MINOR, IN, outside this package: the V4 instrument (`tools/container_spike/compare.py`) still compares PCM audio packet by packet, so a V4 record on a re-chunked PCM export reads DIFFERENT where this check passes | A register row at the accept; a small follow-on package teaches V4 the same PCM reading. No committed V4 record is affected. |
+| F-B2 ADVISORY, OUT: the check reads no sample content, so a planted same-codec PCM re-encode with changed samples passes | Banked; pre-existing (the base rule passes it too); the product always stream-copies audio. |
+| F-B3 ADVISORY, OUT: under D86 an earlier frame-aligned packet declaring more samples than it stores refuses a faithful copy | Banked; malformed source only; follows CHARC `b44b0ee7` verbatim. |
+| F-B4 ADVISORY, OUT: a PCM source whose audio timescale is not 1/sample_rate now refuses | Banked; a Limit below. |
 
 ## Limits
 
@@ -291,6 +306,12 @@ Companded/block-packed PCM variants `alaw`, `mulaw`, `bluray`, `dvd`, `lxf`,
 `s24daud`, `sga` and `vidc` are now REFUSED as missing exact sample evidence;
 the earlier packet rule judged them by packet pts. No camera in the envelope
 writes them. Their payload rules remain outside this package's scope.
+
+A PCM source whose audio time base is not 1/sample_rate is now REFUSED
+(Reviewer B F-B4): the rule requires equal time bases, and FFmpeg's MP4
+muxer writes 1/sample_rate. The earlier rule compared seconds and would have
+passed it. Every shape exercised (the iPhone files at 1/48000 and six packed
+widths through the real sink) kept its time base.
 
 The seat observed MOV `lpcm` becoming MP4 `ipcm`; codec-tag equality is not
 required by this PCM rule. Codec name, decoded format, both sample extents and
