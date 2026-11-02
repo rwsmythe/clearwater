@@ -57,17 +57,137 @@ Only read-only git metadata/listing commands accompanied source reads.
   re-executed product behaviour. Main moved during read-only worktree
   listing; the report remains pinned to the commissioned gate snapshot.
 
+## Turn 2
+
+Filled Result 1 from the transferred p5b summary and leg logs: GREEN,
+with head, start/end, free disk, literal count lines, timing scopes and
+skip reasons. Kept all three fullclip comparisons and added WP-DR113's
+serial comparison. The report remains DRAFT with the same two owner fields.
+
+FILES CHANGED:
+- docs/reports/wp5.6-gate-report.md
+- docs/proofs/wp5.6-ledger.md
+
+Depth at turn-2 end: 199,699 input tokens of a 258,400 window (driver footer, turn 2; read at the yield)
+
+### Fact-check dispositions
+
+The following severities are the cell's classifications of the returned
+fact-check items, not a Reviewer B verdict. All three are NEW, in-envelope
+and text-bearing; no reverts, product-code or test changes. Reviewer B
+remains at the orchestrator's seat after this turn.
+
+| Item | Severity | Confirmation | Disposition |
+|---|---|---|---|
+| FC-1 | ADVISORY | New inventory :263 measures V-S orphans 3.0G; :264 supplies wp5.6r whole 17M, work under 1M (inputs only at measurement). | ACCEPTED / FIXED: replaced missing size cells and traces; retained earlier about-2-GB estimate as superseded, not current measurement. |
+| FC-2 | MINOR | Summary :11 serial wall 2,046 s exceeds register :95 threshold about 25 min (1,500 s) by 546 s; WP-DR113 accept :27 gives 2,036 s. | ACCEPTED / FIXED: trigger explicitly FIRES, with comparison; paydown remains CHARC's / the owner's. |
+| FC-3 | MINOR | Register :34 assigns the staged >=182-frame run to WP5.2. Case-insensitive search for DR-25, staged, staging, or a 182-frame-run phrase finds no match in WP5.2 report/accept; accept commit 2da5d0c7 is already recorded. | ACCEPTED / FIXED: assignment is historical; accepted without evidence; disposition and next action CHARC's. No new owner decision or register edit. |
+
+Fact-check totals: 0 critical, 0 major, 2 minor, 1 advisory; 3 NEW,
+0 REOPENED; 3 in-envelope, 0 out; 0 reverts; documentation-only fixes.
+The dispatcher independently confirmed the other listed turn-1 facts
+(open/closed row sets, V7/V15/V16/D111, pack counts/accept, newer fullclip)
+in the turn-2 dispatch. This is not a claim that Reviewer B has run.
+
+### Verification-loop record and limits
+
+The gate summary and final log lines agree on exits and counts. The
+summary separately records enclosing product-leg wall seconds and the
+pytest count-line durations; both scopes are retained, never substituted.
+The harness records test runtime only. Static and separate collection /
+harness enclosing wall times are not supplied; they remain UNTRACED.
+Harness skip count is 1 but its nonverbose log supplies no name/reason;
+that reason remains UNTRACED. Product skip reasons were checked directly
+from the -rs lines, with source paths reduced to names in the report.
+
+Both turn-1 size gaps are RESOLVED by the added inventory block. The
+turn-1 historical handoff list above is preserved as history, not current
+missing data. The report makes no archive-completeness claim. Gate
+results were read, not rerun; all execution and path locks remain honored.
+The FC-3 search first matched an unrelated numeric substring with a broad
+182 expression; a word/phrase-bounded search rejected that false positive
+and confirmed no staged-run/DR-25 mention in either source.
+
+Document validation after these edits checks ASCII/LF/final newline,
+trailing whitespace, Markdown table columns, relative links, acceptance
+ids, unchanged register-row coverage, two owner fields, and owned-file
+scope. No pytest, FFmpeg, GPU/tool instrument, du, uv sync, static runner,
+commit, mailbox post, deletion or write outside the two owned files.
+
+Validation result: PASS for ASCII, LF, final newline, no trailing
+whitespace, consistent table columns, and 0 missing relative file links.
+Acceptance coverage remains 20 unique ids; the 64 OPEN/partial row ids
+are identical to turn 1. Gate-transfer fields, FC-1/2/3 text, the two
+pending owner fields and dispatcher depth placeholder are present; stale
+gate-pending and missing-size cells are absent. Trace table now has 377
+rows (50 added this turn; affected inherited rows updated). git diff
+--check passed; status shows only the two owned files modified. Git emits
+an autocrlf advisory, but direct byte checks confirm both current files
+contain 0 CR and 0 non-ASCII bytes. No new text issue was found by this
+document-check pass; this is not an independent Reviewer B verdict.
+
 ## Trace table
 
 One row per acceptance disposition, register row, inventory figure or
 other report claim; expanded numeric witnesses are separately listed.
-Line anchors refer to the turn-1 source snapshot. A shorthand :N after
+Inherited line anchors refer to the turn-1 source snapshot; turn-2 source
+additions and the gate transfer are identified below. A shorthand :N after
 a file means another line in that same file. Source ranges identify a
 bounded table/section; no source logs were rerun.
 
 | Report section | Claim (short) | Source file:line or commit | Checked how |
 |---|---|---|---|
 | Status | DRAFT; V2/CP5 and N6 owner fields; CHARC finalises | docs/briefs/wp5.6-brief.md:3; :18 | read |
+| Status / turn 2 | p5b GREEN; FC-1..FC-3 dispositioned, Reviewer B still to run | work/wp5.6/gate/summary.txt:2 through :13; turn-2 dispatch | read; dispatch |
+| 1 / p5b | Head 1934bcbb | work/wp5.6/gate/summary.txt:1 | read |
+| 1 / p5b | Start 20:57:01Z, 2026-11-02 | work/wp5.6/gate/summary.txt:1; report status date / turn-2 dispatch | read |
+| 1 / p5b | C: free at start 57G | work/wp5.6/gate/summary.txt:1; turn-2 dispatch (volume) | read |
+| 1 / p5b | End 22:06:38Z | work/wp5.6/gate/summary.txt:14 | read |
+| 1 / p5b | C: free at end 52G | work/wp5.6/gate/summary.txt:14; turn-2 dispatch (volume) | read |
+| 1 / static | ruff exit 0; All checks passed! | work/wp5.6/gate/summary.txt:2; work/wp5.6/gate/ruff.txt:1 | read |
+| 1 / static | format exit 0; 311 files already formatted | work/wp5.6/gate/summary.txt:3; work/wp5.6/gate/format.txt:1 | read |
+| 1 / static | mypy exit 0; Success: no issues found in 156 source files | work/wp5.6/gate/summary.txt:4; work/wp5.6/gate/mypy.txt:1 | read |
+| 1 / static | Static wall times UNTRACED, absent from supplied authority | work/wp5.6/gate/summary.txt:2 through :4 | read; no duration supplied |
+| 1 / collection | all exit 0; literal count line: 7877 tests collected in 3.14s; ids/unique 7877 | work/wp5.6/gate/summary.txt:5 | read |
+| 1 / collection | all reported collection time 3.14s; not enclosing wall | work/wp5.6/gate/summary.txt:5 | read |
+| 1 / collection | parallel exit 0; literal count line: 6598/7877 tests collected (1279 deselected) in 3.12s; ids/unique 6598 | work/wp5.6/gate/summary.txt:6 | read |
+| 1 / collection | parallel reported collection time 3.12s; not enclosing wall | work/wp5.6/gate/summary.txt:6 | read |
+| 1 / collection | serial exit 0; literal count line: 1272/7877 tests collected (6605 deselected) in 3.10s; ids/unique 1272 | work/wp5.6/gate/summary.txt:7 | read |
+| 1 / collection | serial reported collection time 3.10s; not enclosing wall | work/wp5.6/gate/summary.txt:7 | read |
+| 1 / collection | fullclip exit 0; literal count line: 7/7877 tests collected (7870 deselected) in 3.20s; ids/unique 7 | work/wp5.6/gate/summary.txt:8 | read |
+| 1 / collection | fullclip reported collection time 3.20s; not enclosing wall | work/wp5.6/gate/summary.txt:8 | read |
+| 1 / collection | Union 7877; duplicates 0; difference versus all 0; 6598+1272+7=7877 | work/wp5.6/gate/summary.txt:5 through :9 | read; arithmetic |
+| 1 / collection | Separate enclosing wall UNTRACED | work/wp5.6/gate/summary.txt:5 through :9 | read; only collection-reported times supplied |
+| 1 / parallel | exit 0; 6597 passed, 1 skipped, 5 warnings in 512.86s (0:08:32) | work/wp5.6/gate/summary.txt:10; work/wp5.6/gate/parallel.log:112 | read |
+| 1 / parallel | enclosing wall 515s; pytest duration separately retained | work/wp5.6/gate/summary.txt:10 | read |
+| 1 / serial | exit 0; 1261 passed, 11 skipped, 6605 deselected, 1 warning in 2041.95s (0:34:01) | work/wp5.6/gate/summary.txt:11; work/wp5.6/gate/serial.log:1914 | read |
+| 1 / serial | enclosing wall 2046s; pytest duration separately retained | work/wp5.6/gate/summary.txt:11 | read |
+| 1 / fullclip | exit 0; 7 passed, 7870 deselected, 1 warning in 1568.04s (0:26:08) | work/wp5.6/gate/summary.txt:12; work/wp5.6/gate/fullclip.log:174 | read |
+| 1 / fullclip | enclosing wall 1569s; pytest duration separately retained | work/wp5.6/gate/summary.txt:12 | read |
+| 1 / harness | exit 0; Ran 382 tests in 21.664s OK (skipped=1) | work/wp5.6/gate/summary.txt:13; work/wp5.6/gate/harness.txt:14; :16 | read |
+| 1 / harness | 21.664s supplied test runtime; enclosing wall UNTRACED | work/wp5.6/gate/summary.txt:13; work/wp5.6/gate/harness.txt:14 | read; no enclosing duration supplied |
+| 1 / skips | Parallel 1 swscale yuvj full-range refusal, test_color_roundtrip.py:123 | work/wp5.6/gate/parallel.log:111 | read |
+| 1 / skips | Serial 1 generic absent look-check frame at test_app_v8_v18.py:134 | work/wp5.6/gate/serial.log:1910 | read |
+| 1 / skips | Serial 5 absent GX011625_0024.925.png method cases | work/wp5.6/gate/serial.log:1911 | read |
+| 1 / skips | Serial 4 absent GX011625_0114.648.png method cases | work/wp5.6/gate/serial.log:1912 | read |
+| 1 / skips | Serial 1 absent GX011625_0024.925.png WP4.1 case; absent-frame total 11 | work/wp5.6/gate/serial.log:1913; :1910 through :1912 | read; 1+5+4+1=11 |
+| 1 / skips | Product skips standing; look-check frames archived to D: | docs/proofs/wp-dr113-accept.md:26; :27; docs/proofs/prune-2026-10-29.md:32 | read |
+| 1 / skips | Fullclip 0 skipped; all 7 pass | work/wp5.6/gate/summary.txt:12; work/wp5.6/gate/fullclip.log:174 | read |
+| 1 / skips | Harness 1 skip, name/reason UNTRACED in nonverbose log | work/wp5.6/gate/harness.txt:12 through :16; work/wp5.6/gate/summary.txt:13 | read; no skip-detail line |
+| 1 / comparison | p5b 1569s near WP-T6 about 26min / reported W4 1556.05s | work/wp5.6/gate/summary.txt:12; docs/reports/wp-t6-gate-sizing.md:335 | read; scopes stated |
+| 1 / comparison | p5b fullclip 1066s shorter than D112 2635s | work/wp5.6/gate/summary.txt:12; docs/proofs/wp-d112-accept.md:28 | read; 2635-1569=1066 |
+| 1 / comparison | p5b fullclip 26s shorter than DR113 1595s | work/wp5.6/gate/summary.txt:12; docs/proofs/wp-dr113-accept.md:28 | read; 1595-1569=26 |
+| 1 / comparison | WP-DR113 serial 2036s, alongside WP-T6 1389.24s | docs/proofs/wp-dr113-accept.md:27; docs/reports/wp-t6-gate-sizing.md:475 | read |
+| 1 / FC-2 | DR-86 trigger fires: phase-end 2046s > about25min=1500s, 546s excess | docs/debt-register.md:95; work/wp5.6/gate/summary.txt:11 | read; arithmetic |
+| 1 / FC-2 | Suite-cost paydown remains CHARC/owner, no commissioning/row by report | docs/debt-register.md:3; :95; docs/briefs/wp5.6-brief.md:16; :17 | read |
+| 6 / FC-1 | Added inventory measurement time 2026-11-02T21:22Z | work/wp5.6/prune-inventory.txt:262 | read |
+| 6 / FC-1 | V-S orphans 3.0G measurement supersedes earlier about2GB estimate | work/wp5.6/prune-inventory.txt:263; docs/briefs/wp5.6-brief.md:34 | read |
+| 6 / FC-1 | wp5.6r whole 17M | work/wp5.6/prune-inventory.txt:264 | read |
+| 6 / FC-1 | wp5.6r work under1M, wp5.6 inputs only at measurement | work/wp5.6/prune-inventory.txt:264 | read |
+| 6 / keep | Gate completed; gate evidence KEEP until acceptance | work/wp5.6/gate/summary.txt:14; work/wp5.6/prune-inventory.txt:256 | read |
+| 4 / FC-3 | DR-25(3) register assigns staged >=182-frame run to WP5.2, still open | docs/debt-register.md:34 | read |
+| 4 / FC-3 | WP5.2 accepted at 2da5d0c7 without staged-run evidence in either report/accept | docs/reports/wp5.2-performance-memory.md; docs/proofs/wp5.2-accept.md; commit 2da5d0c7 | read; bounded rg -n -i query returns no match; turn-2 fact-check confirms |
+| Next / FC-3 | CHARC action to reconcile assignment, not new owner decision | docs/debt-register.md:1; :4; :34; turn-2 dispatch FC-3 | read; dispatch |
 | Status | Report date 2026-11-02; no release acceptance | docs/briefs/wp5.6-brief.md:3; :18 | read |
 | Status | Spec v0.5.7 and section-11 / N1-N13 scope | docs/briefs/wp5.6-brief.md:13; CLAUDE.md:8 | read |
 | Status | AMD Ryzen 9 7940HS | docs/reports/wp1.6-gate-report.md:10 | read |
@@ -82,7 +202,7 @@ bounded table/section; no source logs were rerun.
 | Results table | WP-DR113 report wp-dr113-v4-pcm.md; accept 6ff6f5d3 | docs/proofs/wp-dr113-accept.md:3; report pointer; commit 6ff6f5d3 | read; git log --oneline -- record |
 | Results table | WP-D54 report wp-d54-warning-words.md; accept 4ece5183 | docs/proofs/wp-d54-accept.md:3; report pointer; commit 4ece5183 | read; git log --oneline -- record |
 | Status | Reviewer A substitution, orchestrator fact-check, Claude Reviewer B | docs/briefs/wp5.6-brief.md:9 | read |
-| 1 | p5b gate running; figures deferred to turn 2 | docs/briefs/wp5.6-brief.md:24; turn-1 dispatch | read; dispatch (not a gate result) |
+| 1 | p5b GREEN after transfer; all gate exits 0, no failing node | work/wp5.6/gate/summary.txt:2 through :13 | read; count lines agree with transferred logs |
 | 1 | Gate 1934bcbb product-identical to ac033be7; only CHARC state differs | docs/briefs/wp5.6-brief.md:11; commits 1934bcbb / ac033be7 | git diff --name-only 1934bcbb ac033be7 |
 | 1 | Phase-end fullclip and disjoint collection identity rule | CLAUDE.md, Conventions, Tests bullet | read |
 | 1 | WP-T6 parallel 714 s rounded / 714.41 s | docs/reports/wp-t6-gate-sizing.md:474 | read |
@@ -158,7 +278,7 @@ bounded table/section; no source logs were rerun.
 | 4 / DR-16 | Spike containment check/use junction race, outside threat model. Product 8.4 safe writing must prove its form. | docs/debt-register.md:25 | read |
 | 4 / DR-20 | Instrument-only items (2),(3),(5),(8),(9): PTS deduplication, percent paths, cover art, record provenance and test gaps. Any reuse beyond WP1.4 re-reads row; product ownership/paydowns remain as recorded. | docs/debt-register.md:29 | read |
 | 4 / DR-22 | Temp guard limits. Early plugin if pre-conftest writes revisited; next guard/helper touch fixes (4)-(9), retests fixture containment. Trigger is guard itself, not additive conftest changes. | docs/debt-register.md:31 | read |
-| 4 / DR-25 | Only (3) open: provisional staged smoothing/default evidence. Staged run on >=182-frame excerpt belongs to WP5.2; AD-3 remains PROVISIONAL in the register. | docs/debt-register.md:34 | read |
+| 4 / DR-25 | Only (3) open; >=182-frame staged run assigned to WP5.2 by register, accepted without it; CHARC disposition; AD-3 PROVISIONAL | docs/debt-register.md:34; docs/proofs/wp5.2-accept.md at 2da5d0c7; docs/reports/wp5.2-performance-memory.md | read; bounded text search in both WP5.2 records returned no match |
 | 4 / DR-27 | Unreadable footage lookup can skip; stale chapter docstring. Next local-config/affected-test touch distinguishes unreadable from absent and corrects text. | docs/debt-register.md:36 | read |
 | 4 / DR-29 | Look-check CLI/cache validation limits. Next lookcheck touch or WP5.3 reuse rejects shallow --part and hashes changing sources. | docs/debt-register.md:38 | read |
 | 4 / DR-30 | Noise edge-test and GPMF strict parsing gaps. Reuser adds Immerkaer edge test / strict nesting, padding and SCAL rules or reference parser. | docs/debt-register.md:39 | read |
@@ -187,7 +307,7 @@ bounded table/section; no source logs were rerun.
 | 4 / DR-69 | Device-wide job estimate bench-only, frozen IF-8 gap. If GUI shows total, CHARC interface decision; otherwise remains bench-only. | docs/debt-register.md:78 | read |
 | 4 / DR-70 | Export analysis-bound; optimise analysis, not stream step. Owner wish below N6 / WP5.2 remeasure; shipped-build reread leaves lever unchanged. | docs/debt-register.md:79 | read |
 | 4 / DR-83 | Cache write through planted link. Next cache touch checks is_link before every write, with junction test. | docs/debt-register.md:92 | read |
-| 4 / DR-86 | Further serial-cost candidates, not additive predictions. Owner suite-cost commission or phase-end serial wall >about 25 min triggers. | docs/debt-register.md:95 | read |
+| 4 / DR-86 | Further serial-cost candidates; phase-end >about 25min trigger FIRES: p5b 2,046s >1,500s; paydown CHARC/owner | docs/debt-register.md:95; work/wp5.6/gate/summary.txt:11 | read; 25*60=1500; 2046-1500=546 |
 | 4 / DR-88 | Trim fixture self-check trusts plan. Next fixture touch adds independent cut derivation beside plan time. | docs/debt-register.md:97 | read |
 | 4 / DR-89 | Missing removable-drive journal entry discarded. Next startup-journal touch or stale-partial report; keep entry until seen again is a design candidate. | docs/debt-register.md:98 | read |
 | 4 / DR-90 | Clear cache can fail another clip's export. Next Clear/export-cache coupling touch exposes export activity and refuses Clear during it. | docs/debt-register.md:99 | read |
@@ -360,7 +480,7 @@ bounded table/section; no source logs were rerun.
 | 6 / worktrees | orch-state-g35 17M; no work size supplied | work/wp5.6/prune-inventory.txt:208 | read |
 | 6 / worktrees | orch-state-g36 17M; no work size supplied | work/wp5.6/prune-inventory.txt:209 | read |
 | 6 / worktrees | tmp-wp36p-red 4.0K folder, not registered | work/wp5.6/prune-inventory.txt:210; :259 | read |
-| 6 / worktrees | wp5.6r whole/work sizes UNTRACED; KEEP | work/wp5.6/prune-inventory.txt:187 through :216; :257 | read; absent from size table |
+| 6 / worktrees | wp5.6r whole 17M, work under 1M (inputs only at measurement); KEEP | work/wp5.6/prune-inventory.txt:264; :257 | read; FC-1 resolves turn-1 gap |
 | 6 / worktrees | wp5.3 KEEP CP5 tally; gate/report worktrees KEEP until accept | work/wp5.6/prune-inventory.txt:256; :257; :258 | read |
 | 6 / worktrees | Inventory registered worktree membership checked live | work/wp5.6/prune-inventory.txt:223 through :253 | read; git worktree list (main moved to bc4dd024, report/gate bases unchanged) |
 | 6 / worktrees | WP-D112 released after merge | docs/proofs/wp-d112-accept.md:42 | read |
@@ -370,7 +490,7 @@ bounded table/section; no source logs were rerun.
 | 6 / worktrees | Brief/state trees candidate only, owning seat confirms release | docs/briefs/wp5.6-brief.md:34; docs/proofs/prune-2026-11-01.md:69 | read; candidate recommendation, not release assertion |
 | 6 / residuals | pytest temp 16G at seat | work/wp5.6/prune-inventory.txt:219 | read |
 | 6 / residuals | CHARC pytest temp 15.4GB, no equivalence/conversion asserted | work/wp5.6/prune-inventory.txt:260 | read |
-| 6 / residuals | V-S orphan subtree size UNTRACED; enclosing orch-g33 3.1G | work/wp5.6/prune-inventory.txt:183; docs/briefs/wp5.6-brief.md:34 | read; no subtree size in inventory |
+| 6 / residuals | V-S orphans measured 3.0G, supersedes about-2-GB estimate; enclosing orch-g33 3.1G | work/wp5.6/prune-inventory.txt:263; :183; docs/briefs/wp5.6-brief.md:34 | read; FC-1 resolves turn-1 gap |
 | 6 / residuals | V-S orphan files moved to orch-g33/vs-orphans, await owner's prune word | docs/proofs/wp5.3-accept.md:24 | read |
 | 6 / residuals | Whole-clip input copy 158,459,032 B (~158MB) and exact work location | work/wp5.6/prune-inventory.txt:221; docs/proofs/wp5.2-accept.md:27 | read |
 | 6 / archives | 2026-10-29 WP3.21 oracle moved to D:/clearwater-archive/work | docs/proofs/prune-2026-10-29.md:30; :18 | read |

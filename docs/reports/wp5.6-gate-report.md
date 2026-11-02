@@ -2,8 +2,8 @@
 
 **Status: DRAFT, 2026-11-02.** Owner fields: **V2 / CP5: PENDING**;
 **N6: PROPOSED, PENDING the owner's ruling**. CHARC fills these fields and
-marks the report FINAL after the owner's decisions. This turn leaves the
-gate evidence awaiting transfer as specified below; it makes no release claim.
+marks the report FINAL after the owner's decisions. Gate p5b is GREEN as
+recorded below; this report makes no release claim.
 Authority: [WP5.6 brief](../briefs/wp5.6-brief.md), status and Done.
 
 Spec **v0.5.7**, section 11 (V1-V18), N1-N13; plan section 7 completion
@@ -26,29 +26,55 @@ section 6.
 
 Accept commits above were checked with `git log --oneline -- <record>`.
 The ledger maps every result to its source; the orchestrator independently
-fact-checks it and runs Reviewer B (Claude). The brief replaces Reviewer A
+fact-checks it and runs Reviewer B (Claude). The turn-2 fact-check returned
+FC-1..FC-3, dispositioned in the ledger; Reviewer B is still to run.
+The brief replaces Reviewer A
 with the trace table and that fact-check for this deterministic documentation arc.
 
 ## Result 1 - Phase-end gate
 
-**PENDING (gate p5b running)**
+**Verdict: GREEN - static, collection identity, parallel, serial, fullclip and harness checks exited 0; no failing node.**
 
 Run `p5b` is at the orchestrator's seat on main snapshot `1934bcbb` in the
 separate gate worktree. It is product-identical to brief base `ac033be7`;
 the intervening difference is the CHARC state document only
 (`git diff --name-only 1934bcbb ac033be7`). This report does not track a
 moving main HEAD. The phase-end fullclip leg is required by CLAUDE.md,
-Conventions. Turn 2 reads `work/wp5.6/gate/summary.txt` and the transferred
-leg logs, then fills exit status, literal count lines and wall seconds.
+Conventions. Authority for exit, counts and supplied timings is
+`work/wp5.6/gate/summary.txt` (lines 1-14); skip reasons come from the
+transferred leg logs. On 2026-11-02 the gate started **20:57:01Z** with
+**57G C: free** and ended **22:06:38Z** with **52G C: free** (summary
+lines 1 and 14). This reporting cell read those files and ran no gate leg.
 
-| Leg | Exit | Count line | Wall s | Comparison figure and source |
+| Leg | Exit | Count line | Wall s / supplied timing scope | Comparison figure and source |
 |---|---|---|---|---|
-| Static: ruff check / format / mypy | -- | -- | -- | No comparison figure requested |
-| Collection identity | -- | -- | -- | Parallel + serial + fullclip = all; CLAUDE.md, Conventions |
-| Parallel | -- | -- | -- | WP-T6 714 s (714.41 s), report Gate |
-| Serial | -- | -- | -- | WP-T6 1,389 s (1,389.24 s), report Gate |
-| Fullclip | -- | -- | -- | WP-T6 about 26 min (1,556.05 s, W4); WP-D112 2,635 s, accept Gate; WP-DR113 1,595 s, accept Gate |
-| Harness | -- | -- | -- | No comparison figure requested |
+| Static: ruff check / format / mypy | 0 / 0 / 0 | `All checks passed!`; `311 files already formatted`; `Success: no issues found in 156 source files` | UNTRACED: wall times not supplied | No comparison figure requested |
+| Collection identity | 0 for all four collections | `7877 tests collected in 3.14s`; `6598/7877 tests collected (1279 deselected) in 3.12s`; `1272/7877 tests collected (6605 deselected) in 3.10s`; `7/7877 tests collected (7870 deselected) in 3.20s`; `identity: union 7877 dup 0 diff-vs-all 0` | Reported collection times: all 3.14, parallel 3.12, serial 3.10, fullclip 3.20; enclosing wall not supplied | Parallel + serial + fullclip = all; CLAUDE.md, Conventions |
+| Parallel | 0 | `6597 passed, 1 skipped, 5 warnings in 512.86s (0:08:32)` | 515 (summary wall) | WP-T6 714 s (714.41 s), report Gate |
+| Serial | 0 | `1261 passed, 11 skipped, 6605 deselected, 1 warning in 2041.95s (0:34:01)` | 2,046 (summary wall) | WP-T6 1,389 s (1,389.24 s), report Gate; WP-DR113 2,036 s, accept Gate |
+| Fullclip | 0 | `7 passed, 7870 deselected, 1 warning in 1568.04s (0:26:08)` | 1,569 (summary wall) | WP-T6 about 26 min (1,556.05 s, W4); WP-D112 2,635 s, accept Gate; WP-DR113 1,595 s, accept Gate |
+| Harness | 0 | `Ran 382 tests in 21.664s OK (skipped=1)` | 21.664 (test runtime; enclosing wall not supplied) | No comparison figure requested |
+
+Timing scopes are preserved: the summary's parallel/serial/fullclip wall
+seconds are distinct from pytest's elapsed figures inside the literal
+count lines. Static wall times and separate enclosing walls for collection
+and harness are **UNTRACED** in the supplied summary; no estimate replaces
+them. The ruff success wording is from `ruff.txt:1`; the summary records
+its exit only. Format/mypy counts are summary lines 3-4.
+
+Skips by recorded reason (product logs, `-rs`):
+
+| Leg | Count by reason | Log source |
+|---|---|---|
+| Parallel | 1: `swscale reads a yuvj format as full whatever in_range says (refused instead)` at `tests/test_color_roundtrip.py:123` | `parallel.log:111` |
+| Serial | 11 absent look-check frames: 1 `the look-check frame is absent` at `test_app_v8_v18.py:134`; 5 + 1 `look-check frame absent` for `GX011625_0024.925.png` at `test_methods_assembly_v8.py:44` / `test_wp41_v8.py:193`; 4 for `GX011625_0114.648.png` at `test_methods_assembly_v8.py:44` | `serial.log:1910-1913` |
+| Fullclip | 0 skips; all 7 passed | `fullclip.log:174`; summary line 12 |
+| Harness | 1 skip, name/reason not reported by the supplied nonverbose log (UNTRACED); no reason inferred | `harness.txt:12-16`; summary line 13 |
+
+The product skips are the standing swscale refusal and archived look-check
+frames, not new failures. The archive provenance is WP-DR113 accept, Gate,
+and the 2026-10-29 prune record's MOVED section; log paths are reduced to
+file names here.
 
 Comparison sources: [WP-T6](wp-t6-gate-sizing.md), W4 and Gate;
 [WP-D112 accept](../proofs/wp-d112-accept.md), Gate and Dispositions;
@@ -56,7 +82,16 @@ Comparison sources: [WP-T6](wp-t6-gate-sizing.md), W4 and Gate;
 The brief calls WP-D112 the last fullclip figure; WP-DR113 records a later
 1,595 s run. Both are carried so the p5b fullclip result can be compared
 against WP-T6 and WP-D112 as commissioned, with the newer record visible.
-No gate verdict is made before the transfer.
+p5b fullclip wall **1,569 s** is near WP-T6's **about 26 min** (its W4
+reported **1,556.05 s**), **1,066 s shorter** than WP-D112's **2,635 s**,
+and **26 s shorter** than WP-DR113's **1,595 s**. These are historical
+gate timings with differing host conditions, not a controlled speedup claim.
+
+**DR-86 trigger fires:** this phase-end serial wall is **2,046 s** against
+about **25 min = 1,500 s**, exceeding the threshold by **546 s** (summary
+line 11; register DR-86). For context, WP-T6 recorded **1,389.24 s** and
+WP-DR113 **2,036 s**. Paydown disposition remains CHARC's / the owner's;
+this report neither commissions a suite-cost pass nor adds a register row.
 
 ## Result 2 - Acceptance matrix carried forward
 
@@ -141,7 +176,7 @@ CHARC owns register changes; the owner commissions phase-boundary paydown.
 | DR-16 | Spike containment check/use junction race, outside threat model. Product 8.4 safe writing must prove its form. |
 | DR-20 | Instrument-only items (2),(3),(5),(8),(9): PTS deduplication, percent paths, cover art, record provenance and test gaps. Any reuse beyond WP1.4 re-reads row; product ownership/paydowns remain as recorded. |
 | DR-22 | Temp guard limits. Early plugin if pre-conftest writes revisited; next guard/helper touch fixes (4)-(9), retests fixture containment. Trigger is guard itself, not additive conftest changes. |
-| DR-25 | Only (3) open: provisional staged smoothing/default evidence. Staged run on >=182-frame excerpt belongs to WP5.2; AD-3 remains PROVISIONAL in the register. |
+| DR-25 | Only (3) open: provisional staged smoothing/default evidence. The >=182-frame staged run is assigned to WP5.2 by the register; WP5.2 accepted at `2da5d0c7` without it (neither report nor accept record mentions DR-25 or a staged run). AD-3 remains PROVISIONAL; disposition CHARC's. |
 | DR-27 | Unreadable footage lookup can skip; stale chapter docstring. Next local-config/affected-test touch distinguishes unreadable from absent and corrects text. |
 | DR-29 | Look-check CLI/cache validation limits. Next lookcheck touch or WP5.3 reuse rejects shallow --part and hashes changing sources. |
 | DR-30 | Noise edge-test and GPMF strict parsing gaps. Reuser adds Immerkaer edge test / strict nesting, padding and SCAL rules or reference parser. |
@@ -170,7 +205,7 @@ CHARC owns register changes; the owner commissions phase-boundary paydown.
 | DR-69 | Device-wide job estimate bench-only, frozen IF-8 gap. If GUI shows total, CHARC interface decision; otherwise remains bench-only. |
 | DR-70 | Export analysis-bound; optimise analysis, not stream step. Owner wish below N6 / WP5.2 remeasure; shipped-build reread leaves lever unchanged. |
 | DR-83 | Cache write through planted link. Next cache touch checks is_link before every write, with junction test. |
-| DR-86 | Further serial-cost candidates, not additive predictions. Owner suite-cost commission or phase-end serial wall >about 25 min triggers. |
+| DR-86 | Further serial-cost candidates, not additive predictions. Owner suite-cost commission or phase-end serial wall >about 25 min triggers. Trigger FIRES at p5b: 2,046 s >1,500 s; paydown CHARC's / the owner's. |
 | DR-88 | Trim fixture self-check trusts plan. Next fixture touch adds independent cut derivation beside plan time. |
 | DR-89 | Missing removable-drive journal entry discarded. Next startup-journal touch or stale-partial report; keep entry until seen again is a design candidate. |
 | DR-90 | Clear cache can fail another clip's export. Next Clear/export-cache coupling touch exposes export activity and refuses Clear during it. |
@@ -286,7 +321,8 @@ Alternatives in the request: **15 min/min**, retain interim **25**, or a
 
 No prune is performed by this package. All current sizes below come
 **only** from `work/wp5.6/prune-inventory.txt`, the orchestrator's seat
-snapshot (main work sizes 2026-11-02T20:54Z, worktree list 21:12Z).
+snapshot (main work sizes 2026-11-02T20:54Z, worktree list 21:12Z;
+orphan/report-worktree measurements added 21:22Z).
 Units/rounding are preserved as recorded; parent and child entries overlap,
 so these are not additive reclaimable-space totals. Archive state is not
 proved by a nonzero work-folder size; retained evidence must be checked
@@ -338,8 +374,8 @@ CHARC's accept-side commit, so confirm release before removal.
 | `wp5.1` | 5.8G / 2.8G | Conditional candidate: confirm accept-side release, then archive verification |
 | `wp5.2` | 5.0G / 2.0G | Released; work retained, archive verification required |
 | `wp5.3` | 5.3G / 2.3G | KEEP: CP5 tally when owner's sheet returns |
-| `wp5.6` | 4.5G / 1.5G | KEEP: live p5b gate until WP5.6 accepts |
-| `wp5.6r` | UNTRACED / UNTRACED | KEEP: this report's worktree until WP5.6 accepts; no size supplied |
+| `wp5.6` | 4.5G / 1.5G | KEEP: p5b gate evidence until WP5.6 accepts |
+| `wp5.6r` | 17M / under 1M (only `work/wp5.6/` inputs at measurement) | KEEP: this report's worktree until WP5.6 accepts; inventory added block, line 264 |
 | `brief-dr113`, `brief-dr87`, `brief-phase5` | 17M, 14M, 15M / no work size reported | Candidate state/brief trees; owner confirms release |
 | `brief-wp3.6p`, `brief-wp4.4`, `brief-wp5.2` | 14M, 13M, 17M / no work size reported | Same |
 | `orch-state-g21` through `g28` | 13M, 13M, 14M, 14M, 14M, 14M, 15M, 15M / no work size reported | Candidate older state trees, owning seat confirms |
@@ -351,7 +387,7 @@ CHARC's accept-side commit, so confirm release before removal.
 | Item | Recorded size / disposition | Source |
 |---|---|---|
 | `%LOCALAPPDATA%\Temp\pytest-of-rwsmy` | 16G at the seat; inventory also records CHARC's 15.4 GB. Preserve both reported units, no conversion asserted. Candidate on owner's word. | Inventory, pytest temp and orchestrator notes |
-| `work/orch-g33/vs-orphans/` | UNTRACED subtree size: inventory has only enclosing `work/orch-g33` 3.1G. Brief's about-2-GB figure is not an inventory measurement. Candidate on owner's word. | Inventory main work; WP5.3 accept, real build |
+| `work/orch-g33/vs-orphans/` | 3.0G measured at the seat, superseding CHARC's earlier about-2-GB estimate carried in the brief; enclosing `work/orch-g33` is 3.1G. Candidate on owner's word. | Inventory added block, line 263; main work line 183; WP5.3 accept, real build |
 | `work/wp5.2/W52-2/attempt-20261102T150359Z-1621/W52-2-GX011627-whole.mp4` | 158,459,032 B (about 158 MB), input stream copy still retained. Candidate on owner's word. | Inventory whole-clip copy; WP5.2 accept Windows |
 
 [2026-10-29 prune](../proofs/prune-2026-10-29.md), MOVED section, already
@@ -382,6 +418,9 @@ This report supplies candidates, not deletion authority.
   CHARC updates the ruled figure and spec.
 - **DR-115 scope:** CHARC brings the encoder-watchdog and CPU-route
   encoder-choice question at the Phase 5 close.
+- **DR-25(3), CHARC action:** reconcile the register's WP5.2 assignment
+  for the >=182-frame staged smoothing run with accepted WP5.2's absent
+  evidence. Disposition is CHARC's; no owner decision is asserted here.
 - **WP5.5:** release preparation is commissioned after the close;
   dependency-license compatibility/notices, installation/usage and version
   tagging belong there (plan Phase 5 / N13).
