@@ -103,7 +103,12 @@ current). State hygiene is a custodian-of-FORM concern, hence its place here.
 context has REACHED the cap the project's prompting standard sets (~400K tokens by default) --
 never before it (operator-directed 2026-09-25: a roll is not considered until the cap is hit,
 then it happens at the next available opportunity; a seat does not roll early because its next
-unit would cross the cap) -- and
+unit would cross the cap). **The ONE exception, operator-ruled 2026-11-02 (it resolves the
+2026-10-20 director ruling against the 2026-09-25 direction):** a seat about to start a unit it
+cannot see finish before the cap -- a dispatch of cells whose expected life exceeds the seat's
+remaining depth, or a long job spawned from its pane -- rolls BEFORE that unit, at that boundary,
+with the arithmetic stated in its rollover post. Pre-dispatch only, never mid-round, never
+mid-job. The same text binds `docs/model-prompting-standard.md`. -- and
 it rolls at a BOUNDARY -- after an accept, before a dispatch -- because the per-turn cost of a
 session scales with its depth while the handoff a compact state pointer enables costs a fixed
 few tens of thousands of tokens. The prompt hook reports the depth every turn; rolling is the
