@@ -61,7 +61,11 @@
   (4)-(7)). Record `docs/proofs/harness-upstream-2026-11-02.md`. OWNER RULED 2026-11-02 ("1. concur ... 2. concur"): the early-roll text is ONE text in both files, template
   `ef7e671` and main `8ef219e0` (the 09-25 direction is the rule; rolling before a unit the seat cannot see finish is its
   one exception); the branch (8 commits, suite 382 OK) is READY FOR THE OWNER'S PUSH; the second pass (cell_depth from
-  swing) stays recommended, not commissioned. CP5 walkthrough given to the owner in chat.
+  swing) stays recommended, not commissioned. CP5 walkthrough given to the owner in chat, STEP BY STEP (owner 2026-11-02 ~10:38Z): step 1 = open and check
+  rendering: OWNER FINDING, the source/corrected pairs stack VERTICALLY in the owner's browser (CSS inline-block 45 %); video
+  stills and pair links open; page usable. Layout rebuild REQUESTED of gen 34 (`18837537` + correction `dda6f7e3`: explicit
+  flex row per pair, page + page --check from the kept wp5.3 worktree, no sheet conflict expected); the owner may judge
+  vertically meanwhile or wait. Step 2 = the first judgement pass over the 64 P-A photos (not started).
   **HARNESS TEMPLATE PORT DONE (owner in chat 2026-11-02, "I am ready to update the comms harness template ... including
   the codex development addition"; chose: CHARC ports on a branch):** `C:/Users/rwsmy/harness-template` branch
   `clearwater-upstream-2026-11-02`, 5 commits on origin/master `6488556` (layer 1 `fc9f4b5` the coa-chess comms core as
