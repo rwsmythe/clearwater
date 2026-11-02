@@ -394,7 +394,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 6 / turn 16 / clips V-D read-back | same session 6 | 137,514 | Dispatcher supplied at turn 17; committed bcc498c1. Eight V-D outputs/aid sets, six excerpts and unchanged earlier groups verified; full module checks; only ledger changed. |
 | Session 6 / turn 17 / clips V-Z read-back | same session 6 | 154,213 | Dispatcher supplied at turn 18; committed 6bf8ce99. Two V-Z outputs/aid sets, one excerpt and unchanged earlier rows verified against saved turn-16 snapshot; full module checks; only ledger changed. |
 | Session 6 / turn 18 / clips V-R read-back | same session 6 | 170,040 | Dispatcher supplied at turn 19; committed 792ee22c. Two exact expected product HLG refusals, no outputs, zero pending, unchanged earlier rows; full module checks; only ledger changed. |
-| Session 6 / turn 19 / publication read-back | same session 6 | dispatcher pending | All 128 published identities/statuses, 117 sheet rows, 603 targets and zero-judged coverage verified; exit/rerun rules cited. YIELD; report assigned to fresh session near evaluation point. |
+| Session 6 / turn 19 / publication read-back | same session 6 | 200,702 | Dispatcher supplied at turn 20; session 6 retired. All 128 published identities/statuses, 117 sheet rows, 603 targets and zero-judged coverage verified; exit/rerun rules cited. |
+| Session 7 / turn 20 / the report | fresh session 7; dispatcher to fill ID | dispatcher pending | Report traces completed receipts/read-backs, retains OPEN DR-112 / CP5 blocker and Limits; full module/static checks; only report and ledger changed. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -3086,3 +3087,129 @@ media judgement, mailbox post, commit or git mutation. **YIELD at this turn
 boundary; report assigned to a fresh session.** WP-D112 merge and V-P recovery,
 publication rerun/read-back, report and final gate remain outstanding. Pending
 0 is not owner readiness while failed=9; no CP5 acceptance is asserted.
+
+## Session 7 / Turn 20: the report
+
+### Session boundary, assignment and scope
+
+Fresh **session 7** starts on **e23dfd3c**. Session 6 retired at the
+dispatcher-supplied **200,702 depth_input_tokens**; the turn-19 depth row above
+is filled accordingly. **Session-7 ID and turn-20 depth_input_tokens:
+dispatcher to fill; no estimate.** This is the dispatched report-only turn:
+**docs/reports/wp5.3-review-pack.md** is new and this ledger is updated.
+No code or test changes, no real-pack build stage, no source/media inspection.
+
+The real pack and generation-32/33 receipts were accessed read-only at the
+explicitly granted main-tree locations. Only completed text/JSON/CSV/HTML
+records and named directory listings were read. No footage folder, other
+worktree, owner media or local configuration was opened or changed. All
+scratch verification output stays in this worktree's ignored
+**work/wp5.3/turn20/**; pytest uses **work/wp5.3/tmp/t20/**. No main-working-folder
+write, source mutation, git mutation/commit or mailbox post was performed.
+
+**Existing PRODUCT STOP / recommended disposition:** keep DR-112 OPEN and
+CP5 blocked until WP-D112 merges and `clips V-P`, `page`, `page --check` and
+the tally are rerun/read back with pending=0 **and** failed=0. No instrument
+workaround or new STOP is introduced. Current facts are **117 done / 9 failed
+V-P / 2 expected HLG refusals / 0 pending**, not owner readiness. The report
+retains every exact product message and distinguishes HLG refusals from the
+nine audio failures.
+
+### Report trace table
+
+Report labels R32/R33 mean the respective generation's completed run receipts;
+L13-L19 mean the named read-back sections already in this ledger. P means the
+read-only current pack/runner/excerpt/preset records and published text files.
+This table covers the report's numerical claims; scheduling estimates are not
+introduced, and missing receipt fields are explicitly marked missing.
+
+| Report figure / claim | Receipt or ledger row / direct check |
+|---|---|
+| Current 128 = 117 done + 9 failed + 2 refused, pending 0; group counts P-A 64, P-Z 9, V-S 26, V-D 8, V-P 8 done/9 failed of 17, V-Z 2, V-R 2 refused | L18 entire-catalog row; L19 page-count row; current pack.json group/status Counter independently compared by turn20/verification.py. |
+| Photos: head 6d470028, exit 0, 673 s, 2026-11-01 22:00:18-22:11:32Z, free 171 -> 167 GB | R32 summary.txt photos start/exit rows; RUN REQUEST table order 1; L13 receipt reconciliation. |
+| Presets: exit 0, 1 s, 22:12:15-22:12:16Z | R32 summary.txt presets rows; RUN REQUEST order 2; L13. No separate head/disk reading supplied: report says missing. |
+| Mistaken initial page --check: exit 2, 0 s, 22:12:16Z; initial actual page exit 2, 1 s, start 22:12:33Z; following check exit 0 | R32 summary.txt page rows; L13 receipt reconciliation and RUN REQUEST order 3. End/head/disk/other missing timings are not inferred. |
+| Initial page 55 pending / 73 photo sheet rows / 295 targets; initial tally headline expected 115 / available 64 / missing 51 and candidates expected 11 / available 9 / missing 2, exit 0 | L13 catalog/sheet/link/receipt rows; R32 page-build.log, page-check.log and tally-1.log. Initial tally wall/head/disk are not receipted and named missing. Exact config-resolved command is from the RUN REQUEST table's tally request. |
+| V-P: receipt head 6d470028, exit 1, 2,961 s, 22:12:54-23:02:14Z, free 167 -> 165 GB; instrument unchanged through ef7cbf15; all 17 whole, IMG_6762 last | R32 summary.txt; RUN REQUEST order 4; L14 order/log and receipt rows. |
+| Lost V-S: ef7cbf15, 23:03:35Z to about 00:36:53Z next day, free 165 GB before; no exit/elapsed/after-disk receipt | R32 summary.txt V-S start row; L15 boundary/lost-attempt section. Approximate termination stamp is the dispatcher's fact, not a newly calculated wall time. |
+| Recovery 33 moved = 20 completed MP4s + 1 partial + 11 excerpts + 1 sidecar; copied stale-reviewpack.lock makes 34 archived files | L15 boundary/recovery and orphan-listing row; no archived media contents read in turn 20. |
+| Successful V-S: 0b04e372, exit 0, 8,740 s, 2026-11-02 00:39:08-03:04:48Z, free 161 -> 155 GB | R33 summary.txt; RUN REQUEST order 5; L15 completed receipt. |
+| V-D: 1f8b036a, exit 0, 3,162 s, 04:31:56-05:24:38Z, free 155 -> 152 GB | R33 summary.txt; RUN REQUEST order 6; L16 completed receipt. |
+| V-Z: bcc498c1, exit 0, 374 s, 05:28:32-05:34:46Z, free 152 -> 151 GB | R33 summary.txt; RUN REQUEST order 7; L17 completed receipt. |
+| V-R: 6bf8ce99, stage exit 0, 3 s, 05:37:56-05:37:59Z, free 151 -> 151 GB; raw runner exit 1 / 2 recognized expected refusals | R33 summary.txt; RUN REQUEST order 8; L18 log/receipt and exact-refusal sections; V-R.json/pack.json. |
+| Final page / link check / tally: 792ee22c; exits 1 / 0 / 0; walls 2 / 1 / 1 s; intervals 05:41:16-18 / 18-19 / 19-20Z | R33 summary.txt and page.log/page_check.log/tally.log; RUN REQUEST orders 9-11; L19 publication-receipt table. Disk readings absent and named missing. |
+| 25 GB clips prerequisite and each measured start above it | Commissioned lock and RUN REQUEST scheduling paragraph; measured starts 167, 165 (lost), 161, 155, 152, 151 GB from R32/R33. No claim of a new disk check in this turn. |
+| 128 articles / 117 blank sheet rows / 603 targets = 117 products + 73 neutral views + 234 thumbs + 44 pairs + 132 stills + 1 sheet + 2 presets | L19 publication table; report uses its independently checked identity/link totals. Current sheet row count and empty answer/status cells independently rechecked by verification.py. |
+| Empty tally: headline 0/0=0.0 %, 80 % D65 bar, expected 115 / available 106 / missing 9 / unjudged 106; candidates expected/available/unjudged 11, missing 0; all judged/preferred/artifact/above-surface/aid counts 0 | R33 tally.log and L19 independent tally row; verification.py compares the report's literal coverage/tally lines to the receipt. 106/115 is labelled coverage. |
+| Excerpt rule <=45 s whole, otherwise 30 s at 40 %; 18 excerpts; 15 V-S / 2 V-D / 1 V-Z whole | Brief/rulings and L15-L17 excerpt-accounting rows. All 18 report timing rows match the ledger's printed rows and their completed sidecars at the printed decimal precision (four fields per item). |
+| All 11 V-S planned/actual start/duration rows, including GX011615's 29.362667 s actual duration | L15 excerpt timing table and V-S-excerpts.json; exact per-row comparison, no source re-probe. |
+| All 6 V-D planned/actual start/duration rows | L16 excerpt timing table and V-D-excerpts.json; exact per-row comparison. |
+| Compilation planned 71.971900 / actual 70.904167 start, planned 30 / actual 31.131100 duration, null timecode | L17 excerpt timing table and V-Z-excerpts.json; exact comparison. |
+| All 9 V-P exact product failure strings, including packet indices/counts and rational timestamps; both exact HLG refusals | L14/L18/L19 and V-P.json/V-R.json; verification.py requires each complete raw failure string exactly once in the report (11 strings), not rewritten fragments. |
+| Both exports format_version 1, c3, parameters {}, created 2026-11-01T22:12:16.062509+00:00, app_version 0.0.0; both effective tables' 18 numeric defaults | Read-only Snorkel (shallow).json / Scuba (deep).json and index.html; verification.py proves whole exported objects equal, every serialized field appears in the report, and both 18-row effective page tables equal the report table. Round-0 Q6 explicitly forbids inventing red/blue cap fields for c3. |
+| 8-bit photo pose; shipped standard/auto video encoding, force_cpu=false, GPU / hevc_nvenc | L13-L17 product-pose rows, P-A.json sample settings and current runner_arguments implementation (flags only read). No new device benchmark or fallback claim. |
+| Pair encoding p5/hq VBR CQ 20, no bitrate target; BT.1886 -> sRGB both halves | Current index.html description and README.md; R3-7 and R1-F3 display/encoding rulings. Product output remains item of record. |
+| Recovery reuses 31 archived basenames; zero archived-location references | L15 name-check caveat and L19 orphan-name caveat; no archived-file equivalence inferred. |
+| Future successful recovery: 17 V-P selected (8 currently done), 126 reviewable rows, headline 115 available / 0 missing, 11 candidates, 2 refused | L19 required-rerun section; report explicitly labels these expected post-repair counts, not current results. |
+| Page exit 2 for pending/presets/conflict, 1 for failed items, --check 0 only links; tally 0 on valid empty sheet | L19 exit-code/denominator section; current R33 receipts. No completion inferred from pending 0 alone. |
+| Reviewer A round 4 converged; executing B NO_NEW_CRITICAL_MAJOR with findings closed | Cumulative review table and turns 10-13; supplied turn-20 dispatch. No new review pass or final gate claimed. |
+| Fresh 177 passed / 46.24 s, format 6 files, mypy 151 source files, all exits 0 | turn20/full.log/full.xml/full.exit, ruff.log/.exit, format.log/.exit, mypy.log/.exit. |
+
+### Verification loop and fresh checks
+
+Suspect a mistranscribed excerpt, rewritten product error or incorrect preset value
+in the report -> independently compare every excerpt's four timing fields,
+all eleven full error/refusal strings, both entire preset objects and the two
+effective page tables -> **rejected**, all match. Suspect incomplete denominator
+or accidental answers -> group/status Counter, current CSV and literal tally
+receipt comparison -> **rejected**, all 128 rows accounted and owner cells blank.
+Missing head/time/disk fields were identified in the receipts and explicitly
+marked **missing**, not estimated. The lost-attempt/recovery and pending-versus-
+failed distinctions are retained without adopting or judging orphan media.
+
+The initial scratch comparison used exact binary-float equality against the
+ledger's decimal presentation, producing an **audit false positive** on values
+such as 21.781760000000002 versus printed 21.7817600. The final audit requires
+each complete printed row to match its existing ledger row and every number to
+equal the sidecar formatted to that printed precision. No report figure,
+product record or committed test assertion was changed to obtain the pass.
+
+The verification script reads only completed text records. It checks the
+report ends with the exact current empty CSV header, scans for full paths,
+requires ASCII report text, inspects changed-file scope, checks both changed
+files for CR bytes and runs git diff --check. Report figure trace review also
+carries R4-5/R4-6, B-F5/B-F6, the supported-cwd limit and the killed-group
+unrecorded-output limitation. There is no new instrument finding or repair.
+
+PowerShell sets **PYTHONPATH=scripts**. The light command retains the mandatory
+sandbox shim despite its omission in the dispatch shorthand; no other test
+scope/marker changes. All runner output is routed to files under turn20/:
+
+```text
+uv run pytest -q tests/test_reviewpack.py --basetemp=work/wp5.3/tmp/t20 -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp5.3/turn20/full.xml
+uv run ruff check tools/reviewpack tests/test_reviewpack.py
+uv run ruff format --check tools/reviewpack tests/test_reviewpack.py
+uv run mypy
+uv run python work/wp5.3/turn20/verification.py
+```
+
+- **full.log/.xml/.exit:** **177 passed in 46.24 s**, exit 0, including the
+  planted tiny headless/FFmpeg integration; no failures, skips or deselections.
+- **ruff.log/.exit:** All checks passed, exit 0.
+  **format.log/.exit:** 6 files already formatted, exit 0.
+  **mypy.log/.exit:** Success: no issues found in 151 source files, exit 0.
+- **verification.log/.exit:** **exit 0**; 128 item facts, all 18 excerpt rows,
+  all 11 exact product messages, both preset exports/default tables and the
+  empty sheet/tally match. ASCII report, no full-path candidates, only the two
+  owned changed files, both **0 CR**, git diff --check clean. uv ignores the
+  inherited VIRTUAL_ENV mismatch; no other environment is targeted. Git's
+  autocrlf warning describes a possible future checkout conversion, not current
+  bytes; this turn verified the actual files are LF, and the dispatcher owns
+  committed-blob LF verification.
+
+Only the report and this ledger are submitted. No new dependency, product,
+instrument, fixture, frozen-interface or configuration change; no footage
+read or output write outside the worktree. The report carries the OPEN DR-112
+blocker and expressly withholds owner readiness. **YIELD after the report**;
+WP-D112 merge, V-P recovery/publication/read-back, the dispatcher's final gate
+and the owner's CP5 judgement remain outstanding.
