@@ -45,7 +45,9 @@
   there as the post-witness test-only item; serial +713 s recorded; AD-13 NOTE written by me at this accept; `.worktrees/wp5.3`
   KEPT LIVE for the V-P witness). Disk: the 61 GB drop is NOT a large file of ours (pagefile 18.2 GB written during the gate,
   hiberfil 12.5 GB, proxy cache 0, Temp 25 GB, no file over 100 MB written since the gate started); free steady at 93 GB since
-  06:57Z; a per-folder Temp breakdown pending; CLOSED as ours unless that breakdown says otherwise. WP-D112 Reviewer A round
+  06:57Z; Temp breakdown (post `4b7766da`): `pytest-of-rwsmy` 15.4 GB last written 10-29 + `claude` 7.05 GB, no growth
+  today; CLOSED, not ours. PRUNE CANDIDATE for the owner's next prune word: `%LOCALAPPDATA%\Temp\pytest-of-rwsmy` (15.4 GB of
+  pre-10-29 basetemps outside `work/`, never deleted without the owner's word). WP-D112 Reviewer A round
   1 started 06:58Z on the owner's word (Claude 97 % at 06:14Z) = NEW_CRITICAL_MAJOR_FOUND: F1 MAJOR truncated PCM sources
   under D86 refused by the new sample-extent rule (2 of 3 probes where base passed), F2 MINOR no pts check after the first,
   F3 advisory; Codex turn 4 adjudicated `2e471364`; MY RULING `b44b0ee7` (query `1aef5947`): F1 the D86-only
