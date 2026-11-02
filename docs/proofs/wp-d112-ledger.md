@@ -1063,3 +1063,157 @@ stash, mailbox post, dependency, interface or product/test edit. Final ledger
 ASCII/LF, scope and `git diff --check` evidence are in
 `work/wp-d112/turn4-ledger-qa.log`. YIELD for the ruling packet, not an
 implementation promise or a completion claim.
+
+## Session 3 / Turn 5: round 1 remediation
+
+Fresh session 3, base `981724b9`. Session 2 retired at dispatcher-reported
+184,370 tokens. Depth THIS TURN: PENDING -- dispatcher to fill from transcript;
+no cell estimate. This turn bundles the commissioned RED and GREEN for F1/F2
+and the warning grant into one logical round-1 remediation, with no cell commit.
+
+Binding packet: CHARC `b44b0ee7` adopts the D86-only source exception (F1,
+MAJOR) and gap-preserving run equality (F2, MINOR), rejects source-gap refusal,
+and banks F3 without a code/test change. CHARC `81ebcf52` grants exactly one
+insertion after `encode.py`'s post-encode `check_output` call: append the named
+partial-frame warning, using a default-zero read-only verifier result. No mux,
+flags, IF-5 or other `encode.py` changes are authorized or made.
+
+### RED before GREEN
+
+Evidence paths below are relative to `work/wp-d112/`. The pre-product-edit run
+`turn5-red.log` / `.xml` has **13 failed, 7 passed, 236 deselected**. It ran
+both owned test modules, selecting `truncated_pcm or changed_timeline_runs or
+same_gap or manifest_packet_table or odd_source_requires`. Failures were
+assertions on the real check/sink, not collection or setup errors. The three
+minus-one rows already refused at base, but failed their required normalized
+sample-count diagnostics: odd source tails gave invalid evidence, and the
+aligned short tail gave the unnormalized declared count.
+
+All 20 nodes map to PASS in final `turn5-light-final.xml`; machine-readable
+before/after table: `turn5-node-results.json`. Node names below omit their
+module prefix: units except the final three integration nodes.
+
+| Node | Before | After |
+| --- | --- | --- |
+| `test_check_output_truncated_pcm_uses_complete_readable_tail[55]` | FAIL: invalid evidence | PASS |
+| `test_check_output_truncated_pcm_uses_complete_readable_tail[70]` | FAIL: 50096 declared vs 49502 readable | PASS |
+| `test_check_output_truncated_pcm_uses_complete_readable_tail[85]` | FAIL: invalid evidence | PASS |
+| `test_check_output_truncated_pcm_refuses_one_readable_sample_fewer[55]` | FAIL: wrong refusal diagnostic | PASS |
+| `test_check_output_truncated_pcm_refuses_one_readable_sample_fewer[70]` | FAIL: wrong expected sample count | PASS |
+| `test_check_output_truncated_pcm_refuses_one_readable_sample_fewer[85]` | FAIL: wrong refusal diagnostic | PASS |
+| `test_check_output_truncated_pcm_refuses_other_partial_packets[earlier-source]` | PASS: strict guard | PASS |
+| `test_check_output_truncated_pcm_refuses_other_partial_packets[output]` | PASS: strict guard | PASS |
+| `test_check_output_pcm_odd_source_requires_both_d86_conditions[False-False]` | PASS: strict guard | PASS |
+| `test_check_output_pcm_odd_source_requires_both_d86_conditions[False-True]` | PASS: strict guard | PASS |
+| `test_check_output_pcm_odd_source_requires_both_d86_conditions[True-False]` | PASS: strict guard | PASS |
+| `test_check_output_pcm_refuses_changed_timeline_runs[shift-after-30]` | FAIL: accepted changed timeline | PASS |
+| `test_check_output_pcm_refuses_changed_timeline_runs[all-zero]` | FAIL: accepted changed timeline | PASS |
+| `test_check_output_pcm_refuses_changed_timeline_runs[closes-gap]` | FAIL: accepted changed timeline | PASS |
+| `test_check_output_pcm_refuses_changed_timeline_runs[opens-gap]` | FAIL: accepted changed timeline | PASS |
+| `test_check_output_pcm_accepts_same_gap_with_different_packet_boundaries` | PASS: positive control | PASS |
+| `test_check_output_pcm_accepts_the_manifest_packet_table` | PASS: measured control | PASS |
+| `test_truncated_pcm_audio_survives_the_real_sink[55-38814-1]` | FAIL: verify_failed | PASS |
+| `test_truncated_pcm_audio_survives_the_real_sink[70-49502-0]` | FAIL: verify_failed | PASS |
+| `test_truncated_pcm_audio_survives_the_real_sink[85-60659-1]` | FAIL: verify_failed | PASS |
+
+The opens-gap plant was refined after the first GREEN to open an additional
+gap while preserving a pre-existing source gap; shift-after-30 remains the
+contiguous-source plant. The same-gap control also re-chunks the two runs.
+Neither plant changes a predecessor's expected result.
+
+### Implemented rule and warning
+
+| Mechanic | File:line | Behavior |
+| --- | --- | --- |
+| Source-PCM branch | `src/clearwater/io/video/verify.py:873` | Passes the probe's truncated fault to the private comparison; compressed branch still uses the unchanged packet rule. |
+| `_pcm_totals` | `src/clearwater/io/video/verify.py:910` | Exact duration-to-sample arithmetic and codec-width payload count. Under D86, each included source packet stores `floor(size / bytes-per-frame)` and presents `min(declared, stored)`. Only its window's final packet may have a remainder. Output uses neither cap nor floor. |
+| `_pcm_problems` | `src/clearwater/io/video/verify.py:972` | Enables D86 only for `truncated AND end is not None`; retains equal format/clock/first pts and admissible whole-prefix cut semantics. |
+| Candidate extents | `src/clearwater/io/video/verify.py:1016` | Compares paired presented/stored totals from ONE admissible source prefix, never independent alternatives or intermediate totals. |
+| Run merge and match | `src/clearwater/io/video/verify.py:965`, `:1053` | Merge only exact adjacency in file order; output runs must equal the SAME prefix's runs. Source gaps remain supported. The rule docstring explicitly binds equality in SOURCE ticks to the equal-time-base check. |
+| Read-only warning result | `src/clearwater/io/video/verify.py:200`, `:903` | `PacketTable.pcm_dropped_bytes` recalculates the successful PCM verdict without mutation or I/O; `_PcmResult` is frozen and defaults dropped bytes to zero. No `check_output` signature/return change. |
+| Granted warning insertion | `src/clearwater/io/video/encode.py:1105` | Append exactly one warning when matching D86 normalization floored bytes: `audio cut at the last whole sample frame; N bytes of a partial frame dropped`. Only this six-line insertion changes encode.py. |
+
+The new integration node at `tests/test_io_video_encode.py:337` is parametrized
+over all three ratios and is UNMARKED like the synthetic libx265 PCM control:
+no gpu/footage/gui/slow/fullclip marker. It remuxes the committed fixture with
+`-c copy -movflags +faststart`, truncates only its per-test derivative, checks
+the probe fault and exact short payload, and calls `vf.encode_file` ->
+`_RecordingSink(FFmpegVideoSink)` without checker bypass or command emulation.
+It checks byte-identical decoded readable PCM, the existing cut-short warning,
+and exactly one partial-frame warning for 55/85 percent, none for 70 percent.
+No new committed media or fixture/manifest/generator/consumer edit.
+
+| Derivative | Source / output packets | Complete samples | Final source bytes | Partial warning |
+| --- | --- | --- | --- | --- |
+| 55 percent | 39 / 39 | 38814 | 909 | Exactly one, N=1 |
+| 70 percent | 50 / 49 | 49502 | 860 | Absent |
+| 85 percent | 61 / 61 | 60659 | 647 | Exactly one, N=1 |
+
+Independent evidence: `turn5_timeline_oracle.py` expands each real source and
+output presentation into individual sample ticks, rather than using the
+production run merger, and finds all three timelines equal. Results:
+`turn5-timeline-oracle.json` / `.log`. Its first scratch glob did not account
+for pytest's shortened folder names (StopIteration); corrected to find each
+`cut-N.mov` under this run's basetemp and reran successfully. No product or
+test change resulted from that scratch-driver correction.
+
+Limit to carry into the report turn: a short trailing packet is one measured
+trigger for sink re-chunking (70 percent: 50 source packets become 49 output
+packets). The intact synthetic control retains its packet boundaries. The
+cause of the intact owner's sources' re-chunking remains unknown and outside
+this fix's scope; no owner's media was read to investigate it.
+
+### Checks and verification loop
+
+Every pytest invocation sets `PYTHONPATH=scripts`, unsets `PYTEST_ADDOPTS`,
+loads `-p sandbox_mkdir_shim -p no:cacheprovider`, and uses a fresh basetemp
+under `work/wp-d112/tmp/t5-*`. Runner outputs are files under this worktree.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Initial new-node GREEN | 20 passed, 236 deselected | `turn5-green.log` / `.xml` |
+| Initial keyword light run | 64 passed, 192 deselected | `turn5-light.log` / `.xml` |
+| Final required keyword light run, both modules, `audio or pcm or check_output` | 64 passed, 192 deselected | `turn5-light-final.log` / `.xml` |
+| Whole unit module | 126 passed | `turn5-units.log` / `.xml` |
+| Explicit real-sink integration node, all three ratios | 3 passed | `turn5-real-sink.log` / `.xml` |
+| Ruff on four changed Python files | All checks passed | `turn5-ruff-final.log` |
+| Ruff format --check on four changed Python files | 4 files already formatted | `turn5-format-check-final.log` |
+| Mypy | Success, 149 source files | `turn5-mypy-final.log` |
+| Scope/identity and LF check | PASS | `turn5-scope-qa.log` / `.json`; final ledger QA below |
+
+No predecessor row's assertion or expected result changed. `_pcm_check` only
+adds a default-off truncated-fault switch. Both numerical owner shapes,
+regular PCM, whole straddling packets, slack prefix pairing, all strict
+refusals, the real-sink control and PCM-to-AAC plant pass in the final light
+run. The three named kept-green rows are byte-identical to HEAD and pass;
+`_seconds` and `_audio_problems` are also byte-identical. Evidence:
+`turn5_qa.py`, `turn5-scope-qa.json`. No owner/trim/fullclip proof was rerun
+in this remediation turn; the orchestrator's final gate/proof schedule stands.
+
+| Suspected | Independently confirmed / rejected | Fix / final observation |
+| --- | --- | --- |
+| F1 D86 short/odd-tail refusal | Confirmed MAJOR by 3 failing unit acceptances and 3 failing real-sink derivatives; byte equality checked after GREEN | Source-only per-packet normalization, final partial-frame floor, exact normalized pair and warning; 3 real exports pass with identical readable bytes. |
+| Lost complete sample might be excused | Rejected by 3 minus-one rows against exact normalized counts | All refuse with PCM presented-count diagnostics; no tolerance. |
+| Exception might leak to earlier source/output or lack one enabling condition | Rejected by 5 strict guard nodes | All refuse; source cap/floor remains D86-only. |
+| F2 timing hidden by equal totals | Confirmed MINOR by 4 RED timeline plants; gap-preserving positive control passes | Source-tick run equality fixes all four; source-gap refusal was not implemented. |
+| Style/type slips in first GREEN | Confirmed: one long warning line, two tuple-concatenation lint items, one Fraction union annotation | Fixed; changed-file lint/format and full mypy pass. |
+| Compressed-path or frozen-interface drift | Rejected by helper byte comparison, diff review and named unchanged test evidence | No compressed, video, data, mux, flag or interface behavior changed. |
+| Final pass over rule, warning, tests, locks and evidence | No new finding | Required final light/unit/real-sink checks green; scope identity and LF assertions pass. |
+
+### Cumulative round ledger and boundary
+
+| Reviewer round | Verdict / disposition | Critical / major / minor / advisory | IN / OUT | NEW / REOPENED / pre-existing | Reverts | Product / test fixes THIS TURN | Transport / depth |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A1 | F1/F2 remediated per CHARC; F3 BANKED; A2 PENDING | 0 / 1 / 1 / 1 | 2 / 1 | 2 / 0 / 1 | 0 | 2 ruled product fixes plus granted warning; 20 new test nodes (17 unit + 3 integration) | Dispatcher-run Claude; session 2 retired at 184370; current depth PENDING |
+
+F1 and F2 are fixed and locally verified, not claimed independently converged.
+F3 remains BANKED to CHARC for the accept's note; no row or code change.
+Reviewer A round 2, Reviewer B, final three-leg gate, report and post-merge
+V-P witness remain pending at their commissioned seats. No request to start
+a Claude pass or heavy gate is made by this cell.
+
+Locks: only verify.py, the one granted encode.py insertion, the two owned test
+modules and this ledger changed. No footage, main-tree work or other worktree
+opened; no mailbox, stash, commit, dependency, media/manifest, interface or
+other product edit. Code/test files have zero CR; the appended ledger text is
+ASCII and its final LF/scope/diff QA is `turn5-ledger-qa.log`. YIELD for A2.

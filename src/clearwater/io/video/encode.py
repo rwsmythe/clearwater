@@ -1102,6 +1102,12 @@ class FFmpegVideoSink:
             end_pts=end,
             audio_end=self._audio_end,
         )
+        dropped = source.pcm_dropped_bytes(output, probe=probe, audio_end=self._audio_end)
+        if dropped:
+            self._warnings.append(
+                f"audio cut at the last whole sample frame; {dropped} bytes "
+                "of a partial frame dropped"
+            )
         if problems:
             raise VideoEncodeError(
                 "verify_failed",

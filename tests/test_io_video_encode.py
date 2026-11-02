@@ -331,6 +331,77 @@ def test_planted_pcm_audio_reencode_is_caught(sample: Sample, tmp_path: Path) ->
     assert "audio stream 0 (PCM)" in str(caught.value) and "codec" in str(caught.value)
 
 
+@pytest.mark.parametrize(
+    ("percent", "samples", "dropped"), [(55, 38814, 1), (70, 49502, 0), (85, 60659, 1)]
+)
+def test_truncated_pcm_audio_survives_the_real_sink(
+    sample: Sample, tmp_path: Path, percent: int, samples: int, dropped: int
+) -> None:
+    """D86 carries readable PCM bytes and warns exactly when it floors a partial frame."""
+    faststart = tmp_path / "faststart.mov"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-v",
+            "error",
+            "-i",
+            str(sample("vid-pcm-irregular")),
+            "-c",
+            "copy",
+            "-movflags",
+            "+faststart",
+            str(faststart),
+        ],
+        capture_output=True,
+        check=True,
+    )
+    data = faststart.read_bytes()
+    source = tmp_path / f"cut-{percent}.mov"
+    source.write_bytes(data[: len(data) * percent // 100])
+    info = probe(source)
+    assert {f.kind for f in info.faults} == {"truncated"}
+    before = read_packet_table(source)
+    audio = before.of_type("audio")[0]
+    assert before.audio_sizes[audio.index][-1] == {55: 909, 70: 860, 85: 647}[percent]
+    assert before.audio_durations[audio.index][-1] == 1024
+
+    output = tmp_path / "corrected.mp4"
+    run = vf.encode_file(source, output, encoder="libx265", bit_depth=8)
+    assert any("cut short" in w for w in run.report.warnings)
+    floor_warnings = [w for w in run.report.warnings if "partial frame dropped" in w]
+    assert floor_warnings == (
+        [f"audio cut at the last whole sample frame; {dropped} bytes of a partial frame dropped"]
+        if dropped
+        else []
+    )
+
+    def decoded(path: Path) -> bytes:
+        return subprocess.run(
+            [
+                "ffmpeg",
+                "-nostdin",
+                "-v",
+                "error",
+                "-i",
+                str(path),
+                "-map",
+                "0:a:0",
+                "-c:a",
+                "pcm_s16le",
+                "-f",
+                "s16le",
+                "pipe:1",
+            ],
+            capture_output=True,
+            check=True,
+        ).stdout
+
+    source_pcm = decoded(source)
+    assert len(source_pcm) == 2 * samples
+    assert decoded(output) == source_pcm
+
+
 def test_vfr_pts_are_exact(sample: Sample, runs: Runs) -> None:
     source = sample("vid-vfr")
     assert probe(source).video.vfr

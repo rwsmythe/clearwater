@@ -7,7 +7,7 @@ closes, and :func:`check_output` compares the MANDATORY items it can see without
 frame count and every pts against the pts written, the video start, the video track's edit list
 against the written start and end (its ``media_time`` is checked through its effect: the
 demuxer applies it to every pts compared), the display rotation, and the audio: PCM format,
-first pts and presented/stored sample totals, or every compressed audio packet's pts.
+first pts, presented/stored sample totals and timeline runs, or every compressed packet's pts.
 The full item-by-item comparison is the fidelity instrument's (``tools/video_fidelity.py``);
 this check is what every export runs.
 
@@ -196,6 +196,30 @@ class PacketTable:
             The matching streams.
         """
         return tuple(s for s in self.streams if s.codec_type == codec_type)
+
+    def pcm_dropped_bytes(
+        self, output: PacketTable, *, probe: ProbeResult, audio_end: Fraction | None
+    ) -> int:
+        """Return partial-frame bytes discarded by a successful D86 PCM comparison.
+
+        Args:
+            output: The finished output's packet table.
+            probe: The source's probe result, including its truncated fault if any.
+            audio_end: The source audio cut, or None for a whole-stream copy.
+
+        Returns:
+            The dropped byte count, defaulting to zero without a matching D86 exception.
+            This read-only calculation changes neither table nor the check's return value.
+        """
+        if audio_end is None or not any(f.kind == "truncated" for f in probe.faults):
+            return 0
+        return sum(
+            _pcm_problems(number, src, out, self, output, audio_end, truncated=True).dropped_bytes
+            for number, (src, out) in enumerate(
+                zip(self.of_type("audio"), output.of_type("audio"), strict=False)
+            )
+            if src.codec_name.startswith("pcm_")
+        )
 
 
 def _int(value: object) -> int | None:
@@ -801,9 +825,10 @@ def check_output(
     """Compare a finished output with the source and the frames written (D94).
 
     Compressed audio retains every source packet's pts in order. Raw PCM retains its format,
-    first pts and both presented and stored sample totals, regardless of packet boundaries.
+    first pts, presented/stored sample totals and timeline runs, regardless of packet boundaries.
     With ``audio_end``, compare whole source packets starting before that point; a packet
     within :data:`CUT_SLACK_S` may go either way, always as a complete prefix.
+    Only a truncated source with an audio cut uses complete readable sample frames (D86).
 
     Args:
         out_path: The output file (its edit list is read from its boxes).
@@ -846,7 +871,15 @@ def check_output(
         )
     for number, (src, out) in enumerate(zip(source_audio, output_audio, strict=False)):
         if src.codec_name.startswith("pcm_"):
-            problems += _pcm_problems(number, src, out, source, output, audio_end)
+            problems += _pcm_problems(
+                number,
+                src,
+                out,
+                source,
+                output,
+                audio_end,
+                truncated=any(f.kind == "truncated" for f in probe.faults),
+            ).problems
             continue
         problems += _audio_problems(
             number,
@@ -857,10 +890,32 @@ def check_output(
     return problems
 
 
+@dataclass(frozen=True)
+class _PcmExtent:
+    """Exact sample totals and maximal timeline runs for one compared packet prefix."""
+
+    totals: tuple[int, int]
+    runs: tuple[tuple[Fraction, Fraction], ...]
+    dropped_bytes: int = 0
+
+
+@dataclass(frozen=True)
+class _PcmResult:
+    """Read-only PCM verdict, with a default-zero successful D86 partial-byte count."""
+
+    problems: tuple[str, ...] = ()
+    dropped_bytes: int = 0
+
+
 def _pcm_totals(
-    stream: StreamRow, table: PacketTable, count: int | None = None
-) -> list[tuple[int, int]] | None:
-    """Return cumulative presented/stored sample-frame pairs, or None without exact evidence."""
+    stream: StreamRow, table: PacketTable, count: int | None = None, *, d86: bool = False
+) -> _PcmExtent | None:
+    """Read exact totals/runs; only D86 source prefixes may floor their final packet.
+
+    Each source packet presents min(declared, stored) sample frames under D86. Output
+    packets always use strict declared durations and frame-aligned payloads. Runs use
+    exact ticks, with effective durations only for the normalised source.
+    """
     rate, base, channels = stream.sample_rate, stream.time_base, stream.channels
     if not rate or rate < 0 or base is None or base <= 0 or not channels or channels < 0:
         return None
@@ -889,16 +944,29 @@ def _pcm_totals(
     sizes = table.audio_sizes.get(stream.index, ())[:count]
     if len(pts) != len(durations) or len(pts) != len(sizes) or any(p is None for p in pts):
         return None
-    totals = [(0, 0)]
-    for duration, size in zip(durations, sizes, strict=True):
-        if duration is None or duration < 0 or size is None or size < 0 or size % frame_bytes:
+    presented_total = stored_total = dropped_bytes = 0
+    runs: list[tuple[Fraction, Fraction]] = []
+    for i, (start, duration, size) in enumerate(zip(pts, durations, sizes, strict=True)):
+        if start is None or duration is None or duration < 0 or size is None or size < 0:
+            return None
+        remainder = size % frame_bytes
+        if remainder and not (d86 and i == len(pts) - 1):
             return None
         presented = duration * base * rate
         if presented.denominator != 1:
             return None
-        before_presented, before_stored = totals[-1]
-        totals.append((before_presented + int(presented), before_stored + size // frame_bytes))
-    return totals
+        stored = size // frame_bytes
+        if d86:
+            presented = min(presented, Fraction(stored))
+        presented_total += int(presented)
+        stored_total += stored
+        dropped_bytes += remainder
+        end = Fraction(start) + (presented / (base * rate) if d86 else duration)
+        if runs and start == runs[-1][1]:
+            runs[-1] = (runs[-1][0], end)
+        else:
+            runs.append((Fraction(start), Fraction(end)))
+    return _PcmExtent((presented_total, stored_total), tuple(runs), dropped_bytes)
 
 
 def _pcm_problems(
@@ -908,8 +976,17 @@ def _pcm_problems(
     source: PacketTable,
     output: PacketTable,
     end: Fraction | None,
-) -> list[str]:
-    """Compare PCM format, first pts and both exact totals for whole source-packet prefixes."""
+    *,
+    truncated: bool = False,
+) -> _PcmResult:
+    """Compare PCM format, exact paired totals and gap-preserving timeline runs.
+
+    Run equality is in SOURCE ticks and depends on the equal-time-base requirement
+    below; neither may be relaxed without the other. A run continues exactly when
+    next_pts == pts + duration, using D86-normalised source durations only when the
+    probe reports truncation AND the audio cut is set. Floor a partial sample frame
+    only in the final source packet of the compared window; output remains strict.
+    """
     label = f"audio stream {number} (PCM)"
     problems = []
     for name, expected, got in (
@@ -925,24 +1002,31 @@ def _pcm_problems(
                 f"{ascii_text(str(expected))}"
             )
     if problems:
-        return problems
+        return _PcmResult(tuple(problems))
     src_pts = source.audio_pts.get(src.index, ())
     out_pts = output.audio_pts.get(out.index, ())
     if any(p is None for p in src_pts):
-        return [f"{label}: missing source packet pts for the sample window"]
+        return _PcmResult((f"{label}: missing source packet pts for the sample window",))
     if end is None:
         low = high = len(src_pts)
     else:
         timed = _seconds(src_pts, src.time_base)
         low = sum(p is not None and p < end - CUT_SLACK_S for p in timed)
         high = sum(p is not None and p < end + CUT_SLACK_S for p in timed)
-    src_totals, out_totals = _pcm_totals(src, source, high), _pcm_totals(out, output)
-    if src_totals is None or out_totals is None:
-        return [f"{label}: missing or invalid evidence for exact presented/stored samples"]
-    # A straddling packet contributes ALL its duration and payload. Slack admits
-    # whole prefixes only, and both totals must belong to the SAME prefix.
-    wanted = src_totals[low : high + 1]
-    got_totals = out_totals[-1]
+    candidates = [
+        _pcm_totals(src, source, count, d86=truncated and end is not None)
+        for count in range(low, high + 1)
+    ]
+    source_extents = [extent for extent in candidates if extent is not None]
+    out_extent = _pcm_totals(out, output)
+    if not source_extents or out_extent is None:
+        return _PcmResult(
+            (f"{label}: missing or invalid evidence for exact presented/stored samples",)
+        )
+    # A straddling packet contributes its whole extent (normalised only under D86).
+    # Slack admits whole prefixes only; both totals and runs must match the SAME prefix.
+    wanted = [extent.totals for extent in source_extents]
+    got_totals = out_extent.totals
     if got_totals not in wanted:
         for column, name in enumerate(("presented", "stored")):
             values = sorted({pair[column] for pair in wanted})
@@ -965,7 +1049,13 @@ def _pcm_problems(
             )
     elif low:
         problems.append(f"{label}: missing first packet pts")
-    return problems
+    matches = [extent for extent in source_extents if extent.totals == got_totals]
+    same_runs = [extent for extent in matches if extent.runs == out_extent.runs]
+    if matches and not same_runs:
+        problems.append(f"{label}: output timeline runs do not match the source in source ticks")
+    if problems:
+        return _PcmResult(tuple(problems))
+    return _PcmResult(dropped_bytes=same_runs[0].dropped_bytes)
 
 
 def _seconds(pts: Sequence[int | None], time_base: Fraction | None) -> list[Fraction | None]:

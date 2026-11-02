@@ -805,12 +805,16 @@ def _pcm_check(
     source: _PcmPacketTable,
     output: _PcmPacketTable,
     end: Fraction | None = None,
+    *,
+    truncated: bool = False,
 ) -> list[str]:
     """Run the real mandatory check with only the unrelated file-box read stubbed."""
     from clearwater.interfaces.video import AudioStreamInfo
 
     monkeypatch.setattr(verify, "_edit_problems", lambda path, first, end: [])
     info = replace(_probe(), audio=(AudioStreamInfo(1, "pcm_s16le", 48000, 1, Fraction(0)),))
+    if truncated:
+        info = replace(info, faults=(Fault("truncated", "warn", "cut short"),))
     return verify.check_output(
         Path("o"),
         output,
@@ -1036,6 +1040,123 @@ def test_check_output_pcm_refuses_inexact_sample_evidence(
         )
         output = replace(output, streams=source.streams, audio_durations={1: (1024,) * 6 + (1023,)})
     _assert_pcm_refusal(_pcm_check(monkeypatch, source, output), "evidence")
+
+
+def _truncated_pcm_pair(percent: int) -> tuple[_PcmPacketTable, _PcmPacketTable, Fraction, int]:
+    """Reproduce the three measured faststart EOF shapes without opening media."""
+    count, size, end, samples = {
+        55: (39, 909, Fraction(1001, 1250), 38814),
+        70: (50, 860, Fraction(31031, 30000), 49502),
+        85: (61, 647, Fraction(19019, 15000), 60659),
+    }[percent]
+    durations = ((1024,) * 23 + (472,)) * 3
+    source = _pcm_table(durations[:count])
+    source = replace(source, audio_sizes={1: (*source.audio_sizes[1][:-1], size)})
+    out_durations = (
+        (*durations[:47], 1024, 902) if percent == 70 else (*durations[: count - 1], size // 2)
+    )
+    return source, _pcm_table(out_durations), end, samples
+
+
+@pytest.mark.parametrize("percent", [55, 70, 85])
+def test_check_output_truncated_pcm_uses_complete_readable_tail(
+    monkeypatch: pytest.MonkeyPatch, percent: int
+) -> None:
+    """D86 carries every whole readable frame, including a re-chunked short tail."""
+    source, output, end, samples = _truncated_pcm_pair(percent)
+    assert sum(output.audio_durations[1]) == samples
+    assert _pcm_check(monkeypatch, source, output, end, truncated=True) == []
+
+
+@pytest.mark.parametrize("percent", [55, 70, 85])
+def test_check_output_truncated_pcm_refuses_one_readable_sample_fewer(
+    monkeypatch: pytest.MonkeyPatch, percent: int
+) -> None:
+    """Normalising the EOF packet never excuses losing a complete readable sample."""
+    source, output, end, samples = _truncated_pcm_pair(percent)
+    last = output.audio_durations[1][-1]
+    assert last is not None
+    output = replace(
+        output,
+        audio_durations={1: (*output.audio_durations[1][:-1], last - 1)},
+        audio_sizes={1: (*output.audio_sizes[1][:-1], 2 * (last - 1))},
+    )
+    problems = _pcm_check(monkeypatch, source, output, end, truncated=True)
+    _assert_pcm_refusal(problems, "presented", str(samples - 1), str(samples))
+
+
+@pytest.mark.parametrize("partial", ["earlier-source", "output"])
+def test_check_output_truncated_pcm_refuses_other_partial_packets(
+    monkeypatch: pytest.MonkeyPatch, partial: str
+) -> None:
+    """Only the final included SOURCE packet may discard an incomplete sample frame."""
+    source, output, end, _ = _truncated_pcm_pair(70)
+    if partial == "earlier-source":
+        source = replace(source, audio_sizes={1: (2047, *source.audio_sizes[1][1:])})
+    else:
+        output = replace(output, audio_sizes={1: (*output.audio_sizes[1][:-1], 1803)})
+    _assert_pcm_refusal(_pcm_check(monkeypatch, source, output, end, truncated=True), "evidence")
+
+
+@pytest.mark.parametrize(("truncated", "cut"), [(False, False), (False, True), (True, False)])
+def test_check_output_pcm_odd_source_requires_both_d86_conditions(
+    monkeypatch: pytest.MonkeyPatch, truncated: bool, cut: bool
+) -> None:
+    """A cut alone or a truncated fault alone cannot enable the source-only exception."""
+    source, output, end, _ = _truncated_pcm_pair(55)
+    _assert_pcm_refusal(
+        _pcm_check(monkeypatch, source, output, end if cut else None, truncated=truncated),
+        "evidence",
+    )
+
+
+@pytest.mark.parametrize("change", ["shift-after-30", "all-zero", "closes-gap", "opens-gap"])
+def test_check_output_pcm_refuses_changed_timeline_runs(
+    monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    """Equal totals and first pts cannot conceal moved samples or a changed source gap."""
+    source = _pcm_table(((1024,) * 23 + (472,)) * 3)
+    output = source
+    shifted = tuple(p if i <= 30 else p + 1024 for i, p in enumerate(source.audio_pts[1]))
+    if change == "closes-gap":
+        source = replace(source, audio_pts={1: shifted})
+    elif change == "all-zero":
+        output = replace(output, audio_pts={1: (0,) * 72})
+    elif change == "opens-gap":
+        gapful = tuple(p if i <= 10 else p + 512 for i, p in enumerate(source.audio_pts[1]))
+        source = replace(source, audio_pts={1: gapful})
+        output = replace(
+            output,
+            audio_pts={1: tuple(p if i <= 30 else p + 1024 for i, p in enumerate(gapful))},
+        )
+    else:
+        output = replace(output, audio_pts={1: shifted})
+    _assert_pcm_refusal(_pcm_check(monkeypatch, source, output), "timeline", "runs")
+
+
+def test_check_output_pcm_accepts_same_gap_with_different_packet_boundaries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Gapful sources remain supported when output re-chunking preserves every run."""
+    source = replace(_pcm_table((1024, 508, 1024)), audio_pts={1: (0, 1024, 2048)})
+    output = replace(_pcm_table((1532, 512, 512)), audio_pts={1: (0, 2048, 2560)})
+    assert _pcm_check(monkeypatch, source, output) == []
+
+
+def test_check_output_pcm_accepts_the_manifest_packet_table(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The fixture's measured packet table is a pure-table timeline control."""
+    manifest = json.loads((Path(__file__).parent / "fixtures/manifest.json").read_text())
+    entry = next(row for row in manifest["samples"] if row["id"] == "vid-pcm-irregular")
+    packets = entry["facts"]["audio"][0]["pcm"]["packets"]
+    source = _pcm_table(tuple(p["duration"] for p in packets))
+    source = replace(
+        source,
+        audio_pts={1: tuple(p["pts"] for p in packets)},
+        audio_sizes={1: tuple(p["size"] for p in packets)},
+    )
+    assert _pcm_check(monkeypatch, source, source) == []
 
 
 def test_not_carried_lists_best_effort_items() -> None:
