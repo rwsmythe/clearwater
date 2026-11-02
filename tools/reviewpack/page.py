@@ -113,7 +113,8 @@ def write_page(
         '<!doctype html><html lang="en"><meta charset="utf-8">',
         "<title>CP5 visual review pack</title>",
         "<style>body{font:18px sans-serif;margin:2em;max-width:1500px}"
-        "figure{display:inline-block;width:45%;margin:1%}figure img{max-width:100%;height:auto}"
+        ".pair{display:flex;flex-wrap:nowrap;gap:2%;align-items:flex-start}"
+        "figure{flex:1 1 0;margin:0;min-width:0}figure img{width:100%;height:auto}"
         "video{max-width:100%}"
         "article{border-top:1px solid #aaa;padding:1em 0}td,th{padding:.3em}</style>",
         "<h1>CP5 visual review pack</h1>",
@@ -189,14 +190,18 @@ def write_page(
                 )
                 if item["kind"] == "photo" and item.get("source_view_name"):
                     parts.append(_link("photos", item["source_view_name"], "Source (neutral)"))
+                figures = []
                 for key, label in (("source_thumb", "Source"), ("corrected_thumb", "Corrected")):
                     if item.get(key):
                         name = str(item[key])
                         _link("thumbs", name, label)  # Validate the name before constructing src.
-                        parts.append(
+                        figures.append(
                             f'<figure><img src="{quote("thumbs/" + name)}" alt="{label}">'
                             f"<figcaption>{label}</figcaption></figure>"
                         )
+                if figures:
+                    # One non-wrapping row per pair: source left, corrected right.
+                    parts.append('<div class="pair">' + "".join(figures) + "</div>")
                 if item.get("pair_name"):
                     parts.append(_link("pairs", item["pair_name"], "Pair clip (viewing aid)"))
                 for still in item.get("stills", []):
