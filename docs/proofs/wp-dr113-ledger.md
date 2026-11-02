@@ -667,3 +667,222 @@ all four files as ASCII with CR=0, 57 unique new nodes with valid outcomes, and
 is clean; `git status --short` names exactly these three tests and this ledger.
 This turn is one logical RED-test change; no implementation or completion of
 the overall package is claimed. No STOP/dispute remains for this rung.
+
+## Session 2 / Turn 3: GREEN
+
+Session boundary: this is the fresh session-2 GREEN cell, based on `a7e99af0`.
+Session 1 ended turn 1 at 147,692 tokens and retired after turn 2 at 216,276
+(dispatcher readings supplied in this dispatch). Round 0 and turn 2 are retained
+above; R0-1, R0-2 and R0-3 are implemented without new rulings. This turn is one
+logical instrument implementation, not overall package acceptance.
+
+Depth after session 2 / turn 3: DISPATCHER TO FILL (no cell estimate).
+
+| Round / rung | Critical | Major | Minor | In/out envelope | NEW/REOPENED | Reverts | Product-code / test-only fixes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Turn 3 GREEN, before Reviewer A round 1 | No reviewer findings yet | No reviewer findings yet | One self-verification note-duplication issue confirmed and fixed | In envelope | NEW self-finding; no REOPENED reviewer finding | 0 | 0 product-code; 0 test-only; 2 instrument files implemented |
+
+### Implementation and contracts
+
+- `tools/container_spike/compare.py:1121` owns the independent 27-codec
+  `_PCM_BYTES_PER_SAMPLE` table, using packed payload widths, never decoded
+  sample widths or a product reader. Unsupported `pcm_*` names refuse with
+  their codec named in the PCM note. `_pcm_format` at `:1165` validates positive
+  clocks/rates/channels and known sample formats; the packet helper compares
+  codec, exact time base, rate, channels and sample format before sample extents.
+- `_pcm_extent` at `compare.py:1182` counts presented and stored sample frames
+  separately and merges only exactly adjacent packets into maximal runs. The
+  docstring explicitly says runs are in source ticks and require equal time
+  bases. Missing timing, nonintegral sample/tick evidence and disallowed partial
+  frames refuse. There is no duration rounding, clock slack or run sorting.
+- `_pcm_packet_item` at `compare.py:1220`, dispatched at `:1403`, replaces only
+  source-codec `pcm_*` items. A successful item records both extents, source-tick
+  runs and format evidence and carries the exact commissioned packet-count note.
+  The generic packet-row helper and compressed item data/status/note stay intact.
+- `_cut_items` at `tools/video_fidelity.py:1009` passes the existing source window
+  (absent pts or pts strictly before readable end) to that instrument helper.
+  Only with `cut` true does each kept source packet present min(declared, stored)
+  samples, with floor(size / bytes-per-frame) allowed only for the final kept
+  source packet. The output stays strict. Compressed/telemetry cut rows stay as
+  before.
+- `_audio_side_item` at `video_fidelity.py:1026` uses the final PCM packet item's
+  format/extents/runs only when both compared windows have no discard flag and no
+  packet side data. Its source window is selected independently of output packet
+  count. The separate instrument ffprobe side-data read must cover every packet.
+  Invalid PCM evidence forces DIFFERENT even if both rendered values happen to
+  match. Otherwise the old per-packet fallback (including its compressed D86
+  slice) is used. Identical nonempty side data is not prohibited by a new rule.
+- `video_fidelity.py:1314` collects distinct successful per-stream PCM notes into
+  the returned notes, which `fidelity_record` attaches to `summary.notes` as
+  before. The side-data item joins stream notes, but that joined display string
+  is not added as an extra summary note. Item names/classes/clauses, ROSTER,
+  `compare.build_record` schema and WP4.4 note behavior are unchanged.
+- No new product import was added. The preexisting `video_fidelity` import of
+  `read_packet_table`/`readable_end` serves the unchanged video readable-end
+  discovery only; none of the new PCM format, sample, run or side-data reading
+  calls it. Product/instrument audio agreement imports remain in tests only.
+
+### Commands and final outcomes
+
+All runner output is under `work/wp-dr113/t3/`. Every pytest invocation used
+`PYTHONPATH=scripts`, unset `PYTEST_ADDOPTS`, `-p sandbox_mkdir_shim
+-p no:cacheprovider` and a fresh worktree basetemp. All pytest selections added
+`-m "not gpu and not footage and not slow and not fullclip"`. No prohibited
+marker or full suite ran, and no owner footage was opened.
+
+New-node command (the eight committed roots select all 57 nodes):
+
+```text
+uv run pytest -vv --tb=short tests/test_container_spike_compare_equivalences.py::test_pcm_sample_extent_equivalence tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product tests/test_container_spike_compare_equivalences.py::test_pcm_compressed_and_absent_paths_unchanged tests/test_video_fidelity.py::test_pcm_d86_sample_extent_equivalence tests/test_video_fidelity.py::test_pcm_d86_difference_control tests/test_video_fidelity.py::test_pcm_side_data_control tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink -m "not gpu and not footage and not slow and not fullclip" --basetemp=work/wp-dr113/tmp/t3-green -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp-dr113/t3/green.xml > work/wp-dr113/t3/green.log 2>&1
+```
+
+Result: **57 passed**, exit 0. All 28 REDs become GREEN and all 29 baseline-green
+controls remain GREEN. Every one also appears passing in the final 113-node
+light run after the note-duplication fix. The 17 agreement rows assert both the
+product's expected outcome and instrument SAME iff product pass. The five
+real-sink rows retain decoded-byte/product assertions and pass V4 plus PCM notes;
+only d86-70 is claimed as integration re-chunking (50 -> 49 packets).
+
+Existing whole-module light regression command:
+
+```text
+uv run pytest -q tests/test_container_spike.py tests/test_container_spike_compare_equivalences.py tests/test_video_fidelity.py -m "not gpu and not footage and not slow and not fullclip" --basetemp=work/wp-dr113/tmp/t3-regression-final -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp-dr113/t3/regression-final.xml > work/wp-dr113/t3/regression-final.log 2>&1
+```
+
+Result: **170 passed, 3 deselected**, exit 0. The initial same selection also
+passed 170 tests (`regression.log`); the final run follows the multi-stream note
+fix. No existing test row was changed, and no committed test file changed this
+turn.
+
+The brief's light run, with the binding shim/marker exclusions:
+
+```text
+uv run pytest -q tests/test_container_spike_compare_equivalences.py tests/test_video_fidelity.py tests/test_io_video_encode.py -k "pcm or audio or equival" -m "not gpu and not footage and not slow and not fullclip" --basetemp=work/wp-dr113/tmp/t3-light -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp-dr113/t3/light.xml > work/wp-dr113/t3/light.log 2>&1
+```
+
+Result: **113 passed, 130 deselected**, exit 0. This is all 57 new nodes plus the
+same 56 existing passing light nodes from turn 2. No skips/errors/failures in any
+of these three final node sets.
+
+Static checks (final logs):
+
+```text
+uv run ruff check tools/container_spike/compare.py tools/video_fidelity.py > work/wp-dr113/t3/ruff-final.log 2>&1
+uv run ruff format --check tools/container_spike/compare.py tools/video_fidelity.py > work/wp-dr113/t3/format-final.log 2>&1
+uv run mypy > work/wp-dr113/t3/mypy-final.log 2>&1
+```
+
+All exit 0: `All checks passed!`, `2 files already formatted`, and
+`Success: no issues found in 154 source files`. Formatter-preserved CRLF was
+normalized to LF in only the two owned instrument files before these final
+checks. The evidence summary script checks ASCII and CR=0 for all three
+submitted files. `git diff --check` is clean.
+
+### Per-node before -> after (from the JUnit files)
+
+| Node ID | Before | After |
+| --- | --- | --- |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_sample_extent_equivalence[img6731-coalesced]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_sample_extent_equivalence[img6729-moved-boundary]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_sample_extent_equivalence[gapful-rechunked]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[one-sample-fewer]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[presented-only]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[stored-only]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[rate]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[format]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[channels]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[codec-aac]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[time-base]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[one-tick-shift]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[swapped-packets]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[closed-gap]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[opened-gap]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-alaw]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-mulaw]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-bluray]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-dvd]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-lxf]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-s24daud]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-sga]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-vidc]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-unlisted]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[img6731-coalesced]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[img6729-moved-boundary]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[gapful-rechunked]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[d86-55]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[d86-70]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[d86-85]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[one-sample-fewer]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[presented-only]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[stored-only]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[rate]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[format]` | RED | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[channels]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[time-base]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[closed-gap]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[opened-gap]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[earlier-source-partial]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[output-partial]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_compressed_and_absent_paths_unchanged[compressed-intact]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_compressed_and_absent_paths_unchanged[compressed-rechunked]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_compressed_and_absent_paths_unchanged[mixed]` | GREEN | GREEN |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_compressed_and_absent_paths_unchanged[absent]` | GREEN | GREEN |
+| `tests/test_video_fidelity.py::test_pcm_d86_sample_extent_equivalence[d86-55]` | RED | GREEN |
+| `tests/test_video_fidelity.py::test_pcm_d86_sample_extent_equivalence[d86-70]` | RED | GREEN |
+| `tests/test_video_fidelity.py::test_pcm_d86_sample_extent_equivalence[d86-85]` | RED | GREEN |
+| `tests/test_video_fidelity.py::test_pcm_d86_difference_control[earlier-source-partial]` | GREEN | GREEN |
+| `tests/test_video_fidelity.py::test_pcm_d86_difference_control[output-partial]` | GREEN | GREEN |
+| `tests/test_video_fidelity.py::test_pcm_side_data_control[discard]` | GREEN | GREEN |
+| `tests/test_video_fidelity.py::test_pcm_side_data_control[side-data]` | GREEN | GREEN |
+| `tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink[trim-380-over-472]` | RED | GREEN |
+| `tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink[trim-148-over-240]` | RED | GREEN |
+| `tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink[d86-55]` | RED | GREEN |
+| `tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink[d86-70]` | RED | GREEN |
+| `tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink[d86-85]` | RED | GREEN |
+
+### Owner verification loop and handoff
+
+Pass 1:
+
+- Suspected boundary-only false differences: CONFIRMED by the committed RED
+  assertions, FIXED by independent exact totals/runs; all six synthetic faithful
+  shapes and five real-sink derivatives pass, with note assertions intact.
+- Suspected excessive relaxation: REJECTED as a remaining fault by the planted
+  extent, format, time-base, shifted/swapped-packet, gap, early-source partial,
+  output partial, unknown-width, discard and side-data controls. All stay green
+  as tests that require the appropriate DIFFERENT verdict.
+- Suspected summary duplication for multiple PCM streams [MINOR, in envelope]:
+  CONFIRMED by `verify_extra.py`, two successful stream notes produced three
+  summary notes because the aggregate side note was copied too (`extra-before.log`,
+  exit 1). FIXED by collecting packet-item notes plus distinct stream-side notes,
+  not the side item's joined string. The same two-stream reading now produces
+  exactly two notes (`extra-final.log`, exit 0). No test was weakened.
+
+Pass 2 (complete pass after the fix):
+
+- The independent scratch check compares all serialized items for intact and
+  damaged compressed Facts against the committed baseline implementation:
+  baseline-identical. It separately proves the compressed and ineligible PCM
+  side-data fallback, including identical nonempty side data and the legacy D86
+  slice: baseline-identical. Missing independent PCM side-data evidence reads
+  DIFFERENT. These are direct supplemental checks, not extra pytest pass counts.
+- The scratch baseline-loader initially lacked `__file__`; this verification
+  setup error was corrected without any instrument change, and the full scratch
+  check passed. It was never counted as product or GREEN evidence before passing.
+- All 57 new nodes pass in the final light selection; the final whole-module
+  regression and final static checks pass. The full pass found no new issue.
+- Scope/locks: exactly the two owned tools and this ledger changed; no src,
+  frozen interface, dependency, media fixture, local configuration, mailbox,
+  register, decision, WP4.4 proof, other worktree or footage-folder change/read.
+  ASCII and LF are checked on the submitted files. No timing/memory figure is
+  claimed and no heavy run was taken alongside WP5.2.
+
+Deviation: none from the adopted rulings or this turn's scope. Open questions:
+none for this rung. The sample CONTENT limit remains exactly the commissioned
+F-B2 exclusion: PCM extent/run equality drops per-packet MD5 and does not prove
+sample content; decoded-sample MD5 is a possible later item, not built here.
+
+Reviewer A round 1 is NEXT at the dispatcher's seat. Reviewer A convergence,
+Reviewer B, the report turn (`docs/reports/wp-dr113-v4-pcm.md`), the three-leg
+rebased gate and owner PCM witness remain pending; this turn claims only GREEN
+implementation and its authorized light validation. YIELD for Reviewer A.

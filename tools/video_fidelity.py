@@ -1002,6 +1002,13 @@ def _cut_items(
             whole = source.packets.get(index, []) if index is not None else []
             kept = [p for p in whole if p.pts is None or p.pts < end]
             got_packets = output.packets.get(out_index, []) if out_index is not None else []
+            if name.startswith(AUDIO_PACKETS) and str(
+                compare._audio_stream(source, key).get("codec_name", "")
+            ).startswith("pcm_"):
+                result.append(
+                    compare._pcm_packet_item(item, source, output, key, kept=kept, d86=True)
+                )
+                continue
             want_packets, got_rows = compare._packet_rows(kept), compare._packet_rows(got_packets)
             item = compare.Item(
                 name,
@@ -1014,6 +1021,81 @@ def _cut_items(
             )
         result.append(item)
     return result
+
+
+def _audio_side_item(
+    source: compare.Facts,
+    output: compare.Facts,
+    items: Sequence[compare.Item],
+    *,
+    end: Fraction | None,
+    cut: bool,
+) -> tuple[compare.Item, list[str]]:
+    """Compare priming rows, using PCM extents only without discard flags or side data.
+
+    Compressed and ineligible PCM streams retain the per-packet rule, including
+    its D86 output-count slice. Eligible PCM uses the same source packet window
+    as the packet item, independently of how many output packets the sink wrote.
+    """
+    whole_side, out_side = audio_side_data(source), audio_side_data(output)
+    src_side = whole_side
+    if cut:
+        out_counts = {k: len(v) for k, v in out_side.items()}
+        src_side = {k: v[: out_counts.get(k, 0)] for k, v in src_side.items()}
+    # Work on copies so the exact legacy rows remain available for fallback.
+    src_side, out_side = dict(src_side), dict(out_side)
+    notes: list[str] = []
+    refusals: list[str] = []
+    packet_items = {i.name: i for i in items if i.name.startswith(AUDIO_PACKETS)}
+    for stream in compare._streams_of(source, "audio"):
+        if not str(stream.get("codec_name", "")).startswith("pcm_"):
+            continue
+        index = int(stream["index"])
+        key = source.keys[index]
+        out_stream = compare._audio_stream(output, key)
+        if not out_stream:
+            continue
+        packets = source.packets.get(index, [])
+        src_rows = whole_side.get(key, [])
+        out_rows = out_side.get(key, [])
+        # A second probe must account for every packet before its empty rows can
+        # establish that there is no priming or side data to preserve.
+        if len(src_rows) != len(packets) or len(out_rows) != len(
+            output.packets.get(int(out_stream["index"]), [])
+        ):
+            refusals.append(f"PCM: incomplete priming/side-data packet evidence [{key}]")
+            continue
+        if cut and end is not None:
+            src_rows = [
+                row
+                for packet, row in zip(packets, src_rows, strict=True)
+                if packet.pts is None or packet.pts < end
+            ]
+        if any(row[1] or row[2] for row in (*src_rows, *out_rows)):
+            continue
+        packet_item = packet_items[f"{AUDIO_PACKETS} [{key}]"]
+        src_side[key] = [["PCM sample extent and timeline runs", packet_item.source]]
+        out_side[key] = [["PCM sample extent and timeline runs", packet_item.output]]
+        if packet_item.status == compare.SAME:
+            if packet_item.note not in notes:
+                notes.append(packet_item.note)
+        else:
+            refusals.append(packet_item.note)
+    item = compare._sequence_item(
+        "audio priming and packet side data",
+        compare.MANDATORY,
+        "7.5",
+        [[k, *row] for k in sorted(src_side) for row in src_side[k]],
+        [[k, *row] for k in sorted(out_side) for row in out_side[k]],
+        compare._sequence_summary,
+    )
+    if notes or refusals:
+        item = replace(
+            item,
+            status=compare.DIFFERENT if refusals else item.status,
+            note="; ".join(part for part in (item.note, *notes, *refusals) if part),
+        )
+    return item, notes
 
 
 def movie_duration_item(
@@ -1227,21 +1309,22 @@ def fidelity_items(
             audio_configuration(output),
         )
     )
-    src_side, out_side = audio_side_data(source), audio_side_data(output)
     if cut:
         notes.append("D86: audio side data compared on the source packets kept")
-        out_counts = {k: len(v) for k, v in out_side.items()}
-        src_side = {k: v[: out_counts.get(k, 0)] for k, v in src_side.items()}
-    items.append(
-        compare._sequence_item(
-            "audio priming and packet side data",
-            compare.MANDATORY,
-            "7.5",
-            [[k, *row] for k in sorted(src_side) for row in src_side[k]],
-            [[k, *row] for k in sorted(out_side) for row in out_side[k]],
-            compare._sequence_summary,
-        )
-    )
+    side_item, pcm_notes = _audio_side_item(source, output, items, end=end, cut=cut)
+    items.append(side_item)
+    for note in (
+        *(
+            i.note
+            for i in items
+            if i.name.startswith(AUDIO_PACKETS)
+            and i.status == compare.SAME
+            and i.note.startswith("PCM:")
+        ),
+        *pcm_notes,
+    ):
+        if note not in notes:
+            notes.append(note)
     items.append(_missing_pts_item(source, output))
     items = [_redact(item) for item in items]
     items.append(roster_item(items))

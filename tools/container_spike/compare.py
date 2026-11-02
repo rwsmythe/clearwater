@@ -1116,6 +1116,156 @@ def _keyed_packet_items(
     return items
 
 
+# Packed payload widths, independently enumerated from FFmpeg's fixed-width PCM codecs.
+# Decoded sample_fmt is not a payload width (for example, 24-bit PCM decodes to s32).
+_PCM_BYTES_PER_SAMPLE = {
+    **dict.fromkeys(("pcm_s8", "pcm_s8_planar", "pcm_u8"), 1),
+    **dict.fromkeys(
+        (
+            "pcm_s16be",
+            "pcm_s16be_planar",
+            "pcm_s16le",
+            "pcm_s16le_planar",
+            "pcm_u16be",
+            "pcm_u16le",
+            "pcm_f16le",
+        ),
+        2,
+    ),
+    **dict.fromkeys(
+        ("pcm_s24be", "pcm_s24le", "pcm_s24le_planar", "pcm_u24be", "pcm_u24le", "pcm_f24le"),
+        3,
+    ),
+    **dict.fromkeys(
+        (
+            "pcm_s32be",
+            "pcm_s32le",
+            "pcm_s32le_planar",
+            "pcm_u32be",
+            "pcm_u32le",
+            "pcm_f32be",
+            "pcm_f32le",
+        ),
+        4,
+    ),
+    **dict.fromkeys(("pcm_s64be", "pcm_s64le", "pcm_f64be", "pcm_f64le"), 8),
+}
+_PCM_SAMPLE_FORMATS = frozenset(
+    ("u8", "s16", "s32", "s64", "flt", "dbl", "u8p", "s16p", "s32p", "s64p", "fltp", "dblp")
+)
+
+
+def _audio_stream(facts: Facts, key: str) -> dict[str, Any]:
+    """Find an audio stream by its cross-file pairing key."""
+    return next(
+        (s for s in _streams_of(facts, "audio") if facts.keys.get(int(s["index"])) == key), {}
+    )
+
+
+def _pcm_format(stream: Mapping[str, Any]) -> tuple[str, Fraction, int, int, str]:
+    """Validate the format evidence needed for an exact PCM sample reading."""
+    codec = str(stream.get("codec_name", ""))
+    if codec not in _PCM_BYTES_PER_SAMPLE:
+        raise ValueError(f"unknown packed sample width for {codec!a}")
+    try:
+        base = _time_base(stream)
+        rate = int(str(stream.get("sample_rate", "")))
+        channels = int(str(stream.get("channels", "")))
+    except (ProbeError, ValueError):
+        raise ValueError("missing or invalid PCM clock, rate or channels") from None
+    sample_fmt = str(stream.get("sample_fmt", ""))
+    if base <= 0 or rate <= 0 or channels <= 0 or sample_fmt not in _PCM_SAMPLE_FORMATS:
+        raise ValueError("missing or invalid PCM clock, rate, channels or sample format")
+    return codec, base, rate, channels, sample_fmt
+
+
+def _pcm_extent(
+    packets: Sequence[Packet], base: Fraction, rate: int, frame_bytes: int, *, d86: bool
+) -> dict[str, Any]:
+    """Read presented/stored totals and maximal contiguous runs in source ticks.
+
+    Run equality depends on the caller requiring equal time bases. Only a D86
+    source window caps presented samples at stored samples and floors a partial
+    sample frame in its final packet; output packets are always read strictly.
+    """
+    presented_total = stored_total = 0
+    runs: list[tuple[Fraction, Fraction]] = []
+    for position, packet in enumerate(packets):
+        if packet.pts is None or packet.duration is None or packet.duration < 0 or packet.size < 0:
+            raise ValueError("missing or invalid PCM packet pts, duration or payload size")
+        start, duration = packet.pts / base, packet.duration / base
+        presented = packet.duration * rate
+        if start.denominator != 1 or duration.denominator != 1 or presented.denominator != 1:
+            raise ValueError("PCM packet timing is not exact ticks and whole samples")
+        stored, remainder = divmod(packet.size, frame_bytes)
+        if remainder and not (d86 and position == len(packets) - 1):
+            raise ValueError("partial PCM sample frame outside the final D86 source packet")
+        if d86:
+            presented = min(presented, Fraction(stored))
+            duration = presented / (base * rate)
+        presented_total += int(presented)
+        stored_total += stored
+        end = start + duration
+        if runs and start == runs[-1][1]:
+            runs[-1] = (runs[-1][0], end)
+        else:
+            runs.append((start, end))
+    return {
+        "presented samples": presented_total,
+        "stored samples": stored_total,
+        "timeline runs (source ticks)": [[exact(start), exact(end)] for start, end in runs],
+    }
+
+
+def _pcm_packet_item(
+    item: Item,
+    source: Facts,
+    output: Facts,
+    key: str,
+    *,
+    kept: Sequence[Packet] | None = None,
+    d86: bool = False,
+) -> Item:
+    """Replace only a source raw-PCM packet verdict with the independent extent reading.
+
+    The unchanged item is returned for compressed or absent source audio. Runs
+    are compared in source ticks and depend on the equal-time-base requirement.
+    """
+    src, out = _audio_stream(source, key), _audio_stream(output, key)
+    if not str(src.get("codec_name", "")).startswith("pcm_"):
+        return item
+    left_packets = source.packets.get(int(src["index"]), []) if kept is None else kept
+    right_packets = output.packets.get(int(out["index"]), []) if out else []
+    left: Any = item.source
+    right: Any = item.output
+    try:
+        left_format, right_format = _pcm_format(src), _pcm_format(out)
+        left = {"format": [str(v) for v in left_format]}
+        right = {"format": [str(v) for v in right_format]}
+        if left_format != right_format:
+            raise ValueError(
+                "codec, time base, sample rate, channel count or sample format differs"
+            )
+        codec, base, rate, channels, _ = left_format
+        frame_bytes = channels * _PCM_BYTES_PER_SAMPLE[codec]
+        left.update(_pcm_extent(left_packets, base, rate, frame_bytes, d86=d86))
+        right.update(_pcm_extent(right_packets, base, rate, frame_bytes, d86=False))
+    except ValueError as error:
+        return Item(
+            item.name, item.item_class, item.clause, left, right, DIFFERENT, f"PCM: {error}"
+        )
+    same = left == right
+    note = (
+        "PCM: compared by sample extent and timeline runs; "
+        f"packets {len(left_packets)} -> {len(right_packets)}"
+        if same
+        else "PCM: presented/stored sample totals or timeline runs differ"
+    )
+    return Item(
+        item.name, item.item_class, item.clause, left, right, SAME if same else DIFFERENT, note
+    )
+
+
 def compare_facts(source: Facts, output: Facts) -> list[Item]:
     """Compare two files' facts item by item.
 
@@ -1250,7 +1400,8 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
         )
     )
     items.extend(
-        _keyed_packet_items(
+        _pcm_packet_item(item, source, output, item.name.partition(" [")[2].rstrip("]"))
+        for item in _keyed_packet_items(
             source,
             output,
             "audio packets passed through (pts, duration, size, MD5)",
