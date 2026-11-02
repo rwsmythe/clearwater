@@ -84,7 +84,9 @@ capped arc's subscription usage is compared against the transcript-derived figur
 re-reads the whole context, so a turn at 900K costs about 2.25x a turn at 400K for the same work;
 on this harness's record 68% of all read tokens landed on turns above 400K. Rules:
 - **A generation rolls AFTER its depth has REACHED ~400K tokens, at the NEXT boundary** (after an
-  accept, before a dispatch, never mid-review or with a cell in flight) -- not at window exhaustion
+  accept, before a dispatch, never mid-review, never with a cell in flight or a job of its own
+  still running -- a build piece or gate leg spawned from the pane dies with the pane; operator-
+  directed 2026-11-02 after gen 32 lost a 95-minute piece that way) -- not at window exhaustion
   and **NEVER BEFORE 400K (operator-directed 2026-09-25, verbatim: "turnovers should not be
   considered until after 400k is hit, then the roll should happen at the next available
   opportunity"; an orchestrator generation had rolled at ~260K; the operator's stated concern is

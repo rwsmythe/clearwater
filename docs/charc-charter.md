@@ -110,7 +110,18 @@ few tens of thousands of tokens. The prompt hook reports the depth every turn; r
 role's own act under this convention.
 
 **THE ROLLOVER SEQUENCE (added 2026-09-07, operator-directed; every generation of every role).**
-Four acts, in this order, nothing between them -- **after ONE precondition: NO CELL IN FLIGHT.**
+Four acts, in this order, nothing between them -- **after ONE precondition: NOTHING THE
+GENERATION STARTED IS STILL RUNNING** -- no cell in flight, and no background job of its own
+(a build piece, a gate leg, a footage run, any process spawned from its pane). **Operator-directed
+2026-11-02, verbatim: "the generations should not have handed over if the previous generation was
+still working."** A process spawned from a session's pane is that pane's child and dies when the
+pane closes, whatever the state file says about it: on 2026-11-01 an orchestrator generation rolled
+at ~405K with a 95-minute review-pack piece running as its pane's background child; the piece died
+mid-export when the pane closed, its 20 finished outputs were orphaned, and the whole piece re-ran.
+So the roll goes in the GAP between pieces: at the cap with a job running, the generation waits for
+the job's exit line, records it, and then rolls; and a generation near the cap starts NO long job
+it cannot see finish (the depth check comes BEFORE the dispatch, not after). The cell form of the
+same precondition:
 A subagent does not die when its parent announces a rollover; it dies when the parent SESSION
 ends, and the four acts leave the old session alive. So a generation with a working cell rolls
 only after that cell has YIELDED and its committed head is recorded (or, if it cannot be waited

@@ -191,7 +191,12 @@ orchestrator inbox (no session_id, no newest-live, no registry). A director neve
 has to pick a generation.
 
 **THE ROLLOVER SEQUENCE (added 2026-09-07, operator-directed; charter Sec 5.1 has the generic
-form).** Four acts, in this order, nothing between them: (1) overwrite and COMMIT
+form).** PRECONDITION (operator-directed 2026-11-02, verbatim: "the generations should not have
+handed over if the previous generation was still working"): NOTHING YOU STARTED IS STILL RUNNING --
+no cell in flight, no build piece, gate leg or footage run spawned from your pane (it dies with the
+pane; gen 32 lost a 95-minute piece that way on 2026-11-01). At the cap with a job running, wait for
+its exit line and record it, then roll; near the cap, start no long job you cannot see finish.
+Four acts, in this order, nothing between them: (1) overwrite and COMMIT
 `docs/orchestrator-state.md` -- the successor reads it at HEAD; (2) post the rollover announcement
 and STOP DRAINING -- `peek` only from here, and the stop hook's "drain now" is VOID for an outgoing
 generation; (3) `TaskStop` the inbox Monitor if the named exception above left one armed (ordinarily
