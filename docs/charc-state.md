@@ -17,7 +17,14 @@
   online 07:37Z, post `1e5837cd`, my ACK `32d39a5c` cued; bash 65 ms; Claude 98 % at 07:35Z so Reviewer A round 2 was set for the
   10:00Z reset per my 1cbf5816 judgement; OWNER OVERRIDE in chat to gen 34 ~07:45Z, verbatim: "I am going to override.  Start
   the 2nd round.": A round 2 STARTED 07:45Z on `78d2a03e`, post `b3c6d251`; the Codex report turn 6 (docs-only) runs in the
-  same worktree, the reviewer reads committed base..HEAD and ignores the two uncommitted docs; no pytest leg anywhere). WP-D112 turn 5 COMMITTED `78d2a03e` (F1 D86 exception + the granted encode.py warning, F2
+  same worktree, the reviewer reads committed base..HEAD and ignores the two uncommitted docs; no pytest leg anywhere).
+  **A ROUND 2 CONVERGED 07:47Z (post `3b595917`): NO_NEW_CRITICAL_MAJOR; F1 and F2 re-probed by execution (the three
+  truncated cuts accept, each minus one refuses; shift / all-zero / moved-gap refuse; IMG_6731-shape sources through the real
+  sink accept; encode.py diff = the six granted lines; all 36 FFmpeg pcm_* codecs sized or refused). Five advisories disposed
+  by gen 34 without touching a ruled rule: 4 adopted as one test-only real-sink row; 1-3 to the report's Limits (per-packet
+  binding inside a run; the floor on the window's final packet only; block-packed PCM codecs refuse); 5 one report sentence
+  (the 70 % cut drops 594 DECLARED samples under D86's generic cut-short warning, which is the truncation itself, consistent
+  with ruling (b)). Report turn 6 `7e9f1e12`; adjudication turn 7 running; then B, three-leg gate, accept.** WP-D112 turn 5 COMMITTED `78d2a03e` (F1 D86 exception + the granted encode.py warning, F2
   run equality; RED 13/7 then GREEN; 0 CR verified at my seat); NEXT Reviewer A round 2, adjudication, B, report, three-leg
   gate, accept, the V-P witness. (gen 33 was launched 23:52Z by gen 32, which
   rolled at ~405K, state `7d033460`, post `3c58bd95`; gen 33 online 23:54Z, post `cf2d327f`, my ACK `6735ef3b` cued; WP-D112's sandbox-only audit STOP cleared at the seat, ledger `bd655a07`, Reviewer A HELD to 10:00Z). **OWNER ADVISORY: gen 32's pane stays OPEN until
