@@ -35,8 +35,14 @@
   verified in `work/orch-g33/wp53-runs/summary.txt`; C: 155 GB free; pack.json: P-A 64, P-Z 9, V-S 26, V-P 8 done + 9 failed
   (DR-112), pending V-D 8 / V-Z 2 / V-R 2); ALL BUILD PIECES DONE 05:41Z (post `d28aac15`; V-D 3162 s, V-Z 374 s, V-R 3 s with both HLG
   refusals verbatim, page exit 1 by design, page --check 0, tally 0; read-backs `1f8b036a`..`e23dfd3c`, ledger-only; pack 128 =
-  117 done / 9 V-P failed (DR-112) / 2 V-R refused / pending 0; 603 targets resolve; C: 151 GB); report turn 20 running in
-  Codex session 7, then the two-leg gate (host time), then the accept with the V-P rows loud; WP-D112 Reviewer A waits on
+  117 done / 9 V-P failed (DR-112) / 2 V-R refused / pending 0; 603 targets resolve; C: 151 GB); report written; gate w53 GREEN on
+  `b6521664` (rebased, patch-ids identical; parallel 6,446 / 1 skip 699 s; serial ALONE 1,255 / 11 skip, 0 failed, 2,752 s
+  vs 2,039 at WP5.1; harness 382 OK); MY RULING `d4224524` (query `977d2851`): ACCEPT NOW with B-F4 as measured (5.75 /
+  5.63 s under -n 4; no wall-clock bound asserted, so CLAUDE.md's slow rule does not bite); the `slow` marker with its
+  reason goes on both parametrisations in the post-witness read-back turn, named in the accept record, covered by WP5.2's
+  gate. OPEN: a 61 GB C: drop during the gate (154 -> 93 GB) unexplained by 1.9 GB of basetemps; the orchestrator sources
+  it (proxy cache, Temp, work/, pagefile) before any window opens; STOP if ours and growing. WP-D112 Reviewer A round 1
+  started 06:58Z on the owner's word (Claude 97 % at 06:14Z); WP-D112 Reviewer A waits on
   the owner lifting the Claude pause; the first run DIED 00:36:53Z with gen 32's pane (its 33
   orphans moved, not deleted, to `work/orch-g33/vs-orphans/`, pruned only on the owner's word). **OWNER RULE carried into the
   kernel, main `215b1fd6` (owner verbatim: "the generations should not have handed over if the previous generation was still
