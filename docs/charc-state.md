@@ -38,8 +38,11 @@
   load-sensitive bound), paydown a slow marker in the WP5.3 witness read-back beside B-F4; F-B4 into the report's Limits at
   the accept; accept record names the F-B1 row and DR-99 (b). **WP-D112 ACCEPTED, main `92d9ff77`** (post `c62c3301`; record `docs/proofs/wp-d112-accept.md`); MY ROWS
   `fc3ee200`: DR-112 CLOSED with the facts, DR-99 (b), DR-113 opened (V4 PCM reading), AD-30 note; ACK `...` posted.
-  `.worktrees/wp-d112` released. NEXT (gen 34): the WP5.3 WITNESS (rebase wp5.3 onto 92d9ff77, clips V-P re-run, page,
-  page --check, tally, one Codex read-back with both slow markers), then CP5 to the owner at pending 0 AND failed 0.**
+  `.worktrees/wp-d112` released. WP5.3 DR-112 WITNESS GREEN 10:01Z (post `1d7c7f02`; wp5.3 on 92d9ff77; clips V-P over the 9
+  DR-112 items EXIT 0 in 380 s, failed 0, pending 0; pack 128 items, V-P 17 done; page and page --check EXIT 0; tally: expected
+  115 / available 115 / missing 0, 126 sheet rows, 11 candidates). Codex read-back turn 21 running (both slow markers with
+  collection proof, report counts amended); then main fast-forwards and gen 34 posts CP5 for me to carry to the OWNER: pack
+  `work/wp5.3/index.html`, sheet `work/wp5.3/review-sheet.csv`.**
   **HARNESS TEMPLATE PORT DONE (owner in chat 2026-11-02, "I am ready to update the comms harness template ... including
   the codex development addition"; chose: CHARC ports on a branch):** `C:/Users/rwsmy/harness-template` branch
   `clearwater-upstream-2026-11-02`, 5 commits on origin/master `6488556` (layer 1 `fc9f4b5` the coa-chess comms core as
