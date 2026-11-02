@@ -244,7 +244,8 @@ at the ORCHESTRATOR seat from the repo root in Git Bash, after Reviewer A and
 the WP-DR113 gate, with no WP-DR113 reviewer or other heavy activity. No window
 is opened by this turn.
 
-Before EACH window: `df -h /c` (STOP below 25 GB free), available RAM,
+Before EACH window: `df -h /c` (STOP below 25 GB for W52-1;
+30 GB for W52-2), available RAM,
 `nvidia-smi --query-gpu=clocks.sm,clocks.mem,temperature.gpu,memory.free,memory.used --format=csv`,
 and the process strays. Repeat conditions/strays at close. Open/close to CHARC;
 no tests, reviewer, V4 witness or other heavy work during a window. GX011625 is
@@ -257,6 +258,7 @@ Shared seat setup (reads configuration; do not substitute this cell's cwd):
 ```bash
 unset PYTEST_ADDOPTS
 WORK52=$(uv run python -c "import sys; sys.path.insert(0,'tools'); from local_config import load_local_config; print((load_local_config().working_path/'wp5.2').as_posix())")
+: "${WORK52:?}"
 export WORK52
 mkdir -p "$WORK52/v16/W52-1" "$WORK52/W52-2"
 ```
@@ -265,28 +267,108 @@ mkdir -p "$WORK52/v16/W52-1" "$WORK52/W52-2"
 mapped in section 1, device frames enabled, no --keep:
 
 ```bash
+: "${WORK52:?}"
 uv run python tools/export_bench.py v16 --device-frames --subdir wp5.2/v16/W52-1 > "$WORK52/v16/W52-1/W52-1-v16.log" 2>&1
 ```
 
-Read exit status immediately (3 means memory breach; never continue the plan).
+Read exit status immediately. On exit 3, read the printed record's
+`memory_check` for the stopped row: memory check failed (a breach, or the
+device peak unmeasured). Never continue the plan; distinguish those causes.
 Use the exact printed RECORD path to rename that JSON byte-preserving with
 the `W52-1-` prefix, beside the original location, recording pre/post SHA256.
 Keep prior failed attempts too; do not select an arbitrary glob result. Require
 eight records on success, read memory checks, resolved encoders and all keys
 in section 1. No benchmark edit beyond DR-72 is commissioned.
 
-**R2 preparation / W52-2.** WHOLE GX011627: 681 frames / about 22.7 s.
-No time cap, frame duplication, or session-trim substitution. Exact stream copy:
+**R2 / W52-2: ONE self-contained bash script.** Save the following ONE
+block under the main tree's `work/wp5.2/W52-2/` at the seat and run it as
+ONE `bash <file>` invocation from the repo root. The script file is never
+committed. No shell state is inherited from the shared R1 setup. It computes
+and validates WORK52, refuses below **30 GB** free, and preserves each attempt
+in `W52-2/attempt-<UTC>-<pid>/`. Each stop file is unique to that attempt.
+Records retain the required W52-2-r2-held / -free / -cpu names inside it.
+
+WHOLE GX011627 is 681 frames / about 22.7 s, stream-copied without a time
+cap or duplication. The holder targets 1536 MiB device-wide free, with an
+automated inclusive **1280-1792 MiB** DURING band. Outside that band the script
+releases/reaps it and exits 2 before exporting; the seat retries, with no
+manual pause or automatic re-size. Timeout is 900 s. An EXIT trap releases
+the holder on normal shell exits (not an uncatchable kill); liveness receipts
+before and after the held export qualify the pressure observation.
+
+The held export's exit is an OBSERVATION: no assertion requires zero. Every
+held outcome proceeds to recovery and the free/CPU exports, subject to the
+explicit free-card safety guard: after stopping/reaping the holder, poll for
+device-wide used <= pre-holder + **100 MiB**, within **30 s**, otherwise
+record refusal and exit 2. Free vs CPU comparison is always attempted after
+those two exports. Held vs free is compared only on held exit 0 and GPU route;
+otherwise the comparison record states why it was skipped. R3 remains the
+D111 engagement witness; cross-process pressure does not promise fallback.
 
 ```bash
-uv run python - > "$WORK52/W52-2/W52-2-copy.log" 2>&1 <<'PY'
+set -euo pipefail
+unset PYTEST_ADDOPTS
+# All setup, copy, holder, exports and comparison run in THIS bash process.
+WORK52=$(uv run python - <<'PY'
+import sys
+sys.path.insert(0, 'tools')
+from local_config import load_local_config
+from spike_io.guard import WriteGuard
+cfg = load_local_config()
+root = cfg.working_path.resolve() / 'wp5.2'
+guard = WriteGuard(root, cfg.footage_path)
+guard.folder('W52-2')
+print(root.as_posix())
+PY
+)
+: "${WORK52:?}"
+export WORK52
+uv run python - <<'PY'
+import os, shutil, sys
+from pathlib import Path
+sys.path.insert(0, 'tools')
+from local_config import load_local_config
+cfg = load_local_config()
+root = Path(os.environ['WORK52']).resolve()
+assert root == cfg.working_path.resolve() / 'wp5.2'
+assert root.is_relative_to(cfg.working_path.resolve())
+free = shutil.disk_usage(root).free
+print('W52-2 disk_free_bytes', free, 'required', 30_000_000_000)
+if free < 30_000_000_000:
+    raise SystemExit('REFUSED: W52-2 requires at least 30 GB free')
+PY
+# An attempt folder preserves every retry's logs, receipts and outputs.
+ATTEMPT52="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+R2ROOT="$WORK52/W52-2/attempt-$ATTEMPT52"
+mkdir "$R2ROOT"
+export R2ROOT
+STOP52="$R2ROOT/W52-2-r2-hold-$ATTEMPT52.stop"
+HOLDER_PID=''
+release_holder() {
+    touch "$STOP52"
+    if [ -n "$HOLDER_PID" ]; then
+        if wait "$HOLDER_PID"; then HOLDER_STATUS=0; else HOLDER_STATUS=$?; fi
+        printf '%s\n' "$HOLDER_STATUS" > "$R2ROOT/W52-2-r2-holder.exit"
+        HOLDER_PID=''
+    fi
+}
+cleanup() {
+    local status=$?
+    trap - EXIT
+    set +e
+    if [ -n "$HOLDER_PID" ]; then release_holder; fi
+    exit "$status"
+}
+trap cleanup EXIT
+
+uv run python - > "$R2ROOT/W52-2-copy.log" 2>&1 <<'PY'
 import os, subprocess, sys
 from pathlib import Path
 sys.path.insert(0, 'tools')
 from local_config import load_local_config, find_footage_file
 from clearwater.io.video import find_tool, probe
 cfg = load_local_config()
-root = Path(os.environ['WORK52']) / 'W52-2'
+root = Path(os.environ['R2ROOT'])
 assert root.is_relative_to(cfg.working_path.resolve())
 source = find_footage_file('GX011627', cfg.footage_path)
 info = probe(source)
@@ -307,35 +389,21 @@ copied = probe(output).video
 assert copied.nb_frames == 681
 print('WHOLE', output.name, 'frames', copied.nb_frames, 'fps', str(copied.frame_rate))
 PY
-```
 
-**R2 holder and THREE exports / W52-2 (WDDM ruling / DR-114).**
-The existing whole-GX011627 stream-copy command above is unchanged: 681 frames,
-about 22.7 s, no time cap. R2 is now the held/free/forced-CPU characterisation;
-it does NOT promise automatic fallback under cross-process memory pressure.
-R3 supplies the D111 engagement witness. Before starting the holder, size it
-from DEVICE-WIDE free MiB reported by nvidia-smi, never another process's
-`cudaMemGetInfo` or `free_device_bytes()`:
-
-```bash
-unset PYTEST_ADDOPTS
-nvidia-smi --id=0 --query-gpu=memory.free,memory.used --format=csv,noheader,nounits > "$WORK52/W52-2/W52-2-r2-before.csv" || exit $?
-HOLD_MIB=$(uv run python -c "import math,sys; from pathlib import Path; free=float(Path(sys.argv[1]).read_text().strip().split(',')[0]); size=math.floor(free)-1536; assert size>0; print(size)" "$WORK52/W52-2/W52-2-r2-before.csv") || exit $?
-printf '%s\n' "$HOLD_MIB" > "$WORK52/W52-2/W52-2-r2-hold-mib.txt"
-STOP52="$WORK52/W52-2/W52-2-r2-hold.stop"
-test ! -e "$STOP52" || exit 2
-trap 'touch "$STOP52"; if [ -n "${HOLDER_PID:-}" ]; then wait "$HOLDER_PID"; fi' EXIT
-uv run python tools/device_hold.py --mib "$HOLD_MIB" --stop-file "$STOP52" --timeout-s 3600 > "$WORK52/W52-2/W52-2-r2-holder.jsonl" 2> "$WORK52/W52-2/W52-2-r2-holder.stderr" &
+nvidia-smi --id=0 --query-gpu=memory.free,memory.used --format=csv,noheader,nounits > "$R2ROOT/W52-2-r2-before.csv"
+HOLD_MIB=$(uv run python -c "import math,sys; from pathlib import Path; free=float(Path(sys.argv[1]).read_text().strip().split(',')[0]); size=math.floor(free)-1536; assert size>0; print(size)" "$R2ROOT/W52-2-r2-before.csv")
+printf '%s\n' "$HOLD_MIB" > "$R2ROOT/W52-2-r2-hold-mib.txt"
+uv run python tools/device_hold.py --mib "$HOLD_MIB" --stop-file "$STOP52" --timeout-s 900 > "$R2ROOT/W52-2-r2-holder.jsonl" 2> "$R2ROOT/W52-2-r2-holder.stderr" &
 HOLDER_PID=$!
-uv run python - "$WORK52/W52-2/W52-2-r2-holder.jsonl" > "$WORK52/W52-2/W52-2-r2-readiness.log" 2>&1 <<'PY'
+uv run python - "$R2ROOT/W52-2-r2-holder.jsonl" > "$R2ROOT/W52-2-r2-readiness.log" 2>&1 <<'PY'
 import json, sys, time
 from pathlib import Path
 path = Path(sys.argv[1])
 deadline = time.monotonic() + 30
 while True:
     text = path.read_text() if path.exists() else ''
-    if text.endswith('\n'):
-        record = json.loads(text)
+    if '\n' in text:
+        record = json.loads(text.splitlines()[0])
         assert record['held_bytes'] > 0
         assert record['free_before'] > record['free_after']
         print(json.dumps(record))
@@ -343,85 +411,97 @@ while True:
     assert time.monotonic() < deadline, 'holder readiness timeout'
     time.sleep(0.05)
 PY
-test $? -eq 0 || exit 1
-kill -0 "$HOLDER_PID" || exit 1
-nvidia-smi --id=0 --query-gpu=memory.free,memory.used --format=csv,noheader,nounits > "$WORK52/W52-2/W52-2-r2-during.csv" || exit $?
-```
-
-The size targets 1536 MiB (1.5 GiB) device-wide free; the holder's CUDA
-context can reduce it further. Inspect the measured DURING free figure before
-exporting and require about 1.5 GiB free; if context/strays make it materially
-different, stop/re-size the holder from that observed discrepancy and retain
-the calibration readings. Do not call the holder's own free-after a
-device-wide reading. Keep its flushed line and before/during/after CSVs.
-The holder must stay alive throughout the held export. Exact export commands
-(same input, settings, separate fresh cache/output directories):
-
-```bash
+nvidia-smi --id=0 --query-gpu=memory.free,memory.used --format=csv,noheader,nounits > "$R2ROOT/W52-2-r2-during.csv"
+if ! uv run python - "$R2ROOT/W52-2-r2-during.csv" > "$R2ROOT/W52-2-r2-band.log" 2>&1 <<'PY'
+import sys
+from pathlib import Path
+free = float(Path(sys.argv[1]).read_text().strip().split(',')[0])
+print('device-wide free MiB', free, 'required band', [1280, 1792])
+raise SystemExit(0 if 1280 <= free <= 1792 else 2)
+PY
+then
+    release_holder
+    exit 2
+fi
 for leg in held free cpu; do
-    mkdir -p "$WORK52/W52-2/W52-2-r2-$leg/out" "$WORK52/W52-2/W52-2-r2-$leg/cache"
+    mkdir -p "$R2ROOT/W52-2-r2-$leg/out" "$R2ROOT/W52-2-r2-$leg/cache"
 done
-{ time uv run python tools/headless_export.py "$WORK52/W52-2/W52-2-GX011627-whole.mp4" --out "$WORK52/W52-2/W52-2-r2-held/out" --cache-dir "$WORK52/W52-2/W52-2-r2-held/cache" --method c3 --encoder auto --quality standard --record "$WORK52/W52-2/W52-2-r2-held.json"; } > "$WORK52/W52-2/W52-2-r2-held.log" 2>&1
-R2_HELD_STATUS=$?
-printf '%s\n' "$R2_HELD_STATUS" > "$WORK52/W52-2/W52-2-r2-held.exit"
-nvidia-smi --id=0 --query-gpu=memory.free,memory.used --format=csv,noheader,nounits > "$WORK52/W52-2/W52-2-r2-held-end.csv"
-kill -0 "$HOLDER_PID" || exit 1
-touch "$STOP52"
-wait "$HOLDER_PID"
-HOLDER_STATUS=$?
-printf '%s\n' "$HOLDER_STATUS" > "$WORK52/W52-2/W52-2-r2-holder.exit"
-trap - EXIT
-nvidia-smi --id=0 --query-gpu=memory.free,memory.used --format=csv,noheader,nounits > "$WORK52/W52-2/W52-2-r2-after.csv" || exit $?
-test "$R2_HELD_STATUS" -eq 0 && test "$HOLDER_STATUS" -eq 0 || exit 1
-# Inspect AFTER and prove recovery before the free-card run; poll briefly if needed.
-{ time uv run python tools/headless_export.py "$WORK52/W52-2/W52-2-GX011627-whole.mp4" --out "$WORK52/W52-2/W52-2-r2-free/out" --cache-dir "$WORK52/W52-2/W52-2-r2-free/cache" --method c3 --encoder auto --quality standard --record "$WORK52/W52-2/W52-2-r2-free.json"; } > "$WORK52/W52-2/W52-2-r2-free.log" 2>&1
-R2_FREE_STATUS=$?
-printf '%s\n' "$R2_FREE_STATUS" > "$WORK52/W52-2/W52-2-r2-free.exit"
-test "$R2_FREE_STATUS" -eq 0 || exit "$R2_FREE_STATUS"
-{ time uv run python tools/headless_export.py "$WORK52/W52-2/W52-2-GX011627-whole.mp4" --out "$WORK52/W52-2/W52-2-r2-cpu/out" --cache-dir "$WORK52/W52-2/W52-2-r2-cpu/cache" --method c3 --encoder auto --quality standard --force-cpu --record "$WORK52/W52-2/W52-2-r2-cpu.json"; } > "$WORK52/W52-2/W52-2-r2-cpu.log" 2>&1
-R2_CPU_STATUS=$?
-printf '%s\n' "$R2_CPU_STATUS" > "$WORK52/W52-2/W52-2-r2-cpu.exit"
-test "$R2_CPU_STATUS" -eq 0 || exit "$R2_CPU_STATUS"
-```
+run_export() {
+    local leg=$1 status
+    shift
+    # An export exit is a receipt, not an errexit trigger, including held failure.
+    if { time uv run python tools/headless_export.py "$R2ROOT/W52-2-GX011627-whole.mp4" --out "$R2ROOT/W52-2-r2-$leg/out" --cache-dir "$R2ROOT/W52-2-r2-$leg/cache" --method c3 --encoder auto --quality standard --record "$R2ROOT/W52-2-r2-$leg.json" "$@"; } > "$R2ROOT/W52-2-r2-$leg.log" 2>&1; then
+        status=0
+    else
+        status=$?
+    fi
+    printf '%s\n' "$status" > "$R2ROOT/W52-2-r2-$leg.exit"
+}
+if kill -0 "$HOLDER_PID"; then
+    printf 'alive\n' > "$R2ROOT/W52-2-r2-holder-alive-before.txt"
+else
+    printf 'not alive; refused held export\n' > "$R2ROOT/W52-2-r2-holder-alive-before.txt"
+    exit 2
+fi
+run_export held
+if kill -0 "$HOLDER_PID"; then
+    printf 'alive\n' > "$R2ROOT/W52-2-r2-holder-alive-after.txt"
+else
+    printf 'not alive; held-pressure witness invalid; continue after recovery\n' > "$R2ROOT/W52-2-r2-holder-alive-after.txt"
+fi
+# Snapshot failure must not cancel the independent free/CPU observations.
+if ! nvidia-smi --id=0 --query-gpu=memory.free,memory.used --format=csv,noheader,nounits > "$R2ROOT/W52-2-r2-held-end.csv"; then
+    printf 'held-end nvidia-smi unavailable\n' > "$R2ROOT/W52-2-r2-held-end-unavailable.txt"
+fi
+release_holder
+# Refuse the free-card run unless device-wide used recovers within 30 s.
+if ! uv run python - > "$R2ROOT/W52-2-r2-recovery.log" 2>&1 <<'PY'
+import json, math, os, subprocess, time
+from pathlib import Path
+root = Path(os.environ['R2ROOT'])
+before = float((root / 'W52-2-r2-before.csv').read_text().strip().split(',')[1])
+deadline = time.monotonic() + 30
+samples = []
+reason = 'device-wide used did not recover within 100 MiB in 30 s'
+while time.monotonic() < deadline:
+    try:
+        reading = subprocess.run(
+            ['nvidia-smi', '--id=0', '--query-gpu=memory.free,memory.used',
+             '--format=csv,noheader,nounits'], capture_output=True, text=True,
+            check=True, timeout=max(0.01, deadline-time.monotonic()))
+        free, used = map(float, reading.stdout.strip().split(','))
+        assert math.isfinite(free) and math.isfinite(used)
+        samples.append(dict(free_mib=free, used_mib=used))
+        if time.monotonic() <= deadline and used <= before + 100:
+            (root / 'W52-2-r2-after.csv').write_text(reading.stdout, encoding='ascii')
+            reason = None
+            break
+    except (OSError, ValueError, AssertionError, subprocess.SubprocessError) as error:
+        samples.append(dict(error=type(error).__name__))
+    time.sleep(min(0.2, max(0, deadline-time.monotonic())))
+result = dict(before_used_mib=before, tolerance_mib=100, timeout_s=30,
+              samples=samples, recovered=reason is None, refusal_reason=reason)
+(root / 'W52-2-r2-recovery.json').write_text(json.dumps(result, indent=2), encoding='ascii')
+print(json.dumps(result))
+raise SystemExit(0 if reason is None else 2)
+PY
+then
+    printf 'REFUSED free-card export: recovery not proved; see recovery.json\n' > "$R2ROOT/W52-2-r2-free-refused.txt"
+    exit 2
+fi
+run_export free
+run_export cpu --force-cpu
 
-Record each exit, shell `time` wall and record `elapsed_s` / item `elapsed_s`,
-device reason, settings, frames and output path. Held route is an OBSERVATION,
-not an expected capacity-CPU assertion; free-card should read `GPU`, forced
-CPU should read `CPU: forced` (AD-9). Require 681 frames/completed output on
-each successful run. Inspect and retain any failure before the later-window
-retry policy; never fabricate a successful held result.
-
-`headless_export.py` has NO `--keep` option (parser at `:1185-1240`); it retains
-outputs by default. The ruling's `--keep` intent is implemented by retaining
-these THREE dedicated video outputs through comparison, rather than passing
-an unsupported flag. R1 still omits --keep. After successful comparison and
-read-back, the seat deletes exactly these three output MP4s named by their
-runner records; keep all JSON, CSVs, logs, holder line, comparison records and
-raw comparison samples. No other cleanup is authorised by this request.
-
-**R2 first 30 decoded frames / W52-2.** Compare FREE vs forced CPU, and also
-HELD vs FREE if the held run completed on GPU (expected identical decoded
-frames). Record the literal CPU-vs-GPU AD-11 bounds (max 2e-3, mean 2e-4) in
-unit scale and whether decoded pixels meet them. These exports include the
-encoder, so this is not a pre-encode AD-11 proof. The brief's R2(e) allowance
-and AD-11's clarification still apply: the separate post-encode
-characterisation is mean <=3.5/255, explicitly labeled, never a replacement
-pre-encode tolerance. Report both results, including any strict numeric miss;
-if the post-encode characterisation also fails, follow the retry/STOP policy.
-The held/free identity check has no tolerance. No bound or encoder is tuned.
-Exact memory-bounded comparison request (WP5.1 decode colour conventions):
-
-```bash
-uv run python - > "$WORK52/W52-2/W52-2-r2-compare.log" 2>&1 <<'PY'
+uv run python - > "$R2ROOT/W52-2-r2-compare.log" 2>&1 <<'PY'
 import json, os, subprocess, sys
 from pathlib import Path
 import numpy as np
 sys.path.insert(0, 'tools')
 from clearwater.io.video import find_tool, probe
 from clearwater.color import decode_filter
-root = Path(os.environ['WORK52']) / 'W52-2'
+root = Path(os.environ['R2ROOT'])
 records = {label: json.loads((root / f'W52-2-r2-{label}.json').read_text())
-           for label in ('held', 'free', 'cpu')}
+           for label in ('free', 'cpu')}
 for label, record in records.items():
     assert (root / f'W52-2-r2-{label}.exit').read_text().strip() == '0'
     assert len(record['items']) == 1 and not record['cancelled']
@@ -430,9 +510,23 @@ for label, record in records.items():
 assert records['free']['items'][0]['device'] == 'GPU'
 assert records['cpu']['items'][0]['device'] == 'CPU: forced'
 labels = ['free', 'cpu']
-held_gpu = records['held']['items'][0]['device'] == 'GPU'
-if held_gpu:
-    labels.append('held')
+held_status = int((root / 'W52-2-r2-held.exit').read_text().strip())
+held_reason = None
+held_skip = None
+if held_status == 0:
+    records['held'] = json.loads((root / 'W52-2-r2-held.json').read_text())
+    held = records['held']
+    assert len(held['items']) == 1 and not held['cancelled']
+    assert held['items'][0]['state'] in ('done', 'done with warnings')
+    assert len(held['items'][0]['outputs']) == 1
+    held_reason = held['items'][0]['device']
+    if held_reason == 'GPU':
+        labels.append('held')
+    else:
+        held_skip = f'held route was {held_reason}; GPU identity comparison inapplicable'
+else:
+    held_skip = f'held export exited {held_status}; no completed output to compare'
+held_gpu = 'held' in labels
 arrays, signatures = {}, []
 for label in labels:
     # Runner records deliberately redact outputs to basenames.
@@ -471,7 +565,7 @@ held_free = compare('held', 'free') if held_gpu else None
 if held_free is not None:
     held_free['identical'] = held_free['max_abs_255'] == 0
 result = dict(window='W52-2', frames=30, cpu_gpu=cpu_gpu, held_free=held_free,
-              held_device_reason=records['held']['items'][0]['device'],
+              held_exit=held_status, held_device_reason=held_reason, held_skip_reason=held_skip,
               passes=(cpu_gpu['postencode_characterisation_passes']
                       and (held_free is None or held_free['identical'])))
 with (root / 'W52-2-r2-compare.json').open('x', encoding='ascii') as dst:
@@ -480,6 +574,22 @@ print(json.dumps(result))
 raise SystemExit(0 if result['passes'] else 1)
 PY
 ```
+
+Record each exit, shell `time` wall and runner/item `elapsed_s`, route,
+settings and frames. Free should read `GPU`, forced CPU `CPU: forced`.
+Successful exports require 681 frames/completed output. Failed held output
+is retained as an observation, without cancelling the independent pair.
+
+Comparison retains literal AD-11 max **2e-3** / mean **2e-4** unit bounds,
+and reports strict numeric misses. Encoded outputs do not prove pre-encode
+AD-11: the separate allowed post-encode characterisation is mean **3.5/255**,
+explicitly labelled. Held/free GPU decoded identity has no tolerance. Failed
+comparisons follow the later-window retry/STOP policy; no bounds are tuned.
+
+`headless_export.py` has no `--keep` flag: retain these three dedicated
+outputs until comparison/read-back, then delete exactly their recorded output
+MP4s. Keep every JSON, CSV, exit/liveness receipt, holder lines, log and raw
+comparison sample. No other cleanup is authorised.
 
 **Window estimates (planning, not measurements).** W52-1 remains R1 alone,
 about 115 min. W52-2: held GPU about 3.6-3.8 min + free GPU 3.6-3.8 min +
@@ -494,6 +604,7 @@ then measure through the commissioned adapter. No full-size input is created
 by the cell; no generated image/output is committed. Recipe:
 
 ```bash
+: "${WORK52:?}"
 uv run python - > "$WORK52/W52-2/W52-2-generate48.log" 2>&1 <<'PY'
 import os, sys
 from pathlib import Path
@@ -732,7 +843,7 @@ the dispatcher's seat-only holder run and Reviewer A round 1 before windows.
 This turn executes NO gpu test invocation, holder launch, timed leg or
 EXCLUSIVE window. The turn-2 STOP is resolved by the binding WDDM ruling;
 hardware verification remains at the seat, with no sandbox retry requested.
-Depth: **dispatcher to fill from this turn's transcript**. Turn-2 depth is
+Depth: **179,121** (session 2 retirement, dispatcher-supplied). Turn-2 depth is
 **140,094**, dispatcher-supplied, now recorded in its own depth line and row.
 Binding ruling: CHARC `eade11c9`, folded at `3fcad7a9` in the brief's newest
 "WDDM ruling" section. It replaces the disputed cross-process premise; no
@@ -811,7 +922,7 @@ forced CPU + 10 min R3 generator/two photo legs = 37-38 min, reserve
 **40-45 min** with setup/comparisons. If held also selects CPU, reserve
 **55-60 min** instead. These extrapolate historical rates, not newly
 measured figures. All windows remain at the seat, opened/closed to CHARC,
-with the 25 GB disk floor, clocks/temperature/strays and no other heavy work
+with the 25 GB W52-1 / 30 GB W52-2 disk floors, clocks/temperature/strays and no other heavy work
 (including WP-DR113's reviewer). No window is requested open by this turn.
 
 ### Report Limits draft (seat evidence, DR-114)
@@ -861,4 +972,121 @@ figure or hardware GREEN is asserted. Reviewer A remains dispatcher-run.
 
 | Round / turn | Critical / major / minor | Envelope | NEW / REOPENED | Reverts | Fix surface | Transport / depth | Outcome |
 |---|---|---|---|---|---|---|---|
-| Session 2 / turn 3 (ruling implementation; not Reviewer A) | 0 / 1 / 1 | 2 in / 0 out | 2 / 0 | 0 | Test + ledger only; tools/product unchanged | Codex exec; depth dispatcher to fill | WDDM assertion replaced as ruled; 156 light tests passed; hardware at seat; YIELD for Reviewer A round 1 |
+| Session 2 / turn 3 (ruling implementation; not Reviewer A) | 0 / 1 / 1 | 2 in / 0 out | 2 / 0 | 0 | Test + ledger only; tools/product unchanged | Codex exec; depth 179,121 | WDDM assertion replaced as ruled; 156 light tests passed; hardware at seat; YIELD for Reviewer A round 1 |
+
+
+### Additional report Limits draft (Reviewer A round 1, F13/F14)
+
+`device_within_limit` is `None` (not a bool) when the device read is unavailable;
+the measurement failure and exit status are unchanged. `estimate_fits_free_before`
+uses the parent's nvidia-smi view, not the runner's per-process free-memory
+figure read by the product (DR-114). Quote `device_reason` from the default
+runner record as D111 evidence; that estimate predicate is not such a witness.
+
+## Session 3 / Turn 4: Reviewer A round 1 adjudication
+
+Fresh session 3, dispatch HEAD `26f02528`, branch/worktree `wp5.2`.
+Session 2 retired at **179,121**, dispatcher-supplied; its turn-3 depth line
+and cumulative row above now carry that figure. Current depth (session 3 / turn 4, at yield, codex_cell footer): **111,385**. Seat checks after the turn: `bash -n` on the R2 script OK (identical to the section-5 block); `tests/test_device_hold.py` 1 passed at the seat.
+
+Status: all fifteen findings dispositioned under the binding turn-4 packet;
+light/static checks GREEN. **Validation STOP: the seat must run `bash -n`
+on the R2 script before windows.** Recommended next action: run
+`bash -n work/wp5.2/tmp/turn4-r2.sh` from this worktree at the unrestricted
+seat, then Reviewer A round 2. Git Bash cannot initialise under this cell's
+restricted token; the attempted syntax check exited 256 before parsing.
+This is not a script syntax verdict. GPU holder execution also remains at
+the seat, as expressly ordered; its prior `26f02528` PASS was supplied by
+the dispatcher, not repeated or claimed for this changed candidate.
+
+Review source: the one authorised external read,
+`C:/Users/rwsmy/clearwater-review-evidence/wp5.2/r1/review.txt`, Reviewer A
+Claude opus/high (46 turns), verdict **NEW_CRITICAL_MAJOR_FOUND**. No reviewer
+or agent was launched by this cell. Scope/rulings/locks remain unchanged.
+
+### Per-finding adjudication and changes
+
+All findings are IN envelope and NEW; none REOPENED, rejected, reverted or
+banked outside scope. The review's individual tags total **2 MAJOR, 6 MINOR,
+7 ADVISORY**. The dispatch header says **2 MAJOR, 7 MINOR, 6 ADVISORY**;
+that tally discrepancy is retained here explicitly, without dropping an ID
+or changing a per-finding tag. Both have 15 total and 2 blocking findings.
+
+| Finding / severity | Disposition and independent confirmation | Changed mechanic / surface |
+|---|---|---|
+| F1 MAJOR | FIXED. Old section 5 needed shell state from four separate blocks; an EXIT trap could release the holder before export. | Section 5 R2 at `docs/proofs/wp5.2-ledger.md:283` is ONE self-contained fenced script, saved/run by the seat as ONE `bash <file>`. It computes/asserts WORK52 and configured-root containment, creates a unique attempt directory and stop file, and owns its EXIT trap. R1/R3 blocks carry WORK52 guards. |
+| F2 MAJOR | FIXED. Traced the old held-status assertion and unconditional held-record validation; either could cancel the independent pair. | R2 `run_export` captures statuses inside `if`, always proceeds from a held outcome through recovery to free/cpu, and reads held output only on exit 0. Comparison records the skip reason otherwise; free/cpu are the independent mandatory pair. Held route is not asserted CPU or held exit 0. |
+| F3 MINOR | KEPT stop as ruled; FIXED description. Actual `memory_check` with `peak_gpu_memory_used_mib: None` yields failed device check. | `tools/export_bench.py:51` and `:895` distinguish a breach from an unmeasured device peak; `tests/test_export_bench_breach.py:39` plants the actual computed check. R1 seat instructions at ledger `:274` require reading the stopped record's `memory_check` on exit 3. No change inside `memory_check`. |
+| F4 MINOR | FIXED. RED reproduced missing top-level `failed` on simultaneous job/memory failure. | Bench `:892` writes exactly the exit-1 `failed` shape before returning 3; test `tests/test_export_bench_breach.py:57` reads the written JSON and checks the full literal entry. Exit 3 keeps precedence and stops subsequent calls. |
+| F5 MINOR | KEPT behaviour; DOCUMENTED both commands. | Bench module `:51` explicitly names `v16` and `run`; test `tests/test_export_bench_breach.py:74` requires one recorded call and exit 3 for a three-run request. |
+| F6 MINOR | FIXED. Independently traced `photo_verify._disk_check`'s real 20 GB plus budget requirement and adapter catch returning 1 inside a leg. | `tests/test_photo_memory.py:71` stubs only the disk seam; `:196` plants an OutputRefusedError, asserts exit 1/no runner/no record. `tools/photo_memory.py:7` and `:145` document inside-leg refusal as 1, pre-measure refusal as 2. Product/adapter behaviour is retained. |
+| F7 MINOR | FIXED as ruled; hardware result PENDING. | `tests/test_device_hold.py:80` documents and permits device-wide recovery <= baseline + 100 MiB. Rise >=200 MiB, own drop >=256 MiB and stop exit <2 s stay intact. |
+| F8 MINOR | FIXED with F1. Old recovery requirement was only a comment. | R2 polls nvidia-smi used to <= baseline + 100 MiB, with 30 s total deadline and bounded subprocess timeout; writes samples/result/refusal reason, and refuses free export when recovery is unproved. |
+| F9 ADVISORY | ADOPTED. RED reproduced AttributeError on a null check. | Bench `:891` uses `(run.get("memory_check") or {})`; passing/absent/null controls continue the full plan in test `:25`. |
+| F10 ADVISORY | ADOPTED; hardware result PENDING. | `tools/device_hold.py:83` flushes a closing `stopped` JSON before finally/release; module `:7` documents stop-file/timeout. `tests/test_device_hold.py:85` requires the second line to be `stop-file` on its normal path. |
+| F11 ADVISORY | ADOPTED with F1. | R2 holder timeout is 900 s; trap stops/reaps on shell exit. Uncatchable kill remains a stated limit. |
+| F12 ADVISORY | ADOPTED with F1. | R2 self-check refuses free disk below 30,000,000,000 B before stream copy/holder; section 5 and later window summary now distinguish W52-1 25 GB from W52-2 30 GB. |
+| F13 ADVISORY | NO code change, as ruled; DISCLOSED. | Additional report Limits draft above records `device_within_limit=None` on unavailable device read and unchanged failure/exit status. |
+| F14 ADVISORY | NO code change, as ruled; DISCLOSED. | Same Limits draft distinguishes parent nvidia-smi fit predicate from runner admission input (DR-114), and requires `device_reason` as D111 evidence. |
+| F15 ADVISORY | ADOPTED. Old location test did not isolate nested footage. | `tests/test_photo_memory.py:212` configures footage INSIDE working/wp5.2, places a valid PNG16 inside it, and requires the specific footage refusal with no measurement folder. No real footage/config folder read. |
+
+Section 5 is the executable seat request of record. Its local syntax-check
+copy is `work/wp5.2/tmp/turn4-r2.sh`, not committed and NEVER executed here.
+R2 records now live below `work/wp5.2/W52-2/attempt-<UTC>-<pid>/`, retaining
+required W52-2-r2-held/free/cpu names and every failed attempt. R3 still
+uses its existing W52-2 paths; its synthetic-input/admission witness is
+unchanged. W52-2 remains 40-45 min provisionally, or 55-60 min if held also
+selects CPU; these are historical planning estimates, not measurements.
+
+### Validation and verification-loop record
+
+All logs are below this worktree's ignored `work/wp5.2/turn4/`.
+Every pytest invocation used `PYTHONPATH=scripts`, unset `PYTEST_ADDOPTS`,
+both `-p sandbox_mkdir_shim -p no:cacheprovider`, fresh basetemp below
+`work/wp5.2/tmp/`, and
+`-m "not gpu and not footage and not gui and not slow and not fullclip"`.
+
+- RED `red.log`: **3 failed, 22 passed in 1.22 s**, exit 1. Failures were
+  the intended null-check AttributeError, missing unmeasured-stop explanation,
+  and missing persisted `failed` key. New `run`/refusal/footage controls passed
+  existing behaviour; no false RED is claimed for those compatibility rows.
+- GREEN `light.log`: `test_export_bench_breach.py`, `test_photo_memory.py`,
+  existing `test_export_bench.py`: **40 passed in 64.29 s**, exit 0. No skips,
+  failures or errors. Holder GPU module was NOT invoked. No full-suite gate.
+- `ruff.log`: full `uv run ruff check .`, **All checks passed!**, exit 0.
+  `format.log`: full `uv run ruff format --check .`, **311 files already
+  formatted**, exit 0. `mypy.log`: full `uv run mypy`, **Success: no issues
+  found in 156 source files**, exit 0. The inherited MAIN VIRTUAL_ENV warning
+  states uv ignored it; no active-environment override was used.
+- `bash-n.log`: attempted `bash -n work/wp5.2/tmp/turn4-r2.sh`, exit **256**:
+  `fatal error - CreateFileMapping ... Win32 error 5. Terminating.` Bash never
+  reached parsing. No permission escalation or script execution attempted.
+- `audit.log`: **7 changed owned paths, ASCII, zero CR; 8 embedded Python
+  bodies syntax-valid without execution; extracted R2 matches section 5;
+  git diff --check clean**, exit 0. This does not substitute for bash syntax
+  validation or runtime seat execution.
+
+Verification loop: suspected/independently confirmed F1/F2 via old shell
+state/exit paths; confirmed F3/F4/F9 with the distinguishing RED; traced
+F5/F6/F15 against the actual CLI/catch/guard paths and kept compatibility
+controls; implemented the explicit F7/F8/F10-F12 operational constraints;
+disclosed F13/F14 without changing recorded semantics. Rejected as false
+positive: none. Final source/record/recipe pass found no further issue in
+the authorised envelope. Bash parsing and hardware remain explicitly unproved.
+
+Only three tools, three test modules and this ledger changed. No product
+module, frozen interface, fixture, dependency, local config or brief changed.
+No GPU test, timed leg, run request, full-size generation, EXCLUSIVE window,
+footage-folder read, MAIN-work read, other-worktree read, mailbox post, commit
+or git write occurred. No footage-derived or GPS/IMU bytes were added. All
+cell writes stayed in this worktree, including ignored work logs/check files.
+One logical round-1 remediation turn bundles the ordered tool/test/request
+fixes. Full package acceptance/report/measurements remain pending.
+
+### Cumulative Reviewer A round ledger
+
+Earlier build/ruling turns above are not counted Reviewer A rounds.
+
+| Round | Critical / major / minor / advisory | Envelope | NEW / REOPENED | Reverts | Fix surface | Transport / depth | Outcome |
+|---|---|---|---|---|---|---|---|
+| A1, session 3 / turn 4 | 0 / 2 / 6 / 7 per-ID review tags (dispatch header 0 / 2 / 7 / 6) | 15 in / 0 out | 15 / 0 | 0 | Tools + tests + run-request text; product code 0; not test-only | Claude opus/high via dispatcher; Codex exec remediation; depth 111,385 | All IDs dispositioned; 40 light tests/static checks GREEN; bash -n blocked by sandbox startup, seat check required; YIELD for A2 |

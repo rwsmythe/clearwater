@@ -4,7 +4,8 @@ Seat-only CLI: ``measure INPUT --name W52-2 --exclusive [--config FILE]``. INPUT
 below <working>/wp5.2, outside footage. Records, runner logs, settings and outputs stay below
 <working>/wp5.2/photo/<name>-<leg>-<unique id>. The 5d record schema is retained with class
 synthetic-png16 instead of an owner HEIC/JPEG class. Exit 0 means both legs passed; 1 means a
-measurement failed; 2 means usage/config/input/output refusal. No EXIF or raw runner payload
+measurement failed (including a disk/output refusal raised inside a measurement leg);
+2 means usage/config/input/output refusal before measurement. No EXIF or raw runner payload
 is copied into the summary. Full-size generation and measurement belong in EXCLUSIVE windows.
 
 The executable 48 MP generator recipe is in ``docs/proofs/wp5.2-ledger.md``, section 5,
@@ -141,7 +142,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: CLI arguments, or None for sys.argv[1:].
 
     Returns:
-        Zero for two successful records, one for measurement failure, two for refusal.
+        Zero for two successful records; one for measurement failure, including a refusal
+        inside a leg; two for refusal before measurement.
     """
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)

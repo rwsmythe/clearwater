@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -18,7 +19,9 @@ def test_v16_stops_on_memory_breach_and_keeps_records(tmp_path, monkeypatch, bre
     assert records[-1]["memory_check"]["passes"] is False
 
 
-@pytest.mark.parametrize("memory_check", [{"applies": True, "passes": True}, {"applies": False}])
+@pytest.mark.parametrize(
+    "memory_check", [{"applies": True, "passes": True}, {"applies": False}, None]
+)
 def test_v16_continues_without_a_memory_breach(tmp_path, monkeypatch, memory_check):
     calls, records, status = _plan(tmp_path, monkeypatch, memory_check=memory_check)
     assert status == 0
@@ -33,7 +36,47 @@ def test_v16_preserves_job_failure_status(tmp_path, monkeypatch):
     assert records[0]["failure"] == "planted job failure"
 
 
-def _plan(tmp_path, monkeypatch, *, breach_at=None, memory_check=None, failed=False):
+def test_v16_stops_when_device_peak_is_unmeasured(tmp_path, monkeypatch, capsys):
+    check = bench.memory_check(
+        {
+            "leg": {"method": "c3"},
+            "telemetry": {"peak_gpu_memory_used_mib": None},
+        },
+        SimpleNamespace(memory_estimate_bytes=lambda *_: 1024),
+        SimpleNamespace(video=SimpleNamespace(height=6, width=8)),
+        512,
+    )
+    calls, records, status = _plan(tmp_path, monkeypatch, memory_check=check)
+    assert status == 3 and calls == ["first"]
+    assert records[0]["memory_check"]["device_peak_mib"] is None
+    assert (
+        "memory check failed (a breach, or the device peak unmeasured)" in capsys.readouterr().out
+    )
+
+
+def test_v16_preserves_failure_when_memory_check_also_fails(tmp_path, monkeypatch):
+    calls, _, status = _plan(tmp_path, monkeypatch, breach_at=0, failed=True)
+    assert status == 3 and calls == ["first"]
+    path = next((tmp_path / "work/wp5.2/bench").glob("*.json"))
+    assert json.loads(path.read_text())["failed"] == {
+        "leg": {
+            "clip": "first",
+            "runs": 2,
+            "cache": "cold",
+            "method": "c3",
+            "encoder": "auto",
+            "quality": "standard",
+        },
+        "error": "planted job failure",
+    }
+
+
+def test_run_subcommand_stops_after_memory_check_failure(tmp_path, monkeypatch):
+    calls, records, status = _plan(tmp_path, monkeypatch, breach_at=0, command="run")
+    assert status == 3 and calls == ["first"] and len(records) == 1
+
+
+def _plan(tmp_path, monkeypatch, *, breach_at=None, memory_check=..., failed=False, command="v16"):
     config = LocalConfig(footage_path=tmp_path / "footage", working_path=tmp_path / "work")
     calls = []
     monkeypatch.setattr(bench, "load_local_config", lambda _: config)
@@ -52,12 +95,15 @@ def _plan(tmp_path, monkeypatch, *, breach_at=None, memory_check=None, failed=Fa
             "failure": "planted job failure" if failed else None,
             "ordinal": ordinal,
             "memory_check": memory_check
-            if memory_check is not None
+            if memory_check is not ...
             else {"applies": True, "passes": ordinal != breach_at},
         }
 
     monkeypatch.setattr(bench, "run_once", run_once)
-    status = bench.main(["v16", "--subdir", "wp5.2/bench"])
+    args = [command, "--subdir", "wp5.2/bench"]
+    if command == "run":
+        args += ["first", "--runs", "3"]
+    status = bench.main(args)
     paths = list((config.working_path / "wp5.2/bench").glob("*.json"))
     assert len(paths) == 1
     return calls, json.loads(paths[0].read_text(encoding="utf-8"))["runs"], status

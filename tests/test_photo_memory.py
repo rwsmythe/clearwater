@@ -9,6 +9,7 @@ import pytest
 import photo_verify as pv
 from fixtures.stills import png16_bytes, quantize, unit_content
 from local_config import LocalConfig
+from spike_io.guard import OutputRefusedError
 
 
 @pytest.fixture
@@ -67,6 +68,8 @@ def memory_seam(configured, monkeypatch):
     _, source = configured
     calls = []
     facts = {"reason": "GPU", "peak": 9000, "active": 2, "exit": 0, "device": True}
+    # These seam controls must not depend on the host's available disk space.
+    monkeypatch.setattr(pv, "_disk_check", lambda *_: None)
 
     class Sampler:
         def __init__(self, process):
@@ -188,3 +191,35 @@ def test_photo_memory_reports_capacity_fallback(adapter, configured, memory_seam
     assert default["device_reason"] == facts["reason"]
     assert default["automatic_fallback"] is True and default["memory_capacity_fallback"] is True
     assert cpu["automatic_fallback"] is False and cpu["memory_capacity_fallback"] is False
+
+
+def test_photo_memory_disk_refusal_inside_leg_exits_one(
+    adapter, configured, memory_seam, monkeypatch, capsys
+):
+    _, source = configured
+    _, calls = memory_seam
+
+    def refuse(root, needed):
+        raise OutputRefusedError("outside", root, "insufficient free disk")
+
+    monkeypatch.setattr(pv, "_disk_check", refuse)
+    assert adapter.main(["measure", str(source), "--name", "W52-2", "--exclusive"]) == 1
+    assert calls == []
+    assert "FAILED OutputRefusedError" in capsys.readouterr().err
+    assert not list((source.parent / "photo").glob("*/record.json"))
+
+
+def test_photo_memory_refuses_footage_inside_package_root(adapter, configured, monkeypatch, capsys):
+    config, source = configured
+    footage = source.parent / "nested-footage"
+    footage.mkdir()
+    nested = footage / "input.png"
+    nested.write_bytes(source.read_bytes())
+    monkeypatch.setattr(
+        adapter,
+        "load_local_config",
+        lambda _: LocalConfig(footage_path=footage, working_path=config.working_path),
+    )
+    assert adapter.main(["measure", str(nested), "--name", "W52-2", "--exclusive"]) == 2
+    assert "refused (footage)" in capsys.readouterr().err
+    assert not (source.parent / "photo").exists()

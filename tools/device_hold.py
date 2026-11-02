@@ -4,6 +4,8 @@ Usage: ``uv run python tools/device_hold.py --mib 256 --stop-file PATH --timeout
 One flushed JSON line announces readiness: held_bytes is the allocator's actual block size;
 free_before/free_after are driver free bytes before/after the live allocation, with the CUDA
 context already initialised. The supplied stop file is only inspected, never written.
+Before release, a second flushed JSON line reports {"stopped": "stop-file"} or
+{"stopped": "timeout"} for a normal exit.
 Normal stop or timeout exits 0; argument errors exit 2. Python-level exits release in finally;
 process teardown releases the context even when an external kill cannot execute finally.
 """
@@ -78,6 +80,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if remaining <= 0:
                     break
                 time.sleep(min(0.05, remaining))
+            print(
+                json.dumps({"stopped": "stop-file" if args.stop_file.exists() else "timeout"}),
+                flush=True,
+            )
         finally:
             buffer = None
             cp.get_default_memory_pool().free_all_blocks()

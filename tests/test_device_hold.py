@@ -77,11 +77,14 @@ def test_device_hold_releases_on_stop_file(tmp_path, monkeypatch):
             deadline = time.monotonic() + 5
             while True:
                 recovered = _device_used_mib()
-                if recovered <= before:
+                # Device-wide readings include unrelated processes: allow 100 MiB drift.
+                if recovered <= before + 100:
                     break
                 assert time.monotonic() < deadline, (before, held_used, recovered)
                 time.sleep(0.05)
-            assert len(stdout_path.read_text(encoding="utf-8").splitlines()) == 1
+            lines = stdout_path.read_text(encoding="utf-8").splitlines()
+            assert len(lines) == 2
+            assert json.loads(lines[1]) == {"stopped": "stop-file"}
         finally:
             stop.touch(exist_ok=True)
             if child.poll() is None:

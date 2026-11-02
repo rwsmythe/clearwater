@@ -49,11 +49,12 @@ where OPTIONS, after the subcommand, are ``--config FILE``, ``--keep``, ``--forc
 ``--memory-every S`` and ``--gpu-every S``.
 
 ``v16`` runs :data:`V16_PLAN` in order, or only the legs of the clips named by ``--clip`` (each
-footage window covers one clip: GX011627 first, GX011625 last). Exit status 0 when every run
-finished with an ok result and no memory breach; 1 when a run failed (the record says which
-and why); 2 on a usage, configuration, footage-lookup or disk-space error before any run;
-3 on a recorded memory-check
-breach (the plan stops after preserving the breached run and all earlier records).
+footage window covers one clip: GX011627 first, GX011625 last). For both ``v16`` and ``run``,
+exit status 0 when every run finished with an ok result and no failed memory check;
+1 when a run failed (the record says which and why); 2 on a usage, configuration,
+footage-lookup or disk-space error before any run; 3 when the memory check failed
+(a breach, or the device peak unmeasured). Exit 3 takes precedence over a job failure;
+both failures are preserved, and the plan stops with all earlier records kept.
 """
 
 from __future__ import annotations
@@ -887,7 +888,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             record["runs"].append(run)
             _write(record_path, record)
             print(row_line(run), flush=True)
-            if run.get("memory_check", {}).get("passes") is False:
+            if (run.get("memory_check") or {}).get("passes") is False:
+                if not run["ok"]:
+                    record["failed"] = {"leg": asdict(leg), "error": run["failure"]}
+                    _write(record_path, record)
+                print("memory check failed (a breach, or the device peak unmeasured)", flush=True)
                 print(f"RECORD {record_path}")
                 return 3
             if not run["ok"]:
