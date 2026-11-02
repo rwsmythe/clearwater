@@ -1067,3 +1067,31 @@ No STOP or unresolved question in this turn. The report turn must carry M1 and
 Limits A3/A6/A7 plus the existing F-B2 exclusion. Reviewer B, the rebased
 three-leg gate and the orchestrator's owner PCM witness remain at their seats.
 YIELD for the report turn.
+
+## Session 2 / Turn 5: report
+
+Base: `586d08f2`. Wrote `docs/reports/wp-dr113-v4-pcm.md`, with the commissioned
+Summary, finding, Tests, Reviews, Limits and Ledger pointer sections. The report
+names the fourth PCM equivalence, independent extent/run reading, strict output
+and source-only D86 exception, and keyed record notes. Its test/review figures
+come from the committed code and this ledger's turn-2/3/4 evidence. The original
+IMG_6731 RED figures are cited to the committed brief at
+`docs/briefs/wp-dr113-brief.md:14`, which names the orchestrator's
+`work\wp3.10\dr113-red` record; that record and owner footage were not opened.
+
+The report discloses M1's helper input, F-B2/sample content, A3's malformed
+container case, A6's cut slack/nonintegral run ends, A7's full run list/rendering,
+and the unchanged D105 mebx omissions. It keeps the GREEN witness, Reviewer B
+and gate placeholders PENDING at the orchestrator's seat. No acceptance or
+owner-media witness is claimed. No code, tests, interfaces, configuration,
+dependencies or media changed; no pytest run was needed or taken this turn.
+
+Depth after session 2 / turn 5: 169,816 tokens (dispatcher reading, codex_cell footer depth_input_tokens, at yield).
+
+Checks: `uv run ruff check .` exits 0, `All checks passed!`
+(`work/wp-dr113/t5/ruff.log`); `uv run ruff format --check .` exits 0,
+`306 files already formatted` (`format.log`). Byte/placeholder checks exit 0:
+both changed files are ASCII with CR=0, and all three required pending lines
+are present (`bytes.log`). `git diff --check` exits 0 (`diff-check.log`).
+Only the report and this ledger changed. No deviation or unresolved question;
+YIELD to the dispatcher for Reviewer B and the gate.
