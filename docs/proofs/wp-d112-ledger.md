@@ -768,3 +768,298 @@ not acceptance or the final package report.
   the package. No scope ruling is needed; the package proceeds to Reviewer A.
 - Reviewer A round 1 (a Claude pass) is held under the 92 % rule (Claude weekly
   use 94 % at 23:54Z, reset 2026-11-02 10:00Z).
+
+## Session 2 / Turn 4: Reviewer A round 1 adjudication
+
+Base: `bd655a07`, branch `wp-d112`; clean at entry. The dispatcher recorded
+session 2's turn-3 depth as **136,826** above. Current turn-4 depth: PENDING --
+dispatcher to fill; no cell estimate. This turn changes this ledger only.
+Product code, tests, generator, manifest and committed media are unchanged.
+Scratch probes and their output remain under this worktree's `work/wp-d112/`.
+
+Read Reviewer A's authorized `r1/review.txt` IN FULL at
+`C:/Users/rwsmy/clearwater-review-evidence/wp-d112/r1/review.txt`.
+Its verdict is `NEW_CRITICAL_MAJOR_FOUND`; all three findings are tagged
+EXECUTED. Reviewer identity/conditions supplied by the dispatcher: Claude
+Opus, independent, 26 turns, no refused command, clean worktree afterward.
+The allowed report does not contain a CLI version or invocation banner;
+those mechanical assertions remain with the dispatcher's invocation record,
+not an inferred cell claim. No second reviewer or subagent was started.
+
+The turn-3 audit item is CLOSED as a sandbox-only finding on the dispatcher's
+new evidence: the three audit rows pass at its seat, 3 passed. No fifth
+consumer edit or scope ruling is needed for that item.
+
+### Round-1 disposition, one row per finding
+
+| Finding | Classification / provenance | IN / OUT | Independent evidence | Proposal / status |
+| --- | --- | --- | --- | --- |
+| F1 | **MAJOR, NEW**, introduced by the PCM check | **IN**: D86 explicitly accepts the readable portion of truncated supported MOVs; actual probe returns warning-only and the real sink reaches read-back | All three faststart MOV cuts reproduce; 55/85 percent passed base, all three now refuse despite identical decoded source/output PCM; details below | CONFIRMED. STOP for CHARC to amend truncated-source sample evidence as specified below; no remediation this turn |
+| F2 | **MINOR, NEW** timing-verification gap; current implementation follows the commissioned first-pts-plus-totals rule | **IN** for detecting sink/muxer timing damage under D94; strengthening the ruled rule requires CHARC | Real fixture table with a +1024-tick shift after packet 30, or all-zero pts, returns no problems; numeric owner shapes and real fixture are contiguous | CONFIRMED. Recommend contiguity in both compared timelines, with an explicit policy that a noncontiguous source refuses; STOP for that new rule / acceptance restriction |
+| F3 | **ADVISORY, PRE-EXISTING**, not a regression | **OUT** of remediation envelope: compressed behavior is expressly locked | AAC table with PCM-relabelled output returns no problems under BOTH current and base checks; source-only branch confirmed at `verify.py:848` | RETAIN unchanged compressed path. BANKED to CHARC for a separately commissioned codec-identity check if desired; no fix or extra in-envelope round |
+
+### F1: independent reproduction and envelope
+
+Probe driver: `work/wp-d112/turn4_probes.py`; main transcript:
+`work/wp-d112/turn4-probes.log`; commands and FFmpeg diagnostics:
+`work/wp-d112/turn4-probes/commands.log`; complete measured tables and results:
+`work/wp-d112/turn4-probes/f1.json`. No owner media was opened.
+
+Recipe: stream-copy the committed `tests/fixtures/video/pcm-irregular.mov`
+to `turn4-probes/faststart.mov` with FFmpeg `-c copy -movflags +faststart`.
+The resulting 219495-byte MOV is cut at `len(bytes) * percent // 100` for
+55, 70 and 85 percent. These are scratch derivatives, not new committed files.
+Each is probed and passed through `video_fidelity.encode_file`, libx265, 8-bit:
+the real `_RecordingSink(FFmpegVideoSink)` NUT-pipe/two-input path, with no
+command emulation. The check observer calls the CURRENT check and base
+`9d37169b`'s check on the SAME finished output, records its packet facts,
+retains a scratch copy before abort, and returns the current check's actual
+problems. It does NOT suppress the refusal. Each real sink therefore raises
+`VideoEncodeError(kind="verify_failed")`, as the product would today.
+All three paths ran in this sandbox; no reproduction step was unavailable.
+
+| Cut | Bytes retained | Probe readable video frames / faults | audio_end (s) | Source audio packets / final pts, duration, bytes | Source declared PRESENTED / complete STORED | Output packets / PRESENTED = STORED = decoded | Current / base |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 55 percent | 120722 | 24/45; only `truncated`, `warn` | `1001/1250` | 39; `38360, 1024, 909` | 39384 / 38814 | 39 / 38814 | Invalid exact evidence / PASS |
+| 70 percent | 153646 | 31/45; only `truncated`, `warn` | `31031/30000` | 50; `49072, 1024, 860` | 50096 / 49502 | 49 / 49502 | Presented 49502 vs 50096 / packet-count refusal |
+| 85 percent | 186570 | 38/45; only `truncated`, `warn` | `19019/15000` | 61; `60336, 1024, 647` | 61360 / 60659 | 61 / 60659 | Invalid exact evidence / PASS |
+
+All listed source audio packets start before the respective cut (separate
+calculation in `turn4-window-membership.log`); no CUT_SLACK ambiguity accounts
+for the difference. Decoding both tracks to s16le returns status 0 in all six
+decode calls (`turn4-decode-status.log`). The decoded source/output bytes are
+IDENTICAL at each cut: 38814, 49502 and 60659 complete sample frames. Odd
+payloads 909/647 contribute 454/323 complete mono s16 frames, respectively;
+their final unmatched byte does not decode to a sample frame. At 70 percent,
+860 bytes contribute 430 frames despite the stated 1024-frame duration.
+Only the final listed audio packet has a duration/payload discrepancy.
+
+The 70-percent product output re-chunks this measured source tail:
+`47576(472), 48048(1024), 49072(1024 duration, 860 bytes)` becomes
+`47576(1024), 48600(902)`. This supplies a concrete truncated-tail trigger for
+harmless re-chunking. It does not establish why the intact owner files
+re-chunk, and does not authorize an `encode.py` change. Carry this new measured
+fact into the eventual report's Limit paragraph.
+
+Envelope evidence at this head:
+
+- Spec D86, `docs/underwater-correction-spec.md:124`, and damaged inputs
+  section 5.4 at `:225`: process the readable portion of truncated/corrupt
+  sources and warn. A MOV need not come from an iPhone to be in that contract.
+- `probe.py:538` (`probe`) accepts supported MOV/MP4, codecs and formats.
+  `_tail_fault` at `:489`, its condition at `:504`, and its use at `:634`
+  turn a partial-file report, corrupt last video packet or short frame count
+  into `Fault("truncated", "warn", ...)`, not a refusal. The three measured
+  derivatives have exactly that warning and no refuse fault.
+- `encode.py:652` refuses only `severity == "refuse"`; `_check_source` at
+  `:834` applies SAR/edit-list/pts checks and passes these files.
+- `_plan_tracks` at `encode.py:857` uses the readable video portion; at `:888`
+  it sets `audio_end`. `verify.py:680` (`readable_end`) requires the retained
+  source sample table when a later frame is not listed. These faststart files
+  retain a readable moov and satisfy that requirement.
+- The real failure occurs only at `encode.py:1096-1105`, after successful
+  encoding. `_pcm_totals` at `verify.py:894` rejects odd payload sizes; at
+  `:896-900` it otherwise counts the overstated source duration without an
+  EOF cap. `_pcm_problems` at `:939-946` demands that impossible duration total.
+
+Therefore F1 is a confirmed MAJOR IN-envelope regression. The reviewer caveat
+about whether a particular real iPhone MOV retains moov does not remove the
+supported synthetic faststart MOV from D86. The evidence establishes three
+failing shapes, not a claim that every possible truncated PCM file fails.
+
+### F1: exact proposed ruling text (STOP, not implemented)
+
+**Recommended: approve the following source-only D86 exception.** It changes
+the turn-2 raw duration / exact-payload rule and therefore requires CHARC's
+ruling before code or tests change.
+
+1. Enable the exception only when the source ProbeResult has a `truncated`
+   fault AND `audio_end is not None`. A cut value alone is insufficient.
+   No exception for an intact source, an `unreadable_tail` copied whole, a
+   compressed source, or any output packet. This is a private verifier input,
+   derived from the existing ProbeResult; no frozen interface change.
+2. Keep the source-packet-start cut window and `CUT_SLACK_S` prefix choices
+   exactly as now. A complete packet straddling the cut is still counted
+   whole; this exception concerns absent payload at physical EOF, not clipping
+   a complete packet to the cut timestamp.
+3. Let `B = channels * packed_codec_bytes_per_channel_sample`, and for each
+   included source packet let `D_i = duration_i * time_base * sample_rate`.
+   D_i must still be a known, nonnegative INTEGER. For a frame-aligned payload,
+   `S_i = size_i / B` exactly. A remainder is allowed ONLY for the LAST LISTED
+   packet of that source audio stream (physical readable tail), and only if
+   that packet is included: then `S_i = floor(size_i / B)`. Remainders in an
+   earlier source packet remain invalid; being merely the last packet of a
+   chosen cut prefix does not qualify it. Missing/negative sizes and missing
+   format/clock facts still refuse.
+4. In that truncated source window define effective PRESENTED as
+   `sum(min(D_i, S_i))` PER PACKET, and complete STORED as `sum(S_i)`.
+   Do not use `min(sum(D_i), sum(S_i))`: padding in one packet must not mask
+   absent readable samples in another. If stored exceeds presented, its full
+   complete stored count remains independently required; this preserves the
+   distinction that resolved the original owner-file totals.
+5. Count the OUTPUT strictly as today: integral nonnegative declared
+   durations and frame-aligned payload bytes in every packet; no cap and no
+   floor. Its exact `(PRESENTED, STORED)` pair must equal the normalized source
+   pair of ONE admissible whole source prefix. No new tolerance. Format and
+   codec equality, time base, rate, channels, sample format and first pts
+   checks remain mandatory, with ASCII messages naming PCM and the failed
+   total. This permits discarding only bytes that cannot make a complete
+   decoded source sample frame; it never excuses a lost complete sample.
+6. If the source does not satisfy BOTH conditions in item 1, retain the
+   present implementation's duration and payload rules exactly, including
+   rejection of odd payloads. F1 alone makes no other non-truncated change.
+
+Arithmetic-only oracle (NOT remediation or a claimed implemented fix):
+`turn4_rule_oracle.py`, `turn4-rule-oracle.log`, and
+`turn4-probes/rule-oracle.json`. The proposed source pairs are exactly
+`(38814,38814)`, `(49502,49502)`, `(60659,60659)`, matching the three measured
+outputs. Subtracting one complete output sample fails each exact pair test.
+
+Proposed RED roster for a ruled implementation turn:
+
+| Proposed row | Pure table / expected result |
+| --- | --- |
+| `test_check_output_truncated_pcm_uses_complete_readable_tail[55]` | Take the first 39 packets of `((1024 x 23),472) x 3`; final source size 909, duration 1024, pts 38360. Source has truncated fault and cut `1001/1250`. Output keeps first 38 durations, final duration 454, aligned size 908. Expect accept 38814/38814; today's invalid-evidence refusal is RED |
+| Same `[70]` | First 50 source packets, last size 860, duration 1024, pts 49072, cut `31031/30000`. Output durations are the first 47 source durations plus `(1024,902)`, 49 packets total with aligned sizes. Expect accept 49502/49502; today's presented-total refusal is RED |
+| Same `[85]` | First 61 source packets, last size 647, duration 1024, pts 60336, cut `19019/15000`. Output keeps first 60 durations, final duration 323, aligned size 646. Expect accept 60659/60659; today's invalid-evidence refusal is RED |
+| Truncated normalized tail minus one complete output sample | For each of the three shapes reduce output's last duration and stored count by one; expect PCM refusal, not a tolerance pass |
+| Partial earlier source packet / partial OUTPUT packet | Floor is not available in either position; expect named PCM invalid-evidence refusal |
+| Same odd terminal source with no truncated fault, or with `audio_end=None` | Strict original rule still refuses; a cut alone and a warning alone cannot activate the exception |
+
+Feasible integration RED: a new libx265 row under `tests/test_io_video_encode.py`
+builds the 70-percent faststart derivative from the committed PCM fixture at
+test time, verifies the truncation warning and short readable audio tail,
+and calls the real sink with NO checker bypass. It must export and retain
+identical decoded readable PCM after the fix; today it raises verify_failed,
+as independently measured. Re-chunking is permitted. Use its synthetic
+neighbors' marks and assert the intended short-tail precondition. No new
+committed fixture, generator change or manifest/consumer edit is needed.
+
+Existing expected outcomes: **none change**. `_pcm_check` would need only an
+optional, default-off way to plant a truncated fault for new rows. Existing
+complete straddling-packet and cut-slack rows retain their outcomes and
+assertions. In particular `test_check_output_pcm_refuses_inexact_sample_evidence`
+with `[partial-sample]` remains a strict, NON-truncated refusal. Existing
+one-sample-fewer, rate, format, first-pts, time-base and channel-count rows
+continue refusing: they never enter the source-only exception, and the format
+and start checks do not move behind normalization. A fresh run of the existing
+refusal roster (`-k "pcm and refuses"`) passes **18 rows, 91 deselected**:
+`turn4-guards.log` / `.xml`, with the required sandbox shim and no cacheprovider,
+PYTEST_ADDOPTS unset, basetemp `work/wp-d112/tmp/turn4-guards`.
+This is evidence of the current guards plus a precise branch-isolation argument;
+it is NOT a claim that the not-yet-implemented rule has passed tests. Its
+remediation turn must run the complete touched light roster again.
+
+### F2: reproduction, proposed timing guard and source policy (STOP)
+
+`turn4-probes/f2.json` records direct calls to the real `_pcm_problems` on pure
+tables. Starting from the committed fixture's real packet table:
+
+- Leave packet 0..30 pts unchanged and shift packets 31..71 by +1024 ticks:
+  current problems `[]`; the contiguity break is exactly before packet 31.
+- Set all 72 pts to zero: current problems `[]`; contiguity breaks before
+  every packet 1..71. First pts, format and both totals still match.
+- Give BOTH source and output the same shifted table: current problems `[]`;
+  the source is itself noncontiguous before packet 31. This makes the source
+  acceptance consequence of the proposed rule explicit, not hypothetical
+  arithmetic silently omitted from the return.
+
+Mechanic: `_pcm_totals` reads pts only for presence/alignment of the mapping,
+`verify.py:888-891`; `_pcm_problems` uses source pts to select the window and
+then checks only the first output pts at `:960-967`. No later timestamp is
+compared or constrained. The hole is reachable under a broken sink/muxer,
+and base's packet-identity rule would catch a changed output with an unchanged
+source. It is MINOR here because the cell followed the explicit ruled check
+definition; adding the missing D94 evidence is a rule amendment, not an
+unilateral reinterpretation to fix inline.
+
+**Recommended: require contiguity of BOTH compared PCM timelines**, with the
+following explicit source policy for CHARC to approve:
+
+- For each candidate source prefix and for ALL output packets, every adjacent
+  pair must satisfy `next_pts == current_pts + current_duration` in exact
+  stream ticks. For an F1-normalized source use its effective presented extent
+  in exact time (`next_pts * time_base == current_pts * time_base + P_i/rate`);
+  ordinary source packets use the existing declared duration. No timing slack.
+  F1's short physical tail has no successor, so no false adjacency is created.
+- Check only the compared source prefix for a cut, never ignored packets
+  beyond it. Existing CUT_SLACK alternatives still require one valid prefix
+  whose exact pair matches the output. Output contiguity is always required.
+- Preserve the current first-pts, format and paired-total requirements.
+  Contiguity plus equal start and total presented extent fixes the entire
+  presented timeline without requiring matching packet boundaries.
+- A SOURCE that is itself noncontiguous in the compared prefix is REFUSED
+  with a named PCM source-timing message; do not repair its gaps or silently
+  normalize overlaps. This is a NEW acceptance restriction relative to
+  first-pts-plus-totals and must be explicitly ruled. No evidence in this
+  turn establishes that all possible supported PCM sources are contiguous.
+  If CHARC requires preserving gapful sources, commission a gap-preserving
+  timeline rule separately rather than silently adopting this restriction.
+
+Prefer adjacency over only equal final end time: compensating interior
+gap/overlap changes can restore the same last end while moving samples inside
+the stream. That observation is the reason for the proposed guard, not a new
+scope claim or a claim about any owner's media.
+
+Measured positive controls for this proposal (source and output both have
+ZERO adjacency failures, and current full audio problems are `[]`):
+
+| Control | Source / output packets | First pts; PRESENTED / STORED | Adjacency result |
+| --- | --- | --- | --- |
+| IMG_6731 numerical owner shape from the committed unit rows, not owner media | 100 / 99 | 0; 100720 / 100812 | Both contiguous |
+| IMG_6729 numerical moved-boundary shape from the committed unit rows | 133 / 133 | 0; 134400 / 134414 | Both contiguous |
+| Committed fixture's measured real packet table | 72 / 72 identity control | 0; 72072 / 72072 | Contiguous across both mid-stream 472-sample packets |
+| All three newly observed truncated source/output pairs | 39/39, 50/49, 61/61 | Normalized totals as above | Both contiguous; short final packet has no following adjacency |
+
+The two numerical source/output tables retain the original presented/stored
+tail discrepancy and re-chunking shapes. No owner's file was inspected to make
+these claims. For the fixture, the prior real-sink control's measured packet
+identity is already recorded in turn 3; this turn re-reads the committed real
+packet table and records fresh real-sink truncated derivative tables.
+
+Proposed timing RED rows: shifted output after packet 30, all-zero output pts,
+and noncontiguous SOURCE (including source/output same-gap); all must refuse
+with PCM timing messages under an approved source-refusal policy. Keep the two
+existing owner-shape acceptance rows and real-sink fixture control as positive
+controls, plus a synthetic re-chunked contiguous output. No current expected
+test assertion needs weakening. F2 is nonblocking by severity and does not
+independently extend the review loop; it is routed now because this dispatch
+expressly requires adjudication without remediation.
+
+### F3: compressed behavior locked; no remediation recommended
+
+Independent table reproduction in `turn4-probes/f3.json`: read the committed
+AAC fixture `video/hevc10.mp4`, relabel only the output audio StreamRow's
+codec name/tag as `pcm_s16le`/`ipcm`, leave its packet pts unchanged, and call
+complete current/base `check_output`. Both return `[]`. This is table evidence
+of a codec-identity hole, not a claim that an actual AAC-to-PCM export occurred.
+
+The branch is chosen at `verify.py:848` using the SOURCE codec. The locked
+compressed `_audio_problems` at `:977` compares only source-prefix packet pts.
+Provenance: `git log -S "def _audio_problems"` names `b2d761c9` (WP3.10);
+`work/wp-d112/turn4-f3-origin.log`. The pre-package base independently accepts
+the same relabel, so this is pre-existing, not a WP-D112 regression.
+
+Recommendation: RETAIN compressed behavior exactly; do not route by output
+codec or add a codec check to compressed streams inside this package. BANKED
+to CHARC to commission a separate compressed-format check if desired, before
+any such behavior is changed. No cell register edit, new requirement, or
+additional review round is commissioned by this advisory.
+
+### Cumulative round ledger and turn boundary
+
+| Reviewer round | Verdict | Critical / major / minor / advisory | IN / OUT | NEW / REOPENED / pre-existing | Reverts | Product / test fixes THIS TURN | Transport / depth |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A1 | NEW_CRITICAL_MAJOR_FOUND | 0 / 1 / 1 / 1 | 2 / 1 | 2 / 0 / 1 | 0 | 0 / 0; adjudication only | Dispatcher-run Claude Opus process; CLI version in dispatcher record; prior turn depth 136826, current PENDING |
+
+F1 and F2 remain OPEN pending CHARC's two explicit rule rulings; no code or
+test remediation has been attempted. F3 is nonblocking and banked outside
+the package. Reviewer A has NOT converged. Final gate, Reviewer B, report,
+owner/trim proofs and witness retain their commissioned dispositions.
+
+Locks this turn: no footage read; no other worktree or main-tree work read;
+only the authorized single file read in the external review-evidence folder; no commit,
+stash, mailbox post, dependency, interface or product/test edit. Final ledger
+ASCII/LF, scope and `git diff --check` evidence are in
+`work/wp-d112/turn4-ledger-qa.log`. YIELD for the ruling packet, not an
+implementation promise or a completion claim.
