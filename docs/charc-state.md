@@ -42,6 +42,11 @@
   kernel, main `215b1fd6` (owner verbatim: "the generations should not have handed over if the previous generation was still
   working"): no generation rolls while anything it started is still running; charter 5.1, orchestrator-context rollover
   sequence, prompting standard; harness gate 382 OK; posts 4933b8dc / 8b981462, my ACK 83baafc4.**
+  **HOLD RELEASED (owner in chat to gen 33, 2026-11-02 ~06:12Z, verbatim: "Hold released, resume all activity"; post
+  `f0bf91db`, my ACK `1cbf5816`): supersedes the 92 % line for this window; Claude passes resume. WP5.3 gate w53: static /
+  collect clean, parallel 6,446 / 1 skipped in 699 s, serial running at 06:14Z; then WP-D112 Reviewer A, B, three-leg gate,
+  accept, the V-P re-run, page / tally, CP5.** (The 92 % line below is HISTORY for this window; it returns as the standing
+  rule after the 10:00Z reset.)
   **CLAUDE 92 % = THE LINE (reached 22:01Z): no Claude pass (A or B) of any package starts before 2026-11-02 10:00Z;
   Codex turns, RUN REQUESTS and windows continue; no reviewer-tier downgrade.** Codex 15 % / 0.238 (resets 11-04).
   **LIVE BOARD (verify in `docs/orchestrator-state.md` and gen 32's last posts):**
