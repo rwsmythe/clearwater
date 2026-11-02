@@ -402,6 +402,96 @@ def test_truncated_pcm_audio_survives_the_real_sink(
     assert decoded(output) == source_pcm
 
 
+@pytest.mark.parametrize(
+    ("presented", "stored", "samples", "last_pts"),
+    [(380, 472, 72072, 71600), (148, 240, 71920, 71680)],
+    ids=["380-over-472", "148-over-240"],
+)
+def test_pcm_audio_trimmed_presentation_survives_the_real_sink(
+    sample: Sample, tmp_path: Path, presented: int, stored: int, samples: int, last_pts: int
+) -> None:
+    """Audio copy preserves stored PCM bytes beyond the last packet's presented extent."""
+    source = tmp_path / "trimmed-presentation.mov"
+    audio_args = (
+        ["-c:a", "copy"]
+        if stored == 472
+        else [
+            "-af",
+            f"atrim=end_sample={samples},asetnsamples=n=1024:p=0",
+            "-c:a",
+            "pcm_s16le",
+        ]
+    )
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-v",
+            "error",
+            "-i",
+            str(sample("vid-pcm-irregular")),
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a:0",
+            "-c:v",
+            "copy",
+            *audio_args,
+            "-bsf:a",
+            rf"setts=duration=if(eq(PTS\,{last_pts})\,{presented}\,DURATION)",
+            str(source),
+        ],
+        capture_output=True,
+        check=True,
+    )
+    assert probe(source).faults == ()
+    before = read_packet_table(source)
+    src = before.of_type("audio")[0]
+    assert (
+        before.audio_pts[src.index][-1],
+        before.audio_durations[src.index][-1],
+        before.audio_sizes[src.index][-1],
+    ) == (last_pts, presented, 2 * stored)
+    assert sum(s for s in before.audio_sizes[src.index] if s is not None) == 2 * samples
+    assert sum(d for d in before.audio_durations[src.index] if d is not None) == (
+        samples - stored + presented
+    )
+
+    output = tmp_path / "corrected.mp4"
+    run = vf.encode_file(source, output, encoder="libx265", bit_depth=8)
+    assert not any("partial frame dropped" in w for w in run.report.warnings)
+    after = read_packet_table(output)
+    out = after.of_type("audio")[0]
+    assert after.audio_durations[out.index][-1] == presented
+    assert after.audio_sizes[out.index][-1] == 2 * stored
+
+    def decoded(path: Path) -> bytes:
+        return subprocess.run(
+            [
+                "ffmpeg",
+                "-nostdin",
+                "-v",
+                "error",
+                "-i",
+                str(path),
+                "-map",
+                "0:a:0",
+                "-c:a",
+                "pcm_s16le",
+                "-f",
+                "s16le",
+                "pipe:1",
+            ],
+            capture_output=True,
+            check=True,
+        ).stdout
+
+    source_pcm = decoded(source)
+    assert len(source_pcm) == 2 * samples
+    assert source_pcm == decoded(sample("vid-pcm-irregular"))[: 2 * samples]
+    assert decoded(output) == source_pcm
+
+
 def test_vfr_pts_are_exact(sample: Sample, runs: Runs) -> None:
     source = sample("vid-vfr")
     assert probe(source).video.vfr

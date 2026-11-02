@@ -1,8 +1,9 @@
 # WP-D112 - PCM audio sample extents and timing
 
-Candidate status at `78d2a03e`: round-1 remediation is locally green.
-Reviewer A round 2 and Reviewer B are PENDING. The final gate and post-merge
-WP5.3 witness belong to the orchestrator. This is not an acceptance record.
+Executable rule at `78d2a03e`: Reviewer A CONVERGED in round 2. Turn 7 adds
+the adopted test-only control and report limits on parent `7e9f1e12`.
+Reviewer B is PENDING. The final gate and post-merge WP5.3 witness belong
+to the orchestrator. This is not an acceptance record.
 
 ## Changes
 
@@ -130,6 +131,20 @@ and compares byte-identical readable PCM. No extra media file is committed.
 | 70 percent | 50 / 49 | 49502 | 860 bytes | Absent |
 | 85 percent | 61 / 61 | 60659 | 647 bytes | Exactly once, N=1 |
 
+The UNMARKED test-only control
+`test_pcm_audio_trimmed_presentation_survives_the_real_sink` at
+`tests/test_io_video_encode.py:410` covers the last packet storing more than
+it presents. Two test-time derivatives use `setts` to trim only the last
+packet's duration: 380 presented over 472 stored samples, and 148 over 240.
+The latter first selects 71920 samples with `atrim` and 1024-sample framing;
+the former retains the intact fixture's 72072 stored samples. Both source
+preconditions are asserted from packet tables. Both real-sink exports pass,
+keep the trimmed output last duration and payload size, and carry PCM bytes
+identical to the derivative and the corresponding committed-fixture prefix.
+Turn 7's explicit node run: **2 passed**, `work/wp-d112/turn7-trimmed-tail.log`.
+This is the adopted round-2 advisory-4 CONTROL, not a new RED or rule change;
+no gpu/footage/gui/slow/fullclip marker or new committed media file.
+
 RED/GREEN evidence, with full node records in `docs/proofs/wp-d112-ledger.md`:
 
 | Turn / check | Result | Log under `work/wp-d112/` |
@@ -173,10 +188,20 @@ Turn 5 on the executable state committed as `78d2a03e`:
 | Format --check on those four files | 4 files already formatted | `turn5-format-check-final.log` |
 | Mypy | Success, 149 source files | `turn5-mypy-final.log` |
 
+Turn-7 terminating clean-up, with executable product code unchanged:
+
+| Check | Result | Log under `work/wp-d112/` |
+| --- | --- | --- |
+| New trimmed-presentation real-sink node, both shapes | 2 passed | `turn7-trimmed-tail.log` |
+| Both encode modules, `-k "audio or pcm or check_output"` | 66 passed, 192 deselected | `turn7-light.log` |
+| Ruff on the changed test file | All checks passed | `turn7-ruff.log` |
+| Format --check on the changed test file | 1 file already formatted | `turn7-format-check.log` |
+| Mypy | Success, 149 source files | `turn7-mypy.log` |
+
 All pytest commands set `PYTHONPATH=scripts`, unset `PYTEST_ADDOPTS`, load
 `-p sandbox_mkdir_shim -p no:cacheprovider`, and use distinct basetemps under
 `work/wp-d112/tmp/`. These are light checks, not the final package gate.
-This docs-only turn reruns no product test, lint or type check.
+Turn 6 was docs-only and reran no product test, lint or type check.
 
 ## Verification loop, locks and handoff
 
@@ -193,8 +218,9 @@ byte-identical compressed helpers and the three named kept-green test bodies,
 and ASCII/LF changed text (`turn5-scope-qa.json`, `turn5-ledger-qa.log`). No
 interface, dependency, mux/flag, video/data rule or local configuration change.
 The cell opened no owner's footage, other worktree or main-tree working data.
-The report and ledger are the only changes this turn; their ASCII/LF and diff
-checks are recorded in `work/wp-d112/turn6-docs-qa.log`.
+Turn 6 changed only the report and ledger (`turn6-docs-qa.log`). Turn 7 adds
+only the new integration row and documentation amendments; ASCII/LF, diff,
+source-identity and ownership checks are in `work/wp-d112/turn7-scope-qa.log`.
 
 ## Reviewer A round 1
 
@@ -208,8 +234,33 @@ Independent Claude Opus/high pass: `NEW_CRITICAL_MAJOR_FOUND`, with 0 critical,
 | F2 MINOR: later pts changes escape first-pts/totals checks | CHARC `b44b0ee7` adopts source-tick run equality and rejects blanket refusal of gapful sources. Remediated and locally verified in turn 5. |
 | F3 ADVISORY, pre-existing: compressed source paired with a codec-relabelled output still accepts | BANKED to CHARC for the accept note; no code/test change or extra row in this package. |
 
-Reviewer A round 2: PENDING. Reviewer B: PENDING. No convergence or acceptance
-is claimed by this report. Amend these lines after the scheduled reviews.
+## Reviewer A round 2
+
+Claude Opus/high reviewed `78d2a03e` on 2026-11-02 around 07:45Z, before the
+10:00Z weekly reset on the OWNER's override. **NO_NEW_CRITICAL_MAJOR**:
+0 critical, 0 major, 0 minor, 5 advisories. This is the CONVERGED round;
+turn 7 is its authorized terminating test/report clean-up.
+Evidence: `C:/Users/rwsmy/clearwater-review-evidence/wp-d112/r2/review.txt`.
+
+Executed checks included D86 accept/refusal/floor-count guards; shifted,
+swapped and gap-changing timelines with re-chunked positive controls;
+real-sink trimmed-duration probes; linear PCM format cases; the warning
+grant and compressed-path identity. The reviewer reports 62 passed,
+194 deselected in its light selection, one real-sink control pass, and five
+passes across the three truncated derivatives and the two re-encode plants.
+Its targeted Ruff/format/mypy checks were clean. These are reviewer results,
+distinct from the cell's light selections above.
+
+| Advisory | Disposition |
+| --- | --- |
+| 1, OUT: totals/runs do not bind each output packet's stored samples to its own presentation interval | Recorded in Limits; no rule or code change. |
+| 2, OUT: D86 may floor the window's final packet even when later file packets exist | Recorded in Limits; follows CHARC's wording, malformed-source reach only. |
+| 3, OUT: companded/block-packed PCM variants now refuse missing exact evidence | Recorded in Limits; outside the camera envelope, no code change. |
+| 4, IN: no real-sink regression for a final packet storing more than it presents | ADOPTED: the parametrized test-only row above passes both reviewer shapes. |
+| 5, IN: aligned short D86 tail has only the generic warning | Report-only note below; conforms to the warning grant, no code change. |
+
+Reviewer B: PENDING. Final gate and acceptance: PENDING at the orchestrator's
+seat. No further Reviewer A round is requested by this clean-up.
 
 ## Limits
 
@@ -220,6 +271,26 @@ fix scope. A short trailing packet IS one measured trigger: the test-time
 70-percent derivative changes 50 source packets to 49 output packets while
 carrying all 49502 readable sample frames. This does not explain the intact
 owner sources' re-chunking.
+
+In the D86 70-percent case, the 594 declared samples beyond the 430 stored
+ones in the 1024-sample tail leave with only the generic "cut short" warning
+and no floor line because no partial byte was dropped, conforming to ruling (b).
+
+Totals and runs do not bind each output packet's stored samples to its own
+presented interval: a hand-built output could move sample content inside one
+run while preserving these aggregate checks. The product's `-c:a copy` cannot
+produce the reviewer's shape. This advisory is outside the remediation
+envelope; no additional per-packet rule was adopted.
+
+Under D86, the floor applies to the final packet of the WINDOW, per CHARC
+`b44b0ee7`, rather than requiring the file's final packet. A malformed source
+with later packets can therefore reach this exception; ordinary sources in
+the commissioned envelope do not exercise that malformed-file case.
+
+Companded/block-packed PCM variants `alaw`, `mulaw`, `bluray`, `dvd`, `lxf`,
+`s24daud`, `sga` and `vidc` are now REFUSED as missing exact sample evidence;
+the earlier packet rule judged them by packet pts. No camera in the envelope
+writes them. Their payload rules remain outside this package's scope.
 
 The seat observed MOV `lpcm` becoming MP4 `ipcm`; codec-tag equality is not
 required by this PCM rule. Codec name, decoded format, both sample extents and

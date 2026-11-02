@@ -1067,8 +1067,8 @@ implementation promise or a completion claim.
 ## Session 3 / Turn 5: round 1 remediation
 
 Fresh session 3, base `981724b9`. Session 2 retired at dispatcher-reported
-184,370 tokens. Depth THIS TURN: PENDING -- dispatcher to fill from transcript;
-no cell estimate. This turn bundles the commissioned RED and GREEN for F1/F2
+184,370 tokens. Depth THIS TURN: 106,962 -- dispatcher reading supplied in
+turns 6 and 7; no cell estimate. This turn bundles the commissioned RED and GREEN for F1/F2
 and the warning grant into one logical round-1 remediation, with no cell commit.
 
 Binding packet: CHARC `b44b0ee7` adopts the D86-only source exception (F1,
@@ -1204,7 +1204,7 @@ in this remediation turn; the orchestrator's final gate/proof schedule stands.
 
 | Reviewer round | Verdict / disposition | Critical / major / minor / advisory | IN / OUT | NEW / REOPENED / pre-existing | Reverts | Product / test fixes THIS TURN | Transport / depth |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| A1 | F1/F2 remediated per CHARC; F3 BANKED; A2 PENDING | 0 / 1 / 1 / 1 | 2 / 1 | 2 / 0 / 1 | 0 | 2 ruled product fixes plus granted warning; 20 new test nodes (17 unit + 3 integration) | Dispatcher-run Claude; session 2 retired at 184370; current depth PENDING |
+| A1 | F1/F2 remediated per CHARC; F3 BANKED; A2 PENDING | 0 / 1 / 1 / 1 | 2 / 1 | 2 / 0 / 1 | 0 | 2 ruled product fixes plus granted warning; 20 new test nodes (17 unit + 3 integration) | Dispatcher-run Claude; session 2 retired at 184370; turn-5 depth 106962 |
 
 F1 and F2 are fixed and locally verified, not claimed independently converged.
 F3 remains BANKED to CHARC for the accept's note; no row or code change.
@@ -1221,8 +1221,8 @@ ASCII and its final LF/scope/diff QA is `turn5-ledger-qa.log`. YIELD for A2.
 ## Session 3 / Turn 6: the report
 
 Base `78d2a03e`, clean at entry. Dispatcher-supplied depth after turn 5:
-106,962 tokens. Depth THIS TURN: PENDING -- dispatcher to fill from the
-transcript; no cell estimate.
+106,962 tokens. Depth THIS TURN: 145,932 -- dispatcher reading supplied in
+turn 7; no cell estimate.
 
 Wrote `docs/reports/wp-d112-pcm-audio.md`, following the headings and scale of
 `docs/reports/wp-dr87.md`. It records DR-112 without owner stems, the four
@@ -1247,3 +1247,103 @@ Only the report and this ledger changed. No footage, other worktree/main work,
 mailbox, commit, stash, product/test/fixture/interface/dependency edit or
 reviewer process. Reviewer A round 2 and B remain PENDING; the report will be
 amended if adjudication changes the candidate. YIELD to the orchestrator.
+
+## Session 3 / Turn 7: Reviewer A round 2 adjudication
+
+Base `7e9f1e12`, clean at entry. Dispatcher-supplied depths are now filled in
+the turn-5 and turn-6 depth lines: **106,962** and **145,932** respectively.
+Depth THIS TURN: PENDING -- dispatcher to fill from transcript; no cell estimate.
+
+Read the authorized `r2/review.txt` in full at
+`C:/Users/rwsmy/clearwater-review-evidence/wp-d112/r2/review.txt`.
+Reviewer A, Claude Opus/high, reviewed product state `78d2a03e`, starting
+2026-11-02 around 07:45Z on the OWNER's override before the 10:00Z weekly
+reset. Verdict **NO_NEW_CRITICAL_MAJOR**: 0 critical, 0 major, 0 minor,
+5 advisories. Round 2 CONVERGED; this is the dispatched terminating clean-up,
+not a new rule/review round. No rule or grant amendment is proposed.
+
+### Every advisory adjudicated
+
+| Advisory | Severity / reach | Evidence and disposition |
+| --- | --- | --- |
+| 1: per-output-packet stored extent is not bound to its own presented interval | ADVISORY, OUT, executed by reviewer | A hand-built output can shift payload extent within one run while totals and runs match; `-c:a copy` cannot produce that shape. Recorded in report Limits; NO code/test change for this advisory. |
+| 2: D86 floor can apply before the physical file's end | ADVISORY, OUT, executed by reviewer | The final packet of the WINDOW is exactly the ruled boundary; a malformed source can reach it with later packets present. Recorded in report Limits; NO rule/code change. |
+| 3: companded/block-packed PCM now refuses | ADVISORY, OUT, regex executed / consequence reasoned by reviewer | alaw, mulaw, bluray, dvd, lxf, s24daud, sga and vidc lack the exact fixed-byte evidence rule and now refuse, where the old packet rule judged them. No camera in the commissioned envelope writes them. Recorded in report Limits; NO code change. |
+| 4: missing real-sink trimmed-presentation control | ADVISORY, IN, executed by reviewer and cell | ADOPTED as the one parametrized test-only row below; both shapes pass. No product edit or new media fixture. |
+| 5: aligned short D86 tail has no partial-frame warning | ADVISORY, IN, reasoned by reviewer | At 70 percent, 594 declared samples beyond the 430 stored ones in the 1024-sample packet leave with the generic cut-short warning only; no partial byte was dropped. Conforms to ruling (b). One report sentence; NO warning/code change. |
+
+Reviewer execution, attributed to its text rather than repeated or summed:
+62 passed / 194 deselected in its light selection; one real-sink control;
+five passes across three truncated derivatives and the PCM/AAC plants.
+It also exercised own D86 guard/count variants, run-equality plants and
+re-chunked positives, codec-width/real-format cases, and the granted warning
+and compressed-path identities. Its targeted lint/format/type checks passed.
+These reviewer results are distinct from the cell's final light command.
+
+### The adopted test-only row
+
+`tests/test_io_video_encode.py:410`:
+`test_pcm_audio_trimmed_presentation_survives_the_real_sink`, parametrized
+`380-over-472` and `148-over-240`. It is UNMARKED, like the neighbouring
+truncated-PCM libx265 row (no gpu/footage/gui/slow/fullclip marker).
+
+The row makes a per-test MOV derivative of the committed fixture. For the
+first shape it stream-copies audio, retaining all 72072 stored samples and
+the last packet at pts 71600 with 472 stored samples. For the second it uses
+`atrim=end_sample=71920,asetnsamples=n=1024:p=0` and lossless pcm_s16le encoding
+to make a last packet at pts 71680 with 240 stored samples. In both cases the
+`setts` bitstream filter changes ONLY that last packet's declared duration
+to 380 or 148; the corresponding PCM bytes equal the committed source prefix.
+The derivative has no probe fault; packet preconditions and independent
+presented/stored totals are asserted before invoking the sink.
+
+`vf.encode_file` drives the REAL `_RecordingSink(FFmpegVideoSink)`, without
+checker bypass or sink emulation. Both calls succeed; output last durations
+remain 380 / 148 and payloads 944 / 480 bytes. Each decoded output equals
+the derivative's complete readable PCM (144144 / 143840 bytes), which also
+equals the committed fixture's corresponding prefix. No partial-frame warning
+is expected or observed. This is a positive regression CONTROL already green
+on the reviewed rule, not a claimed new RED. No committed media file is added.
+
+The report now names the converged A2 verdict and owner override, lists all
+five dispositions, records this row/results and the three out-of-envelope
+limits plus advisory 5's warning explanation. Reviewer B, gate and witness
+remain explicitly PENDING/commissioned to the orchestrator. Existing source
+anchors remain valid; the new test anchor was relocated after formatting.
+
+### Light runs and verification
+
+Every pytest invocation sets `PYTHONPATH=scripts`, unsets `PYTEST_ADDOPTS`,
+loads `-p sandbox_mkdir_shim -p no:cacheprovider`, and has a fresh basetemp
+under `work/wp-d112/tmp/t7-*`. All runner outputs are files in this worktree.
+
+| Check | Result | Evidence under `work/wp-d112/` |
+| --- | --- | --- |
+| New row by explicit node, both shapes | 2 passed | `turn7-trimmed-tail.log` / `.xml` |
+| Both encode modules, `-k "audio or pcm or check_output"` | 66 passed, 192 deselected | `turn7-light.log` / `.xml` |
+| Ruff on changed test file | All checks passed | `turn7-ruff.log` |
+| Format --check on changed test file | 1 file already formatted | `turn7-format-check.log` |
+| Mypy | Success, 149 source files | `turn7-mypy.log` |
+| Scope, source/test identity, ASCII/LF, report anchors and diff QA | PASS | `turn7-scope-qa.log` |
+
+Verification loop: suspected false refusal of a PCM tail whose stored extent
+exceeds presentation was NOT reproduced: both real-sink controls pass with
+byte equality and the asserted trimmed output durations. Independent packet
+preconditions prevent a fixture that silently has equal extents from passing.
+The final keyword light roster remains green, with exactly two additional
+passing nodes. No predecessor assertion was modified. Final scope review
+finds no new issue and no need to change the ruled rule or warning grant.
+
+### Cumulative round ledger and handoff
+
+| Reviewer round | Verdict / disposition | Critical / major / minor / advisory | IN / OUT | NEW / REOPENED / pre-existing | Reverts | Product / test fixes THIS TURN | Transport / depth |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A1 | F1/F2 remediated; F3 BANKED | 0 / 1 / 1 / 1 | 2 / 1 | 2 / 0 / 1 | 0 | Turn 5: two ruled fixes plus warning; 20 test nodes | Claude at dispatcher's seat; turn-5 depth 106962 |
+| A2 | NO_NEW_CRITICAL_MAJOR, CONVERGED; terminating clean-up | 0 / 0 / 0 / 5 | 2 / 3 | 5 / 0 / 0 | 0 | 0 product; 1 adopted control row, 2 parametrized nodes; report limits | Claude Opus/high on owner override; turn-6 depth 145932; current PENDING |
+
+Locks: only `tests/test_io_video_encode.py`, the report and this ledger changed.
+`verify.py`, `encode.py`, frozen interfaces and every dependency/configuration
+file remain untouched. No footage, main-tree work or other worktree opened;
+no mailbox, stash, commit, new committed media or extra review process. All
+changed files are ASCII/LF with zero CR. YIELD; Reviewer B follows at the
+orchestrator's seat, then the commissioned gate/accept/witness sequence.
