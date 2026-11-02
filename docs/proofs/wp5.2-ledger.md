@@ -245,7 +245,7 @@ the WP-DR113 gate, with no WP-DR113 reviewer or other heavy activity. No window
 is opened by this turn.
 
 Before EACH window: `df -h /c` (STOP below 25 GB for W52-1;
-30 GB for W52-2), available RAM,
+30 GB for W52-2; R3 rechecks 25 GB before generation), available RAM,
 `nvidia-smi --query-gpu=clocks.sm,clocks.mem,temperature.gpu,memory.free,memory.used --format=csv`,
 and the process strays. Repeat conditions/strays at close. Open/close to CHARC;
 no tests, reviewer, V4 witness or other heavy work during a window. GX011625 is
@@ -253,37 +253,128 @@ last in W52-1. A failed leg is retried once in a later window before STOP.
 Every run log and record carries W52-1 or W52-2. Export failures retain records.
 Cleanup of retained evidence follows an explicit keep/delete grant.
 
-Shared seat setup (reads configuration; do not substitute this cell's cwd):
+Each request below is ONE self-contained bash script in ONE fenced block.
+At the seat, save each under the main tree's work/wp5.2 folder and invoke it
+as ONE `bash <file>` from the repo root; no shell state crosses blocks.
+Script files remain uncommitted. There is no shared setup block.
+
+**R1 / W52-1 alone, about 115 min.** Eight exports in six unchanged legs,
+device frames enabled, no --keep. Disk floor: **25 GB**. Configuration/root
+validation precedes writes; after bootstrap, disk/bench/record steps each
+capture their status in unique receipt files beside the bench records.
+Bench exit is captured immediately, including exit 3 for a memory-check
+failure. The exact printed RECORD path is read (never a glob), renamed with
+the W52-1 prefix, and SHA256 compared before/after. Exit 3 receipts include
+the stopped `memory_check`, `idle_before_mib` and device peak; the idle is
+stated, never subtracted. Prior attempts remain; no plan resumes after exit 3.
 
 ```bash
+set -euo pipefail
 unset PYTEST_ADDOPTS
-WORK52=$(uv run python -c "import sys; sys.path.insert(0,'tools'); from local_config import load_local_config; print((load_local_config().working_path/'wp5.2').as_posix())")
+WORK52=$(uv run python - <<'PY'
+import sys
+sys.path.insert(0, 'tools')
+from local_config import load_local_config
+from spike_io.guard import WriteGuard
+cfg = load_local_config()
+working = cfg.working_path.resolve()
+root = working / 'wp5.2'
+assert root.resolve() == root and root.is_relative_to(working)
+guard = WriteGuard(root, cfg.footage_path)
+guard.folder('v16/W52-1')
+print(root.as_posix())
+PY
+)
 : "${WORK52:?}"
 export WORK52
-mkdir -p "$WORK52/v16/W52-1" "$WORK52/W52-2"
+R1ROOT="$WORK52/v16/W52-1"
+ATTEMPT52="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+R1RECEIPT="$R1ROOT/W52-1-$ATTEMPT52"
+export R1ROOT R1RECEIPT
+if uv run python - > "$R1RECEIPT-disk.log" 2>&1 <<'PY'
+import os, shutil
+from pathlib import Path
+root = Path(os.environ['R1ROOT'])
+free = shutil.disk_usage(root).free
+print('disk_free_bytes', free, 'required', 25_000_000_000)
+raise SystemExit(0 if free >= 25_000_000_000 else 2)
+PY
+then DISK_STATUS=0; else DISK_STATUS=$?; fi
+printf '%s\n' "$DISK_STATUS" > "$R1RECEIPT-disk.exit"
+if [ "$DISK_STATUS" -ne 0 ]; then exit "$DISK_STATUS"; fi
+R1LOG="$R1RECEIPT-v16.log"
+export R1LOG
+if uv run python tools/export_bench.py v16 --device-frames --subdir wp5.2/v16/W52-1 > "$R1LOG" 2>&1; then
+    BENCH_STATUS=0
+else
+    BENCH_STATUS=$?
+fi
+# Capture immediately; 3 is memory-check failure, including unmeasured peak.
+printf '%s\n' "$BENCH_STATUS" > "$R1RECEIPT-bench.exit"
+export BENCH_STATUS
+if uv run python - > "$R1RECEIPT-record.log" 2>&1 <<'PY'
+import hashlib, json, os
+from pathlib import Path
+root = Path(os.environ['R1ROOT']).resolve()
+log = Path(os.environ['R1LOG'])
+status = int(os.environ['BENCH_STATUS'])
+printed = [line[len('RECORD '):].strip()
+           for line in log.read_text(encoding='utf-8').splitlines()
+           if line.startswith('RECORD ')]
+receipt = dict(window='W52-1', bench_exit=status, log=log.name,
+               record=None, sha256_before=None, sha256_after=None)
+post_status = 0
+try:
+    if not printed:
+        receipt['reason'] = 'bench printed no RECORD path; inspect exit and log'
+        post_status = 1
+    else:
+        assert len(printed) == 1, printed
+        source = Path(printed[0]).resolve()
+        assert source.parent == root, source
+        before = hashlib.sha256(source.read_bytes()).hexdigest()
+        record = json.loads(source.read_text(encoding='utf-8'))
+        receipt.update(record=source.name, sha256_before=before,
+                       run_count=len(record['runs']))
+        if status == 3:
+            stopped = record['runs'][-1]
+            check = stopped.get('memory_check') or {}
+            assert check.get('passes') is False
+            receipt.update(memory_check=check,
+                           idle_before_mib=check.get('idle_before_mib'),
+                           device_peak_mib=check.get('device_peak_mib'),
+                           failure='memory check failed (a breach, or the device peak unmeasured)')
+            print(json.dumps({key: receipt[key] for key in
+                  ('memory_check', 'idle_before_mib', 'device_peak_mib', 'failure')}))
+        target = source.with_name('W52-1-' + source.name)
+        assert not target.exists(), target
+        source.rename(target)
+        after = hashlib.sha256(target.read_bytes()).hexdigest()
+        receipt.update(record=target.name, sha256_after=after)
+        assert before == after
+        if status == 0:
+            assert len(record['runs']) == 8
+
+except Exception as error:
+    receipt['reason'] = f'{type(error).__name__}: {error}'
+    post_status = 1
+receipt['record_step_exit'] = post_status
+with Path(os.environ['R1RECEIPT'] + '-record.json').open('x', encoding='ascii') as dst:
+    dst.write(json.dumps(receipt, indent=2, ensure_ascii=True) + '\n')
+print(json.dumps(receipt, ensure_ascii=True))
+raise SystemExit(post_status)
+PY
+then RECORD_STATUS=0; else RECORD_STATUS=$?; fi
+printf '%s\n' "$RECORD_STATUS" > "$R1RECEIPT-record.exit"
+# Preserve the bench's status, including 3, even if record handling also failed.
+if [ "$BENCH_STATUS" -ne 0 ]; then exit "$BENCH_STATUS"; fi
+exit "$RECORD_STATUS"
 ```
-
-**R1 / W52-1 alone, about 115 min.** Eight exports in the six unchanged legs
-mapped in section 1, device frames enabled, no --keep:
-
-```bash
-: "${WORK52:?}"
-uv run python tools/export_bench.py v16 --device-frames --subdir wp5.2/v16/W52-1 > "$WORK52/v16/W52-1/W52-1-v16.log" 2>&1
-```
-
-Read exit status immediately. On exit 3, read the printed record's
-`memory_check` for the stopped row: memory check failed (a breach, or the
-device peak unmeasured). Never continue the plan; distinguish those causes.
-Use the exact printed RECORD path to rename that JSON byte-preserving with
-the `W52-1-` prefix, beside the original location, recording pre/post SHA256.
-Keep prior failed attempts too; do not select an arbitrary glob result. Require
-eight records on success, read memory checks, resolved encoders and all keys
-in section 1. No benchmark edit beyond DR-72 is commissioned.
 
 **R2 / W52-2: ONE self-contained bash script.** Save the following ONE
 block under the main tree's `work/wp5.2/W52-2/` at the seat and run it as
 ONE `bash <file>` invocation from the repo root. The script file is never
-committed. No shell state is inherited from the shared R1 setup. It computes
+committed. No shell state is inherited from R1 or any shared setup. It computes
 and validates WORK52, refuses below **30 GB** free, and preserves each attempt
 in `W52-2/attempt-<UTC>-<pid>/`. Each stop file is unique to that attempt.
 Records retain the required W52-2-r2-held / -free / -cpu names inside it.
@@ -292,7 +383,9 @@ WHOLE GX011627 is 681 frames / about 22.7 s, stream-copied without a time
 cap or duplication. The holder targets 1536 MiB device-wide free, with an
 automated inclusive **1280-1792 MiB** DURING band. Outside that band the script
 releases/reaps it and exits 2 before exporting; the seat retries, with no
-manual pause or automatic re-size. Timeout is 900 s. An EXIT trap releases
+manual pause or automatic re-size. Holder timeout is **3600 s**.
+The held export runs under **timeout 2400**; status **124** is recorded as
+the held observation and never gates the independent pair. An EXIT trap releases
 the holder on normal shell exits (not an uncatchable kill); liveness receipts
 before and after the held export qualify the pressure observation.
 
@@ -302,7 +395,9 @@ explicit free-card safety guard: after stopping/reaping the holder, poll for
 device-wide used <= pre-holder + **100 MiB**, within **30 s**, otherwise
 record refusal and exit 2. Free vs CPU comparison is always attempted after
 those two exports. Held vs free is compared only on held exit 0 and GPU route;
-otherwise the comparison record states why it was skipped. R3 remains the
+otherwise the comparison record states why it was skipped. If free or CPU
+failed, compare.json still records each failed leg and its exit status,
+without attempting to read its incomplete/missing export record. R3 remains the
 D111 engagement witness; cross-process pressure does not promise fallback.
 
 ```bash
@@ -393,7 +488,7 @@ PY
 nvidia-smi --id=0 --query-gpu=memory.free,memory.used --format=csv,noheader,nounits > "$R2ROOT/W52-2-r2-before.csv"
 HOLD_MIB=$(uv run python -c "import math,sys; from pathlib import Path; free=float(Path(sys.argv[1]).read_text().strip().split(',')[0]); size=math.floor(free)-1536; assert size>0; print(size)" "$R2ROOT/W52-2-r2-before.csv")
 printf '%s\n' "$HOLD_MIB" > "$R2ROOT/W52-2-r2-hold-mib.txt"
-uv run python tools/device_hold.py --mib "$HOLD_MIB" --stop-file "$STOP52" --timeout-s 900 > "$R2ROOT/W52-2-r2-holder.jsonl" 2> "$R2ROOT/W52-2-r2-holder.stderr" &
+uv run python tools/device_hold.py --mib "$HOLD_MIB" --stop-file "$STOP52" --timeout-s 3600 > "$R2ROOT/W52-2-r2-holder.jsonl" 2> "$R2ROOT/W52-2-r2-holder.stderr" &
 HOLDER_PID=$!
 uv run python - "$R2ROOT/W52-2-r2-holder.jsonl" > "$R2ROOT/W52-2-r2-readiness.log" 2>&1 <<'PY'
 import json, sys, time
@@ -428,9 +523,11 @@ for leg in held free cpu; do
 done
 run_export() {
     local leg=$1 status
+    local -a export_limit=()
+    if [ "$leg" = held ]; then export_limit=(timeout 2400); fi
     shift
     # An export exit is a receipt, not an errexit trigger, including held failure.
-    if { time uv run python tools/headless_export.py "$R2ROOT/W52-2-GX011627-whole.mp4" --out "$R2ROOT/W52-2-r2-$leg/out" --cache-dir "$R2ROOT/W52-2-r2-$leg/cache" --method c3 --encoder auto --quality standard --record "$R2ROOT/W52-2-r2-$leg.json" "$@"; } > "$R2ROOT/W52-2-r2-$leg.log" 2>&1; then
+    if { time "${export_limit[@]}" uv run python tools/headless_export.py "$R2ROOT/W52-2-GX011627-whole.mp4" --out "$R2ROOT/W52-2-r2-$leg/out" --cache-dir "$R2ROOT/W52-2-r2-$leg/cache" --method c3 --encoder auto --quality standard --record "$R2ROOT/W52-2-r2-$leg.json" "$@"; } > "$R2ROOT/W52-2-r2-$leg.log" 2>&1; then
         status=0
     else
         status=$?
@@ -500,74 +597,91 @@ sys.path.insert(0, 'tools')
 from clearwater.io.video import find_tool, probe
 from clearwater.color import decode_filter
 root = Path(os.environ['R2ROOT'])
-records = {label: json.loads((root / f'W52-2-r2-{label}.json').read_text())
-           for label in ('free', 'cpu')}
-for label, record in records.items():
-    assert (root / f'W52-2-r2-{label}.exit').read_text().strip() == '0'
-    assert len(record['items']) == 1 and not record['cancelled']
-    assert record['items'][0]['state'] in ('done', 'done with warnings')
-    assert len(record['items'][0]['outputs']) == 1
-assert records['free']['items'][0]['device'] == 'GPU'
-assert records['cpu']['items'][0]['device'] == 'CPU: forced'
-labels = ['free', 'cpu']
-held_status = int((root / 'W52-2-r2-held.exit').read_text().strip())
-held_reason = None
-held_skip = None
-if held_status == 0:
-    records['held'] = json.loads((root / 'W52-2-r2-held.json').read_text())
-    held = records['held']
-    assert len(held['items']) == 1 and not held['cancelled']
-    assert held['items'][0]['state'] in ('done', 'done with warnings')
-    assert len(held['items'][0]['outputs']) == 1
-    held_reason = held['items'][0]['device']
-    if held_reason == 'GPU':
-        labels.append('held')
+def comparison():
+    exits = {label: int((root / f'W52-2-r2-{label}.exit').read_text().strip())
+             for label in ('free', 'cpu')}
+    failed = [dict(leg=label, exit_status=status,
+                   reason=f'{label} export exited {status}; no completed output to compare')
+              for label, status in exits.items() if status != 0]
+    if failed:
+        return dict(window='W52-2', frames=30, cpu_gpu=None, held_free=None,
+                    passes=False, skipped=True, failed_legs=failed,
+                    skip_reason='; '.join(item['reason'] for item in failed))
+    records = {label: json.loads((root / f'W52-2-r2-{label}.json').read_text())
+               for label in ('free', 'cpu')}
+    for label, record in records.items():
+        assert (root / f'W52-2-r2-{label}.exit').read_text().strip() == '0'
+        assert len(record['items']) == 1 and not record['cancelled']
+        assert record['items'][0]['state'] in ('done', 'done with warnings')
+        assert len(record['items'][0]['outputs']) == 1
+    assert records['free']['items'][0]['device'] == 'GPU'
+    assert records['cpu']['items'][0]['device'] == 'CPU: forced'
+    labels = ['free', 'cpu']
+    held_status = int((root / 'W52-2-r2-held.exit').read_text().strip())
+    held_reason = None
+    held_skip = None
+    if held_status == 0:
+        records['held'] = json.loads((root / 'W52-2-r2-held.json').read_text())
+        held = records['held']
+        assert len(held['items']) == 1 and not held['cancelled']
+        assert held['items'][0]['state'] in ('done', 'done with warnings')
+        assert len(held['items'][0]['outputs']) == 1
+        held_reason = held['items'][0]['device']
+        if held_reason == 'GPU':
+            labels.append('held')
+        else:
+            held_skip = f'held route was {held_reason}; GPU identity comparison inapplicable'
     else:
-        held_skip = f'held route was {held_reason}; GPU identity comparison inapplicable'
-else:
-    held_skip = f'held export exited {held_status}; no completed output to compare'
-held_gpu = 'held' in labels
-arrays, signatures = {}, []
-for label in labels:
-    # Runner records deliberately redact outputs to basenames.
-    name = records[label]['items'][0]['outputs'][0]
-    assert Path(name).name == name
-    video = root / f'W52-2-r2-{label}' / 'out' / name
-    stream = probe(video).video
-    assert stream.bit_depth == 8 and stream.nb_frames == 681
-    signatures.append((stream.height, stream.width, stream.frame_rate))
-    raw = root / f'W52-2-r2-{label}-first30.rgb'
-    subprocess.run([str(find_tool('ffmpeg')), '-nostdin', '-v', 'error', '-n',
-                    '-noautorotate', '-i', str(video), '-map', '0:v:0', '-frames:v', '30',
-                    '-vf', decode_filter(stream), '-pix_fmt', 'gbrp',
-                    '-fps_mode', 'passthrough', '-f', 'rawvideo', str(raw)], check=True)
-    assert raw.stat().st_size == 30 * 3 * stream.height * stream.width
-    arrays[label] = np.memmap(raw, dtype=np.uint8, mode='r',
-                             shape=(30, 3, stream.height, stream.width))
-assert len(set(signatures)) == 1
-def compare(left, right):
-    largest, total, count = 0.0, 0.0, 0
-    for a, b in zip(arrays[left], arrays[right], strict=True):
-        diff = np.abs(a.astype(np.float32) - b.astype(np.float32))
-        largest = max(largest, float(diff.max()))
-        total += float(diff.sum(dtype=np.float64))
-        count += diff.size
-    return dict(max_abs_255=largest, mean_abs_255=total/count,
-                max_abs_unit=largest/255, mean_abs_unit=total/count/255)
-cpu_gpu = compare('free', 'cpu')
-cpu_gpu.update(ad11_numeric_max_limit=2e-3, ad11_numeric_mean_limit=2e-4,
-               ad11_numeric_bounds_met=(cpu_gpu['max_abs_unit'] <= 2e-3
-                                        and cpu_gpu['mean_abs_unit'] <= 2e-4),
-               preencode_ad11_proved=False, comparison='post-encode free vs forced CPU',
-               postencode_mean_limit_255=3.5,
-               postencode_characterisation_passes=cpu_gpu['mean_abs_255'] <= 3.5)
-held_free = compare('held', 'free') if held_gpu else None
-if held_free is not None:
-    held_free['identical'] = held_free['max_abs_255'] == 0
-result = dict(window='W52-2', frames=30, cpu_gpu=cpu_gpu, held_free=held_free,
-              held_exit=held_status, held_device_reason=held_reason, held_skip_reason=held_skip,
-              passes=(cpu_gpu['postencode_characterisation_passes']
-                      and (held_free is None or held_free['identical'])))
+        held_skip = f'held export exited {held_status}; no completed output to compare'
+    held_gpu = 'held' in labels
+    arrays, signatures = {}, []
+    for label in labels:
+        # Runner records deliberately redact outputs to basenames.
+        name = records[label]['items'][0]['outputs'][0]
+        assert Path(name).name == name
+        video = root / f'W52-2-r2-{label}' / 'out' / name
+        stream = probe(video).video
+        assert stream.bit_depth == 8 and stream.nb_frames == 681
+        signatures.append((stream.height, stream.width, stream.frame_rate))
+        raw = root / f'W52-2-r2-{label}-first30.rgb'
+        subprocess.run([str(find_tool('ffmpeg')), '-nostdin', '-v', 'error', '-n',
+                        '-noautorotate', '-i', str(video), '-map', '0:v:0', '-frames:v', '30',
+                        '-vf', decode_filter(stream), '-pix_fmt', 'gbrp',
+                        '-fps_mode', 'passthrough', '-f', 'rawvideo', str(raw)], check=True)
+        assert raw.stat().st_size == 30 * 3 * stream.height * stream.width
+        arrays[label] = np.memmap(raw, dtype=np.uint8, mode='r',
+                                 shape=(30, 3, stream.height, stream.width))
+    assert len(set(signatures)) == 1
+    def compare(left, right):
+        largest, total, count = 0.0, 0.0, 0
+        for a, b in zip(arrays[left], arrays[right], strict=True):
+            diff = np.abs(a.astype(np.float32) - b.astype(np.float32))
+            largest = max(largest, float(diff.max()))
+            total += float(diff.sum(dtype=np.float64))
+            count += diff.size
+        return dict(max_abs_255=largest, mean_abs_255=total/count,
+                    max_abs_unit=largest/255, mean_abs_unit=total/count/255)
+    cpu_gpu = compare('free', 'cpu')
+    cpu_gpu.update(ad11_numeric_max_limit=2e-3, ad11_numeric_mean_limit=2e-4,
+                   ad11_numeric_bounds_met=(cpu_gpu['max_abs_unit'] <= 2e-3
+                                            and cpu_gpu['mean_abs_unit'] <= 2e-4),
+                   preencode_ad11_proved=False, comparison='post-encode free vs forced CPU',
+                   postencode_mean_limit_255=3.5,
+                   postencode_characterisation_passes=cpu_gpu['mean_abs_255'] <= 3.5)
+    held_free = compare('held', 'free') if held_gpu else None
+    if held_free is not None:
+        held_free['identical'] = held_free['max_abs_255'] == 0
+    result = dict(window='W52-2', frames=30, cpu_gpu=cpu_gpu, held_free=held_free,
+                  held_exit=held_status, held_device_reason=held_reason, held_skip_reason=held_skip,
+                  skipped=False, passes=(cpu_gpu['postencode_characterisation_passes']
+                          and (held_free is None or held_free['identical'])))
+    return result
+try:
+    result = comparison()
+except Exception as error:
+    result = dict(window='W52-2', frames=30, cpu_gpu=None, held_free=None,
+                  passes=False, skipped=True,
+                  skip_reason=f'comparison unavailable: {type(error).__name__}: {error}')
 with (root / 'W52-2-r2-compare.json').open('x', encoding='ascii') as dst:
     dst.write(json.dumps(result, indent=2))
 print(json.dumps(result))
@@ -599,13 +713,57 @@ comparisons. If held also chooses CPU at the provisional CPU rate, budget
 **55-60 min** instead. Record actual walls; failures/retries are additional.
 No timed leg is run by this cell. No heavy work beside WP-DR113's reviewer.
 
-**R3 / W52-2.** Generate the synthetic under the configured working folder,
-then measure through the commissioned adapter. No full-size input is created
-by the cell; no generated image/output is committed. Recipe:
+**R3 / W52-2: ONE self-contained script.** Disk floor: **25 GB**;
+the adapter needs 20,292,626,432 B at 8064x6048 RGB16, leaving
+4,707,373,568 B (about 4.71 GB) margin before generation. Configuration/root
+is checked independently. Disk/generator/measurement each have an exit
+receipt beside the photo record folders, with unique attempt prefixes.
+Generation failure writes a measurement-skipped receipt and never launches
+the adapter. The PNG uses a fixed same-folder `.tmp` name; existing final
+or temporary files refuse with their exact path named. A temporary is never
+silently reused or deleted. Publish the final name only after closing the
+complete write and checking file size and RGB16 IHDR dimensions. No full-size
+input is created by the cell; all of this runs at the EXCLUSIVE seat.
 
 ```bash
+set -euo pipefail
+unset PYTEST_ADDOPTS
+WORK52=$(uv run python - <<'PY'
+import sys
+sys.path.insert(0, 'tools')
+from local_config import load_local_config
+from spike_io.guard import WriteGuard
+cfg = load_local_config()
+working = cfg.working_path.resolve()
+root = working / 'wp5.2'
+assert root.resolve() == root and root.is_relative_to(working)
+guard = WriteGuard(root, cfg.footage_path)
+guard.folder('W52-2')
+guard.folder('photo')
+print(root.as_posix())
+PY
+)
 : "${WORK52:?}"
-uv run python - > "$WORK52/W52-2/W52-2-generate48.log" 2>&1 <<'PY'
+export WORK52
+# Receipt files sit beside the adapter's per-leg record folders.
+R3ROOT="$WORK52/photo"
+ATTEMPT52="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+R3RECEIPT="$R3ROOT/W52-2-r3-$ATTEMPT52"
+export R3RECEIPT
+if uv run python - > "$R3RECEIPT-disk.log" 2>&1 <<'PY'
+import os, shutil
+from pathlib import Path
+root = Path(os.environ['WORK52'])
+free = shutil.disk_usage(root).free
+need = 20_000_000_000 + 8064 * 6048 * 6
+print('disk_free_bytes', free, 'adapter_need_bytes', need,
+      'required', 25_000_000_000, 'margin_bytes', 25_000_000_000 - need)
+raise SystemExit(0 if free >= 25_000_000_000 else 2)
+PY
+then DISK_STATUS=0; else DISK_STATUS=$?; fi
+printf '%s\n' "$DISK_STATUS" > "$R3RECEIPT-disk.exit"
+if [ "$DISK_STATUS" -ne 0 ]; then exit "$DISK_STATUS"; fi
+if uv run python - > "$R3RECEIPT-generate48.log" 2>&1 <<'PY'
 import os, sys
 from pathlib import Path
 sys.path.insert(0, 'tools')
@@ -615,12 +773,46 @@ from spike_io.guard import WriteGuard
 cfg = load_local_config()
 guard = WriteGuard(cfg.working_path.resolve() / 'wp5.2', cfg.footage_path)
 output = Path(os.environ['WORK52']) / 'W52-2/W52-2-synthetic-48mp.png'
+temporary = output.with_name(output.name + '.tmp')
+guard.check(output)
+guard.check(temporary)
+if output.exists():
+    raise FileExistsError(f'REFUSED existing final PNG: {output}')
+if temporary.exists():
+    raise FileExistsError(f'REFUSED leftover temporary PNG: {temporary}; never reused')
 pixels = quantize(unit_content('lowred', width=8064, height=6048), 16)
-with guard.check(output).open('xb') as dst:
-    dst.write(png16_bytes(pixels, srgb_profile(), 'sRGB'))
-print(output.name, '8064x6048', 'RGB16', 'seeded lowred', 'no EXIF')
+payload = png16_bytes(pixels, srgb_profile(), 'sRGB')
+with guard.check(temporary).open('xb') as dst:
+    dst.write(payload)
+    dst.flush()
+    os.fsync(dst.fileno())
+with temporary.open('rb') as src:
+    header = src.read(29)
+assert len(header) == 29 and header[:8] == b'\x89PNG\r\n\x1a\n'
+assert header[12:16] == b'IHDR'
+assert int.from_bytes(header[16:20], 'big') == 8064
+assert int.from_bytes(header[20:24], 'big') == 6048
+assert header[24:26] == b'\x10\x02'
+assert temporary.stat().st_size == len(payload)
+if output.exists():
+    raise FileExistsError(f'REFUSED existing final PNG before rename: {output}')
+guard.check(temporary).rename(guard.check(output))
+print(output.name, '8064x6048', 'RGB16', 'seeded lowred', 'no EXIF',
+      'complete temporary write and IHDR read-back before rename')
 PY
-uv run python tools/photo_memory.py measure "$WORK52/W52-2/W52-2-synthetic-48mp.png" --name W52-2 --exclusive > "$WORK52/W52-2/W52-2-photo-memory.log" 2>&1
+then GENERATOR_STATUS=0; else GENERATOR_STATUS=$?; fi
+printf '%s\n' "$GENERATOR_STATUS" > "$R3RECEIPT-generate48.exit"
+if [ "$GENERATOR_STATUS" -ne 0 ]; then
+    printf 'SKIPPED: generator exited %s; input was not measured\n' "$GENERATOR_STATUS" > "$R3RECEIPT-measure-skipped.txt"
+    exit "$GENERATOR_STATUS"
+fi
+if uv run python tools/photo_memory.py measure "$WORK52/W52-2/W52-2-synthetic-48mp.png" --name W52-2 --exclusive > "$R3RECEIPT-photo-memory.log" 2>&1; then
+    MEASURE_STATUS=0
+else
+    MEASURE_STATUS=$?
+fi
+printf '%s\n' "$MEASURE_STATUS" > "$R3RECEIPT-photo-memory.exit"
+exit "$MEASURE_STATUS"
 ```
 
 Records are `<working>/wp5.2/photo/W52-2-{default,cpu}-<unique>/record.json`.
@@ -1090,3 +1282,92 @@ Earlier build/ruling turns above are not counted Reviewer A rounds.
 | Round | Critical / major / minor / advisory | Envelope | NEW / REOPENED | Reverts | Fix surface | Transport / depth | Outcome |
 |---|---|---|---|---|---|---|---|
 | A1, session 3 / turn 4 | 0 / 2 / 6 / 7 per-ID review tags (dispatch header 0 / 2 / 7 / 6) | 15 in / 0 out | 15 / 0 | 0 | Tools + tests + run-request text; product code 0; not test-only | Claude opus/high via dispatcher; Codex exec remediation; depth 111,385 | All IDs dispositioned; 40 light tests/static checks GREEN; bash -n blocked by sandbox startup, seat check required; YIELD for A2 |
+
+## Session 3 / Turn 5: Reviewer A round 2 terminating clean-up
+
+Resumed session 3, turn-4 commit `959083eb`. Depth after turn 4:
+**111,385**, dispatcher-supplied and already recorded above. Current depth:
+**142,196** (session 3 / turn 5, at yield, codex_cell footer). Seat checks: `bash -n` OK on all three scripts, each identical to its section-5 block.
+
+Status: **Reviewer A CONVERGED at round 2; terminating clean-up complete.**
+The dispatcher supplied the seat's successful `bash -n` on turn 4's R2
+script (identical to section 5 at that commit), and **1 passed** for
+`tests/test_device_hold.py` at the seat. Those resolve turn 4's validation
+STOP; they are seat evidence, not executions by this cell. This turn changes
+only the ledger's live section-5 requests and adds this adjudication record.
+No tool, test or brief changed. No pytest or run request was executed.
+
+Review source: the one authorised external read,
+`C:/Users/rwsmy/clearwater-review-evidence/wp5.2/r2/review.txt`, Claude
+opus/high, 38 turns, verdict **NO_NEW_CRITICAL_MAJOR** on `959083eb`.
+The reviewer re-checked round-1 F1/F2/F4/F6 as closed and found the tools
+sound on every claim. Its **2 MINOR + 4 ADVISORY** findings are all in the
+run requests or ruled design, all IN envelope. No new blocking finding;
+the six dispositions below do not open another review round.
+
+### Findings and section-5 changes
+
+| Finding / severity | Disposition and confirmed mechanism | Live ledger lines |
+|---|---|---|
+| 1 MINOR: holder expires before the held-run contingency | FIXED as ruled. Replace 900 s with `--timeout-s 3600`, matching the binding turn-5 packet and original R2 figure. Unique stop path, EXIT cleanup and pre/post liveness receipts remain. This supersedes round-1 F11's 900 s choice; the bounded held export below now ends at 2400 s. | R2 prose/script, `docs/proofs/wp5.2-ledger.md:374-690`; timeout at `:491`. |
+| 2 MINOR: R1/R3 inherit WORK52; R3 continues after failed generation | FIXED. Deleted shared setup, replacing it with an invocation pointer. R1 and R3 each compute/assert WORK52 and configured-root containment within ONE `set -euo pipefail` script, run by the seat as ONE `bash <file>`. Each captures disk and operation exits beside its records with unique attempt prefixes. R1 captures the bench status immediately, reads its exact printed RECORD path, records the stopped check/idle on 3, renames byte-preserving with W52-1 prefix, and records pre/post SHA256. R3 launches measurement ONLY after generator exit 0; failure gets an explicit skipped receipt. | Pointer `:256-259`; R1 `:261-372`; R3 `:716-830`. |
+| 3 ADVISORY: interrupted generation leaves a partial final PNG | ADOPTED. Generator writes the same-folder `.png.tmp` with exclusive creation, closes/flushed-syncs it, checks total byte count and RGB16 IHDR dimensions, then renames to final. Existing final refuses; a leftover temporary refuses with its exact name and is never reused/deleted. A generator failure cannot launch measurement. | R3 script `:729-815`. |
+| 4 ADVISORY: held export is unbounded | ADOPTED. Only the held leg gets Bash array prefix `timeout 2400`; free/cpu keep their commands. Status 124 is written by the same export-status receipt path and remains an observation, never gating the independent pair. | R2 `run_export`, `:524-537`; prose `:386-389`. |
+| 5 ADVISORY: failed free/cpu exit prevents compare.json | ADOPTED. Read both exit receipts before export JSON. If either failed, return a skipped comparison listing each failed leg, its exit status and reason, without opening incomplete/missing runner records. The outer comparison wrapper also records other comparison exceptions, and the shared final write emits compare.json with failure status. Successful comparisons keep literal AD-11 and post-encode bounds, plus the existing held skip rules. | R2 comparison `:593-688`. |
+| 6 ADVISORY: device-wide peak contains other processes | NO change, by ruled design. Peak remains device-wide, idle stated rather than subtracted. R1's exit-3 receipt quotes `memory_check`, `idle_before_mib` and `device_peak_mib`; it never infers that all observed use belongs to this export. | R1 record receipt `:328-338`; existing bench unchanged. |
+
+Disk floors: R1 **25 GB**; R2/window opening **30 GB**; R3 rechecks
+**25 GB** before generation. At 8064x6048 RGB16 the adapter's current
+minimum is 20,000,000,000 + 8064*6048*6 = **20,292,626,432 B**.
+The R3 floor supplies **4,707,373,568 B**, about **4.71 GB**, above that
+minimum before generation; it does not relax the adapter's own later check.
+All paths still derive from configuration, and every seat record/output
+stays below configured work/wp5.2. No new deletion grant is introduced.
+
+### Seat syntax-check handoff and checks
+
+Three exact fenced-script copies are ready in THIS worktree for the
+dispatcher's `bash -n` checks (not run here):
+
+- `work/wp5.2/tmp/turn5-r1.sh`: R1 block at ledger `:272-371`, 100 lines.
+- `work/wp5.2/tmp/turn5-r2.sh`: R2 block at ledger `:404-689`, 286 lines.
+- `work/wp5.2/tmp/turn5-r3.sh`: R3 block at ledger `:729-815`, 87 lines.
+
+Each copy is byte-identical to its section-5 body including the final LF,
+ASCII and zero CR; none is committed. The seat saves/runs each as one
+script invocation from its repo root. This cell did not retry Git Bash:
+its startup failure under this restricted token is already established.
+Pending seat syntax checks on these revised copies are distinct from the
+successful check on turn 4's superseded R2 body. No new STOP or ruling is
+requested; the planned windows follow after WP-DR113 acceptance and the
+seat's script checks.
+
+Light/formal checks, logs under this worktree's `work/wp5.2/turn5/`:
+
+- `ruff.log`: `uv run ruff check .`, **All checks passed!**, exit 0.
+- `format.log`: `uv run ruff format --check .`, **311 files already
+  formatted**, exit 0. No source Python changed or formatter mutation ran.
+- `audit.log`: only `docs/proofs/wp5.2-ledger.md` changed; ledger and all
+  three extracted scripts ASCII/zero CR; exact script-byte identity;
+  **13 embedded Python bodies parsed without execution**; `git diff --check`
+  clean, exit 0. This is a syntax-only Python audit, not Bash/runtime proof.
+
+Verification/adjudication record: confirmed findings 1/2 against the prior
+900 s setting, shared-setup references and missing R3 branch; replaced the
+live instructions as ordered. Adopted 3/4/5 with staged write/explicit
+timeout/record-before-reading-failed-outputs controls. Kept 6 by the ruled
+measurement scope. Rejected as false positive: none. No unrequested
+behaviour, tolerance, product, tool, test or brief change. Reverts: **1
+ruled request-setting reversal**, 900 -> 3600 s; no code reversion.
+
+No pytest, GPU holder, Bash syntax-check process, run-request script,
+full-size generation, timed leg, reviewer, EXCLUSIVE window, footage-folder
+read, MAIN-work read, other-worktree read, mailbox post, commit or git write
+occurred in this turn. Cell writes are only this ledger and ignored
+worktree-local helper/check/log/script files. No footage-derived material,
+GPS/IMU bytes, dependency or local-config change. Measurements/report and
+the final gate remain with the dispatched later stages.
+
+| Round | Critical / major / minor / advisory | Envelope | NEW / REOPENED | Reverts | Fix surface | Transport / depth | Outcome |
+|---|---|---|---|---|---|---|---|
+| A2, session 3 / turn 5 | 0 / 0 / 2 / 4 | 6 in / 0 out | 6 / 0 | 1 ruled timeout-setting reversal | Ledger request text only; product/tool/test code 0 | Claude opus/high via dispatcher; Codex exec terminating clean-up; depth 142,196 | NO_NEW_CRITICAL_MAJOR; CONVERGED; all findings dispositioned; three exact scripts staged for seat bash -n; YIELD |
