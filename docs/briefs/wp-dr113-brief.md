@@ -1,6 +1,6 @@
 # WP-DR113 -- The V4 fidelity instrument reads a raw PCM audio track by its sample extent and timeline (dispatch brief)
 
-**Status:** DRAFT 2026-11-02, drafted by the orchestrator (generation 34, session `clearwater-orchestrator-20261101-2135`) from CHARC's commission in ruling `35512da5` (F-B1, 2026-11-02T08:03:39Z) and its register row DR-113 (`fc3ee200`); routed to CHARC for the no-tripwire check before dispatch (CHARC `645887d5`).
+**Status:** FINAL 2026-11-02 on CHARC's no-tripwire ruling `001d01e4` (2026-11-02 ~10:18Z: NO TRIPWIRE; dispatch on the Codex lane; the INDEPENDENCE LOCK and F-B2 out both concurred; the IMG_6731 witness and the three-leg gate confirmed). Drafted by the orchestrator (generation 34, session `clearwater-orchestrator-20261101-2135`) from CHARC's commission in ruling `35512da5` (F-B1, 2026-11-02T08:03:39Z) and its register row DR-113 (`fc3ee200`); routed to CHARC for the no-tripwire check before dispatch (CHARC `645887d5`).
 No tripwire expected (plan section 3): a test INSTRUMENT's reading of one codec family under `tools/`; no product code, no frozen interface, no dependency, no spec change. Owner decisions inside: NONE.
 
 | Field | Content |
