@@ -9,7 +9,65 @@
 
 ---
 
-### RESUME HERE (CHARC generation 12: read this block top to bottom; gen 11 `clearwater-charc-20261101-0727` ROLLED 2026-11-01 ~23:35Z at ~411K, clean boundary, no cell at CHARC's seat; gen 10 rolled 17:30Z; gen 9 08:00Z)
+### RESUME HERE (CHARC generation 13: read this block top to bottom; gen 12 `clearwater-charc-20261101-1330` ROLLED 2026-11-02 ~10:50Z at ~400K, clean boundary, nothing of its own running; gen 11 rolled 11-01 23:35Z)
+
+- **GEN 13 PICKUP (read first).** Orchestrator = **gen 34 `clearwater-orchestrator-20261101-2135`** (online 2026-11-02
+  07:37Z; re-read `comms/.launch-sessions.json` before every cue). Time the bash launch and record it here. Drain with
+  `read --role charc --all` (gen 12 stopped draining at its announce). Main = gen 12's last commit + any later orchestrator
+  commit; FREE. Subjects under 100 chars. Every `--body` goes through `--body-file` (a backtick in a `--body` string is
+  shell-expanded and the word vanishes; it happened to gen 12 once, corrected by a second post). Any script with a
+  backslash goes through the Write tool; `tr -cd '\r\v' | wc -c` = 0 BEFORE every commit; a NEW file needs `git add`
+  before a pathspec commit. `python -I` hides site-packages (the template's [web] tests skip under it). Claude weekly
+  reset at 10:00Z today: the 92 % line is VOID until reached again; Codex 17 % / 0.238 (resets 11-04).
+  **CP5 IS LIVE WITH THE OWNER, STEP BY STEP (owner 2026-11-02: "Let's go through CP5 step by step").** Pack
+  `work/wp5.3/index.html` (rebuilt side by side at main `c935b869` after the owner's step-1 finding; `page --check` EXIT 0;
+  126 pair rows; sheet untouched, 0 judgements so far), sheet `work/wp5.3/review-sheet.csv` (126 rows; `preferred` =
+  exact lowercase yes / no / undecided, blank = not judged; halos / banding / color_errors / shimmer / flicker /
+  above_surface = blank or yes; note free; viewing_aid_failed untouched). Headline set = P-A 64 + V-S 26 + V-D 8 + V-P 17
+  = 115 against D65's 80 % bar; P-Z 9 and V-Z 2 are candidates in their own tally; 2 V-R HLG refusals absent by design.
+  Step 1 DONE (page renders; owner reloads for the side-by-side layout). **STEP 2 NEXT: the owner's first pass over the 64
+  P-A photos; then V-S 26, V-D 8, V-P 17, then the candidates; the owner reports batches in chat, the sheet is the record.**
+  When the owner says the sheet is filled: gen 34 runs the strict tally from `.worktrees/wp5.3` (`uv run python -m
+  tools.reviewpack.build tally <sheet>`; an unknown value errors naming the row; headline line `preferred/judged = pct`);
+  then I write `docs/proofs/cp5-visual-review.md` (pass -> WP5.5 release prep; shimmer seen -> WP5.4 under D96; a miss ->
+  owner scope decision). AD-13: both starter presets value-identical in v1; the owner may set the Scuba values at CP5 (a
+  parameter edit, not a decision).
+  **LIVE BOARD (verify in `docs/orchestrator-state.md` and gen 34's posts):** (1) **WP-DR113** (Codex, tools-only: the V4
+  instrument learns the PCM reading; brief FINAL `dc018f25`; worktree `.worktrees/wp-dr113`; RED turn 2 was running at my
+  roll; independence lock + F-B2 out ruled `001d01e4`; three legs, no window during them; owner record = V4 over
+  IMG_6731.MOV MANDATORY all SAME after). At its accept MINE: DR-113 CLOSED with the record. (2) **WP5.2** (Codex, brief
+  FINAL `70c3a5db`, worktree `.worktrees/wp5.2`; round 0 STOP ruled `6e0128fd`: R1 = `export_bench.py v16
+  --device-frames --subdir wp5.2/v16/W52-1`; run requests at the orchestrator's seat into `work/wp5.2`; F3 option (a) =
+  new owned `tools/photo_memory.py` importing photo_verify's APIs + light test, the 48 MP PNG16 generated at run time via
+  `tools/fixtures/stills.py`, photo_verify.py unedited; R2 = the WHOLE GX011627 (681 frames); W52-1 = R1 alone (~115
+  min), W52-2 = R2 + R3; windows EXCLUSIVE, opened and closed to me with df (25 GB floor), only when nothing of DR-113
+  runs). Next: T2 + T3 RED/GREEN, Reviewer A on the tool code BEFORE any window, then the windows. At its accept MINE: the
+  N6 proposal to the OWNER (D106 / N6), AD-21 closed, DR-72 closed, DR-70 note, plan section 7 pointer for V15 / V16.
+  (3) **Phase 5 close** after CP5, DR-113 and WP5.2: the gate report (fullclip 2,635 s at d112 noted), the owner's spec
+  bundle (N6 final figure; D63 'provisional' -> confirmed (AD-24); photo resolution 24.5 MP max + the 48 MP figure; D75
+  errata), WP5.5 release preparation, the form-debt proposal (split this file's history into `docs/charc-log.md`).
+  **HARNESS TEMPLATE PORT: DONE, AWAITING THE OWNER'S PUSH.** `C:/Users/rwsmy/harness-template` branch
+  `clearwater-upstream-2026-11-02`, 8 commits on origin/master `6488556`, head `ef7e671`, suite 382 OK / 1 skip (run WITHOUT
+  `python -I`). Both sibling CHARC reviews adjudicated (record `docs/proofs/harness-upstream-2026-11-02.md`; coa-chess
+  confirmed by re-run, no disagreement; swing's receipt not yet seen). Owner ruled 2026-11-02: the early-roll text is one
+  text (template `ef7e671`, main `8ef219e0`); the second pass (swing's `cell_depth.py --sessions / --live`) is
+  RECOMMENDED, NOT commissioned. Kernel on main now: three-act rollover (`d5b76c53`), the remediation mirror (`15d1c828`:
+  hazards renumbered (4)-(7), the cap's mirror, the DryRun rehearsal, reviewer-is-the-other-model in the recipe). In
+  Clearwater `refs/remotes/template/main` = the template head for a later re-port diff.
+  **DONE THIS GENERATION (all on main):** WP5.3 ACCEPTED `91db201b` (AD-13 note `da16fc19`); WP-D112 ACCEPTED `92d9ff77`
+  (rows `fc3ee200`: DR-112 CLOSED with the facts, DR-99 (b), DR-113 opened, AD-30 note); the DR-112 witness GREEN
+  (`69050ead`: V-P 17 done, pending 0, failed 0, slow markers B-F4 + DR-99 (b)); the owner's pause and release handled
+  (verbatim lines in the gen 12 block below); the owner rule "no handover while a job runs" into the kernel (`215b1fd6`);
+  post-v1 candidates recorded (Photoshop plugin; macOS); disk drop closed as not ours (pagefile; prune candidate
+  `%LOCALAPPDATA%/Temp/pytest-of-rwsmy` 15.4 GB; V-S orphans `work/orch-g33/vs-orphans/` 2 GB). Orchestrator gens 32 ->
+  33 -> 34 rolled cleanly. Register through DR-113.
+  **OWNER LINES (every owner-facing summary ends with these):** Open owner decisions: the CP5 judgements (live). Owner-pending
+  inputs: the filled review sheet. Owner action pending: push the template branch; prune candidates wait for a prune word.
+  Advisory: gen 12's CHARC pane and orchestrator panes for gens 32-33 may be closed. Next owner checkpoint: CP5 (in
+  progress), then the N6 proposal at WP5.2's accept.
+- **(gen 12 history follows, newest facts at the top of its block; then gen 11 and older)**
+
+### GEN 12 (was LIVE: `clearwater-charc-20261101-1330`, online 2026-11-01 23:32Z; ROLLED 2026-11-02 ~10:50Z at ~400K, clean boundary, no cell and no job at CHARC's seat; its pickup block follows as history)
 
 - **GEN 12 LIVE: `clearwater-charc-20261101-1330`** (online 2026-11-01 23:32Z; bash gauge 119 ms; C: 168 GB free; inbox 0 unread at pickup; announce `16902a27` posted and cued to gen 32). Board verified at pickup: `clips V-S` running since 23:03:35Z (head ef7cbf15); WP-D112 RED committed `62fe3caa` (21 RED, 3 PCM controls green, seat-verified by gen 32; verified at my seat: 2 files, 0 CR), turn 3 GREEN + fixture running in a fresh Codex session (post `e4a40022`, 23:38Z); gen 32's round-0 post `5015195f` stands. Gen 11's session is idle and listed; the owner closes its pane.
 - **GEN 12 PICKUP (read first).** Orchestrator = **gen 34 `clearwater-orchestrator-20261101-2135`** (launched 2026-11-02 07:35Z by
