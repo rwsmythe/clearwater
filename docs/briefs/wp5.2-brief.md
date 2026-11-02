@@ -141,3 +141,17 @@ read-back; the report; the nets. Codex evaluate at about 200K, STOP near 250K; a
 > (d) DONE: DR-114 OPEN with your figures as evidence; (a)'s outcome becomes its evidence at the accept.
 >
 > Brief: fold this under "## WDDM ruling (CHARC, 2026-11-02)" with the R2 table row rewritten (held / free / cpu legs, R3 as the D111 witness). Expected W52-2 length grows by one 4K CPU export of 681 frames (your Q3 estimate: about 20 min at the CPU rate); state the new estimate when you open the window. Resume the cell: the test fix under (c), then Reviewer A round 1 on the tool code before any window. Nothing heavy beside WP-DR113's Reviewer A pass.
+
+## W52-2 hang ruling (CHARC a171ca08, 2026-11-02T17:40:26Z, verbatim; binding; it GOVERNS W52-3, the held-vs-free check and the report's Limits; DR-115)
+
+> RULING on 709ca481 (WP5.2 W52-2, the force-cpu export hung in NVENC). RECOMMENDED path RULED; the ALTERNATIVE (accept R2 without the CPU comparison) is REJECTED: the AD-11 real-export CPU-vs-GPU witness is the remaining half of R2's purpose.
+>
+> (1) DONE: DR-115 OPEN on main (docs/debt-register.md, the commit after d5cf5762) with your counters as the evidence: (a) no encoder-stall detection (the job never fails on its own; the GUI would show a stuck export), (b) the NVENC hang under a ~10 s/frame feed, which is exactly the rate a real D111 CPU fallback at 4K would present, so the fallback path carries the risk. Paydown is a product package AFTER Phase 5 (owner-scoped: an encoder-progress watchdog in the export worker; whether a fallback export should prefer a software encoder). Nothing is tuned in WP5.2.
+>
+> (2) W52-3 RULED: re-run the force-cpu leg ONCE, same command and encoder (hevc_nvenc, so the comparison baseline is unchanged), under `timeout 7200` (124 recorded as the observation), WITH a 60 s progress poll written beside the log: partial output size, the encoder process's CPU seconds and I/O read bytes, one nvidia-smi line (used MiB, clocks, temperature). A second hang then has a timeline and is REPRODUCIBLE (DR-115 evidence; the real-export AD-11 witness waits on the product package); a clean run gives the AD-11 free-vs-cpu comparison and the CPU rate. Session 4 writes the W52-3 script in the W52-2 read-back turn; bash -n at your seat; the same preflight and close discipline; EXCLUSIVE; about 2 h plus the comparison.
+>
+> (3) held-vs-free identity check: run it from the KEPT outputs in the read-back turn (not timed; after W52-2 closes, not beside R3) and record it; the comparison script's early return on a failed cpu leg is a script fix for W52-3 (held-vs-free never waits on cpu).
+>
+> (4) Ending the hung encoder was correct: your own child, the window's leg, nothing else touched; the product's own failure path and D85 clean-up are a RESULT for the report (the clean-up worked; the detection did not exist).
+>
+> Report Limits gain: the CPU rate figure from W52-3 (or its absence), the hang, and that --force-cpu moves the processing, not the encoder. R3 continues; close W52-2 to me with the figures as planned.
