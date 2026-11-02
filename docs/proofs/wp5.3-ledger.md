@@ -289,7 +289,7 @@ Wall times are scheduling estimates, not figures of record.
 
 Q8 order, including candidate/refusal coverage omitted from its shorthand:
 
-| Order | Exact queued command | Expected wall time | Outputs under work/wp5.3/ | Actual receipt / read-back (turns 13-18) |
+| Order | Exact queued command | Expected wall time | Outputs under work/wp5.3/ | Actual receipt / read-back (turns 13-19) |
 |---|---|---|---|---|
 | 1 | `RUN REQUEST: uv run python -m tools.reviewpack.build photos` | about 1 hour, GPU | photos, thumbnails, P-A/P-Z corrected and neutral records, state, logs | On 6d470028, EXIT 0, 673 s, 2026-11-01 22:00:18Z-22:11:32Z; free 171 -> 167 GB. 73 done (64 P-A / 9 P-Z), failed=0, pending=55. |
 | 2 | `RUN REQUEST: uv run python -m tools.reviewpack.build presets` | <1 minute | both preset JSON files, pack-local store and marker, state/log | EXIT 0, 1 s, 22:12:15Z-22:12:16Z; both exported presets present, two page value tables. |
@@ -299,10 +299,15 @@ Q8 order, including candidate/refusal coverage omitted from its shorthand:
 | 6 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-D` | about 40-70 minutes, provisional | 8 clips and aids, excerpts where needed, V-D record, state/logs/cache | On 1f8b036a, EXIT 0, 3,162 s, 2026-11-02 04:31:56Z-05:24:38Z, free 155 -> 152 GB. 8 done, failed=0, pending=4 (V-Z 2 / V-R 2). Turn-16 read-back: all 56 product/aid files and 6 excerpts present; no numbered/partial/unreferenced V-D output; earlier groups unchanged. Page/sheet still post-photos. |
 | 7 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-Z` | about 10-20 minutes, provisional | 2 candidate clips and aids, excerpt as needed, V-Z record, state/logs/cache | On bcc498c1, EXIT 0, 374 s, 2026-11-02 05:28:32Z-05:34:46Z, free 152 -> 151 GB. 2 done, failed=0, pending=2 (V-R only). Turn-17 read-back: 14 product/aid files and 1 excerpt present; no numbered/partial/unreferenced V-Z output; earlier rows unchanged. Page/sheet still post-photos. |
 | 8 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-R` | <2 minutes for expected refusals | 2 product refusal records/texts, state/logs; no review rows | On 6bf8ce99, EXIT 0, 3 s, 2026-11-02 05:37:56Z-05:37:59Z, free 151 -> 151 GB. 2 expected HLG refusals, failed=0 for this piece, pending=0. Turn-18 read-back: exact product texts retained, no outputs/aids/excerpts, earlier rows unchanged. Whole pack: 117 done / 9 V-P failed (DR-112) / 2 refused. Page/sheet still post-photos. |
-| 9 | `RUN REQUEST: uv run python -m tools.reviewpack.build page` followed by `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | <2 minutes | final index and merged sheet; page checks links inside and exits 2 while pending items/presets or sheet conflicts remain; --check is links only | Queued after clips; no final-pack completion claim. |
-| 10 | Config-resolved tally request below | <1 minute | zero-judged tally, console captured by dispatcher under logs | EXIT 0. Headline 0/0; expected 115 / available 64 / missing 51 / unjudged 64. Candidates expected 11 / available 9 / missing 2 / unjudged 9. Pending 55. |
+| 9 | `RUN REQUEST: uv run python -m tools.reviewpack.build page` | <2 minutes | rebuilt index and merged owner sheet; state remains read-only | On 792ee22c, EXIT 1, 2 s, 2026-11-02 05:41:16Z-05:41:18Z; 128 accounted, failed=9 (V-P, DR-112), pending=0. 117 sheet rows; 117 done / 9 failed / 2 refused page articles. Not owner-ready. |
+| 10 | `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | <1 minute | link-check console receipt; no state/page/sheet write | EXIT 0, 1 s, 05:41:18Z-05:41:19Z, same head. Turn-19 independent check: all 603 distinct relative targets resolve inside pack; link success is not pack readiness. |
+| 11 | Config-resolved tally request below | <1 minute | zero-judged tally, console captured by dispatcher | EXIT 0, 1 s, 05:41:19Z-05:41:20Z, same head; pending=0. Headline 0/0; expected 115 / available 106 / missing 9 / unjudged 106. Candidates expected 11 / available 11 / missing 0 / unjudged 11; all flags 0. Earlier post-photos tally (then order 10): EXIT 0, pending 55, headline available 64 / missing 51, candidates available 9 / missing 2. |
 
-Order 10 resolves the configured working folder so that invocation from the
+Turn 19 splits the formerly combined page/check row and renumbers the tally
+as order 11, matching the dispatch's three publication receipts. The earlier
+turn-13 references to order 10 describe the historical initial tally.
+
+Order 11 resolves the configured working folder so that invocation from the
 worktree root cannot mistake the worktree's scratch folder for the real pack:
 
 ```text
@@ -388,7 +393,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 6 / turn 15 / clips V-S read-back | same session 6 | 116,597 | Dispatcher supplied at turn 16; committed 1f8b036a. Complete V-S re-run read-back, orphan listing and interruption-contract assessment; full module checks; only ledger changed. |
 | Session 6 / turn 16 / clips V-D read-back | same session 6 | 137,514 | Dispatcher supplied at turn 17; committed bcc498c1. Eight V-D outputs/aid sets, six excerpts and unchanged earlier groups verified; full module checks; only ledger changed. |
 | Session 6 / turn 17 / clips V-Z read-back | same session 6 | 154,213 | Dispatcher supplied at turn 18; committed 6bf8ce99. Two V-Z outputs/aid sets, one excerpt and unchanged earlier rows verified against saved turn-16 snapshot; full module checks; only ledger changed. |
-| Session 6 / turn 18 / clips V-R read-back | same session 6 | dispatcher pending | Two exact expected product HLG refusals, no outputs, zero pending, unchanged earlier rows; full module checks; only ledger changed. |
+| Session 6 / turn 18 / clips V-R read-back | same session 6 | 170,040 | Dispatcher supplied at turn 19; committed 792ee22c. Two exact expected product HLG refusals, no outputs, zero pending, unchanged earlier rows; full module checks; only ledger changed. |
+| Session 6 / turn 19 / publication read-back | same session 6 | dispatcher pending | All 128 published identities/statuses, 117 sheet rows, 603 targets and zero-judged coverage verified; exit/rerun rules cited. YIELD; report assigned to fresh session near evaluation point. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -2898,3 +2904,185 @@ media judgement, mailbox post, commit or git mutation. **YIELD after the V-R
 read-back**. Page/sheet publication and read-back, report and final gate remain
 outstanding. DR-112 remains routed to CHARC. Pending=0 is an accounting fact;
 the owner alone makes the CP5 judgement.
+
+## Session 6 / Turn 19: read-back of page, page --check and tally
+
+### Boundary and publication receipts
+
+Session 6 resumes on **792ee22c**, with dispatcher-supplied **turn-18 depth
+170,040 depth_input_tokens**. **Turn-19 depth_input_tokens: dispatcher to fill;
+no estimate.** Tool unchanged since 6d470028. The turn ends at the dispatched
+boundary; **the report belongs to a fresh session** near the 200K evaluation
+point. No real-pack build stage is run, and only this ledger changes.
+
+Receipts **orch-g33/wp53-runs/summary.txt**, **page.log**, **page_check.log** and
+**tally.log**, all at 792ee22c on **2026-11-02**, reconcile as follows:
+
+| Piece | Exit / informal wall time | Receipt |
+|---|---|---|
+| page | **1 / 2 s**, 05:41:16Z-05:41:18Z | 128 items accounted for; failed=9, pending=0; build/viewing-aid failures recorded, see Not built. |
+| page --check | **0 / 1 s**, 05:41:18Z-05:41:19Z | Published links resolve; this is a link-only check. |
+| tally | **0 / 1 s**, 05:41:19Z-05:41:20Z | pack pending: 0; headline 0/0, expected 115 / available 106 / missing 9 / unjudged 106; candidates expected/available/unjudged 11. All flags zero. |
+
+The table's orders 9-11 now name these separate pieces; the historical
+post-photos tally is retained beside its current receipt rather than lost.
+
+### Publication read-back
+
+The worktree-only ignored **work/wp5.3/turn19/readback.py** reads index.html,
+README.md, review-sheet.csv and pack.json, plus the completed V-P/V-R raw
+records to check exact product messages. It stats linked files without media
+inspection and lists orphan names without opening their contents. It calls
+**sheet.tally** as a read-only function, never a real-pack build stage. Evidence:
+**readback.log/.exit**, **readback-summary.json**, **readback-findings.json**,
+**publication-checks.csv**, **orphan-basename-overlap.json**. Read-back exit
+**0**, instrument findings **[]**. No source-folder read, image decoding or
+agent quality judgement occurred.
+
+| Check | Result |
+|---|---|
+| State untouched by publication | pack.json is **byte-identical** to the saved turn-18 snapshot: SHA256 **d1271b94d4dbfa83b25378982c171983fa73b9bac9fc59450e62846e6cfb6d9f**. All 128 records, prior output identities and preset state remain intact. |
+| Page counts and one article per item | Exactly **128 unique named articles**; counting their displayed status labels gives **117 done / 9 failed / 2 refused**, identical to records. Header says Pending 0; catalog pending is empty. These are counted individual labels, not a claimed aggregate done/failed/refused counter in the header. |
+| Every DONE item's sheet identity | **117 unique sheet rows**, exactly one for each done item; each first-five identity cell (item/group/kind/source_name/corrected_name) equals its record. **Every owner answer and status flag is blank**, including preferred, artifacts, above_surface, note and viewing_aid_failed. No agent answers. |
+| Every DONE item's publication links | Each article's href/src multiset equals exactly that item's saved identities, with no extra, duplicate or missing link. **117 products + 73 neutral photo source views + 234 thumbnails + 44 pair clips + 132 pair stills = 600 media targets**, all present/nonempty. Both source and corrected photo thumbs are included; video stills are 10/50/90 percent. No viewing-aid-failure row is hidden. |
+| FAILED V-P rows | All **9** appear exactly once under Not built by filename with **the full product failure string verbatim**, as well as in their own failed article. Comparing to V-P.json proves the strings are unchanged, including rational timestamp ratios. No failed item has a sheet row, article media link or media link elsewhere on the page. DR-112 remains visible. |
+| Expected V-R refusals | Both V-R articles display **refused** and the exact product HLG refusal text from V-R.json. expected_refusal_failed is false; no media link or sheet row for either source. They are accounted expected refusals, distinct from DR-112. |
+| Relative link resolution | **603 distinct published targets** = 600 media + owner CSV + 2 exported presets. Every href/src is relative, has no scheme/host, rooted spelling, backslash or traversal component, resolves within the current pack and exists. Both effective starter-preset tables are present. |
+| Privacy | Page, sheet and README have **0 full-path candidates and 0 GPS/EXIF mentions**. There is no value-bearing metadata fragment to adjudicate. Both published preset/source-view explanations and the viewing-aid display note remain present. |
+| Tally versus independent counts | Independent read-only sheet.tally matches **every line of the seat's tally receipt**, including all six groups, headline, candidates, pending and flag counts. Every judged/preferred/artifact/above-surface/aid-failure count is zero; this reports blank answers, not image quality. |
+
+**Orphan-name caveat carried forward, not concealed:** the literal request
+"no link or text names a file now in vs-orphans" remains impossible under
+basename reuse, as documented in turn 15. **31 archived basenames occur on the
+rebuilt page**, e.g. **GX011603_corrected.mp4**, whose current link is
+clips/GX011603_corrected.mp4 and resolves to the current pack file. Eleven
+source/excerpt names and 20 product basenames are reused by the successful
+re-run. **Zero orphan-location references** appear in page/sheet/README, and
+no link resolves into the orphan folder. Recommended interpretation remains
+no archived-location reference and correct current relative target identity.
+The literal no-basename-overlap claim is **not made**; this is the previously
+disclosed naming premise, not a new instrument defect. No archived media
+contents were compared or judged.
+
+### Exit codes and denominator against the brief
+
+**page EXIT 1 is the specified behavior, not a defect.** The governing R3-5
+ruling says **"page exits 2 (distinct from 1 = item failures) while pending >
+0"** (docs/briefs/wp5.3-brief.md:220); R2 also says **"the exit check is per
+piece"** (:202). Code makes page's scope all saved items
+(tools/reviewpack/build.py:1392), counts failures with _failed (:1295/:1396),
+returns 2 for pending, sheet conflict or missing presets (:1405-1409), then
+**returns 1 for item failures** (:1410-1411). There are no pending items or
+missing preset tables now, but nine V-P item failures remain. The earlier
+EXIT 2 while Pending 55 and the current EXIT 1 while Pending 0 are consistent.
+The Done row still requires **"exit 0 and every item accounted for (done, or
+refused with the product's text)"** (brief :25), so this exit 1 is not acceptance.
+Link-only --check is separately implemented at build.py:1443-1447 and returns
+0 when its link-error list is empty; README expressly warns it is not finished.
+
+**115 / 106 / 9 is correct coverage, not a preference fraction.** The brief
+says **"Headline tally set = P-A + V-S + V-D + V-P"** (:54): exact counts are
+**64 + 26 + 8 + 17 = 115**. P-Z and V-Z are excluded candidates (:47/:52);
+V-R is the refused group with no review row (:51). The brief's printed D65
+fraction is **"headline: <preferred>/<judged>"** (:96), not available/expected.
+Code fixes HEADLINE at sheet.py:31, derives expected from the full catalog
+at :273 and missing as expected minus available at :277; _available at :135-143
+only admits successful reviewable products (including preserved aid-failure
+cases). The nine product failures therefore remain **missing=9**, while
+**available=106 = 64 + 26 + 8 + 8**. They are not silently dropped from the
+expected coverage count and are not turned into owner "no" votes.
+
+sheet.py:271-281 counts judged from nonblank preferences and computes
+preferred/judged. The current line is **0/0 = 0.0 %**, zero judged; candidates
+are expected/available **11**, separately reported. The brief requires empty
+sheet tally without error (:25), and **"exit 0 always, no judgement words"**
+for valid tally (:96); build.py:1434-1438 returns 0 after formatting. Missing
+coverage is a readiness blocker here, not permission to accept a reduced test
+set or calculate V2 before DR-112 is repaired.
+
+### CP5 readiness and the required V-P rerun (state only)
+
+**NOT owner-ready:** pending is 0 but failed is **9**, and page returns 1.
+The dispatch requires **WP-D112 to merge, then clips V-P to rerun successfully**
+before owner handoff: pending=0 **and** failed=0, with viewing aids/presets
+accounted for. Nothing is rerun or adopted by this cell this turn.
+
+The nine failed V-P rows that must be replaced with successful product results
+are **IMG_6729, IMG_6731, IMG_6733, IMG_6735, IMG_6736, IMG_6738, IMG_6741,
+IMG_6742 and IMG_6760** (all .MOV). The eight presently successful V-P rows
+are **IMG_6702, IMG_6716, IMG_6717, IMG_6727, IMG_6728, IMG_6734, IMG_6745
+and IMG_6762**. The instrument's rules matter to the rerun:
+
+- A plain **clips V-P** selects **all 17**, not only failed rows: _selection
+  returns the whole catalog without a manifest (build.py:948-954), subject
+  filtering selects the group (:1383-1387), and _build_groups has no done-row
+  skip (:1177/:1246). All are whole inputs; IMG_6762 remains last. A successful
+  plain rerun thus replaces all 17 V-P row identities and leaves the other
+  **111 rows**, presets and inventory intact via _store_item's replace-or-append
+  rule (:1149-1155/:1291-1292). Brief R3-1 says **"The manifest is a SELECTION
+  filter, never a STATE filter"** (:212); no denominator shrink is allowed.
+- Existing successful media and raw invocation records are kept. A fresh raw
+  record is allocated via _fresh (:157/:294), expected **V-P-2.json** if no new
+  invocation has intervened; runner collision-numbered outputs are taken from
+  its actual record, never guessed (:348-373). Fresh viewing-aid names preserve
+  earlier completed files. The plain rerun re-exports the eight successes too,
+  so their new row identities may name numbered outputs while the old files
+  remain. Do not move/delete either accepted prior file set as recovery.
+- If the dispatcher instead wants to preserve those eight row identities and
+  rerun only the nine failures, the existing **pack-local --manifest** can name
+  those nine commissioned name/group/kind triples (:948-977). That is explicit
+  selection, not automatic resume. No manifest or alternate RUN REQUEST is
+  created or issued here; the scheduled group command remains all 17 unless
+  the dispatcher chooses the supported subset.
+- After success, rerun **page, page --check and tally** at the seat, then read
+  them back. Currently all answers are blank: sheet.py:178-195 updates blank
+  row identities and appends the nine newly available rows, yielding **126
+  reviewable rows**, still excluding the two V-R refusals. Owner answers, if
+  any are added meanwhile, are protected: changed answered identities cause
+  SheetConflictError (:185-190/:246), never transfer a vote to a new output;
+  the page/README recovery instruction applies. Expected headline coverage
+  stays 115; availability must become 115, missing=0. Candidate coverage stays
+  11. V-R remains refused. No preference or artifact judgement follows from
+  any of those state counts; CP5 is the owner's alone.
+
+### Verification loop, light checks and yield
+
+Suspect incomplete publication or identity mismatch -> independently parse
+all 128 articles, join all 117 exact sheet identities, and check each article's
+full link multiset plus 603 guarded targets -> **rejected**. Suspect lost
+product refusal/failure text -> compare raw product records, main article and
+Not built paragraphs -> **rejected**. Suspect page changed state or tally
+denominator -> byte-identical pack snapshot and independent catalog/CSV tally
+-> **rejected**. Shared orphan basenames remain explicitly disclosed above;
+no false claim of zero basename overlap. Exit-code and rerun source checks
+agree with the binding rulings. Final full module/static checks and read-back
+find **no instrument defect or new STOP**; DR-112 remains the product blocker.
+
+PowerShell sets PYTHONPATH=scripts and retains the mandatory sandbox mkdir
+shim. The full module includes the existing slow tiny headless/FFmpeg node.
+All output and exit sidecars are under **work/wp5.3/turn19/**:
+
+```text
+uv run pytest -q tests/test_reviewpack.py --basetemp=work/wp5.3/tmp/t19 -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp5.3/turn19/full.xml
+uv run ruff check tools/reviewpack tests/test_reviewpack.py
+uv run ruff format --check tools/reviewpack tests/test_reviewpack.py
+uv run mypy
+uv run python work/wp5.3/turn19/readback.py
+```
+
+- **full.log/.xml/.exit:** **177 passed in 44.98 s**, exit 0; no failures,
+  skips or deselected nodes. No test/marker edit.
+- **ruff.log/.exit:** All checks passed, exit 0.
+  **format.log/.exit:** 6 files already formatted, exit 0.
+  **mypy.log/.exit:** Success: no issues found in 151 source files, exit 0.
+- **readback.log/.exit:** 128 per-item evidence rows, 117 sheet rows, all 603
+  links resolving, zero instrument findings, exit 0. Final diff/byte audit:
+  only this ledger changes, whitespace clean and **0 CR**. uv ignores the
+  inherited VIRTUAL_ENV mismatch; no other environment is targeted.
+
+No product/interface/instrument/test/dependency/fixture/config edit,
+main-working-folder write, real build stage, source or other-worktree read,
+media judgement, mailbox post, commit or git mutation. **YIELD at this turn
+boundary; report assigned to a fresh session.** WP-D112 merge and V-P recovery,
+publication rerun/read-back, report and final gate remain outstanding. Pending
+0 is not owner readiness while failed=9; no CP5 acceptance is asserted.
