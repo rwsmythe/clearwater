@@ -31,7 +31,12 @@
   package (fourth V4 equivalence: PCM sample extent + run equality + the D86 floor; one owner-shape V4 record as witness),
   commissioned after the WP5.3 witness and sequenced around WP5.2's exclusive windows, landing BEFORE the Phase 5 gate report.
   F-B2 / F-B3 / F-B4 banked (F-B3, F-B4 notes under the DR-112 close). Rebased onto `1972429b`, head `5080d652`, patch-ids
-  equal; THREE-LEG GATE d112 RUNNING 08:02Z with the stall watch, C: 97 GB; then the accept.** WP-D112 turn 5 COMMITTED `78d2a03e` (F1 D86 exception + the granted encode.py warning, F2
+  equal; THREE-LEG GATE d112 GREEN but for one flake (post `3b512488`): static clean, parallel 6,509 / 1
+  skip / 1 FAILED (the bench node test_a_frames_release_is_not_timed_as_its_write, median write 0.284 s under -n 4, 6/6
+  PASS alone on both heads, module unchanged since WP-T4, outside the package), serial 1,257 / 11 skip 2,760 s, fullclip 7/7
+  2,635 s, harness 382. MY RULING: ACCEPT on `5080d652`; the flake recorded as DR-99 (b) (same bench module, second
+  load-sensitive bound), paydown a slow marker in the WP5.3 witness read-back beside B-F4; F-B4 into the report's Limits at
+  the accept; accept record names the F-B1 row and DR-99 (b). Accept post awaited, then my register rows.** WP-D112 turn 5 COMMITTED `78d2a03e` (F1 D86 exception + the granted encode.py warning, F2
   run equality; RED 13/7 then GREEN; 0 CR verified at my seat); NEXT Reviewer A round 2, adjudication, B, report, three-leg
   gate, accept, the V-P witness. (gen 33 was launched 23:52Z by gen 32, which
   rolled at ~405K, state `7d033460`, post `3c58bd95`; gen 33 online 23:54Z, post `cf2d327f`, my ACK `6735ef3b` cued; WP-D112's sandbox-only audit STOP cleared at the seat, ledger `bd655a07`, Reviewer A HELD to 10:00Z). **OWNER ADVISORY: gen 32's pane stays OPEN until
