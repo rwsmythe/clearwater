@@ -36,7 +36,18 @@
   PASS alone on both heads, module unchanged since WP-T4, outside the package), serial 1,257 / 11 skip 2,760 s, fullclip 7/7
   2,635 s, harness 382. MY RULING: ACCEPT on `5080d652`; the flake recorded as DR-99 (b) (same bench module, second
   load-sensitive bound), paydown a slow marker in the WP5.3 witness read-back beside B-F4; F-B4 into the report's Limits at
-  the accept; accept record names the F-B1 row and DR-99 (b). Accept post awaited, then my register rows.** WP-D112 turn 5 COMMITTED `78d2a03e` (F1 D86 exception + the granted encode.py warning, F2
+  the accept; accept record names the F-B1 row and DR-99 (b). **WP-D112 ACCEPTED, main `92d9ff77`** (post `c62c3301`; record `docs/proofs/wp-d112-accept.md`); MY ROWS
+  `fc3ee200`: DR-112 CLOSED with the facts, DR-99 (b), DR-113 opened (V4 PCM reading), AD-30 note; ACK `...` posted.
+  `.worktrees/wp-d112` released. NEXT (gen 34): the WP5.3 WITNESS (rebase wp5.3 onto 92d9ff77, clips V-P re-run, page,
+  page --check, tally, one Codex read-back with both slow markers), then CP5 to the owner at pending 0 AND failed 0.**
+  **HARNESS TEMPLATE PORT DONE (owner in chat 2026-11-02, "I am ready to update the comms harness template ... including
+  the codex development addition"; chose: CHARC ports on a branch):** `C:/Users/rwsmy/harness-template` branch
+  `clearwater-upstream-2026-11-02`, 5 commits on origin/master `6488556` (layer 1 `fc9f4b5` the coa-chess comms core as
+  instantiated at `87b577a9`; README `b3dc40a`; layer 2 `d74f40c` the Codex lane + kernel lessons; `4c05c8e` the rollover
+  sequence is THREE acts; `5519644` README lanes), 58 files, template suite 382 OK (40 skips = the [web] extra); the
+  sandbox shim and research/ stayed instance; the owner reviews and pushes. The same act-3 fix is on main here `d5b76c53`
+  (harness gate 382 OK). A later re-port diff = `git diff template/main HEAD -- scripts/ .claude/ tests/harness/ <kernel docs>`
+  minus instance cells.** WP-D112 turn 5 COMMITTED `78d2a03e` (F1 D86 exception + the granted encode.py warning, F2
   run equality; RED 13/7 then GREEN; 0 CR verified at my seat); NEXT Reviewer A round 2, adjudication, B, report, three-leg
   gate, accept, the V-P witness. (gen 33 was launched 23:52Z by gen 32, which
   rolled at ~405K, state `7d033460`, post `3c58bd95`; gen 33 online 23:54Z, post `cf2d327f`, my ACK `6735ef3b` cued; WP-D112's sandbox-only audit STOP cleared at the seat, ledger `bd655a07`, Reviewer A HELD to 10:00Z). **OWNER ADVISORY: gen 32's pane stays OPEN until
