@@ -1371,3 +1371,254 @@ the final gate remain with the dispatched later stages.
 | Round | Critical / major / minor / advisory | Envelope | NEW / REOPENED | Reverts | Fix surface | Transport / depth | Outcome |
 |---|---|---|---|---|---|---|---|
 | A2, session 3 / turn 5 | 0 / 0 / 2 / 4 | 6 in / 0 out | 6 / 0 | 1 ruled timeout-setting reversal | Ledger request text only; product/tool/test code 0 | Claude opus/high via dispatcher; Codex exec terminating clean-up; depth 142,196 | NO_NEW_CRITICAL_MAJOR; CONVERGED; all findings dispositioned; three exact scripts staged for seat bash -n; YIELD |
+
+
+## Session 3 / Turn 6: W52-1 read-back
+
+Resumed session 3, HEAD `d3fadaea`, rebased onto main `6ff6f5d3` after
+WP-DR113 acceptance. The dispatcher reports all seven package patch-ids
+unchanged by rebase. Prior turn-5 depth: **142,196**, dispatcher-supplied;
+current depth (session 3 / turn 6, at yield, codex_cell footer): **194,184** (past the ~200K evaluation point next turn; session 3 retires here and the W52-2 read-back goes to a fresh session 4).
+
+Status: **W52-1 request/receipt/record checks PASS**, eight runs retained in
+their original order. This is the seat-run record read-back, not a new run.
+No report file is written before W52-2. No N6 recommendation or cause of
+the timing difference is inferred. Reviewer A remains converged at round 2.
+
+### Evidence and request identity
+
+Read grant used only for JSON/exit receipts inside
+`C:/Users/rwsmy/clearwater/work/wp5.2/v16/W52-1/`, read-only. No synthetic
+MP4, run cache, footage folder or other MAIN-work path was opened. The
+orchestrator reports W52-1 **2026-11-02 12:48:16Z -> 14:55:15Z**, about
+127 min, script exit 0, run from this worktree at `d3fadaea`; the saved
+script was byte-identical to section 5. Its save path is dispatcher evidence,
+not opened by this cell.
+
+Every table below is **W52-1**. Alias **R** = `W52-1-export-bench-v16-20261102T124817Z.json` in the granted folder;
+**r[i]** = `R.runs[i]`, zero-based. Alias **P** =
+`W52-1-20261102T124816Z-1856-record.json` beside R. All WP5.2 numeric measurements below come from
+R, not a log or the orchestrator notes. Calculated unit conversions, ratios
+and percentages are labelled; displayed values are rounded, raw JSON is
+the record of record.
+
+Computed SHA256(R) = **`e93f060399e73bb7416cce4f045557b8c0b0cb8be053686036b2d4f4a12c0495`**,
+equal to both `P.sha256_before` and `P.sha256_after`. `P.record` names R;
+`P.run_count=8`, `P.bench_exit=0`, `P.record_step_exit=0`; the disk, bench
+and record `.exit` receipts all read 0. Therefore the byte-preserving
+W52-1 rename and receipt chain agree with the actual record bytes.
+
+Read `tools/export_bench.py:144-150` V16_PLAN as AST data, without importing
+or executing it. `R.plan` equals those six legs; expanded `r[i].leg` order
+is cold x3, warm, ancuti2018, libx265, synthetic 5.3K, sustained LAST.
+Every row has `ok=true`, `failure=null`, `memory_check.passes=true`,
+`memory_check.device_ok=true`, `memory_check.pool_ok=true`, `device=GPU`,
+`force_cpu=false`, `device_frames=true`; top-level `R.device_frames=true`.
+Every `device_backend` is the cuda:0 CuPy backend. Resolved `encoder` is
+hevc_nvenc except r[5] libx265; Standard/8-bit, full source frame counts
+681 / 150 synthetic / 14,938 sustained are checked, and only r[3] starts
+with complete cache. No cold row was discarded. D106 arithmetic checked
+from `wall_s / frames * frame_rate`; frame rate is `30000/1001` on all rows.
+
+### V16 table of record: WP3.21 -> WP5.2
+
+Exact WP3.21 column set retained. Each numeric pair is published WP3.21
+after-optimisation -> W52-1 shipped-build result. The supplemental OFF row
+was not part of V16_PLAN and is not added. Baseline rows are
+`docs/reports/wp3.21-optimisation.md:232-240` (specific lines below);
+warm/pool state and the prior 5.3K/sustained caveats remain at `:250-257`.
+
+| Row | s/frame | min/min (D106 25) | per frame median / p90 / max | lead + stall share | peak tree RSS MiB | peak GPU MiB (device-wide) |
+|---|---|---|---|---|---|---|
+| W52-1 r[0] GX011627 c3 cold 1 (baseline :232) | 0.3195 -> 0.392924 | 9.57 -> 11.775954 | 0.290 / 0.322 / 0.602 -> 0.316343 / 0.342331 / 0.429582 | 7.39 % -> 9.0789 % | 3,394 -> 3,522.703 | 3,244 -> 3,613 |
+| W52-1 r[1] GX011627 c3 cold 2 (baseline :233) | 0.3264 -> 0.359285 | 9.78 -> 10.767787 | 0.297 / 0.332 / 0.624 -> 0.327670 / 0.368823 / 0.835539 | 7.39 % -> 7.9392 % | 3,417 -> 3,532.195 | 3,142 -> 3,669 |
+| W52-1 r[2] GX011627 c3 cold 3 (baseline :234) | 0.3310 -> 0.363329 | 9.92 -> 10.888984 | 0.302 / 0.334 / 0.688 -> 0.330838 / 0.367174 / 0.858039 | 7.44 % -> 8.2354 % | 3,396 -> 3,556.125 | 3,130 -> 3,575 |
+| W52-1 r[3] GX011627 c3 warm (a) (baseline :235) | 0.3022 -> 0.321605 | 9.06 -> 9.638515 | 0.296 / 0.319 / 0.359 -> 0.314386 / 0.342360 / 0.389250 | 0.81 % -> 0.8488 % | 2,456 -> 2,555.789 | 2,601 -> 2,984 |
+| W52-1 r[4] GX011627 ancuti2018 cold (baseline :236) | 0.2917 -> 0.332299 | 8.74 -> 9.959024 | 0.255 / 0.271 / 1.212 -> 0.278721 / 0.308780 / 1.593705 | 11.66 % -> 15.5547 % | 3,396 -> 3,530.621 | 3,014 -> 3,505 |
+| W52-1 r[5] GX011627 c3 libx265 cold (baseline :237) | 0.4869 -> 0.682129 | 14.59 -> 20.443414 | 0.426 / 0.552 / 3.593 -> 0.507169 / 1.162660 / 5.022489 | 2.10 % -> 1.7905 % | 4,963 -> 5,119.070 | 2,761 -> 3,068 |
+| W52-1 r[6] synthetic 5.3K 8:7 c3 cold (baseline :239) | 1.2229 -> 1.345737 | 36.65 -> 40.331778 | 1.074 / 1.178 / 4.654 -> 1.115174 / 1.137576 / 1.186678 | - -> 7.4283 % | 7,753 -> 5,340.090 | 7,901 -> 7,085 |
+| W52-1 r[7] GX011625 c3 cold, sustained (baseline :240) | 0.3195 -> 0.359659 | 9.58 -> 10.779005 | 0.299 / 0.337 / 4.117 -> 0.338958 / 0.372027 / 4.222788 | 5.75 % -> 5.0579 % | 3,653 -> 3,731.852 | 3,277 -> 3,638 |
+
+Column key paths: `r[i].total.s_per_frame`; `r[i].total.min_per_min`;
+`r[i].per_frame.{median,p90,max}` (the separately reported first frame is
+excluded); `100*r[i].analysis_share_overlapped`;
+`r[i].telemetry.peak_tree_rss_bytes / 1048576`;
+`r[i].telemetry.peak_gpu_memory_used_mib`. Lead+stall means
+`(lead_s + record_wait_s)/wall_s`, independently checked per row, and is
+not whole-analysis runtime or the legacy lead-only `analysis_share`.
+
+### Wall, analysis and encoder evidence (W52-1)
+
+| Row | wall_s | legacy analysis_share % | lead_s + record_wait_s | analysis_end_s | encoder; nvenc_proof.tied; PID; samples; active PID rows; window_s |
+|---|---|---|---|---|---|
+| r[0] | 267.581480 | 9.0065 | 24.099828 + 0.193506 | 210.217561 | hevc_nvenc; true; 38528; 2413; 338; 241.56 |
+| r[1] | 244.673201 | 2.6824 | 6.563171 + 12.861951 | 223.115413 | hevc_nvenc; true; 33236; 2313; 354; 236.49 |
+| r[2] | 247.427106 | 2.7892 | 6.901276 + 13.475433 | 225.701699 | hevc_nvenc; true; 29452; 2278; 354; 238.53 |
+| r[3] | 219.013079 | 0.7965 | 1.744497 + 0.114497 | 122.733931 | hevc_nvenc; true; 4692; 1806; 337; 215.80 |
+| r[4] | 226.295916 | 6.5699 | 14.867507 + 20.332149 | 199.947185 | hevc_nvenc; true; 14608; 2021; 307; 209.55 |
+| r[5] | 464.529558 | 1.4262 | 6.625220 + 1.692403 | 268.882034 | libx265; false; not an NVENC encode (libx265) |
+| r[6] | 201.860550 | 7.4200 | 14.977981 + 0.016778 | 42.318292 | hevc_nvenc; true; 29524; 1621; 99; 179.73 |
+| r[7] | 5372.593214 | 0.1198 | 6.434622 + 265.305190 | 5284.375990 | hevc_nvenc; true; 42024; 49955; 7579; 5362.08 |
+
+Keys are `r[i].wall_s`, `100*r[i].analysis_share`, `r[i].lead_s`,
+`r[i].record_wait_s`, `r[i].analysis_end_s`, `r[i].encoder`,
+`r[i].nvenc_proof.{tied,pid,samples,window_s,reason}` and length of
+`r[i].nvenc_proof.pid_samples_with_encoder_load`. The seven NVENC rows
+have positive PID-tied encoder-load observations; libx265 is explicitly
+not an NVENC encode and is characterisation, not the N6 target.
+
+### GPU memory controls and estimate margins (W52-1)
+
+| Row | device peak / job limit MiB | job estimate / device peak | pool peak / pool limit MiB | pool estimate / pool peak | idle_before_mib |
+|---|---|---|---|---|---|
+| r[0] | 3,613.0 / 4,065.4 | 1.125215x | 1,510.8 / 2,173.8 | 1.438840x | 662.0 |
+| r[1] | 3,669.0 / 4,065.4 | 1.108040x | 1,566.2 / 2,173.8 | 1.387945x | 712.0 |
+| r[2] | 3,575.0 / 4,065.4 | 1.137175x | 1,470.5 / 2,173.8 | 1.478273x | 712.0 |
+| r[3] | 2,984.0 / 3,582.0 | 1.200402x | 1,342.5 / 2,173.8 | 1.619218x | 736.0 |
+| r[4] | 3,505.0 / 4,065.4 | 1.159886x | 1,392.2 / 2,173.8 | 1.561414x | 712.0 |
+| r[5] | 3,068.0 / 3,412.7 | 1.112353x | 1,414.5 / 2,173.8 | 1.536797x | 724.0 |
+| r[6] | 7,085.0 / 10,330.8 | 1.458123x | 3,993.8 / 6,281.4 | 1.572788x | 712.0 |
+| r[7] | 3,638.0 / 4,065.4 | 1.117482x | 1,523.3 / 2,173.8 | 1.427033x | 716.0 |
+
+All fields are under `r[i].memory_check`: `device_peak_mib`,
+`job_estimate_mib`, `pool_peak_mib`, `pool_estimate_mib`, `idle_before_mib`.
+Each ratio divides the stated estimate by its matching peak; the recorded
+estimate/peak values are already rounded by the instrument. The device
+peak equals `telemetry.peak_gpu_memory_used_mib` on every row. These job
+and pool limits are different estimates, not the base admission estimate or
+the physical card capacity. No base admission estimate or device-total
+capacity field is carried by these runs; an admission/peak ratio cannot be
+claimed from them. All reported job/device and pool/pool ratios are below
+2x. The estimates are conservative by design; no estimate was tuned.
+At 5.3K the recorded `memory_check.note` makes the pool bound binding and
+records the device-wide job check separately. Its historical 4,427 MiB
+example is not this run's peak and is not substituted for the current row.
+
+### Conditions present in R, separate from seat observations (W52-1)
+
+| Row | recorded non-own run strays (CPU as recorded) | before -> after temperature C | sampled SM MHz range | sampled memory MHz range | sampled temperature C range | sampled GPU utilisation % range |
+|---|---|---|---|---|---|---|
+| r[0] | WmiPrvSE.exe pid 10304: 70.4 | 60 -> 72 | 210-2475 | 405-8001 | 59-83 | 0-100 |
+| r[1] | WmiPrvSE.exe pid 10304: 66.4; System pid 4: 26.0 | 71 -> 74 | 210-2460 | 405-8001 | 71-87 | 0-100 |
+| r[2] | WmiPrvSE.exe pid 10304: 69.3; System pid 4: 26.5 | 73 -> 75 | 210-2460 | 405-8001 | 72-87 | 0-100 |
+| r[3] | WmiPrvSE.exe pid 10304: 59.7 | 66 -> 74 | 210-2460 | 405-8001 | 65-86 | 0-100 |
+| r[4] | WmiPrvSE.exe pid 10304: 71.2; System pid 4: 33.1 | 73 -> 74 | 210-2460 | 405-8001 | 72-89 | 0-100 |
+| r[5] | WmiPrvSE.exe pid 10304: 76.6; MoUsoCoreWorker.exe pid 32600: 44.4 (new, alive_s=7.81); System pid 4: 39.0 | 74 -> 67 | 210-2460 | 405-8001 | 68-86 | 0-99 |
+| r[6] | WmiPrvSE.exe pid 10304: 55.7; System pid 4: 26.6 | 65 -> 73 | 210-2475 | 405-8001 | 65-83 | 0-100 |
+| r[7] | WmiPrvSE.exe pid 10304: 70.2; System pid 4: 31.1 | 71 -> 75 | 210-2460 | 405-8001 | 70-93 | 0-100 |
+
+Stray keys: `r[i].strays.busy[*].{name,pid,cpu,own,new,alive_s}`; only
+`own=false` entries are displayed above. Own=true python.exe pid 39500 is
+also recorded, with per-row CPU values 118.9, 118.0, 118.5, 111.3, 119.6, 95.8, 105.3, 123.0.
+CPU values are the instrument's process readings, not an attribution of
+whole-machine CPU load. Conditions use `before.gpu.temperature.gpu`,
+`after.gpu.temperature.gpu`, and min/max of numeric
+`telemetry.gpu[*].{clocks.sm,clocks.mem,temperature.gpu,utilization.gpu}`.
+The record also carries before/after UTC, CPU snapshots, memory.used,
+power.draw and clocks_event_reasons.active; flag bit meanings are not
+decoded here and no throttling cause is asserted.
+
+Endpoint stray samples can differ from whole-run entries: the synthetic
+row also has before `svchost.exe` pid 31644 CPU 141.0 and WmiPrvSE 95.8,
+and after svchost CPU 39.7 (`r[6].before/after.strays.busy`). WmiPrvSE
+is present in whole-run observations on every row, System in r[1,2,4,5,6,7],
+and a new MoUsoCoreWorker in r[5]. These are recorded conditions; their
+contribution to wall time is not isolated. The record does not establish
+a causal shipped-code regression, an uncontaminated exclusive host, or
+absence of quiet/unreported applications; no controlled temperature/load
+A/B is present. Photos, CPU fallback and GUI-path timing are not measured
+by R. Peak sampling is not a continuous allocation maximum.
+
+| Row | RSS samples | max RSS gap s | GPU samples | max GPU gap s | telemetry errors |
+|---|---|---|---|---|---|
+| r[0] | 1078 | 0.426 | 270 | 1.053 | [] |
+| r[1] | 988 | 0.371 | 247 | 1.047 | [] |
+| r[2] | 998 | 0.398 | 250 | 1.066 | [] |
+| r[3] | 884 | 0.353 | 221 | 1.037 | [] |
+| r[4] | 914 | 0.365 | 229 | 1.087 | [] |
+| r[5] | 1865 | 0.308 | 467 | 1.069 | [] |
+| r[6] | 816 | 0.274 | 204 | 1.026 | [] |
+| r[7] | 21499 | 0.450 | 5375 | 1.184 | [] |
+
+Keys: `telemetry.rss_samples`, `telemetry.gaps_s.memory.max`, length of
+`telemetry.gpu`, `telemetry.gaps_s.gpu.max`, `telemetry.errors`, all per row.
+Nominal `telemetry.periods_s` is memory 0.25 s / GPU 1.0 s on every row;
+observed gaps above qualify the sampled peaks.
+
+### N6 facts for CHARC (no recommendation)
+
+WP3.21 comparisons use its published rounded figures, so percentage
+deltas are approximate `(WP5.2 / WP3.21 - 1)*100`. Cold median is the
+median of all three cold `total.min_per_min` values, with no exclusion;
+the corresponding s/frame and wall medians are from the same row r[2].
+
+| Quantity | WP3.21 min/min | W52-1 min/min | Delta | WP5.2 key / baseline line |
+|---|---|---|---|---|
+| GX011627 c3 cold median | 9.78 | 10.888983519 | +11.3393 % | median r[0:3].total.min_per_min; WP3.21 :232-234 |
+| GX011625 sustained | 9.58 | 10.779005197 | +12.5157 % | r[7].total.min_per_min; WP3.21 :240 |
+| GX011627 warm | 9.06 | 9.638514754 | +6.3854 % | r[3].total.min_per_min; WP3.21 :235 |
+| GX011627 ancuti2018 | 8.74 | 9.959024077 | +13.9476 % | r[4].total.min_per_min; WP3.21 :236 |
+
+One sentence of fact for CHARC: W52-1 on `d3fadaea` measured the full-clip
+4K c3 NVENC cold median at **10.888984 min/min**, the sustained row at
+**10.779005 min/min**, and synthetic 5.3K best effort at
+**40.331778 min/min**, with all eight recorded memory checks passing.
+The owner retains the N6 decision; the interim D106 target is not reset here.
+
+### V15 video half / DR-70 share read-back
+
+Synthetic 5.3K 8:7, r[6], `size=[4648,5312]`, `frames=150`:
+`telemetry.peak_tree_rss_bytes` = **5,599,490,048 B**
+(**5,340.089844 MiB**, about 5.599490 GB decimal),
+below N4's 16 GB RAM requirement. The device-wide peak is
+**7,085 MiB**; `memory_check.job_estimate_mib` =
+**10,330.8 MiB**, ratio **1.458123x**.
+Pool peak **3,993.8 MiB** / pool estimate **6,281.4 MiB**,
+estimate/peak **1.572788x**; idle **712.0 MiB**.
+Base admission estimate is NOT carried; its ratio to device peak is N/A,
+rather than relabelling a job/pool estimate. Prior WP3.21 row is
+`docs/reports/wp3.21-optimisation.md:239`: 7,753 MiB RSS / 7,901 MiB device;
+current values are sampled peaks with the cadence/errors table above.
+
+DR-70: sustained `analysis_end_s=5284.375990` against
+`wall_s=5372.593214` (derived 98.3580 % of wall),
+`record_wait_s=265.305190`, `lead_s=6.434622`,
+`analysis_share_overlapped=5.0579 %`.
+The legacy `analysis_share` is only lead/wall. WP3.21's comparable
+sustained lead+stall share is 5.75 % (`:240`), and its analysis return is
+4,690.6 s / frame 14,655 of 14,938 (`:274-276`). The current record places
+the analysis return near export end; this does not by itself apportion
+CPU/GPU time or prove a cause for the timing delta. No pipeline tuning.
+
+### Orchestrator seat observations (separate provenance)
+
+The following are the orchestrator's supplied readings, NOT substitutions
+for any R table cell. Open 12:48Z: C: 84 GB free; GPU SM/memory 210 /
+405 MHz, 59 C, 7,404 MiB free / 545 MiB used; free RAM 12.7 GB; CPU about
+9 %. Strays: Brave, Battle.net, PianoMarvel, OktaVerify, QNAPRaidMgr, two
+Claude sessions; no pytest, Codex turn or reviewer pass. Mid-GX011625 at
+14:19Z / 14:50Z: GPU utilisation 65 % / 74 %, SM 1,470 / 1,830 MHz,
+88 C / 85 C. Close 14:55Z: C: 84 GB free; GPU SM/memory 210 / 405 MHz,
+70 C, 7,413 MiB free / 536 MiB used; free RAM 12.7 GB; strays as at open.
+These window snapshots differ in time and scope from per-run R.before,
+R.after and telemetry samples, and are not merged with them.
+
+### Checks, verification record and handoff
+
+All identity/hash/ordering/encoder/ok/memory and rate-arithmetic checks
+above executed in this cell's read-only read-back helper; log and numeric
+extraction are under this worktree's ignored `work/wp5.2/turn6/`. No
+request mismatch found, no STOP, no result discarded. Verification loop:
+confirmed hashes against actual bytes and receipts; independently expanded
+the source plan; checked rate/share arithmetic and matching memory scopes;
+kept the missing admission/device-capacity fields explicit. No cause claim
+or product defect inferred. False positives/fixes/reverts this turn: none.
+Formal checks: `work/wp5.2/turn6/ruff.log`, full `uv run ruff check .`,
+**All checks passed!**, exit 0; `format.log`, full `uv run ruff format
+--check .`, **311 files already formatted**, exit 0. `audit.log` verifies
+the ledger is ASCII/zero CR, the ledger is the sole changed tracked path,
+and `git diff --check` is clean, exit 0. No pytest, GPU allocation, timing or run-request execution;
+no report/source/test/brief/config/fixture/dependency change. Only this
+ledger and ignored worktree-local helper/log files are written; all granted
+MAIN-work files remain untouched. No media/GPS/IMU payload is copied.
+YIELD for the orchestrator's W52-2 window; report follows its read-back.
