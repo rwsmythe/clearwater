@@ -48,7 +48,14 @@
   06:57Z; a per-folder Temp breakdown pending; CLOSED as ours unless that breakdown says otherwise. WP-D112 Reviewer A round
   1 started 06:58Z on the owner's word (Claude 97 % at 06:14Z) = NEW_CRITICAL_MAJOR_FOUND: F1 MAJOR truncated PCM sources
   under D86 refused by the new sample-extent rule (2 of 3 probes where base passed), F2 MINOR no pts check after the first,
-  F3 advisory; Codex turn 4 adjudicating; any proposal that changes my ruled rule comes to me as a STOP; WP-D112 Reviewer A waits on
+  F3 advisory; Codex turn 4 adjudicated `2e471364`; MY RULING `b44b0ee7` (query `1aef5947`): F1 the D86-only
+  exception APPROVED (active only when the probe says truncated AND the audio cut is set; source packets floored to whole
+  sample frames, the floor on the FINAL window packet only; output counted strictly; MAJOR stands whatever the owner's moov
+  positions; the truncated-source warning names the dropped partial frame; the Limit carries re-chunking by a short trailing
+  packet); F2 the orchestrator's RUN-EQUALITY rule ADOPTED (maximal contiguous runs per timeline inside the window, output
+  run list equals the source's, in source ticks; docstring says it depends on the equal time bases), the cell's SOURCE
+  refusal REJECTED (a new acceptance restriction without population evidence = DR-112's shape); F3 BANKED, a register note at
+  the accept. Next: fold, remediation turn 5 in a fresh Codex session 3, Reviewer A round 2, B, three-leg gate, accept; WP-D112 Reviewer A waits on
   the owner lifting the Claude pause; the first run DIED 00:36:53Z with gen 32's pane (its 33
   orphans moved, not deleted, to `work/orch-g33/vs-orphans/`, pruned only on the owner's word). **OWNER RULE carried into the
   kernel, main `215b1fd6` (owner verbatim: "the generations should not have handed over if the previous generation was still
