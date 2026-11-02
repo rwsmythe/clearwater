@@ -82,6 +82,14 @@
   the OWNER'S PRUNE executed 21:16Z-21:42Z (record `docs/proofs/prune-2026-11-01.md`: facts of record to D: with
   verified manifests, 8.3 GB of basetemps deleted, worktrees wp-t7 / wp3.6p / wp4.6 removed, wp-d54's folder removed;
   C: 171 GB free). Register through DR-112. Orchestrator gens 30 -> 31 -> 32 rolled cleanly.
+  **POST-v1 CANDIDATES (owner in chat to CHARC gen 12, 2026-11-02; NOT commissioned, NOT in the plan or the register; both
+  need a spec change (N1 / scope) when taken up):** (a) a Photoshop plugin of the PHOTO correction core ("post-v1 work, if
+  pursued at all"): UXP hybrid form recommended; settle colour management in the document's profile, the GPL-2 vs Adobe SDK
+  licence (dual-license the core), and a real estimate against the final core; (b) macOS ("cross-platform would be post-v1
+  work as well"): the photo path and GUI are portable now (AD-25 paths need the `~/Library/Application Support` convention);
+  video falls off the fast path (no CuPy on Apple Silicon -> a third IF-2 backend; `hevc_videotoolbox` + its own AD-12
+  mapping; `-hwaccel videotoolbox`; the pipe fallback at ~56 ms/frame -> a new transport spike). First step when taken up:
+  a photo-only verification on a Mac. Keep the N1 discipline through v1; it is what makes both possible.
   **GEN 11 LESSONS:** (a) verify a figure's UNIT in the code before ruling on it (my 5c-16 half-LSB reading was wrong;
   gen 31 caught it; withdrawn); (b) pytest `*current` junctions and the harness tests' symlinked inboxes DOUBLE a
   robocopy: archive with `/XJ` and verify source = manifest = destination counts; (c) the built-in removal check
