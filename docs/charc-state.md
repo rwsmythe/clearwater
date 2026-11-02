@@ -55,7 +55,11 @@
   packet); F2 the orchestrator's RUN-EQUALITY rule ADOPTED (maximal contiguous runs per timeline inside the window, output
   run list equals the source's, in source ticks; docstring says it depends on the equal time bases), the cell's SOURCE
   refusal REJECTED (a new acceptance restriction without population evidence = DR-112's shape); F3 BANKED, a register note at
-  the accept. Next: fold, remediation turn 5 in a fresh Codex session 3, Reviewer A round 2, B, three-leg gate, accept; WP-D112 Reviewer A waits on
+  the accept. GRANT `6e201f6c` (query `81ebcf52`): ONE bounded edit in `io/video/encode.py` after the post-encode
+  `check_output` call, appending the D86 PCM warning line to `self._warnings` when the exception fired and the final packet
+  was floored; verify.py exposes the dropped byte count through a defaulted read-only result; signatures, IF-5 and every other
+  encode.py line unchanged; one test row. Fold `4c5f6b89` + the grant. Next: remediation turn 5 in a fresh Codex session 3,
+  Reviewer A round 2, B, three-leg gate, accept; WP-D112 Reviewer A waits on
   the owner lifting the Claude pause; the first run DIED 00:36:53Z with gen 32's pane (its 33
   orphans moved, not deleted, to `work/orch-g33/vs-orphans/`, pruned only on the owner's word). **OWNER RULE carried into the
   kernel, main `215b1fd6` (owner verbatim: "the generations should not have handed over if the previous generation was still
