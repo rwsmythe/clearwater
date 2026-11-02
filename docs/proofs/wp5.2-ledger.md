@@ -829,6 +829,465 @@ device/RAM peaks on both, but graphics-work estimate ratios are N/A on CPU.
 Allow about 10 min provisionally for generation plus the two legs. GUI margin
 and 24.5 MP owner photo remain CITED (Q1/R4), no re-run.
 
+**W52-2 held-vs-free identity follow-up (CHARC a171ca08 (3)).**
+Seat-only, NOT timed, after W52-2 closed. No CPU dependency. Save this ONE
+block as a script and run from the repo root; no inherited setup. It uses
+R2's `find_tool`, `probe`, `decode_filter` imports and identical decode
+flags, with rawvideo streamed to pipes instead of retained raw files. Only
+`W52-2-r2-held-free.json` and its log are written in the kept attempt.
+Existing JSON refuses before log redirection. Decode both first 30 frames;
+`identical` requires every decoded byte to match. Failures write a skip
+record, with no identity claim. This does not wait for W52-3.
+
+```bash
+set -euo pipefail
+unset PYTEST_ADDOPTS
+WORK52=$(uv run python - <<'PY'
+import sys
+sys.path.insert(0, 'tools')
+from local_config import load_local_config
+from spike_io.guard import WriteGuard
+cfg = load_local_config()
+working = cfg.working_path.resolve()
+root = working / 'wp5.2'
+assert root.resolve() == root and root.is_relative_to(working)
+WriteGuard(root, cfg.footage_path).check(root)
+assert root.is_dir()
+print(root.as_posix())
+PY
+)
+: "${WORK52:?}"
+export WORK52
+R2ROOT="$WORK52/W52-2/attempt-20261102T150359Z-1621"
+export R2ROOT
+# This request writes ONLY its JSON and log beside the kept outputs.
+test -d "$R2ROOT"
+test ! -e "$R2ROOT/W52-2-r2-held-free.json"
+if uv run python - > "$R2ROOT/W52-2-r2-held-free.log" 2>&1 <<'PY'
+import json, os, sys
+from pathlib import Path
+sys.path.insert(0, 'tools')
+root = Path(os.environ['R2ROOT']).resolve()
+assert root == Path(os.environ['WORK52']) / 'W52-2/attempt-20261102T150359Z-1621'
+target = root / 'W52-2-r2-held-free.json'
+assert not target.exists(), target
+def compare_videos(videos):
+    import subprocess
+    import numpy as np
+    from clearwater.io.video import find_tool, probe
+    from clearwater.color import decode_filter
+    streams = [probe(video).video for video in videos]
+    assert all(s.bit_depth == 8 and s.nb_frames == 681 for s in streams)
+    assert len({(s.height, s.width, s.frame_rate) for s in streams}) == 1
+    size = 3 * streams[0].height * streams[0].width
+    processes = []
+    largest, total, count, frames = 0.0, 0.0, 0, 0
+    try:
+        for video, stream in zip(videos, streams, strict=True):
+            command = [str(find_tool('ffmpeg')), '-nostdin', '-v', 'error', '-n',
+                       '-noautorotate', '-i', str(video), '-map', '0:v:0',
+                       '-frames:v', '30', '-vf', decode_filter(stream),
+                       '-pix_fmt', 'gbrp', '-fps_mode', 'passthrough',
+                       '-f', 'rawvideo', 'pipe:1']
+            processes.append(subprocess.Popen(command, stdout=subprocess.PIPE,
+                                              stderr=sys.stderr))
+        def read_frame(pipe):
+            chunks, remaining = [], size
+            while remaining:
+                chunk = pipe.read(remaining)
+                assert chunk, 'decoder ended before 30 complete frames'
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            return np.frombuffer(b''.join(chunks), dtype=np.uint8)
+        for _ in range(30):
+            a, b = [read_frame(p.stdout) for p in processes]
+            diff = np.abs(a.astype(np.float32) - b.astype(np.float32))
+            largest = max(largest, float(diff.max()))
+            total += float(diff.sum(dtype=np.float64))
+            count += diff.size
+            frames += 1
+        for process in processes:
+            assert process.stdout.read(1) == b'', 'extra decoded bytes'
+            assert process.wait(timeout=60) == 0, 'decoder failed'
+        return dict(frames=frames, max_abs_255=largest, mean_abs_255=total/count,
+                    max_abs_unit=largest/255, mean_abs_unit=total/count/255,
+                    identical=largest == 0)
+    finally:
+        for process in processes:
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.poll() is None:
+                process.kill()
+            process.wait()
+
+def output_video(record_path, out_folder, reason):
+    record = json.loads(record_path.read_text(encoding='utf-8'))
+    assert len(record['items']) == 1 and not record['cancelled']
+    item = record['items'][0]
+    assert item['state'] in ('done', 'done with warnings')
+    assert item['device'] == reason
+    assert item['video']['encoder'] == 'hevc_nvenc'
+    assert len(item['outputs']) == 1
+    name = item['outputs'][0]
+    assert Path(name).name == name
+    video = (out_folder / name).resolve()
+    assert video.parent == out_folder.resolve() and video.is_file()
+    return video
+try:
+    videos = []
+    for label in ('held', 'free'):
+        assert (root / f'W52-2-r2-{label}.exit').read_text().strip() == '0'
+        videos.append(output_video(root / f'W52-2-r2-{label}.json',
+                                   root / f'W52-2-r2-{label}/out', 'GPU'))
+    result = compare_videos(videos)
+    result.update(window='W52-2', comparison='post-encode held vs free GPU',
+                  skipped=False, passes=result['identical'])
+except Exception as error:
+    result = dict(window='W52-2', frames=0, requested_frames=30, identical=None,
+                  max_abs_255=None, mean_abs_255=None, passes=False, skipped=True,
+                  skip_reason=f'{type(error).__name__}: {error}')
+with target.open('x', encoding='ascii') as dst:
+    dst.write(json.dumps(result, indent=2, ensure_ascii=True) + '\n')
+print(json.dumps(result, ensure_ascii=True))
+raise SystemExit(0 if result['passes'] else 1)
+PY
+then COMPARE_STATUS=0; else COMPARE_STATUS=$?; fi
+exit "$COMPARE_STATUS"
+```
+
+**W52-3 / forced-CPU repeat (CHARC a171ca08 (2)).** ONE self-contained
+seat script; EXCLUSIVE, NOT executed by the cell. Expected wall **about
+2 h plus comparison**, based on W52-2's roughly 9.9 s/frame feed. The
+60 s polls and 7200 s timeout are instrumentation, no product watchdog.
+The whole kept 681-frame copy is read in place; c3 / auto / standard /
+force-cpu are unchanged, with fresh output/cache/record. Disk floor 30 GB.
+Open/close to CHARC with disk, RAM, clocks, temperature and strays; nothing
+else heavy. The earlier 40-45 min W52-2 budget is superseded for this retry.
+
+Each poll records UTC, partial size, encoder PID/CPU seconds/read bytes and
+one card reading (used MiB, SM/memory MHz, C). The encoder must be a child
+or descendant of this attempt's headless exporter and match `-f nut -i pipe:0`.
+Missing readings are empty, never fatal. Poll commands have 20/10 s limits;
+the stop-file loop checks every 0.2 s between polls and drains an in-flight
+reading on export exit (at most those command timeouts). EXIT also stops
+and reaps this poll. No other process is ended by the poll. After timeout,
+the seat checks for any surviving job children before closing the window;
+124 remains the timeout observation, not a completed export or CPU rate.
+
+Disk/input/poll/export/comparison/final statuses have receipt files; setup
+success is receipted once the unique attempt exists (a pre-bootstrap
+refusal cannot receipt into a nonexistent folder). A failed export still
+gets `W52-3-compare.json`, naming the failed leg and status before any failed
+record/output read. Held-vs-free has the independent script above. For a
+successful CPU run, the comparison streams R2's same 30-frame decode against
+the kept W52-2 free output. It reports literal AD-11 numeric bounds and the
+separate allowed post-encode mean <=3.5/255 characterisation; encoded
+outputs never prove pre-encode AD-11. No tolerance is relaxed.
+
+```bash
+set -euo pipefail
+unset PYTEST_ADDOPTS
+WORK52=$(uv run python - <<'PY'
+import sys
+sys.path.insert(0, 'tools')
+from local_config import load_local_config
+from spike_io.guard import WriteGuard
+cfg = load_local_config()
+working = cfg.working_path.resolve()
+root = working / 'wp5.2'
+assert root.resolve() == root and root.is_relative_to(working)
+WriteGuard(root, cfg.footage_path).check(root)
+assert root.is_dir()
+print(root.as_posix())
+PY
+)
+: "${WORK52:?}"
+export WORK52
+R2ROOT="$WORK52/W52-2/attempt-20261102T150359Z-1621"
+export R2ROOT
+# EXCLUSIVE W52-3; preflight/open/close remain the seat's responsibility.
+ATTEMPT53="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+R3ROOT="$WORK52/W52-3/attempt-$ATTEMPT53"
+export ATTEMPT53 R3ROOT
+uv run python - <<'PY'
+import os, sys
+from pathlib import Path
+sys.path.insert(0, 'tools')
+from local_config import load_local_config
+from spike_io.guard import WriteGuard
+cfg = load_local_config()
+root = Path(os.environ['WORK52'])
+assert root == cfg.working_path.resolve() / 'wp5.2'
+assert root.is_relative_to(cfg.working_path.resolve())
+guard = WriteGuard(root, cfg.footage_path)
+parent = guard.folder('W52-3')
+attempt = guard.check(Path(os.environ['R3ROOT']))
+assert attempt.parent == parent and not attempt.exists()
+attempt.mkdir()
+guard.check(attempt)
+PY
+printf '0\n' > "$R3ROOT/W52-3-setup.exit"
+POLL_STOP="$R3ROOT/W52-3-poll.stop"
+export POLL_STOP
+POLL_PID=''
+stop_poll() {
+    touch "$POLL_STOP"
+    if [ -n "$POLL_PID" ]; then
+        if wait "$POLL_PID"; then POLL_STATUS=0; else POLL_STATUS=$?; fi
+        printf '%s\n' "$POLL_STATUS" > "$R3ROOT/W52-3-poll.exit"
+        POLL_PID=''
+    fi
+}
+cleanup() {
+    local status=$?
+    trap - EXIT
+    set +e
+    if [ -n "$POLL_PID" ]; then stop_poll; fi
+    exit "$status"
+}
+trap cleanup EXIT
+if uv run python - > "$R3ROOT/W52-3-disk.log" 2>&1 <<'PY'
+import os, shutil
+from pathlib import Path
+root = Path(os.environ['R3ROOT'])
+free = shutil.disk_usage(root).free
+print('disk_free_bytes', free, 'required', 30_000_000_000)
+raise SystemExit(0 if free >= 30_000_000_000 else 2)
+PY
+then DISK_STATUS=0; else DISK_STATUS=$?; fi
+printf '%s\n' "$DISK_STATUS" > "$R3ROOT/W52-3-disk.exit"
+if [ "$DISK_STATUS" -ne 0 ]; then exit "$DISK_STATUS"; fi
+if uv run python - > "$R3ROOT/W52-3-input.log" 2>&1 <<'PY'
+import os
+from pathlib import Path
+old = Path(os.environ['R2ROOT'])
+source = old / 'W52-2-GX011627-whole.mp4'
+assert source.is_file(), source
+assert (old / 'W52-2-r2-free.exit').read_text().strip() == '0'
+print(source.name, 'bytes', source.stat().st_size, 'read in place; no copy')
+root = Path(os.environ['R3ROOT'])
+(root / 'out').mkdir()
+(root / 'cache').mkdir()
+PY
+then INPUT_STATUS=0; else INPUT_STATUS=$?; fi
+printf '%s\n' "$INPUT_STATUS" > "$R3ROOT/W52-3-input.exit"
+if [ "$INPUT_STATUS" -ne 0 ]; then exit "$INPUT_STATUS"; fi
+
+# Poll from launch through export exit; missing process/GPU readings stay empty.
+uv run python - > "$R3ROOT/W52-3-poll.log" 2>&1 <<'PY' &
+import csv, json, os, subprocess, time
+from datetime import datetime, timezone
+from pathlib import Path
+root = Path(os.environ['R3ROOT'])
+stop = Path(os.environ['POLL_STOP'])
+powershell = r'''
+$ErrorActionPreference = 'Stop'
+$all = @(Get-CimInstance Win32_Process)
+$exportIds = @($all | Where-Object {
+    $_.Name -match '^python(w)?\.exe$' -and
+    $_.CommandLine -like '*headless_export.py*' -and
+    $_.CommandLine.Contains($env:ATTEMPT53)
+} | ForEach-Object { [uint32]$_.ProcessId })
+$encoders = @($all | Where-Object {
+    $_.Name -ieq 'ffmpeg.exe' -and $_.CommandLine -match '-f\s+nut\s+-i\s+pipe:0'
+})
+$matched = @()
+foreach ($encoder in $encoders) {
+    $ancestor = [uint32]$encoder.ParentProcessId
+    $seen = @{}
+    while ($ancestor -ne 0 -and -not $seen.ContainsKey($ancestor)) {
+        $seen[$ancestor] = $true
+        if ($exportIds -contains $ancestor) { $matched += $encoder; break }
+        $parent = @($all | Where-Object { $_.ProcessId -eq $ancestor })
+        if ($parent.Count -ne 1) { break }
+        $ancestor = [uint32]$parent[0].ParentProcessId
+    }
+}
+if ($matched.Count -eq 1) {
+    $encoder = $matched[0]
+    [pscustomobject]@{
+        encoder_pid = $encoder.ProcessId
+        encoder_cpu_s = ([double]$encoder.KernelModeTime + [double]$encoder.UserModeTime) / 10000000
+        encoder_read_bytes = $encoder.ReadTransferCount
+    } | ConvertTo-Json -Compress
+}
+'''
+with (root / 'W52-3-progress.csv').open('x', newline='', encoding='ascii') as dst:
+    writer = csv.writer(dst, lineterminator='\n')
+    writer.writerow(['utc', 'partial_bytes', 'encoder_pid', 'encoder_cpu_s',
+                     'encoder_read_bytes', 'gpu_used_mib', 'sm_mhz', 'memory_mhz',
+                     'temperature_c'])
+    dst.flush()
+    next_poll = time.monotonic()
+    while not stop.exists():
+        now = time.monotonic()
+        if now < next_poll:
+            time.sleep(min(0.2, next_poll-now))
+            continue
+        utc = datetime.now(timezone.utc).isoformat()
+        partial = ''
+        try:
+            files = list((root / 'out').glob('*.clearwater-partial-*.mp4'))
+            if files:
+                partial = sum(p.stat().st_size for p in files)
+        except OSError as error:
+            print(utc, 'partial unavailable', type(error).__name__, flush=True)
+        counters = {}
+        try:
+            reading = subprocess.run(['powershell', '-NoProfile', '-Command', powershell],
+                                     capture_output=True, text=True, check=True, timeout=20)
+            if reading.stdout.strip():
+                counters = json.loads(reading.stdout)
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            print(utc, 'encoder reading unavailable', type(error).__name__, flush=True)
+        gpu = ['', '', '', '']
+        try:
+            reading = subprocess.run(['nvidia-smi', '--id=0',
+                '--query-gpu=memory.used,clocks.sm,clocks.mem,temperature.gpu',
+                '--format=csv,noheader,nounits'], capture_output=True,
+                text=True, check=True, timeout=10)
+            values = [v.strip() for v in reading.stdout.strip().split(',')]
+            if len(values) == 4:
+                gpu = [v if v not in ('N/A', '[N/A]') else '' for v in values]
+        except (OSError, subprocess.SubprocessError) as error:
+            print(utc, 'GPU reading unavailable', type(error).__name__, flush=True)
+        writer.writerow([utc, partial, counters.get('encoder_pid', ''),
+                         counters.get('encoder_cpu_s', ''),
+                         counters.get('encoder_read_bytes', ''), *gpu])
+        dst.flush()
+        next_poll += 60
+        if next_poll < time.monotonic():
+            next_poll = time.monotonic() + 60
+print('poll stopped', datetime.now(timezone.utc).isoformat(), flush=True)
+PY
+POLL_PID=$!
+if { time timeout 7200 uv run python tools/headless_export.py "$R2ROOT/W52-2-GX011627-whole.mp4" --out "$R3ROOT/out" --cache-dir "$R3ROOT/cache" --method c3 --encoder auto --quality standard --force-cpu --record "$R3ROOT/W52-3-r2-cpu.json"; } > "$R3ROOT/W52-3-r2-cpu.log" 2>&1; then
+    CPU_STATUS=0
+else
+    CPU_STATUS=$?
+fi
+printf '%s\n' "$CPU_STATUS" > "$R3ROOT/W52-3-r2-cpu.exit"
+# 124 means timeout, not a completed CPU export or measured CPU rate.
+stop_poll
+export CPU_STATUS
+if uv run python - > "$R3ROOT/W52-3-compare.log" 2>&1 <<'PY'
+import json, os, sys
+from pathlib import Path
+sys.path.insert(0, 'tools')
+root = Path(os.environ['R3ROOT'])
+old = Path(os.environ['R2ROOT'])
+def compare_videos(videos):
+    import subprocess
+    import numpy as np
+    from clearwater.io.video import find_tool, probe
+    from clearwater.color import decode_filter
+    streams = [probe(video).video for video in videos]
+    assert all(s.bit_depth == 8 and s.nb_frames == 681 for s in streams)
+    assert len({(s.height, s.width, s.frame_rate) for s in streams}) == 1
+    size = 3 * streams[0].height * streams[0].width
+    processes = []
+    largest, total, count, frames = 0.0, 0.0, 0, 0
+    try:
+        for video, stream in zip(videos, streams, strict=True):
+            command = [str(find_tool('ffmpeg')), '-nostdin', '-v', 'error', '-n',
+                       '-noautorotate', '-i', str(video), '-map', '0:v:0',
+                       '-frames:v', '30', '-vf', decode_filter(stream),
+                       '-pix_fmt', 'gbrp', '-fps_mode', 'passthrough',
+                       '-f', 'rawvideo', 'pipe:1']
+            processes.append(subprocess.Popen(command, stdout=subprocess.PIPE,
+                                              stderr=sys.stderr))
+        def read_frame(pipe):
+            chunks, remaining = [], size
+            while remaining:
+                chunk = pipe.read(remaining)
+                assert chunk, 'decoder ended before 30 complete frames'
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            return np.frombuffer(b''.join(chunks), dtype=np.uint8)
+        for _ in range(30):
+            a, b = [read_frame(p.stdout) for p in processes]
+            diff = np.abs(a.astype(np.float32) - b.astype(np.float32))
+            largest = max(largest, float(diff.max()))
+            total += float(diff.sum(dtype=np.float64))
+            count += diff.size
+            frames += 1
+        for process in processes:
+            assert process.stdout.read(1) == b'', 'extra decoded bytes'
+            assert process.wait(timeout=60) == 0, 'decoder failed'
+        return dict(frames=frames, max_abs_255=largest, mean_abs_255=total/count,
+                    max_abs_unit=largest/255, mean_abs_unit=total/count/255,
+                    identical=largest == 0)
+    finally:
+        for process in processes:
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.poll() is None:
+                process.kill()
+            process.wait()
+
+def output_video(record_path, out_folder, reason):
+    record = json.loads(record_path.read_text(encoding='utf-8'))
+    assert len(record['items']) == 1 and not record['cancelled']
+    item = record['items'][0]
+    assert item['state'] in ('done', 'done with warnings')
+    assert item['device'] == reason
+    assert item['video']['encoder'] == 'hevc_nvenc'
+    assert len(item['outputs']) == 1
+    name = item['outputs'][0]
+    assert Path(name).name == name
+    video = (out_folder / name).resolve()
+    assert video.parent == out_folder.resolve() and video.is_file()
+    return video
+try:
+    exits = dict(free=int((old / 'W52-2-r2-free.exit').read_text().strip()),
+                 cpu=int(os.environ['CPU_STATUS']))
+    failed = [dict(leg=label, exit_status=status,
+                   reason=f'{label} export exited {status}; no completed output to compare')
+              for label, status in exits.items() if status != 0]
+    result = dict(window='W52-3', baseline_window='W52-2', requested_frames=30,
+                  frames=0, cpu_gpu=None, export_exits=exits,
+                  timeout_observed=exits['cpu'] == 124, failed_legs=failed,
+                  passes=False, skipped=bool(failed))
+    if failed:
+        result['skip_reason'] = '; '.join(item['reason'] for item in failed)
+    else:
+        free = output_video(old / 'W52-2-r2-free.json', old / 'W52-2-r2-free/out', 'GPU')
+        cpu = output_video(root / 'W52-3-r2-cpu.json', root / 'out', 'CPU: forced')
+        metrics = compare_videos([free, cpu])
+        metrics.update(ad11_numeric_max_limit=2e-3, ad11_numeric_mean_limit=2e-4,
+                       ad11_numeric_bounds_met=(metrics['max_abs_unit'] <= 2e-3
+                                                and metrics['mean_abs_unit'] <= 2e-4),
+                       preencode_ad11_proved=False,
+                       comparison='post-encode free vs forced CPU',
+                       postencode_mean_limit_255=3.5,
+                       postencode_characterisation_passes=metrics['mean_abs_255'] <= 3.5)
+        result.update(frames=metrics['frames'], cpu_gpu=metrics,
+                      passes=metrics['postencode_characterisation_passes'])
+except Exception as error:
+    result = dict(window='W52-3', baseline_window='W52-2', frames=0,
+                  requested_frames=30, cpu_gpu=None, passes=False, skipped=True,
+                  cpu_exit=int(os.environ['CPU_STATUS']),
+                  timeout_observed=int(os.environ['CPU_STATUS']) == 124,
+                  skip_reason=f'comparison unavailable: {type(error).__name__}: {error}')
+with (root / 'W52-3-compare.json').open('x', encoding='ascii') as dst:
+    dst.write(json.dumps(result, indent=2, ensure_ascii=True) + '\n')
+print(json.dumps(result, ensure_ascii=True))
+raise SystemExit(0 if result['passes'] else 1)
+PY
+then COMPARE_STATUS=0; else COMPARE_STATUS=$?; fi
+printf '%s\n' "$COMPARE_STATUS" > "$R3ROOT/W52-3-compare.exit"
+# Comparison always gets its own outcome before the export status is returned.
+if [ "$CPU_STATUS" -ne 0 ]; then FINAL_STATUS=$CPU_STATUS
+elif [ "$POLL_STATUS" -ne 0 ]; then FINAL_STATUS=$POLL_STATUS
+else FINAL_STATUS=$COMPARE_STATUS; fi
+printf '%s\n' "$FINAL_STATUS" > "$R3ROOT/W52-3-script.exit"
+exit "$FINAL_STATUS"
+```
+
+Both turn-7 blocks are staged byte-identically under this worktree's
+`work/wp5.2/tmp/turn7-heldfree.sh` and `turn7-w52-3.sh` for the
+orchestrator's `bash -n` at the seat. They remain unexecuted here.
+
 ### 6. Fullclip consumers / gate mapping
 
 Repository search `rg` over all test Python files finds exactly these direct
@@ -1622,3 +2081,353 @@ no report/source/test/brief/config/fixture/dependency change. Only this
 ledger and ignored worktree-local helper/log files are written; all granted
 MAIN-work files remain untouched. No media/GPS/IMU payload is copied.
 YIELD for the orchestrator's W52-2 window; report follows its read-back.
+
+## Session 4 / Turn 7: W52-2 read-back
+
+Fresh session 4, dispatched HEAD `f57a4e76`, branch/worktree `wp5.2`.
+Session 3 retired at dispatcher-supplied depth **194,184**. This turn's
+depth (session 4 `01a19d5c-ab8d-7522-8618-1a1b3117639e` / turn 7, at yield, codex_cell footer): **98,174**; seat `bash -n` OK on both scripts, each identical to its section-5 block. Reviewer A remains converged at round 2;
+this turn is the read-back and ruled request text, not a reviewer round.
+
+Status: **W52-2 records agree with the supplied seat facts; no STOP.**
+R3 supplies the real D111 capacity-fallback witness. R2 supplies DR-114's
+real-export GPU-route observation under allocated pressure, and DR-115's
+failed forced-CPU/NVENC export. The CPU/GPU frame comparison and CPU rate
+are outstanding; neither is claimed from a failed job. The independent
+held-vs-free script and the W52-3 retry script are in section 5. No run
+request, Bash syntax check, decode, GPU allocation or pytest ran here.
+
+### Evidence scope and identity (W52-2)
+
+Read grant used read-only for text records/receipts in
+`C:/Users/rwsmy/clearwater/work/wp5.2/W52-2/`, the two photo record folders
+under `C:/Users/rwsmy/clearwater/work/wp5.2/photo/`, and
+`C:/Users/rwsmy/clearwater/work/orch-g35/w52-2-cpu-hang.txt`.
+No PNG/MP4 contents were opened: only their names and sizes were read.
+No other MAIN-work folder, footage folder or other worktree was read.
+Aliases below are exact paths relative to that granted `wp5.2/` root:
+
+- **A** = `W52-2/attempt-20261102T150359Z-1621/`.
+- **H/F/C** = A's `W52-2-r2-held.json`, `W52-2-r2-free.json`,
+  `W52-2-r2-cpu.json`, respectively; **item** means `items[0]`.
+- **D** = `photo/W52-2-default-d9c469d756db/record.json`;
+  **P** = `photo/W52-2-cpu-dcd7c55c3970/record.json`.
+- **GD** = `photo/W52-2-r3-20261102T173825Z-8075-`, the R3 receipt prefix.
+
+The orchestrator reports W52-2 **2026-11-02 15:03:59Z -> 17:42:42Z**,
+run from this worktree at `a6b9f720`; R2 script exit **1**, R3 script
+exit **0**. Its saved `scripts/W52-2-r2.sh` and `W52-2-r3.sh` were
+byte-identical to the committed requests (seat attestation; those paths
+are outside this turn's read grant and were not opened). All tables in
+this read-back are W52-2. Displayed conversions/ratios are calculated from
+the named raw record keys, not substituted from the dispatch notes.
+
+### R2 pressure, liveness, recovery and exit receipts
+
+All file names in this table are inside **A**. CSV order is exactly
+`memory.free,memory.used`, in MiB, device-wide from nvidia-smi.
+
+| Receipt / key path | Read-back |
+|---|---|
+| `W52-2-copy.log` | `WHOLE W52-2-GX011627-whole.mp4 frames 681 fps 30000/1001` |
+| `W52-2-r2-hold-mib.txt` | `5861` MiB requested |
+| `W52-2-r2-holder.jsonl`, first line | `{"held_bytes": 6145703936, "free_before": 7411335168, "free_after": 1262485504}` |
+| Same JSONL, second line | `{"stopped": "stop-file"}` |
+| `W52-2-r2-readiness.log` | Same first-line holder JSON; readiness completed |
+| `W52-2-r2-holder.stderr` | 216 B; CuPy warns CUDA path could not be detected (set CUDA_PATH if load fails); holder subsequently allocated and exited 0 |
+| `W52-2-r2-before.csv` | `7397, 552` |
+| `W52-2-r2-during.csv` | `1421, 6528` |
+| `W52-2-r2-band.log` | `device-wide free MiB 1421.0 required band [1280, 1792]` |
+| `W52-2-r2-holder-alive-before.txt` | `alive` |
+| `W52-2-r2-holder-alive-after.txt` | `alive` |
+| `W52-2-r2-held-end.csv` | `3059, 4890` |
+| `W52-2-r2-holder.exit` | `0` |
+| `W52-2-r2-after.csv` | `7756, 193` |
+| `W52-2-r2-recovery.json` | `before_used_mib=552.0`, `tolerance_mib=100`, `timeout_s=30`; `samples[0]={free_mib:7756.0,used_mib:193.0}`, `recovered=true`, `refusal_reason=null` |
+| `W52-2-r2-held.exit` / `-free.exit` / `-cpu.exit` | `0` / `0` / `1` |
+
+Holder-local reported free drop is **6,148,849,664 B**, equal to its held
+allocation; this is its own CUDA process's reading, not another process's
+admission reading. Initial device-wide free was in the requested band.
+The held-end sample is **3,059 MiB free**, outside that initial band,
+despite the holder being alive. Thus the evidence establishes the initial
+band and two liveness checks, not constant 1.5 GiB free throughout export.
+The lower held-end device-wide residency is recorded without attributing
+its cause. Recovery is established independently before the free export.
+
+### R2 runner records, walls and frame-count limits
+
+All three records have `schema=1`, `tool=headless_export`, `method=c3`,
+`parameters_from=defaults`, `cancelled=false`; `settings.video_encoder=auto`,
+`settings.quality_level=standard`, `settings.cache_limit_bytes=20000000000`.
+`settings.force_cpu` is false for H/F and true for C. Each has one video
+item named `W52-2-GX011627-whole.mp4`. Every `item.video.encoder` is
+`hevc_nvenc`, including the forced-CPU leg; every decode-pass count is 2.
+
+| Record / key | Held H | Free F | Forced CPU C |
+|---|---|---|---|
+| `item.device` | `GPU` | `GPU` | `CPU: forced` |
+| `item.state` | `done with warnings` | `done with warnings` | `failed` |
+| `elapsed_s` (batch) | 240.080798800 | 242.112675100 | 8769.236927100 |
+| `item.elapsed_s` | 240.078226700 | 242.110168900 | 8769.231191800 |
+| `item.video.device_backend` / `frame_device` | `cuda:0` / `cuda:0` | `cuda:0` / `cuda:0` | null / `cpu` |
+| `item.failure` | null | null | Encoder failure, quoted below |
+| `item.outputs` length | 1 | 1 | 0 |
+| Corresponding `W52-2-r2-<leg>.log`, shell `real` | 4m3.764s | 4m3.268s | 146m10.234s |
+
+H/F `counts` each reports one `done with warnings`, zero failed; C has
+one failed and zero done. H/F warnings both read `Not carried to the
+output: creation date and time` and `Not carried to the output: camera
+firmware tag`. These are successful exports with metadata warnings, not
+memory/fallback warnings. Their redacted `item.outputs[0]` is
+`W52-2-GX011627-whole_corrected.mp4`. Each kept MP4's size is
+**85,988,998 B** under A's corresponding `W52-2-r2-{held,free}/out/`.
+The source copy is **158,459,032 B**. Equal output file sizes alone do
+not prove decoded identity; that check is requested independently below.
+
+**Frame-count provenance:** the source-copy receipt records **681** frames
+at **30000/1001**. H/F/C runner JSONs carry no source/export frame-count
+key, so a completed-output frame count cannot be read from them. H/F
+states prove completion, not an independently decoded count. Both new
+comparison scripts require `probe(...).video.nb_frames == 681` before
+decoding exactly 30 frames; their seat results will supply that output
+check. The approximately 670 frames at the CPU hang are the orchestrator's
+I/O-based observation, not an invented C record counter.
+
+**DR-114 on a real export:** H `item.device="GPU"` and
+`item.video.frame_device="cuda:0"`, exit 0, with the holder alive before
+and after and the initial nvidia-smi free figure **1,421 MiB**. No real
+4K CPU fallback was engaged by this pressure mechanism. This extends the
+WDDM finding to the actual export without asserting sustained physical
+residency or tuning the product's admission estimate.
+
+**C failure text (key `C.items[0].failure`):** begins
+`W52-2-GX011627-whole.mp4: The video encoder stopped (exit status 4294967295):`
+and reports `[hevc_nvenc @ 0000029d2cb4dd80] Failed unlocking input buffer!:
+generic error (20):`, `Error submitting video frame to the encoder`,
+`Error encoding a frame: Unknown error occurred`,
+`Task finished with error code: -1313558101 (Unknown error occurred)`,
+and `Terminating thread with return code -1313558101 (Unknown error occurred)`.
+The full address-bearing failure remains in C; no product edit is owned.
+Its `outputs=[]`, plus the directory size-only inventory showing no CPU
+MP4, agree with the seat's report that D85 removed the partial on failure.
+The external termination is essential context: this is not evidence that
+the product detected the encoder stall on its own.
+
+**Comparison skip record:** `A/W52-2-r2-compare.json` has `window=W52-2`,
+`frames=30` (requested, not decoded), `cpu_gpu=null`, `held_free=null`,
+`passes=false`, `skipped=true`, `failed_legs[0].leg=cpu`,
+`failed_legs[0].exit_status=1`, and
+`skip_reason="cpu export exited 1; no completed output to compare"`.
+R2's early return skipped held/free too. No frame comparison or AD-11
+result is claimed from that record. CHARC a171ca08 (3) commissions the
+independent identity script in section 5; (2) commissions W52-3.
+
+### R3 / V15 synthetic-photo row and D111 engagement witness
+
+GD's `disk.exit`, `generate48.exit`, `photo-memory.exit` each read **0**.
+`disk.log`: `disk_free_bytes=89009053696`,
+`adapter_need_bytes=20292626432`, `required=25000000000`,
+`margin_bytes=4707373568`. `generate48.log` records
+`W52-2-synthetic-48mp.png 8064x6048 RGB16 seeded lowred no EXIF complete
+temporary write and IHDR read-back before rename`.
+The generated input's size-only reading is **177,855,498 B**.
+It is the same input for both fresh-runner legs, not an owner photo.
+
+D/P share the 5d-form keys `schema=1`, `command=memory`,
+`file=W52-2-synthetic-48mp.png`, `class=synthetic-png16`,
+`stored_size=[8064,6048]` (**48,771,072 pixels**, approximately 48 MP),
+`method=c3`, `exclusive=true`. Both have `estimate_bytes=12214137856`
+(**11,648.309570 MiB**, **12.214137856 GB decimal**),
+`device_free_before_bytes=8334082048` (**7,948 MiB**),
+`device_total_bytes=device_limit_bytes=8585740288` (**8,188 MiB**),
+`ram_limit_bytes=16000000000`, `estimate_exceeds_free_before=true`,
+`estimate_fits_free_before=false`. These pre-run sampler readings and
+the product's **7,064 MiB** route-time free reading differ in time and
+process; they are kept distinct. The estimate exceeds either reading.
+
+| W52-2 V15 row / record key | Default device D | Forced CPU P |
+|---|---|---|
+| `force_cpu` / `forced_cpu` | false / false | true / true |
+| `device_reason` | `CPU: estimate 11,649 MiB exceeds free 7,064 MiB` | `CPU: forced` |
+| `automatic_fallback` / `memory_capacity_fallback` | true / true | false / false |
+| `rss_baseline_bytes` | 82,690,048 | 83,132,416 |
+| `rss_tree_peak_bytes` | **6,635,884,544** (6,328.472656 MiB; **6.635885 GB**) | **6,168,494,080** (5,882.734375 MiB; **6.168494 GB**) |
+| `os_peak_working_set_bytes` | 6,548,729,856 | 6,077,247,488 |
+| `device_used_baseline_bytes` | 0 | 0 |
+| `device_used_peak_bytes` | **122,683,392** (**117 MiB**) | **0** |
+| Calculated `estimate_bytes / rss_tree_peak_bytes` | **1.840619x** | **1.980084x** |
+| Calculated `estimate_bytes / device_used_peak_bytes` | **99.558201x** (CPU route; not a GPU-estimate margin) | **undefined**, zero denominator |
+| `runner_exit` / `read_ok` | 0 / true | 0 / true |
+| `ram_within_limit` / `device_within_limit` | true / true | true / true |
+| `failed_checks` / `sampler_errors` | [] / [] | [] / [] |
+| `measured_at_utc` | 2026-11-02T17:39:02.255587+00:00 | 2026-11-02T17:40:53.914541+00:00 |
+| `sampler_elapsed_s` | 111.563 | 108.422 |
+
+Both sampled tree-RSS peaks satisfy N4's **16 GB decimal** bound.
+`rss_scope=tool-runner-tree-including-sampler-children` on both, so the
+OS per-process working-set peak is not substituted for the tree peak.
+Graphics admission-estimate/actual-GPU-work margin is **N/A on both CPU
+routes**. The requested arithmetic above remains visible, but the 99.56x
+number cannot establish a GPU overestimate: D used CPU and its sampled
+117 MiB includes device-wide activity. P's zero GPU denominator has no
+finite ratio. The RAM ratios compare a graphics admission estimate with
+CPU-tree RSS, distinct scopes; neither tunes or validates the GPU bound.
+The estimate is conservative by design; this package changes no estimate.
+
+The corresponding `runner.json` in each D/P folder agrees with its
+`record.json.device_reason`. Default: `items[0].state="done with warnings"`,
+`counts["done with warnings"]=1`, batch `elapsed_s=109.559164100`, item
+`elapsed_s=109.555865100`, warning
+`Processed on the CPU (CPU: estimate 11,649 MiB exceeds free 7,064 MiB).`.
+Forced: `items[0].state="done"`, `counts.done=1`, batch
+`elapsed_s=107.449415300`, item `elapsed_s=107.446125300`, `warnings=[]`.
+Both `cancelled=false`, `items[0].failure=null`, `video=null`, one output
+`W52-2-synthetic-48mp_corrected.png`, and zero failed/not-run items.
+PNG bit depth is 16 in both runner settings. Output size-only readings
+are **245,143,087 B** default / **245,143,051 B** forced. No pixel
+equivalence is inferred from successful writes or these sizes.
+
+**D111 witness of record:** D `device_reason` and its runner
+`items[0].device` both read **`CPU: estimate 11,649 MiB exceeds free
+7,064 MiB`**, with `force_cpu=false`, `automatic_fallback=true`,
+`memory_capacity_fallback=true`, runner exit **0**, completed output and
+`failed_checks=[]`. This is a real export automatically choosing CPU
+because its estimate does not fit, as D111 requires. P is forced CPU and
+is not a separate automatic-fallback witness. R3 does not exercise a
+video encoder and cannot settle DR-115 or real-video AD-11.
+
+### R3 sampling cadence and limits (keys under D/P)
+
+| Key | Default D | Forced P |
+|---|---|---|
+| `rss_samples` / `rss_active_samples` | 1643 / 1641 | 1590 / 1588 |
+| `device_samples` / `device_active_samples` | 250 / 248 | 186 / 183 |
+| `sampling_cadence_s.rss.gap_count` | 1642 | 1589 |
+| `sampling_cadence_s.rss.{min,mean,max}` seconds | 0.016 / 0.067296 / 0.094 | 0.046 / 0.068203 / 0.094 |
+| `sampling_cadence_s.device.gap_count` | 249 | 185 |
+| `sampling_cadence_s.device.{min,mean,max}` seconds | 0.063 / 0.443839 / 1.406 | 0.063 / 0.585811 / 1.515 |
+
+Both `sample_intervals_s={rss:0.05,device:0.2}` and
+`sample_interval_kind="wait-after-sample"`. Actual device cadence is
+slower than nominal; peaks are sampled, not continuous maxima.
+Both `decoder_versions` record ffmpeg **9.0.2**, pillow_heif **1.8.1**,
+libheif **1.23.6**. Neither record supplies the bench's clock/temperature
+series or stray list; window conditions below are separate seat readings.
+
+### DR-115: evidence-file read-back and orchestrator observations
+
+The granted `orch-g35/w52-2-cpu-hang.txt` is a snapshot labelled
+**17:38:13Z**. It records exporter Python pid **36156** (parent **38024**),
+encoder ffmpeg **42972** and decoder ffmpeg **40288**, both children of
+36156. The encoder command has `-f nut -i pipe:0`, `-c:v hevc_nvenc`,
+and the CPU leg's partial output name; the decoder writes rawvideo to
+pipe:1. Selected counters from that single snapshot:
+
+| PID / role | KernelModeTime | UserModeTime | ReadTransferCount | WriteTransferCount |
+|---|---|---|---|---|
+| 36156 exporter | 10,644,375,000 | 61,711,875,000 | 33,762,581,645 | 16,711,513,769 |
+| 42972 encoder | 628,437,500 | 20,879,531,250 | 16,678,523,010 | 82,178,429 |
+| 40288 decoder | 77,500,000 | 735,156,250 | 158,531,337 | 16,705,557,397 |
+
+Times above are Win32_Process's raw 100 ns counters, not seconds.
+The encoder's main thread **16204** is Running with **2109.9 CPU_s**;
+two other listed threads are waiting. The evidence's file table records
+partial **82,177,867 B**, and CPU log **33,613 B**, both last written
+**17:02:57Z**. It does not itself contain repeated counter samples.
+
+The following timeline and diagnosis are **the orchestrator's observations**,
+not inferred solely from that snapshot: export progressed from about
+15:13Z to 17:02:57Z at roughly **9.9 s/frame wall**; about **670 of 681**
+frames were sent when the encoder stopped reading stdin, its main thread
+spinning at 100% with zero subsequent I/O; exporter and decoder blocked.
+At **17:38:10Z** the orchestrator ended only that encoder. C then recorded
+the failure above, removed the partial (D85), and headless exited 1 after
+shell wall **146m10.234s**. CHARC a171ca08 opens **DR-115** for absent
+encoder-stall detection and the NVENC hang under slow CPU feed. This
+package does not add a watchdog or change encoder selection.
+
+### Orchestrator seat conditions (separate provenance, W52-2)
+
+Open **15:03Z**: C: **84 GB** free; GPU SM/memory **210 / 405 MHz**, **58 C**,
+**7,397 MiB** free / **552 MiB** used; available RAM **12.4 GB**; CPU about
+**12%**. Close **17:43Z**: C: **83 GB**; GPU **1,980 / 8,001 MHz** (boost
+just after the run), **63 C**, **7,948 MiB** free / **0 MiB** used;
+available RAM **13.9 GB**. Strays: Brave, Battle.net, PianoMarvel,
+OktaVerify, the Claude sessions. These are seat-supplied opening/closing
+snapshots, not the R3 sampler's per-process route-time free readings or
+proof of an otherwise unloaded laptop.
+
+### Report Limits draft additions (CHARC a171ca08)
+
+- R2's forced-CPU video did not finish; W52-2 supplies **no completed CPU
+  rate or CPU/GPU frame-comparison result**. W52-3 repeats it once under
+  `timeout 7200`, expecting about 2 h plus comparison from the observed
+  feed rate. Report its completed CPU rate and allowed post-encode
+  characterisation if successful; otherwise record timeout/failure and
+  the absence of those figures. A second hang is reproducible DR-115
+  evidence; the real-export AD-11 witness then waits on the product
+  package. Never use elapsed failed-job wall as an export rate.
+- The NVENC hang and absent automatic stall detection are DR-115.
+  `--force-cpu` moves **processing, not the encoder**: C's processing
+  route was `CPU: forced`, its encoder `hevc_nvenc`. The slow-feed video
+  fallback risk remains even though R3's photo fallback completed.
+  External encoder termination led to product failure and D85 cleanup;
+  that cleanup is not automatic detection of a stuck encoder.
+- The held video completed on GPU despite initial **1,421 MiB** device-wide
+  free; WDDM cross-process memGetInfo does not reflect the holder as
+  assumed (DR-114). Initial band / liveness / held-end / recovery readings
+  are separate facts. Held-end free **3,059 MiB** prevents a claim of
+  constant low free memory throughout. R3, not the held video, is the
+  D111 engagement witness. Its GPU estimate/peak margin is N/A on CPU.
+- R3 uses synthetic **8064x6048 RGB16**, both legs processing on CPU;
+  owner-photo evidence stays cited from WP3.6P. R3's device peaks and
+  tree RSS are sampled with the actual cadence above on the shared
+  laptop. Synthetic 5.3K video and cited GUI margin remain the earlier
+  stated limits. No cause for host/load/rate differences is isolated.
+- Held/free equality is still pending the independent section-5 request.
+  Equal MP4 byte lengths are not evidence of decoded identity. Encoded
+  CPU/GPU results, if obtained, are labelled post-encode, preserving the
+  separate 3.5/255 mean characterisation and strict numeric AD-11 readout.
+
+### Checks, verification record and handoff
+
+Read-back assertions and arithmetic: this worktree's ignored
+`work/wp5.2/tmp/readback-turn7.log`, **READBACK ASSERTIONS PASS**. Checked
+the three R2 exit/settings/encoder/state/route records, the D/P runner
+reasons against memory records, and calculated ratios from exact bytes.
+Suspected discrepancies: none confirmed. Missing H/F frame-count keys
+are disclosed, not invented; output probes are part of the seat scripts.
+The held-end residency change is preserved as a limit, not hidden.
+Confirmed outstanding results: held/free identity and CPU/GPU comparison;
+fixed the request structure by making identity independent and writing a
+CPU-failure comparison skip record on W52-3. Rejected false positives:
+none. Product/tool/test fixes or reverts this turn: **0**.
+
+Formal checks (this worktree, logs in `work/wp5.2/tmp/`):
+
+- `turn7-ruff.log`: full `uv run ruff check .`, **All checks passed!**,
+  exit **0**.
+- `turn7-format.log`: full `uv run ruff format --check .`,
+  **311 files already formatted**, exit **0**. Both uv invocations warn
+  that the inherited MAIN-tree VIRTUAL_ENV differs and is ignored in
+  favour of this worktree's project environment.
+- `turn7-audit.log`: **AUDIT PASS**; ledger and staged scripts ASCII and
+  zero CR; both blocks byte-identical to their staged `.sh` files;
+  **8 embedded Python bodies parsed without execution**;
+  `git diff --check` exit **0** (detail `turn7-diff-check.log`).
+- Section-5 script body line ranges, inclusive: held/free **843-955**,
+  W52-3 **988-1284**. Staged files are respectively
+  `work/wp5.2/tmp/turn7-heldfree.sh` (**4,942 B**) and
+  `work/wp5.2/tmp/turn7-w52-3.sh` (**13,054 B**). The seat must still
+  run `bash -n` on these exact files/blocks before either request.
+  No Bash/PowerShell syntax or runtime validation is claimed here.
+
+Only this ledger changes among tracked files. Ignored
+worktree-local script/helper/log files are staging evidence, never commit
+paths. No main-tree write, media-content read, test, GPU/timed leg,
+request execution, mailbox post, git write, dependency, fixture, product,
+tool, test, brief or local-configuration change. No footage-derived media
+or GPS/IMU bytes are copied into a committed file. No N6 recommendation
+or final acceptance claim. YIELD for seat syntax checks, held/free identity
+and the EXCLUSIVE W52-3 window.
