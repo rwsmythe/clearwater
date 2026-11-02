@@ -12,7 +12,7 @@ CODEX lane (`implementer-codex-sol-high`, GPT-6.1 Sol / high; paces at 20:50Z Co
 - Turn 3 (`b6bf22ff`): N6 SET (spec 0.5.8) and Reviewer B's 4 MINOR + 2 ADVISORY folded (ADVISORY-7/8 concern the brief; noted in the ledger). Driver footer 49,258.
 - Accept-side edit by the orchestrator (`d9fcc454`): a paragraph naming the durable copies of the gitignored `work/wp5.6/` inputs, and CHARC's N6 notice cited by mailbox id. No figure changed.
 
-Branch `wp5.6r` was rebased onto `1db84842` before turn 3 (no conflicts; the package files are new).
+Branch `wp5.6r` was rebased onto `1db84842` before turn 3 (no conflicts; the package files are new), and once more onto main `e1ee64ba` (CHARC state only) for the merge. The SHAs above are those on `1db84842`; on main they are: brief `1051e39a`, turn 1 `078704be`, turn 2 `e5932143`, turn 3 `ed3d2999`, accept-side edit `7186fe0a`, then this record. The harness gate was re-run on the rebased head: 382 OK (1 skipped).
 
 ## Nets
 
