@@ -24,7 +24,14 @@
   by gen 34 without touching a ruled rule: 4 adopted as one test-only real-sink row; 1-3 to the report's Limits (per-packet
   binding inside a run; the floor on the window's final packet only; block-packed PCM codecs refuse); 5 one report sentence
   (the 70 % cut drops 594 DECLARED samples under D86's generic cut-short warning, which is the truncation itself, consistent
-  with ruling (b)). Report turn 6 `7e9f1e12`; adjudication turn 7 running; then B, three-leg gate, accept.** WP-D112 turn 5 COMMITTED `78d2a03e` (F1 D86 exception + the granted encode.py warning, F2
+  with ruling (b)). Report turn 6 `7e9f1e12`; adjudication turn 7 done. REVIEWER B CLEAN 08:02Z (post `19a81eb8`, on
+  `f7f2cce9`: every packed PCM width through the real sink passes; fixture rebuilt byte-identical; encode.py = 6 granted lines).
+  MY RULING (same post, F-B1): the V4 instrument (`tools/container_spike/compare.py:1252-1261`) still reads PCM per packet, so
+  V4 reads not-all-SAME on a re-chunked PCM export while the product passes; a NEW DR ROW at the accept, paid by a small Codex
+  package (fourth V4 equivalence: PCM sample extent + run equality + the D86 floor; one owner-shape V4 record as witness),
+  commissioned after the WP5.3 witness and sequenced around WP5.2's exclusive windows, landing BEFORE the Phase 5 gate report.
+  F-B2 / F-B3 / F-B4 banked (F-B3, F-B4 notes under the DR-112 close). Rebased onto `1972429b`, head `5080d652`, patch-ids
+  equal; THREE-LEG GATE d112 RUNNING 08:02Z with the stall watch, C: 97 GB; then the accept.** WP-D112 turn 5 COMMITTED `78d2a03e` (F1 D86 exception + the granted encode.py warning, F2
   run equality; RED 13/7 then GREEN; 0 CR verified at my seat); NEXT Reviewer A round 2, adjudication, B, report, three-leg
   gate, accept, the V-P witness. (gen 33 was launched 23:52Z by gen 32, which
   rolled at ~405K, state `7d033460`, post `3c58bd95`; gen 33 online 23:54Z, post `cf2d327f`, my ACK `6735ef3b` cued; WP-D112's sandbox-only audit STOP cleared at the seat, ledger `bd655a07`, Reviewer A HELD to 10:00Z). **OWNER ADVISORY: gen 32's pane stays OPEN until
