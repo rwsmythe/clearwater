@@ -492,6 +492,48 @@ def test_pcm_audio_trimmed_presentation_survives_the_real_sink(
     assert decoded(output) == source_pcm
 
 
+@pytest.mark.parametrize(
+    "shape",
+    ["trim-380-over-472", "trim-148-over-240", "d86-55", "d86-70", "d86-85"],
+)
+def test_pcm_derivative_v4_through_real_sink(sample: Sample, tmp_path: Path, shape: str) -> None:
+    """V4 accepts faithful real-sink PCM derivatives and records the sample-extent reading."""
+    # Reuse the WP-D112 recipes and their decoded-byte/product-check assertions unchanged.
+    # Like those neighbors, this uses ffmpeg_tools and libx265 without hardware/slow markers.
+    if shape.startswith("trim-"):
+        presented, stored, samples, last_pts, count = {
+            "trim-380-over-472": (380, 472, 72072, 71600, 72),
+            "trim-148-over-240": (148, 240, 71920, 71680, 71),
+        }[shape]
+        test_pcm_audio_trimmed_presentation_survives_the_real_sink(
+            sample, tmp_path, presented, stored, samples, last_pts
+        )
+        source = tmp_path / "trimmed-presentation.mov"
+        counts = (count, count)  # These are already-green presentation controls, not rechunking.
+    else:
+        percent = int(shape.removeprefix("d86-"))
+        samples, dropped, counts = {
+            55: (38814, 1, (39, 39)),
+            70: (49502, 0, (50, 49)),
+            85: (60659, 1, (61, 61)),
+        }[percent]
+        test_truncated_pcm_audio_survives_the_real_sink(sample, tmp_path, percent, samples, dropped)
+        source = tmp_path / f"cut-{percent}.mov"
+    output = tmp_path / "corrected.mp4"
+    before, after = read_packet_table(source), read_packet_table(output)
+    src, out = before.of_type("audio")[0], after.of_type("audio")[0]
+    assert (len(before.audio_pts[src.index]), len(after.audio_pts[out.index])) == counts
+    if shape == "d86-70":
+        assert counts == (50, 49)  # The integration witness really changed packet boundaries.
+    record = vf.fidelity_record(source, output)
+    _assert_v4(record)
+    note = f"PCM: compared by sample extent and timeline runs; packets {counts[0]} -> {counts[1]}"
+    packet = next(i for n, i in _items(record).items() if n.startswith(vf.AUDIO_PACKETS))
+    side = _items(record)["audio priming and packet side data"]
+    assert packet["note"] == note
+    assert note in side["note"] and note in record["summary"]["notes"]
+
+
 def test_vfr_pts_are_exact(sample: Sample, runs: Runs) -> None:
     source = sample("vid-vfr")
     assert probe(source).video.vfr

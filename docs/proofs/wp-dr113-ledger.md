@@ -8,7 +8,7 @@ or committed test change has been made. Reviewer A and Reviewer B have not run.
 Transport: Windows-native Codex cell, PowerShell; dispatcher owns the CLI/model
 invocation record and commits. All evidence below is inside this worktree.
 
-Depth: PENDING DISPATCHER READING (not supplied; not estimated).
+Depth after turn 1: 147,692 tokens (dispatcher reading supplied with turn 2).
 
 | Round | Critical | Major | Minor | In/out envelope | NEW/REOPENED | Reverts | Fixes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -421,3 +421,249 @@ item, not built here (F-B2 remains out).
   uv's inherited VIRTUAL_ENV mismatch warning says it ignores the main-tree
   environment in favor of this worktree's .venv; its hardlink fallback was a
   copy warning, not a reproduction failure. Both reproduction commands exit 0.
+
+## Turn 2: RED
+
+Parent: `8e1d207d` (round 0 committed by the dispatcher). This turn adds tests
+and records their baseline behavior. Instrument/product code is unchanged.
+Incoming depth: 147,692 tokens. Depth after turn 2: PENDING DISPATCHER READING.
+Reviewer A/B have not run; this is a RED rung, not review convergence or a gate.
+
+### Adopted rulings (verbatim from the turn-2 dispatch)
+
+- **R0-1 ADOPTED:** the sample-format-only row and the identical-unknown-width rows are additional REDs (they read SAME today); every other control is baseline-green. The required end state is unchanged: all read DIFFERENT.
+- **R0-2 ADOPTED:** `d86-70` is the integration row that proves re-chunking; the two trimmed-presentation rows are baseline-green controls whose PCM-note assertions are RED; `d86-55` / `d86-85` are RED on the packet item (the source-only floor). Do not claim the trims re-chunk.
+- **R0-3 ADOPTED:** the PCM note lives in `Item.note` (compare) AND reaches `video_fidelity`'s record `notes` for every PCM SAME; `compare.build_record`'s bare record schema is NOT changed; WP4.4's existing note behaviour is NOT changed.
+
+### What was written and what each table plants
+
+The 57 new parametrized nodes are all listed below with their observed results.
+Eight test functions implement round 0's named rows, including its additional
+compressed/mixed/absent controls. No tests were xfailed or skipped. Expected
+outcomes and the note wording are fixed test values, not inferred from the
+product verdict. The existing WP4.4 scaffold gains only `sample_fmt='s16'` so
+that its declared PCM stream has usable format evidence when GREEN is built.
+
+Current helper/consumer locations (these are the turn-2 files' lines):
+
+- `tests/test_container_spike_compare_equivalences.py:273` `_pcm_pair`: common
+  literal packet table builder; `:376` `_pcm_facts`: exact tick/byte conversion
+  into independent Facts; `:403` audio-item selection; `:408` literal note form.
+- Same file `:413` `_pcm_fidelity_reading`: real fidelity_items pipeline with
+  ffprobe stream/packet documents supplied at the file boundary. It stubs only
+  unrelated readable-video-end and mvhd-duration file reads. Real
+  audio_configuration, audio_side_data, `_cut_items`, note collection and roster
+  functions execute. No audio comparator is stubbed.
+- Same file `:455` synthetic positives, `:471` difference controls, `:485`
+  agreement, `:502` compressed/mixed/absent controls.
+- `tests/test_video_fidelity.py:319` D86 positives, `:337` D86 partial controls,
+  `:348` side-data controls.
+- `tests/test_io_video_encode.py:499` ONE new real-sink V4 integration function
+  with five parametrizations. It invokes the existing derivative recipes and
+  their product-check/decoded-byte assertions, then adds the V4 checks. Its
+  module ffmpeg_tools fixture and software libx265 path match its neighbors;
+  no gpu, footage, slow or fullclip marker was added.
+
+| Table / plant | Original source mechanic and base file:line | Test-side reproduction / expected outcome |
+| --- | --- | --- |
+| img6731-coalesced | `tests/test_io_video_encode_units.py:837-848` | Source durations `(1024*70,508,1024*23,736,1024*4,148)`, final stored 240; output `(1024*70,508,1024*27,884)`, final stored 976. 100 -> 99; totals 100720 presented / 100812 stored. SAME plus PCM note. |
+| img6729-moved-boundary | `tests/test_io_video_encode_units.py:851-879` | Original 133-packet literal sequences retained; second 736-sample boundary moves by 1024 samples; final presentation/storage 291/305. Totals 134400/134414. SAME plus PCM note. |
+| gapful-rechunked | `tests/test_io_video_encode_units.py:1137-1143` | Source durations 1024/508/1024 at 0/1024/2048; output 1532/512/512 at 0/2048/2560. Same runs [0,1532], [2048,3072]. SAME plus PCM note. |
+| d86-55/70/85 | `tests/test_io_video_encode_units.py:1045-1058`, exercised at `:1061-1068` | Import `_truncated_pcm_pair`: source payload tails 909/860/647, strict output totals 38814/49502/60659 samples; 39/39, 50/49, 61/61 packets. SAME after SOURCE-only cap/final-frame floor, plus PCM note. |
+| one-sample-fewer | `tests/test_io_video_encode_units.py:887-890` | Seven 1024-sample packets become six plus 1023 in output, both extent totals reduced. DIFFERENT. |
+| presented-only | `tests/test_io_video_encode_units.py:893-900` | Last output declares 1023, still stores 1024. DIFFERENT. |
+| stored-only | `tests/test_io_video_encode_units.py:903-910` | Last output stores 1023, still presents 1024. DIFFERENT. |
+| rate / format | `tests/test_io_video_encode_units.py:913-925` | Output-only sample_rate 44100 or sample_fmt s32; packet table unchanged. DIFFERENT. |
+| channels / time-base | `tests/test_io_video_encode_units.py:963-975` | Output-only channels 2 or time_base 1/96000. DIFFERENT. |
+| codec-aac | Existing real PCM reencode control `tests/test_io_video_encode.py:325-331`; new synthetic mutation at `_pcm_pair` | Output-only codec_name aac with otherwise identical evidence. DIFFERENT via audio format/presence. |
+| one-tick-shift | New synthetic mutation at `_pcm_pair` | Shift ONLY the fourth output packet's pts by one source tick; preserve both totals and first pts. DIFFERENT. |
+| swapped-packets | New synthetic mutation at `_pcm_pair` | Swap output packet 2/3 pts in file order; preserve count, totals and first pts. DIFFERENT. |
+| closed-gap / opened-gap | `tests/test_io_video_encode_units.py:1113-1134` | Reproduce its 72-packet run mutations: close a 1024-tick source gap after packet 30, or retain a 512-tick gap after 10 and add a 1024-tick gap after 30. DIFFERENT. |
+| earlier-source-partial / output-partial | `tests/test_io_video_encode_units.py:1088-1098` | Use d86-70, plant first source payload 2047 or last output payload 1803. DIFFERENT; neither floor is permitted. |
+| unknown-alaw/mulaw/bluray/dvd/lxf/s24daud/sga/vidc/unlisted | New synthetic mutations at `_pcm_pair`, named refused set from brief | BOTH streams use the same unknown-width codec and identical packet rows. DIFFERENT despite equality, with codec named in the failure note. |
+| discard / side-data | New ffprobe-document plants in `_pcm_fidelity_reading`; real `video_fidelity.audio_side_data` consumes them | Identical valid PCM packet tables, output packet 2 gains discard flag KD or Skip Samples side data with skip_samples 1. Packet item SAME, side-data item DIFFERENT under fallback. |
+| compressed-intact/rechunked/mixed/absent | New literal Facts in `test_pcm_compressed_and_absent_paths_unchanged` | AAC exact rows SAME; merged AAC packets DIFFERENT; changed AAC payload hash alongside unchanged PCM DIFFERENT; absent audio retains absent/absent SAME and empty note. Compressed source/output summaries and first-difference notes are checked too. |
+| trim-380-over-472 / trim-148-over-240 | `tests/test_io_video_encode.py:410-492` (unchanged original function) | Reuse setts and optional atrim/asetnsamples derivative; actual counts 72/72 and 71/71. Product/decoded-byte/V4 controls pass today; new PCM-note assertion fails. |
+| integration d86-55/70/85 | `tests/test_io_video_encode.py:337-402` (unchanged original function) | Faststart committed fixture, byte-prefix cuts at test time, real sink and decoded bytes assertions. Independently assert actual packet counts 39/39, 50/49, 61/61 before V4; d86-70 explicitly proves re-chunking. V4 must be all MANDATORY+REQUIRED/roster SAME with PCM notes. |
+
+All imports of `test_io_video_encode_units` and product PacketTable/checking
+helpers are in TESTS only. `_pcm_check` (`tests/test_io_video_encode_units.py:803`)
+reaches the real `verify.check_output` (`:818`), with only unrelated file-box
+checking stubbed. Each agreement row asserts the product's hand-specified
+expected verdict, instrument SAME <-> product pass, and the instrument's expected
+verdict. The instrument runs its own compare_facts and its own `_cut_items`
+when cut. `tools/` imports and implementations were not edited.
+
+### Commands and observed results
+
+PowerShell setup for EVERY pytest command below:
+
+```powershell
+$env:PYTHONPATH='scripts'
+$env:PYTEST_ADDOPTS=$null
+```
+
+The first new-node command (all 57 new nodes, once):
+
+```text
+uv run pytest -vv --tb=short tests/test_container_spike_compare_equivalences.py::test_pcm_sample_extent_equivalence tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product tests/test_container_spike_compare_equivalences.py::test_pcm_compressed_and_absent_paths_unchanged tests/test_video_fidelity.py::test_pcm_d86_sample_extent_equivalence tests/test_video_fidelity.py::test_pcm_d86_difference_control tests/test_video_fidelity.py::test_pcm_side_data_control tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink --basetemp=work/wp-dr113/tmp/t2 -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp-dr113/t2/red.xml > work/wp-dr113/t2/red.log 2>&1
+```
+
+Initial output: **32 failed, 25 passed** (exit 1). Seven failures were UNRELATED
+synthetic setup failures, not legitimate RED evidence: `movie_duration_item`
+called `movie_duration` (`tools/video_fidelity.py:1037`, `:581`), which tried to
+open synthetic source.mov. Reproduced in all seven fidelity-module new nodes;
+the real-sink rows did not have the problem. After tracing that file-read
+boundary, added one stub for the unrelated mvhd duration read (1/2 second).
+The existing real audio reading, cut helper and side-data reader stay real.
+
+Only those seven affected nodes were rerun, as the dispatch requires for an
+unrelated failure. A fresh basetemp preserves the first run's integration media:
+
+```text
+uv run pytest -vv --tb=short tests/test_video_fidelity.py::test_pcm_d86_sample_extent_equivalence tests/test_video_fidelity.py::test_pcm_d86_difference_control tests/test_video_fidelity.py::test_pcm_side_data_control --basetemp=work/wp-dr113/tmp/t2-setupfixed -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp-dr113/t2/red-setupfixed.xml > work/wp-dr113/t2/red-setupfixed.log 2>&1
+```
+
+Corrected output: **3 failed, 4 passed** (exit 1). Every failure is now the
+intended packet-item DIFFERENT-versus-SAME assertion. The earlier-source partial,
+output partial, discard flag and planted side-data controls all pass. The
+corrected seven outcomes supersede their seven initial setup failures below.
+No other new node was rerun.
+
+Combined, valid new-node evidence is **28 RED / 29 baseline GREEN**, 57 unique
+nodes. There are no unresolved import, fixture, typo, file-read or setup errors.
+The first run's other failures are the intended per-packet refusals, ignored
+sample_fmt/unknown-width refusals, product/instrument disagreement or empty PCM
+notes. The product verdict assertion succeeded for all 17 agreement rows before
+the instrument assertion. The five integration recipes passed all their old
+product/decoded-byte assertions before the newly added V4/note assertions.
+
+Existing light regression command (new functions deselected to honor the
+new-node-once requirement; marker exclusions honor the cell's prohibition on
+gpu/footage/slow/fullclip runs):
+
+```text
+uv run pytest -q tests/test_container_spike_compare_equivalences.py tests/test_video_fidelity.py tests/test_io_video_encode.py -k "pcm or audio or equival" -m "not gpu and not footage and not slow and not fullclip" --deselect tests/test_container_spike_compare_equivalences.py::test_pcm_sample_extent_equivalence --deselect tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control --deselect tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product --deselect tests/test_container_spike_compare_equivalences.py::test_pcm_compressed_and_absent_paths_unchanged --deselect tests/test_video_fidelity.py::test_pcm_d86_sample_extent_equivalence --deselect tests/test_video_fidelity.py::test_pcm_d86_difference_control --deselect tests/test_video_fidelity.py::test_pcm_side_data_control --deselect tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink --basetemp=work/wp-dr113/tmp/t2-light -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp-dr113/t2/light.xml > work/wp-dr113/t2/light.log 2>&1
+```
+
+Result: **56 passed, 187 deselected** (exit 0). The JUnit node sets prove zero
+overlap with the new-node set. No existing selected light test broke. This is
+the authorized light evidence, not a full suite or hardware gate.
+
+### Per-node results before GREEN
+
+| Node ID | Before GREEN | Observed reason |
+| --- | --- | --- |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_sample_extent_equivalence[img6731-coalesced]` | RED | P: old packet rows DIFFERENT for faithful re-chunking |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_sample_extent_equivalence[img6729-moved-boundary]` | RED | P: old packet rows DIFFERENT for faithful re-chunking |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_sample_extent_equivalence[gapful-rechunked]` | RED | P: old packet rows DIFFERENT for faithful re-chunking |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[one-sample-fewer]` | GREEN | C: planted format/extent/timeline difference caught |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[presented-only]` | GREEN | C: planted format/extent/timeline difference caught |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[stored-only]` | GREEN | C: planted format/extent/timeline difference caught |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[rate]` | GREEN | C: planted format/extent/timeline difference caught |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[format]` | RED | F: old audio items both SAME for changed sample_fmt |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[channels]` | GREEN | C: planted format/extent/timeline difference caught |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[codec-aac]` | GREEN | C: planted format/extent/timeline difference caught |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[time-base]` | GREEN | C: planted format/extent/timeline difference caught |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[one-tick-shift]` | GREEN | C: planted format/extent/timeline difference caught |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[swapped-packets]` | GREEN | C: planted format/extent/timeline difference caught |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[closed-gap]` | GREEN | C: planted format/extent/timeline difference caught |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[opened-gap]` | GREEN | C: planted format/extent/timeline difference caught |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-alaw]` | RED | U: old audio items both SAME for identical unknown-width PCM |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-mulaw]` | RED | U: old audio items both SAME for identical unknown-width PCM |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-bluray]` | RED | U: old audio items both SAME for identical unknown-width PCM |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-dvd]` | RED | U: old audio items both SAME for identical unknown-width PCM |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-lxf]` | RED | U: old audio items both SAME for identical unknown-width PCM |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-s24daud]` | RED | U: old audio items both SAME for identical unknown-width PCM |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-sga]` | RED | U: old audio items both SAME for identical unknown-width PCM |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-vidc]` | RED | U: old audio items both SAME for identical unknown-width PCM |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[unknown-unlisted]` | RED | U: old audio items both SAME for identical unknown-width PCM |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[img6731-coalesced]` | RED | A+: product PASS, old instrument DIFFERENT |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[img6729-moved-boundary]` | RED | A+: product PASS, old instrument DIFFERENT |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[gapful-rechunked]` | RED | A+: product PASS, old instrument DIFFERENT |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[d86-55]` | RED | A+: product PASS, old instrument DIFFERENT |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[d86-70]` | RED | A+: product PASS, old instrument DIFFERENT |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[d86-85]` | RED | A+: product PASS, old instrument DIFFERENT |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[one-sample-fewer]` | GREEN | A=: product REFUSES and instrument DIFFERENT, expected refusal asserted |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[presented-only]` | GREEN | A=: product REFUSES and instrument DIFFERENT, expected refusal asserted |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[stored-only]` | GREEN | A=: product REFUSES and instrument DIFFERENT, expected refusal asserted |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[rate]` | GREEN | A=: product REFUSES and instrument DIFFERENT, expected refusal asserted |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[format]` | RED | A-: product REFUSES sample_fmt change, old instrument SAME |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[channels]` | GREEN | A=: product REFUSES and instrument DIFFERENT, expected refusal asserted |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[time-base]` | GREEN | A=: product REFUSES and instrument DIFFERENT, expected refusal asserted |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[closed-gap]` | GREEN | A=: product REFUSES and instrument DIFFERENT, expected refusal asserted |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[opened-gap]` | GREEN | A=: product REFUSES and instrument DIFFERENT, expected refusal asserted |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[earlier-source-partial]` | GREEN | A=: product REFUSES and instrument DIFFERENT, expected refusal asserted |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[output-partial]` | GREEN | A=: product REFUSES and instrument DIFFERENT, expected refusal asserted |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_compressed_and_absent_paths_unchanged[compressed-intact]` | GREEN | B: compressed strict rows/notes or absent-audio item preserved |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_compressed_and_absent_paths_unchanged[compressed-rechunked]` | GREEN | B: compressed strict rows/notes or absent-audio item preserved |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_compressed_and_absent_paths_unchanged[mixed]` | GREEN | B: compressed strict rows/notes or absent-audio item preserved |
+| `tests/test_container_spike_compare_equivalences.py::test_pcm_compressed_and_absent_paths_unchanged[absent]` | GREEN | B: compressed strict rows/notes or absent-audio item preserved |
+| `tests/test_video_fidelity.py::test_pcm_d86_sample_extent_equivalence[d86-55]` | RED | D: old cut packet item DIFFERENT for faithful normalized tail |
+| `tests/test_video_fidelity.py::test_pcm_d86_sample_extent_equivalence[d86-70]` | RED | D: old cut packet item DIFFERENT for faithful normalized tail |
+| `tests/test_video_fidelity.py::test_pcm_d86_sample_extent_equivalence[d86-85]` | RED | D: old cut packet item DIFFERENT for faithful normalized tail |
+| `tests/test_video_fidelity.py::test_pcm_d86_difference_control[earlier-source-partial]` | GREEN | Q: earlier-source/output partial frame remains DIFFERENT |
+| `tests/test_video_fidelity.py::test_pcm_d86_difference_control[output-partial]` | GREEN | Q: earlier-source/output partial frame remains DIFFERENT |
+| `tests/test_video_fidelity.py::test_pcm_side_data_control[discard]` | GREEN | S: packet item SAME, planted priming/side-data item DIFFERENT |
+| `tests/test_video_fidelity.py::test_pcm_side_data_control[side-data]` | GREEN | S: packet item SAME, planted priming/side-data item DIFFERENT |
+| `tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink[trim-380-over-472]` | RED | N: V4 already passes; required PCM Item.note is empty |
+| `tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink[trim-148-over-240]` | RED | N: V4 already passes; required PCM Item.note is empty |
+| `tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink[d86-55]` | RED | I: real sink PASS/decoded bytes equal; V4 packet item DIFFERENT |
+| `tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink[d86-70]` | RED | I70: real sink PASS/decoded bytes equal; BOTH V4 audio items DIFFERENT |
+| `tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink[d86-85]` | RED | I: real sink PASS/decoded bytes equal; V4 packet item DIFFERENT |
+
+### Checks, verification loop and fresh-session handoff
+
+`uv run ruff format` initially formatted the new compare tests; after all edits,
+the required targeted checks are:
+
+```text
+uv run ruff check tests/test_container_spike_compare_equivalences.py tests/test_video_fidelity.py tests/test_io_video_encode.py > work/wp-dr113/t2/ruff-final.log 2>&1
+uv run ruff format --check tests/test_container_spike_compare_equivalences.py tests/test_video_fidelity.py tests/test_io_video_encode.py > work/wp-dr113/t2/format-final.log 2>&1
+uv run python work/wp-dr113/t2/report_results.py > work/wp-dr113/t2/results-summary.log 2>&1
+git diff --check
+```
+
+The results-summary script merges the actual JUnit outcomes, rejects any remaining
+non-AssertionError RED, asserts 57 unique new nodes / 28 RED / 29 GREEN, checks
+56 distinct passing old nodes, and validates ASCII plus CR=0 on all four submitted
+files. Ruff check/format final results and scope are recorded at the turn's final
+verification below. The formatter preserved CRLF in the working test files;
+normalization converted only those three owned test files to LF without changing
+their logical contents. No behavior-changing edit followed the test evidence.
+
+Verification-loop record:
+
+- Expected packet-boundary REDs: CONFIRMED on three whole-source shapes, three
+  synthetic D86 shapes and three real D86 derivatives.
+- Adopted extra REDs: CONFIRMED sample_fmt-only plus nine identical unknown-width
+  codecs. Unknown codec-name notes remain required assertions for GREEN.
+- Product agreement: CONFIRMED all 17 product verdicts match expected outcomes;
+  six faithful pairs and the sample_fmt control currently disagree with V4.
+- Trimmed derivatives: CONFIRMED both remain baseline-green V4 controls; new
+  PCM-note assertions fail. No claim that either trim re-chunks.
+- Unrelated synthetic file-read failure: CONFIRMED mvhd read, FIXED in test setup;
+  bounded rerun confirms all seven now have intended outcomes. No remaining
+  unrelated test failure is counted as RED.
+- Strict compressed, mixed/absent and all other controls: CONFIRMED 29 new
+  baseline-green controls; existing selected light tests also pass.
+- Scope: only the three owned test files and this ledger changed. No tools/src,
+  dependency, fixture-media, register, local-config, frozen-interface or mailbox
+  change. No owner-media or other-worktree read, and no heavy/marked node run.
+
+Next rung belongs to a fresh GREEN session if the dispatcher re-seats this cell.
+Use round 0's independent width table and note/roster locks, the adopted rulings
+above, and THESE executable RED rows. Do not import product audio verification
+into tools. Preserve the compressed/audio-side fallback and other item behavior.
+Keep the sample CONTENT limitation explicit in the later report (decoded-sample
+MD5 remains outside this commission). Reviewer A/B, full gate, report and owner
+PCM witness remain outstanding at their commissioned rungs/seats.
+
+Final verification: targeted ruff check exits 0, `All checks passed!`
+(`work/wp-dr113/t2/ruff-final.log`); targeted format --check exits 0,
+`3 files already formatted` (`format-final.log`). The results-summary validates
+all four files as ASCII with CR=0, 57 unique new nodes with valid outcomes, and
+56 distinct passing existing nodes (`results-summary.log`). `git diff --check`
+is clean; `git status --short` names exactly these three tests and this ledger.
+This turn is one logical RED-test change; no implementation or completion of
+the overall package is claimed. No STOP/dispute remains for this rung.

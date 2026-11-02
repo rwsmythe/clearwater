@@ -18,6 +18,7 @@ from typing import Any
 
 import pytest
 
+import test_container_spike_compare_equivalences as pcm_cases
 import video_fidelity as vf
 from clearwater.interfaces.video import SinkReport
 from clearwater.io.video import FFmpegVideoSink, VideoEncodeError, nut, probe
@@ -312,3 +313,45 @@ def _probe_like(color: Any) -> Any:
         "hevc", 16, 16, 8, "yuvj420p", "left", color, Fraction(30), Fraction(1, 30), 1, 0, False
     )
     return ProbeResult(Path("s"), "mp4", Fraction(1), Fraction(0), video, (), (), (), (), None)
+
+
+@pytest.mark.parametrize("shape", pcm_cases._PCM_D86)
+def test_pcm_d86_sample_extent_equivalence(shape: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """D86 normalizes only the readable source tail and discloses both PCM readings."""
+    before, after, end = pcm_cases._pcm_pair(shape)
+    source, output = pcm_cases._pcm_facts(before), pcm_cases._pcm_facts(after, output=True)
+    assert end is not None
+    items, notes = pcm_cases._pcm_fidelity_reading(monkeypatch, source, output, end)
+    packet = next(i for i in items if i.name.startswith(vf.AUDIO_PACKETS))
+    side = next(i for i in items if i.name == "audio priming and packet side data")
+    note = pcm_cases._pcm_note(*pcm_cases._PCM_COUNTS[shape])
+    assert (packet.item_class, packet.status) == (compare.MANDATORY, compare.SAME)
+    assert packet.note == note
+    assert (side.item_class, side.status) == (compare.MANDATORY, compare.SAME)
+    assert note in side.note and note in notes
+    assert any(n.startswith("D86:") for n in notes)
+    assert items[-1].name == vf._ROSTER_ITEM and items[-1].status == compare.SAME
+
+
+@pytest.mark.parametrize("shape", ["earlier-source-partial", "output-partial"])
+def test_pcm_d86_difference_control(shape: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The final-source floor cannot excuse an earlier source or any output partial frame."""
+    before, after, end = pcm_cases._pcm_pair(shape)
+    source, output = pcm_cases._pcm_facts(before), pcm_cases._pcm_facts(after, output=True)
+    assert end is not None
+    items, _ = pcm_cases._pcm_fidelity_reading(monkeypatch, source, output, end)
+    packet = next(i for i in items if i.name.startswith(vf.AUDIO_PACKETS))
+    assert (packet.item_class, packet.status) == (compare.MANDATORY, compare.DIFFERENT)
+
+
+@pytest.mark.parametrize("change", ["discard", "side-data"])
+def test_pcm_side_data_control(change: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A planted PCM discard flag or skip-samples payload must reach the per-packet rule."""
+    table, _, _ = pcm_cases._pcm_pair("one-sample-fewer")
+    source, output = pcm_cases._pcm_facts(table), pcm_cases._pcm_facts(table, output=True)
+    items, _ = pcm_cases._pcm_fidelity_reading(monkeypatch, source, output, side_change=change)
+    packet = next(i for i in items if i.name.startswith(vf.AUDIO_PACKETS))
+    side = next(i for i in items if i.name == "audio priming and packet side data")
+    assert packet.status == compare.SAME  # Packet payload/timing is deliberately unchanged.
+    assert (side.item_class, side.status) == (compare.MANDATORY, compare.DIFFERENT)
+    assert "PCM: compared by sample extent" not in side.note
