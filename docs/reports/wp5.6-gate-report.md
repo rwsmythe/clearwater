@@ -35,6 +35,14 @@ folded in turn 3 (record `work/wp5.6/review-B.txt`).
 The brief replaces Reviewer A
 with the trace table and that fact-check for this deterministic documentation arc.
 
+**Where the `work/wp5.6/` inputs live (added by the orchestrator at the
+accept).** Paths of the form `work/wp5.6/...` below name the inputs the
+orchestrator placed in the report's worktree, which is gitignored. Their
+durable copies are in `C:\Users\rwsmy\clearwater-review-evidence\wp5.6\`:
+`gate\` (every p5b leg file and the junit XMLs, with `md5sums.txt`),
+`B\review.txt`, `prune-inventory.txt` and `charc-n6-ruled.txt` (with
+`md5sums.txt`). The line numbers cited below are the same in those copies.
+
 ## Result 1 - Phase-end gate
 
 **Verdict: GREEN - static, collection identity, parallel, serial, fullclip and harness checks exited 0; no failing node.**
@@ -325,7 +333,8 @@ decision request `15f100ae`, verbatim: **"Concur with 12"**. The ruling
 is recorded on main **`1db84842`** in **spec v0.5.8**: D106 (line 145),
 N6 section 10.2 (line 455) and V16 section 11 (line 498); AD-21 is
 **CLOSED-SET** (`docs/decisions.md:30`). CHARC's ruling notice is
-`work/wp5.6/charc-n6-ruled.txt`, lines 14-20.
+mailbox message `c12ad8eaf96abf16` (2026-11-02T22:15:01Z; copy
+`work/wp5.6/charc-n6-ruled.txt`, lines 14-20).
 
 > Export takes at most about 12 minutes of processing per minute of 4K
 > footage on the owner's laptop, end to end including decode and encode,
