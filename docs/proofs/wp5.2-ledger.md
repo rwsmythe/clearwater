@@ -2431,3 +2431,259 @@ tool, test, brief or local-configuration change. No footage-derived media
 or GPS/IMU bytes are copied into a committed file. No N6 recommendation
 or final acceptance claim. YIELD for seat syntax checks, held/free identity
 and the EXCLUSIVE W52-3 window.
+
+## Session 4 / Turn 8: W52-3 read-back
+
+Resumed session 4, turn 7 committed at `b05e2f66`; prior depth **98,174**,
+dispatcher-supplied. Current depth (session 4 / turn 8, at yield, codex_cell footer): **143,083**.
+Status: **W52-3 receipts and records agree with the supplied seat facts;
+no STOP.** The forced-CPU export completed on the unchanged NVENC encoder.
+The post-encode characterisation passes; strict numeric AD-11 bounds are
+not met through the encoder and pre-encode AD-11 is not proved by this leg.
+The independent held/free decoded identity is now confirmed.
+
+### Evidence scope, receipt paths and provenance
+
+This turn's read-only grant covers W52-3 and the earlier W52-1/W52-2/photo
+folders and hang text named by the dispatcher. No MP4/PNG content was opened
+or decoded by the cell; only sizes were read. No writes to MAIN work.
+Alias **S** =
+`C:/Users/rwsmy/clearwater/work/wp5.2/W52-3/attempt-20261102T175410Z-1752/`.
+Alias **C3** = `S/W52-3-r2-cpu.json`; **Q3** = `S/W52-3-compare.json`;
+**T3** = `S/W52-3-progress.csv`. Alias **A** retains turn 7's exact
+`wp5.2/W52-2/attempt-20261102T150359Z-1621/` path.
+
+The orchestrator attests W52-3 ran from this worktree at `b05e2f66`,
+**2026-11-02 17:54:10Z -> 19:44:14Z**, by the saved
+`work/wp5.2/scripts/W52-3.sh`, byte-identical to section 5. Script identity
+and those window times are seat provenance; that scripts folder was not
+opened. All seven exit receipts below were read, not assumed from script exit.
+
+| Receipt / key path under S | Read-back |
+|---|---|
+| `W52-3-setup.exit` | 0 |
+| `W52-3-disk.exit` | 0 |
+| `W52-3-input.exit` | 0 |
+| `W52-3-poll.exit` | 0 |
+| `W52-3-r2-cpu.exit` | 0 |
+| `W52-3-compare.exit` | 0 |
+| `W52-3-script.exit` | 0 |
+| `W52-3-disk.log` | `disk_free_bytes 83185930240 required 30000000000` |
+| `W52-3-input.log` | `W52-2-GX011627-whole.mp4 bytes 158459032 read in place; no copy` |
+| `W52-3-poll.log` | `poll stopped 2026-11-02T19:43:56.520737+00:00` |
+| `W52-3-poll.stop` | Present, 0 B (stop-file metadata only) |
+
+### CPU-route completion, frame provenance and rate (W52-3)
+
+C3: `schema=1`, `tool=headless_export`, `method=c3`,
+`parameters_from=defaults`; `settings.force_cpu=true`,
+`settings.video_encoder=auto`, `settings.quality_level=standard`,
+`settings.cache_limit_bytes=20000000000`. `cancelled=false`;
+`counts["done with warnings"]=1`, all other counts 0. One video item:
+`items[0].source=W52-2-GX011627-whole.mp4`,
+`items[0].device="CPU: forced"`, `items[0].state="done with warnings"`,
+`items[0].failure=null`, `items[0].video={device_backend:null,
+frame_device:"cpu",encoder:"hevc_nvenc",decode_passes:2}`.
+The two warnings are the same creation-date/time and camera-firmware-tag
+not-carried warnings as the free/held exports, not processing failures.
+`items[0].outputs[0]=W52-2-GX011627-whole_corrected.mp4`;
+its size-only reading under `S/out/` is **85,943,474 B**.
+
+Wall keys: C3 `items[0].elapsed_s=6585.155311800001`, batch
+`elapsed_s=6585.15916570001`. The log's shell `real=109m44.814s`
+is a distinct clock/scope and is not used to calculate the rate.
+C3 has **no frame-count/frame-rate field**. Source-copy receipt
+`A/W52-2-copy.log` records **681 frames**, **30000/1001 fps**;
+the successfully executed comparison's `compare_videos` requires both
+outputs' probed `nb_frames=681`, bit depth 8 and matching dimensions/rate
+before it decodes. Q3 records **30** successfully compared frames.
+Thus the output count is attested by the executed probe guard, not
+invented as a C3 key; the decoded sample covers the first 30, not all 681.
+
+Calculated **CPU-route RATE, not a target** (D106 definition):
+`items[0].elapsed_s / 681` = **9.669831589 s/frame**;
+`items[0].elapsed_s / 681 * (30000/1001)` =
+**289.805142514 min/min**. Source duration from those receipts is
+**22.7227 s**. Batch time would include an additional wrapper interval;
+the displayed rate consistently uses the item wall. CPU processing did
+not change the encoder: this successful CPU-route rate still uses NVENC.
+
+### Progress CSV: observations, not a cause attribution
+
+T3 contains **110 rows**, **107** with encoder counters and **3** initial
+rows with those fields empty; all populated encoder PIDs are **1436**.
+First row: `utc=2026-11-02T17:54:11.899767+00:00`, partial/encoder fields
+empty, GPU used/SM/memory/temperature = **0 MiB / 1980 MHz / 8001 MHz /
+60.82 C**. Last row: `utc=2026-11-02T19:43:09.452270+00:00`,
+`partial_bytes=80216116`, `encoder_pid=1436`,
+`encoder_cpu_s=41.796875`, `encoder_read_bytes=16828871544`, GPU
+**472 MiB / 210 MHz / 405 MHz / 61.16 C**.
+
+Selected trajectory from all parsed rows (first populated, approximately
+quarter/half/three-quarter, last populated), keys exactly as T3:
+
+| utc | partial_bytes | encoder_cpu_s | encoder_read_bytes | GPU used MiB / SM MHz / memory MHz / C |
+|---|---|---|---|---|
+| 2026-11-02T17:57:11.910856+00:00 | 52 | 0.734375 | 85812422 | 472 / 210 / 405 / 63.03 |
+| 2026-11-02T18:23:09.444740+00:00 | 18874420 | 12.546875 | 3872650888 | 472 / 210 / 405 / 64.11 |
+| 2026-11-02T18:50:09.444465+00:00 | 41156660 | 22.921875 | 8183118542 | 472 / 210 / 405 / 64.72 |
+| 2026-11-02T19:17:09.454888+00:00 | 62128180 | 31.5 | 12568334190 | 472 / 210 / 405 / 60.79 |
+| 2026-11-02T19:43:09.452270+00:00 | 80216116 | 41.796875 | 16828871544 | 472 / 210 / 405 / 61.16 |
+
+Both populated cumulative CPU and read-byte series are nondecreasing.
+The last three sampled partial sizes are unchanged while encoder reads
+and CPU seconds still rise; partial-file size alone would not establish
+a stall. The progress poll is nominally 60 s, with missing readings empty;
+it is not an automatic product watchdog or a continuous trace.
+
+For comparison, W52-2's granted hang snapshot at
+`C:/Users/rwsmy/clearwater/work/orch-g35/w52-2-cpu-hang.txt` recorded encoder
+pid **42972**, main-thread CPU **2109.9 s** (about **2,110 s**), versus
+W52-3's last sampled **41.796875 s** for the whole encoder process.
+These scopes differ (thread versus process). The former snapshot's
+`(KernelModeTime+UserModeTime)/1e7` is **2150.796875 process CPU s**.
+The figures and successful W52-3 completion distinguish the two runs;
+they do not establish why W52-2 hung. The W52-2 failure remains DR-115;
+it was not reproduced by this single retry, so the observed problem is
+intermittent, not fixed or disproved. No encoder-stall detection was added.
+
+### Comparison records in full
+
+Q3 (`S/W52-3-compare.json`), entire JSON, parsed directly:
+
+```json
+{
+  "window": "W52-3",
+  "baseline_window": "W52-2",
+  "requested_frames": 30,
+  "frames": 30,
+  "cpu_gpu": {
+    "frames": 30,
+    "max_abs_255": 85.0,
+    "mean_abs_255": 3.3288222133809158,
+    "max_abs_unit": 0.3333333333333333,
+    "mean_abs_unit": 0.013054204758356532,
+    "identical": false,
+    "ad11_numeric_max_limit": 0.002,
+    "ad11_numeric_mean_limit": 0.0002,
+    "ad11_numeric_bounds_met": false,
+    "preencode_ad11_proved": false,
+    "comparison": "post-encode free vs forced CPU",
+    "postencode_mean_limit_255": 3.5,
+    "postencode_characterisation_passes": true
+  },
+  "export_exits": {
+    "free": 0,
+    "cpu": 0
+  },
+  "timeout_observed": false,
+  "failed_legs": [],
+  "passes": true,
+  "skipped": false
+}
+```
+
+This is **post-encode free vs forced CPU**. Allowed post-encode
+characterisation **mean 3.3288222133809158/255 <= 3.5/255** passes.
+Max **85/255**, mean **0.013054204758356532** unit and max **1/3** unit
+do not meet the literal numeric AD-11 max **0.002** / mean **0.0002**;
+`preencode_ad11_proved=false`. It is not a pre-encode equivalence claim.
+There was no timeout (`timeout_observed=false`), no failed leg, no skip.
+
+Independent identity JSON, entire record,
+`A/W52-2-r2-held-free.json`:
+
+```json
+{
+  "frames": 30,
+  "max_abs_255": 0.0,
+  "mean_abs_255": 0.0,
+  "max_abs_unit": 0.0,
+  "mean_abs_unit": 0.0,
+  "identical": true,
+  "window": "W52-2",
+  "comparison": "post-encode held vs free GPU",
+  "skipped": false,
+  "passes": true
+}
+```
+
+Its adjacent `W52-2-r2-held-free.log` prints the same result. The
+orchestrator attests script exit **0** and byte-identity to section 5.
+Both GPU outputs' **first 30 decoded frames** match byte for byte;
+this is not a claim that every encoded byte or every full-clip frame was
+compared. The check completed independently of the earlier failed CPU leg.
+
+### Orchestrator seat conditions (W52-3, separate provenance)
+
+Open **17:54Z**: C: **79 GB** free; GPU **1,980 / 8,001 MHz** boost state,
+**0%** utilisation, **60 C**, **7,948 MiB** free / **0 MiB** used;
+available RAM **12.5 GB**, CPU **28%** at the sample. Close **19:45Z**:
+C: **63 GB**; GPU **1,800 / 7,001 MHz**, **60 C**, **7,948 MiB** free /
+**0 MiB** used; available RAM **14.5 GB**; no export or ffmpeg process
+left. Strays as W52-2: Brave, Battle.net, PianoMarvel, OktaVerify, the
+Claude sessions. The orchestrator reports about **16 GB** consumed
+elsewhere on the host during this window, with all `work/wp5.2` about
+**1.3 GB**; this is an unexplained host event, not attributed to these
+package paths. The cell inspected no outside-grant files to infer a cause.
+
+### Verification record and limits carried forward
+
+This worktree's `work/wp5.2/tmp/turn8-readback.log` records
+**READBACK ASSERTIONS PASS**: seven zero receipts, route/encoder/state,
+comparison semantics, held/free identity and rate arithmetic. W52-1's
+record was re-read read-only; SHA256 remains
+`e93f060399e73bb7416cce4f045557b8c0b0cb8be053686036b2d4f4a12c0495`.
+The report preserves job/pool/admission estimate distinctions, sampling,
+F13/F14, WDDM, the W52-2 hang and separate rate/condition provenance.
+Suspected record contradictions: **0**; confirmed/fixed product defects:
+**0**; false-positive rejections and reverts this turn: **0**. Earlier
+missing results are now resolved to sampled held/free identity and a
+passing post-encode characterisation, with pre-encode AD-11 still unproved
+by this leg. No new acceptance bound or recommendation was introduced.
+
+## Session 4 / Turn 8: report
+
+Wrote `docs/reports/wp5.2-performance-memory.md`, T5 sections (1)-(8):
+the unchanged WP3.21-column-set V16 pair table; N6 facts with cited GUI
+margin and no recommendation; V15 video/current synthetic/owner-cited
+photo rows; actual D111 capacity reason, WDDM held/free and first-30
+identity, W52-3 post-encode characterisation with strict AD-11 misses
+preserved; per-row job/pool/admission ratios with scope distinctions;
+sampling/F13/F14/strays/window/disk/hang/input limits; both DR-70 share
+keys; ledger pointer and pending seat B/gate placeholders.
+
+Every numeric claim identifies its window/record alias or the cited
+prior-package record/ledger section. No current figure is attributed to
+a missing runner frame counter. The CPU rate uses the recorded item
+wall and the receipt/probe-guard 681-frame basis, not failed W52-2 wall.
+No owner decision, spec change, debt closure, product tuning or acceptance
+verdict is made. Depth: **143,083** (session 4 / turn 8, at yield).
+
+Formal checks (this worktree's `work/wp5.2/tmp/`):
+
+- `turn8-ruff.log`: full `uv run ruff check .`, **All checks passed!**,
+  exit **0**.
+- `turn8-format.log`: full `uv run ruff format --check .`,
+  **311 files already formatted**, exit **0**. Both uv calls warn that
+  inherited MAIN-tree VIRTUAL_ENV is ignored for the project environment.
+- `turn8-audit.log`: **AUDIT PASS**; report and ledger ASCII / zero CR;
+  T5 sections 1-8 present; full comparison JSON blocks agree with their
+  records; all eight matching-scope memory ratios, rate/share arithmetic,
+  medians, progress counts and comparison semantics checked against the
+  read-only extraction. `git diff --check` exit **0**, detail in
+  `turn8-diff-check.log`; only the tracked ledger and new report changed.
+
+Verification loop: the numeric/key/scope read-back found no contradictory
+record or new product finding. Kept CPU frame-count provenance, sampler
+limits and pre/post-encode distinction explicit. Corrected the cited
+WP3.6P Limits anchor during the text audit. No reverted change, relaxed
+bound or unresolved in-envelope text defect identified by this pass;
+independent Reviewer B and the gate remain PENDING at the seat.
+
+No pytest, mypy, run-request
+script, Bash/PowerShell process, GPU allocation, media decode, timed leg,
+reviewer, mailbox post, git write or main-tree write occurred this turn.
+Only the ledger, new report and ignored worktree-local extraction/helper/
+log files are written. No fixture/tool/source/config/dependency changes.
+YIELD for Reviewer B EXECUTING and the two-leg gate at the seat.
