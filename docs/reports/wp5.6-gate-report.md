@@ -1,12 +1,14 @@
 # WP5.6 - Phase 5 gate report
 
-**Status: DRAFT, 2026-11-02.** Owner fields: **V2 / CP5: PENDING**;
-**N6: PROPOSED, PENDING the owner's ruling**. CHARC fills these fields and
-marks the report FINAL after the owner's decisions. Gate p5b is GREEN as
+**Status: DRAFT, 2026-11-02.** **CP5 / V2: PENDING** is the only
+DRAFT-pending field. **N6: SET = about 12 min/min at 4K**, owner ruling
+recorded in spec v0.5.8 on main `1db84842` (D106 / N6 / V16; AD-21 SET).
+CHARC fills CP5 / V2 and marks the report FINAL after the owner's review.
+Gate p5b is GREEN as
 recorded below; this report makes no release claim.
 Authority: [WP5.6 brief](../briefs/wp5.6-brief.md), status and Done.
 
-Spec **v0.5.7**, section 11 (V1-V18), N1-N13; plan section 7 completion
+Spec **v0.5.8**, section 11 (V1-V18), N1-N13; plan section 7 completion
 pointers. Machine: the owner's laptop, **AMD Ryzen 9 7940HS, RTX 4070 Laptop
 8 GB, Windows 11**. The owner's 2026-10-19 best-effort ruling permits figures
 on a shared, non-idle host. Host/load caveats remain attached to measurements;
@@ -27,7 +29,9 @@ section 6.
 Accept commits above were checked with `git log --oneline -- <record>`.
 The ledger maps every result to its source; the orchestrator independently
 fact-checks it and runs Reviewer B (Claude). The turn-2 fact-check returned
-FC-1..FC-3, dispositioned in the ledger; Reviewer B is still to run.
+FC-1..FC-3, dispositioned in the ledger. Reviewer B ran at the orchestrator's
+seat (Claude opus): **NO_NEW_CRITICAL_MAJOR**, **4 MINOR + 4 ADVISORY**,
+folded in turn 3 (record `work/wp5.6/review-B.txt`).
 The brief replaces Reviewer A
 with the trace table and that fact-check for this deterministic documentation arc.
 
@@ -93,6 +97,25 @@ line 11; register DR-86). For context, WP-T6 recorded **1,389.24 s** and
 WP-DR113 **2,036 s**. Paydown disposition remains CHARC's / the owner's;
 this report neither commissions a suite-cost pass nor adds a register row.
 
+The serial-wall series of record is:
+
+| Record | Serial wall s | Source |
+|---|---|---|
+| WP-T6 | 1,389.24 | WP-T6 gate-sizing report, Gate, line 475 |
+| WP5.1 | 2,039 | WP5.1 accept, Gate, line 27 |
+| WP5.3 w53 | 2,752 | WP5.3 accept, Gate, line 32 |
+| WP-D112 | 2,760 | WP-D112 accept, Gate, line 27 |
+| WP5.2 | 1,974 | WP5.2 accept, Gate, line 35 |
+| WP-DR113 | 2,036 | WP-DR113 accept, Gate, line 27 |
+| WP5.6 p5b | 2,046 | `work/wp5.6/gate/summary.txt:11` |
+
+CHARC condition `d4224524` (WP5.3 accept, line 32) said that if WP-D112's
+serial leg came in near 2,000 s it was load; if the slow time repeated,
+a DR row was due at the Phase 5 gate report. WP-D112 recorded 2,760 s
+beside w53's 2,752 s. That condition is due at this report alongside the
+fired DR-86 trigger. Disposition is CHARC's: a DR row or the DR-86 paydown;
+no disposition is made by this report.
+
 ## Result 2 - Acceptance matrix carried forward
 
 The source roster is [WP5.1, Acceptance matrix](wp5.1-acceptance.md#acceptance-matrix),
@@ -111,7 +134,7 @@ identify the handoff.
 | V5 | PASS: photo metadata, depth, ICC and orientation; two independent decoders stand in for multiple viewers. Windows Photos/browser viewing remains an optional owner CP5 leg. | WP5.1 Acceptance matrix / V5 observations |
 | V6 | PASS: unsupported/damaged input handling and literal BT.709/limited warning; WP-D54 fixed the export warning. | WP5.1 V6 observations; WP-D54 accept `4ece5183` |
 | V7 | PASS against 100 ms longest gap: (a) 18, (b) 19, (c) 39, (d) 56, (e) 48, (f) 50.6 ms. (c)/(e) are WP4.6's accepted figures; its 67 ms batch control does not replace (d). DR-98 CLOSED. | WP5.1 V7 figures table; WP4.6 accept, V7 of record, `bbb4ef3e` |
-| V8 | PASS with standing archived-frame availability skips. AD-11: 1:1 exact; k>1 mean <=1/255, still p99 <=2/255 at k=2 and <=4/255 at k=4; video k=2 p99 <=2.5/255. | WP5.1 Acceptance matrix / V8 figures and skip table |
+| V8 | PASS by cited figures of record, with real-sized k>1 still coverage skipped in the carried gate. Skipped nodes: `test_app_v8_v18.py::test_v8_photo_k_above_1_on_real_sized_content` (1) and `test_methods_assembly_v8.py::test_v8_preview_against_the_downscaled_export` (8 at WP5.1); p5b again skips those real-sized legs for archived frames. AD-11: 1:1 exact; k>1 mean <=1/255, still p99 <=2/255 at k=2 and <=4/255 at k=4; video k=2 p99 <=2.5/255. Historical WP4.3 look-check crop evidence, in [0,1]: k=2 mean 0.00117 / p99 0.00459; k=4 mean 0.00156 / p99 0.0146, within the still limits. | WP5.1 Acceptance matrix, lines 118 / 121, and V8 figures; WP4.3 application-wiring report, lines 168-169; p5b serial log, lines 1910-1913 |
 | V9 | PASS within AD-11 pre-encode max 2/255, mean 0.2/255. Runner post-encode is separately characterised at mean <=3.5/255, not proof of the encoder-free bound. | WP5.1 V9, N10, provenance and tolerances |
 | V10 | PASS: numbering, cross-format clashes, existing outputs and sources unchanged. | WP5.1 Acceptance matrix / provenance and tolerances |
 | V11 | PASS: cancellation, crash/disk-full cleanup and next-start leftovers. Deterministic D85 same-file probe is the witness; crash race's allowed not-observable skip was not observed in recorded successful runs. | WP5.1 V11, STOPs and SKIPs |
@@ -119,14 +142,15 @@ identify the handoff.
 | V13 | PASS: preset round trip. | WP5.1 Acceptance matrix / V13 discussion |
 | V14 | PASS: all six N5 results with decisions recorded; prototype gate CLOSED 2026-10-20 at CP3. This does not retroactively pass the original prototype speed target. | WP5.1 V14 discussion; WP1.6 status and six-result table |
 | V15 | Measured peaks meet 16 GB decimal in the recorded cases: synthetic 5.3K 8:7 video tree RSS 5,599,490,048 B (5.599490 GB; 5,340.090 MiB), device 7,085 MiB; synthetic 48 MP PNG16 automatic CPU tree RSS 6,635,884,544 B (6.635885 GB), device 117 MiB; forced CPU RSS 6,168,494,080 B (6.168494 GB). Largest cited owner photo IMG_6690 (24.5 MP HEIC) RSS 1,926,164,480 B GPU / 3,138,392,064 B CPU. D111 witnessed below; supported-photo-resolution choice remains the owner's. | WP5.2 sections 1, 3-4; accept `2da5d0c7` |
-| V16 | Measured full-clip GPU c3 NVENC: GX011627 cold median 10.888984 min/min; GX011625 sustained 10.779005. Within current interim 25 min/min at 4K; final N6 re-set is the owner's. Synthetic 5.3K 8:7 40.331778 is best-effort, outside the 4K target. | WP5.2 sections 1-2; spec D106 / N6; accept `2da5d0c7` |
+| V16 | PASS against SET N6 about 12 min/min at 4K: full-clip GPU c3 NVENC GX011627 cold median 10.888984 min/min (10.89 rounded) and GX011625 sustained 10.779005 (10.78) are below 12. Synthetic 5.3K 8:7 40.331778 is best-effort, outside the 4K target. | WP5.2 sections 1-2, accept `2da5d0c7`; spec v0.5.8 D106 / N6 / V16, lines 145 / 455 / 498, main `1db84842` |
 | V17 | PASS: unchanged reopen skips decode; cache-format mismatch triggers reanalysis. | WP5.1 Acceptance matrix and cache discussion |
 | V18 | PASS: corrected provisional frame precedes completion and updates to smoothed statistics. Real-trim H12 strengthens the prior not-None check; full-clip record remains WP4.3's. | WP5.1 V18 figures of record |
 | N10 / D92 | PASS: repeated pre-encode pixels on one device bit-identical; CPU/GPU bounds max 2e-3, mean 2e-4 in [0,1]. Encoded-byte identity is recorded, not required. | WP5.1 N10 / reproducibility discussion |
-| D91 | PASS: default-on parseable provenance with app version, parameters and source name only; disabled video comment absent; photo coverage in V5. | WP5.1 Acceptance matrix / provenance discussion |
+| D91 | PASS: default-on parseable provenance with app version, parameters and the source name without a path; disabled video comment absent; photo coverage in V5. | WP5.1 Acceptance matrix / provenance discussion, line 322 |
 
 Decision: carry these results and their stated limits into Phase 5 close.
-The owner decides V2 at CP5 and the N6 re-set; CHARC records both.
+The owner decides V2 at CP5; N6 is SET in spec v0.5.8 (D106 / N6 / V16,
+main `1db84842`). CHARC records the remaining CP5 result.
 The current CP5 pack is ready at `work/wp5.3/index.html`: 128 items,
 126 done and 2 expected HLG refusals, failed 0, pending 0. Its 115 headline
 items and 11 candidates are available and unjudged. Coverage is not preference.
@@ -236,12 +260,17 @@ acceptance findings such as DR-102, DR-111 and the now-closed DR-112.
 uses cudaMemGetInfo plus pool free blocks, per-process under WDDM. A touched
 external hold did not change a second process's reported free bytes.
 W52-2 R2 held 5,861 MiB externally; device-wide free read 1,421 MiB.
-The whole-GX011627 export completed on GPU, exit 0, 4 min 4 s versus
-4 min 3 s free-card; the first 30 decoded frames were identical.
+The whole-GX011627 export completed on GPU, exit 0. Held/free shell
+times were 243.764 / 243.268 s (about 4 min 4 s / 4 min 3 s); item
+walls were 240.078 / 242.110 s, a separate scope with the ordering reversed.
+The first 30 decoded frames were identical. Battle.net wrote at least
+9 x 1 GB at 15:04-15:11Z, overlapping both exports (15:04-15:12Z);
+these are DR-114 evidence, not N6 figures of record.
 That measured case is benign; allocation failure remains unmeasured.
 A device-wide read beside the per-process operand or a documented limit
 is an owner product decision if the case fails/degrades; nothing was tuned.
-Source: register DR-114; WP5.2 sections 4 and 6. The report notes the
+Source: register DR-114; WP5.2 sections 4 and 6, lines 157-159 and
+320(a). The report notes the
 holder readings do not prove constant residency/free memory throughout.
 
 **DR-115 cause / evidence / paydown.** The product has no encoder-progress
@@ -289,33 +318,37 @@ them (no commit inferred from dates or a linked record):
 DR-62's parent-lock confirmation at WP4.6 `bbb4ef3e` is a later note,
 not a second closure.
 
-## Result 5 - N6 proposal for the owner
+## Result 5 - N6 SET = about 12 min/min at 4K
 
-**PROPOSED, PENDING the owner's ruling.** CHARC decision request
-`15f100ae`, posted 2026-11-02T20:51:43Z, recommends:
+**N6 SET.** On 2026-11-02 at about 21:30Z, the owner answered CHARC's
+decision request `15f100ae`, verbatim: **"Concur with 12"**. The ruling
+is recorded on main **`1db84842`** in **spec v0.5.8**: D106 (line 145),
+N6 section 10.2 (line 455) and V16 section 11 (line 498); AD-21 is
+**CLOSED-SET** (`docs/decisions.md:30`). CHARC's ruling notice is
+`work/wp5.6/charc-n6-ruled.txt`, lines 14-20.
 
 > Export takes at most about 12 minutes of processing per minute of 4K
 > footage on the owner's laptop, end to end including decode and encode,
 > in the owner's recording modes; 5.3K is supported but best-effort on speed.
 
-This is CHARC's proposal, not the current spec. D106 / N6 today remains
-**interim 25 min/min**. Sources: [AD-21](../decisions.md), note committed
-at `51a0cfd4`; WP5.6 brief, Content 6; spec D106 and N6.
+This is the current set target; interim **25 min/min** is history in
+D106. Sources: [spec v0.5.8](../underwater-correction-spec.md), lines
+18 / 145 / 455 / 498; [AD-21](../decisions.md), line 30. The table below
+retains the figures of record on which the ruling rests.
 
-| Evidence for ruling | Figure | Source / scope |
+| Evidence supporting the ruling | Figure | Source / scope |
 |---|---|---|
 | GX011627 c3 NVENC cold median | 10.89 min/min versus WP3.21 9.78, +11.3% | WP5.2 section 2, W52-1; full clip, in-process |
 | GX011625 sustained | 10.78 versus WP3.21 9.58, +12.5% | Same, sustained full clip |
-| Historical GUI worker margin | +7.3..8.2%; near 11.7-11.8 min/min indicative GUI projection in CHARC's proposal | WP4.6 V7 window; WP5.6 brief Content 6 |
+| Historical GUI worker margin | +7.3..8.2%; near 11.7-11.8 min/min indicative GUI projection supporting the ruling | WP4.6 V7 window; spec v0.5.8 D106, line 145 |
 | Synthetic 5.3K 8:7 | 40.33 min/min | WP5.2 section 2; supported, best-effort |
 
-The near-11.7-11.8 figure is a proposal-side projection from the historical
+The near-11.7-11.8 figure is a projection from the historical
 margin, not a newly measured GUI rate: WP5.2 section 2 explicitly does
 not manufacture an adjusted rate. The historical comparison includes cold
 worker analysis versus a complete GUI cache, not pure process-start cost.
 Shared-host/load/temperature conditions do not isolate a code regression.
-Alternatives in the request: **15 min/min**, retain interim **25**, or a
-**clean-host re-measure**. The owner decides; CHARC writes the ruled figure.
+Historical alternatives were 15 min/min, retaining interim 25, or a clean-host re-measure; the owner chose 12.
 
 ## Result 6 - Prune candidates for the owner's word
 
@@ -352,6 +385,12 @@ before any later authorised prune.
 | Orchestrator g28 / g29 / g30 / g31 / g32 | 120K / 22M / 1.5M / 3.0M / 27M | `work/orch-g28` through `work/orch-g32`; candidate records/basetemps |
 | Orchestrator g33 / g34 / g35 / g36 | 3.1G / 3.3M / 6.5M / 1.5M | `work/orch-g33` through `work/orch-g36`; preserve gate/window facts first |
 | Shared fixtures / reports / CHARC handoff | 86M / 16K / 28K | `work/fixtures`, `work/reports`, `work/charc-handoff`; KEEP pending owning seat's word |
+| CHARC g12 / g13 | 140K / 91K | `work/charc-g12`, `work/charc-g13`; KEEP until CHARC's word |
+| CHARC QA logs | 1.0K each | `work/charc-qa-wp1.3.log`, `work/charc-qa-wpt1.log`; CHARC's word required (`charc-qa*` keep rule, 2026-10-29 prune line 54) |
+| WP3.5 BT.601 clip | 96K | `work/wp3.5-bt601.mp4`; candidate after evidence check |
+| g28 seat R31 green / red | 128K / 4.0K | `work/g28-seat-r31-green`, `work/g28-seat-r31-red`; candidate support material after evidence check |
+| Usage probe | 4.0K | `work/claude_usage_probe.py`; candidate support material |
+| Zero-size folders | 0 each | `work/orch-g20`, `work/pytest-main-9ae9bf9-benchnode`, `work/wp4.2-c3-p2`, `work/wp4.2-rebase-check2`, `work/wp4.4-seat`; candidates on owner's word |
 
 The inventory also enumerates individual WP4.1/WP4.2 review/reproduction
 basetemps and loose gate logs. These are candidate support material only
@@ -414,8 +453,9 @@ This report supplies candidates, not deletion authority.
 - **CP5 / V2:** owner reviews the WP5.3 pack and returns the sheet.
   The orchestrator tallies it separately; D65 requires >=80% preference
   and no obvious artifacts. CHARC records the owner's result.
-- **N6 ruling:** owner chooses the proposed target or alternative;
-  CHARC updates the ruled figure and spec.
+- **Serial cost, CHARC action:** DR-86's trigger fired and condition
+  `d4224524` is due at this report. Disposition is CHARC's: a DR row or
+  the DR-86 paydown, with the serial-wall series in Result 1.
 - **DR-115 scope:** CHARC brings the encoder-watchdog and CPU-route
   encoder-choice question at the Phase 5 close.
 - **DR-25(3), CHARC action:** reconcile the register's WP5.2 assignment

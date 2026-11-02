@@ -126,6 +126,80 @@ an autocrlf advisory, but direct byte checks confirm both current files
 contain 0 CR and 0 non-ASCII bytes. No new text issue was found by this
 document-check pass; this is not an independent Reviewer B verdict.
 
+## Turn 3
+
+Final bounded turn: folded the N6 ruling and all eight Reviewer B items.
+The report cites spec v0.5.8 and ruling commit 1db84842; N6 is SET at
+about 12 min/min at 4K and V16 is PASS. CP5 / V2 is the only
+DRAFT-pending field. The gate remains the recorded p5b run, not a rerun.
+
+FILES CHANGED:
+- docs/reports/wp5.6-gate-report.md
+- docs/proofs/wp5.6-ledger.md
+
+Depth at turn-3 end: 49,258 input tokens (driver footer, turn 3, as reported; turn 2 read 199,699: the footer figure fell, read at the yield; final turn)
+
+Reviewer B: Claude opus, orchestrator's seat, verdict
+NO_NEW_CRITICAL_MAJOR; 0 critical, 0 major, 4 minor, 4 advisory.
+Source: work/wp5.6/review-B.txt:3; :26-63; model/seat from turn-3 dispatch.
+All 8 findings NEW, 0 REOPENED; 6 in the report envelope, 2 on the brief;
+0 reverts; 0 product-code or test-only fixes. All in-envelope changes are
+documentation changes. The brief findings are noted without editing it.
+
+| B item | Severity / classification | Confirmation and final disposition |
+|---|---|---|
+| MINOR-1 | MINOR, report, text-bearing | Confirmed the serial series against each named record. Added all seven walls and CHARC condition d4224524 beside DR-86; next action CHARC's (DR row or DR-86 paydown), no proposed remedy. |
+| MINOR-2 | MINOR, report, text-bearing | Confirmed historical real-sized still nodes skipped at WP5.1 and again at p5b. Named both nodes and cited WP4.3 crop mean/p99 figures in [0,1] as historical still k>1 evidence. |
+| MINOR-3 | MINOR, report, text-bearing | Replaced still-to-run sentence with actual Claude opus verdict and 4 MINOR + 4 ADVISORY folded in turn 3. |
+| MINOR-4 | MINOR, report, text-bearing | Added all listed inventory entries, including five zero folders. charc-g12/g13 and charc-qa* explicitly require CHARC's word. |
+| ADVISORY-5 | ADVISORY, report, text-bearing | Added held/free item walls 240.078 / 242.110 s beside shell 243.764 / 243.268 s; distinct scope/order and Battle.net write overlap disclosed. |
+| ADVISORY-6 | ADVISORY, report, text-bearing | D91 now says the source name without a path (WP5.1 :322). |
+| ADVISORY-7 | ADVISORY, brief, out of report envelope | NOTED: brief asks for WP5.1 V3 chapter wording, absent there. Report already sources chapter deferral to spec D64/change note; no report change for this item, no brief edit. |
+| ADVISORY-8 | ADVISORY, brief, out of report envelope | NOTED: brief's two commits between gate/base is off; git rev-list 1934bcbb..ac033be7 has one, ac033be7. Report already states the one-document difference correctly; no report/brief change. |
+
+### Verification-loop record and remaining gaps
+
+N6 ruling independently grounded in charc-n6-ruled.txt:14-20, spec
+v0.5.8 :18/:145/:455/:498, AD-21 :30, and commit 1db84842. WP5.2 rates
+10.888984 and 10.779005 are below the set 12; no new timing was run.
+Review B also independently confirmed the gate, counts, arithmetic,
+register set/closures, D111 and prune figures (review-B.txt:5-24).
+Reviewer B was withheld the ledger (review-B.txt:61); this turn does not
+claim an independent review of this ledger or of the final cleanup text.
+
+The unchanged UNTRACED items are static wall times, separate enclosing
+walls for collection/harness, and the harness skip's name/reason. Their
+absence is explicit in the supplied summary/nonverbose log. No source
+gap is filled by an estimate, and no archive-completeness claim is made.
+
+New source disagreement, out of owned files: spec v0.5.8 :18/:145 labels
+GX011627 as 4K 60, while WP5.2 report :61-62 records GX011627 681 frames
+and all W52-1 rows at 30000/1001 fps. Both sides were read this turn.
+This report carries the rates of record and does not copy that frame-rate
+label; the source correction is CHARC's, not made by this package.
+
+The branch was rebased onto main 1db84842 before this turn (dispatch);
+prior implementation commits are b81e32c8 / 068f7636, content unchanged.
+Earlier turn sections remain history, including the formerly pending N6
+field. Inherited spec anchors refer to the pre-v0.5.8 snapshot at
+ac033be7; updated current claims below cite v0.5.8 line anchors explicitly.
+
+Final validation checks ASCII/LF, whitespace, tables, relative links,
+all acceptance ids, unchanged register row coverage, current N6/CP5 and
+review status, new trace coverage and two-file scope. No pytest, FFmpeg,
+GPU/tool instrument, du, uv sync, static runner, commit, mailbox post,
+deletion, footage read or other-worktree content read was performed.
+
+Validation result: PASS. Both files have 0 CR and 0 non-ASCII bytes,
+final LF, no trailing whitespace and consistent Markdown table columns.
+Report relative links: 0 missing. Acceptance coverage: 20 unique ids;
+register coverage: the same 64 OPEN/partial ids as turn 2. Trace table:
+426 rows (49 added this turn, inherited current claims updated). Current
+N6/CP5/B claims and all 8 B dispositions are present; stale report text
+is absent. git diff --check passed and only the two owned files changed.
+Git's autocrlf advisory does not describe the current bytes, checked
+directly above. Final byte/diff checks follow this ledger-only addition.
+
 ## Trace table
 
 One row per acceptance disposition, register row, inventory figure or
@@ -137,8 +211,57 @@ bounded table/section; no source logs were rerun.
 
 | Report section | Claim (short) | Source file:line or commit | Checked how |
 |---|---|---|---|
-| Status | DRAFT; V2/CP5 and N6 owner fields; CHARC finalises | docs/briefs/wp5.6-brief.md:3; :18 | read |
-| Status / turn 2 | p5b GREEN; FC-1..FC-3 dispositioned, Reviewer B still to run | work/wp5.6/gate/summary.txt:2 through :13; turn-2 dispatch | read; dispatch |
+| Status | DRAFT pending CP5 / V2 only; N6 SET, CHARC finalises after CP5 | work/wp5.6/charc-n6-ruled.txt:20; docs/underwater-correction-spec.md:145; :455; :498; commit 1db84842 | read; turn-3 dispatch |
+| Status / turn3 | N6 SET about12min/min; CP5/V2 only DRAFT-pending | work/wp5.6/charc-n6-ruled.txt:20; docs/underwater-correction-spec.md:145; :455; :498; commit 1db84842 | read |
+| Status / turn3 | Spec v0.5.8 on main1db84842; text-only ruling | docs/underwater-correction-spec.md:5; :18; work/wp5.6/charc-n6-ruled.txt:18; commit 1db84842 | read; git show --stat 1db84842 |
+| Status / B | Claude opus at orchestrator seat; NO_NEW_CRITICAL_MAJOR; 4 MINOR +4 ADVISORY foldedturn3 | work/wp5.6/review-B.txt:3; :26-63; turn-3 dispatch | read; dispatch (model/seat) |
+| 1 / B-M1 | WP-T6 serial wall 1389.24s | docs/reports/wp-t6-gate-sizing.md:475 | read |
+| 1 / B-M1 | WP5.1 serial wall 2039s | docs/proofs/wp5.1-accept.md:27 | read |
+| 1 / B-M1 | w53 serial wall 2752s | docs/proofs/wp5.3-accept.md:32 | read |
+| 1 / B-M1 | WP-D112 serial wall 2760s | docs/proofs/wp-d112-accept.md:27 | read |
+| 1 / B-M1 | WP5.2 serial wall 1974s | docs/proofs/wp5.2-accept.md:35 | read |
+| 1 / B-M1 | WP-DR113 serial wall 2036s | docs/proofs/wp-dr113-accept.md:27 | read |
+| 1 / B-M1 | p5b serial wall 2046s | work/wp5.6/gate/summary.txt:11 | read |
+| 1 / B-M1 | CHARC d4224524: D112 near2000s =load; repeatedslowtime -> DRrow at Phase5 gate | docs/proofs/wp5.3-accept.md:32 | read |
+| 1 / B-M1 | D1122760s repeats w532752s; condition due beside firedDR86, CHARC disposition | docs/proofs/wp-d112-accept.md:27; docs/proofs/wp5.3-accept.md:32; docs/debt-register.md:95; turn-3 dispatch MINOR-1 | read; facts only |
+| Next / B-M1 | CHARC action: disposition DRrow or DR86paydown, none commissioned by report | docs/proofs/wp5.3-accept.md:32; docs/debt-register.md:95; turn-3 dispatch MINOR-1 | read |
+| 2 / B-M2 | Named real-sized shell stillnode: test_v8_photo_k_above_1_on_real_sized_content, 1skip at WP5.1 | docs/reports/wp5.1-acceptance.md:118 | read |
+| 2 / B-M2 | Named methodnode: test_v8_preview_against_the_downscaled_export, 8skips in WP5.1 matrix | docs/reports/wp5.1-acceptance.md:121 | read |
+| 2 / B-M2 | p5b real-sized legs skipped again for archived frames | work/wp5.6/gate/serial.log:1910-1913; docs/proofs/wp-dr113-accept.md:27 | read |
+| 2 / B-M2 | WP4.3 historical crop k2mean0.00117, p990.00459 in[0,1] | docs/reports/wp4.3-application-wiring.md:165-169 | read |
+| 2 / B-M2 | WP4.3 historical crop k4mean0.00156, p990.0146 in[0,1] | docs/reports/wp4.3-application-wiring.md:165-169 | read |
+| 2 / B-M2 | Historical crop within still mean1/255, p992/255k2,4/255k4 limits | docs/reports/wp5.1-acceptance.md:247-249; docs/reports/wp4.3-application-wiring.md:169 | read; .00117/.00156<1/255; .00459<2/255; .0146<4/255 |
+| 2 / V16 SET | 10.888984 (10.89 rounded) and10.779005 (10.78) below SET12: PASS | docs/reports/wp5.2-performance-memory.md:78-79; docs/underwater-correction-spec.md:498; commit 1db84842 | read; numeric comparison |
+| 2 / V16 SET | 5.3K40.331778 best effort, outside4K target | docs/reports/wp5.2-performance-memory.md:82; docs/underwater-correction-spec.md:145; :455 | read |
+| 2 / B-A6 | D91 source name without a path | docs/reports/wp5.1-acceptance.md:322 | read |
+| 4 / B-A5 | Held itemwall240.078s, free242.110s (rounded) | docs/reports/wp5.2-performance-memory.md:157 | read |
+| 4 / B-A5 | Held/free shell243.764/243.268s, approximately4m4s/4m3s; reversed ordering vs item scope | docs/reports/wp5.2-performance-memory.md:157-159 | read; compare separate scopes |
+| 4 / B-A5 | Battle.net at least9x1GB writes15:04-15:11Z overlap both exports15:04-15:12Z | docs/reports/wp5.2-performance-memory.md:320(a) | read |
+| 4 / B-A5 | Held/free walls are DR114 evidence, not N6figures | docs/reports/wp5.2-performance-memory.md:320(a) | read |
+| 5 / SET | Owner answered15f100ae on2026-11-02~21:30Z: Concur with12 | work/wp5.6/charc-n6-ruled.txt:14; docs/underwater-correction-spec.md:18; :145 | read |
+| 5 / SET | N6 wording set about12min/min end-to-end4K recordingmodes;5.3K supportedbest-effort | docs/underwater-correction-spec.md:145; :455; work/wp5.6/charc-n6-ruled.txt:16; commit 1db84842 | read |
+| 5 / SET | AD21 CLOSED-SET; interim25 historical | docs/decisions.md:30; docs/underwater-correction-spec.md:145; :455; commit 1db84842 | read |
+| 5 / SET | SetV16 at specsection11:498 | docs/underwater-correction-spec.md:498 | read |
+| 5 / SET | GUI11.7-11.8 indicative projection retained as supportingruling evidence | docs/underwater-correction-spec.md:18; :145; docs/reports/wp5.2-performance-memory.md:84-91 | read |
+| 5 / history | Alternatives15,retain25,clean-host remeasure historical; ownerchose12 | docs/briefs/wp5.6-brief.md:32; work/wp5.6/charc-n6-ruled.txt:14 | read |
+| 6 / B-M4 | work/charc-g12 140K | work/wp5.6/prune-inventory.txt:115 | read |
+| 6 / B-M4 | work/charc-g13 91K | work/wp5.6/prune-inventory.txt:109 | read |
+| 6 / B-M4 | work/charc-qa-wp1.3.log 1.0K | work/wp5.6/prune-inventory.txt:7 | read |
+| 6 / B-M4 | work/charc-qa-wpt1.log 1.0K | work/wp5.6/prune-inventory.txt:8 | read |
+| 6 / B-M4 | work/wp3.5-bt601.mp4 96K | work/wp5.6/prune-inventory.txt:110 | read |
+| 6 / B-M4 | work/g28-seat-r31-green 128K | work/wp5.6/prune-inventory.txt:113 | read |
+| 6 / B-M4 | work/g28-seat-r31-red 4.0K | work/wp5.6/prune-inventory.txt:48 | read |
+| 6 / B-M4 | work/claude_usage_probe.py 4.0K | work/wp5.6/prune-inventory.txt:46 | read |
+| 6 / B-M4 | work/orch-g20 0 | work/wp5.6/prune-inventory.txt:2 | read |
+| 6 / B-M4 | work/pytest-main-9ae9bf9-benchnode 0 | work/wp5.6/prune-inventory.txt:3 | read |
+| 6 / B-M4 | work/wp4.2-c3-p2 0 | work/wp5.6/prune-inventory.txt:4 | read |
+| 6 / B-M4 | work/wp4.2-rebase-check2 0 | work/wp5.6/prune-inventory.txt:5 | read |
+| 6 / B-M4 | work/wp4.4-seat 0 | work/wp5.6/prune-inventory.txt:6 | read |
+| 6 / B-M4 | charc-g12/g13 and charc-qa* need CHARCword | docs/proofs/prune-2026-10-29.md:54; turn-3 dispatch MINOR-4 | read; dispatch |
+| Ledger / B-A7 | Brief's requested WP5.1 V3chapterwording absent; reportuses specdeferral correctly | work/wp5.6/review-B.txt:57; docs/underwater-correction-spec.md at ac033be7:21; :102 | read; NOTED, no report change |
+| Ledger / B-A8 | Only1commit1934bcbb..ac033be7, not2 asbriefsays | work/wp5.6/review-B.txt:59; commit ac033be7 | git rev-list --count; git log |
+| Ledger / sourcegap | MINOR out-of-scope: specv0.5.8 callsGX0116274K60; W52 reportall30000/1001fps | docs/underwater-correction-spec.md:18; :145; docs/reports/wp5.2-performance-memory.md:61-62 | read; disclosed to CHARC, no source edit |
+| Status / review | p5b GREEN; FC-1..FC-3 dispositioned; Reviewer B NO_NEW_CRITICAL_MAJOR, 4 MINOR + 4 ADVISORY, folded turn 3 | work/wp5.6/gate/summary.txt:2 through :13; work/wp5.6/review-B.txt:3; :63 | read; turn-3 dispatch (Claude opus, seat) |
 | 1 / p5b | Head 1934bcbb | work/wp5.6/gate/summary.txt:1 | read |
 | 1 / p5b | Start 20:57:01Z, 2026-11-02 | work/wp5.6/gate/summary.txt:1; report status date / turn-2 dispatch | read |
 | 1 / p5b | C: free at start 57G | work/wp5.6/gate/summary.txt:1; turn-2 dispatch (volume) | read |
@@ -189,7 +312,7 @@ bounded table/section; no source logs were rerun.
 | 4 / FC-3 | WP5.2 accepted at 2da5d0c7 without staged-run evidence in either report/accept | docs/reports/wp5.2-performance-memory.md; docs/proofs/wp5.2-accept.md; commit 2da5d0c7 | read; bounded rg -n -i query returns no match; turn-2 fact-check confirms |
 | Next / FC-3 | CHARC action to reconcile assignment, not new owner decision | docs/debt-register.md:1; :4; :34; turn-2 dispatch FC-3 | read; dispatch |
 | Status | Report date 2026-11-02; no release acceptance | docs/briefs/wp5.6-brief.md:3; :18 | read |
-| Status | Spec v0.5.7 and section-11 / N1-N13 scope | docs/briefs/wp5.6-brief.md:13; CLAUDE.md:8 | read |
+| Status | Spec v0.5.8 and section-11 / N1-N13 scope; ruling main 1db84842 | docs/underwater-correction-spec.md:5; :18; CLAUDE.md:8; work/wp5.6/charc-n6-ruled.txt:18; commit 1db84842 | read |
 | Status | AMD Ryzen 9 7940HS | docs/reports/wp1.6-gate-report.md:10 | read |
 | Status | RTX 4070 Laptop 8 GB | docs/reports/wp1.6-gate-report.md:10 | read |
 | Status | Windows 11 | docs/reports/wp1.6-gate-report.md:11 | read |
@@ -218,7 +341,7 @@ bounded table/section; no source logs were rerun.
 | 2 / V5 | PASS: photo metadata, depth, ICC and orientation; two independent decoders stand in for multiple viewers. Windows Photos/browser viewing remains an optional owner CP5 leg. | docs/reports/wp5.1-acceptance.md:103; :215 | read |
 | 2 / V6 | PASS: unsupported/damaged input handling and literal BT.709/limited warning; WP-D54 fixed the export warning. | docs/reports/wp5.1-acceptance.md:106; :187 | read |
 | 2 / V7 | PASS against 100 ms longest gap: (a) 18, (b) 19, (c) 39, (d) 56, (e) 48, (f) 50.6 ms. (c)/(e) are WP4.6's accepted figures; its 67 ms batch control does not replace (d). DR-98 CLOSED. | docs/reports/wp5.1-acceptance.md:113; :226; docs/proofs/wp4.6-accept.md:13 | read |
-| 2 / V8 | PASS with standing archived-frame availability skips. AD-11: 1:1 exact; k>1 mean <=1/255, still p99 <=2/255 at k=2 and <=4/255 at k=4; video k=2 p99 <=2.5/255. | docs/reports/wp5.1-acceptance.md:117; :247 | read |
+| 2 / V8 | PASS by cited historical crop figures; real-sized still nodes named and skipped in carried gates; AD-11 limits retained | docs/reports/wp5.1-acceptance.md:118; :121; :247; docs/reports/wp4.3-application-wiring.md:165-169; work/wp5.6/gate/serial.log:1910-1913 | read |
 | 2 / V9 | PASS within AD-11 pre-encode max 2/255, mean 0.2/255. Runner post-encode is separately characterised at mean <=3.5/255, not proof of the encoder-free bound. | docs/reports/wp5.1-acceptance.md:122; :283 | read |
 | 2 / V10 | PASS: numbering, cross-format clashes, existing outputs and sources unchanged. | docs/reports/wp5.1-acceptance.md:125; :323 | read |
 | 2 / V11 | PASS: cancellation, crash/disk-full cleanup and next-start leftovers. Deterministic D85 same-file probe is the witness; crash race's allowed not-observable skip was not observed in recorded successful runs. | docs/reports/wp5.1-acceptance.md:131; :326 | read |
@@ -226,11 +349,11 @@ bounded table/section; no source logs were rerun.
 | 2 / V13 | PASS: preset round trip. | docs/reports/wp5.1-acceptance.md:142; :174 | read |
 | 2 / V14 | PASS: all six N5 results with decisions recorded; prototype gate CLOSED 2026-10-20 at CP3. This does not retroactively pass the original prototype speed target. | docs/reports/wp5.1-acceptance.md:143; :256; docs/reports/wp1.6-gate-report.md:3; :16 | read |
 | 2 / V15 | Measured peaks meet 16 GB decimal in the recorded cases: synthetic 5.3K 8:7 video tree RSS 5,599,490,048 B (5.599490 GB; 5,340.090 MiB), device 7,085 MiB; synthetic 48 MP PNG16 automatic CPU tree RSS 6,635,884,544 B (6.635885 GB), device 117 MiB; forced CPU RSS 6,168,494,080 B (6.168494 GB). Largest cited owner photo IMG_6690 (24.5 MP HEIC) RSS 1,926,164,480 B GPU / 3,138,392,064 B CPU. D111 witnessed below; supported-photo-resolution choice remains the owner's. | docs/reports/wp5.2-performance-memory.md:101; :111; :112; :113; :114; :115; :124; :130 | read |
-| 2 / V16 | Measured full-clip GPU c3 NVENC: GX011627 cold median 10.888984 min/min; GX011625 sustained 10.779005. Within current interim 25 min/min at 4K; final N6 re-set is the owner's. Synthetic 5.3K 8:7 40.331778 is best-effort, outside the 4K target. | docs/reports/wp5.2-performance-memory.md:78; :79; :82; docs/underwater-correction-spec.md:144; :454 | read |
+| 2 / V16 | PASS against SET N6 about12min/min: 10.888984 cold / 10.779005 sustained below12; 5.3K best effort 40.331778 | docs/reports/wp5.2-performance-memory.md:78; :79; :82; docs/underwater-correction-spec.md:145; :455; :498; commit 1db84842 | read; numeric comparison |
 | 2 / V17 | PASS: unchanged reopen skips decode; cache-format mismatch triggers reanalysis. | docs/reports/wp5.1-acceptance.md:146; :174 | read |
 | 2 / V18 | PASS: corrected provisional frame precedes completion and updates to smoothed statistics. Real-trim H12 strengthens the prior not-None check; full-clip record remains WP4.3's. | docs/reports/wp5.1-acceptance.md:150; :270 | read |
 | 2 / N10 / D92 | PASS: repeated pre-encode pixels on one device bit-identical; CPU/GPU bounds max 2e-3, mean 2e-4 in [0,1]. Encoded-byte identity is recorded, not required. | docs/reports/wp5.1-acceptance.md:152; :287 | read |
-| 2 / D91 | PASS: default-on parseable provenance with app version, parameters and source name only; disabled video comment absent; photo coverage in V5. | docs/reports/wp5.1-acceptance.md:157; :320 | read |
+| 2 / D91 | PASS: default-on provenance with app version, parameters, source name without a path; disabled comment absent; photo V5 | docs/reports/wp5.1-acceptance.md:157; :320-323 | read |
 | 2 / V7 | (a) longest gap 18 ms | docs/reports/wp5.1-acceptance.md:233 | read |
 | 2 / V7 | (b) longest gap 19 ms | docs/reports/wp5.1-acceptance.md:234 | read |
 | 2 / V7 | (c) longest gap 39 ms | docs/reports/wp5.1-acceptance.md:235; docs/proofs/wp4.6-accept.md:17; :18 | read |
@@ -394,8 +517,8 @@ bounded table/section; no source logs were rerun.
 | 4 | DR-115 root NVENC cause not established; force-cpu moves processing only | docs/reports/wp5.2-performance-memory.md:300; :305 | read |
 | 4 | DR-115 watchdog + software encoder choice owner scope | docs/debt-register.md:124 | read |
 | 5 | CHARC request 15f100ae posted 2026-11-02T20:51:43Z; proposal 12min/min 4K | docs/briefs/wp5.6-brief.md:32; docs/decisions.md:30 | read |
-| 5 | Proposal wording end-to-end recording modes; 5.3K best effort; owner decides | docs/briefs/wp5.6-brief.md:32 | read |
-| 5 | Current interim N6 25min/min; AD-21 note commit 51a0cfd4 | docs/underwater-correction-spec.md:144; :454; docs/decisions.md:30; commit 51a0cfd4 | read; git show --stat 51a0cfd4 |
+| 5 | SET wording: end-to-end including decode/encode, owner's recording modes; 5.3K best effort | docs/underwater-correction-spec.md:145; :455; commit 1db84842 | read |
+| 5 / history | Interim25min/min superseded by SET12; AD-21 CLOSED-SET | docs/underwater-correction-spec.md:145; :455; docs/decisions.md:30; commit 1db84842 | read |
 | 5 | Cold 10.89 vs prototype 9.78, +11.3% | docs/reports/wp5.2-performance-memory.md:78 | read |
 | 5 | Sustained 10.78 vs 9.58, +12.5% | docs/reports/wp5.2-performance-memory.md:79 | read |
 | 5 | GUI historical margin +7.3..8.2% | docs/reports/wp5.2-performance-memory.md:84; docs/proofs/wp4.6-accept.md:22 | read |
@@ -510,7 +633,7 @@ bounded table/section; no source logs were rerun.
 | 6 / archives | WP-D54/T7/3.6P/4.6 basetemps deleted; worktrees removed, branches kept | docs/proofs/prune-2026-11-01.md:55 through :68 | read |
 | 6 / decision | No prune done; owner word/keep list required, orchestrator executes | docs/briefs/wp5.6-brief.md:17; :34; docs/dispatch-recipe.md, deletion grant discipline | read; scope lock |
 | Next | CP5 review/tally/owner decision; >=80% no obvious artifacts | docs/briefs/wp5.6-brief.md:28; :36; docs/underwater-correction-spec.md:103; :474; docs/reports/wp5.3-review-pack.md:303 | read |
-| Next | N6 owner ruling, CHARC writes | docs/briefs/wp5.6-brief.md:32; :36 | read |
+| 5 / completed | N6 owner ruling complete, removed from next actions; CP5 only pending | work/wp5.6/charc-n6-ruled.txt:14-20; docs/underwater-correction-spec.md:498; commit 1db84842 | read |
 | Next | DR-115 watchdog and software-encoder owner scope at close | docs/debt-register.md:124; docs/briefs/wp5.6-brief.md:36 | read |
 | Next | WP5.5 after close; license notices/install/usage/version | docs/briefs/wp5.6-brief.md:36; docs/clearwater-implementation-plan.md:365 | read |
 | Next | WP5.4 conditional V3 failure or CP5 shimmer; synthetic V3 passed | docs/clearwater-implementation-plan.md:364; docs/underwater-correction-spec.md:134; docs/reports/wp5.1-acceptance.md:92 | read |
