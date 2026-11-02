@@ -317,6 +317,8 @@ characterisation does not remove the recorded strict AD-11 numeric
 misses or prove pre-encode equivalence. Admission conservatism and real
 GPU residency at an unadmitted photo size are not tuned or established.
 
+**Host writes and Reviewer B notes (orchestrator, at the accept).** (a) Battle.net wrote game data files (at least 9 x 1 GB, CHARC's scan) at 15:04-15:11Z, during W52-2's held and free exports (15:04-15:12Z); those two walls (4:04 / 4:03) are DR-114 evidence, not N6 figures of record (W52-1 had no such write). (b) The C: drop during W52-3 (79 -> 63 GB) was the WSL and VM virtual disks growing while mounted, not this package's paths. (c) The W52-3 item wall (6,585.155 s) exceeds the enclosing shell `time` real (6,584.814 s) by 0.34 s: the two clocks differ by about 52 ppm; the rate is unaffected (0.005 %). (d) The ruled `timeout 7200` left about 615 s (8.5 %) over the realised W52-3 wall; a slightly slower healthy run would have exited 124, distinguishable from a hang only by the progress CSV. (e) `tools/photo_memory.py` records `ram_within_limit` as `None` (photo_verify: a bool) when `rss_unavailable` is reported with valid peaks, and writes its record without photo_verify's `_safe_record` projection (a superset of keys); neither path was reached in R3 (`sampler_errors` empty) and the exit status is unchanged. (f) The D111 witness leg (R3 default device, a CPU fallback at 48 MP) has no CPU-vs-GPU AD-11 comparison: a GPU run at 48 MP was not admitted, so none can exist on this card; the AD-11 evidence of this package is the forced-CPU video (W52-3), so the brief's D111 debt trigger ("its output breaches AD-11") is evaluated on that leg only.
+
 ## 7. DR-70 analysis-share re-read
 
 Every row below is **W52-1 / R**, retaining both named share keys.
@@ -356,6 +358,6 @@ DR-72's bench stop is implemented/instrumented; registry closure, the
 N6 proposal/owner ruling and acceptance transfer remain with CHARC and
 the orchestrator. This report does not close debt by itself.
 
-Reviewer B: PENDING (orchestrator seat)
+Reviewer B (Claude, the orchestrator's seat, on `16c58b0e`, executing): `NO_NEW_CRITICAL_MAJOR`, 6 ADVISORY, 0 MINOR; it ran the light tests (40 passed), the GPU holder test (1 passed), a DR-72 mutation probe (stop removed: 6 failed, 4 passed) and checked every W52-1 row, the N6 figures, R2, R3 and W52-3 against the records (all equal). Its advisories are the notes (c)-(f) in section 6 (advisory 5, the "663 MiB after" label, checked against the seat's evidence: correct as written). Accept record `docs/proofs/wp5.2-accept.md`.
 
-Gate: PENDING (orchestrator seat)
+Gate (two legs, on the rebased candidate `61d7b661`): parallel 6,597 passed, 1 skipped; serial 1,261 passed, 11 skipped (the holder test among them, passed); 0 failed; collection 7,877 with identity; ruff, format, mypy and the harness gate clean (accept record).
