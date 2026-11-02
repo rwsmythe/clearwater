@@ -41,8 +41,12 @@
   `.worktrees/wp-d112` released. WP5.3 DR-112 WITNESS GREEN 10:01Z (post `1d7c7f02`; wp5.3 on 92d9ff77; clips V-P over the 9
   DR-112 items EXIT 0 in 380 s, failed 0, pending 0; pack 128 items, V-P 17 done; page and page --check EXIT 0; tally: expected
   115 / available 115 / missing 0, 126 sheet rows, 11 candidates). Codex read-back turn 21 running (both slow markers with
-  collection proof, report counts amended); then main fast-forwards and gen 34 posts CP5 for me to carry to the OWNER: pack
-  `work/wp5.3/index.html`, sheet `work/wp5.3/review-sheet.csv`.**
+  collection proof, report counts amended); read-back merged, main `69050ead`; **CP5 WITH THE OWNER since 10:10Z (post `f4cfc84a`; my ACK posted):
+  pack `work/wp5.3/index.html`, sheet `work/wp5.3/review-sheet.csv` (126 rows, judgement columns blank), 128 items = 126
+  done + 2 expected HLG refusals, failed 0, pending 0; D65 headline set 115 items (P-A 64 + V-S 26 + V-D 8 + V-P 17; bar:
+  corrected preferred on at least 80 %); P-Z 9 and V-Z 2 are candidates. The owner fills the sheet; gen 34 runs the strict
+  tally from .worktrees/wp5.3; then I write `docs/proofs/cp5-visual-review.md`.** Gen 34 next: the DR-113 brief (Codex, V4
+  PCM reading; my no-tripwire check before dispatch) then the WP5.2 dispatch fill, CONCURRED.**
   **HARNESS TEMPLATE PORT DONE (owner in chat 2026-11-02, "I am ready to update the comms harness template ... including
   the codex development addition"; chose: CHARC ports on a branch):** `C:/Users/rwsmy/harness-template` branch
   `clearwater-upstream-2026-11-02`, 5 commits on origin/master `6488556` (layer 1 `fc9f4b5` the coa-chess comms core as
