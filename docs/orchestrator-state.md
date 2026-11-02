@@ -41,7 +41,7 @@
 
 - A generation never rolls over with a job it started still running (owner rule, kernel `215b1fd6`); a clips piece is 1-2.5 h.
 - The review-pack instrument writes a group's records only when the whole group returns; a killed group run leaves outputs unrecorded (move orphans aside before a re-run so names stay clean).
-- `grep -c $''` inside a `while read` loop over `git show` miscounted (returned line counts); verify CR with Python bytes.count.
+- `grep -c $'\r'` inside a `while read` loop over `git show` miscounted (returned line counts); verify CR with Python bytes.count.
 - A fresh Codex prompt = agent file + brief at HEAD + dispatch, joined with blank lines; a resumed turn's prompt is the dispatch alone with `--session`.
 
 ### Gen-32 lessons
