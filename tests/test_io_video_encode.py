@@ -531,7 +531,7 @@ def test_pcm_derivative_v4_through_real_sink(sample: Sample, tmp_path: Path, sha
     packet = next(i for n, i in _items(record).items() if n.startswith(vf.AUDIO_PACKETS))
     side = _items(record)["audio priming and packet side data"]
     assert packet["note"] == note
-    assert note in side["note"] and note in record["summary"]["notes"]
+    assert note in side["note"] and f"{note} [soun#0]" in record["summary"]["notes"]
 
 
 def test_vfr_pts_are_exact(sample: Sample, runs: Runs) -> None:

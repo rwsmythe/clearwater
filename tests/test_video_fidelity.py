@@ -328,7 +328,7 @@ def test_pcm_d86_sample_extent_equivalence(shape: str, monkeypatch: pytest.Monke
     assert (packet.item_class, packet.status) == (compare.MANDATORY, compare.SAME)
     assert packet.note == note
     assert (side.item_class, side.status) == (compare.MANDATORY, compare.SAME)
-    assert note in side.note and note in notes
+    assert note in side.note and f"{note} [soun#0]" in notes
     assert any(n.startswith("D86:") for n in notes)
     assert items[-1].name == vf._ROSTER_ITEM and items[-1].status == compare.SAME
 

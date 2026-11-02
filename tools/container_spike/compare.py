@@ -1199,7 +1199,11 @@ def _pcm_extent(
             raise ValueError("PCM packet timing is not exact ticks and whole samples")
         stored, remainder = divmod(packet.size, frame_bytes)
         if remainder and not (d86 and position == len(packets) - 1):
-            raise ValueError("partial PCM sample frame outside the final D86 source packet")
+            raise ValueError(
+                "partial PCM sample frame before the final D86 source packet"
+                if d86
+                else "partial PCM sample frame in a strict packet"
+            )
         if d86:
             presented = min(presented, Fraction(stored))
             duration = presented / (base * rate)
@@ -1239,6 +1243,10 @@ def _pcm_packet_item(
     left: Any = item.source
     right: Any = item.output
     try:
+        if out and src.get("codec_name") != out.get("codec_name"):
+            raise ValueError(
+                f"output codec {out.get('codec_name')} differs from source {src.get('codec_name')}"
+            )
         left_format, right_format = _pcm_format(src), _pcm_format(out)
         left = {"format": [str(v) for v in left_format]}
         right = {"format": [str(v) for v in right_format]}

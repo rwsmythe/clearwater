@@ -676,7 +676,7 @@ Session 1 ended turn 1 at 147,692 tokens and retired after turn 2 at 216,276
 above; R0-1, R0-2 and R0-3 are implemented without new rulings. This turn is one
 logical instrument implementation, not overall package acceptance.
 
-Depth after session 2 / turn 3: DISPATCHER TO FILL (no cell estimate).
+Depth after session 2 / turn 3: 111,996 tokens (dispatcher reading supplied with turn 4).
 
 | Round / rung | Critical | Major | Minor | In/out envelope | NEW/REOPENED | Reverts | Product-code / test-only fixes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -886,3 +886,184 @@ Reviewer A round 1 is NEXT at the dispatcher's seat. Reviewer A convergence,
 Reviewer B, the report turn (`docs/reports/wp-dr113-v4-pcm.md`), the three-leg
 rebased gate and owner PCM witness remain pending; this turn claims only GREEN
 implementation and its authorized light validation. YIELD for Reviewer A.
+
+## Session 2 / Turn 4: Reviewer A round 1 adjudication
+
+Base: `b48c94b3`, the committed GREEN. Reviewer A round 1 (Claude opus/high,
+37 turns) returned `VERDICT: NO_NEW_CRITICAL_MAJOR`. Evidence read: only the
+permitted `C:/Users/rwsmy/clearwater-review-evidence/wp-dr113/r1/review.txt`.
+The dispatcher declares round 1 CONVERGED; this is its terminating clean-up,
+not a new round. Turn-3 depth above is now the supplied 111,996 tokens.
+
+Depth after session 2 / turn 4: 153,121 tokens (dispatcher reading, codex_cell footer depth_input_tokens, at yield).
+
+| Round | Critical | Major | Minor | Advisory | In/out envelope | NEW/REOPENED | Reverts | Product-code / test-only / instrument fixes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A1, terminating clean-up | 0 | 0 | 2 | 6 | 7 in or preexisting/cosmetic; 1 out (A3) | 8 NEW / 0 REOPENED | 0 | 0 product-code; M2 coverage in tests; A4/A5 notes in 2 instrument files plus tests |
+
+### Every finding and its disposition
+
+- **MINOR 1, in envelope, CONFIRMED / DISCLOSED; no code change.** The assertion
+  of `test_synthetic_facts_self_comparison` at
+  `tests/test_container_spike_compare_equivalences.py:92` is unchanged. Its shared
+  `_facts` input gained `"sample_fmt": "s16"` at `:67` during turn 2. Real ffprobe
+  reports this field; without it the strict PCM reader refuses missing evidence,
+  as Reviewer A's executed probe confirms. Earlier ledger language that no
+  existing test row changed describes assertions, not this helper input: this
+  disclosure corrects that material omission. The next-turn report must disclose
+  the input change too. This turn does not alter that input again.
+- **MINOR 2, in envelope, CONFIRMED / FIXED.** `_PCM_AGREEMENT` at
+  `test_container_spike_compare_equivalences.py:249` now has 23 rows (was 17).
+  Added first-pts-plus-one from
+  `test_check_output_pcm_refuses_another_first_pts`, shift-after-30 and all-zero
+  from `test_check_output_pcm_refuses_changed_timeline_runs`, negative-duration
+  and fractional-duration from `test_check_output_pcm_refuses_inexact_sample_evidence`,
+  and missing-duration from `test_check_output_pcm_refuses_missing_sample_evidence`
+  in the WP-D112 unit module. All six are exact product-unit tables; none is
+  merely an instrument-only substitute. The table builder is at `:280`; the
+  independent Facts adapter at `:400` now preserves absent pts/duration and maps
+  absent payload size to the instrument's existing -1 sentinel instead of
+  asserting away unavailable evidence. Both expected verdicts and agreement
+  remain asserted at `:556`. All six additional agreement rows passed even
+  before the note changes, proving this is a coverage fix, not a changed rule.
+- **ADVISORY 3, out of envelope, CONFIRMED by review / DISCLOSE AS LIMIT; no code
+  change.** Moving stored samples between packets while leaving durations,
+  aggregate totals and runs equal reads SAME in the instrument and passes the
+  product. The review's example moves bytes 2048 -> 2000 in packet 3 and
+  2048 -> 2096 in the last packet. Reaching it requires a container whose stts and
+  stsz disagree; the real sink cannot produce it from a consistent source.
+  The next report must state this next to F-B2: sample CONTENT is not verified
+  by this extent/run reading; decoded-sample MD5 is only a possible later item.
+  The commissioned totals/run rule is not changed to address it.
+- **ADVISORY 4, in envelope, CONFIRMED / FIXED.** The raw-PCM packet branch now
+  names a changed output codec before attempting its packed-width lookup
+  (`tools/container_spike/compare.py:1248`). PCM -> AAC reads
+  `PCM: output codec aac differs from source pcm_s16le`. The partial-frame note
+  at `:1203` mentions the D86 source exception only when that exception applies;
+  strict packets read `partial PCM sample frame in a strict packet`. Status
+  remains DIFFERENT for both shapes. Assertions in
+  `test_pcm_difference_control` at `test_container_spike_compare_equivalences.py:501`
+  cover codec-aac and the added uncut-source-partial row. Both wording assertions
+  failed before the change and pass after it.
+- **ADVISORY 5, in envelope, CONFIRMED / FIXED.** Each summary PCM note carries
+  its stream key, for example the original packet-count note followed by
+  `[soun#0]`. `_audio_side_item` at `tools/video_fidelity.py:1080` joins keyed
+  per-stream notes; `fidelity_items` at `:1319` also keys successful packet-item
+  notes so fallback cannot lose their disclosure. Per-packet Item.note wording
+  stays as commissioned; item names, roster and bare record schema are unchanged.
+  `test_pcm_two_tracks_keep_distinct_record_notes` at
+  `test_container_spike_compare_equivalences.py:521` duplicates a faithful
+  100 -> 99 PCM track and asserts two separate notes even though the counts
+  match. It checks both `fidelity_items` and the real `fidelity_record` path
+  (only file-boundary reads stubbed). Existing PCM summary membership assertions
+  in the three owned test modules now expect their stream key. No verdict
+  assertion was weakened.
+- **ADVISORY 6, preexisting window / DISCLOSE AS LIMIT; no code change.** The
+  instrument's D86 source window is strictly `pts < end`, as the commissioned
+  rule says "as today". The product admits whole prefixes within CUT_SLACK_S
+  (2 microseconds), so a prefix admitted only by that slack can pass product
+  verification while the instrument reads DIFFERENT. When the time base is not
+  1/sample_rate, a D86 cap can produce a nonintegral run end; both readings
+  refuse that shape. These are accepted report limitations under the dispatch,
+  not changes to the D86 rule or its independence lock.
+- **ADVISORY 7, cosmetic/resource disclosure; no code change.** The record stores
+  the complete timeline-run list, which is not bounded like the former packet
+  summary. Source-tick run values are rendered by `exact()` in its seconds-style
+  text form, e.g. `72072.000000 (72072/1)`, though the values are source ticks.
+  The report must state both facts; this turn changes neither storage nor format.
+- **ADVISORY 8, measured / NO MARKER CHANGE NEEDED.** All five integration rows
+  ran alone as a serial five-node selection without xdist, and again inside the
+  brief's light run with `--durations=0`. Every isolated row, including its
+  setup/teardown as recorded by JUnit, is below 5 seconds. The table below gives
+  those observed test durations. No product timing/memory claim or exclusive
+  benchmark is made; these are test classification evidence on the shared host.
+  No parametrisation gains `slow`, and no slow/gpu/footage/fullclip node ran.
+
+### Integration duration evidence
+
+| Parametrisation | Isolated JUnit seconds | Final light JUnit seconds |
+| --- | --- | --- |
+| trim-380-over-472 | 3.452 | 3.087 |
+| trim-148-over-240 | 3.110 | 3.137 |
+| d86-55 | 2.813 | 2.886 |
+| d86-70 | 2.969 | 2.851 |
+| d86-85 | 2.884 | 2.971 |
+
+### Commands and observed results
+
+All commands are from this worktree. Every pytest command sets
+`PYTHONPATH=scripts`, unsets `PYTEST_ADDOPTS`, uses `-p sandbox_mkdir_shim
+-p no:cacheprovider` and the fresh basetemp shown. Runner output stays under
+`work/wp-dr113/t4/`. No full-suite or heavy-marker run was taken.
+
+```text
+uv run pytest -q --tb=short tests/test_container_spike_compare_equivalences.py -k pcm --basetemp=work/wp-dr113/tmp/t4-red -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp-dr113/t4/red.xml > work/wp-dr113/t4/red.log 2>&1
+uv run pytest -q --tb=short tests/test_container_spike_compare_equivalences.py tests/test_video_fidelity.py -k pcm --basetemp=work/wp-dr113/tmp/t4-green -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp-dr113/t4/green.xml > work/wp-dr113/t4/green.log 2>&1
+uv run pytest -q --tb=short tests/test_io_video_encode.py::test_pcm_derivative_v4_through_real_sink --durations=0 --basetemp=work/wp-dr113/tmp/t4-integration-duration -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp-dr113/t4/integration-duration.xml > work/wp-dr113/t4/integration-duration.log 2>&1
+uv run pytest -q --tb=short tests/test_container_spike.py tests/test_container_spike_compare_equivalences.py tests/test_video_fidelity.py -m "not gpu and not footage and not slow and not fullclip" --basetemp=work/wp-dr113/tmp/t4-regression -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp-dr113/t4/regression.xml > work/wp-dr113/t4/regression.log 2>&1
+uv run pytest -q --tb=short tests/test_container_spike_compare_equivalences.py tests/test_video_fidelity.py tests/test_io_video_encode.py -k "pcm or audio or equival" -m "not gpu and not footage and not slow and not fullclip" --durations=0 --basetemp=work/wp-dr113/tmp/t4-light -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp-dr113/t4/light.xml > work/wp-dr113/t4/light.log 2>&1
+```
+
+- RED: **6 failed, 47 passed, 41 deselected**, exit 1. All six failures are
+  intended assertions: three keyed-summary-note memberships, codec wording,
+  uncut-source partial-frame wording and two-track note identity. There were
+  no setup/import/fixture errors. The six extra agreement rows already pass.
+- GREEN: **60 passed, 54 deselected**, exit 0. These include all new/changed
+  synthetic PCM nodes. The isolated integration selection: **5 passed**, exit 0.
+- Whole three-module light regression: **178 passed, 3 deselected**, exit 0.
+- Brief light run: **121 passed, 130 deselected**, exit 0. The final node set
+  contains all original 57 commissioned nodes plus the 8 added in this round,
+  and the 56 preexisting selected light nodes. There are no new skips.
+
+Final static checks, on the five changed Python files:
+
+```text
+uv run ruff check tools/container_spike/compare.py tools/video_fidelity.py tests/test_container_spike_compare_equivalences.py tests/test_video_fidelity.py tests/test_io_video_encode.py > work/wp-dr113/t4/ruff-final.log 2>&1
+uv run ruff format --check tools/container_spike/compare.py tools/video_fidelity.py tests/test_container_spike_compare_equivalences.py tests/test_video_fidelity.py tests/test_io_video_encode.py > work/wp-dr113/t4/format-final.log 2>&1
+uv run mypy > work/wp-dr113/t4/mypy-final.log 2>&1
+```
+
+All exit 0: `All checks passed!`, `5 files already formatted`,
+`Success: no issues found in 154 source files`. The summary script verifies
+ASCII/CR=0 on all six submitted files, and `git diff --check` is clean.
+
+### Added node outcomes (all GREEN after note cleanup)
+
+- `tests/test_container_spike_compare_equivalences.py::test_pcm_difference_control[uncut-source-partial]`: RED -> GREEN (new note contract).
+- `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[all-zero]`: GREEN -> GREEN (agreement coverage).
+- `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[first-pts-plus-one]`: GREEN -> GREEN (agreement coverage).
+- `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[fractional-duration]`: GREEN -> GREEN (agreement coverage).
+- `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[missing-duration]`: GREEN -> GREEN (agreement coverage).
+- `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[negative-duration]`: GREEN -> GREEN (agreement coverage).
+- `tests/test_container_spike_compare_equivalences.py::test_pcm_instrument_agrees_with_product[shift-after-30]`: GREEN -> GREEN (agreement coverage).
+- `tests/test_container_spike_compare_equivalences.py::test_pcm_two_tracks_keep_distinct_record_notes`: RED -> GREEN (new note contract).
+
+
+### Verification loop and handoff
+
+Pass 1: every finding was classified against the frozen commissioned rule.
+M1's benign helper-input change was confirmed from the line and review probe,
+not hidden behind the unchanged assertion. M2's six tables were traced to the
+existing product-unit builders. The note problems were confirmed by explicit
+failing assertions before code edits; the fixes alter note wording/identity,
+not PCM verdicts, totals, runs, packed widths or source windows.
+
+Pass 2 after the fixes: all 65 commissioned/additional PCM nodes pass, including
+23 product/instrument agreement rows with expected refusals, both note controls,
+the duplicate-count two-track record and the five real sink derivatives. The
+whole light regressions and static checks pass. A complete pass over the rule,
+new code and all eight dispositions found no new issue. No further review round
+was launched: A1 is converged per the dispatcher, and these are its terminating
+clean-up changes.
+
+Locks: only five owned Python files and this ledger changed. No product source,
+frozen interface, dependency, media fixture, local configuration, register,
+decision or bare-record schema changed. No new product audio import, mailbox
+post, commit, owner-footage read, other-worktree read or out-of-worktree write
+was made. The successful packet-item note remains unchanged; the newly keyed
+summary/side notes are the explicitly adopted advisory-5 disclosure change.
+
+No STOP or unresolved question in this turn. The report turn must carry M1 and
+Limits A3/A6/A7 plus the existing F-B2 exclusion. Reviewer B, the rebased
+three-leg gate and the orchestrator's owner PCM witness remain at their seats.
+YIELD for the report turn.

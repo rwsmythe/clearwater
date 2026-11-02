@@ -1077,8 +1077,9 @@ def _audio_side_item(
         src_side[key] = [["PCM sample extent and timeline runs", packet_item.source]]
         out_side[key] = [["PCM sample extent and timeline runs", packet_item.output]]
         if packet_item.status == compare.SAME:
-            if packet_item.note not in notes:
-                notes.append(packet_item.note)
+            note = f"{packet_item.note} [{key}]"
+            if note not in notes:
+                notes.append(note)
         else:
             refusals.append(packet_item.note)
     item = compare._sequence_item(
@@ -1315,7 +1316,7 @@ def fidelity_items(
     items.append(side_item)
     for note in (
         *(
-            i.note
+            f"{i.note} [{i.name.partition(' [')[2]}"
             for i in items
             if i.name.startswith(AUDIO_PACKETS)
             and i.status == compare.SAME

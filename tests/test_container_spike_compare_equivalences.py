@@ -241,6 +241,7 @@ _PCM_CONTROLS = (
     "time-base",
     "one-tick-shift",
     "swapped-packets",
+    "uncut-source-partial",
     "closed-gap",
     "opened-gap",
     *(f"unknown-{codec}" for codec in _PCM_REFUSED),
@@ -259,6 +260,12 @@ _PCM_AGREEMENT = (
     "opened-gap",
     "earlier-source-partial",
     "output-partial",
+    "first-pts-plus-one",
+    "shift-after-30",
+    "all-zero",
+    "negative-duration",
+    "missing-duration",
+    "fractional-duration",
 )
 _PCM_COUNTS = {
     "img6731-coalesced": (100, 99),
@@ -331,6 +338,17 @@ def _pcm_pair(
         output = pcm_units._pcm_table((1024,) * 6 + (1023,), last_stored_samples=1024)
     elif shape == "stored-only":
         output = pcm_units._pcm_table(last_stored_samples=1023)
+    elif shape == "uncut-source-partial":
+        source = replace(source, audio_sizes={1: (2048,) * 6 + (2047,)})
+    elif shape in ("negative-duration", "missing-duration"):
+        # WP-D112's missing/inexact sample-evidence tests build these same tables.
+        duration = -1 if shape == "negative-duration" else None
+        output = replace(output, audio_durations={1: (1024,) * 6 + (duration,)})
+    elif shape == "fractional-duration":
+        source = replace(
+            source, streams=(source.video, replace(source.streams[1], time_base=Fraction(1, 96000)))
+        )
+        output = replace(output, streams=source.streams, audio_durations={1: (1024,) * 6 + (1023,)})
     elif shape in ("rate", "format", "channels", "codec-aac", "time-base"):
         changes = {
             "rate": {"sample_rate": 44100},
@@ -340,15 +358,17 @@ def _pcm_pair(
             "time-base": {"time_base": Fraction(1, 96000)},
         }[shape]
         output = replace(source, streams=(source.video, replace(source.streams[1], **changes)))
-    elif shape in ("one-tick-shift", "swapped-packets"):
+    elif shape in ("one-tick-shift", "swapped-packets", "first-pts-plus-one"):
         pts = list(source.audio_pts[1])
         if shape == "one-tick-shift":
             assert pts[3] is not None
             pts[3] += 1
-        else:
+        elif shape == "swapped-packets":
             pts[2], pts[3] = pts[3], pts[2]
+        else:
+            pts[0] = 1  # test_check_output_pcm_refuses_another_first_pts.
         output = replace(source, audio_pts={1: tuple(pts)})
-    elif shape in ("closed-gap", "opened-gap"):
+    elif shape in ("closed-gap", "opened-gap", "shift-after-30", "all-zero"):
         # Preserve the run mutations at test_io_video_encode_units.py:1113-1134.
         source = pcm_units._pcm_table(((1024,) * 23 + (472,)) * 3)
         pts = source.audio_pts[1]
@@ -357,13 +377,17 @@ def _pcm_pair(
         if shape == "closed-gap":
             output = source
             source = replace(source, audio_pts={1: shifted})
-        else:
+        elif shape == "opened-gap":
             gapful = tuple(p if i <= 10 else p + 512 for i, p in enumerate(pts))
             source = replace(source, audio_pts={1: gapful})
             output = replace(
                 source,
                 audio_pts={1: tuple(p if i <= 30 else p + 1024 for i, p in enumerate(gapful))},
             )
+        elif shape == "all-zero":
+            output = replace(source, audio_pts={1: (0,) * 72})
+        else:
+            output = replace(source, audio_pts={1: shifted})
     elif shape.startswith("unknown-") and shape.removeprefix("unknown-") in _PCM_REFUSED:
         stream = replace(source.streams[1], codec_name=f"pcm_{shape.removeprefix('unknown-')}")
         source = replace(source, streams=(source.video, stream))
@@ -391,10 +415,12 @@ def _pcm_facts(table: pcm_units._PcmPacketTable, *, output: bool = False) -> com
     for pts, duration, size in zip(
         table.audio_pts[1], table.audio_durations[1], table.audio_sizes[1], strict=True
     ):
-        assert pts is not None and duration is not None and size is not None
         packets.append(
             compare.Packet(
-                pts * base, duration * base, size, f"MD5:planted-{pts}-{duration}-{size}"
+                None if pts is None else pts * base,
+                None if duration is None else duration * base,
+                -1 if size is None else size,
+                f"MD5:planted-{pts}-{duration}-{size}",
             )
         )
     return replace(facts, path=Path("output.mp4" if output else "source.mov"), packets={1: packets})
@@ -431,8 +457,12 @@ def _pcm_fidelity_reading(
         facts = {str(source.path): source, str(output.path): output}[str(arguments[-1])]
         entries = arguments[arguments.index("-show_entries") + 1]
         if entries == "packet=pts,flags:packet_side_data":
-            base = Fraction(facts.probe["streams"][1]["time_base"])
-            packets = [{"pts": int(p.pts / base), "flags": "K_"} for p in facts.packets[1]]
+            index = int(arguments[arguments.index("-select_streams") + 1])
+            base = Fraction(compare._stream(facts, index)["time_base"])
+            packets = [
+                {"pts": None if p.pts is None else int(p.pts / base), "flags": "K_"}
+                for p in facts.packets[index]
+            ]
             if facts is output and side_change == "discard":
                 packets[2]["flags"] = "KD"
             elif facts is output and side_change == "side-data":
@@ -445,7 +475,7 @@ def _pcm_fidelity_reading(
                 ]
             return {"packets": packets}
         assert entries == "stream=index,profile,initial_padding,extradata_size,extradata_hash"
-        return {"streams": [{"index": 1}]}
+        return {"streams": [{"index": s["index"]} for s in compare._streams_of(facts, "audio")]}
 
     monkeypatch.setattr(compare, "run_ffprobe", ffprobe)
     return vf.fidelity_items(source, output, info=info, bit_depth=8)
@@ -463,7 +493,7 @@ def test_pcm_sample_extent_equivalence(shape: str, monkeypatch: pytest.MonkeyPat
     items, notes = _pcm_fidelity_reading(monkeypatch, source, output)
     side = next(i for i in items if i.name == "audio priming and packet side data")
     assert side.status == compare.SAME and note in side.note
-    assert note in notes
+    assert f"{note} [soun#0]" in notes
     assert items[-1].name == vf._ROSTER_ITEM and items[-1].status == compare.SAME
 
 
@@ -479,6 +509,47 @@ def test_pcm_difference_control(shape: str) -> None:
         packet = next(i for i in items if i.name.startswith(vf.AUDIO_PACKETS))
         assert packet.status == compare.DIFFERENT
         assert f"pcm_{shape.removeprefix('unknown-')}" in packet.note
+    elif shape in ("codec-aac", "uncut-source-partial"):
+        packet = next(i for i in items if i.name.startswith(vf.AUDIO_PACKETS))
+        assert packet.status == compare.DIFFERENT
+        if shape == "codec-aac":
+            assert packet.note == "PCM: output codec aac differs from source pcm_s16le"
+        else:
+            assert "partial PCM sample frame" in packet.note and "D86" not in packet.note
+
+
+def test_pcm_two_tracks_keep_distinct_record_notes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Equal packet-count notes still identify both PCM tracks in the final record."""
+    before, after, _ = _pcm_pair("img6731-coalesced")
+
+    def two_tracks(table: pcm_units._PcmPacketTable, *, output: bool) -> compare.Facts:
+        facts = _pcm_facts(table, output=output)
+        return replace(
+            facts,
+            probe={
+                **facts.probe,
+                "streams": [*facts.probe["streams"], {**facts.probe["streams"][1], "index": 2}],
+            },
+            keys={**facts.keys, 2: "soun#1"},
+            packets={**facts.packets, 2: list(facts.packets[1])},
+        )
+
+    source, output = two_tracks(before, output=False), two_tracks(after, output=True)
+    items, notes = _pcm_fidelity_reading(monkeypatch, source, output)
+    packets = [i for i in items if i.name.startswith(vf.AUDIO_PACKETS)]
+    side = next(i for i in items if i.name == "audio priming and packet side data")
+    note = _pcm_note(100, 99)
+    assert len(packets) == 2 and all(i.status == compare.SAME and i.note == note for i in packets)
+    assert side.status == compare.SAME
+    expected = [f"{note} [soun#0]", f"{note} [soun#1]"]
+    assert [n for n in notes if n.startswith("PCM:")] == expected
+    assert all(n in side.note for n in expected)
+    # Run the record entry point as well; only its real-file reads are stubbed.
+    monkeypatch.setattr(vf, "gather", lambda path: source if path == source.path else output)
+    monkeypatch.setattr(vf, "probe", lambda path: pcm_units._probe())
+    record = vf.fidelity_record(source.path, output.path, bit_depth=8)
+    assert [n for n in record["summary"]["notes"] if n.startswith("PCM:")] == expected
+    assert items[-1].name == vf._ROSTER_ITEM and items[-1].status == compare.SAME
 
 
 @pytest.mark.parametrize("shape", _PCM_AGREEMENT)
