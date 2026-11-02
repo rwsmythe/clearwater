@@ -1217,3 +1217,33 @@ modules and this ledger changed. No footage, main-tree work or other worktree
 opened; no mailbox, stash, commit, dependency, media/manifest, interface or
 other product edit. Code/test files have zero CR; the appended ledger text is
 ASCII and its final LF/scope/diff QA is `turn5-ledger-qa.log`. YIELD for A2.
+
+## Session 3 / Turn 6: the report
+
+Base `78d2a03e`, clean at entry. Dispatcher-supplied depth after turn 5:
+106,962 tokens. Depth THIS TURN: PENDING -- dispatcher to fill from the
+transcript; no cell estimate.
+
+Wrote `docs/reports/wp-d112-pcm-audio.md`, following the headings and scale of
+`docs/reports/wp-dr87.md`. It records DR-112 without owner stems, the four
+accepted seat-experiment facts and the reconciled presented/stored counts,
+the current PCM rule and D86 warning, the fixture/control and test-time
+derivatives, per-turn RED/GREEN evidence, review rulings and explicit pending
+reviews/gate/witness. It carries the short-tail re-chunking observation,
+codec-tag distinction, unknown full-command cause and banked F3 limit.
+
+Verification: relocated every report file:line against the unchanged source
+at `78d2a03e`; checked figures against the brief and this ledger's turn-2,
+turn-3, turn-4 and turn-5 evidence. Confirmed the turn-3 sandbox audit item
+was closed by the dispatcher's three passing seat reruns. No product result
+was rerun or promoted to final-gate/acceptance evidence. Report/ledger ASCII,
+zero CR, report line lengths, no owner stems in report, code-anchor checks,
+owned-file scope and `git diff --check` are recorded in
+`work/wp-d112/turn6-docs-qa.log`. Corrected one source anchor to the exact
+partial-frame remainder calculation during documentation QA; the final pass
+finds nothing new. No product finding or scope deviation.
+
+Only the report and this ledger changed. No footage, other worktree/main work,
+mailbox, commit, stash, product/test/fixture/interface/dependency edit or
+reviewer process. Reviewer A round 2 and B remain PENDING; the report will be
+amended if adjudication changes the candidate. YIELD to the orchestrator.
