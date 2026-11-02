@@ -54,8 +54,10 @@
   --sessions / --live, second pass), coa 19 findings (14 fixed incl. the CRITICAL root-discover-runs-0-tests, 2 to the
   OWNER: the early-roll exception vs the 2026-09-25 operator direction; 3 declined / limits). Remediation commit `8031617`
   on the template branch (suite 382 OK, 1 skip); the kernel-doc subset mirrored to main `15d1c828` (hazards renumbered
-  (4)-(7)). Record `docs/proofs/harness-upstream-2026-11-02.md`. OWNER: push after ruling the early-roll text; a second
-  pass (cell_depth from swing) is recommended, not commissioned.
+  (4)-(7)). Record `docs/proofs/harness-upstream-2026-11-02.md`. OWNER RULED 2026-11-02 ("1. concur ... 2. concur"): the early-roll text is ONE text in both files, template
+  `ef7e671` and main `8ef219e0` (the 09-25 direction is the rule; rolling before a unit the seat cannot see finish is its
+  one exception); the branch (8 commits, suite 382 OK) is READY FOR THE OWNER'S PUSH; the second pass (cell_depth from
+  swing) stays recommended, not commissioned. CP5 walkthrough given to the owner in chat.
   **HARNESS TEMPLATE PORT DONE (owner in chat 2026-11-02, "I am ready to update the comms harness template ... including
   the codex development addition"; chose: CHARC ports on a branch):** `C:/Users/rwsmy/harness-template` branch
   `clearwater-upstream-2026-11-02`, 5 commits on origin/master `6488556` (layer 1 `fc9f4b5` the coa-chess comms core as
