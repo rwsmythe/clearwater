@@ -48,7 +48,7 @@
   (3) **Phase 5 close** after CP5, DR-113 and WP5.2: the gate report (fullclip 2,635 s at d112 noted), the owner's spec
   bundle (N6 final figure; D63 'provisional' -> confirmed (AD-24); photo resolution 24.5 MP max + the 48 MP figure; D75
   errata), WP5.5 release preparation, the form-debt proposal (split this file's history into `docs/charc-log.md`).
-  **HARNESS TEMPLATE PORT: DONE, AWAITING THE OWNER'S PUSH.** `C:/Users/rwsmy/harness-template` branch
+  **HARNESS TEMPLATE PORT: DONE AND PUSHED by the owner 2026-11-02 ~16:40Z (`origin/clearwater-upstream-2026-11-02` = `ef7e671`, 7 commits ahead of origin/master `6488556`; PR not yet opened: https://github.com/rwsmythe/harness-template/pull/new/clearwater-upstream-2026-11-02; merge to master is the owner's call; the swing `cell_depth.py` second pass stays RECOMMENDED, not commissioned).** Gen 12's wording follows: `C:/Users/rwsmy/harness-template` branch
   `clearwater-upstream-2026-11-02`, 8 commits on origin/master `6488556`, head `ef7e671`, suite 382 OK / 1 skip (run WITHOUT
   `python -I`). Both sibling CHARC reviews adjudicated (record `docs/proofs/harness-upstream-2026-11-02.md`; coa-chess
   confirmed by re-run, no disagreement; swing's receipt not yet seen). Owner ruled 2026-11-02: the early-roll text is one
