@@ -29,7 +29,9 @@
   seats since 03:05Z (post `310d5f9c`). PARTIAL RESUME (owner in chat to gen 33, 2026-11-02 ~03:10Z, verbatim: "You can
   start the codex work"): Codex turns resumed 04:26Z (WP5.3 read-back turn 15); MY RULING `47bc7679`: the build pieces
   (V-D, V-Z, V-R, page, tally) are included (no weekly budget drawn), Claude passes (WP-D112 A, B, any Claude-seat gate)
-  STAY PAUSED until the owner lifts that part explicitly; the owner's chat answer, if different, wins.** V-S re-run from gen 33's pane EXIT 0 at 03:04:48Z (8740 s, 26 done, 0 failed,
+  STAY PAUSED until the owner lifts that part explicitly. OWNER CONCURRED (in chat to gen 33, ~04:30Z, verbatim: "concur
+  with CHARC's ruling.  Work that does not impact the weekly budget may be resumed.  Small token usage to invoke the tools
+  or invoke codex are allowed exceptions to the no spend."; post `e9f8c235`).** V-S re-run from gen 33's pane EXIT 0 at 03:04:48Z (8740 s, 26 done, 0 failed,
   verified in `work/orch-g33/wp53-runs/summary.txt`; C: 155 GB free; pack.json: P-A 64, P-Z 9, V-S 26, V-P 8 done + 9 failed
   (DR-112), pending V-D 8 / V-Z 2 / V-R 2); on resume the order is the Codex read-back turn 15, V-D, V-Z, V-R, page, tally, and
   WP-D112 Reviewer A; the first run DIED 00:36:53Z with gen 32's pane (its 33
