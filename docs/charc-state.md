@@ -49,7 +49,11 @@
   on the Codex lane (independence lock + F-B2 out concurred; the owner record = V4 over IMG_6731.MOV MANDATORY all SAME
   after, 2 DIFFERENT before). WP5.2 brief FINAL `70c3a5db` on brief-wp5.2 (gen 34 fill `f70ad027`); BOTH DISPATCHED 10:19Z (post `f5bcb939`): WP-DR113 brief FINAL `dc018f25`,
   worktree `.worktrees/wp-dr113`, round 0 running; WP5.2 worktree `.worktrees/wp5.2` at `70c3a5db`, round 0 / T1 running,
-  light only; Codex share 2 of 2 live cells; every EXCLUSIVE window named to me before it opens.**
+  light only; Codex share 2 of 2 live cells; every EXCLUSIVE window named to me before it opens. WP5.2 ROUND 0 STOP
+  (post `63abdaa1`, ledger `6d0103a0`) RULED by me: F1 R1 command corrected (--device-frames --subdir); F2 run requests at the
+  orchestrator's seat into work/wp5.2, the cell read-only; F3 OPTION (a): new owned tools/photo_memory.py importing
+  photo_verify's APIs + light test, the 48 MP PNG16 generated at run time via tools/fixtures/stills.py, photo_verify.py
+  unedited; F4 R2 = the WHOLE GX011627 (681 frames; my '30 s' struck); F5 W52-1 = R1 alone, W52-2 = R2 + R3.**
   **TEMPLATE REVIEW ADJUDICATED 2026-11-02 ~10:20Z:** swing 15 findings (12 fixed, 1 OPEN MAJOR: cell_depth lacks
   --sessions / --live, second pass), coa 19 findings (14 fixed incl. the CRITICAL root-discover-runs-0-tests, 2 to the
   OWNER: the early-roll exception vs the 2026-09-25 operator direction; 3 declined / limits). Remediation commit `8031617`
