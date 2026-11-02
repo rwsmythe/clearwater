@@ -1,14 +1,12 @@
 # WP5.3: CP5 visual review pack build report
 
-**2026-11-02; NOT OWNER-READY.** The pack accounts for all **128** commissioned
-items: **117 done, 9 failed V-P items, 2 expected HLG refusals, pending 0**.
-The nine failures are the **OPEN product defect DR-112** (PCM audio with
-irregular packet sizes, as routed by the dispatcher), assigned to **WP-D112**.
-This package does not repair or work around the product. CP5 waits for
-WP-D112's merge, a successful `clips V-P` rerun, then `page`, `page --check`
-and `tally`, with **pending 0 AND failed 0**, before owner handoff. The current
-`page` exit is **1**, link-only `page --check` is **0**, and `tally` is **0**.
-These facts come from the turn-19 publication read-back and its receipts.
+**2026-11-02; ready for CP5 (the owner judges).** **128 items = 126 done
+(P-A 64, P-Z 9, V-S 26, V-D 8, V-Z 2, V-P 17), 2 V-R expected HLG refusals,
+failed 0, pending 0**. WP-D112 accepted at **92d9ff77** closed DR-112;
+the nine-item V-P witness rerun and subsequent `page`, `page --check` and
+sheet-qualified `tally` all exited **0**. Session 8 / Turn 21 independently
+read back their records, published links and empty sheet. This package
+introduced no product workaround or correction judgement.
 
 **No agent judged any image.** Preference, above-surface classification,
 artifacts, preset changes and the CP5 decision belong to the owner. All owner
@@ -30,6 +28,7 @@ machine paths. The ledger is **wp5.3-ledger.md**.
 |---|---|
 | R32 | Generation-32 summary.txt and the completed photos.log, presets.log, page.log, page-build.log, page-check.log, tally-1.log and clips-V-P.log receipts |
 | R33 | Generation-33 summary.txt and clips-V-S.log, clips-V-D.log, clips-V-Z.log, clips-V-R.log, page.log, page_check.log and tally.log receipts |
+| R34 | Generation-34 summary.txt, clips-V-P.log, page.log, page_check.log and tally.log witness receipts |
 | L13 | Ledger, Session 5 / Turn 13: photo, preset and initial publication read-back |
 | L14 | Ledger, Session 6 / Turn 14: V-P results and exact failure strings |
 | L15 | Ledger, Session 6 / Turn 15: V-S rerun, interruption/recovery and excerpt timing table |
@@ -37,7 +36,8 @@ machine paths. The ledger is **wp5.3-ledger.md**.
 | L17 | Ledger, Session 6 / Turn 17: V-Z results and excerpt timing table |
 | L18 | Ledger, Session 6 / Turn 18: V-R expected refusals |
 | L19 | Ledger, Session 6 / Turn 19: final publication, links, empty tally and readiness |
-| P | Read-only pack.json; P-A.json, P-A-neutral.json, P-Z.json, P-Z-neutral.json, V-P.json, V-S.json, V-D.json, V-Z.json, V-R.json; V-S-excerpts.json, V-D-excerpts.json, V-Z-excerpts.json; index.html, review-sheet.csv and both exported starter JSON files |
+| L21 | Ledger, Session 8 / Turn 21: DR-112 witness, preserved rows, current publication and empty tally |
+| P | Read-only pack.json; P-A.json, P-A-neutral.json, P-Z.json, P-Z-neutral.json, V-P.json, V-P-2.json, V-S.json, V-D.json, V-Z.json, V-R.json; V-S-excerpts.json, V-D-excerpts.json, V-Z-excerpts.json; index.html, review-sheet.csv and both exported starter JSON files |
 
 This reporting turn reads receipts/records only; it runs no real-pack stage,
 opens no footage or owner media, and writes nothing to the real pack. Earlier
@@ -68,6 +68,9 @@ pieces are on **2026-11-01**, and the rerun/later pieces on **2026-11-02**.
 Free-disk values reproduce the ledger's GB readings. Every recorded clips-start
 reading exceeds the commissioned **25 GB** prerequisite.
 
+Witness manifest/sheet arguments below are shown by file name to preserve the
+privacy rule; the ledger's RUN REQUEST table retains the exact seat commands.
+
 | Piece / exact command | Head | Exit | Informal wall / UTC interval | Free disk before -> after (GB) | Evidence |
 |---|---|---:|---|---|---|
 | `uv run python -m tools.reviewpack.build photos` | 6d470028 | 0 | 673 s; 22:00:18-22:11:32 | 171 -> 167 | R32, L13 |
@@ -85,6 +88,11 @@ reading exceeds the commissioned **25 GB** prerequisite.
 | `uv run python -m tools.reviewpack.build page` (final publication) | 792ee22c | 1 | 2 s; 05:41:16-05:41:18 | missing -> missing | R33, L19 |
 | `uv run python -m tools.reviewpack.build page --check` (final links) | 792ee22c | 0 | 1 s; 05:41:18-05:41:19 | missing -> missing | R33, L19 |
 | T below (final empty tally) | 792ee22c | 0 | 1 s; 05:41:19-05:41:20 | missing -> missing | R33, L19 |
+| `uv run python -m tools.reviewpack.build clips V-P --manifest` with pack-local vp-witness.json | 92d9ff77 | 0 | 380 s; 09:54:02-10:00:25 | 101 -> 101 | R34, L21; nine named failed items only |
+| `uv run python -m tools.reviewpack.build page` (witness publication) | 92d9ff77 | 0 | 2 s; 10:00:37-10:00:39 | missing -> missing | R34, L21 |
+| `uv run python -m tools.reviewpack.build page --check` (witness links) | 92d9ff77 | 0 | 2 s; 10:00:39-10:00:41 | missing -> missing | R34, L21 |
+| `uv run python -m tools.reviewpack.build tally` (missing sheet argument) | 92d9ff77 | 2 | 0 s; 10:00:41-10:00:41 | missing -> missing | R34; invocation error, not an instrument defect |
+| `uv run python -m tools.reviewpack.build tally` with pack-local review-sheet.csv | 92d9ff77 | 0 | wall missing; 10:00:51-10:00:52 | missing -> missing | R34, L21; current empty tally |
 
 T is the ledger's exact config-resolved tally request, avoiding any literal
 machine path or accidental use of the worktree's scratch sheet:
@@ -113,8 +121,8 @@ recovery and did not adopt the orphan media as completed results.
 
 ## Current accounting and empty tally
 
-Counts are from P and L13-L19, with the final coverage lines independently
-matched to R33's tally.log in L19. Done includes the product's "done with
+Counts are from P and L21, with the current coverage lines independently
+matched to R34's tally.log in L21. Done includes the product's "done with
 warnings" results. There are no current failed viewing aids.
 
 | Group | Commissioned | Done / available sheet rows | Failed | Refused | Pending | Headline treatment |
@@ -123,34 +131,33 @@ warnings" results. There are no current failed viewing aids.
 | P-Z pre-corrected photo candidates | 9 | 9 | 0 | 0 | 0 | Separate candidates |
 | V-S Snorkel | 26 | 26 | 0 | 0 | 0 | Included |
 | V-D SCUBA | 8 | 8 | 0 | 0 | 0 | Included |
-| V-P phone | 17 | 8 | 9 | 0 | 0 | Included; missing coverage remains visible |
+| V-P phone | 17 | 17 | 0 | 0 | 0 | Included |
 | V-Z pre-corrected video candidates | 2 | 2 | 0 | 0 | 0 | Separate candidates |
 | V-R HLG | 2 | 0 | 0 | 2 | 0 | Expected refusals; no review rows |
-| Total | 128 | 117 | 9 | 2 | 0 | No CP5 handoff yet |
+| Total | 128 | 126 | 0 | 2 | 0 | Ready for CP5; owner judges |
 
-L19 verifies **128** unique page articles and **117** unique sheet rows with
+L21 verifies **128** unique page articles and **126** unique sheet rows with
 the exact saved source/corrected identities. All owner answers and status flags
-are blank. **603** distinct relative targets resolve inside the pack:
-**117** corrected products, **73** neutral photo source views, **234** thumbnails,
-**44** pair clips, **132** pair stills, the sheet and **2** preset files.
+are blank. **666** distinct relative targets resolve inside the pack:
+**126** corrected products, **73** neutral photo source views, **252** thumbnails,
+**53** pair clips, **159** pair stills, the sheet and **2** preset files.
 Link success says nothing about preference or completion.
 
 ```text
 pack pending: 0
 headline: 0/0 = 0.0 %  (D65 bar 80 %)
-  coverage: expected=115, available=106, missing=9, unjudged=106
+  coverage: expected=115, available=115, missing=0, unjudged=115
 candidates: 0/0 = 0.0 %
   coverage: expected=11, available=11, missing=0, unjudged=11
 ```
 
 Every per-group judged/preferred count, and all halos, banding, color_errors,
 shimmer, flicker, above_surface and viewing_aid_failed counts, are **0**
-(R33, L19). **106/115 is coverage, not a preference fraction.** Failed products
-remain missing from expected coverage; they are not owner "no" votes and do
-not authorize a reduced CP5 test set. The valid empty tally exits 0 without
-making a visual judgement. Page exits 1 for the recorded failures; exit 2 is
-reserved for pending items/presets or sheet conflicts. Link-only `--check`
-does not establish readiness.
+(R34, L21). **115/115 is coverage, not a preference fraction.** All **115**
+headline items and **11** candidates are available and unjudged. The valid
+empty tally exits 0 without making a visual judgement. The rebuilt page exits
+0 with no failures, pending items, missing presets or sheet conflicts.
+Link-only `--check` does not by itself establish readiness.
 
 ## Excerpt record
 
@@ -193,7 +200,7 @@ is null; no GoPro timecode was invented. The other **15 V-S**, **2 V-D** and
 **1 V-Z** items are whole (L15-L17). Whole inputs are read in place; no
 whole-source copies are made for the pack.
 
-## Product refusals and open failures
+## Product refusals and DR-112 witness
 
 Both V-R items are expected **refused** results under spec 5.3, with no media
 or sheet rows. The product runner's raw exit is 1, preserved in their rows;
@@ -205,12 +212,11 @@ IMG_6704.MOV: This video uses HLG HDR, which Clearwater does not support. Record
 IMG_6772.MOV: This video uses HLG HDR, which Clearwater does not support. Record in standard (SDR) mode instead.
 ```
 
-The following **nine V-P failures remain OPEN under DR-112**. They have no
-completed product or review row and appear under **Not built** with the same
-text. This is a product blocker, not an HLG refusal or an instrument retry.
-The PCM packet-size association is the dispatcher's diagnosis; the cell did
-not open sources to reproduce it. Product strings are verbatim from V-P.json
-and agree with L14/L19:
+The following **nine historical V-P failures were closed by the DR-112 witness**
+after WP-D112 accepted at **92d9ff77**. Product strings below remain verbatim
+from the immutable original V-P.json and L14/L19 as historical evidence;
+they are absent from the current page's **Not built** list. The cell did not
+open sources to reproduce the product defect.
 
 | Item | Product text |
 |---|---|
@@ -224,14 +230,23 @@ and agree with L14/L19:
 | IMG_6742.MOV | IMG_6742.MOV: The finished video does not match what was written: audio stream 0: packet 72 at 192/125 s where the source has 6069/4000 s |
 | IMG_6760.MOV | IMG_6760.MOV: The finished video does not match what was written: audio stream 0: packet 143 at 36289/12000 s where the source has 36217/12000 s |
 
-After WP-D112 merges, the scheduled plain `clips V-P` command selects all
-**17** V-P items, including the **8** current successes; it is not automatic
-failed-only resume. Fresh records and collision-numbered outputs preserve
-earlier files. A dispatcher-selected manifest can instead name only the
-failures, but this report creates none. No output should be adopted by guessed
-filename. Rebuild/check/tally must then be read back: the expected successful
-state has **126** reviewable rows, headline available **115**, missing **0**,
-candidates **11**, and the same **2** expected HLG refusals (L19).
+The dispatcher used vp-witness.json to select exactly these **nine** items.
+Their fresh raw runner record is **V-P-2.json**, with **9 done with warnings**,
+zero failures and exit 0. Each current pack row names that record and the
+product's actual corrected output; all **63** product/pair/still/thumbnail
+files are present and linked. Their only warnings are the product's own
+**"Not carried to the output: data track mebx"** (D105), preserved verbatim.
+The original **V-P.json** retains its historical 8 successes / 9 failures;
+it is not rewritten to disguise the failed attempt.
+
+L21 compares literal item-object bytes with the pre-witness saved snapshot:
+exactly these nine rows changed, while the other **119**, including all
+**8** earlier DONE V-P rows, are byte-unchanged. The catalog retains **128**
+rows, presets are unchanged, and all **17** V-P rows are now done. Every
+article's link multiset equals its saved output identities; no stale or
+orphan output is linked. All **126** sheet rows have blank owner/status cells,
+headline available **115**, missing **0**, candidates **11**, and the same
+**2** expected HLG refusals. No agent judged any image.
 
 ## Starter presets as exported
 
@@ -274,9 +289,9 @@ these are resolved schema values, not extra fields inserted into either export:
 
 In v1 both starter presets carry AD-8's defaults, so the corrected items on this page are what both presets produce; at CP5 the owner may change either preset's values (AD-13).
 
-## How the owner uses the pack after recovery
+## How the owner uses the pack
 
-Once the dispatcher confirms the readiness conditions above, open index.html
+The witnessed pack is ready for CP5 (the owner judges). Open index.html
 and compare source on the left with corrected on the right. Photo source views
 are the product's neutral exports with the same orientation, ICC handling and
 bit depth. Pair clips/stills are viewing aids; the linked corrected product
@@ -302,8 +317,8 @@ acceptance. The owner/CHARC records CP5 and any D96 shimmer follow-up.
 If a later rebuild changes a pair that already has owner answers, the tool
 preserves those answers and reports a sheet conflict rather than transferring
 a vote. Follow README.md: blank that row's owner cells to accept the new pair
-at the next page build, or restore the earlier output. Do not judge the current
-incomplete pack as a reduced test set.
+at the next page build, or restore the earlier output. A later incomplete
+rebuild does not authorize a reduced test set.
 
 ## Limits, review and remaining work
 
@@ -340,9 +355,11 @@ incomplete pack as a reduced test set.
 Reviewer A **converged at round 4** under CHARC's ruling; the executing
 Reviewer B returned **NO_NEW_CRITICAL_MAJOR**, with findings closed before the
 real builds (ledger review table and turns 10-13). This report does not claim
-the final two-leg gate, WP-D112 recovery or CP5 acceptance. Those remain at the
-dispatcher/owner seats. No dependency, product, frozen interface or code changes
-are part of this reporting turn; only the report and ledger change.
+CP5 acceptance. The dispatcher's WP5.3 accept record records the final two-leg
+gate; WP-D112 accepted at 92d9ff77 and its recovery witness is recorded above.
+CP5 judgement remains with the owner. No dependency, product, frozen interface
+or instrument code changes are part of turn 21; its only test edits are the
+two commissioned slow markers for B-F4 and DR-99 (b).
 
 Fresh turn-20 light verification includes the tiny planted headless/FFmpeg
 integration, never the real pack. **177 tests passed in 46.24 s**, exit 0;
@@ -350,7 +367,15 @@ ruff check passed, format check reported **6 files already formatted**, and
 mypy reported no issues in **151 source files**, all exit 0. Evidence is the
 worktree's ignored full.log/full.xml, ruff.log, format.log and mypy.log for
 turn 20. The mandatory sandbox mkdir shim was retained. These checks do not
-close DR-112 or replace the dispatcher's final gate.
+replace the dispatcher's final gate. Turn-21 verification and the DR-112
+witness are recorded in L21; DR-112 was closed by WP-D112, not those tests.
+
+Turn 21: **174 non-slow reviewpack tests passed** (3 deselected); the **three
+moved nodes passed once** by exact ID. Collection proves all three are absent
+from the parallel selection and present in serial. Ruff check and format
+check passed on both changed test files; mypy found no issues in **154 source
+files**. Every changed file is ASCII with 0 CR bytes. Evidence and exact
+commands are recorded in L21. No real-pack stage ran in this cell.
 
 ## Empty CP5 sheet header
 

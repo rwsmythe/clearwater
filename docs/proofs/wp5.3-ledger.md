@@ -302,6 +302,11 @@ Q8 order, including candidate/refusal coverage omitted from its shorthand:
 | 9 | `RUN REQUEST: uv run python -m tools.reviewpack.build page` | <2 minutes | rebuilt index and merged owner sheet; state remains read-only | On 792ee22c, EXIT 1, 2 s, 2026-11-02 05:41:16Z-05:41:18Z; 128 accounted, failed=9 (V-P, DR-112), pending=0. 117 sheet rows; 117 done / 9 failed / 2 refused page articles. Not owner-ready. |
 | 10 | `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | <1 minute | link-check console receipt; no state/page/sheet write | EXIT 0, 1 s, 05:41:18Z-05:41:19Z, same head. Turn-19 independent check: all 603 distinct relative targets resolve inside pack; link success is not pack readiness. |
 | 11 | Config-resolved tally request below | <1 minute | zero-judged tally, console captured by dispatcher | EXIT 0, 1 s, 05:41:19Z-05:41:20Z, same head; pending=0. Headline 0/0; expected 115 / available 106 / missing 9 / unjudged 106. Candidates expected 11 / available 11 / missing 0 / unjudged 11; all flags 0. Earlier post-photos tally (then order 10): EXIT 0, pending 55, headline available 64 / missing 51, candidates available 9 / missing 2. |
+| 12 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-P --manifest C:\Users\rwsmy\clearwater\work\wp5.3\manifests\vp-witness.json` | Actual informal 380 s | nine product clips and viewing aids, V-P-2.json and replacement pack rows | Generation 34 on 92d9ff77, 2026-11-02 09:54:02Z-10:00:25Z, EXIT 0, free 101 -> 101 GB. Nine selected items accounted, failed=0, pending=0; pack retains 128 rows, V-P 17 done. Turn-21 read-back verified 63 new linked media targets and 119 byte-unchanged earlier item objects. |
+| 13 | `RUN REQUEST: uv run python -m tools.reviewpack.build page` | Actual informal 2 s | rebuilt index and 126-row owner sheet | Same head, 10:00:37Z-10:00:39Z, EXIT 0; 128 accounted, failed=0, pending=0. |
+| 14 | `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | Actual informal 2 s | read-only link-check receipt | Same head, 10:00:39Z-10:00:41Z, EXIT 0; turn-21 independent check resolves all 666 distinct relative targets inside the pack. |
+| 15 | `uv run python -m tools.reviewpack.build tally` (dispatcher invocation error) | Actual informal 0 s | diagnostic only | Same head, 10:00:41Z, EXIT 2: reviewpack: tally requires a sheet. Not an instrument defect. |
+| 16 | `RUN REQUEST: uv run python -m tools.reviewpack.build tally C:\Users\rwsmy\clearwater\work\wp5.3\review-sheet.csv` | Wall not receipted; 10:00:51Z-10:00:52Z | empty-sheet tally receipt | Same head, EXIT 0; pending 0, headline expected=115 available=115 missing=0 unjudged=115; candidates 11; all judged/preferred/artifact/status counts zero. |
 
 Turn 19 splits the formerly combined page/check row and renumbers the tally
 as order 11, matching the dispatch's three publication receipts. The earlier
@@ -395,7 +400,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 6 / turn 17 / clips V-Z read-back | same session 6 | 154,213 | Dispatcher supplied at turn 18; committed 6bf8ce99. Two V-Z outputs/aid sets, one excerpt and unchanged earlier rows verified against saved turn-16 snapshot; full module checks; only ledger changed. |
 | Session 6 / turn 18 / clips V-R read-back | same session 6 | 170,040 | Dispatcher supplied at turn 19; committed 792ee22c. Two exact expected product HLG refusals, no outputs, zero pending, unchanged earlier rows; full module checks; only ledger changed. |
 | Session 6 / turn 19 / publication read-back | same session 6 | 200,702 | Dispatcher supplied at turn 20; session 6 retired. All 128 published identities/statuses, 117 sheet rows, 603 targets and zero-judged coverage verified; exit/rerun rules cited. |
-| Session 7 / turn 20 / the report | fresh session 7; dispatcher to fill ID | dispatcher pending | Report traces completed receipts/read-backs, retains OPEN DR-112 / CP5 blocker and Limits; full module/static checks; only report and ledger changed. |
+| Session 7 / turn 20 / the report | fresh session 7; dispatcher to fill ID | 106,986 | Dispatcher supplied at turn 21; session 7 retired. Report traces completed receipts/read-backs, retains then-OPEN DR-112 / CP5 blocker and Limits; full module/static checks; only report and ledger changed. |
+| Session 8 / turn 21 / DR-112 witness and markers | fresh session 8; dispatcher to fill ID | dispatcher pending | Read-only nine-item witness/publication audit; report now ready for owner CP5 judgement; only two commissioned test markers plus report/ledger changes. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -3213,3 +3219,131 @@ read or output write outside the worktree. The report carries the OPEN DR-112
 blocker and expressly withholds owner readiness. **YIELD after the report**;
 WP-D112 merge, V-P recovery/publication/read-back, the dispatcher's final gate
 and the owner's CP5 judgement remain outstanding.
+
+
+## Session 8 / Turn 21: DR-112 witness read-back and two slow markers
+
+### Boundary and authority
+
+Fresh **session 8** starts at **92d9ff77**. **Session 7 retired at 106,986
+depth_input_tokens** after turn 20 (dispatcher supplied). **Session-8 ID and
+turn-21 depth_input_tokens: dispatcher to fill; no estimate.** WP5.3 was
+accepted at 91db201b; WP-D112 accepted at 92d9ff77 closed DR-112. The
+commissioned witness replaces the nine failed V-P rows; it introduces no
+product/instrument repair, new review round or new full gate.
+
+Read-only receipts are generation 34's **summary.txt**, **clips-V-P.log**,
+**page.log**, **page_check.log** and **tally.log**. Their completed RUN REQUEST
+rows 12-16 are appended above, including the dispatcher's missing-sheet
+invocation error and corrected tally. Times/free disk are informal receipts,
+not new measurements or figures of record. No build stage ran in this cell.
+
+### Per-check witness results
+
+The ignored worktree-only **work/wp5.3/turn21/readback.py** audits records and
+publication, stats named files, and calls sheet.tally read-only. It never
+opens any media. Evidence: **readback.log/.exit**, **readback-summary.json**,
+**readback-findings.json**, **publication-checks.csv**. Exit **0**; findings
+**[]**. The pre-witness baseline is the saved turn-18 pack-snapshot.json,
+already proved byte-identical to the turn-19 publication state.
+
+| Check | Observed result |
+|---|---|
+| Complete accounting | **128 items = 126 done (P-A 64, P-Z 9, V-S 26, V-D 8, V-Z 2, V-P 17), 2 V-R expected HLG refusals, failed 0, pending 0**. No catalog name lost or duplicated; preset state unchanged. |
+| Nine witness identities | **IMG_6729.MOV, IMG_6731.MOV, IMG_6733.MOV, IMG_6735.MOV, IMG_6736.MOV, IMG_6738.MOV, IMG_6741.MOV, IMG_6742.MOV, IMG_6760.MOV** are all done, with raw outputs identical to normalized corrected_name. Their runner_exit_status is 0 and record_name is **V-P-2.json**. |
+| Fresh versus historical raw records | The new runner invocation correctly allocated **V-P-2.json**: 9 done with warnings, 0 failed/cancelled/not run. **V-P.json remains the immutable original 8 done with warnings / 9 failed invocation**, preserving the earlier diagnostic history. The dispatch's reference to nine new DONE rows in V-P.json is read as the current V-P results, not authority to rewrite history; no record is changed here. |
+| Product pose and warnings | Fresh raw record: c3 / defaults, force_cpu=false, GPU and hevc_nvenc. Every new row has only the product's **Not carried to the output: data track mebx** warning (D105), equal to raw warnings including repetitions; empty failure/message, no viewing_aid_failed or aid_message. |
+| Replace-or-append preservation | Literal UTF-8 item-object slices from both snapshots differ for **exactly the nine named items**. All **119** other object slices are byte-unchanged, including the **8** prior DONE V-P items: IMG_6702, 6716, 6717, 6727, 6728, 6734, 6745, 6762 (all .MOV). Those eight still reference V-P.json and their original product identities/warnings. This proves the manifest selected work without shrinking state. |
+| Witness artifacts | **9 product MP4s + 9 pair MP4s + 27 pair stills + 18 thumbnails = 63 files**, all present/nonempty and linked by the exact saved identities. Each video's stills are 10/50/90 percent; no failed aid. |
+| Whole publication | **128 unique articles**, status labels **126 done / 2 refused / 0 failed**; header Pending 0. Both effective starter-preset tables remain present. No claim that an aggregate failed counter exists in the header: zero is verified from every displayed label and the page completion receipt. |
+| Old failures and stale links | None of the nine old product failure strings remains on index.html or under Not built. Every DONE article's href/src multiset equals exactly its current saved outputs, with no missing, extra or duplicate link. No orphan-location or partial output reference. Thus no stale/unrecorded failed-attempt media is linked; historical raw records remain diagnostic evidence only. |
+| Sheet | **126 unique rows**, exactly one per reviewable DONE item, with first-five identity columns equal to current records; no V-R row. All preferred/artifact/above_surface/note/viewing_aid_failed cells blank. |
+| Relative targets | **666** distinct targets resolve within the current pack: **126 products + 73 neutral photo views + 252 thumbs + 53 pairs + 159 stills + 1 sheet + 2 presets**. No absolute/external/traversal link. V-R has no media links. |
+| Privacy | **17 surfaces**: page, sheet, README and **all 14 JSON records**, including both V-P invocations and excerpt sidecars. **0 full-path candidates, 0 GPS/EXIF mentions**. No value-bearing metadata fragment needs adjudication. Logs/seat receipts remain diagnostics, not publication surfaces. |
+| Tally | Read-only sheet.tally matches **every formatted line** of R34 tally.log. Headline expected=115 / available=115 / missing=0 / unjudged=115; candidates expected=available=unjudged=11, missing=0. All judged/preferred/artifact/above_surface/aid-failure counts zero; pending total 0. These are coverage counts, not preference votes. |
+| Stable read | pack.json and both raw V-P files are byte-identical at audit start/end. Current pack SHA256 **a4d925f81254f96d014bfa5a27de194cd888e0db189235fa0fb514c16bd3b833**. No real-pack write occurred. |
+
+The earlier V-S archive-basename reuse caveat remains as documented in L15/L19;
+current relative target identity, not a claim of unique historical basenames,
+is the link criterion. No archived media were read or compared.
+
+### Two commissioned markers and collection proof
+
+Exactly two test-only decorator additions (no test body or other code edit):
+
+- **B-F4**, CHARC d4224524: test_missing_starter_presets_are_pending_until_both_tables_exist
+  receives `@pytest.mark.slow(reason="5.6-5.75 s under -n 4 at WP5.3 gate w53 (B-F4)")`.
+  Both present=0 and present=1 parametrisations move together.
+- **DR-99 (b)**, WP-D112 accept ruling 2026-11-02T09:51:52Z:
+  test_a_frames_release_is_not_timed_as_its_write receives
+  `@pytest.mark.slow(reason="median write 0.284 s under -n 4 at WP-D112 gate d112 (DR-99 (b))")`.
+  Existing usefixtures("quick") is preserved. The module's existing slow marker
+  is bare, with no conflicting reason convention.
+
+All pytest invocations set **PYTHONPATH=scripts**, load the mandatory
+**sandbox_mkdir_shim**, disable cacheprovider and route output under this
+worktree's **work/wp5.3/turn21/**. Collection commands target only the two
+changed test files, using the commissioned parallel/serial marker predicates:
+
+```text
+uv run pytest --collect-only -q -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not slow and not fullclip" tests/test_reviewpack.py tests/test_io_video_encode_bench.py
+uv run pytest --collect-only -q -p sandbox_mkdir_shim -p no:cacheprovider -m "(gpu or footage or gui or slow) and not fullclip" tests/test_reviewpack.py tests/test_io_video_encode_bench.py
+```
+
+**collect-parallel.log/.exit:** **221/227 collected, 6 deselected**, exit 0;
+none of the three moved node IDs occurs. **collect-serial.log/.exit:**
+**6/227 collected, 221 deselected**, exit 0; all three occur exactly once:
+
+```text
+tests/test_reviewpack.py::test_missing_starter_presets_are_pending_until_both_tables_exist[0]
+tests/test_reviewpack.py::test_missing_starter_presets_are_pending_until_both_tables_exist[1]
+tests/test_io_video_encode_bench.py::test_a_frames_release_is_not_timed_as_its_write
+```
+
+Those **three nodes were run once by exact ID**, together serially, with
+`--basetemp=work/wp5.3/tmp/t21-nodes -p sandbox_mkdir_shim -p no:cacheprovider`:
+**3 passed in 22.07 s**, exit 0 (**nodes.log/.exit/.xml**). No rerun was needed.
+They are excluded from the following non-slow pass.
+
+### Light checks, report and verification loop
+
+```text
+uv run pytest -q tests/test_reviewpack.py -m "not slow" --basetemp=work/wp5.3/tmp/t21 -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp5.3/turn21/non-slow.xml
+uv run ruff check tests/test_reviewpack.py tests/test_io_video_encode_bench.py
+uv run ruff format --check tests/test_reviewpack.py tests/test_io_video_encode_bench.py
+uv run mypy
+```
+
+- **non-slow.log/.exit/.xml:** **174 passed, 3 deselected in 33.02 s**, exit 0.
+- **ruff.log/.exit:** All checks passed, exit 0.
+- **format.log/.exit:** **2 files already formatted**, exit 0.
+- **mypy.log/.exit:** Success: no issues found in **154 source files**, exit 0.
+- **final-audit.log/.exit:** PASS, exit 0: exactly four authorized changed
+  files, test diffs exactly the two marker additions, all three IDs absent
+  from parallel and present once in serial, current report figures and
+  historical failure strings checked; every changed file **0 CR and ASCII**.
+  **diff-check.log/.exit:** whitespace clean, exit 0.
+- The inherited VIRTUAL_ENV mismatch is ignored by uv; no alternate environment
+  is targeted. Seat logs also retain their known package-import deprecation
+  warning; it is not a per-item warning or an instrument change request.
+
+The report's status/counts, current publication/tally, DR-112 witness and run
+table are amended; historical receipts and exact old failure strings stay
+explicitly historical. It states **ready for CP5 (the owner judges)** without
+claiming CP5 acceptance. The original empty CP5 header, preset values and
+excerpt tables remain. The only code changes are the two authorized markers.
+
+Verification loop: suspect lost/changed earlier rows -> independently compare
+literal saved item-object bytes -> **rejected**, exactly 9 replacements and
+119 unchanged. Suspect stale failure/media links or denominator loss ->
+compare raw results, every article's link multiset and all sheet identities ->
+**rejected**, 126 products/rows with full expected coverage. Suspect leaked
+path/metadata values -> scan all 17 commissioned text/record surfaces ->
+**rejected**, zero candidates. Suspect marker leg mismatch -> collect both
+predicates and run the three nodes once -> **rejected**, moved and passing.
+Full read-back pass finds **no instrument defect; no STOP or fix**.
+
+No footage-folder read, image/video opening or judgement, real build invocation,
+main working-folder write, other-worktree access, local-config edit, product or
+instrument edit, mailbox post, git mutation or commit. The dispatcher commits
+by the four named pathspecs; **YIELD at the commissioned turn boundary**.

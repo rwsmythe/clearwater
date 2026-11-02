@@ -489,6 +489,7 @@ def test_run_once_refuses_a_strays_count_below_one(tmp_path: Path) -> None:
 
 
 @pytest.mark.usefixtures("quick")
+@pytest.mark.slow(reason="median write 0.284 s under -n 4 at WP-D112 gate d112 (DR-99 (b))")
 def test_a_frames_release_is_not_timed_as_its_write(
     sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

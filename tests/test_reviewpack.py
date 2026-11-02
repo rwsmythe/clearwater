@@ -2516,6 +2516,7 @@ def test_conflict_section_escapes_every_displayed_fact(roots: OutputRoots) -> No
         assert value in unescape(section)
 
 
+@pytest.mark.slow(reason="5.6-5.75 s under -n 4 at WP5.3 gate w53 (B-F4)")
 @pytest.mark.parametrize("present", [0, 1])
 def test_missing_starter_presets_are_pending_until_both_tables_exist(
     roots: OutputRoots,
