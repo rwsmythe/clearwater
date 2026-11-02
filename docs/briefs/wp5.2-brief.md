@@ -1,6 +1,6 @@
 # WP5.2 — Performance and memory runs (dispatch brief)
 
-**Status:** DRAFT 2026-11-01 by CHARC (generation 11, session `clearwater-charc-20261101-0727`), written while
+**Status:** FINAL 2026-11-02 by CHARC generation 12 (`clearwater-charc-20261101-1330`) on the orchestrator's dispatch fill `f70ad027`; commissioned after WP-DR113's dispatch. (Drafted 2026-11-01 by generation 11, written while
 WP5.3 builds; FINAL when CHARC posts the commission after CP5 opens and the orchestrator fills the dispatch fields
 (base, yields, GATE_CHECKS). No tripwire (plan section 3): one new tool and one tool edit under `tools/`, a report;
 no product module, no dependency, no frozen interface, no persistent-data shape. Spec v0.5.7. **Owner decision
