@@ -1,6 +1,7 @@
-"""Real cross-process device hold and release; no performance figure is recorded."""
+"""Holder readiness, stop latency and device-wide memory recovery (WDDM ruling)."""
 
 import json
+import math
 import subprocess
 import sys
 import time
@@ -8,8 +9,19 @@ from pathlib import Path
 
 import pytest
 
+from video_fidelity import _nvidia_smi
+
 pytestmark = pytest.mark.gpu
 SCRIPT = Path(__file__).resolve().parents[1] / "tools/device_hold.py"
+
+
+def _device_used_mib():
+    text = _nvidia_smi(["--id=0", "--query-gpu=memory.used", "--format=csv,noheader,nounits"])
+    if text is None:
+        pytest.skip("nvidia-smi is not available; cannot verify device-wide memory")
+    used = float(text.strip())
+    assert math.isfinite(used) and used >= 0, text
+    return used
 
 
 def test_device_hold_releases_on_stop_file(tmp_path, monkeypatch):
@@ -19,15 +31,9 @@ def test_device_hold_releases_on_stop_file(tmp_path, monkeypatch):
     cache = tmp_path / "cupy-cache"
     cache.mkdir()
     monkeypatch.setenv("CUPY_CACHE_DIR", str(cache))
-    from clearwater.core.backend import backend_for
-
-    try:
-        backend = backend_for("cuda:0")
-    except (ImportError, RuntimeError) as error:
-        pytest.skip(f"CUDA unavailable: {error}")
-    backend.xp.cuda.runtime.free(0)
-    before = backend.free_device_bytes()
-    assert before is not None
+    # WDDM may report another process's live allocation as free to this process.
+    # The independent witness is device-wide used memory, not parent memGetInfo.
+    before = _device_used_mib()
     stop = tmp_path / "hold.stop"
     stdout_path = tmp_path / "holder.jsonl"
     stderr_path = tmp_path / "holder.stderr"
@@ -55,19 +61,26 @@ def test_device_hold_releases_on_stop_file(tmp_path, monkeypatch):
             record = json.loads(stdout_path.read_text(encoding="utf-8"))
             assert record["held_bytes"] >= 256 * 2**20
             assert record["free_before"] - record["free_after"] >= 256 * 2**20
-            held_free = backend.free_device_bytes()
-            assert held_free is not None and before - held_free >= 256 * 2**20
+            deadline = time.monotonic() + 5
+            while True:
+                held_used = _device_used_mib()
+                if held_used - before >= 200:
+                    break
+                assert child.poll() is None, stderr_path.read_text(encoding="utf-8")
+                assert time.monotonic() < deadline, (before, held_used, record)
+                time.sleep(0.05)
             started = time.monotonic()
             stop.touch()
             child.wait(timeout=2)
             assert child.returncode == 0, stderr_path.read_text(encoding="utf-8")
-            while True:
-                recovered = backend.free_device_bytes()
-                if recovered is not None and recovered >= before:
-                    break
-                assert time.monotonic() - started < 2, (before, held_free, recovered)
-                time.sleep(0.01)
             assert time.monotonic() - started < 2
+            deadline = time.monotonic() + 5
+            while True:
+                recovered = _device_used_mib()
+                if recovered <= before:
+                    break
+                assert time.monotonic() < deadline, (before, held_used, recovered)
+                time.sleep(0.05)
             assert len(stdout_path.read_text(encoding="utf-8").splitlines()) == 1
         finally:
             stop.touch(exist_ok=True)
