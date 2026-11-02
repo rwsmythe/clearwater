@@ -112,18 +112,19 @@ role's own act under this convention.
 **THE ROLLOVER SEQUENCE (added 2026-09-07, operator-directed; every generation of every role).**
 Three acts, in this order, nothing between them -- **after ONE precondition: NOTHING THE
 GENERATION STARTED IS STILL RUNNING** -- no cell in flight, and no background job of its own
-(a build piece, a gate leg, a footage run, any process spawned from its pane). **Operator-directed
+(a build piece, a gate leg, a long export or render job, any process spawned from its pane). **Operator-directed
 2026-11-02, verbatim: "the generations should not have handed over if the previous generation was
 still working."** A process spawned from a session's pane is that pane's child and dies when the
 pane closes, whatever the state file says about it: on 2026-11-01 an orchestrator generation rolled
-at ~405K with a 95-minute review-pack piece running as its pane's background child; the piece died
+at ~405K with a 95-minute background job running as its pane's child; the piece died
 mid-export when the pane closed, its 20 finished outputs were orphaned, and the whole piece re-ran.
 So the roll goes in the GAP between pieces: at the cap with a job running, the generation waits for
 the job's exit line, records it, and then rolls; and a generation near the cap starts NO long job
-it cannot see finish (the depth check comes BEFORE the dispatch, not after). The cell form of the
+it cannot see finish (the depth check comes BEFORE the dispatch, not after). The mirror
+holds too: AT OR PAST the cap, dispatch nothing new -- that dispatch is the successor's. The cell form of the
 same precondition:
 A subagent does not die when its parent announces a rollover; it dies when the parent SESSION
-ends, and the four acts leave the old session alive. So a generation with a working cell rolls
+ends, and the three acts leave the old session alive. So a generation with a working cell rolls
 only after that cell has YIELDED and its committed head is recorded (or, if it cannot be waited
 for, after `TaskStop` on it with its last committed head recorded); the successor must not touch
 that cell's worktree until the record exists (two agents in one worktree collide on the git
@@ -136,7 +137,7 @@ thing: a single relay of the cell's head and yield state to its successor and th
 no commit, no ruling, no dispatch -- then nothing (found 2026-09-07: the first orchestrator to
 run the sequence rolled with two cells working; one kept running under the dead generation).
 
-**The INCOMING side of the same precondition (added 2026-09-07, from orchestrator a06374's own
+**The INCOMING side of the same precondition (added 2026-09-07, from an orchestrator generation's own
 finding against itself).** A fresh generation treats **every worktree named in its predecessor's
 state file as OCCUPIED** until it holds positive evidence that the cell working there has RETURNED
 at its parent's seat or that the parent session is gone. A clean `git status` is NOT that evidence:
@@ -159,11 +160,12 @@ from memory.
    uncommitted state file is a handoff to nobody. It records every live cell's branch, head
    and round, **AND every authority granted by `SendMessage`** (a declared envelope, a scope
    grant, a fix authorized mid-round): a grant is STATE and a cell message is not a record --
-   the first exercise of this sequence (orchestrator 73e1fb45, 2026-09-07) found three such
+   the first exercise of this sequence (an orchestrator generation, 2026-09-07) found three such
    grants that existed nowhere durable and would have died with the cells that held them.
 2. **Post the rollover announcement and STOP DRAINING.** From this line on, `peek` only, never
-   `read`. The stop hook's "drain now" instruction is VOID for an outgoing generation -- obeying
-   it would swallow mail meant for the successor.
+   `read`. Where the stop hook fires for your role (the director seat, by its role list), its
+   "drain now" instruction is VOID for an outgoing generation -- obeying it would swallow mail
+   meant for the successor.
    (No seat arms an inbox Monitor since 2026-09-15: post + cue wakes the recipient. A seat that
    armed one under the named exception in the project's orchestrator context, "Comms routing",
    stops it BEFORE act 2, as that exception says; the sequence itself has no monitor act --
@@ -186,6 +188,8 @@ from memory.
    psmux SERVER's environment, started from the operator's plain shell; verified with a probe
    window). The launcher scrubs the session markers on every vehicle regardless. Verify the
    vehicle before trusting it: a dry run from inside a session must print `vehicle: psmux`.
+   Run that `-DryRun` rehearsal immediately BEFORE the real launch, every roll, and read its
+   printed line: a preflight failure after the announce leaves the seat empty.
 
 ## 6. Comms routing rules
 
@@ -255,7 +259,7 @@ Adding a SECOND peer director later touches this small enumerated set:
    (`docs/<role>-context.md` + `docs/<role>-state.md`) carry domain vocabulary,
    so they are INSTANCE SURFACE: the genericity guard + manifest exempt them via
    the `docs/*-context.md` / `docs/*-state.md` patterns in
-   `tests/genericity_lists.py` (`is_instance_surface`). They pass by construction
+   `tests/harness/genericity_lists.py` (`is_instance_surface`). They pass by construction
    -- no per-file registration needed for the standard `docs/<role>-*.md` layout;
    a non-standard path must be added to `INSTANCE_SURFACE_RELPATHS`.
 

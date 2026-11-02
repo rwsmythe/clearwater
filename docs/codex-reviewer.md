@@ -80,6 +80,10 @@ review subcommand auto-detects the branch diff). The older
 
 ## Staging -- THE PINNED IMPLEMENTER-CELL INVOCATION (verified 2026-07-24)
 
+(Claude implementer cells only. A Codex implementer cell's reviewer is the OTHER model, a
+Claude pass its dispatcher runs between turns: dispatch recipe section 3 and this document's
+"Codex as an IMPLEMENTER" section. A Codex cell never stages this invocation on its own diff.)
+
 **PRIMARY PATH: Git-Bash-direct, Windows-native.** The Windows codex CLI
 (`codex-cli` 0.145.0+, on PATH via npm) runs non-interactively from Git Bash
 end-to-end -- verified live at the CHARC seat (profile layered, clean

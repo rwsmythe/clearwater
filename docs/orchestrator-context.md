@@ -86,17 +86,17 @@ figure names its MOMENT.** Write which reading it is (at dispatch / at a round g
 at retirement) beside every depth figure you record; two figures for one cell read as a
 contradiction when neither says. (4) **Read the file back.** After any edit to a handoff or state
 file made while a cell is working, re-read the file at HEAD before relying on it: a cell that
-commits again makes your row stale in the act of writing it (the r7 cell caught its dispatcher's
-table four commits behind). (6) **Read the cell's depth at dispatch, at every yield and before any ruling or remediation
-(added 2026-10-20, CHARC; paid for by the WP1.2B cell retiring at 932K after a 9-finding
+commits again makes your row stale in the act of writing it (one cell caught its dispatcher's
+table four commits behind). (5) **Read the cell's depth at dispatch, at every yield and before any ruling or remediation
+(added 2026-10-20, CHARC; paid for by a cell retiring at 932K after a 9-finding
 remediation was sent to it unread).** Record each figure with its moment. **~250K is an
 EVALUATION point, not an automatic re-seat** (owner, 2026-10-20: "You don't need to replace the
 cell at 240k, that should just be an evaluation point"): a few bounded steps remaining (a review
 round, a gate, a report) mean the cell continues; a large or open-ended load, such as a
 multi-finding remediation, goes to a fresh cell from the ledger. **~400K is a STOP** at the round
 boundary and a fresh re-dispatch (unchanged; the cell-side rule is in the dispatch recipe section 5).
-(7) **Never carry an uncommitted edit in the MAIN tree's working copy** (added 2026-10-21, CHARC; paid for when a contract amendment sat uncommitted on main for five minutes while another seat's QA suite ran there -- child-process tests import whatever is on disk at that moment). Every edit, however small, is made in a worktree on its own branch; the main tree is only ever checked out at a committed head.
-(5) **The main tree has ONE git index and every role commits in it.**
+(6) **Never carry an uncommitted edit in the MAIN tree's working copy** (added 2026-10-21, CHARC; paid for when a contract amendment sat uncommitted on main for five minutes while another seat's QA suite ran there -- child-process tests import whatever is on disk at that moment). Every edit, however small, is made in a worktree on its own branch; the main tree is only ever checked out at a committed head.
+(7) **The main tree has ONE git index and every role commits in it.**
 A bare `git commit` after `git add` sweeps whatever ANOTHER role has staged into your commit
 under your message (found 2026-09-08: an orchestrator state commit carried CHARC's two staged
 fill files). Commit your own files BY PATHSPEC -- `git commit -m "..." -- docs/orchestrator-state.md`
@@ -123,7 +123,7 @@ fill's `SCOPED_ACCEPT_TIER` rule names for the moment at hand** (amended
 2026-08-26: a phase-boundary tier may exclude closed-arc modules from the
 routine accept default, with the FULL suite retained at the fill's four named
 moments -- shared-module arcs, cross-package merges, phase boundaries,
-pre-live-tranche). Run FULL when the fill says FULL; the routine default may
+pre-release). Run FULL when the fill says FULL; the routine default may
 legitimately be an inner tier. The concrete commands live on the
 instance surface (see the application's own README), not here. Provenance
 (rollover-proofing, like the two-net block above): a docs-only accept once re-ran
@@ -195,14 +195,16 @@ has to pick a generation.
 **THE ROLLOVER SEQUENCE (added 2026-09-07, operator-directed; charter Sec 5.1 has the generic
 form).** PRECONDITION (operator-directed 2026-11-02, verbatim: "the generations should not have
 handed over if the previous generation was still working"): NOTHING YOU STARTED IS STILL RUNNING --
-no cell in flight, no build piece, gate leg or footage run spawned from your pane (it dies with the
-pane; gen 32 lost a 95-minute piece that way on 2026-11-01). At the cap with a job running, wait for
+no cell in flight, no build piece, gate leg or long job spawned from your pane (it dies with the
+pane; an orchestrator generation lost a 95-minute job that way on 2026-11-01). At the cap with a job running, wait for
 its exit line and record it, then roll; near the cap, start no long job you cannot see finish.
 Three acts, in this order, nothing between them: (1) overwrite and COMMIT
 `docs/orchestrator-state.md` -- the successor reads it at HEAD; (2) post the rollover announcement
-and STOP DRAINING -- `peek` only from here, and the stop hook's "drain now" is VOID for an outgoing
-generation; (3) LAST ACT, launch your
-successor yourself with the web UI button's own fixed command, FRESH mode, from the repo root:
+and STOP DRAINING -- `peek` only from here, and where the stop hook fires for your role its "drain
+now" is VOID for an outgoing generation; (3) LAST ACT, launch your
+successor yourself with the web UI button's own fixed command, FRESH mode, from the repo root
+(rehearse with `-DryRun` first and read its `vehicle:` line; a preflight failure after the
+announce leaves the seat empty):
 
     powershell -NoProfile -File scripts/launch_role.ps1 -Role orchestrator
 

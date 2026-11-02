@@ -69,7 +69,11 @@ mechanism is NOT named here** -- it is the project's seam-3 fill
 concrete reviewer there). The optional ready-to-use reviewer reference shipped
 with the harness (`codex-reviewer.md`) is ONE such plug-in for the `REVIEWER`
 slot on this Claude Code + WSL/Windows substrate -- a non-software domain plugs
-a different reviewer and ignores it. **Adjudicate, don't blind-fix:** a finding
+a different reviewer and ignores it. **Two implementer lanes, one rule: the reviewer is the
+OTHER model from the implementer.** A Claude cell's Reviewer A is the Codex reviewer; a Codex
+cell's Reviewer A is a Claude pass its dispatcher runs between the cell's turns
+(`scripts/codex_cell.py review`). A Codex cell never runs `codex-reviewer.md`'s staged
+invocation on its own diff. **Adjudicate, don't blind-fix:** a finding
 premised on something the system *verifiably prevents* is out-of-scope -- but
 ONLY with the cited constraint; absent the citation it stays in-scope.
 
@@ -125,13 +129,13 @@ no window once ran eight tasks in one turn to 553K before its dispatcher could r
 long run inside an exclusive window, run it with a foreground poll-wait (a loop that checks the
 process or its result file) or end your turn and let the dispatcher re-prompt you at its end. Never
 start it in the background and idle on the completion notice: an idle cell is not woken by it, and
-the host sits unused inside the window (WP3.21 task 1: 33 minutes lost between two legs).
+the host sits unused inside the window (one instance lost 33 minutes between two legs this way).
 
 **A deletion grant names what is KEPT in the same message (2026-10-28).** When your dispatcher grants
 you deletion of evidence, caches or outputs, the grant lists the files or patterns that stay beside
 those that go, and you delete nothing the grant does not name. An amendment that follows a grant is
-too late by construction: you act on the first message you read (WP3.21: 27 superseded oracle
-folders deleted whole a minute before the amendment to keep each `oracle.json` arrived).
+too late by construction: you act on the first message you read (one instance deleted 27
+superseded evidence folders whole a minute before the amendment to keep one file in each arrived).
 
 - **Honor the brief's locks.** They are binding. A defect/gap OUTSIDE your scope
   gets FLAGGED in the return report -- never fixed inline (scope creep), never

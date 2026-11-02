@@ -86,7 +86,7 @@ on this harness's record 68% of all read tokens landed on turns above 400K. Rule
 - **A generation rolls AFTER its depth has REACHED ~400K tokens, at the NEXT boundary** (after an
   accept, before a dispatch, never mid-review, never with a cell in flight or a job of its own
   still running -- a build piece or gate leg spawned from the pane dies with the pane; operator-
-  directed 2026-11-02 after gen 32 lost a 95-minute piece that way) -- not at window exhaustion
+  directed 2026-11-02 after an orchestrator generation lost a 95-minute job that way) -- not at window exhaustion
   and **NEVER BEFORE 400K (operator-directed 2026-09-25, verbatim: "turnovers should not be
   considered until after 400k is hit, then the roll should happen at the next available
   opportunity"; an orchestrator generation had rolled at ~260K; the operator's stated concern is
@@ -102,7 +102,8 @@ on this harness's record 68% of all read tokens landed on turns above 400K. Rule
   life exceeds the seat's remaining depth to the cap may roll BEFORE that dispatch, at that
   boundary, with the arithmetic stated in its rollover post; the cost of one early spin-up is
   below the cost of re-dispatching every cell from its ledger. It is a pre-dispatch exception only
-  and never applies mid-round. The prompt hook prints the session's depth
+  and never applies mid-round. At or past the cap no new dispatch happens at all: that
+  dispatch is the successor's. The prompt hook prints the session's depth
   every turn (`[ctx] NNNK of 1000K (NN%)`) and names the cap when it is reached; the rollover
   procedure is the state-pointer convention (charter 5.1).
 - **Cells too.** A cell past ~400K is re-dispatched from a fresh context with its round ledger, the
