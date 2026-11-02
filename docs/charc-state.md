@@ -22,6 +22,15 @@
   `posted ->` line before cueing. Any script or body with a backslash goes through the Write tool; `tr -cd '\r\v' |
   wc -c` = 0 BEFORE every commit, and the committed blob re-checked (`git cat-file -p HEAD:<file>`). A `cd` into a
   worktree as the FIRST word of a command moves the session cwd: use `git -C`, absolute paths, or `cd` back.
+  **OWNER PAUSE (owner in chat to gen 33, 2026-11-02 ~00:50Z, verbatim: "once the run is complete, we will pause further
+  execution based on the proximity to the weekly limit."): after the WP5.3 `clips V-S` re-run's exit line lands and is
+  recorded, NOTHING STARTS at either seat (no read-back turn, no V-D, no WP-D112 Reviewer A even after 10:00Z, no gate, no
+  commission) until the owner's word; whichever seat receives it relays it to the other in one line.** V-S re-run from gen
+  33's pane since 00:39:08Z (`work/orch-g33/wp53-runs/`, ~95 min); the first run DIED 00:36:53Z with gen 32's pane (its 33
+  orphans moved, not deleted, to `work/orch-g33/vs-orphans/`, pruned only on the owner's word). **OWNER RULE carried into the
+  kernel, main `215b1fd6` (owner verbatim: "the generations should not have handed over if the previous generation was still
+  working"): no generation rolls while anything it started is still running; charter 5.1, orchestrator-context rollover
+  sequence, prompting standard; harness gate 382 OK; posts 4933b8dc / 8b981462, my ACK 83baafc4.**
   **CLAUDE 92 % = THE LINE (reached 22:01Z): no Claude pass (A or B) of any package starts before 2026-11-02 10:00Z;
   Codex turns, RUN REQUESTS and windows continue; no reviewer-tier downgrade.** Codex 15 % / 0.238 (resets 11-04).
   **LIVE BOARD (verify in `docs/orchestrator-state.md` and gen 32's last posts):**
