@@ -41,8 +41,14 @@
   5.63 s under -n 4; no wall-clock bound asserted, so CLAUDE.md's slow rule does not bite); the `slow` marker with its
   reason goes on both parametrisations in the post-witness read-back turn, named in the accept record, covered by WP5.2's
   gate. OPEN: a 61 GB C: drop during the gate (154 -> 93 GB) unexplained by 1.9 GB of basetemps; the orchestrator sources
-  it (proxy cache, Temp, work/, pagefile) before any window opens; STOP if ours and growing. WP-D112 Reviewer A round 1
-  started 06:58Z on the owner's word (Claude 97 % at 06:14Z); WP-D112 Reviewer A waits on
+  it (proxy cache, Temp, work/, pagefile) before any window opens; STOP if ours and growing. **WP5.3 ACCEPTED, main `91db201b`** (post `c2661b6d`; record `docs/proofs/wp5.3-accept.md`; B-F4 named
+  there as the post-witness test-only item; serial +713 s recorded; AD-13 NOTE written by me at this accept; `.worktrees/wp5.3`
+  KEPT LIVE for the V-P witness). Disk: the 61 GB drop is NOT a large file of ours (pagefile 18.2 GB written during the gate,
+  hiberfil 12.5 GB, proxy cache 0, Temp 25 GB, no file over 100 MB written since the gate started); free steady at 93 GB since
+  06:57Z; a per-folder Temp breakdown pending; CLOSED as ours unless that breakdown says otherwise. WP-D112 Reviewer A round
+  1 started 06:58Z on the owner's word (Claude 97 % at 06:14Z) = NEW_CRITICAL_MAJOR_FOUND: F1 MAJOR truncated PCM sources
+  under D86 refused by the new sample-extent rule (2 of 3 probes where base passed), F2 MINOR no pts check after the first,
+  F3 advisory; Codex turn 4 adjudicating; any proposal that changes my ruled rule comes to me as a STOP; WP-D112 Reviewer A waits on
   the owner lifting the Claude pause; the first run DIED 00:36:53Z with gen 32's pane (its 33
   orphans moved, not deleted, to `work/orch-g33/vs-orphans/`, pruned only on the owner's word). **OWNER RULE carried into the
   kernel, main `215b1fd6` (owner verbatim: "the generations should not have handed over if the previous generation was still
