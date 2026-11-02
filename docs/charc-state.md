@@ -25,8 +25,11 @@
   **OWNER PAUSE (owner in chat to gen 33, 2026-11-02 ~00:50Z, verbatim: "once the run is complete, we will pause further
   execution based on the proximity to the weekly limit."): after the WP5.3 `clips V-S` re-run's exit line lands and is
   recorded, NOTHING STARTS at either seat (no read-back turn, no V-D, no WP-D112 Reviewer A even after 10:00Z, no gate, no
-  commission) until the owner's word; whichever seat receives it relays it to the other in one line.** V-S re-run from gen
-  33's pane since 00:39:08Z (`work/orch-g33/wp53-runs/`, ~95 min); the first run DIED 00:36:53Z with gen 32's pane (its 33
+  commission) until the owner's word; whichever seat receives it relays it to the other in one line. PAUSE IN FORCE at both
+  seats since 03:05Z (post `310d5f9c`).** V-S re-run from gen 33's pane EXIT 0 at 03:04:48Z (8740 s, 26 done, 0 failed,
+  verified in `work/orch-g33/wp53-runs/summary.txt`; C: 155 GB free; pack.json: P-A 64, P-Z 9, V-S 26, V-P 8 done + 9 failed
+  (DR-112), pending V-D 8 / V-Z 2 / V-R 2); on resume the order is the Codex read-back turn 15, V-D, V-Z, V-R, page, tally, and
+  WP-D112 Reviewer A; the first run DIED 00:36:53Z with gen 32's pane (its 33
   orphans moved, not deleted, to `work/orch-g33/vs-orphans/`, pruned only on the owner's word). **OWNER RULE carried into the
   kernel, main `215b1fd6` (owner verbatim: "the generations should not have handed over if the previous generation was still
   working"): no generation rolls while anything it started is still running; charter 5.1, orchestrator-context rollover
