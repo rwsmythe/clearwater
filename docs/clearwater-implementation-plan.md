@@ -372,6 +372,8 @@ Every acceptance test in spec §11, with where it is built and where it is run t
 
 **Completion pointer (2026-11-01, WP5.1 accepted, main `0e8f0e00`):** every test this table completes in WP5.1 (V1, V3 minus the deferred chapter seam, V4-V11, V13, V17, V18; N10 / D92 and D91) has a committed, passing node or a cited figure of record, traced in `tests/test_v51_traceability.py`; the matrix of nodes, figures and gate results is `docs/reports/wp5.1-acceptance.md`, the accept record `docs/proofs/wp5.1-accept.md`. Still open after WP5.1: V2 (the owner's visual review at CP5, from the WP5.3 pack), V14 (the prototype gate, done), V15 and V16 (WP5.2, performance and memory on full clips, EXCLUSIVE), and the V7 figures of record (WP4.6's window).
 
+**Completion pointer (2026-11-02, WP5.2 accepted, main `2da5d0c7`):** V15 and V16 have figures of record on full clips (`docs/reports/wp5.2-performance-memory.md`, accept `docs/proofs/wp5.2-accept.md`): V16 GX011627 c3 NVENC cold median 10.89 min/min and GX011625 sustained 10.78 (the N6 figure is proposed to the owner from these; D106 re-set at the owner's ruling); V15 peak RAM 5,340 MiB and graphics memory 7,085 MiB on the synthetic 5.3K 8:7 clip, 6.64 GB RAM on the 48 MP photo, which is also the D111 automatic-fallback witness (`CPU: estimate 11,649 MiB exceeds free 7,064 MiB`). V7 figures of record are WP4.6's (`bbb4ef3e`). Still open: V2 (CP5, in progress).
+
 | Test | Subject | Built in | Completed in |
 |---|---|---|---|
 | V1 | Stage correctness | WP3.1–WP3.4 | WP5.1 |
