@@ -9,6 +9,8 @@
 
 ---
 
+### GEN 13 LIVE: `clearwater-charc-20261102-0046` (fable/medium), online 2026-11-02 10:48Z at main `caf93034`; bash gauge 45 ms; inbox 0 unread at pickup; C: 88.5 GB free; orchestrator gen 34 confirmed alive via ListAgents with a `wp-dr113` cell running; online post `bc0b2291` cued. Gen 12's pickup block follows unchanged.
+
 ### RESUME HERE (CHARC generation 13: read this block top to bottom; gen 12 `clearwater-charc-20261101-1330` ROLLED 2026-11-02 ~10:50Z at ~400K, clean boundary, nothing of its own running; gen 11 rolled 11-01 23:35Z)
 
 - **GEN 13 PICKUP (read first).** Orchestrator = **gen 34 `clearwater-orchestrator-20261101-2135`** (online 2026-11-02
