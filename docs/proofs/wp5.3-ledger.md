@@ -289,13 +289,13 @@ Wall times are scheduling estimates, not figures of record.
 
 Q8 order, including candidate/refusal coverage omitted from its shorthand:
 
-| Order | Exact queued command | Expected wall time | Outputs under work/wp5.3/ | Actual receipt / read-back (turns 13-14) |
+| Order | Exact queued command | Expected wall time | Outputs under work/wp5.3/ | Actual receipt / read-back (turns 13-15) |
 |---|---|---|---|---|
 | 1 | `RUN REQUEST: uv run python -m tools.reviewpack.build photos` | about 1 hour, GPU | photos, thumbnails, P-A/P-Z corrected and neutral records, state, logs | On 6d470028, EXIT 0, 673 s, 2026-11-01 22:00:18Z-22:11:32Z; free 171 -> 167 GB. 73 done (64 P-A / 9 P-Z), failed=0, pending=55. |
 | 2 | `RUN REQUEST: uv run python -m tools.reviewpack.build presets` | <1 minute | both preset JSON files, pack-local store and marker, state/log | EXIT 0, 1 s, 22:12:15Z-22:12:16Z; both exported presets present, two page value tables. |
 | 3 | `RUN REQUEST: uv run python -m tools.reviewpack.build page` followed by `RUN REQUEST: uv run python -m tools.reviewpack.build page --check` | <2 minutes | page builds index.html and initial sheet, checks links inside; --check is links only | Initial mistakenly queued --check: EXIT 2, index.html FileNotFoundError. Dispatcher then ran page: EXIT 2 in 1 s (pending 55, not finished); subsequent --check EXIT 0. 73 sheet rows / 74 lines, 295 resolving links. |
 | 4 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-P` | reserve about 2.5 hours, provisional; CHARC's allowance is about 27 minutes of source material | 17 whole product clips, IMG_6762.MOV last, pair clips/stills, thumbnails, V-P record, state/logs/cache | EXIT 1, 2,961 s, receipt 22:12:54Z-23:02:14Z, free 167 -> 165 GB. 17 accounted: 8 done with warnings / 9 product failures; failed=9, pending=38. Receipt names 6d470028; instrument unchanged through ef7cbf15. Product audio failures STOP-routed by dispatcher to CHARC; no workaround/retry. Read-back turn 14: all 56 successful artifacts present; page/sheet still post-photos, publication deferred. |
-| 5 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-S` | about 1.5-2 hours, provisional | 26 clips and aids, excerpts where needed, V-S record, state/logs/cache | Not yet returned. |
+| 5 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-S` | about 1.5-2 hours, provisional | 26 clips and aids, excerpts where needed, V-S record, state/logs/cache | First attempt LOST after generation-32 pane closed: 23:03:35Z to about 00:36:53Z, ef7cbf15, no exit receipt; dispatcher moved 33 orphans and archived the stale lock before removing it. Re-run on 0b04e372 EXIT 0, 8,740 s, 2026-11-02 00:39:08Z-03:04:48Z, free 161 -> 155 GB; 26 done, failed=0, pending=12. Turn-15 read-back: all 182 product/aid files and 11 excerpts present; no numbered/partial/unreferenced V-S output. Page/sheet still post-photos. |
 | 6 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-D` | about 40-70 minutes, provisional | 8 clips and aids, excerpts where needed, V-D record, state/logs/cache | Not yet returned. |
 | 7 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-Z` | about 10-20 minutes, provisional | 2 candidate clips and aids, excerpt as needed, V-Z record, state/logs/cache | Not yet returned. |
 | 8 | `RUN REQUEST: uv run python -m tools.reviewpack.build clips V-R` | <2 minutes for expected refusals | 2 product refusal records/texts, state/logs; no review rows | Not yet returned. |
@@ -384,7 +384,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 5 / turn 11 / Reviewer B remediation | fresh session 5; dispatcher to fill ID | dispatcher pending | B-F1/B-F2 RED/GREEN, verification and write-audit correction; YIELD for dispatcher-run real build. |
 | Session 5 / turn 12 / B-F1 completion | same session 5 | dispatcher pending | Conflict page/stderr pair identities completed; STOP for ruling on existing failed-excerpt cleanup versus blanket deletion ban. |
 | Session 5 / turn 13 / RUN REQUESTs 1-3 read-back | same session 5 | 191,145 | Dispatcher supplied at turn 14; session 5 retired. CHARC exemption confirmed; real photo/preset/page text and output existence read-only audit, exemption regression and non-slow checks. |
-| Session 6 / turn 14 / clips V-P read-back | fresh session 6; dispatcher to fill ID | dispatcher pending | V-P completed records/media-file existence read-only audit; 8 done / 9 product refusals already STOP-routed; non-slow checks only while V-S runs. |
+| Session 6 / turn 14 / clips V-P read-back | fresh session 6; dispatcher to fill ID | 81,940 | Dispatcher supplied at turn 15; committed 0b04e372. V-P completed records/media-file existence read-only audit; 8 done / 9 product refusals already STOP-routed; non-slow checks only while V-S runs. |
+| Session 6 / turn 15 / clips V-S read-back | same session 6 | dispatcher pending | Complete V-S re-run read-back, orphan listing and interruption-contract assessment; full module checks; only ledger changed. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -2433,4 +2434,170 @@ read, no other-worktree access, media judgement, mailbox post, git mutation or
 commit. The nine product failures remain the dispatcher's existing STOP to
 CHARC; no new instrument STOP. **YIELD after the V-P read-back**. V-S and later
 pieces, page publication read-back, report, final gate and owner CP5 judgement
+remain at their assigned seats.
+
+## Session 6 / Turn 15: read-back of clips V-S
+
+### Boundary, lost attempt and seat recovery
+
+Session 6 resumes on **0b04e372**, with dispatcher-supplied turn-14 depth
+**81,940 depth_input_tokens**. Orchestrator generation 32 has rolled to 33.
+**Turn-15 depth_input_tokens: dispatcher to fill; no estimate.** No build stage
+is running at the seat. The cell runs no real-pack stage and changes only this
+ledger. Reviewer A remains converged and Reviewer B's findings remain closed.
+
+**Dispatcher facts, not independently reconstructed from media:** the first
+V-S attempt started **2026-11-01 23:03:35Z**, head **ef7cbf15**, as a child of
+generation 32's pane. The pane closed and the process died about **2026-11-02
+00:36:53Z**, during GX011623. There was no exit receipt, no completed V-S runner
+record/pack rows, and a stale pack lock (pid **32568**). Preparation had written
+the excerpt sidecar; "no completed rows" does not mean that sidecar was absent.
+The dispatcher checked no saved pack field named the orphan outputs, then
+**moved**, without deleting, **33 files** to **vs-orphans/**: 20 completed MP4s
+(GX011603 through GX011622), one GX011623 partial, 11 excerpts and the excerpt
+sidecar. The stale lock was copied there as **stale-reviewpack.lock**, then
+removed from the pack manually. No such move/removal was performed by this cell.
+
+The completed re-run receipt is **orch-g33/wp53-runs/summary.txt** and
+**clips-V-S.log**: head **0b04e372**, **EXIT 0**, **8,740 s**, **00:39:08Z to
+03:04:48Z on 2026-11-02**, free **161 -> 155 GB**. Completion text is
+**26 items accounted for; failed=0, pending=12**. These are informal run
+receipts, not EXCLUSIVE performance figures.
+
+### Read-only checks and publication boundary
+
+The worktree-only ignored **work/wp5.3/turn15/readback.py** reads the completed
+V-S runner record, excerpt sidecar, pack state, V-S.log, page, sheet and README;
+it stats named product/aid/excerpt files. The orphan folder is inspected by
+**relative name and byte size only**: no orphan content was opened. No source
+folder, image or video was opened/decoded, and no agent judged a correction.
+Evidence is **readback.log/.exit**, **readback-summary.json**,
+**readback-findings.json**, **vs-checks.csv**, **excerpt-checks.csv** and
+**orphan-listing.csv**. Read-back **exit 0**, instrument findings **[]**.
+Pack snapshot SHA256:
+**a8611f7fe7ca4c12e05190839c3c75690f652d02db74213a415e3ad6fa7a1a8c**.
+
+| Check | Result |
+|---|---|
+| Catalog, names and order | **128 pack rows**, **26 V-S done**. Pack order and raw runner order both equal select.VIDEO_S: GX011603 through GX011628. Raw counts **11 done / 15 done with warnings / 0 failed / 0 cancelled / 0 not run**. Every normalized output identity equals the raw output; record_name=V-S.json and runner_exit_status=0. |
+| Product pose and warning fidelity | c3, shipped defaults, force_cpu=false; **26 GPU / hevc_nvenc**. Warning arrays equal _safe_text applied to the product warnings. No product error or failed viewing aid; no viewing_aid_failed flag or aid_message on any V-S row. |
+| Product and viewing files | **26 product MP4s, 26 pair MP4s, 78 pair stills, 52 thumbnails: 182 named nonempty files**. Each item has 10/50/90 percent stills. Every file name is a bare name under its required folder; no media quality judgement. |
+| Excerpts | **11 ready excerpt rows**, all match pack.json's excerpt dictionary exactly and name a present, nonempty excerpt. Each carries finite planned/actual start and duration, planned length 30 s, regenerated timecode and empty message. Remaining **15** items are whole, duration <=45 s, start=0. Timings below are recorded facts, not newly probed source timestamps. |
+| Logs | Only final **V-S.log** exists for this group; header exit_status=0, wall_s=**6667.829**. Raw runner elapsed_s=**6666.440257500006**. All 26 summary result lines agree; final progress line saves **GX011628_corrected.mp4** as 26/26. The longer seat duration includes preparation and viewing aids. |
+| Current pending | **12: V-D=8, V-R=2, V-Z=2**. V-S has no pending item. V-P's already STOP-routed nine product failures are not pending and are not repaired/retried here. |
+| Page and sheet deferred | Both remain the **post-photos** snapshot: header Pending 55, V-S=26 and V-P=17 included; **73 photo sheet rows**, no V-S sheet rows or product links. All owner/status cells remain blank. Per-item V-S link/sheet identity checks await page; they are not claimed complete. All **295 existing distinct relative targets** resolve safely under the pack. |
+| Clean current pack | Exactly **26 V-S files in clips/**, with filenames equal to all 26 saved corrected_name values; **zero unreferenced V-S outputs**, zero numbered _corrected-2 / _corrected_2 variants, zero clearwater-partial files anywhere in clips/. The excerpts folder contains exactly the 11 saved excerpt names. No stage lock remains. |
+| Orphan listing | **34 archived files** = 33 moved files plus the copied lock: clips=21, excerpts=11, records=1, root lock=1. All nonempty; completed clip names exactly GX011603..GX011622. Only archived clips contain the one GX011623 partial. No orphan file content, lock content or archived sidecar was read. |
+| Privacy and orphan-location references | Page, sheet, README and **all 8 current JSON records** have **0 full-path candidates and 0 GPS/EXIF mentions**. None names vs-orphans or orch-g33. No page target points outside the current pack. |
+
+**Name-check caveat [ADVISORY, instruction premise; not an instrument defect]:**
+the literal check "no record, page or sheet references a name now in
+vs-orphans" cannot pass after a clean-name re-run: **31 archived basenames**
+also occur on current surfaces. Cheap example: **GX011603_corrected.mp4** is
+listed under archived clips/ and named by current V-S.json; a new nonempty
+clips/GX011603_corrected.mp4 exists in the pack. Eleven source/excerpt basenames
+also appear in pending page text and completed records. The moved sidecar name
+itself is not a field reference. Basenames alone cannot identify which physical
+copy a record refers to. Recommended interpretation: require **no orphan-folder
+reference and every current relative media identity to resolve under the pack**;
+both hold. The literal no-basename-overlap condition is explicitly **not claimed**.
+The archived and current clips were not hashed or compared; listing/stat evidence
+does not independently establish their media provenance beyond the seat receipt.
+
+### Excerpt timing record (seconds)
+
+| Item | Planned start | Actual start | Planned duration | Actual duration |
+|---|---:|---:|---:|---:|
+| GX011603.mp4 | 27.6542932 | 27.027 | 30 | 30.630600 |
+| GX011609.mp4 | 27.7877600 | 27.027 | 30 | 30.764067 |
+| GX011611.mp4 | 29.8831868 | 29.029 | 30 | 30.864167 |
+| GX011612.mp4 | 21.7817600 | 21.021 | 30 | 30.764067 |
+| GX011615.mp4 | 19.3526668 | 19.019 | 30 | 29.362667 |
+| GX011619.mp4 | 30.1901600 | 30.030 | 30 | 30.163467 |
+| GX011621.mp4 | 31.0843868 | 31.031 | 30 | 30.063367 |
+| GX011622.mp4 | 22.9829600 | 22.022 | 30 | 30.964267 |
+| GX011624.mp4 | 32.9128800 | 32.032 | 30 | 30.897533 |
+| GX011625.mp4 | 199.3725068 | 199.199 | 30 | 30.196833 |
+| GX011626.mp4 | 98.0312668 | 97.097 | 30 | 30.964267 |
+
+GX011615's recorded actual duration is shorter than 30 s. From the commissioned
+40-percent formula, its planned start implies source duration **48.381667 s**;
+actual start + actual duration gives the same **48.381667 s**. This is consistent
+with reaching the source end (inference from records, no source read). Other
+start/duration differences are retained verbatim; no interval was re-probed,
+trimmed or silently rewritten during this read-back.
+
+### Interrupted-run contract assessment (recommendation only)
+
+**Recommend: within the current brief; record a recovery limitation, not a new
+instrument-defect STOP.** The actual brief says **"A committed, re-runnable
+instrument"** (Goal, docs/briefs/wp5.3-brief.md:16), and explicitly chooses
+**"one process per group"** with **"--record per group"** (Q2, :110-111).
+Design step 3 (:86-89) runs the runner over the group, then creates pairs/stills.
+There is no explicit crash-resume, skip-done-items or per-item checkpoint promise
+in that brief. Its R3-1 ruling (:212) says **"pack.json is replace-by-item or
+append, and no option on any stage may reduce its row count"**: this preserves
+already saved rows, rather than guaranteeing that a killed subprocess has saved
+every completed file. R4-1 likewise requires replace-or-append persistence, not
+a crash journal. The earlier ledger's rerun design explicitly permits fresh
+records and collision-numbered outputs and protects old sheet answers.
+
+Code agrees with that narrower contract: **build.py:1015** waits for the group
+subprocess via run_tool; **:1031-1034** reads its completed runner record;
+**:1246** gets the complete group result before constructing viewing aids;
+**:1291-1292** stores rows and writes pack.json after the group. The excerpt
+sidecar is saved earlier at **:1238**, explaining the archived sidecar. The
+runner itself writes its record only after batch processing
+(headless_export.py:1404). The stage lock refuses a stale lock loudly; it does
+not silently break it or claim group completion. All saved P-A/P-Z/V-P rows
+remain present, so this event did not shrink the state of record.
+
+The limitation is material: a hard kill can strand completed but unrecorded
+products and a partial, and a rerun can number around them and repeat expensive
+work. The seat's explicit move/manual stale-lock recovery is recorded, not
+presented as automatic resume. A future requirement for interrupted-group
+recovery should be commissioned separately with a failure-injection fixture
+and explicit evidence-adoption rules; do not infer completion from filenames
+or alter the product runner in this package. **No code change recommended in
+this read-back turn, no new STOP.**
+
+### Verification loop, light checks and yield
+
+Suspect missing/misidentified outputs -> independently join raw record, pack
+and 182 nonempty filenames -> **rejected**. Suspect excerpt facts lost on rerun
+-> compare all 11 complete timing dictionaries and current files -> **rejected**.
+Suspect moved outputs still linked -> current paths stay inside pack and every
+V-S product is referenced; no orphan-location reference -> **rejected**, with
+the explicit shared-basename caveat above. Suspect interruption violates saved
+row preservation -> inspect brief and actual save boundary -> **not confirmed**;
+bank crash recovery as the documented limitation, not an invented resume claim.
+Final complete module/static checks and read-back -> **no instrument finding**.
+
+PowerShell sets PYTHONPATH=scripts; the mandatory sandbox mkdir shim is retained.
+No build runs at the seat, so the sole existing slow tiny integration is included.
+All outputs and exit sidecars are under **work/wp5.3/turn15/**:
+
+```text
+uv run pytest -q tests/test_reviewpack.py --basetemp=work/wp5.3/tmp/t15 -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp5.3/turn15/full.xml
+uv run ruff check tools/reviewpack tests/test_reviewpack.py
+uv run ruff format --check tools/reviewpack tests/test_reviewpack.py
+uv run mypy
+uv run python work/wp5.3/turn15/readback.py
+```
+
+- **full.log/.xml/.exit:** **177 passed in 47.76 s**, exit 0; no skips,
+  failures or deselected nodes. No test/marker edits.
+- **ruff.log/.exit:** All checks passed, exit 0.
+  **format.log/.exit:** 6 files already formatted, exit 0.
+  **mypy.log/.exit:** Success: no issues found in 151 source files, exit 0.
+- **readback.log/.exit:** 26 item rows / 11 excerpt rows / 34 orphan listing
+  rows; zero instrument findings, exit 0. Only this owned ledger changes;
+  final diff whitespace clean and **0 CR**. uv ignores the inherited
+  VIRTUAL_ENV mismatch; no other environment is targeted.
+
+No product, interface, instrument, test, dependency, fixture or local-config
+edit; no main-working-folder write, footage read, other-worktree access,
+real-pack build, mailbox post, commit/git mutation or image judgement.
+**YIELD after the V-S read-back**. The earlier V-P product STOP remains routed;
+later clips, page/sheet publication, report, final gate and CP5 owner judgement
 remain at their assigned seats.
