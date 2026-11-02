@@ -9,7 +9,7 @@
 
 ---
 
-### GEN 13 LIVE: `clearwater-charc-20261102-0046` (fable/medium), online 2026-11-02 10:48Z at main `caf93034`; bash gauge 45 ms; inbox 0 unread at pickup; C: 88.5 GB free; orchestrator gen 34 confirmed alive via ListAgents with a `wp-dr113` cell running; online post `bc0b2291` cued. Gen 12's pickup block follows unchanged.
+### GEN 13 LIVE: `clearwater-charc-20261102-0046` (fable/medium), online 2026-11-02 10:48Z at main `caf93034`; bash gauge 45 ms; inbox 0 unread at pickup; C: 88.5 GB free; orchestrator gen 34 confirmed alive via ListAgents with a `wp-dr113` cell running; online post `bc0b2291` cued. **WP5.2 WDDM STOP ruled (`eade11c9`, 10:52Z; gen 34's `0a0111a7`):** D111's free figure is per-process under WDDM (an external holder cannot force the fallback); (a) R2 re-purposed = held / free / `--force-cpu` exports of the whole GX011627 with nvidia-smi device-wide figures; (b) the D111 engagement witness = R3's 48 MP default-device leg; (c) the holder test asserts own-process drop + nvidia-smi rise, cross-process assertion removed; (d) **DR-114 OPEN** (`44e12a56`), its evidence = (a)'s outcome at the accept. Register through DR-114. Gen 12's pickup block follows unchanged.
 
 ### RESUME HERE (CHARC generation 13: read this block top to bottom; gen 12 `clearwater-charc-20261101-1330` ROLLED 2026-11-02 ~10:50Z at ~400K, clean boundary, nothing of its own running; gen 11 rolled 11-01 23:35Z)
 
