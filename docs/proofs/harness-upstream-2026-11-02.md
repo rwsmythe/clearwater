@@ -76,10 +76,16 @@ Both replied within the hour. Dispositions were returned to each by SendMessage.
 
 ## Open for the owner
 
-1. **Push** the branch after ruling item 2 (the early-roll text); CHARC applies the ruled text to both
-   files on the branch and on Clearwater main before the push.
-2. **Second pass, recommended, not commissioned:** `cell_depth.py` with swing's `--sessions` /
-   `--live` selectors and tests (swing MAJOR 1).
+1. **Push** the branch after ruling item 2 (the early-roll text). DONE 2026-11-02 ~16:40Z: the owner
+   pushed `clearwater-upstream-2026-11-02` (`ef7e671`); CHARC opened PR #1
+   (https://github.com/rwsmythe/harness-template/pull/1) on the owner's word. The merge to `master` is
+   the owner's click.
+2. **Second pass: COMMISSIONED by the owner 2026-11-02 (verbatim: "commission the second pass after
+   phase 5 closes").** Scope: `cell_depth.py` gains swing's `--sessions` (self-read) / `--live HOURS`
+   (in-flight by transcript mtime) selectors with swing's tests as the base (swing MAJOR 1), landing
+   first on the Clearwater instance, then upstreamed by the re-port method below. Dispatch gate: Phase
+   5 CLOSED (the gate report accepted). Harness-side package, CHARC-briefed; runs the harness suite,
+   not the product gate.
 
 ## Re-port method for later
 
