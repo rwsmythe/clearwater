@@ -1693,3 +1693,218 @@ about 10 GB in all; 56 GB free now, so about 46 GB at the end against the 25 GB 
    points of 10 % (W52-1's three cold rows spanned 9.4 %).
 
 Depth at mid-build yield: 364,008 (scripts/cell_depth.py, wp57-cell6, read by the orchestrator at the yield 2026-11-03; near the 400K stop: the report goes to a fresh cell)
+
+### Part 3 results
+
+Dispatch `clearwater-review-evidence/wp5.7/cell/dispatch-10.md` (orchestrator gen 38, binding;
+started by gen 39). Fresh cell `wp57-cell7` (implementer-opus-high) on head `60357596`. No GPU
+run, no render, no pytest, no instrument change: every figure below is read from the window's
+records (READ-ONLY, `work/wp5.7/part3/`) by scratch tabulators in the worktree
+(`work/c57-p3r/tabulate.py`, `crops.py`, `newband.py`, `siderise.py`, not committed; outputs
+`table.txt`, `crops.txt`, `siderise.txt` beside them). CHARC's rulings C1-C6, Q1 / Q2 and the C4
+STOP ruling are quoted in the dispatch and applied as written.
+
+#### The window as run (the orchestrator's seat; `part3/logs/runs.txt`)
+
+| Piece | Window (Z, 2026-11-03) | Outcome |
+|---|---|---|
+| `v3` | 15:08-15:11 (190 s) | exit 0; the four shipped rows "reproduces record: yes" (condition 2 met); table `part3/v3/v3-table.md` |
+| `n6` | 15:11-15:40 | six runs S D S D S D, all exit 0 (walls 263-305 s), memory_check True, tied True, 1,362 `fusion_inputs` calls per run, the clip in effect on the (d) runs only; `n6-summary` exit 4 = the C4 STOP (effect over 10 %; routed, ruled by CHARC 4c60bacc3de85d88) |
+| `crops` | 15:40-15:49 | six probe runs exit 0 (20-147 s) |
+| `photos` | first attempt 15:49, exit 2 in 1 s; re-run 15:50-15:58 (512 s) | first attempt: a SEAT FIX (below); re-run exit 0, 70 `done`, no `FAILED` or `Traceback` in the log |
+| `videos` | 15:59-20:27 | 50 / 50 exit 0, one process each, IMG_6762 last (4,441 s); 50 `done` lines, no `FAILED` or `Traceback` in any log; no staging or failed item folder left |
+| `sheet` | 20:28 (24 s) | exit 0, "SHEET 120 items; contact: IMG_6762, GX011601, GX011600, GX011590, GX011625, IMG_6751, IMG_6758, IMG_6753, IMG_6755, IMG_6754, IMG_6757, IMG_6746, IMG_6759, IMG_6756, IMG_6752, IMG_6768, IMG_6770, IMG_6767, IMG_6769, IMG_6761" |
+
+Free C: 56 GB at 15:08Z, 55 GB at the crops and photos, 52 GB at the first video, 47 GB from
+GX011601 on, 46 GB at 20:28Z (the 25 GB STOP never near).
+
+**The seat fix (a limit of `wholeset-list`).** `wholeset-list` prints its ids with `print`, which
+on Windows writes CRLF; `mapfile -t` in `run-part3.sh` kept the CR, so every id was refused
+before any write (exit 2 in 1 s, nothing published). The orchestrator added `| tr -d '\r'` to the
+photo and video list lines of `work/wp5.7/part3/run-part3.sh` (the original kept as
+`run-part3.sh.orig`; `diff`: lines 90 and 99 only; both copies durable in
+`clearwater-review-evidence/wp5.7/part3/`). Follow-up note only (no committed fix in this
+package): `wholeset-list` should write LF (a list meant for a shell pipe), or its consumers strip
+CR; recommended the former.
+
+#### V3 (C3 / Q2; WP4.2's two synthetic clips; `part3/v3/v3-table.md`, durable `clearwater-review-evidence/wp5.7/v3/`)
+
+| Clip | Method | Setting | AD-14 /255 per-frame -> smoothed | V3 ratio L* / a* / b* / contrast | Asserted bound | V3 <= 25 % |
+|---|---|---|---|---|---|---|
+| jitter | c3 | shipped | 0.1006 -> 0.0017 | 0.018 / 0.014 / 0.026 / 0.016 | V3: PASS | yes |
+| jitter | c3 | (d) | 0.0569 -> 0.0009 | 0.016 / 0.014 / 0.026 / 0.020 | V3: PASS | yes |
+| jitter | ancuti2018 | shipped | 0.1055 -> 0.0017 | 0.012 / 0.016 / 0.024 / 0.012 | V3: PASS | yes |
+| jitter | ancuti2018 | (d) | 0.0660 -> 0.0010 | 0.011 / 0.016 / 0.024 / 0.022 | V3: PASS | yes |
+| ad14 | c3 | shipped | 0.0416 -> 0.0102 | 0.053 / 0.200 / 0.401 / 0.072 | AD-14: PASS | no |
+| ad14 | c3 | (d) | 0.0331 -> 0.0087 | 0.037 / 0.198 / 0.408 / 0.316 | AD-14: PASS | no |
+| ad14 | ancuti2018 | shipped | 0.0388 -> 0.0067 | 0.061 / 0.257 / 0.497 / 0.071 | AD-14: PASS | no |
+| ad14 | ancuti2018 | (d) | 0.0298 -> 0.0057 | 0.080 / 0.257 / 0.502 / 0.387 | AD-14: PASS | no |
+
+(d) passes every clip's asserted bound; the shipped leg reproduced WP4.2's four rows of record
+(`v3.log`: "reproduces record: yes" x 4), so condition 2 is met. Not buried: on `ad14-flicker` the
+CONTRAST ratio rises under (d) (c3 0.072 -> 0.316; ancuti2018 0.071 -> 0.387); that clip's
+asserted bound is AD-14 (passes: c3 0.0331 -> 0.0087 /255 against shipped 0.0416 -> 0.0102), and
+its a* / b* ratios are already over 25 % at the shipped defaults (c3 0.200 / 0.401), as AD-14's
+2026-10-21 extension records. On the jittering clip the contrast ratio also rises (c3 0.016 ->
+0.020; ancuti2018 0.012 -> 0.022), within 25 %.
+
+#### N6 (C4; `tools/export_bench.py` in-process, GX011627, W52-1's form; `part3/logs/n6-*.log`, durable `clearwater-review-evidence/wp5.7/part3/`)
+
+| Run | Setting | min/min | wall s (bench) | s/frame | memory_check | tied | calls | clip |
+|---|---|---|---|---|---|---|---|---|
+| 1 | shipped | 10.9467 | 248.7 | 0.3653 | True | True | 1,362 | False |
+| 2 | (d) | 12.4234 | 282.3 | 0.4145 | True | True | 1,362 | True |
+| 3 | shipped | 10.8630 | 246.8 | 0.3625 | True | True | 1,362 | False |
+| 4 | (d) | 12.4346 | 282.5 | 0.4149 | True | True | 1,362 | True |
+| 5 | shipped | 11.0729 | 251.6 | 0.3695 | True | True | 1,362 | False |
+| 6 | (d) | 12.6115 | 286.6 | 0.4208 | True | True | 1,362 | True |
+
+681 frames each. Medians: shipped 10.9467, (d) 12.4346 min/min; effect = 12.4346 / 10.9467 - 1 =
++13.59 %; pair ratios 1.1349, 1.1447, 1.1389; `VALID True`; `STOP: the N6 effect is over 10 %`
+(exit 4). The shipped median reproduces W52-1's cold median of record (10.89) within 0.5 %. Peak
+GPU memory shipped 3,692-3,756 MiB, (d) 3,760-3,840 MiB of 4,065.4 (all `ok`). CHARC's STOP ruling:
+the binding figure is N6 itself (about 12 min/min, D106, spec v0.5.8): (d) as measured (12.43) is
+OVER N6 on the clip of record and NOT adoptable in v1.0.x on cost alone; the headroom for any
+implementation of the clip is about 1.0 min/min = about +9.6 % on GX011627 (12 / 10.95 = 1.096).
+The cost is the instrument's clip (per-channel 23 x 23 `ndimage` minimum / maximum at 4K,
+unoptimised); a separable or fused min / max is a candidate at an UNMEASURED cost. Observation (not
+owned, a follow-up): `tools/export_bench.py:99` still holds `D106_MIN_PER_MIN = 25.0` (the interim
+figure of 0.5.4), so every ROW line prints "meets D106 25", (d)'s 12.43 included; the min/min
+figures are unaffected (`total.min_per_min`), only the verdict label is stale against spec v0.5.8.
+
+#### The C2 crops (the ten undecided lines and the one remaining band; shipped vs (d) 1 sigma)
+
+From the six crop runs (`part3/crops/<setting>/<item>/`, every frame's render and prefused check
+equal) and, for the photo, Part 2's records. Every video crop-run band equals Part 2's record for
+the same pts exactly (both settings), so the crops show the frames Part 2 measured. Fused luma band
+x C, verdict, attributed stage; "undecided" is NOT removal (S3: not evidence either way).
+
+| Item, time, line | Shipped | (d) 1 sigma | Shipped crop | (d) crop |
+|---|---|---|---|---|
+| IMG_6739 photo, line 3 (right flank) | 3.07 band, input2 | 0.24 undecided | `part2/defaults/IMG_6739/photo-output.png` | `part2/d-unsharpened-1/IMG_6739/photo-output.png` |
+| IMG_6738 0.433 s, line 2 | 3.26 band, input2 | 0.17 undecided | `part3/crops/shipped/IMG_6738/t0000.433-output.png` | `part3/crops/candidate/IMG_6738/t0000.433-output.png` |
+| IMG_6738 0.467 s, line 2 | 5.40 band, input2 | 0.20 undecided | `.../shipped/IMG_6738/t0000.467-output.png` | `.../candidate/IMG_6738/t0000.467-output.png` |
+| IMG_6738 0.633 s, line 2 | 1.97 band, input2 | 0.11 undecided | `.../shipped/IMG_6738/t0000.633-output.png` | `.../candidate/IMG_6738/t0000.633-output.png` |
+| GX011627 22.155 s | 3.85 band, input2 | 0.10 undecided | `.../shipped/GX011627/t0022.155-output.png` | `.../candidate/GX011627/t0022.155-output.png` |
+| GX011627 22.356 s | 7.42 band, input2 | 0.18 undecided | `.../shipped/GX011627/t0022.356-output.png` | `.../candidate/GX011627/t0022.356-output.png` |
+| GX011627 22.389 s | 4.41 band, input2 | 0.14 undecided | `.../shipped/GX011627/t0022.389-output.png` | `.../candidate/GX011627/t0022.389-output.png` |
+| GX011627 22.422 s | 4.01 band, input2 | 0.15 undecided | `.../shipped/GX011627/t0022.422-output.png` | `.../candidate/GX011627/t0022.422-output.png` |
+| GX011627 22.456 s | 6.76 band, input2 | 0.29 undecided | `.../shipped/GX011627/t0022.456-output.png` | `.../candidate/GX011627/t0022.456-output.png` |
+| compilation 27.027 s, line 1 | 6.77 band, input2 | 0.21 undecided | `.../shipped/compilation-20261010-1080p60/t0027.027-output.png` | `.../candidate/compilation-20261010-1080p60/t0027.027-output.png` |
+| compilation 27.010 s, line 3 (the shin; the remaining BAND) | 3.22 band, input2 | 0.15 band, input2 | `.../shipped/compilation-20261010-1080p60/t0027.010-output.png` | `.../candidate/compilation-20261010-1080p60/t0027.010-output.png` |
+
+Reading (measurement): under (d) every one of the eleven falls to 0.10-0.29 x C from 1.97-7.42
+(2.5-5.6 % of the shipped band on the ten video lines, 7.7 % on IMG_6739); ten are undecided, which shows neither a band
+nor its absence; the shin keeps a qualifying band of 0.15 x C, attributed to input 2. Each run
+folder also holds the stage crops, `*-output-marked.png` and the overviews.
+
+#### The whole set (120 items; `part3/wholeset/items/<item>/<item>.json`; sheet `part3/wholeset/sheet-20261103T202754214375Z/`)
+
+Per item (the full 120-row table is `summary.tsv` in the sheet folder and `work/c57-p3r/table.txt`
+in the worktree): whole-image change ((d) against shipped, the largest over the item's frames: the
+mean absolute and 99th-percentile per-value difference, the largest per-channel mean shift, the
+clipped fractions of both); the edge-band scan of both renders (48 strongest-edge points per image,
+two sides each, band / none / undecided summed over the item's frames, the largest qualifying band
+x C); the input-2 saliency movement (videos); the walls. Photos: 1 image each (70). Videos: the
+pack's three still positions, 10 / 50 / 90 % (150 frames from 51,445 analysed).
+
+| | Photos (70) | Videos (50; 150 frames) |
+|---|---|---|
+| Mean abs change: min / median / max | 0.0082 / 0.0215 / 0.0856 | 0.0086 / 0.0172 / 0.0293 |
+| p99 abs change: min / median / max | 0.0869 / 0.1249 / 0.1847 | 0.0910 / 0.1201 / 0.1413 |
+| Largest channel-mean shift: median / max | 0.0037 / 0.0189 | 0.0028 / 0.0109 |
+| Clipped fraction, shipped -> (d): max | 0.0041 -> 0.0000 | 0.0047 -> 0.0000 |
+| Scan sides b / n / u, shipped | 248 / 1,709 / 4,763 (of 6,720) | 963 / 3,894 / 9,543 (of 14,400) |
+| Scan sides b / n / u, (d) | 13 / 3,403 / 3,304 | 39 / 8,196 / 6,165 |
+| Items with a qualifying side, shipped -> (d) | 50 -> 11 | 49 -> 18 |
+| Largest qualifying band x C, shipped -> (d) | 13.79 -> 2.57 | 15.20 -> 2.05 |
+| Side transitions band -> band / none / undecided | 12 / 105 / 131 | 37 / 567 / 359 |
+| Side transitions undecided -> band / none / undecided | 1 / 1,626 / 3,136 | 2 / 3,813 / 5,728 |
+| Side transitions none -> none / undecided | 1,672 / 37 | 3,816 / 78 |
+| Whole-frame std L*, (d) / shipped per frame: min / median / max | 0.189 / 0.895 / 0.980 | 0.522 / 0.895 / 1.006 |
+| Whole-frame mean L* shift (d) - shipped: min / median / max | -2.09 / -0.34 / +0.06 | -1.12 / -0.17 / +0.08 |
+| Input-2 saliency mean moved (smoothed, Lab): min / median / max | - | 0.070 / 0.167 / 0.684 |
+
+Group medians of the mean absolute change: P-A 0.0224 (61), P-Z 0.0091 (9); V-D 0.0131 (8), V-P
+0.0158 (16), V-S 0.0186 (25), V-Z 0.0145 (1). Per video, the smoothed statistics other than input
+2's saliency means are unchanged by (d) (white-balance means and gains, fusion bounds: largest
+change 0.0 over all 50), as Part 2's cache column states.
+
+**Which items' scans RISE under (d).** By the sheet's rule (more qualifying sides, or a larger
+largest qualifying band, than at the shipped defaults): NONE of the 120 (`scan_regressions: []`;
+no item and no frame rises by either test). Below the item rule, at the side level (every one
+disclosed): 3 sides qualify only under (d) (undecided at the shipped defaults): GX011610 f90 side
+83 (1.68 -> 0.21 x C) and IMG_6716 f50 side 24 (3.56 -> 1.26), each a SMALLER band that now
+clears its noise level, and IMG_6800 (photo) side 5 at (5343, 4032), 0.11 -> 0.56 x C, a band that
+RISES. Over all sides, the band is larger under (d) on 154 of 6,720 photo and 380 of 14,400 video
+sides; on 180 of them (57 photo, 123 video) the (d) band is 0.10 x C or more on a non-weak edge:
+115 of those go none -> undecided, 64 stay undecided, 1 goes undecided -> band (IMG_6800 above).
+
+**Walls (indicative only; not N6 figures).** Photos: 510 s for 70 items (4.2-15.9 s an item);
+render walls shipped 0.58-7.43 s, (d) 0.53-4.11 s (the download included). Videos: shipped analyses
+12,146 s in all, (d) analyses 1,543 s; the (d) analysis runs second and reads the proxies the
+shipped analysis cached, so the two analysis walls are not comparable. IMG_6762 (1920 x 1080,
+22,471 frames): 4,439 s (shipped analysis 3,382 s, (d) 695 s).
+
+#### The contact sheet's 20, and how chosen
+
+`part3/wholeset/sheet-20261103T202754214375Z/contact-sheet.html` (side-by-side previews shipped |
+(d), 1200 px a half, links to the full-resolution 8-bit PNGs in the item folders; 8-bit values,
+NOT display-converted, both halves alike). Rule (`select_contact`): first the 5 videos whose
+smoothed input-2 saliency mean moves most (C3 (3)), then the 15 largest whole-image mean absolute
+changes among the rest; each item shown at its frame of largest change. No scan regression to add.
+
+| # | Item | Group | Frame | Mean abs | p99 | Max shift | Input-2 saliency moved | Scan b / n / u shipped -> (d) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | IMG_6762 | V-P | f90 | 0.0191 | 0.1254 | 0.0086 | 0.684 | 60/82/146 -> 1/204/83 |
+| 2 | GX011601 | V-D | f10 | 0.0135 | 0.0956 | 0.0024 | 0.409 | 3/163/122 -> 0/225/63 |
+| 3 | GX011600 | V-D | f10 | 0.0127 | 0.1016 | 0.0025 | 0.329 | 2/109/177 -> 0/173/115 |
+| 4 | GX011590 | V-D | f90 | 0.0187 | 0.1110 | 0.0028 | 0.302 | 3/114/171 -> 0/177/111 |
+| 5 | GX011625 | V-S | f10 | 0.0172 | 0.1268 | 0.0045 | 0.267 | 15/55/218 -> 0/128/160 |
+| 6 | IMG_6751 | P-A | photo | 0.0856 | 0.1526 | 0.0092 | - | 0/0/96 -> 0/0/96 |
+| 7 | IMG_6758 | P-A | photo | 0.0700 | 0.1842 | 0.0166 | - | 0/0/96 -> 0/1/95 |
+| 8 | IMG_6753 | P-A | photo | 0.0687 | 0.1800 | 0.0179 | - | 0/0/96 -> 0/1/95 |
+| 9 | IMG_6755 | P-A | photo | 0.0679 | 0.1834 | 0.0189 | - | 0/0/96 -> 0/3/93 |
+| 10 | IMG_6754 | P-A | photo | 0.0674 | 0.1847 | 0.0189 | - | 0/0/96 -> 0/3/93 |
+| 11 | IMG_6757 | P-A | photo | 0.0662 | 0.1800 | 0.0184 | - | 0/1/95 -> 0/3/93 |
+| 12 | IMG_6746 | P-A | photo | 0.0649 | 0.1716 | 0.0103 | - | 0/2/94 -> 0/10/86 |
+| 13 | IMG_6759 | P-A | photo | 0.0641 | 0.1780 | 0.0170 | - | 0/0/96 -> 0/2/94 |
+| 14 | IMG_6756 | P-A | photo | 0.0636 | 0.1777 | 0.0174 | - | 0/0/96 -> 0/0/96 |
+| 15 | IMG_6752 | P-A | photo | 0.0631 | 0.1780 | 0.0168 | - | 0/0/96 -> 0/0/96 |
+| 16 | IMG_6768 | P-A | photo | 0.0526 | 0.1625 | 0.0154 | - | 1/4/91 -> 0/19/77 |
+| 17 | IMG_6770 | P-A | photo | 0.0462 | 0.1446 | 0.0120 | - | 0/2/94 -> 0/10/86 |
+| 18 | IMG_6767 | P-A | photo | 0.0432 | 0.1564 | 0.0136 | - | 1/10/85 -> 0/42/54 |
+| 19 | IMG_6769 | P-A | photo | 0.0431 | 0.1417 | 0.0123 | - | 2/4/90 -> 0/18/78 |
+| 20 | IMG_6761 | P-A | photo | 0.0403 | 0.1492 | 0.0109 | - | 0/2/94 -> 0/17/79 |
+
+The 21st by mean absolute change: IMG_6766 (0.0395). The sixth to eighth videos by input-2
+saliency movement: GX011621 0.241, GX011592 0.239, GX011616 0.227.
+
+#### Readings (measurement, not a look judgement)
+
+- **The scanned band falls set-wide under (d).** Qualifying sides 963 -> 39 (video) and 248 -> 13
+  (photo); items with a qualifying side 49 -> 18 and 50 -> 11; the largest qualifying band 15.2 ->
+  2.1 and 13.8 -> 2.6 x C. Of the shipped qualifying sides, 567 / 963 (video) and 105 / 248 (photo)
+  go to `none`, 359 and 131 to `undecided` (not removal), 37 and 12 stay `band`. No item's scan
+  rises by the sheet's rule; at the side level one band rises (IMG_6800, 0.11 -> 0.56 x C) and 115
+  sides go from none to undecided.
+- **(d) also changes texture set-wide, most on a group of P-A photos.** The whole-frame standard
+  deviation of L* falls on every photo ((d) / shipped 0.19-0.98, median 0.895) and on 149 of 150
+  video frames (0.52-1.006; the one exception IMG_6742 f10, 13.75 -> 13.83); the mean L* falls slightly (median -0.34 photo, -0.17 video). The
+  largest whole-image changes are ten P-A photos (IMG_6746, IMG_6751-IMG_6759; mean absolute
+  0.063-0.086, about 16-22 / 255) whose scan is undecided on 94-96 of 96 sides at the shipped
+  defaults and whose std L* falls to 0.19-0.45 of shipped (IMG_6751 11.75 -> 2.57, IMG_6752 7.67 ->
+  1.45): consistent with Part 1's reading that the saturated N{} stretch amplifies noise and fine
+  texture, which the clip limits everywhere; whether that is the look the owner preferred is the
+  owner's judgement (the contact sheet's photos 6-20). std L* does not separate noise from
+  texture.
+- **No clipping under (d)** on any image (shipped up to 0.0047): input 2 is held inside the local
+  range of its unsharpened form, which lies in [0, 1].
+- **The cached statistics.** Only input 2's smoothed saliency mean moves (0.070-0.684 Lab; largest
+  IMG_6762); every white-balance record and the fusion bounds are unchanged, as Part 2's (i)
+  column states for (d).
+- **No STOP.** No record exposes an instrument defect: every item `done` and published, every crop
+  run's render and prefused checks equal, the crop bands equal Part 2's records, the V3 shipped leg
+  reproduced the record. The stale `D106 25` label (above) is outside the owned files.
+
+Depth at Part 3 yield: DISPATCHER TO FILL
