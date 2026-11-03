@@ -120,9 +120,10 @@ tool never deletes or writes into a published folder, so a link planted in it is
 through). A run that fails or is refused after the staging folder was made publishes nothing
 and leaves ``<out>`` untouched: an empty staging folder is removed (``os.rmdir``, which removes
 nothing else); one holding partial output is kept, renamed ``.<out>.failed-<stamp>``. When
-the publish rename fails or is interrupted after ``<out>`` was moved aside, the old
-publication is renamed back (for any exception, which is then re-raised); if that also fails,
-the run exits 1 naming both failures and the kept folder that holds the old publication. The
+either publish rename fails or is interrupted after ``<out>`` was moved aside, the old
+publication is renamed back (for any exception, which is then re-raised once the staging folder
+is retired as above); if that also fails, the run exits 1 naming both failures and the kept
+folder that holds the old publication. The
 analysis cache (``--cache-dir``) is the product's ``DiskProxyCache``, reused across runs by
 design, and keeps its own write discipline; it is refused when it equals, lies inside or
 contains ``<out>``, or lies inside any of ``<out>``'s sibling folders (``<out>.*`` or
@@ -2001,10 +2002,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise
     try:
         _publish(staging, out, options["replaced"] if args.replace else None)
-    except OSError as exc:
+    except BaseException as exc:  # round 3, fix 3: retire the staging folder on ANY exception
         kept = _abandon(staging, options["failed"])
-        print(f"halo_probe: FAILED to publish: {exc}{kept}", file=sys.stderr)
-        return 1
+        if isinstance(exc, OSError):
+            print(f"halo_probe: FAILED to publish: {exc}{kept}", file=sys.stderr)
+            return 1
+        raise
     print(summary(record))
     return 0
 
@@ -2054,8 +2057,11 @@ def _abandon(staging: Path, failed: Path) -> str:
     """Retire a failed run's staging folder; return a note for the message (may be empty).
 
     An empty folder is removed with ``os.rmdir`` (it removes nothing else); one holding partial
-    output is renamed ``failed`` and kept. Nothing is published either way.
+    output is renamed ``failed`` and kept. Nothing is published either way. A staging folder
+    that is already gone (the publish rename completed before an interrupt) is left alone.
     """
+    if not os.path.lexists(staging):
+        return ""
     try:
         os.rmdir(staging)
         return ""
@@ -2075,9 +2081,13 @@ class RollbackError(OSError):
 def _publish(staging: Path, out: Path, replaced: Path | None) -> None:
     """Publish the staging folder as ``out``, keeping an existing ``out`` aside as ``replaced``.
 
-    When the publish rename fails or is interrupted (any exception) after ``out`` was moved
-    aside, ``replaced`` is renamed back to ``out`` and the exception re-raised, so ``out`` is
-    as it was and the staging folder stays.
+    Both renames sit inside one guard (Reviewer A round 3, fix 2). When either fails or is
+    interrupted (any exception), the rollback reads the folders to tell where the publication
+    stopped: ``out`` absent and ``replaced`` present means ``out`` was renamed aside and nothing
+    took its place, so ``replaced`` is renamed back; ``out`` still present means it was not yet
+    renamed aside (or the publish completed), so nothing is moved. ``replaced`` is a fresh
+    stamped name, so its presence is this run's doing. The exception is then re-raised; the
+    staging folder stays for the caller to retire.
 
     Raises:
         OSError: ``out`` exists and ``replaced`` is None, or a rename fails.
@@ -2088,10 +2098,12 @@ def _publish(staging: Path, out: Path, replaced: Path | None) -> None:
     if os.path.lexists(out):
         if replaced is None:
             raise FileExistsError(f"{out.name} appeared during the run; nothing published")
-        out.rename(replaced)
         try:
+            out.rename(replaced)
             staging.rename(out)
         except BaseException as exc:
+            if os.path.lexists(out) or not os.path.lexists(replaced):
+                raise  # not yet renamed aside (or already published): nothing to put back
             try:
                 replaced.rename(out)
             except BaseException as undo:

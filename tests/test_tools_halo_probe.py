@@ -886,6 +886,7 @@ def test_main_interrupted_publish_rolls_back(
             hp.main(replace)
         assert _snapshot(out) == before
         assert not [p for p in working.iterdir() if p.name.startswith("out.replaced-")]
+        _assert_staging_retired(working)  # round 3, fix 3
         return
     assert hp.main(replace) == 1
     kept = [p for p in working.iterdir() if p.name.startswith("out.replaced-")]
@@ -895,6 +896,42 @@ def test_main_interrupted_publish_rolls_back(
     assert "KeyboardInterrupt" in message
     assert "undo-boom" in message
     assert kept[0].name in message
+
+
+def _assert_staging_retired(working: Path) -> None:
+    """No staging folder is left; exactly one ``.out.failed-*`` holds the unpublished record."""
+    assert not [p for p in working.iterdir() if p.name.startswith(".out.staging-")]
+    failed = [p for p in working.iterdir() if p.name.startswith(".out.failed-")]
+    assert len(failed) == 1
+    assert (failed[0] / "scene.json").is_file()
+
+
+@pytest.mark.parametrize("after", [True, False])
+def test_main_interrupt_at_the_aside_rename_rolls_back_only_what_moved(
+    tmp_path: Path, working: Path, monkeypatch: pytest.MonkeyPatch, after: bool
+) -> None:
+    # Round 3, fix 2: an interrupt delivered at the first publication rename (out -> replaced),
+    # just AFTER it took effect (``after``) or before it did. Either way ``out`` ends as it was,
+    # the interrupt is re-raised, no replaced folder is left, and the staging folder is retired
+    # (fix 3). The rollback must tell "renamed aside" (put it back) from "not yet renamed"
+    # (move nothing: a blind rollback would fail on the absent replaced folder).
+    replace, out, before = _published(tmp_path, working)
+    original = Path.rename
+
+    def rename(self: Path, target: Any) -> Any:
+        if self.name == "out" and Path(target).name.startswith("out.replaced-"):
+            if after:
+                original(self, target)
+            raise KeyboardInterrupt
+        return original(self, target)
+
+    monkeypatch.setattr(Path, "rename", rename)
+    with pytest.raises(KeyboardInterrupt):
+        hp.main(replace)
+    monkeypatch.undo()
+    assert _snapshot(out) == before
+    assert not [p for p in working.iterdir() if p.name.startswith("out.replaced-")]
+    _assert_staging_retired(working)
 
 
 @pytest.mark.parametrize(

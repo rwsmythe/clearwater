@@ -638,3 +638,52 @@ Success, no issues found in 157 source files.
 | 2 | A (Codex, at the orchestrator's seat) | 0 | 1 (out of envelope by adjudication) | 3 | 1 (out of envelope) | 3 / 2 | 5 / 0 | 0 | 2 / 1 / 0 |
 
 Depth at step-2D end: 309001 (scripts/cell_depth.py, wp57-cell3, read by the orchestrator at the step-2D yield 2026-11-03; cell stood down)
+
+## Part 2
+
+Dispatch `clearwater-review-evidence/wp5.7/cell/dispatch-5.md` (orchestrator gen 37). Fresh cell
+(implementer-opus-high) on head `1bd99a4e`.
+
+### Step 0 (Reviewer A round 3: record and fix its two minors)
+
+Reviewer A round 3 (Codex, read-only, at the orchestrator's seat, on `1bd99a4e`; transcript
+withheld): an AST comparison confirms no measurement function changed since round 1; S1, S2,
+attribution with the clip, qualification and the full-frame equality checks hold; relative
+paths, trailing separators, case variants and an 8.3 short name behave in the cache check; no
+product divergence. Dispositions are the orchestrator's (binding).
+
+| # | Sev | Finding | Disposition / what changed | Tests |
+|---|---|---|---|---|
+| 1 | MAJOR, out of envelope (adjudicated) | a junction pre-planted INSIDE the cache folder under an exact cache-entry name (`e_<size>_<mtime_ns>_<version>`): discovery skips it, but the product's cache store (`src/clearwater/cache/store.py` `_entry_for_write`) reuses the pathname and writes through it | no code change (a deliberately planted junction, a hostile local actor; the product's cache store, not owned here); a stated limit below; routed to CHARC by the orchestrator as a possible product debt item | - |
+| 2 | MINOR | the first publication rename (`out.rename(replaced)`) sat outside the rollback guard: an interrupt just after it left `out` absent, no rollback, no message | `_publish`: both renames inside one guard; the rollback reads the folders to tell "renamed aside" (`out` absent, the stamped `replaced` present: rename it back) from "not yet renamed" (`out` present: move nothing), then re-raises | an interrupt injected at the `out -> replaced` rename, after it took effect and before: `out` byte-identical, the interrupt re-raised, no replaced folder, the staging folder retired |
+| 3 | MINOR | after an interrupt during publication `main` caught only `OSError`, so the staging folder was not retired | `main` retires the staging folder (`_abandon`: `.<out>.failed-<stamp>`) on ANY exception from `_publish`, then exits 1 for an `OSError` (as before) or re-raises the original; `_abandon` leaves a staging folder that is already gone (the publish completed) alone | the round-2 interrupt test now also asserts no `.out.staging-*` remains and one `.out.failed-*` holds the unpublished record |
+
+No measurement code changed (the publish path and `_abandon` only; no GPU run).
+
+Limits, added: the analysis cache's writes go through the product's cache store, which does not
+refuse a junction pre-planted under a cache-entry name (out of envelope; routed to CHARC).
+
+RED (the new tests against `1bd99a4e`'s probe, restored into the working copy for the run and
+the new probe copied back, compared byte for byte; log `work/c57-p2-step0-red.log` in the
+worktree): 3 failed, 1 passed.
+- `test_main_interrupt_at_the_aside_rename_rolls_back_only_what_moved[True]`: `assert {} ==
+  {'overview-ou...` (`out` absent after the interrupt).
+- `...[False]` and `test_main_interrupted_publish_rolls_back[False]`: `AssertionError: assert not
+  [WindowsPath('.../.out.staging-...')]` (the staging folder not retired).
+- `test_main_interrupted_publish_rolls_back[True]` passes on both (its rollback-failure path
+  already exited 1 through the `OSError` branch).
+
+GREEN: `uv run pytest -q tests/test_tools_halo_probe.py` 75 passed (7.6 s); `uv run ruff check .`
+All checks passed; `uv run ruff format --check .` 313 files already formatted; `uv run mypy`
+Success, no issues found in 157 source files.
+
+Round ledger (cumulative):
+
+| Round | Reviewer | Critical | Major | Minor | Advisory | In-envelope / out | NEW / REOPENED | Reverts | Fixes: instrument / test-only / product |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | A (Codex, at the orchestrator's seat) | 0 | 4 | 4 | 1 | 9 / 0 | 9 / 0 | 0 | 9 / 0 / 0 |
+| 1 | A (Codex, at the orchestrator's seat) | 0 | 1 | 3 | 0 | 4 / 0 | 4 / 0 | 0 | 3 / 1 / 0 |
+| 2 | A (Codex, at the orchestrator's seat) | 0 | 1 (out of envelope by adjudication) | 3 | 1 (out of envelope) | 3 / 2 | 5 / 0 | 0 | 2 / 1 / 0 |
+| 3 | A (Codex, at the orchestrator's seat) | 0 | 1 (out of envelope by adjudication) | 2 | 0 | 2 / 1 | 3 / 0 | 0 | 2 / 0 / 0 |
+
+Reviewer A CONVERGED at round 3 (no in-envelope critical or major).
