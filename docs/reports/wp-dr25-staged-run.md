@@ -344,60 +344,86 @@ float32 NumPy area-average proxies.
 
 ## 9. Verification and acceptance transfer
 
-This report turn changes only this report and the owned ledger. The
-instrument used through turn 5 is blob
-`e346ca303cadf719c6b1f30eb9aaeaa80dcdbe61` (pre-rebase `68caf100`): long routing,
-start/source records, method/reach-specific studies and the ruled R1
-diagnostic; synthetic controls pin default records to the WP1.4 base.
-No product/prototype code, frozen interface, dependency, smoother/default
-decision or WP1.4 report is changed. This cell performed no GPU phase,
-footage write, main-tree working-folder write, mailbox post or git commit.
-Scratch scripts/logs/temp files stay under this worktree's ignored `work/`.
+The final package spans four owned files:
 
-Light checks run on this report turn, each exit 0:
+- `tools/statistics_experiments.py`: long routing, start/source records,
+  method/reach-specific studies and the ruled R1 diagnostic.
+- `tests/test_tools_statistics_experiments.py`: synthetic long-path
+  checks, whole-document default goldens, stable blob source pins and
+  equality/strict-crossing controls.
+- `docs/reports/wp-dr25-staged-run.md`: the measured results and reading.
+- `docs/proofs/wp-dr25-ledger.md`: verification evidence and dispositions.
+
+The final instrument blob `f7a4988f300006c878c4636e022a5336c83960c2`
+differs from the second analysis's
+`e346ca303cadf719c6b1f30eb9aaeaa80dcdbe61` only by the
+`run_experiments` docstring ("instead of rendering it"), so those records
+stand for the final code. A byte-for-byte comparison allowing precisely
+that one replacement passed (`work/cdr25-8-blobs.log`, exit 0).
+No executable instrument behavior, product/prototype code, frozen
+interface, dependency, smoother/default decision or WP1.4 report changed
+in the review remediation. The cells performed no GPU phase, footage
+write, main-tree working-folder write, mailbox post or git commit;
+the GPU instrument phases were run by the dispatcher (section 7).
+Scratch logs/temp files stay under this worktree's ignored `work/`.
+
+Final light verification evidence, each exit 0:
 
 | Check | Observed summary | Worktree log |
 |---|---|---|
-| New synthetic module | `22 passed in 4.53s` | `work/cdr25-6-green.log` |
-| Ruff, whole tree | `All checks passed!` | `work/cdr25-6-ruff.log` |
-| Format, whole tree | `312 files already formatted` | `work/cdr25-6-format.log` |
-| Configured mypy scope | `Success: no issues found in 156 source files` | `work/cdr25-6-mypy.log` |
+| Synthetic module, turn 8 (once) | `27 passed in 1.96s` | `work/cdr25-8-green.log` |
+| Both importers, turn 7 | `85 passed, 4 deselected, 1 warning in 7.37s` | `work/cdr25-7-importers.log` |
+| Ruff, whole tree, turn 7 | `All checks passed!` | `work/cdr25-7-ruff.log` |
+| Format, whole tree, turn 7 | `312 files already formatted` | `work/cdr25-7-format.log` |
+| Configured mypy scope, turn 7 | `Success: no issues found in 156 source files` | `work/cdr25-7-mypy.log` |
 
-Exact cell commands (PowerShell, all runner output redirected):
+Exact pytest commands (PowerShell, with the sandbox shim and all runner
+output redirected):
 
 ```powershell
 $env:PYTHONPATH='scripts'
 $env:PYTHONDONTWRITEBYTECODE='1'
 Remove-Item Env:VIRTUAL_ENV -ErrorAction SilentlyContinue
-uv run python work/cdr25-6-audit.py > work/cdr25-6-audit.log 2>&1
-uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-6-green > work/cdr25-6-green.log 2>&1
-uv run ruff check . > work/cdr25-6-ruff.log 2>&1
-uv run ruff format --check . > work/cdr25-6-format.log 2>&1
-uv run mypy > work/cdr25-6-mypy.log 2>&1
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-8-green > work/cdr25-8-green.log 2>&1
 ```
 
-Verification loop: suspected wrong interiors/missing methods were rejected
-by the independent re-trim, counts and tick checks; the anticipated trend
-exception was confirmed exactly as ruled; unequal comparison step sets
-were addressed with matched unsmoothed baselines and the common-2 s-slice
-control; attributing a historical difference solely to boundaries was
-rejected because references and, for GX011625, populations differ.
-The final report pass found no additional in-envelope instrument defect.
-No implementation change or STOP was needed.
+The importers ran once in turn 7, in a separate process with the same
+pytest environment plus a process-local GPU mask, proactively using the
+earlier confirmed import-time CUDA collection workaround:
 
-The final scratch document check (`work/cdr25-6-report-check.py`, output
-`work/cdr25-6-report-check.log`, exit 0) reconciled 31 long-run table rows
-with the durable records, confirmed both owned files are ASCII/LF, checked
-local link targets and the two-file scope, and ran `git diff --check`
-successfully. Git's prospective LF-to-CRLF warning concerns its configured
-future checkout behavior; the audited files on disk contain no CR bytes.
+```powershell
+$env:CUDA_VISIBLE_DEVICES='-1'
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_footage_locator.py tests/test_prototype_temporal.py -m "not gpu and not footage and not gui and not slow" --timeout 120 --basetemp=work/cdr25-7-importers > work/cdr25-7-importers.log 2>&1
+```
+
+There were no selected-test skips or new collection stall. The warning
+was CuPy's existing undetected-CUDA-path warning. The turn-7 static
+commands were `uv run ruff check .`, `uv run ruff format --check .` and
+`uv run mypy`, redirected to the table's logs. Turn 8 changed documentation
+only and ran the synthetic module once; it did not repeat those static
+checks or the importers.
+
+Verification loop: the independent re-trim, count and tick checks rejected
+wrong interiors/missing methods; the anticipated trend exception matched
+the ruling; matched baselines and the common-slice control addressed
+unequal step populations; changed references and remaining boundary
+exposure prevented attributing historical differences solely to boundary
+bias. Review remediation fixed source pinning, added the missing equality
+control, corrected identifiers and wording, and updated this final-state
+verification record. The record figures are unchanged. The final document
+checks confirm ASCII/LF, the two documentation paths changed in turn 8,
+and `git diff --check`; the package's scope remains the four files above.
 
 Reviewer A round 2 is dispatcher-reported **CONVERGED** (0 critical,
 0 major, 1 minor, 3 advisory); its F1/F3 test cleanup and R1 were fixed
 in turn 5, and the carried F2/F4, A1 F4/F8 and resource obligations are
-covered here. This is not a fresh review pass. Importers were not rerun
-because no code changed. Reviewer B, the parallel/serial gate (including
-the two named instrument importers), harness gate and collection identity
-remain at the dispatcher's seat; no full-gate pass is claimed here.
+covered here. Reviewer B's dispatcher-seat rerun on the turn-7 candidate
+reported **NO_NEW_CRITICAL_MAJOR**, closed all seven prior findings,
+recomputed every report figure without mismatch, and killed 14 of 14
+mutants. Its one minor (this section's stale verification state) is
+corrected here; its two advisories require no change and are dispositioned
+in the ledger. The parallel/serial gate (including the two named instrument
+importers), harness gate and collection identity remain at the
+dispatcher's seat; no full-gate pass is claimed here.
 The DR-25 (3) register note, AD-3 ruling and one-line WP1.4 erratum pointer
 are CHARC's acceptance actions and remain outside this cell's ownership.

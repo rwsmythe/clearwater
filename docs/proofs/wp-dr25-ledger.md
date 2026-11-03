@@ -1029,3 +1029,76 @@ frozen interface, dependency, footage/evidence file, main-tree output,
 git history or mailbox is changed. No new question or deviation is raised.
 
 Depth at turn-7 end: 173,792 input tokens of 258,400 (driver footer, session 01a1a157, 2026-11-03 turn 7; the footer reported 475,000 at turn 6).
+
+## Turn 8 (Reviewer B re-run minor)
+
+Resumed session on `d5650ea8`. Reviewer B's dispatcher-seat Claude rerun
+on that candidate returned `NO_NEW_CRITICAL_MAJOR`: all seven earlier
+findings closed, every report figure recomputed without mismatch, and
+14 of 14 mutants failed the test module. The transcript is withheld;
+these are dispatcher-supplied review results, not another cell review.
+
+### Three dispositions
+
+| Finding | Classification | Disposition |
+|---|---|---|
+| B rerun 1 | MINOR, in envelope | FIXED in report section 9 only. Replaced the stale turn-6 verification state with the final four-file package scope, the fresh 27-test command/result, the turn-7 importers' 85 passed / 4 deselected result, and explicitly dated turn-7 static evidence. Identified the final instrument blob and its sole docstring difference from the second analysis blob, so the saved records stand for the final code. Removed stale two-file package-scope and importer-not-rerun claims; distinguished this turn's two documentation edits from the four-file package. |
+| B rerun 2 | ADVISORY, accepted integration constraint | NO CHANGE. Blob pins survive rebases but not a squash merge followed by pruning. The dispatcher states it will fast-forward merge and records that in the accept record; this cell performs no merge or history operation. |
+| B rerun 3 | ADVISORY, confirmed ordering | NO CHANGE. The crossing preflight follows the method's reference / unsmoothed / staged / flat renders and runs before any render of the trend series, as ruled. The dispatcher reports records identical across the two runs. |
+
+### Evidence and checks
+
+`git rev-parse HEAD:tools/statistics_experiments.py` returned final blob
+`f7a4988f300006c878c4636e022a5336c83960c2`. A read-only byte comparison
+against the second analysis's blob
+`e346ca303cadf719c6b1f30eb9aaeaa80dcdbe61` allowed only the single
+`run_experiments` docstring replacement, "before rendering it" ->
+"instead of rendering it", and passed. Output/exit:
+`work/cdr25-8-blobs.log` / `.exit`, exit 0:
+
+```text
+INSTRUMENT_BLOB_CHECK_PASS f7a4988f300006c878c4636e022a5336c83960c2 only_change run_experiments_docstring
+```
+
+The required synthetic module ran **once**, with stdout/stderr redirected
+under this worktree's ignored `work/`:
+
+```powershell
+$env:PYTHONPATH='scripts'
+$env:PYTHONDONTWRITEBYTECODE='1'
+Remove-Item Env:VIRTUAL_ENV -ErrorAction SilentlyContinue
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-8-green > work/cdr25-8-green.log 2>&1
+```
+
+Observed exit 0: **`27 passed in 1.96s`**, recorded in section 9 and
+`work/cdr25-8-green.log` / `.exit`. Importers were not repeated this
+turn; section 9 now correctly quotes their turn-7 result, **85 passed,
+4 deselected, 1 warning in 7.37s**, with its command and process-local
+GPU-mask explanation. Ruff/format/mypy evidence there is explicitly from
+turn 7. No code or test file changed; no static runner or GPU phase ran
+this turn.
+
+Final document validation (`work/cdr25-8-final-check.log`) checks ASCII/LF,
+`git diff --check`, and exactly the two owned documentation paths. It
+also compares report sections 1-8 byte for byte to `d5650ea8`, preserving
+every measured figure and historical comparison, and checks the
+instrument/test files against HEAD. Only report section 9 and this
+ledger change. No report measurement was recomputed or altered.
+
+### Cumulative round ledger
+
+| Round | Critical | Major | Minor | Advisory | In / out of envelope | NEW / REOPENED | Reverts | Fix surface | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 prerequisite audit | 0 | 2 | 1 | D3 fit observation | All in | All new / 0 | 0 | Ruled instrument changes in turn 2 | CHARC ruled at `0f2d19c4` |
+| A1 | 0 | 0 | 2 | 6 | F1-F7 in; F8 out | 8 / 0 | 0 permanent | Instrument/tests in turn 3; report obligations in turn 6 | `NO_NEW_CRITICAL_MAJOR` |
+| A2 | 0 | 0 | 1 | 3 | F1-F4 in | 4 / 0 | 0 permanent | Tests F1/F3 in turn 5; report F2/F4 in turn 6 | CONVERGED |
+| B1 | 0 | 1 | 1 | 5 | B6 out; other six dispositioned / accepted coverage | 7 / 0 | 0 permanent | Three new test functions, loader pins, report, instrument docstring in turn 7; no executable product fix | All seven closed by B rerun |
+| Reviewer B re-run | 0 | 0 | 1 | 2 | Minor in; advisories accepted integration/ordering constraints | 3 / 0 | 0 | Report section 9 only; no code/test fix | `NO_NEW_CRITICAL_MAJOR`; minor corrected in turn 8 |
+
+Final verification found no additional issue. No assumptions or new
+questions, code/test edits, dependency or frozen-interface changes,
+extract/analyse/render rerun, footage/evidence/main-tree output write,
+git history mutation or mailbox post occurred. Only the report and
+ledger are handed back; the dispatcher owns the final gate and accept.
+
+Depth at turn-8 end: 185,072 input tokens of 258,400 (driver footer, session 01a1a157, 2026-11-03 turn 8).
