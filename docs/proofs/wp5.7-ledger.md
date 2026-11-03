@@ -908,4 +908,4 @@ about 680 4K and 1,870 1080p frames, perhaps 10-15 min). A reduced set (defaults
 (e1) 0.01, 0/100; (e2) 0.1, 0.2; (d) unsharpened 1, 3; (e3); (b) 4; (c) 1.0: 12 settings) about
 80 min plus (e3).
 
-Depth at mid-build yield 2: DISPATCHER TO FILL
+Depth at mid-build yield 2: 268700 (scripts/cell_depth.py, wp57-cell4, read by the orchestrator at the yield 2026-11-03)
