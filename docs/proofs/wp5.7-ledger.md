@@ -2198,4 +2198,4 @@ the re-check); its Limits gain the B4 line. Ledger row for the cumulative table:
 |---|---|---|---|---|---|---|---|---|---|
 | B | B (Codex, the orchestrator's single pass) | 0 | 1 | 3 | 1 (out of envelope) | 4 / 1 | 5 / 0 | 0 | 4 (B1, B2, B3, B5, each with tests) / 0 / 0; B4 banked; plus 1 report line |
 
-Depth at Reviewer-B yield: DISPATCHER TO FILL
+Depth at Reviewer-B yield: 156,588 (wp57-cell9 at its yield, 44 turns, 2026-11-03 ~22:20Z; read by orchestrator gen 39 with scripts/cell_depth.py). The cell stays available for a Reviewer A round-7 fix (below the 250K evaluation point).
