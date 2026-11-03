@@ -37,13 +37,14 @@ evidence folder is `C:\Users\rwsmy\clearwater-review-evidence\wp5.7\`):
 - **(d) on the 120 other CP5 items (Part 3):** the edge-scan qualifying sides fall from 963 to 39
   (video) and from 248 to 13 (photo). No item's scan rises. Texture changes set-wide: the
   whole-frame std L* falls on 219 of 220 images, by up to 81 % on a group of P-A photos.
+  OBSERVATION (CHARC's viewing of the contact sheet; the cell has no eye on it): CHARC, viewing
+  the sheet, reports that (d) visibly softens fine texture wherever the local range is narrow,
+  not only at halo edges: the fabric pattern on item 01 (IMG_6762; whole-image mean abs 0.0191,
+  p99 0.1254) and the grain on item 06 (IMG_6751; 0.0856 / 0.1526). No preference judgement.
 - **V3:** (d) passes every asserted bound on WP4.2's two clips, and the shipped leg reproduced the
   record. On `ad14-flicker` the contrast ratio rises (section 6).
 - **N6:** shipped runs at 10.95 min/min median and (d) at 12.43 (+13.59 %). As measured, (d) is
   OVER N6 (about 12 min/min) on the clip of record (section 7).
-- **Observation (CHARC's viewing; section 5):** beyond the halo edges, the clip visibly softens
-  fine texture wherever the local range is narrow. Examples are the fabric on IMG_6762 (mean abs
-  0.0191, p99 0.1254) and the grain on IMG_6751 (0.0856, 0.1526).
 - **Outcome (CHARC's A-prime):** nothing is proposed or shipped for v1.0.x. (d) at 1 sigma is
   stated as an amendment of spec 6.2 step 3. The owner has two options: (i) defer to Phase 6 with
   DR-117 open, or (ii) commission the optimisation now (section 8).
@@ -232,11 +233,13 @@ look judgement):
   2.57). This is consistent with section 3: the saturated N{} amplifies noise and fine texture,
   and the clip limits that everywhere. std L* does not separate noise from texture, and whether
   this is the look the owner preferred is the owner's judgement.
-- **OBSERVATION: the clip softens fine texture wherever the local range is narrow, not only at
-  halo edges.** The visual sighting is CHARC's, from viewing the contact sheet (CHARC msg
-  61fa577714607f97): the fabric pattern on item 01, IMG_6762, and the grain on item 06,
-  IMG_6751, are visibly softer under (d). The cell has no eye on it; its part is the measurement
-  columns below, from the item records (`P3/wholeset/items/<item>/<item>.json`) and the sheet's
+  OBSERVATION (attributed to CHARC's viewing of the contact sheet, CHARC msg 61fa577714607f97;
+  the cell has no eye on it): CHARC, viewing the sheet, reports that (d) visibly softens fine
+  texture wherever the local range is narrow, not only at halo edges: the fabric pattern on item
+  01 (IMG_6762; whole-image mean abs 0.0191, p99 0.1254) and the grain on item 06 (IMG_6751;
+  0.0856 / 0.1526). No preference judgement.
+- **The measurement columns for CHARC's two items.** The cell's part is the columns below, from
+  the item records (`P3/wholeset/items/<item>/<item>.json`) and the sheet's
   `summary.tsv`. CHARC's set-wide counts were checked against the records and agree: qualifying
   scan sides 963 -> 39 over the 50 videos and 248 -> 13 over the 70 photos, and a clipped fraction
   of 0 under (d) on every image. No preference judgement is made here.
