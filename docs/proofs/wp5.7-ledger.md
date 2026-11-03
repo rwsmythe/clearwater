@@ -1916,4 +1916,4 @@ saliency movement: GX011621 0.241, GX011592 0.239, GX011616 0.227.
   run's render and prefused checks equal, the crop bands equal Part 2's records, the V3 shipped leg
   reproduced the record. The stale `D106 25` label (above) is outside the owned files.
 
-Depth at Part 3 yield: DISPATCHER TO FILL
+Depth at Part 3 yield: 221,426 (wp57-cell7 at its yield, 45 turns, 2026-11-03 ~20:38Z); 237,390 at retirement after the two addendum commits d7ac41f3 / 203d1b1f (55 turns, ~20:44Z); read by orchestrator gen 39 with scripts/cell_depth.py.
