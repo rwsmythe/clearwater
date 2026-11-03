@@ -573,3 +573,68 @@ smoke wrote 174 MB, two publications of 87 MB).
 | 1 | A (Codex, at the orchestrator's seat) | 0 | 1 | 3 | 0 | 4 / 0 | 4 / 0 | 0 | 3 / 1 / 0 |
 
 Depth at step-2C end: 275495 (scripts/cell_depth.py, wp57-cell3, read by the orchestrator at the step-2C yield 2026-11-03)
+
+## Step 2D (Reviewer A round 2 remediation)
+
+Dispatch `clearwater-review-evidence/wp5.7/cell/dispatch-6.md` (orchestrator gen 37), the same
+cell (wp57-cell3) resumed on head `1e6cb6c8`, its last step. Reviewer A round 2 (Codex,
+read-only, at the orchestrator's seat, on `1e6cb6c8`): `NEW_CRITICAL_MAJOR_FOUND`; it confirmed
+step 2C changed no measurement function (AST comparison), the metric, S1, S2, the qualification
+rule, the full-frame equality checks and the binding-clip control, and no product divergence
+(no outcome B). Dispositions are the orchestrator's (binding).
+
+### Dispositions
+
+| # | Sev | Finding | Disposition / what changed | Tests |
+|---|---|---|---|---|
+| 1 | MAJOR, out of envelope (adjudicated) | checked ancestors can change between validation and the writes (a concurrent process renames `wp5.7\part1` and installs a junction at its old path; or plants a hard link in the fresh staging folder before a PNG write) | no code change; a stated limit (below, and in the module docstring's publication paragraph) | - |
+| 2 | MINOR | a failed rollback can leave `out` absent and say nothing useful; an interrupt during the publish rename skipped the rollback | `_publish` rolls back for ANY exception (`BaseException`, re-raised after); when the rollback fails too it raises `RollbackError` (an `OSError`) naming the publish failure, the rollback failure and the kept `<out>.replaced-<stamp>` folder holding the old publication; `main` prints it and exits 1 (the staging folder retired to `.<out>.failed-<stamp>`) | injected failures (`Path.rename` patched for the two renames onto `out` only): publish OSError + rollback OSError -> exit 1, the message holds `publish-boom`, `undo-boom` and the kept folder's name, the kept folder byte-identical to the old publication; publish interrupt (KeyboardInterrupt) -> re-raised, `out` byte-identical, no kept folder; publish interrupt + rollback OSError -> exit 1, the message holds `KeyboardInterrupt`, `undo-boom` and the kept folder |
+| 3 | MINOR | a cache folder inside the publication or staging tree defeats isolation | `_cache_conflict`, at start-up (exit 2, before any write): `--cache-dir` equal to, inside or containing `out`, or inside any sibling `<out>.*` / `.<out>.*` (the staging, failed and replaced folders of any run), resolved and case-normalised. Five existing refusal tests used `--cache-dir <wp5.7>` (which contains their `out`) and would now be refused for that reason: changed to `<wp5.7>/c` so each still tests its own refusal | 5 cases (`out`, `out/c`, `wp5.7` itself, `out.replaced-<stamp>/c`, `.out.staging-x`): exit 2 and `wp5.7` left empty |
+| 4 | MINOR (test only) | the S1 tests cannot tell the source reference from the compensated one (achromatic controls; 3C an identity there) | a CHROMATIC control (`_scene`, where 3C moves pixels by more than 1e-3): `remap_balanced` = `clip(source * gains)` with the gains computed in the test from the record (strength, then the D99 clamp) and `remap_input1` = `clip(that ** gamma)`, within 1e-6; and the stage images differ from both by more than 1e-3 | one-off mutation probe (`staged_render` yielding `balanced` / `input1` as the references): `Mismatched elements: 36864 / 36864 (100%)`, `Max absolute difference among violations: 0.30065252`, FAILED, while the four achromatic S1 tests still pass under it (log `work/c57-2d-mutation.log`) |
+| 5 | ADVISORY, out of envelope | on POSIX `Path.rename` can replace an existing empty directory, so the collision refusals are Windows guarantees | no code change; a stated limit (below) | - |
+
+No measurement code changed: the edits are the publish rollback, the cache rule, a docstring and
+tests; no band, record or crop value can move (no STOP; no GPU run).
+
+### Limits (the write path; out of the instrument's envelope, a seat-run tool on the owner's single-user laptop)
+
+- Confinement is checked at start-up and holds against pre-existing files and links; it does not
+  pin ancestors against a concurrent process that swaps a directory for a junction during the run
+  (out of envelope), nor against one that plants a link in the fresh staging folder before a write.
+- On POSIX `Path.rename` can replace an existing EMPTY directory, so the publish-time collision
+  refusals (an `out` that appeared during the run, the rollback) are Windows guarantees.
+
+### RED (the new tests against `1e6cb6c8`'s probe)
+
+Logs `work/c57-2d-red.log` and `work/c57-2d-red2.log` in the worktree (the old probe restored
+into the working copy for the run, then the new one copied back and compared byte for byte).
+
+- `test_main_interrupted_publish_rolls_back[True]`: the injected KeyboardInterrupt escaped
+  `main` (no rollback, no message) and ended the pytest session: `!!! KeyboardInterrupt !!!` at
+  the injected raise, 2 failed / 51 passed before it. Run again with that node deselected: 7
+  failed, 65 passed:
+- `test_main_failed_publish_and_failed_rollback_names_both_and_the_kept_folder`: `assert
+  'publish-boom' in 'halo_probe: FAILED to publish: undo-boom (partial output kept in
+  .out.failed-...)'` (the rollback's error replaced the original; the old publication's folder
+  not named).
+- `test_main_interrupted_publish_rolls_back[False]`: `assert {} == {'overview-ou...` (`out`
+  absent after the interrupt: the old publication left aside).
+- `test_main_refuses_a_cache_folder_in_the_publication_tree` x 5: `assert 0 == 2` (accepted).
+- the chromatic S1 control PASSES on `1e6cb6c8` (finding 4 is test-only); its RED is the
+  mutation probe above.
+
+### GREEN
+
+`uv run pytest -q tests/test_tools_halo_probe.py` 73 passed (5.7 s); `uv run ruff check .` All
+checks passed; `uv run ruff format --check .` 313 files already formatted; `uv run mypy`
+Success, no issues found in 157 source files.
+
+### Round ledger (cumulative)
+
+| Round | Reviewer | Critical | Major | Minor | Advisory | In-envelope / out | NEW / REOPENED | Reverts | Fixes: instrument / test-only / product |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | A (Codex, at the orchestrator's seat) | 0 | 4 | 4 | 1 | 9 / 0 | 9 / 0 | 0 | 9 / 0 / 0 |
+| 1 | A (Codex, at the orchestrator's seat) | 0 | 1 | 3 | 0 | 4 / 0 | 4 / 0 | 0 | 3 / 1 / 0 |
+| 2 | A (Codex, at the orchestrator's seat) | 0 | 1 (out of envelope by adjudication) | 3 | 1 (out of envelope) | 3 / 2 | 5 / 0 | 0 | 2 / 1 / 0 |
+
+Depth at step-2D end: DISPATCHER TO FILL
