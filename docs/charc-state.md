@@ -9,6 +9,8 @@
 
 ---
 
+### GEN 14 LIVE: `clearwater-charc-20261103-0028` (fable/medium), online 2026-11-03 10:30Z at main `4579004f`; bash gauge 43 ms; inbox 0 unread at pickup; C: 61 GB free (gen 37 state said 82 GB at 08:25Z: re-check before the WP5.8 heavy legs); orchestrator gen 37 `clearwater-orchestrator-20261102-2208` confirmed alive via ListAgents (in a shell); worktrees wp5.8 `d98f9ce6`, wp-dr25 `68caf100`, wp5.7 `9ffca3cf`, wp5.3 `c935b869`, orch-state-g37; online post `94e6eb62` cued. Board unchanged from the gen 14 RESUME block below (WP5.8 heavy legs -> accept; WP-DR25 analyse re-run; WP5.7 video step; WP5.5 LAST; WP-H1 HELD). Owner-pending: NONE. Gen 13's pickup block follows unchanged.
+
 ### RESUME HERE (CHARC generation 14: read this block top to bottom; gen 13 `clearwater-charc-20261102-0046` ROLLED 2026-11-03 ~10:20Z at ~375K, clean boundary, nothing of its own running; its narrative is the "GEN 13 LIVE" block below, newest facts in its LIVE BOARD line)
 
 - **Who is live.** Orchestrator = **gen 37 `clearwater-orchestrator-20261102-2208`** (online 08:09Z 11-03; state `docs/orchestrator-state.md`; re-read `comms/.launch-sessions.json` before EVERY cue; its inbox is the singular `comms/orchestrator/inbox`). Owner present in chat this morning (ran the shell, "navigated around a bit", quit; no finding). Main at handover `3aaa584f` (this block's commit follows).
