@@ -75,6 +75,19 @@ Under `P1/<item>/`, each item folder holds 16-bit crops of every 6.2 stage, `*-s
 | GX011627 ("halos that begin at the last second") | fin edge, top right, `3300,420 -> 3700,40`, the 30 frames 21.7-22.7 s | `t0021.788-*`, `t0022.189-*`, `t0022.589-*` |
 | compilation-20261010-1080p60 ("around the legs in the upper left starting at ~27 seconds") | three lines on the legs, upper left, 27.0-27.5 s of the CP5 EXCERPT (read in place from `CP5/excerpts/`; source time about 97.9 s) | `t0027.010-*`, `t0027.494-*` |
 
+**Frame times (recorded at Reviewer A round 5, CHARC's pre-ruling a366bb37423838ae).** The probe's
+times (here and in sections 3-5) are seconds from the clip's FIRST frame. In absolute source time,
+from each source's own pts (ledger step 5R):
+
+- IMG_6738 and GX011627 start at pts 0, so the two coincide. GX011627's 30 frames are 21.7217-22.6893 s
+  (pts 651651-680680, the last frame of the clip). Its featured 22.122 s frame is pts 663663.
+- The compilation excerpt starts at pts 3606 (1/60000 s), 0.0601 s. Its 30 measured frames, 27.0103-27.4941 s
+  from the first frame, are 27.0704-27.5542 s absolute (pts 1624225-1653254). The featured shin
+  frame "27.010 s" is pts 1624225, 27.0704 s absolute.
+
+The frames of record stay as measured: every one lies inside the owner's range in either
+convention, and every comparison across settings is on the same frame pts.
+
 The stage table of record (step 2B, `P1`; luma, half width 4; "first qualifying" = the first
 product stage whose band qualifies; "attributed" = the input carrying the larger share of the
 qualifying FUSED band at its peak; band = the fused stage's band over the source's edge contrast C).

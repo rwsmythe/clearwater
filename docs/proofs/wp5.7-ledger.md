@@ -1962,13 +1962,32 @@ the 150 stills lands EXACTLY on CP5's still time (gap 0.0 s).
 videos (141 stills) and the 70 photos are unaffected: their records stand. Both settings rendered
 the same (late) frame, so no shipped / (d) frame mismatch. GX011590 is contact-sheet item 4.
 
-**`tools/halo_probe.py` (Parts 1-2) checked for the same convention: NO defect, no STOP.** Every
-place it maps seconds to a pts (`run_video`, `halo_probe.py:2086-2110`) uses time from the clip's
-first frame, as its interface documents (`--start` / `--end` "s from the first frame",
-`:2268-2269`; `run_video`'s docstring, `:2019`); its times are the cell's own (the owner's words
-mapped to windows, then the Part 1 records' `time_s`), never a CP5 absolute time, and the Part 3
-crop runs' bands equal Part 2's records for the same pts (Part 3 results, C2). No Part 1 / 2
-figure is in question.
+**`tools/halo_probe.py` (Parts 1-2): the relative convention, RECORDED (CHARC's pre-ruling
+a366bb37423838ae, relayed by the orchestrator as a binding amendment of dispatch-11: not a STOP,
+Parts 1-2 not re-run, `halo_probe.py` not edited; a STOP only if a measured frame falls outside
+the owner's range or two settings compared different frames).** Every place the probe maps
+seconds to a pts (`run_video`, `halo_probe.py:2086-2110`) uses time from the clip's first frame, as
+its interface documents (`--start` / `--end` "s from the first frame", `:2268-2269`; `run_video`'s
+docstring, `:2019`); its times are the cell's own windows (the owner's words), never a CP5
+absolute time. From the records and each source's packet pts (`work/c57-r5/p12abs.py`, output
+`p12abs.txt`; the packet count equals each record's `frames_in_clip`, every measured pts is on the
+axis, every `time_s` = (pts - first) x time base):
+
+| Item (source the probe read) | Time base, first pts (offset) | Measured frames: from the first frame -> absolute | Featured frames, absolute pts (s) |
+|---|---|---|---|
+| IMG_6738 (`IMG_6738.MOV`, footage) | 1/600, 0 (0 s) | 49 frames, pts 0-960: 0.000-1.600 s = the same | 0.167 s pts 100; 0.433 s 260; 0.467 s 280; 0.633 s 380; 0.833 s 500; 1.467 s 880 (absolute = relative) |
+| GX011627 (`GX011627.mp4`, footage) | 1/30000, 0 (0 s) | 30 frames, pts 651651-680680: 21.7217-22.6893 s = the same (the clip's last frame, 22.6893 s) | 21.788 s pts 653653; 22.122 s 663663; 22.155 s 664664; 22.189 s 665665; 22.356 s 670670; 22.389 s 671671; 22.422 s 672672; 22.456 s 673673; 22.589 s 677677 (absolute = relative) |
+| compilation (`CP5/excerpts/compilation-20261010-1080p60.mp4`) | 1/60000, 3606 (0.0601 s) | 30 frames, pts 1624225-1653254: 27.0103-27.4941 s from the first frame = 27.0704-27.5542 s absolute | 27.010 s (shin, line 3 / line 1) pts 1624225 = 27.0704 s; 27.027 s pts 1625226 = 27.0871 s; 27.494 s pts 1653254 = 27.5542 s |
+
+So on IMG_6738 and GX011627 the two conventions coincide (first pts 0); on the compilation
+excerpt every probe time is 0.0601 s (3.6 frames at 59.94 fps) earlier than the frame's absolute
+source time. The frames of record stay as measured. The STOP conditions do not hold: every
+measured frame lies inside the owner's range in either convention (GX011627's last second, the
+window ending on the clip's last frame; the compilation "starting at about 27 s", 27.01-27.49 s
+from the first frame = 27.07-27.55 s absolute), and every comparison was like-for-like: all 12
+Part 2 video settings measured exactly Part 1's frame pts on each of the three items, and the Part
+3 crop runs (7 / 10 / 2 frames per setting) are a subset of them, the same pts under shipped and
+(d).
 
 **The rounding cells (finding 4).** Rule: each figure is its unrounded record value rounded ONCE,
 half to even, to the places shown (the five had been rounded from the 4-decimal figures of the
@@ -2004,18 +2023,21 @@ mypy` Success, no issues found in 158 source files. Both files ASCII, 0 CR in th
 each checked before the next; every write under `work/wp5.7/part3r/` (NEW; never into `part3/`,
 which is read: the copy source, the diff, the C2 crops the sheet links):
 1. `bash .../work/c57-r5/run-part3r.sh copy`: refuses if `part3r` exists or `part3/wholeset/items`
-   holds a dot-prefixed folder; copies the 117 unaffected published item folders (the
-   `wholeset-list` set minus the three; record and renders) to `part3r/wholeset/items/`; then
-   `diff -rq part3/wholeset/items part3r/wholeset/items`: exactly the 3 lines `Only in
-   .../part3/wholeset/items: GX011590` (GX011603, GX011609) and no `differ` line (exit 0 only
-   then). About 4.4 GB, a few minutes.
+   holds a dot-prefixed folder; DERIVES the affected set from the records (the tabulator on
+   `part3/wholeset/items`, `part3r/logs/affected-before.txt`, the names to
+   `part3r/affected-items.txt`; it stops on a tabulator problem or an empty set; today it gives
+   the three above); copies every other listed item's published folder (record and renders; the
+   `wholeset-list` 120 minus the affected, checked to add up to 120) to `part3r/wholeset/items/`;
+   then `diff -rq part3/wholeset/items part3r/wholeset/items`: exactly one `Only in
+   .../part3/wholeset/items: <item>` line per affected item and nothing else, no `differ` line
+   (exit 0 only then). About 4.4 GB, a few minutes. `part3/` is kept, untouched, for the diff.
 2. `... run-part3r.sh videos`: `wholeset-run <item> --out part3r/wholeset --cache-dir
-   part3r/cache`, one process each, GX011590, GX011603, GX011609 (a fresh cache: two analyses per
-   item as in the window). Check: three `ITEM <item> done` lines, `RUN ... exit=0`. The window
-   took 368 / 377 / 372 s for these three: about 19 min.
-3. `... run-part3r.sh verify` (read-only): the affected-set tabulator on `part3r`. Expect `OLD
-   SELECTOR REPRODUCES THE RECORDED PTS on 141 stills`, `AFFECTED ... items 0; stills 0`,
-   `PROBLEMS 0` (the three new records' `source_pts_s` equal to CP5's still times).
+   part3r/cache`, one process per item of `affected-items.txt` (a fresh cache: two analyses per
+   item as in the window). Check: one `ITEM <item> done` line each, `RUN ... exit=0`. The window
+   took 368 / 377 / 372 s for the three: about 19 min.
+3. `... run-part3r.sh verify` (read-only): the tabulator on `part3r`. Expect `AFFECTED ... items
+   0; stills 0` and `PROBLEMS 0` (the new records' `source_pts_s` equal CP5's still times), and
+   `OLD SELECTOR REPRODUCES THE RECORDED PTS on 141 stills` (150 minus the 9 re-rendered).
 4. `... run-part3r.sh sheet`: `wholeset-sheet --out part3r/wholeset` over all 120 published
    records (it fails unless they are exactly the listed 120). Check: `SHEET 120 items; contact:
    ...`, the sheet folder `part3r/wholeset/sheet-<stamp>/`.
