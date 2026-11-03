@@ -323,3 +323,189 @@ remains. No new in-envelope issue found after cleanup. F3 remains at the seat;
 F4/F8 are explicit obligations for the later report, not claimed completed.
 This is one logical review-cleanup turn; no instrument or footage run, whole
 suite, harness gate, dependency change, commit or AD-3 decision was made here.
+
+## Turn 4 -- GX011625-long analyse failure
+
+Diagnosis-only turn on `45bca4db`, per generation 37's step 0. STOP / YIELD
+before the instrument fix, Reviewer A round-2 test cleanup and completion
+report. No instrument or test source was edited. The dispatcher must commit
+this ledger; this sandbox cannot write `.git`.
+
+### Finding and exact failing call
+
+**MAJOR, confirmed, experiment blocker; pre-existing instrument diagnostic,
+not a demonstrated shipped-product defect.** In `run_experiments`
+(`tools/statistics_experiments.py:994-1007`), the first method is
+`ancuti2018`. After its constant reference and unsmoothed, staged and flat
+sequences, the `flicker` loop reaches `label="linear_trend"`. Its series is
+`temporal.linear_trend(loaded.raw[name])`. `_signals` selects
+`temporal.at(series, index)` and calls `temporal.render`. At zero-based frame
+542, the supplied N{} bounds are exactly the pair in the failed GPU log:
+
+| Method | First invalid index | PTS ticks (time base 1/30000) | PTS seconds | Fitted low | Fitted high |
+|---|---|---|---|---|---|
+| ancuti2018 (the actual failure) | 542 | 8020012 | 267.3337333333333 | -0.0010379406363364915 | -0.0011621024076525072 |
+| c3 (would fail later if only Ancuti were skipped) | 542 | 8020012 | 267.3337333333333 | -0.0010472760167360845 | -0.0012093584930396722 |
+
+Both methods' fitted bounds cross on **57 frames, indices 542..598**, ticks
+8020012..8076068, PTS 267.3337333333333..269.2022666666667 s. There are 599
+frames in each long excerpt. This failure precedes the first method's
+`staged/flat done` print, the entire long window study, and the robust study.
+It is not a candidate smoother/window, staged or flat failure, or a failure
+of the constant reference.
+
+The refusal is specifically **the prototype's**
+`tools/prototype/pipeline.py:202-237` `check_statistics`, reached from
+`temporal.render` -> `prototype.pipeline.correct` (check at line 867), before
+any correction on the rejected frame. The dispatch's attribution to product
+`fusion._checked_bounds` is corrected by this source trace and the exact
+message reproduction. That product function's message starts `bounds has
+low ...`; the observed message starts `supplied normalisation_bounds has
+low ...`. The prototype pipeline does not delegate this render to product
+fusion code.
+
+### Cause: unconstrained independent lines, not inverted measurements
+
+`tools/prototype/temporal.py:413-431` fits each scalar independently with
+`np.polyfit(index, values, 1)` and evaluates the fitted line at every excerpt
+frame. It does not constrain one scalar against another. For GX011625-long,
+with `i` the zero-based excerpt index:
+
+```text
+Ancuti low(i)  = -0.03990916575068024 + 0.00007171812751723938 * i
+Ancuti high(i) =  0.05299684262503532 - 0.00009992425282783732 * i
+c3 low(i)     = -0.03959069969501710 + 0.00007111332781970666 * i
+c3 high(i)    =  0.05305168224606432 - 0.00010011262128985976 * i
+```
+
+The scene's measured spread falls toward a narrower positive spread, whereas
+the fitted high keeps falling and the fitted low keeps rising until they
+cross at the tail. A least-squares fit is not an order-preserving smoother,
+even at positions inside its fitting interval. A second calculation using
+centred covariance/variance, without `polyfit` or `linear_trend`, reproduces
+all four methods/excerpts' fitted bound arrays (atol 1e-16, rtol 1e-13).
+
+The actual raw bounds at the failing Ancuti frame are
+`(-0.005461454689502716, 0.005912245213985423)`, a positive spread of about
+0.011374. The proxy at frame 542 has RGB spatial standard deviations
+`[0.0448529225, 0.0428661717, 0.0456989876]`; it is not an exactly flat
+frame. Tiny negative fitted endpoints do not establish collapsed measured
+bounds. No saved raw, comparison-staged or comparison-flat pair crosses:
+
+| Excerpt | Method | Minimum raw spread | Minimum staged Gaussian 1 s spread | Minimum flat Gaussian 1 s spread | Minimum fitted-line spread |
+|---|---|---|---|---|---|
+| GX011627-long | ancuti2018 | 0.030496441126 | 0.032372232246 | 0.032373572726 | 0.085847987444 |
+| GX011627-long | c3 | 0.029607575685 | 0.031269948159 | 0.031271040903 | 0.081369453976 |
+| GX011625-long | ancuti2018 | 0.009362280667 | 0.009856560414 | 0.009856512775 | -0.009736135071 |
+| GX011625-long | c3 | 0.009257019162 | 0.009777220923 | 0.009777347919 | -0.009750735626 |
+
+All four constant-reference pairs are ordered too. `git log -1 -S
+'trend = temporal.linear_trend' -- tools/statistics_experiments.py` identifies
+`2feea7fc feat(wp1.4): drift floor, render differences and bound step in the
+experiments` as the construction's origin. The new long path exposes this
+existing auxiliary-diagnostic limitation; it did not introduce the fit.
+
+### Product analysis / smoothing check
+
+The shipped analysis measures fusion `bounds` together as two ordered
+percentiles (`src/clearwater/methods/ancuti_fusion.py:226-243`,
+`fusion.normalisation_bounds` at `src/clearwater/methods/fusion.py:101-135`).
+Both method stage declarations smooth the `bounds` array
+(`ancuti_fusion.py:106-107,134-135`). `AnalysisStore.smooth` and `smooth_at`
+pass that array to `smooth_series` (`src/clearwater/analysis/store.py:550,601`),
+not to the prototype's independent linear fit. The product's default
+`median_gaussian`, and its `gaussian`, preserve ordered bounds: the running
+median is monotone on the same frame sets, followed by identical nonnegative
+normalised Gaussian weights for low and high, with the same held endpoints.
+Staging re-measures ordered percentiles before each such smoothing. This
+mechanism cannot cause the observed fitted-line crossing from ordered data;
+the measured spreads here are also far above floating-point roundoff.
+
+Read-only CPU checks on both chapters and both methods found zero crossings
+in 128 product `smooth_series` cases: raw proxy bound pairs and the saved
+staged fusion measurements, each at 0.5 / 1 / 2 / 4 s for all four product
+kinds. All 48 prototype flat candidate series were ordered as well. These
+are smoothing probes on saved prototype measurements, not a run of the full
+product analysis or a claim of product/prototype pixel identity. In
+particular, step-aware kinds have component-dependent weights; the common
+weight order-preservation argument applies to Gaussian/median-Gaussian,
+not generally to those experimental kinds. They did not cross on the probed
+data. No product defect is confirmed by this failure.
+
+### Smallest proposed in-envelope fix (not implemented; ruling required)
+
+On the **long path only**, preflight the auxiliary `linear_trend` bounds
+before `_signals`. When any `low > high`, mark that method's entire
+`flicker.linear_trend` diagnostic unavailable and continue to the actual
+window study. Record a reason and every affected frame's index, PTS ticks,
+PTS seconds, fitted low and fitted high (57 entries for each method here).
+Emit no numeric whole/interior trend level for an unavailable sequence.
+Do not sort, clamp, replace or silently discard invalid samples in a
+reported numeric metric. This preserves the meaning of a pure linear-drift
+diagnostic and exposes why it could not be measured.
+
+The guard must cover both methods, leave the default path's behavior and
+record schema unchanged, and leave the successful long trend record unchanged
+when the preflight passes. GX011627-long has no crossed fit, so this proposal
+changes none of its existing figures. Reference rendering, unsmoothed/staged/
+flat comparisons, candidate smoothing, per-step arrays, reach accounting and
+robust study remain untouched. This resolves the reproduced refusal; a full
+successful analysis is still to be observed at the dispatcher's seat after
+the fix is ruled, implemented and tested.
+
+**Required re-run after that ruling/fix:**
+`uv run python tools/statistics_experiments.py analyse --long` alone, at the
+dispatcher's seat in its hardware window. Extraction stands; neither extract
+nor render is needed. The CLI will analyse both excerpts again. Compare
+GX011627-long's regenerated numeric results against its durable successful
+records; this cell has not run or scheduled that phase.
+
+### Evidence, verification and handoff
+
+Inputs: durable copies under
+`C:\Users\rwsmy\clearwater-review-evidence\wp-dr25\runs\`, including the failed
+analysis log, and a read-only `np.load(..., mmap_mode="r")` view of
+`C:\Users\rwsmy\clearwater\work\wp-dr25\GX011625-long\proxies.npy`.
+All eight excerpt/raw/staged/flat JSON files in the durable copies match
+their current main-tree counterparts by SHA-256; hashes are in the probe log.
+The proxy mapping reports mode `r`, `writeable=False`. No frame was rendered
+by this probe and no file was written under the main-tree work or footage
+folders.
+
+Scratch evidence (under this worktree's ignored `work/`, not committed):
+`cdr25-4-diagnose.py`, `cdr25-4-diagnose.log`, `cdr25-4-diagnose.exit`, and
+`cdr25-4-GX011625-long-{ancuti2018,c3}-crossed.json` (all affected frames).
+The dispatcher can preserve these in its evidence folder. Exact final probe:
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE='1'
+Remove-Item Env:VIRTUAL_ENV -ErrorAction SilentlyContinue
+uv run python work/cdr25-4-diagnose.py > work/cdr25-4-diagnose.log 2>&1
+$probeExit = $LASTEXITCODE
+Set-Content -LiteralPath work/cdr25-4-diagnose.exit -Value $probeExit
+exit $probeExit
+```
+
+Observed exit 0 and final summary:
+`DIAGNOSIS_PROBE_COMPLETE product_smoothing_cases 128 prototype_flat_cases 48`.
+The two expected `ValueError` traces are caught reproductions, with the
+Ancuti message exactly matching the failed GPU log. An initial invocation
+returned shell exit 1 while producing the probe output; uv's inherited
+`VIRTUAL_ENV` warning was surfaced as PowerShell `NativeCommandError`.
+The final invocation clears only that process's inherited environment value
+and completes without that warning; it does not select the main environment.
+
+| Suspected | Confirmation / rejection | Disposition |
+|---|---|---|
+| Candidate staged smoothing or constant reference crosses. | Saved raw/staged/flat and reference pairs are ordered; the failing exact pair comes from the fitted trend before any candidate print. | Rejected for this failure. |
+| The auxiliary independent linear fit crosses near the tail. | Exact logged pair reproduced at frame 542; centred-OLS calculation independently agrees; both methods cross on 542..598. | Confirmed MAJOR; proposed long-only unavailable diagnostic, pending CHARC ruling. |
+| Product default smoothing can create the same crossing. | Product call trace uses medians/common positive Gaussian weights, not a line fit; 128 product smoothing probes on saved data have no crossing. | Rejected as the source of this failure; no full product analysis claimed. |
+| A truly collapsed source frame caused the negative pair. | Raw spread at frame 542 is positive, about 0.011374; all raw spreads exceed 0.009 on GX011625-long. | Rejected; fitted-line overshoot is the cause. |
+
+No pytest, GPU job, extract/analyse/render phase, lint or mypy gate ran in
+this diagnosis-only turn. Reviewer A round 2 is reported CONVERGED by the
+dispatcher; its F1/F3 cleanup and the report remain for the later turn, not
+claimed complete here. No AD-3 decision is made. Only this owned ledger is
+changed; product, prototype, instrument, tests and dependencies are untouched.
+
+Depth at turn-4 (diagnosis) end: 131,886 input tokens of 258,400 (driver footer, FRESH session 01a1a0cb-94f7-71d2-a4c3-34ad022b488a, 2026-11-03 turn 4).
