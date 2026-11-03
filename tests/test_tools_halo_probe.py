@@ -936,6 +936,46 @@ def test_main_interrupt_at_the_aside_rename_rolls_back_only_what_moved(
     _assert_staging_retired(working)
 
 
+@pytest.mark.parametrize("replace", [True, False])
+def test_main_interrupt_after_the_final_rename_keeps_both_publications(
+    tmp_path: Path, working: Path, monkeypatch: pytest.MonkeyPatch, replace: bool
+) -> None:
+    # Round 4, finding 3 (the commit boundary): an interrupt delivered just AFTER the final
+    # rename (staging -> out) took effect. The run is committed: ``out`` holds the NEW
+    # publication, the old one (with --replace) is whole in ``out.replaced-<stamp>``, the
+    # interrupt is re-raised, and no staging or failed folder is left. Nothing is lost.
+    if replace:
+        argv, out, before = _published(tmp_path, working)
+        old_record = json.loads(before["scene.json"])
+    else:
+        source = _scene_file(tmp_path)
+        out = working / "out"
+        argv = ["--source", str(source), "--out", str(out), "--cache-dir", str(working / "c")]
+        argv += ["--line", "30,48,90,48", "--margin", "8", "--force-cpu"]
+    original = Path.rename
+
+    def rename(self: Path, target: Any) -> Any:
+        result = original(self, target)
+        if self.name.startswith(".out.staging-") and Path(target).name == "out":
+            raise KeyboardInterrupt  # after the rename took effect
+        return result
+
+    monkeypatch.setattr(Path, "rename", rename)
+    with pytest.raises(KeyboardInterrupt):
+        hp.main(argv)
+    monkeypatch.undo()
+    new_record = json.loads((out / "scene.json").read_text(encoding="utf-8"))
+    kept = [p for p in working.iterdir() if p.name.startswith("out.replaced-")]
+    if replace:
+        assert new_record["started"] != old_record["started"]  # out is the new publication
+        assert len(kept) == 1
+        assert _snapshot(kept[0]) == before  # the old publication, whole
+    else:
+        assert not kept
+    leftover = (".out.staging-", ".out.failed-")
+    assert not [p for p in working.iterdir() if p.name.startswith(leftover)]
+
+
 @pytest.mark.parametrize(
     "cache", ["out", "out/c", ".", "out.replaced-20261103T000000Z/c", ".out.staging-x"]
 )
@@ -1388,6 +1428,149 @@ def test_run_video_analyses_the_baseline_unswitched_and_the_candidate_switched(
     assert frame["baseline_statistics"] is not None
     assert frame["whole_image"]["mean_abs_difference"] > 0.0
     assert run["switches"] == {"range_floor": 0.3}
+
+
+_BASELINE_SWITCHES = [
+    pytest.param(hp.Switches(range_floor=0.3), id="e2"),
+    pytest.param(hp.Switches(clip_reference="unsharpened", clip_radius_sigma=1.0), id="d"),
+]
+"""The two candidates the baseline-isolation tests run under (Reviewer A round 4, finding 4)."""
+
+
+def _unswitched() -> bool:
+    """True when every attribute a switch patches holds its original object."""
+    floor, inputs, bounds = _ORIGINALS
+    return (
+        product_fusion.NORMALISATION_RANGE_FLOOR is floor
+        and product_ancuti.fusion_inputs is inputs
+        and hp.fusion_inputs is inputs
+        and product_ancuti.normalisation_bounds is bounds
+    )
+
+
+def _recorded_renders(
+    monkeypatch: pytest.MonkeyPatch, method: AncutiFusionMethod
+) -> tuple[list[dict[str, Any]], Any]:
+    """Wrap ``method.render``: each call's image, statistics object, switch state and output.
+
+    Returns the list the calls go to and the unwrapped render (for the test's own renders).
+    """
+    real = method.render
+    calls: list[dict[str, Any]] = []
+
+    def render(image: Image, params: Any, statistics: Any) -> Any:
+        result = real(image, params, statistics)
+        calls.append(
+            {
+                "image": image,
+                "params": dict(params),
+                "statistics": statistics,
+                "unswitched": _unswitched(),
+                "pixels": np.array(result.pixels, copy=True),
+            }
+        )
+        return result
+
+    monkeypatch.setattr(method, "render", render)
+    return calls, real
+
+
+def _assert_baseline_renders_unswitched(
+    calls: list[dict[str, Any]], real: Any, baseline_statistics: Any, expected_count: int
+) -> None:
+    """The baseline renders ran with no switch and equal a render the test makes unswitched.
+
+    The baseline renders are the calls given the shipped-defaults statistics object itself
+    (the candidate's renders get the candidate's statistics, or a copy of them).
+    """
+    _assert_restored()  # the test's own render below runs with no switch at all
+    baseline = [call for call in calls if call["statistics"] is baseline_statistics]
+    assert len(baseline) == expected_count
+    for call in baseline:
+        assert call["unswitched"]  # the patched objects were the originals during the render
+        unswitched = real(call["image"], call["params"], baseline_statistics).pixels
+        assert np.array_equal(call["pixels"], np.asarray(unswitched))
+    candidate = [call for call in calls if call["statistics"] is not baseline_statistics]
+    assert candidate and not any(call["unswitched"] for call in candidate)
+
+
+@pytest.mark.parametrize("switches", _BASELINE_SWITCHES)
+def test_run_video_renders_the_baseline_with_no_switch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, switches: hp.Switches
+) -> None:
+    # Round 4, finding 4: for (e2) and (d) the shipped-defaults baseline RENDER (not only its
+    # analysis) runs with every patched object original, and equals a render the test makes
+    # with no switch; the candidate's renders run switched. Moving the baseline render inside
+    # the switch fails this (the mutation probe of step 3R).
+    method = AncutiFusionMethod("c3")
+    params = hp.resolve_parameters(method, [])
+    image = _photo(_scene())
+    engines: list[Any] = []
+    _fake_video(monkeypatch, skip=set())
+
+    class Engine:
+        def __init__(self, **kwargs: Any) -> None:
+            self.params = kwargs["params"]
+            self.store = SimpleNamespace(axis=lambda: list(range(5)))
+            self.schema_hash = "h"
+            self.statistics: Any = None
+            engines.append(self)
+
+        def analysis_job(self) -> Any:
+            def job(progress: Any) -> Any:
+                self.statistics = hp.photo_statistics(method, image, self.params)
+                return SimpleNamespace(ok=True, failure=None)
+
+            return job
+
+        def smoothed_record(self, pts: int, *, schema_hash: str) -> Any:
+            return self.statistics
+
+    monkeypatch.setattr(hp, "AnalysisEngine", Engine)
+    calls, real = _recorded_renders(monkeypatch, method)
+    options = {**_video_options(tmp_path / "v"), "switches": switches}
+    run = hp.run_video(Path("clip.mp4"), method, params, force_cpu=True, options=options)
+    assert len(engines) == 2  # the baseline analysis first, then the candidate's
+    _assert_baseline_renders_unswitched(calls, real, engines[0].statistics, len(run["frames"]))
+    assert all(frame["whole_image"]["mean_abs_difference"] > 0.0 for frame in run["frames"])
+
+
+@pytest.mark.parametrize("switches", _BASELINE_SWITCHES)
+def test_run_photo_renders_the_baseline_with_no_switch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, switches: hp.Switches
+) -> None:
+    # Round 4, finding 4, the photo path: the baseline statistics are measured with no switch
+    # (the one unswitched photo_statistics call) and the baseline render given them runs with
+    # no switch and equals the test's own unswitched render.
+    method = AncutiFusionMethod("c3")
+    params = hp.resolve_parameters(method, [])
+    measured: list[tuple[Any, bool]] = []
+    real_statistics = hp.photo_statistics
+
+    def photo_statistics(*args: Any, **kwargs: Any) -> Any:
+        result = real_statistics(*args, **kwargs)
+        measured.append((result, _unswitched()))
+        return result
+
+    monkeypatch.setattr(hp, "photo_statistics", photo_statistics)
+    calls, real = _recorded_renders(monkeypatch, method)
+    out = tmp_path / "p"
+    out.mkdir()
+    options = {
+        "lines": [hp.Line(30.0, 48.0, 90.0, 48.0)],
+        "region": None,
+        "margin": 8,
+        "half_width": 1,
+        "threshold": 0.1,
+        "out": out,
+        "switches": switches,
+    }
+    run = hp.run_photo(_scene_file(tmp_path), method, params, force_cpu=True, options=options)
+    baseline = [result for result, unswitched in measured if unswitched]
+    assert len(baseline) == 1
+    assert run["baseline_statistics"] != run["statistics"]  # the switch reached analyze
+    _assert_baseline_renders_unswitched(calls, real, baseline[0], 1)
+    assert run["frames"][0]["whole_image"]["mean_abs_difference"] > 0.0
 
 
 def _e3_video(

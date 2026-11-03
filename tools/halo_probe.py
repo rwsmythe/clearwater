@@ -123,7 +123,11 @@ nothing else); one holding partial output is kept, renamed ``.<out>.failed-<stam
 either publish rename fails or is interrupted after ``<out>`` was moved aside, the old
 publication is renamed back (for any exception, which is then re-raised once the staging folder
 is retired as above); if that also fails, the run exits 1 naming both failures and the kept
-folder that holds the old publication. The
+folder that holds the old publication. The commit point is the final rename (the staging folder
+to ``<out>``): once it has taken effect the run is published, so an interrupt delivered after it
+(before the call returns) leaves the NEW publication in ``<out>`` and, with ``--replace``, the
+old one whole in ``<out>.replaced-<stamp>``; the interrupt is re-raised, no staging or failed
+folder is left, and nothing is lost (Reviewer A round 4, finding 3). The
 analysis cache (``--cache-dir``) is the product's ``DiskProxyCache``, reused across runs by
 design, and keeps its own write discipline; it is refused when it equals, lies inside or
 contains ``<out>``, or lies inside any of ``<out>``'s sibling folders (``<out>.*`` or
@@ -2530,7 +2534,9 @@ def _publish(staging: Path, out: Path, replaced: Path | None) -> None:
     took its place, so ``replaced`` is renamed back; ``out`` still present means it was not yet
     renamed aside (or the publish completed), so nothing is moved. ``replaced`` is a fresh
     stamped name, so its presence is this run's doing. The exception is then re-raised; the
-    staging folder stays for the caller to retire.
+    staging folder stays for the caller to retire. The commit point is ``staging.rename(out)``:
+    an interrupt after it took effect leaves ``out`` = the new publication and ``replaced`` = the
+    old one, both kept, and is re-raised with no rollback (there is nothing to undo).
 
     Raises:
         OSError: ``out`` exists and ``replaced`` is None, or a rename fails.
