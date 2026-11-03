@@ -2158,3 +2158,44 @@ The Part 3 results section above is the window's record (`part3`), kept as run; 
 figures differ, these round-5 figures (`part3r`) supersede them, and the report cites `part3r`.
 
 Depth at round-5 final yield: 331,770 (wp57-cell8 at its final yield, 130 turns, 2026-11-03 ~21:55Z; read by orchestrator gen 39 with scripts/cell_depth.py). The cell is DONE; any round-6 remediation goes to a fresh cell.
+
+### Reviewer B (the orchestrator's single pass)
+
+Reviewer B (Codex, the orchestrator's single pass on `faf592de`; transcript
+`clearwater-review-evidence/wp5.7/B/review-B.txt`): `NEW_CRITICAL_MAJOR_FOUND`, one in-envelope
+MAJOR, three MINORs, one out-of-envelope ADVISORY. The gate fill's rule: ONE bounded remediation
+through the author's loop (wp57-cell9, dispatch-12; the dispositions are the orchestrator's and
+binding), then ONE re-run of B. Code only: no GPU, no render, no batch re-run; no figure changes.
+
+| # | Sev | Finding | Disposition / what changed (`124364cb`) | Tests (RED on `faf592de`: `work/c57-b-red.log`, 12 failed / 39 passed) |
+|---|---|---|---|---|
+| B1 | MAJOR (in envelope) | `n6_summary` gave `valid: true` for an empty population, one setting only, or a non-alternating sequence (S S D D: an effect with `pair_ratios: []`) | FIX: `n6_protocol_problems` (`tools/halo_part3.py:812`) adds a problem line unless both settings are present, the runs in `started` order strictly alternate from `shipped`, the count is even (complete pairs) and there are at least `N6_MIN_PAIRS` = 3 pairs (`:207`, its source C4's six runs, "C4 sizing" above); `stop` is set only on a VALID summary; `n6-summary` exits `N6_INVALID_EXIT` = 5 (`:211`) on an invalid one and keeps 4 for the STOP on a valid one; `n6_text` adds an `INVALID` line | `test_n6_summary_is_valid_only_for_the_protocol_of_record` (`tests/test_tools_halo_part3.py:390`), six cases: empty, `SSS`, `SSDD`, `SDS` (odd), `DSDSDS` (candidate first), `SDSD` (two pairs): all six RED at `assert not summary["valid"]`; each also asserts its problem line and `main n6-summary` exit 5. Guard (passes both ways): `test_n6_summary_exit_is_the_stop_only_on_a_valid_row` (`:404`, 0 / 4 on the six-run fixture); the six-run fixture `test_n6_summary_medians_effect_pairs_and_the_stop` unchanged and green (same medians, effect, pair ratios) |
+| B2 | MINOR (in envelope) | `_write_json` opened the final name (an interrupt left a torn N6 sidecar the summary then failed to parse); `build_sheet` made its final `sheet-*` folder before filling it | FIX: `_write_json` (`:322`) serialises first, writes `_temporary(path)` (`:313`, `.<name>.staging-<stamp>`, same folder, dot-prefixed so `n6-<setting>-*.json` never matches it), publishes by rename, removes the temporary on any exception, refuses an existing final name; `build_sheet` (`:1626`) builds in `.sheet-<stamp>.staging-<stamp>` (`_write_sheet`, `:1668`) and publishes with the probe's own `hp._publish` / `hp._abandon` (`tools/halo_probe.py:2528` / `:2503`; a partial staging kept as `.sheet-<stamp>.failed-<stamp>`) | `test_write_json_interrupted_mid_write_leaves_nothing_under_the_final_name` (`:433`; RED: the final name existed); `test_build_sheet_interrupted_publishes_no_sheet_folder` (`:920`; RED: a `sheet-*` folder existed); `test_n6_summary_ignores_a_torn_temporary` (`:461`; RED only as `AttributeError`, `_temporary` absent: a guard, not a distinguisher); guards passing both ways: `test_write_json_publishes_by_rename_and_refuses_an_existing_name` (`:451`), `test_build_sheet_leaves_no_staging_folder_on_success` (`:935`) |
+| B3 | MINOR (in envelope) | `checked_output` checked the resolved path but returned the original relative one; `build_sheet`'s `as_uri()` then failed | FIX: `checked_output` returns `target.resolve()` (`:310`) | `test_checked_output_returns_the_resolved_path` (`:958`; RED: `is_absolute()` False); `test_wholeset_sheet_accepts_a_relative_out` (`:969`, `main wholeset-sheet --out ../wp5.7/part3/wholeset` from `work/wp5.7`; RED: `ValueError: relative path can't be expressed as a file URI`) |
+| B4 | MINOR (in envelope) | the clip-equivalence test (`test_build_clips_and_masks_equal_wp42s_fixtures`, now `:1000`, `slow`) uses the shared `sample` fixture, whose provider caches in `REPO_ROOT/work/fixtures/generated`, outside `--basetemp` | NO CHANGE: BANKED by the dispatcher. The provider predates this package and serves the whole suite: `tests/fixture_plugin.py:44` (`GENERATED_DIR`) and `:285-287` (`sample_provider` uses it unless `writable_dir` fails, then basetemp). Raised with CHARC by the orchestrator. Report Limits gains one line | none (no change) |
+| B5 | ADVISORY (out of envelope) | `v3 --switch full_res_bounds` recorded (e3) but nothing in the V3 legs overrides the bounds | FIX (cheap): the `v3` subcommand refuses it (`:1837`, a `ProbeError`, exit 2) before any folder is made; Part 3's contracted V3 candidate is (d) | `test_v3_refuses_the_full_res_bounds_switch` (`:982`; RED: "the V3 legs were reached", the legs stubbed so no render ran) |
+
+GREEN (`124364cb`): `tests/test_tools_halo_part3.py` whole module, slow test included, 52 passed
+in 16.06 s (`work/c57-b-green.log`; the non-slow pass first, 51 passed); `uv run ruff check`
+and `ruff format --check` clean on both files; `uv run mypy tools/halo_part3.py` (strict)
+"Success: no issues found in 1 source file". `tools/halo_probe.py` and its test untouched (the
+helpers reused as they are).
+
+N6 re-check (B1), read-only, the fixed `n6_summary` on the delivered `work/wp5.7/part3/n6/`
+(15 entries, unchanged by the read: names, sizes and mtimes compared before and after); output
+`work/c57-b-n6-recheck.txt` in the worktree, nothing written into `part3/`:
+
+- runs S D S D S D, 10.9467 / 12.4234 / 10.8630 / 12.4346 / 11.0729 / 12.6115 min/min, all exit
+  0, 681 frames, memory_check True, tied True, 1,362 calls, the clip in effect on the (d) runs only;
+- MEDIAN shipped 10.946698279693821, candidate 12.434572079902537 min/min; effect +13.59 %
+  (0.13591986936999345); pair ratios 1.1349, 1.1447, 1.1389;
+- VALID True, problems none; STOP True; `n6-summary` would exit 4 (the C4 STOP, as of record).
+
+The report: no sentence about these mechanics became false (section 7's "VALID True" stands on
+the re-check); its Limits gain the B4 line. Ledger row for the cumulative table:
+
+| Round | Reviewer | Critical | Major | Minor | Advisory | In-envelope / out | NEW / REOPENED | Reverts | Fixes: instrument / test-only / product |
+|---|---|---|---|---|---|---|---|---|---|
+| B | B (Codex, the orchestrator's single pass) | 0 | 1 | 3 | 1 (out of envelope) | 4 / 1 | 5 / 0 | 0 | 4 (B1, B2, B3, B5, each with tests) / 0 / 0; B4 banked; plus 1 report line |
+
+Depth at Reviewer-B yield: DISPATCHER TO FILL

@@ -457,6 +457,11 @@ summary).
 - **A stale label outside the owned files.** `tools/export_bench.py:99` holds
   `D106_MIN_PER_MIN = 25.0`, the 0.5.4 interim figure, so its ROW lines print "meets D106 25", (d)
   included. The min/min figures are unaffected. A follow-up for the bench's owner.
+- **One test writes outside `--basetemp`** (Reviewer B finding 4, banked). The `slow`
+  clip-equivalence test uses the suite's shared `sample` fixture, whose provider caches generated
+  samples in `work/fixtures/generated` and falls back to basetemp only when that is unwritable
+  (`tests/fixture_plugin.py:44`, `:285-287`). The provider predates this package and serves the
+  whole suite; routed to CHARC.
 - **The write-path limits, rounds 2-4, adjudicated out of envelope.** These belong to a seat-run
   tool on the owner's single-user laptop:
   - Confinement is checked at start-up and does not pin ancestors against a concurrent junction
