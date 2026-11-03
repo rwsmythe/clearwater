@@ -687,3 +687,125 @@ Round ledger (cumulative):
 | 3 | A (Codex, at the orchestrator's seat) | 0 | 1 (out of envelope by adjudication) | 2 | 0 | 2 / 1 | 3 / 0 | 0 | 2 / 0 / 0 |
 
 Reviewer A CONVERGED at round 3 (no in-envelope critical or major).
+
+### Step 1 (the candidate settings, the switches)
+
+Every setting is in the direction that should shrink the band; at least one modest and one strong
+per candidate, in CHARC's order. Folder `work/wp5.7/part2/<setting>/<item>`.
+
+| Order | Candidate | Settings (folder) | Why these | How applied |
+|---|---|---|---|---|
+| - | shipped defaults | `defaults` | the baseline of the schema-4 record and a determinism check against `part1s` (every band must equal it) | no override |
+| 1 | (a) sharpening strength (6.7 Basic; default 1.0) | 0.75 (`a-0.75`), 0.5 (`a-0.5`), 0.25 (`a-0.25`) | input 2 = `I + s (S - I)`, so its added band scales about linearly with s: 0.75 modest, 0.25 strong (the fused bands are 1.0-3.2 x C, so only a strong step can bring them near the 0.10 threshold) | `--param sharpen_strength=` |
+| 2 | (e1) N{} percentiles (6.7 Advanced; 0.5 / 99.5) | 0.1 / 99.9 (`e1-0.1`), 0.01 / 99.99 (`e1-0.01`), 0 / 100 (`e1-0`) | a wider percentile pair widens the measured range and lowers the stretch; 0.1 / 99.9 modest, 0 / 100 (min / max of the high-pass) the strongest the schema allows | `--param normalisation_low= --param normalisation_high=` |
+| 3 | (e2) N{} range floor (AD-4 / DR-14; 0.02) | 0.05 (`e2-0.05`), 0.1 (`e2-0.1`), 0.2 (`e2-0.2`) | the measured proxy ranges are 0.018-0.051 (photos) and 0.023-0.036 (videos): 0.05 binds on every item but IMG_6739 (0.0512) and caps the stretch at 20 x; 0.1 and 0.2 cap it at 10 x and 5 x (WP1.4b measured ranges up to 0.64 on other footage, where these floors would not bind) | switch `range_floor=F`: a scoped patch of `clearwater.methods.fusion.NORMALISATION_RANGE_FLOOR`, which `_floored` reads at call time, so `fusion_inputs` sees it in `render`, in `analyze` (input 2's saliency mean) and in the staged render |
+| 4 | (d) input 2 clipped to a local range (algorithm change in `fusion_inputs`) | half window 1 sigma (strong: a tight window) and 3 sigma (modest), per reference: `d-<ref>-1`, `d-<ref>-3` | the ring sits 1-2 sharpening sigmas from the edge (the fused FWHM of the step-2A table is 0.14-1.88 sigma), so a 1-sigma window sees only water there; a 3-sigma window spans the edge and clips less | switch `clip_overshoot=REF:R`: a scoped patch of `ancuti_fusion.fusion_inputs` (the name `render` and `analyze` call) and of the probe's `fusion_inputs` (the name `staged_render` calls) with `clipped_fusion_inputs`, which calls the product's `fusion_inputs` and clips input 2 per channel to the min / max of the reference over a square window of half side `round(R x sigma)` px (edges replicated). **The reference is a STOP question (below).** |
+| 5 | (e3) N{} bounds on the full-resolution frame (AD-4) | one setting (`e3-full`) | binary: proxy or full resolution | photos: switch `full_res_bounds`: the white-balance record is measured on the proxy as shipped, the bounds are the full-resolution white-balanced image's percentiles (`_full_bounds`, the Part 1 diagnostic), and the fusion stage is then measured on the proxy with `ancuti_fusion.normalisation_bounds` patched to return them (so input 2's saliency mean follows the new bounds, as the product would measure it). Video: refused for now (question below). |
+| 6 | (b) pyramid minimum level size (6.7 Advanced; 16) | 8 (`b-8`), 4 (`b-4`) | one and two levels deeper (the hypothesis was rejected in Part 1; measured for completeness) | `--param pyramid_min_level_size=` |
+| 7 | (c) weight regularisation delta (0.1, the paper's) | 0.3 (`c-0.3`), 1.0 (`c-1.0`) | a larger delta pulls both normalised weights toward 1/2, lowering input 2's edge preference (Wbar2 0.60-0.71 at the edge); 1.0 is the schema's maximum | `--param weight_delta=`: **a premise correction**: delta is ALREADY a method parameter (`methods/schema.py` `_WEIGHT_DELTA`, Advanced panel, 0.001-1.0, default 0.1, "paper value 0.1"), so no switch is needed and the brief's "selectable with the paper's value kept" condition already holds. A delta above 1.0 would need a switch: not proposed. |
+
+The render-equality check under a switch: the candidate's analysis (the photo proxy statistics, or
+the whole-clip `AnalysisEngine` run), the staged render and the product's `render` all run inside
+`applied(switches)`, so `render_check_equal` compares the staged render with the product's render
+under the SAME switch; the shipped-defaults baseline (statistics and render) runs outside it.
+`applied` restores every patched attribute to its original object on any exit (tests below).
+
+The whole-image change (`whole_image`, schema 4): every run whose parameters or switches differ
+from the shipped defaults also renders the item at the shipped defaults, unswitched (photo: its own
+proxy statistics; video: a second whole-clip analysis), and records per frame: the per-channel
+mean and its shift, the clipped-pixel fraction (any channel at 0 or 1) of both, the mean and the
+99th percentile of the absolute per-value difference, and V3's four per-frame measures (mean L*,
+a*, b*, standard deviation of L*, as `tests/test_analysis_v3.py` forms them) of both. Part 3's
+edge-band scan does not exist yet: not used. Flicker on GX011627's last second (step 3): V3's
+statistic (the standard deviation of the frame-to-frame differences of each measure) over the
+30 frames 21.7-22.7 s, candidate against the baseline from the same run. The statistics column
+(cache invalidation): the record carries both the candidate's and the baseline's smoothed
+`bounds` and `saliency_means` per frame.
+
+### STOP questions (dispatch: ambiguous -> ask, never guess)
+
+**Q-d (the reference of candidate (d)). "Clipping input 2's overshoot to the local range of input
+1" read literally clips input 2 to the local range of `I ** gamma`; but input 2 is not near input 1
+anywhere, so the literal reading moves input 2 on every flat region, not only at edges.**
+Reproduction (CPU, synthetic water with a gentle gradient, a dark disc, noise 0.004; shipped
+defaults; scratch `d_repro.py`, not committed): input 2's mean on open water far from the edge and
+the whole-output mean absolute change, per reading:
+
+| Reading (reference) | Input 2 on open water (R, G, B), shift vs shipped | Output mean abs change | Input 2 / fused band x C on the edge line |
+|---|---|---|---|
+| shipped (no clip) | 0.466, 0.466, 0.467 | - | 0.884 / 0.514 |
+| `input1` (literal), 1 sigma | -0.176, -0.176, -0.175 | 0.093 | 0.002 / 0.000 |
+| `input1` (literal), 3 sigma | -0.173 | 0.091 | 0.007 / 0.003 |
+| `balanced` (the white-balanced I), 1 sigma | -0.030 | 0.024 | 0.006 / 0.003 |
+| `balanced`, 3 sigma | -0.028 | 0.022 | 0.013 / 0.005 |
+| `unsharpened` (input 2 with a zero high-pass), 1 sigma | 0.000 | 0.017 | 0.006 / 0.000 |
+| `unsharpened`, 3 sigma | 0.000 | 0.017 | 0.011 / 0.000 |
+
+Why: input 2 = `(I + N{hp}) / 2`, and on a flat region N{hp} sits near N{0} (about 0.5), so input
+2 is about `(I + 0.5) / 2`: neither `I ** gamma` (literal) nor `I` lies near it, and clipping to
+their local range pulls the whole of input 2 toward them (a tone change, not an overshoot clip).
+The `unsharpened` reference is input 2's own form without the high-pass, so it equals input 2 on
+flat regions and clips only what the sharpening adds beyond the local extremes (the classic
+clamped unsharp mask, the overshoot control of sharpening tools); its residual 0.017 output change
+is the amplified-noise texture it also limits. All three are built (`--switch
+clip_overshoot=input1|balanced|unsharpened:R`). RECOMMENDED: measure `unsharpened` as (d) of
+record; the literal `input1` and `balanced` as two extra rows (4 photo settings, about 5 min) so
+the ruling is informed by the real items; or CHARC names one.
+
+**Q-e3v (candidate (e3) on video).** On a video the bounds are per-frame statistics measured on
+the proxy and then smoothed (spec 7, IF-3). Proposed design (not built until ruled): (1) the
+shipped-defaults analysis (already run as the baseline) gives each frame's smoothed white-balance
+record; (2) a full-resolution decode pass over the WHOLE clip measures each frame's bounds on the
+frame compensated and white-balanced with that record (as the fusion stage measures them on the
+proxy); (3) a second analysis run with `ancuti_fusion.normalisation_bounds` patched to return that
+frame's full-resolution bounds (keyed by the pts the engine reads its proxy for), so the engine
+measures input 2's saliency mean on the proxy with them and smooths both as shipped. Cost: one
+extra full-resolution decode and compensation per frame (GX011627 about 680 4K frames, the
+compilation excerpt about 1,870 1080p frames). Alternative: drop (e3) on video by the step-3 rule
+(not allowed if it shrinks a photo band) or state it unmeasured (then it is not proposable as a
+default). RECOMMENDED: build the design above at step 3 if (e3) shrinks a decided photo band.
+
+### RED (the new tests against `22817c9f`'s probe; log `work/c57-p2-switch-red.log` in the worktree): 11 failed, 75 passed
+
+`AttributeError: module 'halo_probe' has no attribute 'Switches'` (x 6: the floor switch, the
+three clip references, the clean-step ring, the video baseline), `... 'parse_switches'`, `...
+'whole_image'`, `KeyError: 'baseline_statistics'` (the whole-image record), `SystemExit: 2` x 2
+(`--switch` unknown: full_res_bounds, a bad switch). The old probe restored into the working copy
+for the run, the new one copied back and compared byte for byte.
+
+Tests added (11, parallel leg, CPU, synthetic): switch parsing and refusals (9 bad forms); (e2) the
+floor reaches `render` AND `analyze` (input 2's saliency mean moves) with the staged render equal
+to the product's, restored after a normal exit and after an exception; (d) for each reference,
+input 2 lies within the reference's local min / max (scipy recomputation in the test), the staged
+output equals `render`'s under the switch, the clip binds, restored on exit; (d) on a clean
+softened step input 2's ring is over 0.1 unswitched and under 0.01 clipped (`unsharpened`, 1
+sigma); `whole_image` on constructed arrays (clipped fraction, mean shift, mean abs difference;
+zeros against itself); `main` at defaults (no baseline, zero change) and at `sharpen_strength=0.5`
+(the baseline equals the defaults run's own statistics and means); (e3) the record's bounds equal
+the full-resolution diagnostic and differ from the proxy baseline (proxy forced to a 2 x 2 block
+mean), restored after `main`; a bad switch exits 2 with no output; the video path analyses the
+baseline unswitched (floor 0.02) and the candidate switched (0.3), records the baseline statistics
+and the change, and refuses `full_res_bounds`.
+
+### GREEN
+
+`uv run pytest -q tests/test_tools_halo_probe.py` 86 passed (9.7 s); `uv run ruff check .` All
+checks passed; `uv run ruff format --check .` 313 files already formatted; `uv run mypy` Success,
+no issues found in 157 source files.
+
+### Photo commands (step 2; not run before the dispatcher resumes the cell)
+
+`bash C:/Users/rwsmy/clearwater/work/wp5.7/part2/run-photos.sh [SETTING ...]` (not committed; in
+the outputs folder): `df` check first (exits 3 under 25 GB), then for each setting in the order of
+the table and each of IMG_6739, IMG_6743, IMG_6744, one process at a time on the GPU:
+
+    uv --directory <worktree> run python tools/halo_probe.py <item> <Part 1 lines> --margin 120 \
+        --out <work>/wp5.7/part2/<setting>/<item> <--param ... | --switch ...>
+
+with the Part 1 lines (IMG_6739 `1700,2500,2200,2500`, `1560,2300,1810,2300`,
+`2900,2300,2450,2300`; IMG_6743 `2450,600,1850,600`, `835,1008,1132,670`; IMG_6744
+`1300,950,1300,450`, `2550,200,2100,200`). 21 settings x 3 photos = 63 runs (17 settings, 51 runs,
+if Q-d is ruled to one reference). Estimate: `part1s` took 17-34 s per photo; the baseline render
+adds about 3-5 s: about 25 s a run, so about 26 min for all 21 settings (about 21 min for 17).
+
+Depth at mid-build yield 1: DISPATCHER TO FILL

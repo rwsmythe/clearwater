@@ -29,6 +29,8 @@ import halo_probe as hp
 from clearwater.interfaces import ColorDescription, Image
 from clearwater.io.photo.png import write_png
 from clearwater.methods import AncutiFusionMethod
+from clearwater.methods import ancuti_fusion as product_ancuti
+from clearwater.methods import fusion as product_fusion
 from local_config import LocalConfig
 
 SRGB = ColorDescription("bt709", "srgb", "identity", "full", 8, False, None)
@@ -1130,3 +1132,262 @@ def test_run_video_fails_when_the_decode_skips_a_selected_frame(
             force_cpu=True,
             options=_video_options(tmp_path / "v"),
         )
+
+
+# --- Part 2: the instrument-only switches and the whole-image figures ---
+
+_ORIGINALS = (
+    product_fusion.NORMALISATION_RANGE_FLOOR,
+    product_fusion.fusion_inputs,
+    product_fusion.normalisation_bounds,
+)
+
+
+def _assert_restored() -> None:
+    """Every attribute a switch patches holds its original object again."""
+    floor, inputs, bounds = _ORIGINALS
+    assert product_fusion.NORMALISATION_RANGE_FLOOR is floor
+    assert floor == 0.02
+    assert product_ancuti.fusion_inputs is inputs
+    assert hp.fusion_inputs is inputs
+    assert product_ancuti.normalisation_bounds is bounds
+
+
+def _photo(pixels: np.ndarray) -> Image:
+    return Image(pixels=pixels, device="cpu", color=SRGB, orientation_applied=True)
+
+
+def _probe(
+    method: AncutiFusionMethod, image: Image, params: dict[str, Any], statistics: Any
+) -> dict[str, Any]:
+    """probe_frame on one line across the gray step (raises when the render check fails)."""
+    line = hp.Line(20.0, 64.0, 172.0, 64.0)
+    return hp.probe_frame(
+        method,
+        image,
+        params,
+        statistics,
+        lines=[line],
+        region=hp.region_for([line], image.pixels.shape, 10),
+        half_width=2,
+        threshold=0.1,
+        crops=None,
+        prefix="photo",
+    )
+
+
+def test_parse_switches_and_refusals() -> None:
+    switches = hp.parse_switches(["range_floor=0.05", "clip_overshoot=balanced:1.5"])
+    assert switches.range_floor == 0.05
+    assert (switches.clip_reference, switches.clip_radius_sigma) == ("balanced", 1.5)
+    assert switches.active
+    assert not switches.full_res_bounds
+    assert hp.parse_switches(["full_res_bounds"]).describe() == {"full_res_bounds": True}
+    assert not hp.parse_switches([]).active
+    for bad in (
+        ["range_floor=0"],
+        ["range_floor=nan"],
+        ["range_floor=2"],
+        ["clip_overshoot=input3:1"],
+        ["clip_overshoot=input1"],
+        ["clip_overshoot=input1:0"],
+        ["full_res_bounds=1"],
+        ["no_such"],
+        ["range_floor=0.05", "range_floor=0.1"],
+    ):
+        with pytest.raises(hp.ProbeError):
+            hp.parse_switches(bad)
+
+
+def test_switch_range_floor_reaches_analyze_and_render_and_is_restored() -> None:
+    # (e2): inside the block the product's fusion_inputs (in render AND analyze) widens to the
+    # switched floor; the staged render still equals the product's render; on exit (also on an
+    # exception) the constant is the original object again.
+    method = AncutiFusionMethod("c3")
+    params = hp.resolve_parameters(method, [])
+    image = _photo(_softened_gray_step())
+    statistics = hp.photo_statistics(method, image, params)
+    shipped = method.render(image, params, statistics).pixels
+    switches = hp.Switches(range_floor=0.2)
+    with hp.applied(switches):
+        assert product_fusion.NORMALISATION_RANGE_FLOOR == 0.2
+        switched_statistics = hp.photo_statistics(method, image, params)
+        switched = method.render(image, params, switched_statistics).pixels
+        frame = _probe(method, image, params, switched_statistics)
+    assert frame["render_check_equal"]
+    assert float(np.abs(switched - shipped).max()) > 0.01
+    assert switched_statistics["fusion"]["saliency_means"].tolist() != (
+        statistics["fusion"]["saliency_means"].tolist()
+    )  # analyze ran under the switch too (input 2's Lab mean moved)
+    _assert_restored()
+    with pytest.raises(RuntimeError), hp.applied(switches):
+        raise RuntimeError("inside")
+    _assert_restored()
+
+
+@pytest.mark.parametrize("reference", ["input1", "balanced", "unsharpened"])
+def test_switch_clip_overshoot_bounds_input2_by_the_local_range(reference: str) -> None:
+    # (d): input 2 lies inside [min, max] of the reference over the window, per channel, in the
+    # staged render, which equals the product's render under the same switch; restored on exit.
+    method = AncutiFusionMethod("c3")
+    params = hp.resolve_parameters(method, ["sharpen_blur_fraction=0.03"])
+    image = _photo(_halo_scene())
+    statistics = hp.photo_statistics(method, image, params)
+    switches = hp.Switches(clip_reference=reference, clip_radius_sigma=1.0)
+    with hp.applied(switches):
+        assert product_ancuti.fusion_inputs is hp.fusion_inputs
+        assert hp.fusion_inputs is not _ORIGINALS[1]
+        stages = dict(hp.staged_render(method, image, params, statistics))
+        rendered = method.render(image, params, statistics).pixels
+    _assert_restored()
+    assert np.array_equal(stages["output"], rendered)
+    balanced, input1, input2 = stages["balanced"], stages["input1"], stages["input2"]
+    if reference == "input1":
+        ref = input1
+    elif reference == "balanced":
+        ref = balanced
+    else:
+        low, high = hp._floored(*hp._checked_bounds(statistics["fusion"]["bounds"].tolist()))
+        zero = np.float32(min(max(-low / (high - low), 0.0), 1.0))
+        ref = (balanced + 1.0 * ((balanced + zero) / 2.0 - balanced)).clip(0.0, 1.0)
+    radius = max(1, round(hp.spatial_sigma(balanced.shape, 0.03)))
+    size = (2 * radius + 1, 2 * radius + 1, 1)
+    assert np.all(input2 >= ndimage.minimum_filter(ref, size=size, mode="nearest"))
+    assert np.all(input2 <= ndimage.maximum_filter(ref, size=size, mode="nearest"))
+    _, unclipped = hp.fusion_inputs(
+        hp.backend_for("cpu"),
+        balanced,
+        gamma=params["gamma"],
+        sharpen_strength=params["sharpen_strength"],
+        sharpen_blur_fraction=0.03,
+        bounds=statistics["fusion"]["bounds"].tolist(),
+    )
+    assert float(np.abs(unclipped - input2).max()) > 0.01  # the clip binds somewhere
+
+
+def test_switch_clip_overshoot_removes_input2s_ring_on_a_clean_step() -> None:
+    # (d) does what it is for: on a clean softened step (no source overshoot) input 2's outward
+    # ring is over the threshold unswitched and gone under the unsharpened-reference clip.
+    method = AncutiFusionMethod("c3")
+    params = hp.resolve_parameters(method, ["sharpen_blur_fraction=0.03"])
+    image = _photo(_softened_gray_step())
+    statistics = hp.photo_statistics(method, image, params)
+    shipped = _probe(method, image, params, statistics)["lines"][0]["water"]["input2"]["Y"]
+    switches = hp.Switches(clip_reference="unsharpened", clip_radius_sigma=1.0)
+    with hp.applied(switches):
+        statistics = hp.photo_statistics(method, image, params)
+        clipped = _probe(method, image, params, statistics)["lines"][0]["water"]["input2"]["Y"]
+    assert shipped["band_ratio"] > 0.1
+    assert clipped["band_ratio"] < 0.01
+
+
+def test_whole_image_figures() -> None:
+    backend = hp.backend_for("cpu")
+    base = np.full((4, 5, 3), 0.5, dtype=np.float32)
+    out = base.copy()
+    out[0, 0] = [1.0, 0.5, 0.5]  # one clipped pixel, red up by 0.5
+    figures = hp.whole_image(backend, out, base)
+    assert figures["clipped_fraction"] == pytest.approx(1 / 20)
+    assert figures["baseline_clipped_fraction"] == 0.0
+    assert figures["mean_shift_rgb"] == pytest.approx([0.5 / 20, 0.0, 0.0])
+    assert figures["mean_abs_difference"] == pytest.approx(0.5 / 60)
+    assert len(figures["v3_measures"]) == 4
+    same = hp.whole_image(backend, base, base)
+    assert same["mean_abs_difference"] == 0.0
+    assert same["mean_shift_rgb"] == [0.0, 0.0, 0.0]
+    assert same["v3_measures"] == same["baseline_v3_measures"]
+
+
+def test_main_records_the_whole_image_change_against_the_shipped_defaults(
+    tmp_path: Path, working: Path
+) -> None:
+    source = _scene_file(tmp_path)
+    common = ["--source", str(source), "--cache-dir", str(working / "c"), "--force-cpu"]
+    common += ["--line", "30,48,90,48", "--margin", "8"]
+    assert hp.main([*common, "--out", str(working / "d")]) == 0
+    shipped = json.loads((working / "d" / "scene.json").read_text(encoding="utf-8"))
+    assert shipped["baseline_statistics"] is None  # at the defaults the baseline is the run
+    assert shipped["frames"][0]["whole_image"]["mean_abs_difference"] == 0.0
+    argv = [*common, "--out", str(working / "a"), "--param", "sharpen_strength=0.5"]
+    assert hp.main(argv) == 0
+    record = json.loads((working / "a" / "scene.json").read_text(encoding="utf-8"))
+    figures = record["frames"][0]["whole_image"]
+    assert figures["mean_abs_difference"] > 0.0
+    assert figures["baseline_mean_rgb"] == shipped["frames"][0]["whole_image"]["mean_rgb"]
+    assert record["baseline_statistics"] == shipped["statistics"]
+    assert record["schema"] == 4
+    assert record["switches"] == {}
+
+
+def test_main_full_res_bounds_measures_the_bounds_on_the_full_image(
+    tmp_path: Path, working: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # (e3): the fusion record's bounds are the full-resolution image's (the probe's diagnostic
+    # measures the same), not the proxy's (the baseline's); the patch is gone after the run.
+    # The proxy is forced to a 2 x 2 block mean (the product's factor is 1 below a short side
+    # of about 1080), so a small image shows the difference.
+    monkeypatch.setattr(hp, "proxy_factor", lambda height, width: 2)
+    pixels = np.tile(_scene(), (2, 2, 1))  # 192 x 256
+    source = tmp_path / "big.png"
+    write_png(source, pixels, bit_depth=16, icc=None, exif=None, provenance_json=None)
+    argv = ["--source", str(source), "--out", str(working / "e3"), "--force-cpu"]
+    argv += ["--cache-dir", str(working / "c"), "--line", "30,48,90,48", "--margin", "8"]
+    assert hp.main([*argv, "--switch", "full_res_bounds"]) == 0
+    _assert_restored()
+    record = json.loads((working / "e3" / "big.json").read_text(encoding="utf-8"))
+    bounds = record["statistics"]["fusion"]["bounds"]
+    assert bounds == pytest.approx(record["frames"][0]["full_resolution_bounds"], rel=1e-6)
+    assert bounds != pytest.approx(record["baseline_statistics"]["fusion"]["bounds"], rel=1e-3)
+    assert record["switches"] == {"full_res_bounds": True}
+    assert record["frames"][0]["render_check_equal"]
+
+
+def test_main_refuses_a_bad_switch(tmp_path: Path, working: Path) -> None:
+    source = _scene_file(tmp_path)
+    argv = ["--source", str(source), "--out", str(working / "o"), "--line", "30,48,90,48"]
+    assert hp.main([*argv, "--switch", "range_floor=-1"]) == 2
+    assert not (working / "o").exists()
+
+
+def test_run_video_analyses_the_baseline_unswitched_and_the_candidate_switched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The candidate's whole-clip analysis runs INSIDE the switch (the floor it measures under is
+    # the switched one), the shipped-defaults baseline outside it; full_res_bounds is refused.
+    method = AncutiFusionMethod("c3")
+    params = hp.resolve_parameters(method, [])
+    image = _photo(_scene())
+    seen: list[float] = []
+    _fake_video(monkeypatch, skip=set())
+
+    class Engine:
+        def __init__(self, **kwargs: Any) -> None:
+            self.params = kwargs["params"]
+            self.store = SimpleNamespace(axis=lambda: list(range(5)))
+            self.schema_hash = "h"
+            self.statistics: Any = None
+
+        def analysis_job(self) -> Any:
+            def job(progress: Any) -> Any:
+                seen.append(product_fusion.NORMALISATION_RANGE_FLOOR)
+                self.statistics = hp.photo_statistics(method, image, self.params)
+                return SimpleNamespace(ok=True, failure=None)
+
+            return job
+
+        def smoothed_record(self, pts: int, *, schema_hash: str) -> Any:
+            return self.statistics
+
+    monkeypatch.setattr(hp, "AnalysisEngine", Engine)
+    options = {**_video_options(tmp_path / "v"), "switches": hp.Switches(range_floor=0.3)}
+    run = hp.run_video(Path("clip.mp4"), method, params, force_cpu=True, options=options)
+    _assert_restored()
+    assert seen == [0.02, 0.3]  # the baseline first, unswitched
+    frame = run["frames"][0]
+    assert frame["render_check_equal"]
+    assert frame["baseline_statistics"] is not None
+    assert frame["whole_image"]["mean_abs_difference"] > 0.0
+    assert run["switches"] == {"range_floor": 0.3}
+    options["switches"] = hp.Switches(full_res_bounds=True)
+    with pytest.raises(hp.ProbeError):
+        hp.run_video(Path("clip.mp4"), method, params, force_cpu=True, options=options)

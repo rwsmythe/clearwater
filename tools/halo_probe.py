@@ -94,7 +94,7 @@ Command line (from the repository root)::
 
     uv run python tools/halo_probe.py (STEM | --source PATH) --line X0,Y0,X1,Y1 [--line ...]
         [--name NAME] [--out DIR] [--region X,Y,W,H] [--margin PX] [--half-width PX]
-        [--threshold F] [--param NAME=VALUE ...] [--method ID] [--force-cpu]
+        [--threshold F] [--param NAME=VALUE ...] [--switch SWITCH ...] [--method ID] [--force-cpu]
         [--start S --end S] [--crop-at S ...] [--cache-dir DIR] [--replace]
 
 ``STEM`` is found in the configured footage folder (read-only; a video through
@@ -134,6 +134,21 @@ a concurrent process that swaps a directory for a junction during the run, nor a
 plants a link in the fresh staging folder; and on POSIX a rename can replace an existing EMPTY
 directory, so the publish-time collision refusals are Windows guarantees.
 
+Part 2 candidates (:class:`Switches`, ``--switch``). The candidates that are method parameters
+(sharpening strength, the N{} percentiles, the pyramid minimum level size, the weight delta)
+are passed with ``--param``. The others are INSTRUMENT-ONLY switches that edit nothing under
+``src/`` and change no default: ``range_floor=F`` (the N{} range floor, (e2)),
+``clip_overshoot=REF:R`` (input 2 clipped to the local range of REF over a window of half side
+R sharpening sigmas, (d)) and ``full_res_bounds`` (the N{} bounds measured on the
+full-resolution image, (e3); photos). :func:`applied` patches the product's module attributes
+for a ``with`` block and restores them on exit, and the analysis, the staged render and the
+product's ``render`` of the render-equality check all run inside it, so the check compares the
+staged render with the product's render under the SAME switch. Every run whose parameters or
+switches differ from the shipped defaults also renders the item at the shipped defaults,
+unswitched (photos: the proxy statistics; videos: a second analysis run of the clip), and
+records :func:`whole_image` (per-channel mean shift, clipped-pixel fraction, absolute
+difference, V3's per-frame measures) per frame.
+
 A run FAILS (exit 1, no record) when the staged render's output differs from the product's
 ``render`` by any amount, when ``clip(prefused)`` differs from the staged ``fused``, or when the
 video decode did not deliver every selected frame. The video analysis is given the clip's
@@ -145,6 +160,7 @@ Exit status: 0 on success, 2 on a usage refusal, 1 on a failure (nothing publish
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import json
 import math
@@ -172,6 +188,7 @@ from clearwater.core import (
     gaussian_pyramid,
     laplacian_pyramid,
     pyramid_levels,
+    rgb_to_lab,
     select_backend,
     spatial_sigma,
 )
@@ -181,6 +198,8 @@ from clearwater.io.photo.png import write_png
 from clearwater.io.video import FFmpegVideoSource
 from clearwater.jobs.export import expected_frames
 from clearwater.methods import AncutiFusionMethod, available_methods
+from clearwater.methods import ancuti_fusion as _ancuti_module
+from clearwater.methods import fusion as _fusion_module
 from clearwater.methods.ancuti_fusion import blend_with_original
 from clearwater.methods.fusion import (
     _checked_bounds,
@@ -1082,6 +1101,262 @@ def _backend(image: Image) -> CoreBackend:
     return backend_for(image.device)
 
 
+# --- instrument-only switches (Part 2) -------------------------------------------------------
+
+CLIP_REFERENCES = ("input1", "balanced", "unsharpened")
+"""What candidate (d) clips input 2 to the local range of (:func:`clipped_fusion_inputs`)."""
+
+
+@dataclasses.dataclass(frozen=True)
+class Switches:
+    """The Part 2 candidates that are not method parameters, applied inside the probe only.
+
+    Nothing under ``src/`` is edited and no default changes: :func:`applied` patches module
+    attributes of the product for the duration of a ``with`` block and restores them on exit,
+    so the staged render AND the product's ``render`` (and ``analyze``) run under the same
+    switch and the render-equality check compares like with like.
+
+    Attributes:
+        range_floor: Candidate (e2): the N{} range floor in place of
+            ``fusion.NORMALISATION_RANGE_FLOOR`` (0.02); None leaves it.
+        clip_reference: Candidate (d): clip input 2 to the local range of ``"input1"``,
+            ``"balanced"`` (the white-balanced image ``I``) or ``"unsharpened"`` (input 2 formed
+            with a zero high-pass); None for no clip.
+        clip_radius_sigma: Candidate (d): the half side of the square local window, in
+            sharpening sigmas.
+        full_res_bounds: Candidate (e3): the N{} bounds measured on the full-resolution
+            white-balanced image instead of the analysis proxy (photos).
+    """
+
+    range_floor: float | None = None
+    clip_reference: str | None = None
+    clip_radius_sigma: float | None = None
+    full_res_bounds: bool = False
+
+    @property
+    def active(self) -> bool:
+        """True when any switch is set."""
+        return (
+            self.range_floor is not None or self.clip_reference is not None or self.full_res_bounds
+        )
+
+    def describe(self) -> dict[str, Any]:
+        """The switches for the record (only the ones set)."""
+        out: dict[str, Any] = {}
+        if self.range_floor is not None:
+            out["range_floor"] = self.range_floor
+        if self.clip_reference is not None:
+            out["clip_overshoot"] = {
+                "reference": self.clip_reference,
+                "radius_sigma": self.clip_radius_sigma,
+            }
+        if self.full_res_bounds:
+            out["full_res_bounds"] = True
+        return out
+
+
+def parse_switches(items: Sequence[str]) -> Switches:
+    """Parse ``--switch`` values: ``range_floor=F``, ``clip_overshoot=REF:R``, ``full_res_bounds``.
+
+    Args:
+        items: The values, each one switch.
+
+    Returns:
+        The switches.
+
+    Raises:
+        ProbeError: An unknown switch, a repeated one, or an unusable value.
+    """
+    values: dict[str, Any] = {}
+    for item in items:
+        name, sep, text = item.partition("=")
+        if name in values:
+            raise ProbeError(f"--switch {name} given twice")
+        try:
+            if name == "range_floor" and sep:
+                floor = float(text)
+                if not (math.isfinite(floor) and 0.0 < floor <= 1.0):
+                    raise ValueError("must lie in (0, 1]")
+                values[name] = floor
+            elif name == "clip_overshoot" and sep:
+                reference, colon, radius_text = text.partition(":")
+                radius = float(radius_text) if colon else math.nan
+                if reference not in CLIP_REFERENCES:
+                    raise ValueError(f"the reference must be one of {', '.join(CLIP_REFERENCES)}")
+                if not (math.isfinite(radius) and radius > 0.0):
+                    raise ValueError("needs REF:RADIUS with a radius above 0 (sharpening sigmas)")
+                values[name] = (reference, radius)
+            elif name == "full_res_bounds" and not sep:
+                values[name] = True
+            else:
+                raise ValueError("unknown switch")
+        except ValueError as exc:
+            raise ProbeError(f"--switch {item!r}: {exc}") from exc
+    clip = values.get("clip_overshoot")
+    return Switches(
+        range_floor=values.get("range_floor"),
+        clip_reference=None if clip is None else clip[0],
+        clip_radius_sigma=None if clip is None else clip[1],
+        full_res_bounds=bool(values.get("full_res_bounds", False)),
+    )
+
+
+def clipped_fusion_inputs(reference: str, radius_sigma: float) -> Any:
+    """Candidate (d): ``fusion_inputs`` with input 2 clipped to a local range (instrument only).
+
+    The returned function calls the product's ``fusion_inputs`` (the one in
+    ``clearwater.methods.fusion`` when this is called), then clips input 2 per channel to
+    ``[min, max]`` of the reference over a square window of half side ``round(radius_sigma *
+    sigma)`` pixels (``sigma`` the sharpening sigma of the image it is given, so the window
+    scales with the short side as every spatial parameter does; edges replicated). The
+    reference: ``"input1"`` (input 1 as returned), ``"balanced"`` (the white-balanced image
+    the function is given) or ``"unsharpened"`` (input 2 formed with a zero high-pass:
+    ``clip(I + s * ((I + N{0}) / 2 - I))`` on the same floored bounds). An amendment of [A18]'s
+    global N{}: the stretch is unchanged, its result is limited locally.
+
+    Args:
+        reference: One of :data:`CLIP_REFERENCES`.
+        radius_sigma: The window's half side in sharpening sigmas.
+
+    Returns:
+        A function with ``fusion_inputs``' signature.
+    """
+    original = _fusion_module.fusion_inputs
+
+    def wrapped(
+        backend: Any,
+        a: Any,
+        *,
+        gamma: float,
+        sharpen_strength: float,
+        sharpen_blur_fraction: float,
+        bounds: Sequence[float],
+    ) -> tuple[Any, Any]:
+        input1, input2 = original(
+            backend,
+            a,
+            gamma=gamma,
+            sharpen_strength=sharpen_strength,
+            sharpen_blur_fraction=sharpen_blur_fraction,
+            bounds=bounds,
+        )
+        if reference == "input1":
+            ref = input1
+        elif reference == "balanced":
+            ref = a
+        else:
+            low, high = _floored(*_checked_bounds(bounds))
+            zero = np.float32(min(max((0.0 - low) / (high - low), 0.0), 1.0))
+            ref = (a + float(sharpen_strength) * ((a + zero) / 2.0 - a)).clip(0.0, 1.0)
+        radius = max(1, round(radius_sigma * spatial_sigma(a.shape, sharpen_blur_fraction)))
+        size = (2 * radius + 1, 2 * radius + 1, 1)
+        nd = backend.ndimage
+        lower = nd.minimum_filter(ref, size=size, mode="nearest")
+        upper = nd.maximum_filter(ref, size=size, mode="nearest")
+        clipped = backend.xp.minimum(backend.xp.maximum(input2, lower), upper)
+        return input1, clipped.astype(np.float32, copy=False)
+
+    return wrapped
+
+
+@contextlib.contextmanager
+def applied(switches: Switches, *, bounds: Sequence[float] | None = None) -> Iterator[None]:
+    """Apply the switches to the product's modules for the ``with`` block; restore on exit.
+
+    Patched (each restored to the exact object it held, in reverse order, on any exit):
+    ``clearwater.methods.fusion.NORMALISATION_RANGE_FLOOR`` (read by ``_floored`` at call time,
+    so ``fusion_inputs`` everywhere sees it); ``clearwater.methods.ancuti_fusion.fusion_inputs``
+    (the name ``render`` and ``analyze`` call) and this module's ``fusion_inputs`` (the name
+    :func:`staged_render` calls) for candidate (d); ``ancuti_fusion.normalisation_bounds`` (the
+    name ``analyze`` measures the bounds with) for candidate (e3), returning ``bounds``.
+
+    Args:
+        switches: The switches.
+        bounds: Candidate (e3): the bounds the fusion stage's measurement returns instead of
+            measuring them (the caller measured them on the full-resolution image); None for no
+            override.
+
+    Yields:
+        Nothing; the switches hold inside the block.
+    """
+    saved: list[tuple[Any, str, Any]] = []
+
+    def patch(module: Any, name: str, value: Any) -> None:
+        saved.append((module, name, getattr(module, name)))
+        setattr(module, name, value)
+
+    try:
+        if switches.range_floor is not None:
+            patch(_fusion_module, "NORMALISATION_RANGE_FLOOR", float(switches.range_floor))
+        if switches.clip_reference is not None:
+            radius = float(switches.clip_radius_sigma or 0.0)
+            wrapped = clipped_fusion_inputs(switches.clip_reference, radius)
+            patch(_ancuti_module, "fusion_inputs", wrapped)
+            patch(sys.modules[__name__], "fusion_inputs", wrapped)
+        if bounds is not None:
+            fixed = (float(bounds[0]), float(bounds[1]))
+
+            def measured(backend: Any, a: Any, **_: Any) -> tuple[float, float]:
+                return fixed
+
+            patch(_ancuti_module, "normalisation_bounds", measured)
+        yield
+    finally:
+        for module, name, value in reversed(saved):
+            setattr(module, name, value)
+
+
+def whole_image(backend: Any, out: Any, baseline: Any) -> dict[str, Any]:
+    """Whole-image figures of a render and its change against the shipped-defaults render.
+
+    Per channel mean (and its shift), the clipped fraction (pixels with any channel at 0 or 1),
+    the mean and the 99th percentile of the per-value absolute difference, and V3's four
+    per-frame measures (the mean L*, a*, b* and the standard deviation of L*, as
+    ``tests/test_analysis_v3.py`` forms them) of both, from which a flicker figure over frames
+    is computed.
+
+    Args:
+        backend: The backend both arrays live on.
+        out: The render, ``(H, W, 3)``.
+        baseline: The shipped-defaults render of the same image (``out`` itself when the run
+            is at the shipped defaults).
+
+    Returns:
+        The figures, Python floats.
+    """
+    xp = backend.xp
+
+    def host(value: Any) -> list[float]:
+        """A device reduction (float64) as host floats."""
+        data = value.get() if hasattr(value, "get") else value
+        return [float(v) for v in np.atleast_1d(np.asarray(data, dtype=np.float64))]
+
+    def figures(image: Any) -> dict[str, Any]:
+        clipped = ((image <= 0.0) | (image >= 1.0)).any(axis=2)
+        lab = rgb_to_lab(backend, image)
+        return {
+            "mean_rgb": host(image.mean(axis=(0, 1), dtype=xp.float64)),
+            "clipped_fraction": host(clipped.mean(dtype=xp.float64))[0],
+            "v3_measures": [
+                *host(lab.mean(axis=(0, 1), dtype=xp.float64)),
+                *host(lab[..., 0].std(dtype=xp.float64)),
+            ],
+        }
+
+    own, base = figures(out), figures(baseline)
+    difference = abs(out - baseline)
+    p99 = float(backend.to_host(backend.percentile(difference, [99.0]))[0])
+    return {
+        **own,
+        "baseline_mean_rgb": base["mean_rgb"],
+        "baseline_clipped_fraction": base["clipped_fraction"],
+        "baseline_v3_measures": base["v3_measures"],
+        "mean_shift_rgb": [a - b for a, b in zip(own["mean_rgb"], base["mean_rgb"], strict=True)],
+        "mean_abs_difference": host(difference.mean(dtype=xp.float64))[0],
+        "p99_abs_difference": p99,
+    }
+
+
 # --- items -----------------------------------------------------------------------------------
 
 
@@ -1551,27 +1826,44 @@ def run_photo(
         color=image.color,
         orientation_applied=True,
     )
-    statistics = photo_statistics(method, on_device, params)
     region = options["region"] or region_for(options["lines"], pixels.shape, options["margin"])
     _check_region(region, pixels.shape, options["lines"], options["half_width"])
-    frame = probe_frame(
-        method,
-        on_device,
-        params,
-        statistics,
-        lines=options["lines"],
-        region=region,
-        half_width=options["half_width"],
-        threshold=options["threshold"],
-        crops=options["out"],
-        prefix="photo",
-    )
+    switches: Switches = options.get("switches") or Switches()
+    defaults = resolve_parameters(method, [])
+    baseline: Any = None
+    baseline_statistics: dict[str, Any] | None = None
+    if switches.active or dict(params) != defaults:  # the shipped-defaults render, unswitched
+        baseline_statistics = photo_statistics(method, on_device, defaults)
+        baseline = method.render(on_device, defaults, baseline_statistics).pixels
+    bounds = None
+    if switches.full_res_bounds:  # (e3): the bounds of the full-resolution balanced image
+        with applied(dataclasses.replace(switches, full_res_bounds=False)):
+            proxy_statistics = photo_statistics(method, on_device, params)
+            bounds = _full_bounds(method, on_device, params, proxy_statistics)
+    with applied(switches, bounds=bounds):
+        statistics = photo_statistics(method, on_device, params)
+        frame = probe_frame(
+            method,
+            on_device,
+            params,
+            statistics,
+            lines=options["lines"],
+            region=region,
+            half_width=options["half_width"],
+            threshold=options["threshold"],
+            crops=options["out"],
+            prefix="photo",
+        )
+        rendered = method.render(on_device, params, statistics).pixels
     scales = scale_facts(pixels.shape, params)
     add_widths_in_units(frame, scales)
     frame["full_resolution_bounds"] = _full_bounds(method, on_device, params, statistics)
+    frame["whole_image"] = whole_image(
+        backend, rendered, rendered if baseline is None else baseline
+    )
+    del baseline
     out: Path = options["out"]
     save_overview(out / "overview-source.png", pixels, region, options["lines"], 1600)
-    rendered = method.render(on_device, params, statistics).pixels
     save_overview(
         out / "overview-output.png",
         np.asarray(backend.to_host(rendered), dtype=np.float32),
@@ -1583,7 +1875,9 @@ def run_photo(
     return {
         "kind": "photo",
         "device": reason,
+        "switches": switches.describe(),
         "statistics": _plain(statistics),
+        "baseline_statistics": _plain(baseline_statistics),
         "scales": scales,
         "region": dataclasses.asdict(region),
         "frames": [{"time_s": None, **frame}],
@@ -1648,20 +1942,35 @@ def run_video(
     backend, reason = select_backend(
         Settings(force_cpu=force_cpu), video.height, video.width, method.id
     )
-    engine = AnalysisEngine(
-        method=method,
-        backend=backend,
-        cache=DiskProxyCache(options["cache_dir"]),
-        key=cache_key(path),
-        source=source,
-        probe=probe,
-        params=dict(params),
-        hw_decode=backend.device != "cpu",
-        expected_frames=expected_frames(probe),
-    )
-    result = engine.analysis_job()(_Progress())
-    if not result.ok:
-        raise RuntimeError(f"the analysis failed: {result.failure}")
+    switches: Switches = options.get("switches") or Switches()
+    if switches.full_res_bounds:
+        raise ProbeError("--switch full_res_bounds is built for photos only (video: see Part 2)")
+    cache = DiskProxyCache(options["cache_dir"])
+
+    def analysed(values: Mapping[str, Any]) -> AnalysisEngine:
+        """A real analysis run of the whole clip under ``values``, as the export runs it."""
+        engine = AnalysisEngine(
+            method=method,
+            backend=backend,
+            cache=cache,
+            key=cache_key(path),
+            source=source,
+            probe=probe,
+            params=dict(values),
+            hw_decode=backend.device != "cpu",
+            expected_frames=expected_frames(probe),
+        )
+        result = engine.analysis_job()(_Progress())
+        if not result.ok:
+            raise RuntimeError(f"the analysis failed: {result.failure}")
+        return engine
+
+    defaults = resolve_parameters(method, [])
+    baseline_engine = None
+    if switches.active or dict(params) != defaults:  # the shipped defaults, unswitched
+        baseline_engine = analysed(defaults)
+    with applied(switches):
+        engine = analysed(params)
     axis = sorted(int(p) for p in engine.store.axis())
     first = axis[0]
     time_base = video.time_base
@@ -1697,26 +2006,36 @@ def run_video(
             )
             keep = pts in crop_frames
             tag = f"t{seconds:08.3f}"
-            record = probe_frame(
-                method,
-                on_device,
-                params,
-                statistics,
-                lines=options["lines"],
-                region=region,
-                half_width=options["half_width"],
-                threshold=options["threshold"],
-                crops=out if keep else None,
-                prefix=tag,
-            )
+            with applied(switches):
+                record = probe_frame(
+                    method,
+                    on_device,
+                    params,
+                    statistics,
+                    lines=options["lines"],
+                    region=region,
+                    half_width=options["half_width"],
+                    threshold=options["threshold"],
+                    crops=out if keep else None,
+                    prefix=tag,
+                )
+                rendered = method.render(on_device, params, statistics).pixels
             add_widths_in_units(record, scales)
             record["full_resolution_bounds"] = _full_bounds(method, on_device, params, statistics)
+            baseline_statistics = None
+            baseline = rendered
+            if baseline_engine is not None:
+                baseline_statistics = baseline_engine.smoothed_record(
+                    pts, schema_hash=baseline_engine.schema_hash
+                )
+                baseline = method.render(on_device, defaults, baseline_statistics).pixels
+            record["whole_image"] = whole_image(backend, rendered, baseline)
+            del baseline
             if keep:
                 host = np.asarray(frame.pixels, dtype=np.float32)
                 save_overview(
                     out / f"{tag}-overview-source.png", host, region, options["lines"], 1600
                 )
-                rendered = method.render(on_device, params, statistics).pixels
                 save_overview(
                     out / f"{tag}-overview-output.png",
                     np.asarray(backend.to_host(rendered), dtype=np.float32),
@@ -1724,9 +2043,15 @@ def run_video(
                     options["lines"],
                     1600,
                 )
-                del rendered
+            del rendered
             frames.append(
-                {"time_s": seconds, "pts_ticks": pts, "statistics": _plain(statistics), **record}
+                {
+                    "time_s": seconds,
+                    "pts_ticks": pts,
+                    "statistics": _plain(statistics),
+                    "baseline_statistics": _plain(baseline_statistics),
+                    **record,
+                }
             )
             print(f"  frame {seconds:.3f} s done", file=sys.stderr)
     finally:
@@ -1742,6 +2067,7 @@ def run_video(
     return {
         "kind": "video",
         "device": reason,
+        "switches": switches.describe(),
         "analysis": "AnalysisEngine.analysis_job over the whole clip (smoothing defaults, "
         "expected_frames as the export passes it)",
         "expected_frames": expected_frames(probe),
@@ -1818,6 +2144,13 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--half-width", type=int, default=4)
     parser.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD)
     parser.add_argument("--param", action="append", default=[], metavar="NAME=VALUE")
+    parser.add_argument(
+        "--switch",
+        action="append",
+        default=[],
+        metavar="SWITCH",
+        help="instrument-only candidate: range_floor=F, clip_overshoot=REF:R, full_res_bounds",
+    )
     parser.add_argument("--method", default="c3")
     parser.add_argument("--force-cpu", action="store_true")
     parser.add_argument("--start", type=float, help="video: first time (s from the first frame)")
@@ -1896,6 +2229,7 @@ def _options(args: argparse.Namespace) -> tuple[Path, str, Path, dict[str, Any]]
         "end": args.end,
         "crop_at": args.crop_at,
         "cache_dir": cache_dir,
+        "switches": parse_switches(args.switch),
         **siblings,
     }
     return source, name, out, options
@@ -2024,13 +2358,14 @@ def _record(
 ) -> dict[str, Any]:
     """The run record: the settings, the rules in words, the times and the run's results."""
     return {
-        "schema": 3,
+        "schema": 4,
         "tool": "halo_probe",
         "name": name,
         "source": source.name,
         "method": method.id,
         "parameters": params,
         "overrides": list(args.param),
+        "switch_arguments": list(args.switch),
         "threshold": options["threshold"],
         "half_width": options["half_width"],
         "outer_fraction": OUTER_FRACTION,
