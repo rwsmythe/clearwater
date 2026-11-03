@@ -9,7 +9,11 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import subprocess
+import sys
+import types
 from fractions import Fraction
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -29,6 +33,51 @@ LONG_SPECS = (
     ("GX011627-long", "GX011627", 0.30, 20.0, False, False, None),
     ("GX011625-long", "GX011625", 0.50, 20.0, False, False, None),
 )
+
+
+def _revision_runner(revision):
+    """Load immutable historical instrument source, never the working source as an oracle."""
+    source = subprocess.check_output(
+        ["git", "show", f"{revision}:tools/statistics_experiments.py"],
+        cwd=Path(__file__).resolve().parents[1],
+        encoding="utf-8",
+        timeout=10,
+    )
+    module = types.ModuleType(f"statistics_experiments_{revision}")
+    module.__file__ = runner.__file__
+    module.__package__ = "tools"
+    sys.modules[module.__name__] = module
+    exec(
+        compile(source, f"git:{revision}:tools/statistics_experiments.py", "exec"), module.__dict__
+    )
+    return module
+
+
+@pytest.fixture(scope="module")
+def base_runner():
+    """Generate default-path golden records from the fixed WP1.4 base revision."""
+    module = _revision_runner("0cafb374")
+    yield module
+    del sys.modules[module.__name__]
+
+
+@pytest.fixture(scope="module")
+def pre_r1_runner():
+    """Keep all unaffected long measurements pinned to the diagnosis-turn revision."""
+    module = _revision_runner("6dfccdfc")
+    yield module
+    del sys.modules[module.__name__]
+
+
+def _take_documents(folder):
+    """Read whole JSON documents, excluding only written; remove them to prevent stale passes."""
+    documents = {}
+    for path in folder.glob("*.json"):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        document.pop("written")
+        documents[path.name] = document
+        path.unlink()
+    return documents
 
 
 def _defaults():
@@ -115,8 +164,11 @@ def test_long_render_is_refused_before_configuration_or_device_access(monkeypatc
     assert "--long supports extract and analyse only" in capsys.readouterr().err
 
 
-def _extract(tmp_path, monkeypatch, spec, duration, stream_duration="present"):
+def _extract(
+    tmp_path, monkeypatch, spec, duration, stream_duration="present", *, instrument=runner
+):
     """Keep extraction's real records and writers, with three tiny decoded frames."""
+    runner = instrument
     footage = tmp_path / "footage"
     video = footage / f"{spec.chapter}.mp4"
     roots = OutputRoots(allowed=tmp_path / "work", footage=footage)
@@ -158,7 +210,8 @@ def _extract(tmp_path, monkeypatch, spec, duration, stream_duration="present"):
             stream["duration"] = "N/A"
         return {"streams": [stream], "format": {"duration": str(duration)}}
 
-    monkeypatch.setattr(runner, "run_ffprobe", duration_probe, raising=False)
+    if hasattr(runner, "run_ffprobe"):  # The WP1.4 base has no additional duration probe.
+        monkeypatch.setattr(runner, "run_ffprobe", duration_probe)
     monkeypatch.setattr(runner, "excerpt", decode)
     monkeypatch.setattr(runner, "read_png16", lambda path: np.zeros((4, 4, 3), dtype=np.float32))
     monkeypatch.setattr(runner.temporal, "proxy", lambda image: image[:1, :1])
@@ -173,8 +226,15 @@ def _extract(tmp_path, monkeypatch, spec, duration, stream_duration="present"):
 @pytest.mark.parametrize(
     ("duration", "start"), [(22.7227, 11.36135), (10.0, 5.0)], ids=["fits", "short-unclamped"]
 )
-def test_default_extract_keeps_start_and_record_schema(tmp_path, monkeypatch, duration, start):
+def test_default_extract_keeps_start_and_record_schema(
+    tmp_path, monkeypatch, base_runner, duration, start
+):
+    with monkeypatch.context() as base_patches:
+        _extract(tmp_path, base_patches, base_runner.EXCERPTS[1], duration, instrument=base_runner)
+    expected = _take_documents(tmp_path / "work" / "GX011625")
+    assert set(expected) == {"excerpt.json", "statistics-raw.json"}
     document, decoded = _extract(tmp_path, monkeypatch, runner.EXCERPTS[1], duration)
+    assert _take_documents(tmp_path / "work" / "GX011625") == expected
     assert decoded == [(start, 6.0)]
     assert document["start_s"] == start
     assert document["start_fraction"] == 0.50
@@ -211,11 +271,24 @@ def test_long_extract_records_requested_and_clamped_start(
     assert _defaults() == before
 
 
-def _window_study(tmp_path, monkeypatch, count, *, long=False):
+def _window_study(
+    tmp_path,
+    monkeypatch,
+    count,
+    *,
+    long=False,
+    instrument=runner,
+    save_analyses=False,
+    crossing_method=None,
+    reject_crossed_trend=False,
+):
     """Leave trimming/flicker/JSON real; supply marked signals instead of rendering images."""
+    runner = instrument
     roots = OutputRoots(allowed=tmp_path / "work", footage=tmp_path / "footage")
     folder = roots.allowed / "synthetic"
-    entries = [{"pts_ticks": n * 1001, "pts_seconds": n / float(RATE)} for n in range(count)]
+    entries = [
+        {"index": n, "pts_ticks": n * 1001, "pts_seconds": n / float(RATE)} for n in range(count)
+    ]
     raw = {
         name: {
             "normalisation_bounds.low": np.full(count, key, dtype=np.float64),
@@ -223,6 +296,15 @@ def _window_study(tmp_path, monkeypatch, count, *, long=False):
         }
         for name, key in (("ancuti2018", 3), ("c3", 5))
     }
+    if crossing_method is not None:
+        # Eight ordered measurements: a fast narrowing then a plateau. OLS overshoots
+        # at indices 6 and 7: lows=7.25/15.5, highs=-7.25/-15.5, although each
+        # input low is below high. Multiple crossings witness the count and full list.
+        assert count == 8
+        raw[crossing_method] = {
+            "normalisation_bounds.low": np.array([-100.0, *([-1.0] * 7)]),
+            "normalisation_bounds.high": np.array([100.0, *([1.0] * 7)]),
+        }
     loaded = runner.Loaded(
         folder,
         {"frames": entries, "excerpt": "synthetic", "frame_rate": "30000/1001"},
@@ -249,6 +331,10 @@ def _window_study(tmp_path, monkeypatch, count, *, long=False):
         return {"flat": np.ones(count)}
 
     def signals(proxies, params, series, backend, constant=None):
+        if reject_crossed_trend and series is not None and "normalisation_bounds.low" in series:
+            assert np.all(
+                series["normalisation_bounds.low"] <= series["normalisation_bounds.high"]
+            ), "attempted to render a crossed trend"
         method_key = {"ancuti2018": 2, "c3": 7}[params.method]
         if constant is not None:
             # Reference slopes witness the actual raw method used to construct Statistics.
@@ -275,6 +361,10 @@ def _window_study(tmp_path, monkeypatch, count, *, long=False):
     monkeypatch.setattr(runner.temporal, "analyse_flat", flat)
     monkeypatch.setattr(runner.temporal, "step_response", lambda *args: {})
     analyses = {kind: {name: {kind: np.ones(count)} for name in raw} for kind in ("staged", "flat")}
+    if save_analyses:
+        analyses = runner.analyse_statistics(folder, roots, CPU)
+        staged_calls.clear()
+        flat_calls.clear()
     before = _defaults()
     kwargs = {"long": True} if long else {}
     document = runner.run_experiments(folder, roots, CPU, analyses, **kwargs)
@@ -284,8 +374,15 @@ def _window_study(tmp_path, monkeypatch, count, *, long=False):
     return document, staged_calls, flat_calls, step_levels
 
 
-def test_default_window_study_keeps_one_method_and_fixed_margin(tmp_path, monkeypatch):
-    document, staged_calls, flat_calls, _ = _window_study(tmp_path, monkeypatch, 600)
+def test_default_window_study_keeps_one_method_and_fixed_margin(tmp_path, monkeypatch, base_runner):
+    with monkeypatch.context() as base_patches:
+        _window_study(tmp_path, base_patches, 600, instrument=base_runner, save_analyses=True)
+    expected = _take_documents(tmp_path / "work" / "synthetic")
+    assert set(expected) == {"statistics-staged.json", "statistics-flat.json", "results.json"}
+    document, staged_calls, flat_calls, _ = _window_study(
+        tmp_path, monkeypatch, 600, save_analyses=True
+    )
+    assert _take_documents(tmp_path / "work" / "synthetic") == expected
     labels = [
         f"{kind} {window:g} s"
         for kind in ("moving_average", "gaussian", "median_gaussian")
@@ -302,6 +399,85 @@ def test_default_window_study_keeps_one_method_and_fixed_margin(tmp_path, monkey
             offset = {"staged": 16, "flat": 28}[kind]
             assert record["interior"] == pytest.approx(24239 / 479 + offset)
             assert "per_step" not in record and "edge_free_frames" not in record
+
+
+@pytest.mark.parametrize("method", ["ancuti2018", "c3"])
+def test_long_crossed_trend_is_unavailable_without_rendering_or_changing_other_records(
+    tmp_path, monkeypatch, pre_r1_runner, method
+):
+    with monkeypatch.context() as before_patches:
+        before, *_ = _window_study(
+            tmp_path,
+            before_patches,
+            8,
+            long=True,
+            instrument=pre_r1_runner,
+            crossing_method=method,
+        )
+    before.pop("written")
+    _take_documents(tmp_path / "work" / "synthetic")
+    actual, *_ = _window_study(
+        tmp_path,
+        monkeypatch,
+        8,
+        long=True,
+        crossing_method=method,
+        reject_crossed_trend=True,
+    )
+    actual.pop("written")
+    row = actual["flicker"][method].pop("linear_trend")
+    assert set(row) == {"available", "reason", "crossing"}
+    assert row["available"] is False
+    assert row["reason"] == "fitted normalisation_bounds.low exceeds normalisation_bounds.high"
+    assert set(row["crossing"]) == {"count", "frames"}
+    assert row["crossing"]["count"] == 2
+    assert row["crossing"]["frames"] == [
+        {
+            "index": 6,
+            "pts_ticks": 6006,
+            "pts_seconds": 6 / float(RATE),
+            "low": pytest.approx(7.25),
+            "high": pytest.approx(-7.25),
+        },
+        {
+            "index": 7,
+            "pts_ticks": 7007,
+            "pts_seconds": 7 / float(RATE),
+            "low": pytest.approx(15.5),
+            "high": pytest.approx(-15.5),
+        },
+    ]
+    before["flicker"][method].pop("linear_trend")
+    assert actual == before
+
+
+@pytest.mark.parametrize("method", ["ancuti2018", "c3"])
+def test_default_crossed_trend_record_matches_wp14_base(tmp_path, monkeypatch, base_runner, method):
+    # The signal boundary accepts the fit here so the historical default routing
+    # and full payload can be compared. A guard leaked out of --long changes it.
+    with monkeypatch.context() as base_patches:
+        _window_study(
+            tmp_path,
+            base_patches,
+            8,
+            instrument=base_runner,
+            save_analyses=True,
+            crossing_method=method,
+        )
+    expected = _take_documents(tmp_path / "work" / "synthetic")
+    _window_study(tmp_path, monkeypatch, 8, save_analyses=True, crossing_method=method)
+    assert _take_documents(tmp_path / "work" / "synthetic") == expected
+
+
+def test_long_ordered_trend_keeps_full_record_unchanged(tmp_path, monkeypatch, pre_r1_runner):
+    with monkeypatch.context() as before_patches:
+        _window_study(tmp_path, before_patches, 600, long=True, instrument=pre_r1_runner)
+    expected = _take_documents(tmp_path / "work" / "synthetic")
+    document, *_ = _window_study(tmp_path, monkeypatch, 600, long=True, reject_crossed_trend=True)
+    assert _take_documents(tmp_path / "work" / "synthetic") == expected
+    for method in ("ancuti2018", "c3"):
+        assert "available" not in document["flicker"][method]["linear_trend"]
+        assert len(document["flicker"][method]["linear_trend"]["per_step"]) == 599
 
 
 @pytest.mark.parametrize("count", [600, 599])

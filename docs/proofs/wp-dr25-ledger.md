@@ -509,3 +509,219 @@ claimed complete here. No AD-3 decision is made. Only this owned ledger is
 changed; product, prototype, instrument, tests and dependencies are untouched.
 
 Depth at turn-4 (diagnosis) end: 131,886 input tokens of 258,400 (driver footer, FRESH session 01a1a0cb-94f7-71d2-a4c3-34ad022b488a, 2026-11-03 turn 4).
+
+## Turn 5 (R1 fix, Reviewer A round 2 F1 / F3)
+
+Base: `6dfccdfc`. This turn implements CHARC's binding R1 ruling
+(`e09d10970e1fcdfd`, 2026-11-03 09:52Z) and the terminating Reviewer A round-2
+test cleanup. R2 (truncated fit) and R3 (order-preserving fit) were rejected
+because they change the diagnostic's quantity; neither is implemented.
+The completion report waits for the dispatcher's analysis re-run.
+
+### R1 behavior and exact schema
+
+In `run_experiments`, only for `long=True` and `label="linear_trend"`,
+preflight the fitted low/high arrays before `_signals`. If any low exceeds
+its high, skip rendering the entire method's trend and write this row at
+`flicker.<method>.linear_trend`:
+
+```json
+{
+  "available": false,
+  "reason": "fitted normalisation_bounds.low exceeds normalisation_bounds.high",
+  "crossing": {
+    "count": 2,
+    "frames": [
+      {"index": 6, "pts_ticks": 6006, "pts_seconds": 0.2002, "low": 7.25, "high": -7.25},
+      {"index": 7, "pts_ticks": 7007, "pts_seconds": 0.23356666666666667, "low": 15.5, "high": -15.5}
+    ]
+  }
+}
+```
+
+This is the synthetic witness, with fitted bounds shown to display precision,
+not a real-footage record. `index` is zero-based excerpt position. PTS values
+come from the corresponding excerpt frame. `count` is an integer; `frames`
+contains EVERY crossed pair in order, with its actual fitted float values.
+No numeric trend flicker fields are emitted for an unavailable row. Equality
+is valid: only `low > high` triggers this row. No samples are sorted, clipped,
+replaced or re-fitted. A noncrossing long trend keeps the previous complete
+row, without an added `available` key. The default path bypasses the guard.
+The guard and its docstring are the only instrument changes.
+
+Both-method synthetic tests use the real independent fit on eight ordered
+measurements: low `[-100,-1,-1,-1,-1,-1,-1,-1]`, high its negative. The fit
+crosses on indices 6/7 (low 7.25/15.5, high -7.25/-15.5). The signal boundary
+asserts if a crossed fit is even submitted to rendering. The test checks
+the persisted unavailable schema, both positions, times, count and fitted
+values; every other result is compared whole against fixed pre-R1 source
+from `git show 6dfccdfc:tools/statistics_experiments.py`. The valid long case
+compares the whole result, including both complete 599-step trend rows,
+against that same revision.
+
+### Reviewer A round 2 and cumulative ledger
+
+The supplied A2 verdict is CONVERGED, all seven claims HOLD, 18/20 mutants
+killed, on `2e40eb85` (same content later rebased to `45bca4db`). The
+dispatcher owns both Claude review nets. No new pass ran in this cell and
+the withheld transcript's filename/model version was not supplied.
+
+| Round | Critical | Major | Minor | Advisory | In / out of envelope | NEW / REOPENED | Reverts | Fix surface | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 prerequisite audit | 0 | 2 | 1 | D3 fit observation | All in | All new / 0 | 0 | Ruled instrument changes in turn 2 | CHARC ruled at `0f2d19c4` |
+| A1 | 0 | 0 | 2 | 6 | F1-F7 in; F8 out | 8 / 0 | 0 permanent | Instrument and tests; no shipped product code | `NO_NEW_CRITICAL_MAJOR`; cleanup in turn 3 |
+| A2 | 0 | 0 | 1 | 3 | F1-F4 in | 4 / 0 | 0 permanent | Tests: F1/F3; report: F2/F4 owed | CONVERGED; test cleanup in turn 5 |
+
+The pre-existing instrument failure and separately ruled R1 fix are not
+invented as an additional reviewer finding or round. All temporary mutants
+and historical source substitutions were restored, not permanently reverted.
+
+| Finding | Classification | Disposition |
+|---|---|---|
+| A2 F1 | MINOR, in | FIXED: five default JSON documents pinned whole to WP1.4 base source; Mj/Mk killed. |
+| A2 F2 / A1 F4 | ADVISORY, report | CARRIED: use each candidate's own interior/counts, and re-trim unsmoothed per-step arrays to its slice. Top-level margin/steps describe only `flicker`. |
+| A2 F3 | ADVISORY, in | FIXED: removed `raising=False` from `run_ffprobe` patch. The current module uses normal attribute-existence checking; only the historical base, which has no additional probe, skips installing that stub. |
+| A2 F4 | ADVISORY, report | CARRIED: long references use 20 s mean statistics, old references 6 s means; re-trimming gives comparable, not identical, quantities. |
+
+A1 F8's under-20 s chapter limit and the supplied extraction resources remain
+report obligations. CHARC's required R1 qualification also carries forward:
+crossing is an independent-fit property over a narrowing 20 s excerpt, not
+a product defect; product analysis never fits this trend, no saved measured/
+staged/flat pair crosses, and the refusal is prototype `check_statistics`.
+
+### Default golden provenance and exclusions
+
+Goldens are generated at test runtime from immutable source obtained by
+`git show 0cafb374:tools/statistics_experiments.py`, executed in a separate
+module. They never come from the working source. Base and current receive
+identical synthetic inputs, stubs and per-test paths. Golden JSON files are
+read and removed before the current invocation, preventing a missing write
+from passing through a stale file.
+
+**Only top-level `written` is excluded** in each document. No other field,
+path, array, numeric value or definition is normalized. The extraction timer
+is console output and needs no document exclusion. The pinned documents are
+`excerpt.json`, `statistics-raw.json`, `statistics-staged.json`,
+`statistics-flat.json`, and `results.json`. Extraction covers fitting and
+short-unclamped durations. Default analysis also covers both methods' crossed
+fits with the historical signal stub: leaking R1 out of `--long` changes
+their whole recorded payload and fails.
+
+### RED / GREEN and mutation evidence
+
+All pytest invocations use process-local `PYTHONPATH=scripts`, the required
+`sandbox_mkdir_shim`, and `no:cacheprovider`. Before instrument edits, initial
+RED exited 1: `2 failed, 18 passed in 1.87s`; both long crossing tests failed
+at `attempted to render a crossed trend`. Initial GREEN exited 0:
+`20 passed in 1.49s`.
+
+After strengthening the witness and adding default crossing controls, the
+final tests were rechecked on the exact instrument from `6dfccdfc`. Final
+RED exited 1: **`2 failed, 20 passed in 1.98s`**, again both
+`test_long_crossed_trend_is_unavailable_without_rendering_or_changing_other_records`
+parameters, at the intended assertion. The driver restored the instrument
+in `finally` and recorded `RESTORED True`. Final GREEN exited 0:
+**`22 passed in 2.09s`**.
+
+| Mutant | Temporary change | Final failed check (pytest exit 1) |
+|---|---|---|
+| Mj | Add `document["long"] = long` to `results.json`. | `test_default_window_study_keeps_one_method_and_fixed_margin`: whole `results.json` differs; `1 failed in 1.24s`. |
+| Mk | Add `document["start_clamped"] = False` to `excerpt.json`. | `test_default_extract_keeps_start_and_record_schema[fits]` and `[short-unclamped]`: whole `excerpt.json` differs; `2 failed in 0.90s`. |
+| Mtrend | Remove `long and` from the guard, changing default trend handling. | `test_default_crossed_trend_record_matches_wp14_base[ancuti2018]` and `[c3]`: whole `results.json` differs; `2 failed in 0.87s`. |
+
+The driver command was `uv run python work/cdr25-5-mutations.py`, output
+`work/cdr25-5-mutations.log`. It launches the exact worktree interpreter
+selected by `uv run`, `.venv/Scripts/python.exe -m pytest`, with the shim
+and environment above. Exact pytest argument lists (all output to individual
+`work/cdr25-5-<name>.log` files, exit codes in `.exit`):
+
+```text
+python -m pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py::test_default_window_study_keeps_one_method_and_fixed_margin --timeout 120 --basetemp=work/cdr25-5-mj
+python -m pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py::test_default_extract_keeps_start_and_record_schema --timeout 120 --basetemp=work/cdr25-5-mk
+python -m pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py::test_default_crossed_trend_record_matches_wp14_base --timeout 120 --basetemp=work/cdr25-5-mtrend
+```
+
+Final restored instrument SHA-256, also independently matched by
+`Get-FileHash` after checks:
+`9bf859fd6a2f3cc9066d5c7201ca253dd0ee124d3b2f9ea505cd0d1456767908`.
+No mutant is committed. The final RED driver command was
+`uv run python work/cdr25-5-red-recheck.py`, output
+`work/cdr25-5-red-recheck.log`. Its child uses the same interpreter/shim,
+the full new module, `--timeout 120`, and
+`--basetemp=work/cdr25-5-red-final`. Pytest log/exit:
+`work/cdr25-5-red-final.log` / `.exit`.
+
+### Final development checks
+
+| Check | Final observed summary (exit 0) | Worktree log |
+|---|---|---|
+| Synthetic module after restoration and formatting | `22 passed in 2.09s` | `work/cdr25-5-green-final.log` |
+| Existing importers, selected non-hardware tests (once) | `85 passed, 4 deselected, 1 warning in 3.46s` | `work/cdr25-5-importers.log` |
+| Whole-tree Ruff | `All checks passed!` | `work/cdr25-5-ruff-final.log` |
+| Whole-tree format check | `312 files already formatted` | `work/cdr25-5-format-final.log` |
+| Whole configured mypy scope | `Success: no issues found in 156 source files` | `work/cdr25-5-mypy-final.log` |
+
+Commands, with stdout/stderr redirected to the corresponding logs:
+
+```powershell
+$env:PYTHONPATH='scripts'
+$env:PYTHONDONTWRITEBYTECODE='1'
+Remove-Item Env:VIRTUAL_ENV -ErrorAction SilentlyContinue
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-5-green
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-5-green-final
+```
+
+Initial RED used the same module/options and `--basetemp=work/cdr25-5-red`.
+The importer invocation additionally set `CUDA_VISIBLE_DEVICES=-1` inside
+its own process, proactively using the confirmed turn-2 import-time CUDA
+workaround while another cell renders. No new collection stall occurred.
+The warning is the existing CuPy undetected CUDA-path warning; no selected
+test skipped. It preceded only formatting and additional test controls,
+not another behavioral instrument change, so it was not repeated.
+
+```text
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_footage_locator.py tests/test_prototype_temporal.py -m "not gpu and not footage and not gui and not slow" --timeout 120 --basetemp=work/cdr25-5-importers
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+```
+
+Initial static checks found three overlong lines and formatter changes;
+these were corrected before the final passing checks. No full suite,
+harness gate, GPU/footage test or instrument phase was launched here.
+
+### Re-run instructions and verification loop
+
+At the dispatcher's seat, from this worktree with its existing configuration,
+in its GPU window, run only:
+
+```text
+uv run python tools/statistics_experiments.py analyse --long
+```
+
+**No folder or record needs moving aside or deleting.**
+`OutputRoots.write_text` / `write_bytes` (`tools/lookcheck/frames.py:260-294`)
+check the target then overwrite ordinary existing files. Existence alone is
+not refused. The active refusal rules are paths outside the output root,
+inside footage, and existing output files with multiple hard links
+(`check_output_path`, lines 164-197). Analysis replaces staged/flat JSON,
+results JSON and flicker PNG for both excerpts, reading the existing
+excerpt/raw JSON and proxies. Extraction stands. Preserve the existing
+durable successful GX011627-long copies for the numeric identity comparison.
+This cell touched neither main-tree excerpt folder.
+
+| Suspected | Independent evidence | Disposition |
+|---|---|---|
+| Crossed fits still reach rendering. | Both methods fail RED at the signal boundary, pass GREEN with two crossings recorded, and retain other results against fixed pre-R1 source. | Fixed under `--long`; real GPU completion remains for the seat. |
+| R1 changes defaults or valid long trends. | Five default documents match fixed WP1.4 source; default crossing cases match it; valid long result matches pre-R1 whole. All three mutants fail named assertions. | Rejected after controls. |
+| Stale golden output hides a missing current write. | Golden JSONs are removed before the current invocation; exact file sets and payloads are compared. | Rejected on the tested synthetic surface. |
+| Mutant or scope/style drift remains. | Restored hash matches; final synthetic module, whole-tree Ruff/format and configured mypy pass; only the three owned files changed. | No new unresolved in-envelope implementation finding. |
+
+One logical ruled fix and its controls are bundled in this turn. No new
+dependency, frozen interface, product/prototype change, footage write,
+main-tree work write, AD-3 decision, mailbox post or git commit was made.
+Transient evidence stays under this worktree's ignored `work/`; its durable
+preservation and the analysis re-run are the dispatcher's responsibility.
+The report and its obligations above remain for the next turn after that run.
+
+Depth at turn-5 end: 174,724 input tokens of 258,400 (driver footer, session 01a1a0cb, 2026-11-03 turn 5).

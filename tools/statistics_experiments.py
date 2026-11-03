@@ -942,7 +942,9 @@ def run_experiments(
     proxies rendered with constant statistics (the mean of the raw series of the method), over
     all frame steps and over the interior steps (:func:`interior_margin`). With
     ``long=True``, a two-method window study replaces the Ancuti-only study,
-    using each candidate's own staged or flat reach for its interior.
+    using each candidate's own staged or flat reach for its interior. An auxiliary
+    linear-trend fit whose N{} bounds cross is recorded as unavailable on that
+    path, with every crossing frame and its fitted bounds, before rendering it.
 
     Args:
         folder: The excerpt's folder.
@@ -998,6 +1000,31 @@ def run_experiments(
             ("flat", flat),
             ("linear_trend", trend),
         ):
+            if long and label == "linear_trend" and series is not None:
+                lows = series["normalisation_bounds.low"]
+                highs = series["normalisation_bounds.high"]
+                crossed = np.flatnonzero(lows > highs)
+                if len(crossed):
+                    method_flicker[label] = {
+                        "available": False,
+                        "reason": (
+                            "fitted normalisation_bounds.low exceeds normalisation_bounds.high"
+                        ),
+                        "crossing": {
+                            "count": len(crossed),
+                            "frames": [
+                                {
+                                    "index": int(index),
+                                    "pts_ticks": entries[index]["pts_ticks"],
+                                    "pts_seconds": entries[index]["pts_seconds"],
+                                    "low": float(lows[index]),
+                                    "high": float(highs[index]),
+                                }
+                                for index in crossed
+                            ],
+                        },
+                    }
+                    continue
             signals = _signals(loaded.proxies, params, series, backend)
             method_flicker[label] = _sequence_record(
                 signals, reference, interior, source_signals, series=True
