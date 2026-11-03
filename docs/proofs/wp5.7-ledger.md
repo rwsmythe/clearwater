@@ -951,3 +951,262 @@ frame on top of `part1s`' 281 s): about 75-85 min for the twelve, plus about 5-1
 `e3-full` full-resolution pass (a second whole-clip decode of each item).
 
 Depth at mid-build yield 2b: 286396 (scripts/cell_depth.py, wp57-cell4, read by the orchestrator at the yield 2026-11-03)
+
+### Step 3, half 2: the video batch and the candidate table
+
+Dispatch `clearwater-review-evidence/wp5.7/cell/dispatch-7.md` (orchestrator gen 38). Fresh cell
+`wp57-cell5` (implementer-opus-high) on head `9ffca3cf`. No GPU run, no render, no pytest: every
+figure below is read from the batch's JSON records by a scratch tabulator
+(`work/c57-p2h2/tabulate.py` in the worktree, not committed; its output
+`work/c57-p2h2/table-videos.txt`, 309 lines, every number below is from it or from
+`part2/table-photos.txt`).
+
+**The batch.** `run-videos.sh` ran at the orchestrator's seat 12:17:17Z-13:40:36Z, free C: 64 GB
+before (60 GB after). `part2/logs/runs-video.txt`: 36 runs (12 settings x 3 items), every one
+`exit=0`, walls 57-301 s. Each log ends on a normal summary line and holds no `Traceback`,
+`FAILED` or `error`; each `part2/<setting>/<item>/<item>.json` exists; no staging or failed
+folder is left. In every record every frame has `render_check_equal` and `prefused_check_equal`
+true (render difference 0.0), and its frames are the `part1s` frames, pts for pts (49 / 30 / 30).
+
+**Determinism.** The `defaults` video records equal `part1s` on every water band of every stage
+and channel: max difference 0 over every numeric field (IMG_6738 3,136 band records, GX011627
+960, the compilation 2,880), and the smoothed statistics are equal too (max difference 0). In
+every candidate run the baseline render (shipped defaults, unswitched, from its own second
+analysis) has per-frame channel means equal to the `defaults` run's own (max difference 0).
+
+**The measured set.** "Decided" = the frame-lines whose FUSED luma verdict is `band` in the
+Part 1 table of record (`part1s`): IMG_6738 17, GX011627 9, the compilation 5 (31; all
+attributed input 2). The selector's decided count is 19 / 9 / 6: on two IMG_6738 lines and one
+compilation line input 2 qualifies but the fused band is undecided; those, and any band a
+candidate creates elsewhere, are covered by the "all non-weak" counts. Featured frames: IMG_6738
+0.833 s line 2; GX011627 22.122 s (its one line); the compilation 27.010 s line 1 (as the
+dispatches name it: 3.87 x C / 0.131, first qualifying `fused`) AND line 3 (the shin of the
+Part 1 table and of step 2B's "featured frames", 3.22 / 0.200): both are tabled (see the open
+question in the return report).
+
+#### The video candidate table
+
+Per item: the decided frame-lines' fused verdicts after the candidate (band / undecided / none);
+the largest fused band x C over them and the largest absolute band; the median fused FWHM (px)
+over those still `band`; the undecided count over ALL non-weak frame-lines (83 / 14 / 56) and
+any NEW qualifying band (a non-decided line that qualifies under the candidate); the whole-image
+change against the run's own shipped-defaults render (the mean over the frames of the mean
+absolute per-value difference; the largest per-channel mean shift over frames and channels; the
+largest per-frame 99th percentile). The clipped-pixel fraction moves by at most 0.0004 on any
+frame of any run (baseline 0.0001-0.0004): not tabled. Every qualifying fused band in every run
+is attributed to input 2.
+
+| Setting | Item | Decided: b / u / n | Max x C / abs | FWHM | Undecided (non-weak); new | Mean abs | Max shift | p99 |
+|---|---|---|---|---|---|---|---|---|
+| shipped | 6738 | 17 / 0 / 0 | 5.40 / .196 | 9.7 | 57; - | - | - | - |
+| shipped | GX | 9 / 0 / 0 | 7.42 / .162 | 15.9 | 3; - | - | - | - |
+| shipped | comp | 5 / 0 / 0 | 6.77 / .200 | 6.2 | 36; - | - | - | - |
+| (a) 0.5 | 6738 | 13 / 4 / 0 | 2.41 / .086 | 9.4 | 39; 1 (1.333 s L2, 0.25) | .0169 | .0105 | .073 |
+| (a) 0.5 | GX | 6 / 3 / 0 | 3.39 / .076 | 16.1 | 6; 0 | .0180 | .0180 | .068 |
+| (a) 0.5 | comp | 3 / 2 / 0 | 3.11 / .093 | 6.7 | 32; 0 | .0231 | .0351 | .086 |
+| (a) 0.25 | 6738 | 7 / 9 / 1 | 1.13 / .042 | 13.0 | 29; 0 | .0248 | .0158 | .104 |
+| (a) 0.25 | GX | 1 / 8 / 0 | 1.64 / .037 | 18.9 | 10; 0 | .0267 | .0272 | .097 |
+| (a) 0.25 | comp | 2 / 3 / 0 | 1.51 / .046 | 11.6 | 24; 0 | .0343 | .0539 | .123 |
+| (e1) 0.01/99.99 | 6738 | 13 / 4 / 0 | 1.90 / .117 | 8.9 | 33; 0 | .0205 | .0189 | .094 |
+| (e1) 0.01/99.99 | GX | 7 / 2 / 0 | 3.27 / .076 | 9.3 | 2; 2 (22.623 s 0.32, 22.689 s 0.38) | .0182 | .0187 | .089 |
+| (e1) 0.01/99.99 | comp | 2 / 3 / 0 | 2.27 / .141 | 10.1 | 27; 0 | .0147 | .0078 | .100 |
+| (e1) 0/100 | 6738 | 10 / 6 / 1 | 0.92 / .056 | 9.1 | 19; 0 | .0260 | .0252 | .114 |
+| (e1) 0/100 | GX | 2 / 5 / 2 | 1.19 / .028 | 9.7 | 7; 0 | .0261 | .0283 | .106 |
+| (e1) 0/100 | comp | 1 / 4 / 0 | 0.91 / .057 | 3.2 | 13; 0 | .0226 | .0216 | .134 |
+| (e2) 0.1 | 6738 | 11 / 5 / 1 | 1.15 / .072 | 8.9 | 22; 0 | .0194 | .0057 | .101 |
+| (e2) 0.1 | GX | 9 / 0 / 0 | 5.56 / .121 | 10.4 | 0; 2 (22.623 s 0.55, 22.689 s 0.71) | .0120 | .0078 | .074 |
+| (e2) 0.1 | comp | 2 / 3 / 0 | 2.29 / .142 | 10.1 | 24; 0 | .0143 | .0056 | .100 |
+| (e2) 0.2 | 6738 | 4 / 10 / 3 | 0.52 / .030 | 8.9 | 16; 0 | .0219 | .0068 | .115 |
+| (e2) 0.2 | GX | 7 / 2 / 0 | 2.37 / .055 | 9.2 | 3; 1 (22.689 s, 0.27) | .0153 | .0106 | .102 |
+| (e2) 0.2 | comp | 1 / 4 / 0 | 1.13 / .070 | 3.2 | 13; 0 | .0169 | .0066 | .121 |
+| **(d) unsharpened 1 sigma** | 6738 | 0 / 3 / 14 | 0.20 / .006 | - | 3; 0 | .0240 | .0096 | .126 |
+| **(d) unsharpened 1 sigma** | GX | 0 / 5 / 4 | 0.29 / .012 | - | 5; 0 | .0153 | .0046 | .121 |
+| **(d) unsharpened 1 sigma** | comp | 1 / 1 / 3 | 0.21 / .009 | 6.6 | 1; 0 | .0185 | .0050 | .140 |
+| **(d) unsharpened 3 sigma** | 6738 | 1 / 5 / 11 | 0.38 / .014 | 4.8 | 8; 0 | .0226 | .0090 | .123 |
+| **(d) unsharpened 3 sigma** | GX | 0 / 5 / 4 | 0.66 / .022 | - | 5; 0 | .0143 | .0042 | .117 |
+| **(d) unsharpened 3 sigma** | comp | 0 / 3 / 2 | 0.51 / .012 | - | 7; 0 | .0174 | .0046 | .137 |
+| (e3) full-res bounds | 6738 | 16 / 1 / 0 | 5.71 / .202 | 9.9 | 59; 1 (1.333 s L2, 0.63) | .0022 | .0005 | .011 |
+| (e3) full-res bounds | GX | 9 / 0 / 0 | 7.75 / .169 | 15.9 | 3; 0 | .0056 | .0059 | .007 |
+| (e3) full-res bounds | comp | 5 / 0 / 0 | 6.93 / .205 | 6.2 | 36; 0 | .0032 | .0034 | .009 |
+| (b) 4 | 6738 | 17 / 0 / 0 | 5.41 / .196 | 9.8 | 57; 0 | .0016 | .0002 | .007 |
+| (b) 4 | GX | 9 / 0 / 0 | 7.42 / .161 | 15.9 | 3; 0 | .0009 | .0001 | .005 |
+| (b) 4 | comp | 5 / 0 / 0 | 6.76 / .200 | 6.2 | 36; 0 | .0008 | .0001 | .004 |
+| (c) 1.0 | 6738 | 14 / 3 / 0 | 4.59 / .164 | 10.0 | 57; 1 (1.333 s L2, 0.47) | .0035 | .0019 | .020 |
+| (c) 1.0 | GX | 8 / 1 / 0 | 6.50 / .144 | 15.9 | 5; 0 | .0020 | .0010 | .019 |
+| (c) 1.0 | comp | 3 / 2 / 0 | 5.87 / .172 | 7.1 | 37; 0 | .0025 | .0072 | .018 |
+
+The two (d) residuals: 1 sigma, the compilation 27.010 s line 3, 0.15 x C / 0.009 (shipped 3.22 /
+0.200; level 0.12, support 4); 3 sigma, IMG_6738 0.700 s line 2, 0.19 x C / 0.014 (shipped 2.44 /
+0.182; level 0.17, support 4). Both attributed to input 2.
+
+The featured frame-lines (fused band x C / abs, verdict `*` band, `?` undecided, `-` none):
+
+| Setting | 6738 0.833 s L2 | GX 22.122 s | comp 27.010 s L1 | comp 27.010 s L3 |
+|---|---|---|---|---|
+| shipped | 1.45 / .163 * | 1.84 / .162 * | 3.87 / .131 * | 3.22 / .200 * |
+| (a) 0.5 | 0.65 / .073 * | 0.86 / .076 * | 1.73 / .059 ? | 1.50 / .093 * |
+| (a) 0.25 | 0.30 / .034 * | 0.42 / .037 ? | 0.81 / .028 ? | 0.75 / .046 * |
+| (e1) 0.01/99.99 | 0.61 / .068 * | 0.52 / .045 ? | 0.92 / .031 ? | 2.27 / .141 * |
+| (e1) 0/100 | 0.29 / .033 * | 0.19 / .017 ? | 0.38 / .013 ? | 0.91 / .057 * |
+| (e2) 0.1 | 0.38 / .043 * | 0.88 / .077 * | 1.01 / .034 ? | 2.29 / .142 * |
+| (e2) 0.2 | 0.16 / .018 ? | 0.37 / .033 ? | 0.46 / .016 ? | 1.13 / .070 * |
+| (d) unsharpened 1 sigma | 0.03 / .004 - | 0.04 / .003 - | 0.05 / .002 - | 0.15 / .009 * |
+| (d) unsharpened 3 sigma | 0.06 / .006 - | 0.04 / .003 - | 0.04 / .001 - | 0.19 / .012 ? |
+| (e3) full-res bounds | 1.47 / .165 * | 1.92 / .169 * | 3.95 / .134 * | 3.31 / .205 * |
+| (b) 4 | 1.44 / .162 * | 1.83 / .161 * | 3.86 / .131 * | 3.22 / .200 * |
+| (c) 1.0 | 1.15 / .129 * | 1.64 / .144 * | 3.17 / .107 ? | 2.77 / .172 * |
+
+#### The video consequence (CHARC's condition)
+
+(i) Statistics / cache invalidation. Code path: the `c3` stages (`methods/ancuti_fusion.py`
+`C3_STAGES`) are `white_balance` (means, gains) and `fusion` (bounds, saliency means of the two
+inputs), both smoothed; `fusion` depends on `_FUSION_PARAMETERS` (white-balance strength and
+cap, `sharpen_blur_fraction`, `normalisation_low` / `_high`, `gamma`, `sharpen_strength`), and
+`analyze` measures `normalisation_bounds` on the proxy then forms the inputs with `fusion_inputs`
+(so the range floor and (d)'s clip reach input 2's saliency mean). The engine's change detection
+(`analysis/engine.py` `set_parameters`, and `analysis/store.py` `schema_hash`) sees only those
+named parameters. For `c3` the disk cache (`cache/store.py`) holds the proxies only (no
+source-only stage), and no candidate changes a proxy. Confirmed from the records: each candidate
+run's per-frame smoothed `statistics` against its `baseline_statistics` (largest absolute
+difference over the frames of the three items; white-balance records and input 1's saliency
+mean are unchanged, 0, in every run):
+
+| Candidate | Fusion statistics changed (records) | Through the engine's change detection | Cache invalidation |
+|---|---|---|---|
+| (a) sharpening strength | input 2 saliency mean 2.25-7.45 (Lab); bounds 0 | yes: a fusion parameter (schema hash) | YES (fusion stage recomputed; proxies kept) |
+| (e1) N{} percentiles | bounds 0.030-0.221; input 2 saliency mean 1.05-5.25 | yes: a fusion parameter | YES (as (a)) |
+| (e2) range floor | input 2 saliency mean 0.44-2.74; bounds 0 (the floor widens them downstream, in `fusion_inputs`) | no: a module constant (AD-4 / DR-14), not in the hash | YES: the statistics change, but no parameter names it, so no live change would trigger a recompute; shipped, it changes every analysis from then on (no persisted statistic depends on it: the `c3` disk cache holds proxies only) |
+| (d) clip to the unsharpened range | input 2 saliency mean 0.15-0.29; bounds 0 | no: an algorithm change in `fusion_inputs` | YES (as (e2)) |
+| (e3) full-resolution bounds | bounds 0.0010-0.0016; input 2 saliency mean 0.17-1.17 | no: changes where the bounds are measured (AD-4) | YES, and the analysis needs a full-resolution decode pass per clip (the proxy is no longer the sole measurement input) |
+| (b) pyramid minimum level | none (0) | not a dependency of any stage | NO |
+| (c) weight delta | none (0) | not a dependency of any stage | NO |
+
+(ii) Flicker on GX011627's last second: MEASURED for every candidate on video, from the records.
+The quantity is V3's (as `tests/test_analysis_v3.py` `flicker` forms it): per frame the record's
+`whole_image.v3_measures` (whole-frame mean L*, a*, b* and the standard deviation of L* of the
+render) for the candidate and `baseline_v3_measures` for the run's own shipped-defaults render;
+per measure the population standard deviation of the frame-to-frame differences over the 30
+frames 21.722-22.689 s (`np.std(np.diff(m, axis=0), axis=0)`); the figure is candidate / baseline.
+Baseline values (Lab units): 0.0805, 0.0119, 0.0390, 0.1192. A second, statistics-level figure: the
+standard deviation of the frame-to-frame differences of the smoothed N{} range (high - low) over
+the same frames, baseline 0.000476. AD-14's local figure (mean absolute frame-to-frame pixel
+difference in a region) is not in the records: not measured.
+
+| Candidate (setting on video) | V3 flicker ratio: mean L* / a* / b* / std L* | Smoothed-range flicker ratio |
+|---|---|---|
+| (a) 0.5 | 1.10 / 1.12 / 1.07 / 1.10 | 1.00 |
+| (a) 0.25 | 1.17 / 1.17 / 1.11 / 1.15 | 1.00 |
+| (e1) 0.01/99.99 | 1.48 / 0.98 / 1.00 / 1.11 | 1.42 |
+| (e1) 0/100 | 1.60 / 1.00 / 1.00 / 1.13 | 1.61 |
+| (e2) 0.1 | 0.95 / 0.97 / 0.99 / 1.07 | 1.00 |
+| (e2) 0.2 | 0.98 / 0.98 / 0.99 / 1.09 | 1.00 |
+| (d) unsharpened 1 sigma | 1.02 / 1.00 / 1.00 / 1.11 | 1.00 |
+| (d) unsharpened 3 sigma | 1.02 / 0.97 / 0.99 / 1.11 | 1.00 |
+| (e3) full-res bounds | 1.03 / 1.01 / 1.00 / 1.00 | 1.14 |
+| (b) 4 | 1.00 / 1.00 / 1.00 / 1.00 | 1.00 |
+| (c) 1.0 | 0.98 / 0.98 / 0.95 / 0.98 | 1.00 |
+
+The photo-only settings (a) 0.75, (e1) 0.1/99.9, (e2) 0.05, (d) `balanced` and `input1` at 1 and
+3 sigma, (b) 8, (c) 0.3 were not run on video (the orchestrator's set): their statistics column
+follows their family's code path (YES for (a), (e1), (e2), (d); NO for (b), (c)); their flicker is
+UNMEASURED (measured by `bash work/wp5.7/part2/run-videos.sh <setting>`, about 5-7 min a setting
+at this batch's walls).
+
+#### STOP check (dispatch-5)
+
+No STOP. Every qualifying fused band under every video setting (and every photo setting, step 2)
+is attributed to input 2; no attributed stage other than input 2 occurs on any frame-line. No
+divergence from spec 6.2 / 6.6 was found (nothing was built in this half), so nothing looks like
+outcome B.
+
+#### The full candidate table (photos and video)
+
+Photos: of the 3 decided photo lines (IMG_6739 L3, IMG_6743 L1, L2), how many still qualify;
+the photo mean absolute change (6739 / 6743 / 6744; step 2's table). Video: of the 31 decided
+frame-lines, how many still qualify (plus new qualifying bands); the video mean absolute change
+(6738 / GX / comp) and the largest p99. Consequence: (i) statistics change, (ii) GX011627 V3
+ratio on mean L* / std L*.
+
+| Setting | Photo: qualify of 3 | Photo mean abs | Video: qualify of 31 (+ new) | Video mean abs | Video p99 | (i) | (ii) |
+|---|---|---|---|---|---|---|---|
+| shipped | 3 | - | 31 | - | - | - | - |
+| (a) 0.75 | 3 | .010/.017/.017 | not run | - | - | YES | UNMEASURED |
+| (a) 0.5 | 1 | .020/.033/.034 | 22 (+1) | .017/.018/.023 | .086 | YES | 1.10 / 1.10 |
+| (a) 0.25 | 1 | .030/.048/.049 | 10 | .025/.027/.034 | .123 | YES | 1.17 / 1.15 |
+| (e1) 0.1/99.9 | 2 | .021/.031/.025 | not run | - | - | YES | UNMEASURED |
+| (e1) 0.01/99.99 | 2 | .039/.049/.054 | 22 (+2) | .021/.018/.015 | .100 | YES | 1.48 / 1.11 |
+| (e1) 0/100 | 1 | .065/.062/.071 | 13 | .026/.026/.023 | .134 | YES | 1.60 / 1.13 |
+| (e2) 0.05 | 3 | .000/.037/.039 | not run | - | - | YES | UNMEASURED |
+| (e2) 0.1 | 2 | .019/.050/.051 | 22 (+2) | .019/.012/.014 | .101 | YES | 0.95 / 1.07 |
+| (e2) 0.2 | 1 | .029/.056/.057 | 12 (+1) | .022/.015/.017 | .121 | YES | 0.98 / 1.09 |
+| **(d) unsharpened 1 sigma** | **0** | .034/.059/.060 | **1** | .024/.015/.019 | .140 | YES | 1.02 / 1.11 |
+| **(d) unsharpened 3 sigma** | **0** | .032/.057/.058 | **1** | .023/.014/.017 | .137 | YES | 1.02 / 1.11 |
+| (d) balanced 1 sigma (row) | 0 (2 undecided) | .030/.055/.056 | not run | - | - | YES | UNMEASURED |
+| (d) balanced 3 sigma (row) | 0 (3 undecided) | .025/.052/.053 | not run | - | - | YES | UNMEASURED |
+| (d) input1 1 sigma (row) | 0 | .058/.067/.069 | not run | - | - | YES | UNMEASURED |
+| (d) input1 3 sigma (row) | 0 | .052/.063/.065 | not run | - | - | YES | UNMEASURED |
+| (e3) full-res bounds | 2 | .013/.024/.024 | 30 (+1) | .002/.006/.003 | .011 | YES | 1.03 / 1.00 |
+| (b) 8 | 3 | .001/.001/.001 | not run | - | - | NO | UNMEASURED |
+| (b) 4 | 3 | .002/.002/.002 | 31 | .002/.001/.001 | .007 | NO | 1.00 / 1.00 |
+| (c) 0.3 | 3 | .003/.005/.005 | not run | - | - | NO | UNMEASURED |
+| (c) 1.0 | 3 | .005/.009/.009 | 25 (+1) | .004/.002/.003 | .020 | NO | 0.98 / 0.98 |
+
+#### Readings (measurement, not a look judgement)
+
+- **No setting removes every qualifying fused band on all six items.** (d) `unsharpened` comes
+  closest: on the photos it leaves none (step 2), and on video it leaves ONE of 31 decided
+  frame-lines at either window (1 sigma: the compilation shin at 27.010 s, 0.15 x C / 0.009 abs;
+  3 sigma: IMG_6738 0.700 s line 2, 0.19 / 0.014), 4.5-7.7 % of that line's shipped absolute
+  band; every featured frame-line falls to `none` or to 0.15-0.19 x C. Its whole-image change on
+  video is smaller than on the photos: mean absolute 0.014-0.024 (about 3.6-6.1 / 255) against
+  0.032-0.060, the largest channel-mean shift 0.010, p99 0.12-0.14; GX011627's V3 flicker ratio
+  1.02 (mean L*) and 1.11 (std L*). The renders' cost of the clip (a windowed min / max per channel
+  per frame, a window of 23 or 65 px at 4K) is not timed here (no exclusive run): its N6 effect is
+  UNMEASURED.
+- The parameter candidates scale the band down with their strength and none reaches the
+  threshold at the settings tried: the strongest leave 10-13 of the 31 decided frame-lines
+  qualifying ((a) 0.25 10, (e2) 0.2 12, (e1) 0/100 13) at a video whole-image change (mean
+  absolute 0.015-0.034) about equal to (d)'s; (a) raises GX011627's V3 flicker by 10-17 %, (e1) by
+  up to 60 % on mean L* (its 0 / 100 bounds are the high-pass extremes, and its smoothed N{} range
+  flickers 1.42-1.61 x the shipped one). (e2) leaves V3's mean-L* flicker at 0.95-0.98.
+- **(e3) does not shrink the band on video; it grows it slightly** (decided maxima 5.40 -> 5.71,
+  7.42 -> 7.75, 6.77 -> 6.93; featured 1.45 -> 1.47, 1.84 -> 1.92, 3.22 -> 3.31): the video
+  full-resolution ranges are NARROWER than the proxy's (mean over the frames IMG_6738 0.0218 vs
+  0.0236, GX011627 0.0373 vs 0.0374, the compilation 0.0276 vs 0.0289), the opposite of the photos
+  (1.5-1.75 x wider), consistent with Part 1's "video bounds agree within 15 %". Its whole-image
+  change is mostly a uniform offset (GX011627 mean absolute 0.0056 with p99 0.0071): an asymmetric
+  bounds change moves N{0}, so input 2 shifts on flat water.
+- (b) moves nothing material on video either (the decided maxima and the featured lines within
+  0.01 x C; statistics identical). (c) 1.0 shrinks the decided maxima and the featured lines by
+  12-21 % and turns 3 + 1 + 2 decided lines
+  undecided, at a whole-image change of at most 0.0035 mean absolute.
+- New qualifying bands are lines that were `undecided` at the shipped defaults and qualify
+  under a candidate that lowers the noise level more than the band (IMG_6738 1.333 s line 2,
+  GX011627 22.623 / 22.689 s); each is attributed to input 2. Turning decided lines undecided is a cost, not a cure, as in step 2.
+
+#### (d) as an amendment of the paper
+
+Ancuti 2018's input 2 is `S = (I + N{I - G*I}) / 2` with N{} ONE global linear stretch of the
+high-pass (spec 6.2 step 3; here the 0.5 / 99.5 percentile bounds measured on the analysis proxy,
+floored at 0.02 by AD-4 / DR-14, smoothed for video). (d) adds a LOCAL, nonlinear step the paper
+does not have: input 2 clipped per pixel and channel to the minimum and maximum, over a window of
+half side 1 or 3 sharpening sigmas, of the unsharpened form `(I + N{0}) / 2` (the clamped unsharp
+mask). No 6.7 parameter reaches it; adopting it changes the definition of input 2 in spec 6.2
+step 3 (a spec change, owner-reserved) and adds a code path to `fusion_inputs`; it is not a defect
+fix (no divergence from 6.2 was found, so it is not outcome B as the brief defines it).
+
+What the owner's choice trades, from the figures: a PARAMETER default ((a) 6.7 Basic, (e1) 6.7
+Advanced; (e2) is an AD-4 constant, not a user parameter) keeps the paper's input 2 and the spec
+text, and the change is reversible by the user per item ((a), (e1)); but at the strongest
+settings tried it leaves 1 of 3 decided photo lines (IMG_6743 L1, 0.26-0.44 x C) and 10-13 of 31
+decided video frame-lines qualifying, at a whole-image change of the same order as (d)'s (photo
+mean absolute 0.029-0.071, video 0.015-0.034), and (a) / (e1) raise GX011627's V3 flicker
+by 10-60 %. The ALGORITHM change (d) `unsharpened` removes every decided photo band and 30 of 31
+decided video bands (the 31st at 0.15-0.19 x C), with a whole-image change of photo mean absolute
+0.032-0.060 and video 0.014-0.024, flicker unchanged on mean L* (1.02) and std L* up 11 %; it
+departs from the paper, needs a spec 6.2 amendment, changes the cached fusion statistics (input
+2's saliency mean) without a parameter to invalidate them by, and its render cost is unmeasured.
+The owner's eye is the oracle for both; the cell does not judge the look, and CHARC rules the
+candidate.
+
+Depth at Part 2 return: DISPATCHER TO FILL
