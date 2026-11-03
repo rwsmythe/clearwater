@@ -6,7 +6,7 @@
 |---|---|
 | ID and title | WP-DR25 — The WP1.4 staged smoothing experiment re-run on excerpts long enough to have edge-free frames at the 2 s and 4 s windows, so ground 2 of AD-3's `median_gaussian` 2.0 s default is measured, not provisional (DR-25 (3)) |
 | Lane | **CODEX**: `implementer-codex-sol-high` (a committed instrument run to a fixed plan with one parameterisation change; no frozen interface). Reviewer A = the Claude pass at the cell's seat; Reviewer B = the Claude pass at the orchestrator's seat. Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp-dr25\`. |
-| Tier and size | STANDARD. Size S (one instrument change, two runs, a short report). Codex evaluate at about 200K, STOP near 250K. |
+| Tier and size | STANDARD. Size S/M after round 0 (the window study is extended under `--long`: see the rulings; one file plus its test, two runs, a short report). Codex evaluate at about 200K, STOP near 250K. |
 | Base | main at dispatch (at or after `5cfe1bb4`). Worktree `.worktrees/wp-dr25`, branch `wp-dr25`. |
 | Goal | The WP1.4 report's ground 2 for the 2 s default ("0.106 and 0.053 flicker levels against 0.236 and 0.151 unsmoothed") was measured STAGED on two 6 s excerpts whose staged reach at 2 s (3 stages x 30 frames = 90 frames) exceeds half the excerpt, so no staged 2 s frame was edge-free (Reviewer B at WP1.4; DR-25 (3)). Re-measure the staged 1 s, 2 s and 4 s figures on excerpts with at least 182 edge-free frames at the 2 s window (and the edge-free count at 4 s stated), on the same two chapters at the same positions, and state whether ground 2 holds (the 2 s level within the report's claimed margin below 1 s). |
 | Spec / decision clauses | 7.2 (temporal smoothing over pts, D95); AD-3 (`median_gaussian` 2.0 s PROVISIONAL, DR-25 (3)); D98 (staged versus flat: no visible difference; one stage permitted); DR-25 (3) text in the register. |
@@ -26,6 +26,16 @@
 3. **Runs.** `uv run python tools/statistics_experiments.py extract --long` then `analyse --long` on the GPU. Record `results.json`, `statistics-staged.json`, `statistics-flat.json` per excerpt, and the edge-free frame counts the instrument already prints for 1 s, 2 s and 4 s (`staged_reach`).
 4. **The reading.** For each excerpt and each method (`c3`, `ancuti2018`): the staged flicker level at 1 s, 2 s and 4 s on the edge-free interior ONLY, beside the flat interior figure (the WP1.4 report's edge-free comparison: 0.168 / 0.036 at 2 s against 0.183 / 0.048 at 1 s), and the unsmoothed level. State: does 2 s leave less flicker than 1 s on the edge-free staged interior, by how much (per cent), and is the 6 s excerpt's staged figure (0.106 / 0.053) biased by its boundary (the new figure at the same window on the same frames' interior).
 5. **Nothing is decided by the cell.** The report states the figures and the comparison; AD-3's status is CHARC's ruling at the accept.
+
+## Round-0 rulings (CHARC, 2026-11-03, on the orchestrator's query D1-D4; the cell builds these)
+
+The brief's "selection-only" change cannot produce the figures: the instrument's window study runs for ONE method (`RENDER_METHOD = "ancuti2018"`, :103, :913-917; WP1.4 report :458 says so, and its ground-2 figures 0.106 / 0.053 are Ancuti's), and its `_interior` (:668) trims a fixed single-filter margin for every candidate; `staged_reach` (:143) has no caller. Ruled:
+
+- **(a)** Under `--long` ONLY: the window study runs for BOTH methods (loop over `METHODS`); each candidate's staged interior uses that method's `staged_reach` (flat: the single-filter radius); `results.json` records the edge-free frame and step counts per method and window; the long records keep the per-step staged arrays so the interior is auditable. The default path keeps `RENDER_METHOD` and `_interior` exactly (pinned by the two existing tests and the new module). The Files-owned row's "nothing else in the instrument changes" is relaxed for the `--long` path to exactly this.
+- **(b)** The start clamp for the long specs: `start = min(fraction * duration, duration - 20.0)`, requested and actual start recorded (GX011627 is 22.72 s: start 2.72 s).
+- **(c)** Edge-free convention: the instrument's own slice form with reach = `staged_reach`; WP3.11's strict form stated beside it in the report. Expected counts at N = 600: c3 1 / 2 / 4 s = 540 / 480 / 360; Ancuti = 510 / 420 / 240.
+- **(d)** Size S -> S/M. Turn 2 = the change + synthetic tests + RED / GREEN, committed, YIELD; the two GPU runs at the orchestrator's seat, never beside WP5.7's batch or a gate.
+- **Record consequence (CHARC's, at the accept):** DR-25 (3) and the AD-3 note gain the qualification that WP1.4's ground-2 figures were Ancuti-only; AD-3's confirmation for the shipped default c3 rests on this package's c3 figures.
 
 ## Questions (CHARC's recommended answers)
 
