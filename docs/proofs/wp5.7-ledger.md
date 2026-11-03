@@ -165,4 +165,4 @@ GX011627) and `table-compilation.txt`; every number above is read from the run J
 `part1/table-*.txt`; `scratch/` (smoke runs, the analysis cache `scratch/cache` reused by the
 video runs).
 
-Depth at part-1 end: DISPATCHER TO FILL
+Depth at part-1 end: 290,002 (scripts/cell_depth.py, current = peak, 116 turns, read by the orchestrator at the Part 1 yield 2026-11-03)
