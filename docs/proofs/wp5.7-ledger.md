@@ -1367,3 +1367,147 @@ Rounds 0-4 are five review rounds; the next review is round 5, the round the fiv
 names (approval to continue, the dispatcher's).
 
 Depth at step-3R end: 303,358 (scripts/cell_depth.py, wp57-cell5, read by the orchestrator at the yield 2026-11-03; past the re-seat line: Part 3 goes to a fresh cell from this ledger)
+
+#### Addendum: CHARC's candidate ruling C1-C6 (dispatch-8a) -- planning for C3, C4 and Part 3
+
+Step 3R changed NO Part 2 figure: every band, verdict, width, whole-image and diagnostic number is
+the half-2 figure; 3R re-labelled the diagnostic and re-counted the same verdicts three ways (band
+/ none / undecided), so C1-C6 stand on unchanged figures. C2's "nine video and one photo undecided
+lines under (d) 1 sigma" are, from the records (`work/c57-p2h2/undecided.py`, scratch): IMG_6738
+0.433, 0.467, 0.633 s line 2; GX011627 22.155, 22.356, 22.389, 22.422, 22.456 s; the compilation
+27.027 s line 1; IMG_6739 line 3 (photo). Planning only below: nothing built, nothing run.
+
+**C3 sizing (V3-regional flicker on GX011627's last second, (d) 1 sigma and the shipped
+defaults).**
+- The acceptance suite's V3 statistic: `tests/acceptance_support.py:564` maps V3 to
+  `tests/test_wp42_v3_product.py`; the statistic is `_figures` (`test_wp42_v3_product.py:227`):
+  per frame the measured region clipped to [0, 1], Lab (`lab`, `tests/test_analysis_v3.py:121`),
+  the four measures (mean L*, a*, b*, std L*; `MEASURES`), flicker = `np.std(np.diff(...))` per
+  measure, and AD-14's figure (the mean absolute frame-to-frame difference, /255); the acceptance
+  rule is `_v3_holds` (`:358`, smoothed <= 0.25 x unsmoothed per measure). The legs: smoothed =
+  the frames rendered from the smoothed records; unsmoothed = the same decoded frames rendered by
+  the same method with `AnalysisEngine.provisional_record(pts)` (`:296-336`; engine
+  `analysis/engine.py:552`, measured on the stored proxy on the caller's thread, so a module
+  switch applies to it).
+- Applied to GX011627: the probe's window (the 30 frames 21.7217-22.6893 s). Region (proposed;
+  confirmed by eye on the three crop overviews at the run and recorded with a crop): source px
+  `64,64,1024,512` (coded orientation), the upper-left open water; on the `part1s` overviews at
+  21.788 and 22.589 s it holds open water and drifting particles, while the swimmer's limb enters
+  only the top right (x above about 2,900 px). Four legs per frame: (d) smoothed (the run's
+  `rendered`), (d) unsmoothed (`method.render` with the candidate engine's `provisional_record`,
+  inside `applied`), defaults smoothed (the run's baseline render), defaults unsmoothed (the
+  baseline engine's `provisional_record`, unswitched). ONE probe run under `--switch
+  clip_overshoot=unsharpened:1` carries both (its baseline is the shipped defaults). Figures: per
+  setting the four smoothed / unsmoothed ratios and AD-14's figures, `_v3_holds` per setting, and
+  (d)'s ratios against the defaults'. Limit (stated, not removed): the camera moves (the reef and
+  fish shift), so the region is not static as V3 asks of a real clip (spec V3, last line); the
+  motion is common to both legs of a setting, so it pulls both ratios toward 1 and compresses the
+  (d) / defaults difference; V3's 25 % is a synthetic-clip threshold, here informative unless
+  CHARC rules it binding.
+- Instrument change: `tools/halo_probe.py` gains `--v3-region X,Y,W,H` (video only; refused for a
+  photo or a region outside the frame). Per selected frame it keeps the four legs' regions on
+  the host (1024 x 512 x 3 float32 = 6.3 MB, x 30 frames x 4 legs = about 0.75 GB), then computes
+  the figures with the acceptance suite's OWN `_figures` and `_v3_holds`, loaded lazily with
+  `importlib` from the repository's `tests/` folder (never re-implemented), and records
+  `v3_regional` (region, frames, per leg AD-14 and the four flickers, the ratios, the holds).
+- Tests (parallel leg, synthetic, the fake video and engine of the existing tests): the
+  record's figures equal `_figures` applied by the test to regions it renders itself; the
+  unsmoothed legs use `provisional_record` (a fake engine whose provisional records vary per
+  frame, smoothed constant: unsmoothed flicker > smoothed); the baseline legs run unswitched and
+  the candidate legs switched (round 4's recorder); the statistic used IS the acceptance suite's
+  object (identity); refusals (photo, region out of frame). Mutation probes: the whole frame for
+  the region, and the smoothed record for the unsmoothed leg, must each fail a test.
+- GPU time: the (d) GX011627 run took 177 s in the batch; the two extra renders per frame (30 x 2
+  at 4K) and 60 provisional records add about 20-40 s: about 4 min, one run.
+- Command: `uv --directory <worktree> run python tools/halo_probe.py GX011627 --line
+  3300,420,3700,40 --start 21.7 --end 22.7 --crop-at 21.8 --crop-at 22.2 --crop-at 22.6 --margin
+  150 --cache-dir <work>/wp5.7/scratch/cache --switch clip_overshoot=unsharpened:1 --v3-region
+  64,64,1024,512 --out <work>/wp5.7/part3/v3/GX011627`.
+
+**C4 sizing (one timed EXCLUSIVE row: GX011627 export under (d) 1 sigma against the shipped
+defaults, D106 min/min).**
+- Instrument of record: `tools/export_bench.py` (WP3.14; WP5.2's W52-1 row of record, report
+  `docs/reports/wp5.2-performance-memory.md` section 1: GPU, device frames ON, auto -> hevc_nvenc,
+  Standard, cold cache, 681 frames at 30000/1001). D106 min/min = `wall_s / frames *
+  frame_rate` (seconds of processing per second of source; the record's `total.min_per_min`).
+- It takes the (d) switch WITHOUT editing `src/` or `export_bench.py`: `build_engine`
+  (`tools/export_bench.py:419`) builds `ExportEngine` IN-PROCESS (the GUI's spawned export
+  worker, AD-31, is not on this path), and the export renders through `method.render`
+  (`jobs/export.py:1102`) and analyses through `analyze`, both of which call
+  `ancuti_fusion.fusion_inputs`, the attribute `halo_probe.applied` patches. A seat script (under
+  `work/wp5.7/n6/`, outside the owned paths, uncommitted and quoted in the ledger; or a committed
+  home if the dispatcher grants one) calls `export_bench.main(["run", "GX011627", "--runs", "1",
+  "--device-frames", "--subdir", "wp5.7/n6/<tag>"])` per run, the (d) runs inside
+  `applied(Switches(clip_reference="unsharpened", clip_radius_sigma=1.0))` with a call counter
+  on the clipped function (asserted at least 681 calls in a (d) run and none in a shipped run;
+  the original restored after each). Caveat: the timed (d) is the instrument's implementation
+  (`backend.ndimage` minimum / maximum filters, a 23 x 23 window at 4K), not an optimised product
+  one.
+- Order and repeats: cold, alternating S1 D1 S2 D2 S3 D3 (W52-1's three cold rows; alternation
+  shares drift and heat between the two). Arithmetic: N6 effect = median(D) / median(S) - 1, with
+  the three pairwise ratios D_i / S_i beside; over 10 % is a STOP before the proposal (C4). Spread
+  caveat: W52-1's three cold rows spanned 10.77-11.78 min/min (9.4 %), the size of the threshold;
+  a result within about 5 points of 10 % is not decidable at n = 3, and then CHARC may add a
+  further S / D pair or two.
+- Window: W52-1's cold rows took 0.36-0.39 s/frame x 681 = 245-268 s, plus setup: about 4.5-5 min
+  a run, 6 runs about 30 min. Disk: `export_bench` checks the source size plus its margin and
+  deletes each run's output and cache unless `--keep`.
+
+**Part 3 plan (the whole set under (d) 1 sigma against the shipped defaults).**
+- Items: the 120 non-halo CP5 items of `work/wp5.3/review-sheet.csv` (read-only): 70 photos (P-A
+  61, P-Z 9) and 50 videos (V-D 8, V-P 16, V-S 25, V-Z 1). Sources: the footage folder through
+  `find_footage_file` (read-only); the items the pack excerpted (`records/V-D-excerpts.json` 6,
+  `V-S-excerpts.json` 11) read in place from `work/wp5.3/excerpts/`, as the probe read the
+  compilation, so the analysis input is the one the pack paired (to be confirmed against
+  `tools/reviewpack` at the build).
+- What is rendered: per photo the full image twice (shipped defaults, unswitched, from its proxy
+  statistics; (d), switched, from its own); per video the frames at the pack's three still
+  positions (10 / 50 / 90 %, the `pairs/<item>_10|50|90.jpg` stills), each from a whole-clip (or
+  excerpt) analysis per setting (the probe's run_video discipline: baseline analysis unswitched,
+  candidate switched, the render-equality check under the switch).
+- What is recorded (one JSON per item): `whole_image` per render pair (mean absolute and p99
+  difference, per-channel mean shift, clipped fraction of both, V3's four whole-frame measures);
+  the EDGE-BAND SCAN of each render (new; a design for the build, Reviewer A to check): strong
+  source edges = local maxima of the source luma's gradient magnitude at the sharpening sigma
+  with a profile contrast |C| >= 0.05, sampled on a grid of about 2 sigma; at each a
+  perpendicular profile (half width 4, +-6 sigma), the outward overshoot excess over the source
+  on each side over |C| (the water metric's arithmetic, both sides); per render the count, the
+  99th percentile and maximum excess and the fraction over 0.10; the per-render wall (indicative,
+  C4) and the per-item analysis walls.
+- Contact sheet: `work/wp5.7/part3/contact/index.html` and one side-by-side PNG per item (shipped
+  | (d), the 50 % still for a video), for the 20 items with the largest whole-image mean absolute
+  difference, plus ANY item whose edge-scan maximum or p99 rises under (d) (a regression), each
+  with its figures; no preference judgement.
+- The ten undecided lines' crops (C2): the photo (IMG_6739 line 3) from Part 2's own crops
+  (`part2/defaults/IMG_6739/photo-*.png` and `part2/d-unsharpened-1/IMG_6739/photo-*.png`, no
+  run); the nine video lines by six probe runs (defaults and `--switch
+  clip_overshoot=unsharpened:1` for IMG_6738, GX011627 and the compilation, Part 1's lines,
+  `--crop-at` at the nine times) into `work/wp5.7/part3/undecided/<setting>/<item>`; the report
+  shows shipped vs (d) at each and says in words that undecided is not removal.
+- Builds before the window (each RED / GREEN, Reviewer A): `--v3-region` (C3); the whole-set
+  scan mode with the edge-band scan, the walls and the 8-bit views, and the contact-sheet builder
+  (Part 3), all in `tools/halo_probe.py` with tests in `tests/test_tools_halo_probe.py`; the C4
+  seat script.
+- Batch estimate: photos about 10 s an item (two proxy analyses, two full-resolution renders, two
+  scans; CP5 took 4.7 s an item for one render) = about 12 min; videos dominated by the two
+  analyses per clip: from the batch, a first 4K analysis about 2.6 s and a second (proxies
+  cached) about 1 s per source second; the 50 videos are about 900-1,065 s of source (CP5's
+  11,600 s of export at about 11 min/min, fewer where the excerpt is used) = about 55-65 min; six
+  renders and scans per video about 3 min. Part 3 batch about 70-80 min (range 1-1.5 h); the
+  first items' walls refine it.
+- Free disk: the proxy cache for about 30,000-40,000 frames at about 56 KB a frame (the scratch
+  cache: 145 MB for 2,600 frames) = about 2 GB; item records and 8-bit views about 0.5 GB; the
+  undecided-crop runs about 0.3 GB; C3 about 0.1 GB; C4's outputs are transient. About 4-5 GB in
+  all: start the window at 30 GB free or more (the 25 GB STOP); 57 GB free at this step.
+
+**The single exclusive window, in order (the orchestrator's seat, nothing else heavy):**
+1. `df -h /c` (30 GB or more), the host idle.
+2. C4: the six alternating cold exports, about 30 min (first, on a cool idle host).
+3. C3: the V3-regional probe run, about 4 min.
+4. The undecided-line crops: six probe runs, about 13 min (the batch's walls: defaults 57 + 140 +
+   114 s, (d) 73 + 177 + 173 s).
+5. Part 3: the whole-set batch, about 70-80 min, per-item walls recorded.
+6. The contact sheet (CPU), a few minutes.
+Total about 2-2.2 h; plan for 2.5 h.
+
+Depth at the step-3R addendum: DISPATCHER TO FILL
