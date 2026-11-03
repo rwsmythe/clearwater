@@ -1366,4 +1366,4 @@ Round ledger (cumulative):
 Rounds 0-4 are five review rounds; the next review is round 5, the round the five-round gate
 names (approval to continue, the dispatcher's).
 
-Depth at step-3R end: DISPATCHER TO FILL
+Depth at step-3R end: 303,358 (scripts/cell_depth.py, wp57-cell5, read by the orchestrator at the yield 2026-11-03; past the re-seat line: Part 3 goes to a fresh cell from this ledger)
