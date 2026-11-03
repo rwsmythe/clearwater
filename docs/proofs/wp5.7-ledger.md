@@ -329,4 +329,4 @@ attribution residuals at most 6e-6 of C.
 |---|---|---|---|---|---|---|---|---|---|
 | 0 | A (Codex, at the orchestrator's seat) | 0 | 4 | 4 | 1 | 9 / 0 | 9 / 0 | 0 | 9 / 0 / 0 |
 
-Depth at step-2A end: DISPATCHER TO FILL
+Depth at step-2A end: 262949 (scripts/cell_depth.py, wp57-cell2, read by the orchestrator at the step-2A yield 2026-11-03)
