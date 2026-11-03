@@ -316,3 +316,103 @@ No finding was reclassified, reopened or routed out of the envelope. Reviewer A 
 the completion report, Reviewer B and the final gate remain later/dispatcher work; this turn
 does not claim package acceptance. One logical remediation change is offered to the dispatcher;
 no git writes or commits were attempted.
+
+## Turn 4
+
+Depth at turn-4 end: 125,904 input tokens of 475,000 (driver footer, session 01a1a049, 2026-11-03 turn 4)
+
+Base `cca85d8a`, clean on arrival. Dispatcher supplied turn-3 depth: **93,669 of 258,400**
+(already filled above). Reviewer A round 2, a Claude pass at the dispatcher's seat on
+`cca85d8a`, returned **NO_NEW_CRITICAL_MAJOR**. Transcript is withheld; the six findings
+below are the binding dispatch packet, not an independent re-reading of the transcript.
+
+### Round 2 dispositions
+
+| ID | Severity | Disposition | Evidence / change |
+| --- | --- | --- | --- |
+| 1 | MINOR | Confirmed, fixed (test coverage) | Added `test_watchdog_first_observation_caps_suspend_gap`. Park the watcher before starting the send, make the real child stop consuming, advance only encode's clock by 400 s, then release the first poll. The capped implementation survives and later detects the stall. Removing only the first-observation cap in memory fails the new assertion. |
+| 2 | MINOR | Confirmed, fixed (docstrings) | Updated sink class, `_start`, `_watch_encoder`, `_stop_watchdog`, `_encoder_failed`, `_send`, `_end_stream`, and affected constant notes. Text now specifies write plus flush, separate close window, capped first/subsequent observations, current pending-operation timing, scheduling/starvation effects, bounded join, error text and finish-deadline start. Google-style argument/return/error sections added where applicable. No executable product logic changed. |
+| 3 | ADVISORY | Reported limit, no code change | The near-threshold exit test cannot force both timing orders reliably. It asserts exactly one allowed failure, not exhaustive race coverage. Separate stalled-reader and immediate-exit cases witness each behavior. Completion report Limits / test notes names this. |
+| 4 | ADVISORY | Reported limit, no code change | Repeated poll gaps G > 5 s contribute only 5 s each, slowing wall-clock detection by roughly G / 5; continued polls still accumulate. The cap estimates awake time rather than detecting suspend exactly. Report and docstrings state this. |
+| 5 | ADVISORY | Reported message notes, no code change | Report reproduces `stopped accepting data`, rounded capped seconds, no frame/byte count, retained `encoder_failed`, stderr tail and lower-case shared fallback. |
+| 6 | ADVISORY | Reported timing notes, no code change | Report names the one-second test threshold, four-second rescue, three-second readiness margins and bounded joins; scheduling extremes can still fail tests. All eleven final watchdog call durations are recorded. |
+
+### RED and GREEN
+
+The new fake-clock test shortens `SUSPEND_GAP_S` to 0.1 s and `POLL_S` to 0.02 s alongside
+the existing one-second test threshold. It patches the sink's stop-Event wait to park the
+watcher outside `_phase_lock`; the write starts only after that parking is confirmed.
+The clock jump is published before releasing the first pending-I/O poll. Test, rescue,
+subprocess and coordination clocks remain real. The test verifies both survival of the
+first observation and eventual failure under continued awake polling, then cleanup.
+
+All pytest commands use `PYTHONPATH=scripts`, `-p sandbox_mkdir_shim` and
+`-p no:cacheprovider`. Every runner's stdout/stderr is in an owned `work/c58-4-*` log.
+
+- RED command: `uv run python work/c58-4-mut-probe.py`.
+  The one-off pytest plugin compiles the real watcher with only
+  `elapsed = min(now - waiting, SUSPEND_GAP_S)` replaced by `elapsed = now - waiting`.
+  Function globals remain encode's live namespace so threshold/clock monkeypatches apply.
+  It selects only the new test, with `--timeout 120 --basetemp=work/c58-4-mut-red` and the
+  sandbox options above. Exit 1: **1 failed, 136 deselected in 0.50s**.
+  Log: `work/c58-4-mut-red.log`.
+  RED line: `FAILED ...::test_watchdog_first_observation_caps_suspend_gap`;
+  `AssertionError: uncapped first observation killed a pending operation`.
+  Mutation was in memory only; no mutated source file or mutation commit exists.
+- GREEN command: `uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider
+  tests/test_io_video_encode_units.py --timeout 120 --basetemp=work/c58-4-green --durations=0`.
+  Exit 0: **137 passed in 9.95s**. Log: `work/c58-4-green.log`.
+  `--durations=0` adds reporting only, needed for the completion report's per-test timings.
+  New test: **1.01 s** call. All eleven watchdog calls are below 5 s (range 0.01-1.90 s).
+- `uv run ruff check src/clearwater/io/video/encode.py tests/test_io_video_encode_units.py`:
+  exit 0, **All checks passed!**; `work/c58-4-ruff.log`.
+- `uv run ruff format --check src/clearwater/io/video/encode.py tests/test_io_video_encode_units.py`:
+  exit 0, **2 files already formatted**; `work/c58-4-format.log`.
+- `uv run mypy`: exit 0, **Success: no issues found in 156 source files**;
+  `work/c58-4-mypy.log`.
+- Free disk before testing: **82.57 GiB**, above the 25 GiB stop line;
+  `work/c58-4-disk.log`. No whole suite, four-worker rerun, existing encode rerun,
+  hardware-marked test, sync or real export was run in this turn, per dispatch.
+
+Fresh stall timeline from
+`work/c58-4-green/test_watchdog_stalled_frame_fa0/timeline.json`:
+pending window **175442.546**, watcher kill **175443.562** (+1.016 s), output deleted
+**175443.562**, caller observed writer error **175443.562**. The pending timestamp is not
+an independently observed kernel-block instant. Clock granularity cannot separate the last
+three events in that tick; their source-order meaning is explained in the report.
+
+### Completion report and verification pass
+
+Wrote `docs/reports/wp5.8-watchdog.md` with design as built; every initial-design departure
+(R1-R3, suspend accounting, message and removed state); all eleven test durations and check
+results; the fresh fake-encoder timeline; W52-2's nominal 300-second path and source anchors;
+the 32,990,759-byte counter difference **unexplained by the counters**, with mixed-channel,
+aggregate and snapshot caveats; the prior measured **8,192** `io.DEFAULT_BUFFER_SIZE`;
+all retained R1 limits (7, 8, 11), R2 notes (3-6), real-recurrence and POSIX limitations;
+and review/handoff status. It distinguishes current-run evidence from prior-run evidence
+and dispatcher-owned final gate work. No external evidence folder or footage was read.
+
+Verification loop: suspected missing first-observation discrimination, confirmed with the
+specific cap-removal mutation, then verified the real implementation passes. Confirmed
+docstring overclaims about awake time / scheduling / timing boundaries against the code,
+corrected them without logic changes, and ran units, lint, format and mypy to green. Final
+claim/source pass checked the test's park-before-write ordering, cleanup, reset/cap formulas,
+message, report timeline and source anchors, scope and accepted-limit disclosures. No new
+in-envelope issue found. No existing test was weakened or removed.
+
+| Round | Critical | Major | Minor | Advisory | In / out | NEW / REOPENED | Reverts | Product / tests | Status |
+| --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- |
+| 0 (carried) | 0 | 2 | 1 | 0 | 3 / 0 | 3 / 0 | 0 | fixed in turn 2 / yes | R1-R3 ruled and built |
+| A1 (carried) | 0 | 1 | 2 | 8 | 11 / 0 | 11 / 0 | 0 | yes / yes | 7 fixed, 1 already satisfied, 3 accepted limits |
+| A2 | 0 | 0 | 2 | 4 | 6 / 0 | 6 / 0 | 0 | docstrings only / yes | NO_NEW_CRITICAL_MAJOR; 2 minors fixed, 4 advisories reported |
+
+This is terminating-round minor cleanup under the fill's zero-new-blocking criterion, not a
+new review cycle driven by minors. Durable transcript, transport and mechanical assertions
+remain dispatcher-owned. The turn offers one logical closeout change (minor witnesses /
+documentation plus the completion report). Reviewer B, final gate, merge, accept and register
+updates remain with the dispatcher/architect. No git writes or commits were attempted.
+
+Final on-disk checks: all four changed files are ASCII with **0 CR bytes** (LF only).
+`git diff --check` is clean; status lists only the four authorized paths. The encode source
+diff contains docstrings only. The separate existing encode/bench and worker/process test
+files have an empty diff. No further source or test edits followed the successful checks.

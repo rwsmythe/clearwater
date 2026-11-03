@@ -1617,6 +1617,70 @@ def test_watchdog_suspend_gap_does_not_count_as_awake_stall(
             writer.join(timeout=1.0)
 
 
+def test_watchdog_first_observation_caps_suspend_gap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A clock jump before the first pending-I/O poll is capped, then awake polls detect a stall."""
+    ready = tmp_path / "reader-stopped"
+    consumed = len(_watchdog_header()) + len(nut.frame_header(0, _WATCHDOG_PAYLOAD_BYTES)) + 4096
+    body = f"\nread_exact({consumed})\nPath({str(ready)!r}).touch()\ntime.sleep(60)\n"
+    monkeypatch.setattr(encode, "SUSPEND_GAP_S", 0.1)
+    monkeypatch.setattr(encode, "POLL_S", 0.02)
+    with _watchdog_encoder(tmp_path, monkeypatch, body) as (sink, out, rescued):
+        parked = threading.Event()
+        allow_poll = threading.Event()
+        observed_jump = threading.Event()
+        real_wait = sink._watchdog_stop.wait
+        offset = 0.0
+
+        def park_before_poll(timeout: float) -> bool:
+            # Park outside _phase_lock BEFORE starting the write, so it cannot be observed yet.
+            parked.set()
+            allow_poll.wait(timeout=3.0)
+            return real_wait(timeout)
+
+        def clock() -> float:
+            if threading.current_thread() is sink._watchdog_thread and offset:
+                observed_jump.set()
+            return time.monotonic() + offset
+
+        monkeypatch.setattr(sink._watchdog_stop, "wait", park_before_poll)
+        monkeypatch.setattr(encode, "time", SimpleNamespace(monotonic=clock, sleep=time.sleep))
+        errors: list[BaseException] = []
+
+        def write_frame() -> None:
+            try:
+                sink.write(_watchdog_frame())
+            except BaseException as error:
+                errors.append(error)
+
+        writer = threading.Thread(target=write_frame, daemon=True)
+        try:
+            assert parked.wait(timeout=1.0)
+            writer.start()
+            assert _watchdog_wait(ready, timeout=3.0) and writer.is_alive()
+            # The event publishes this jump before the watcher's first poll of the new send.
+            offset = 400.0
+            allow_poll.set()
+            assert observed_jump.wait(timeout=0.5)
+            time.sleep(0.1)
+            assert writer.is_alive(), "uncapped first observation killed a pending operation"
+            assert sink._stalled is None
+            assert sink._process is not None and sink._process.poll() is None
+            writer.join(timeout=2.0)
+            assert not writer.is_alive(), "continued awake polling did not detect the stall"
+            assert len(errors) == 1 and isinstance(errors[0], VideoEncodeError)
+            assert errors[0].kind == "encoder_failed" and "stopped accepting" in str(errors[0])
+            assert sink._stalled is not None and not out.exists() and not rescued.is_set()
+            assert not sink._watchdog_thread.is_alive()
+        finally:
+            allow_poll.set()
+            sink.abort()
+            if writer.ident is not None:
+                writer.join(timeout=1.0)
+
+
 def test_watchdog_render_gap_between_frames_is_not_a_stall(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
