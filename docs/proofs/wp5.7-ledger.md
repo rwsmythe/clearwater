@@ -2039,4 +2039,4 @@ Round ledger (cumulative):
 Round 5 is the round the five-round gate names: approval to continue is the dispatcher's. Its results (the re-rendered three, the whole-set figures and the sheet) follow
 the orchestrator's re-run.
 
-Depth at round-5 yield: DISPATCHER TO FILL
+Depth at round-5 yield: 270,973 (wp57-cell8 at its mid-build yield, 100 turns, 2026-11-03 ~21:15Z; read by orchestrator gen 39 with scripts/cell_depth.py). Past the ~250K evaluation point; the cell continues for step 6 only (a bounded ledger / report update from the part3r records). FIVE_ROUND_GATE (dispatcher): CONTINUE to round 6 -- round 5 brought new in-envelope MAJORs and its fixes change instrument figures (the re-rendered stills).
