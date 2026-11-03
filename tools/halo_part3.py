@@ -45,13 +45,16 @@ status is ``done``, which must be exactly the review sheet's 126 judged items, m
 items of :data:`HALO_ITEMS`). Per item, the same image rendered at the shipped defaults and under
 the candidate (photos: statistics on the block-mean proxy, as the photo export measures them;
 videos: two whole-clip analyses, as the export runs them, then the frames at the pack's three
-still times rendered from each analysis's smoothed records), and recorded: the probe's
+still times rendered from each analysis's smoothed records; a still time is the ABSOLUTE source
+time, matched on ``pts * time_base`` by :func:`still_pts`), and recorded: the probe's
 :func:`halo_probe.whole_image` change (per-channel mean shift, clipped fractions, mean and 99th
 percentile absolute difference), the edge-band scan (:func:`scan_pair`) of both renders, the
 render (and video analysis) walls, both renders as full-resolution 8-bit PNGs, and for a video
 how far the candidate moves the smoothed statistics (:func:`statistics_movement`). The sheet
 (:func:`select_contact`) is 20 items: the :data:`CONTACT_VIDEO_SLOTS` video items whose input-2
-saliency mean moves most, then the largest whole-image changes.
+saliency mean moves most, then the largest whole-image changes. It is built from the PUBLISHED
+item records only (:func:`published_records`: no staging or failed folder), and fails unless they
+are exactly the whole set.
 
 The edge-band scan (:func:`scan_points`, :func:`scan_pair`; the brief's "maximum edge-band
 overshoot found by scanning strong edges"). On the SOURCE's BT.709 luma (smoothed by a Gaussian of
@@ -75,9 +78,10 @@ Command line (from the repository root)::
     uv run python tools/halo_part3.py wholeset-run ITEM [ITEM ...] [--out DIR] [--cache-dir DIR]
     uv run python tools/halo_part3.py wholeset-sheet [--out DIR]
 
-Every output goes under ``<working folder>/wp5.7/part3`` (refused elsewhere, and checked against
-the footage folder); the CP5 pack is read in place, never written; footage is reached only through
-``local_config.find_footage_file`` and :func:`halo_probe.find_footage_photo`, read-only.
+Every output goes under ``<working folder>/wp5.7/part3`` or ``part3r`` (Reviewer A round 5's
+re-render; refused elsewhere, and checked against the footage folder); the CP5 pack is read in
+place, never written; footage is reached only through ``local_config.find_footage_file`` and
+:func:`halo_probe.find_footage_photo`, read-only.
 """
 
 from __future__ import annotations
@@ -96,6 +100,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from datetime import UTC, datetime
+from fractions import Fraction
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -133,7 +138,13 @@ CANDIDATE_METHOD = "c3"
 """The method of every whole-set render: the shipped default (D16), as the CP5 presets."""
 
 PART3 = Path("wp5.7") / "part3"
-"""Every output of this tool lies under this folder of the working folder."""
+"""The Part 3 window's folder of the working folder (the default of every output)."""
+
+PART3R = Path("wp5.7") / "part3r"
+"""Reviewer A round 5's re-render folder (the affected items, then the rebuilt sheet)."""
+
+OUTPUT_ROOTS = (PART3, PART3R)
+"""Every output of this tool lies under one of these folders of the working folder."""
 
 # --- V3 -----------------------------------------------------------------------------------------
 
@@ -252,13 +263,14 @@ the one remaining band (item, time in s or None for a photo, line number, verdic
 # --- shared -------------------------------------------------------------------------------------
 
 
-def part3_root() -> Path:
-    """The folder every output goes under: ``<working folder>/wp5.7/part3``."""
-    return load_local_config().working_path / PART3
+def part3_roots() -> tuple[Path, ...]:
+    """The folders an output may go under: ``<working folder>/wp5.7/part3`` and ``part3r``."""
+    work = load_local_config().working_path
+    return tuple(work / root for root in OUTPUT_ROOTS)
 
 
 def checked_output(target: Path) -> Path:
-    """Refuse an output path outside ``part3`` or refused by the runner's footage check.
+    """Refuse an output path outside ``part3`` / ``part3r`` or refused by the footage check.
 
     Args:
         target: The planned output folder or file.
@@ -267,11 +279,12 @@ def checked_output(target: Path) -> Path:
         ``target``.
 
     Raises:
-        hp.ProbeError: It lies outside ``<working>/wp5.7/part3`` or the footage check refuses it.
+        hp.ProbeError: It lies outside ``<working>/wp5.7/part3`` and ``<working>/wp5.7/part3r``,
+            or the footage check refuses it.
     """
-    root = part3_root()
-    if not headless_export.inside(target, root):
-        raise hp.ProbeError(f"{target} is not inside {root}")
+    roots = part3_roots()
+    if not any(headless_export.inside(target, root) for root in roots):
+        raise hp.ProbeError(f"{target} is not inside {' or '.join(str(r) for r in roots)}")
     footage = headless_export.configured_footage_folder()
     if footage is not None:
         refusal = headless_export.write_target_refusal(target, footage)
@@ -661,8 +674,12 @@ def run_n6(setting: str, subdir: str, keep: bool) -> int:
 def n6_summary(folder: Path) -> dict[str, Any]:
     """Read the N6 sidecars and the bench's records: per run, per setting, the effect.
 
+    Only the run sidecars are read, by their name ``n6-<setting>-<stamp>.json`` for the two
+    settings of :data:`N6_SETTINGS`: a summary this function's caller wrote before
+    (``n6-summary-<stamp>.json``, in the same folder) is not a run.
+
     Args:
-        folder: The bench folder holding ``n6-*.json`` and ``export-bench-*.json``.
+        folder: The bench folder holding ``n6-<setting>-*.json`` and ``export-bench-*.json``.
 
     Returns:
         ``runs`` (in time order), ``medians`` (min/min per setting), ``effect``
@@ -672,7 +689,8 @@ def n6_summary(folder: Path) -> dict[str, Any]:
     """
     runs: list[dict[str, Any]] = []
     problems: list[str] = []
-    for path in sorted(folder.glob("n6-*.json")):
+    sidecars = {p for setting in N6_SETTINGS for p in folder.glob(f"n6-{setting}-*.json")}
+    for path in sorted(sidecars):
         sidecar = json.loads(path.read_text(encoding="utf-8"))
         run: dict[str, Any] = {
             "sidecar": path.name,
@@ -1079,6 +1097,43 @@ def statistics_movement(shipped: Any, candidate: Any, axis: Sequence[int]) -> di
     return {"statistics": out, "input2_saliency_max_abs": headline}
 
 
+STILL_MATCH_S = 1e-6
+"""The largest gap between a pack still's time and its chosen frame's (s): CP5's still time is
+itself a frame's pts, so the match is exact up to float printing (round 5: 0.0 on all 150)."""
+
+
+def still_pts(axis: Sequence[int], time_base: Fraction, at: float) -> int:
+    """The decoded frame at a CP5 still's time: absolute source time on both sides.
+
+    The convention, confirmed in the code: CP5 stores ``source_pts_s`` as the ABSOLUTE source
+    time of the still, ffprobe's ``best_effort_timestamp`` of the first frame at or after the
+    wanted time, times the stream's time base (``tools/reviewpack/build.py:227`` ``_frame_time``,
+    recorded at ``build.py:1141``), with no start offset removed; the product's decoder keeps the
+    container's pts (``-copyts``, ``src/clearwater/io/video/decode.py:247``; ``Frame.pts_ticks``
+    is ``showinfo``'s pts, ``decode.py:553``). So a still is matched on ``pts * time_base``, never
+    on the time from the first frame (Reviewer A round 5 finding 1: on a clip whose first pts is
+    not 0 that match chose the next frame on GX011590, GX011603 and GX011609).
+
+    Args:
+        axis: The clip's frame pts (ticks), sorted.
+        time_base: The stream's time base.
+        at: The still's ``source_pts_s``.
+
+    Returns:
+        The pts of the frame at that time.
+
+    Raises:
+        hp.ProbeFailedError: No frame of the axis lies within :data:`STILL_MATCH_S` of ``at``.
+    """
+    pts = min(axis, key=lambda p: abs(float(p * time_base) - at))
+    if abs(float(pts * time_base) - at) > STILL_MATCH_S:
+        raise hp.ProbeFailedError(
+            f"no decoded frame at the pack's still time {at:.6f} s (nearest pts {pts}, "
+            f"{float(pts * time_base):.6f} s)"
+        )
+    return pts
+
+
 def process_video(
     path: Path,
     method: AncutiFusionMethod,
@@ -1096,16 +1151,19 @@ def process_video(
         method: The method.
         switches: The candidate.
         folder: The item's folder (exists).
-        stills: The pack's stills (``fraction``, ``source_pts_s``); empty: :data:`STILL_FRACTIONS`.
+        stills: The pack's stills (``fraction``, ``source_pts_s``, ABSOLUTE source time: each is
+            the frame :func:`still_pts` finds); empty: :data:`STILL_FRACTIONS` of the frames.
         cache_dir: The analysis cache folder.
         force_cpu: Process on the CPU.
 
     Returns:
-        The item's run record.
+        The item's run record. Per frame ``pts_ticks``, ``source_pts_s`` (``pts * time_base``,
+        the absolute time CP5's still names), ``time_s`` (seconds from the clip's first frame)
+        and ``pack_still_s`` (the still's recorded time, or None).
 
     Raises:
-        hp.ProbeFailedError: An analysis failed, the two axes differ, or the decode did not
-            deliver a chosen frame.
+        hp.ProbeFailedError: An analysis failed, the two axes differ, a still names no frame
+            (:func:`still_pts`), or the decode did not deliver a chosen frame.
     """
     source = FFmpegVideoSource()
     probe = source.probe(path)
@@ -1151,8 +1209,7 @@ def process_video(
         if at is None:
             pts = axis[min(len(axis) - 1, int(fraction * len(axis)))]
         else:
-            target = at
-            pts = min(axis, key=lambda p: abs(float((p - first) * time_base) - target))
+            pts = still_pts(axis, time_base, at)
         chosen[pts] = (f"f{round(100 * fraction):02d}", at)
     sigma = spatial_sigma((video.height, video.width, 3), params["sharpen_blur_fraction"])
     frames: list[dict[str, Any]] = []
@@ -1184,6 +1241,7 @@ def process_video(
             entry.update(
                 {
                     "pts_ticks": pts,
+                    "source_pts_s": float(pts * time_base),
                     "time_s": float((pts - first) * time_base),
                     "pack_still_s": at,
                     "render_s": {"shipped": wall_s, "candidate": wall_d},
@@ -1427,20 +1485,75 @@ def undecided_crops(work: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def published_records(items_dir: Path, listed: Sequence[str]) -> list[dict[str, Any]]:
+    """The published item records, exactly one per listed item, in folder-name order.
+
+    Only published folders are read: a folder whose name starts with ``.`` is a staging
+    (``.<item>.staging-<stamp>``) or kept failed (``.<item>.failed-<stamp>``) folder of
+    :func:`run_item`, whose record may be complete but was never published, and is skipped;
+    files beside the folders are skipped. Each published folder must hold exactly one record,
+    ``<item>.json``, whose ``item`` is the folder's name (Reviewer A round 5 finding 2: a staging
+    copy left by an interrupt was counted beside its resumed publication).
+
+    Args:
+        items_dir: The whole-set ``items`` folder.
+        listed: The items the sheet covers (:func:`wholeset_items`' names).
+
+    Returns:
+        The records.
+
+    Raises:
+        hp.ProbeError: The records are not exactly the listed items (one missing, unlisted or
+            duplicated, a folder without its record or with a second one): the sheet fails.
+    """
+    records: list[dict[str, Any]] = []
+    problems: list[str] = []
+    for folder in sorted(items_dir.iterdir(), key=lambda p: p.name):
+        if not folder.is_dir() or folder.name.startswith("."):
+            continue
+        found = sorted(p.name for p in folder.glob("*.json"))
+        if found != [f"{folder.name}.json"]:
+            problems.append(f"{folder.name}: records {found or 'none'}")
+            continue
+        record = json.loads((folder / found[0]).read_text(encoding="utf-8"))
+        if record.get("item") != folder.name:
+            problems.append(f"{folder.name}: its record names {record.get('item')!r}")
+            continue
+        records.append(record)
+    names = [str(r["item"]) for r in records]
+    missing = sorted(set(listed) - set(names))
+    unlisted = sorted(set(names) - set(listed))
+    duplicated = sorted({n for n in names if names.count(n) > 1})
+    problems += [f"missing {', '.join(missing)}"] if missing else []
+    problems += [f"unlisted {', '.join(unlisted)}"] if unlisted else []
+    problems += [f"duplicated {', '.join(duplicated)}"] if duplicated else []
+    if problems or len(records) != len(listed):
+        raise hp.ProbeError(
+            f"the published records are not exactly the listed items ({len(records)} records, "
+            f"{len(listed)} listed): {'; '.join(problems)}"
+        )
+    return records
+
+
 def build_sheet(out: Path, work: Path) -> dict[str, Any]:
     """The per-item table, the contact sheet of 20 and C2's crops, from the items' records.
 
+    The records are :func:`published_records` of ``out/items`` against the whole set
+    (:func:`wholeset_items` of the CP5 pack: 70 photos and 50 videos); any other population
+    fails before the sheet folder is made.
+
     Args:
         out: The whole-set folder (``items/`` inside it; the sheet is written beside it).
-        work: The working folder (for the crops).
+        work: The working folder (the CP5 pack's list and the crops).
 
     Returns:
         The summary record (also written as ``sheet-<stamp>.json``).
+
+    Raises:
+        hp.ProbeError: The published records are not exactly the whole set.
     """
-    records = [
-        json.loads(path.read_text(encoding="utf-8"))
-        for path in sorted((out / "items").glob("*/*.json"))
-    ]
+    listed = [str(item["item"]) for item in wholeset_items(work / PACK)]
+    records = published_records(out / "items", listed)
     summaries = [item_summary(r) for r in records]
     chosen = select_contact(summaries)
     regressions = scan_regressions(summaries, chosen)

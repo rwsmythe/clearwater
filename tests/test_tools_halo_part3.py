@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
 from fractions import Fraction
 from pathlib import Path
 from types import SimpleNamespace
@@ -354,6 +355,19 @@ def test_n6_summary_refuses_a_run_the_switch_did_not_reach(tmp_path: Path) -> No
     assert not p3.n6_summary(tmp_path)["valid"]
 
 
+def test_n6_summary_reads_only_the_run_sidecars(tmp_path: Path) -> None:
+    # Round 5 finding 3: a folder already holding a summary (``n6-summary-<stamp>.json``, written
+    # by ``n6-summary`` beside the sidecars) is summarised again, identically.
+    for index, rate in enumerate([10.9, 11.0, 10.8]):
+        _n6_run(tmp_path, 2 * index, "shipped", rate)
+        _n6_run(tmp_path, 2 * index + 1, "candidate", rate * 1.12)
+    first = p3.n6_summary(tmp_path)
+    p3._write_json(tmp_path / "n6-summary-20261103T153954935925Z.json", first)
+    again = p3.n6_summary(tmp_path)
+    assert json.dumps(hp._plain(again)) == json.dumps(hp._plain(first))
+    assert len(again["runs"]) == 6
+
+
 # --- the edge-band scan -------------------------------------------------------------------------
 
 
@@ -371,6 +385,65 @@ def test_scan_finds_a_planted_ring_and_no_band_on_a_monotonic_remap() -> None:
     assert rings["band"] >= 1 and rings["max_qualifying_band"] > 0.1
     assert scan["summary"]["candidate"]["band"] == 0
     assert scan["summary"]["candidate"]["max_qualifying_band"] == 0.0
+
+
+def _side(shipped: str, candidate: str, band: float = 0.2) -> dict[str, Any]:
+    """One scanned side with the given verdicts (``band`` the shipped band, x C)."""
+    return {
+        "shipped": {"verdict": shipped, "band": band},
+        "candidate": {"verdict": candidate, "band": band / 4},
+    }
+
+
+def test_scan_counts_are_exact_and_partition_the_sides() -> None:
+    # Round 5 advisory 7: known counts per class (shipped 3 band / 2 none / 4 undecided; the
+    # candidate 1 / 5 / 3), each class counted exactly and the three summing to the sides.
+    sides = [
+        _side("band", "band", 0.9),
+        _side("band", "none", 0.5),
+        _side("band", "undecided", 0.3),
+        _side("none", "none"),
+        _side("none", "none"),
+        _side("undecided", "none"),
+        _side("undecided", "none"),
+        _side("undecided", "undecided"),
+        _side("undecided", "undecided", 1.2),
+    ]
+    shipped = p3._scan_summary(sides, "shipped")
+    candidate = p3._scan_summary(sides, "candidate")
+    assert (shipped["band"], shipped["none"], shipped["undecided"]) == (3, 2, 4)
+    assert (candidate["band"], candidate["none"], candidate["undecided"]) == (1, 5, 3)
+    assert shipped["max_qualifying_band"] == 0.9 and shipped["max_band"] == 1.2
+    assert candidate["max_qualifying_band"] == pytest.approx(0.9 / 4)
+    # On a real scan: every render's three counts are its sides' verdicts, and partition them.
+    source = _scene(seed=1)
+    scan = p3.scan_pair(source, source, (source**0.8).astype(np.float32), sigma_px=2.0)
+    for name in ("shipped", "candidate"):
+        verdicts = [side[name]["verdict"] for side in scan["sides"]]
+        summary = scan["summary"][name]
+        assert [summary[v] for v in ("band", "none", "undecided")] == [
+            verdicts.count(v) for v in ("band", "none", "undecided")
+        ]
+        assert summary["band"] + summary["none"] + summary["undecided"] == 2 * scan["points"]
+    # An item's figures sum the frames' counts exactly (two frames: 3 + 3 band, ...).
+    frame = {
+        "whole_image": {
+            "mean_abs_difference": 0.01, "p99_abs_difference": 0.1, "mean_shift_rgb": [0, 0, 0],
+            "baseline_clipped_fraction": 0.0, "clipped_fraction": 0.0,
+        },
+        "edge_scan": {"summary": {"shipped": shipped, "candidate": candidate}},
+        "tag": "f10",
+    }  # fmt: skip
+    record = {
+        "item": "GX1", "group": "V-S", "kind": "video", "frames": [frame, {**frame, "tag": "f50"}],
+        "item_wall_s": 1.0, "walls_s": {},
+    }  # fmt: skip
+    summary = p3.item_summary(record)
+    assert summary["scan_shipped"] == {
+        "band": 6, "none": 4, "undecided": 8, "max_qualifying_band": 0.9
+    }  # fmt: skip
+    assert (summary["scan_candidate"]["band"], summary["scan_candidate"]["none"]) == (2, 10)
+    assert summary["scan_candidate"]["undecided"] == 6
 
 
 def test_scan_points_are_strongest_first_one_per_cell_and_inside_the_margin() -> None:
@@ -459,11 +532,21 @@ def test_process_photo_renders_both_ways_and_restores(tmp_path: Path) -> None:
     }  # fmt: skip
 
 
-def _fake_video(monkeypatch: pytest.MonkeyPatch, engines: list[Any]) -> None:
-    """Five frames of the scene; an analysis that measures the proxy-free photo statistics."""
+def _fake_video(
+    monkeypatch: pytest.MonkeyPatch,
+    engines: list[Any],
+    *,
+    axis: tuple[int, ...] = (0, 1, 2, 3, 4),
+    time_base: Fraction = Fraction(1, 30),
+) -> None:
+    """Five frames of the scene; an analysis that measures the proxy-free photo statistics.
+
+    ``axis`` is the frames' pts in ticks of ``time_base`` (as the product's decoder delivers
+    them under ``-copyts``: the container's own pts, so the first need not be 0).
+    """
     method = AncutiFusionMethod("c3")
     pixels = _scene()
-    video = SimpleNamespace(height=160, width=220, time_base=Fraction(1, 30), nb_frames=5)
+    video = SimpleNamespace(height=160, width=220, time_base=time_base, nb_frames=len(axis))
     probe = SimpleNamespace(video=video, faults=(), path=Path("clip.mp4"))
 
     class Source:
@@ -471,7 +554,7 @@ def _fake_video(monkeypatch: pytest.MonkeyPatch, engines: list[Any]) -> None:
             return probe
 
         def frames(self, probe: object, *, hw_decode: bool = False) -> Any:
-            for pts in range(5):
+            for pts in axis:
                 yield SimpleNamespace(
                     pts_ticks=pts, pixels=pixels, color=SRGB, orientation_applied=True
                 )
@@ -479,7 +562,7 @@ def _fake_video(monkeypatch: pytest.MonkeyPatch, engines: list[Any]) -> None:
     class Engine:
         def __init__(self, **kwargs: Any) -> None:
             self.params = kwargs["params"]
-            self.store = SimpleNamespace(axis=lambda: list(range(5)))
+            self.store = SimpleNamespace(axis=lambda: list(axis))
             self.schema_hash = "h"
             self.statistics: Any = None
             self.unswitched: bool | None = None
@@ -518,7 +601,10 @@ def test_process_video_analyses_twice_and_renders_the_still_frames(
         return timed(*args)
 
     monkeypatch.setattr(p3, "_timed_render", recorded)
-    stills = [{"fraction": 0.1, "source_pts_s": 0.0}, {"fraction": 0.9, "source_pts_s": 0.12}]
+    stills = [
+        {"fraction": 0.1, "source_pts_s": 0.0},
+        {"fraction": 0.9, "source_pts_s": float(Fraction(4, 30))},
+    ]
     run = p3.process_video(
         Path("clip.mp4"),
         AncutiFusionMethod("c3"),
@@ -541,6 +627,61 @@ def test_process_video_analyses_twice_and_renders_the_still_frames(
     assert {p.name for p in folder.iterdir()} == {
         "f10-shipped.png", "f10-candidate.png", "f90-shipped.png", "f90-candidate.png",
     }  # fmt: skip
+
+
+GX011590_AXIS = tuple(510 + 1001 * k for k in range(5))
+"""GX011590's first five pts (1/30000 s ticks): its first pts is 510, not 0 (round 5 finding 1)."""
+
+
+def _video_stills(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stills: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """``process_video`` on GX011590's axis (first pts 510, 1/30000) with the given stills."""
+    engines: list[Any] = []
+    _fake_video(monkeypatch, engines, axis=GX011590_AXIS, time_base=Fraction(1, 30000))
+    folder = tmp_path / "item"
+    folder.mkdir()
+    run: dict[str, Any] = p3.process_video(
+        Path("clip.mp4"),
+        AncutiFusionMethod("c3"),
+        hp.parse_switches([p3.CANDIDATE]),
+        folder,
+        stills=stills,
+        cache_dir=tmp_path / "cache",
+        force_cpu=True,
+    )
+    return run
+
+
+def test_process_video_matches_the_pack_still_on_absolute_source_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # CP5 stores a still's ABSOLUTE source time (reviewpack/build.py: ffprobe's
+    # best_effort_timestamp x time_base) and the decoder keeps the container's pts (-copyts),
+    # so the still at 1511 / 30000 s is the frame of pts 1511, not the one 1511 / 30000 s after
+    # the first frame (pts 2512, one frame late: the round-5 defect on GX011590 / 603 / 609).
+    stills = [
+        {"fraction": 0.1, "source_pts_s": float(Fraction(1511, 30000))},
+        {"fraction": 0.9, "source_pts_s": float(Fraction(3513, 30000))},
+    ]
+    run = _video_stills(tmp_path, monkeypatch, stills)
+    assert [f["pts_ticks"] for f in run["frames"]] == [1511, 3513]
+    assert [f["tag"] for f in run["frames"]] == ["f10", "f90"]
+    assert [f["source_pts_s"] for f in run["frames"]] == [s["source_pts_s"] for s in stills]
+    assert [f["time_s"] for f in run["frames"]] == [
+        float(Fraction(1001, 30000)),
+        float(Fraction(3003, 30000)),
+    ]  # the time from the first frame, kept beside
+
+
+def test_process_video_refuses_a_pack_still_with_no_frame_at_its_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A still time between two frames (here 1001 / 30000 s: the first frame's time RELATIVE to
+    # the clip's start, i.e. the old convention) names no decoded frame: refused, not rounded.
+    stills = [{"fraction": 0.1, "source_pts_s": float(Fraction(1001, 30000))}]
+    with pytest.raises(hp.ProbeFailedError, match="no decoded frame at the pack's still time"):
+        _video_stills(tmp_path, monkeypatch, stills)
 
 
 def test_run_item_publishes_on_success_skips_done_items_and_keeps_failures(
@@ -589,7 +730,23 @@ def test_select_contact_reserves_the_videos_whose_statistics_move_most() -> None
     assert len(chosen) == p3.CONTACT_ITEMS
 
 
-def test_build_sheet_from_item_records(working: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+SHEET_ITEMS = (
+    {"item": "IMG_1", "group": "P-A", "kind": "photo"},
+    {"item": "GX1", "group": "V-S", "kind": "video", "stills": []},
+)
+"""The two items of the sheet tests (one photo, one video)."""
+
+
+def _sheet_items(
+    working: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    listed: tuple[dict[str, Any], ...] = SHEET_ITEMS,
+) -> Path:
+    """Publish :data:`SHEET_ITEMS` under the whole-set folder; ``listed`` is the pack's list.
+
+    Returns:
+        The whole-set folder (``items/`` inside it).
+    """
     engines: list[Any] = []
     _fake_video(monkeypatch, engines)
     out = working / "wp5.7" / "part3" / "wholeset"
@@ -598,13 +755,16 @@ def test_build_sheet_from_item_records(working: Path, monkeypatch: pytest.Monkey
     source = working / "scene.png"
     write_png(source, _scene(), bit_depth=16, icc=None, exif=None, provenance_json=None)
     monkeypatch.setattr(p3, "item_source", lambda item, pack, footage: source)
+    monkeypatch.setattr(p3, "wholeset_items", lambda pack: [dict(item) for item in listed])
     switches = hp.parse_switches([p3.CANDIDATE])
-    for item in (
-        {"item": "IMG_1", "group": "P-A", "kind": "photo"},
-        {"item": "GX1", "group": "V-S", "kind": "video", "stills": []},
-    ):
+    for item in SHEET_ITEMS:
         result = p3.run_item(item, working, working, items, working / "c", switches, force_cpu=True)
         assert result == "done"
+    return out
+
+
+def test_build_sheet_from_item_records(working: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    out = _sheet_items(working, monkeypatch)
     record = p3.build_sheet(out, working)
     assert record["contact"] == ["GX1", "IMG_1"]
     (sheet,) = out.glob("sheet-*")
@@ -613,6 +773,58 @@ def test_build_sheet_from_item_records(working: Path, monkeypatch: pytest.Monkey
     assert "GX1" in page and page.count("(crop missing)") == 2 * len(p3.UNDECIDED_LINES)
     rows = (sheet / "summary.tsv").read_text(encoding="ascii").splitlines()
     assert len(rows) == 3
+
+
+def test_build_sheet_ignores_staging_and_failed_folders(
+    working: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An interrupt after a staging folder's record was written, then a resumed run that
+    # published the item: the staging copy (and a kept failed folder) must not enter the sheet.
+    out = _sheet_items(working, monkeypatch)
+    items = out / "items"
+    for name, kind in (("IMG_1", "staging"), ("GX1", "failed")):
+        hidden = items / f".{name}.{kind}-20261103T000000000000Z"
+        hidden.mkdir()
+        (hidden / f"{name}.json").write_bytes((items / name / f"{name}.json").read_bytes())
+    record = p3.build_sheet(out, working)
+    assert record["items"] == 2
+    assert sorted(s["item"] for s in record["summaries"]) == ["GX1", "IMG_1"]
+    (sheet,) = out.glob("sheet-*")
+    assert len((sheet / "summary.tsv").read_text(encoding="ascii").splitlines()) == 3
+
+
+@pytest.mark.parametrize("fault", ["missing", "duplicated", "unlisted"])
+def test_build_sheet_fails_unless_the_records_are_exactly_the_listed_items(
+    working: Path, monkeypatch: pytest.MonkeyPatch, fault: str
+) -> None:
+    listed = SHEET_ITEMS
+    if fault == "missing":  # listed, never published
+        listed = (*SHEET_ITEMS, {"item": "IMG_2", "group": "P-A", "kind": "photo"})
+    out = _sheet_items(working, monkeypatch, listed)
+    items = out / "items"
+    if fault == "duplicated":  # a second record of IMG_1 in its published folder
+        (items / "IMG_1" / "IMG_1-copy.json").write_bytes(
+            (items / "IMG_1" / "IMG_1.json").read_bytes()
+        )
+    if fault == "unlisted":  # a published item (record and renders) the pack does not list
+        shutil.copytree(items / "IMG_1", items / "IMG_9")
+        record = json.loads((items / "IMG_9" / "IMG_1.json").read_text(encoding="utf-8"))
+        (items / "IMG_9" / "IMG_1.json").unlink()
+        (items / "IMG_9" / "IMG_9.json").write_text(
+            json.dumps({**record, "item": "IMG_9"}), encoding="utf-8"
+        )
+    with pytest.raises(hp.ProbeError, match="not exactly the listed items"):
+        p3.build_sheet(out, working)
+    assert not list(out.glob("sheet-*"))
+
+
+def test_checked_output_accepts_the_rerun_folder(working: Path) -> None:
+    # Round 5: the re-render of the affected items writes under wp5.7/part3r (never into the
+    # window's part3); every other place stays refused.
+    rerun = working / "wp5.7" / "part3r" / "wholeset"
+    assert p3.checked_output(rerun) == rerun
+    with pytest.raises(hp.ProbeError, match="is not inside"):
+        p3.checked_output(working / "wp5.7" / "part3x")
 
 
 def test_main_refuses_outputs_outside_part3(working: Path) -> None:
