@@ -809,3 +809,103 @@ if Q-d is ruled to one reference). Estimate: `part1s` took 17-34 s per photo; th
 adds about 3-5 s: about 25 s a run, so about 26 min for all 21 settings (about 21 min for 17).
 
 Depth at mid-build yield 1: 241011 (scripts/cell_depth.py, wp57-cell4, read by the orchestrator at the yield 2026-11-03)
+
+### Rulings on the yield-1 questions (CHARC msg 8d65e90c, relayed by the orchestrator)
+
+- **Q-d:** (d) of record = the `unsharpened` reference; the `input1` (literal) and `balanced`
+  references are measured and reported as rows (all 21 photo settings).
+- **Q-e3v:** build (e3) on video ONLY if it shrinks a decided photo band; otherwise state it
+  UNMEASURED on video (then not proposable as a default).
+- **(c) premise correction accepted:** `weight_delta` via `--param` 0.3 / 1.0.
+
+### Step 2 (photos; head `c65332be`; GPU; outputs `work/wp5.7/part2/<setting>/<item>`)
+
+`bash work/wp5.7/part2/run-photos.sh` in three chunks (6, 8 and 7 settings): 63 runs, every one
+exit 0 (so every render check and prefused check held under its switch), 9-21 s a run, 18 min
+in all (09:44:41Z-10:02:28Z); free disk 71 GB before, 71 GB after. Walls `part2/logs/runs.txt`,
+the full per-line table `part2/table-photos.txt` (a scratch tabulator, not committed).
+Determinism: the `defaults` runs equal `part1s` on every water band of every stage and channel
+(max difference 0).
+
+The candidate table (photos). The DECIDED lines of the Part 1 table of record are IMG_6739 line
+3 (right flank), IMG_6743 lines 1 and 2; IMG_6744 has none. Cells: the fused luma band x C, its
+verdict (`*` band, `?` undecided, `-` none) and the fused FWHM in px. Every qualifying fused band
+in the table is attributed to input 2 (no other attributed stage on any line, so no STOP).
+"Undecided" = lines whose fused verdict is undecided, out of 3 / 2 / 2. Whole-image change
+against the shipped defaults (each run's own baseline render): the mean absolute per-value
+difference per photo (6739 / 6743 / 6744), the largest per-channel mean shift over the three,
+and the 99th-percentile difference (largest). The clipped-pixel fraction moves by at most 0.0004
+on any run (IMG_6739 0.0004 shipped; the others 0.0000 shipped and switched): not tabled.
+
+| Setting | 6739 L3 | 6743 L1 | 6743 L2 | Undecided 6739/6743/6744 | Mean abs change | Max mean shift | p99 |
+|---|---|---|---|---|---|---|---|
+| shipped | 3.07* w7 | 1.48* w32 | 2.32* w22 | 2/0/2 | - | - | - |
+| (a) 0.75 | 2.27* w7 | 1.05* w31 | 1.63* w22 | 2/0/2 | .010/.017/.017 | .004 | .048 |
+| (a) 0.5 | 1.52? | 0.66* w31 | 1.00? | 3/1/2 | .020/.033/.034 | .007 | .092 |
+| (a) 0.25 | 0.82? | 0.30* w26 | 0.43? | 3/1/2 | .030/.048/.049 | .010 | .131 |
+| (e1) 0.1/99.9 | 1.93? | 1.43* w28 | 1.98* w12 | 3/0/2 | .021/.031/.025 | .016 | .093 |
+| (e1) 0.01/99.99 | 0.77? | 0.94* w25 | 0.97* w11 | 3/0/2 | .039/.049/.054 | .039 | .154 |
+| (e1) 0/100 | 0.21? | 0.44* w23 | 0.43? | 2/1/2 | .065/.062/.071 | .060 | .198 |
+| (e2) 0.05 | 3.07* w7 (floor not binding: range 0.0512) | 1.20* w27 | 1.48* w11 | 2/0/2 | .000/.037/.039 | .005 | .104 |
+| (e2) 0.1 | 1.73? | 0.61* w24 | 0.61* w11 | 3/0/2 | .019/.050/.051 | .007 | .139 |
+| (e2) 0.2 | 0.70? | 0.26* w22 | 0.24? | 3/1/1 | .029/.056/.057 | .009 | .156 |
+| **(d) unsharpened 1 sigma** | 0.24? | 0.03- | 0.03- | 2/0/0 | .034/.059/.060 | .013 | .173 |
+| **(d) unsharpened 3 sigma** | 0.24? | 0.05- | 0.06- | 3/0/0 | .032/.057/.058 | .012 | .171 |
+| (d) balanced 1 sigma (row) | 0.75? | 0.11? | 0.11? | 2/2/1 | .030/.055/.056 | .012 | .161 |
+| (d) balanced 3 sigma (row) | 0.93? | 0.17? | 0.26? | 3/2/1 | .025/.052/.053 | .011 | .158 |
+| (d) input1 1 sigma (row) | 0.54? | 0.11? | 0.07- | 2/1/0 | .058/.067/.069 | .054 | .216 |
+| (d) input1 3 sigma (row) | 0.35? | 0.10- | 0.12? | 3/1/1 | .052/.063/.065 | .049 | .212 |
+| (e3) full-res bounds | 2.33? | 1.32* w30 | 2.00* w17 | 3/0/2 | .013/.024/.024 | .002 | .064 |
+| (b) 8 | 3.10* | 1.47* (1.4749) | 2.33* | 2/0/2 | .001/.001/.001 | .000 | .004 |
+| (b) 4 | 3.10* | 1.48* (1.4755) | 2.33* | 2/0/2 | .002/.002/.002 | .000 | .007 |
+| (c) 0.3 | 2.94* | 1.30* | 2.04* | 2/0/2 | .003/.005/.005 | .004 | .024 |
+| (c) 1.0 | 2.83* | 1.16* | 1.84* | 2/0/2 | .005/.009/.009 | .006 | .039 |
+
+Readings (measurement, not a look judgement):
+
+- **Only (d) `unsharpened` removes every qualifying fused band on the three photos** (IMG_6743
+  both lines and IMG_6744 both to `none`, 0.03-0.10 x C; IMG_6739's line 3 to 0.24, undecided).
+  Its whole-image change is NOT small by these figures: mean abs 0.032-0.060 (8-15 / 255), p99
+  0.17, a largest channel-mean shift 0.013. The change is mostly input 2's amplified noise and fine
+  texture, which the clip also limits everywhere (the synthetic reproduction of Q-d showed the same
+  kind: 0 plateau shift, 0.017 output change from texture). So the stop-early condition ("removes
+  every qualifying band ... with a whole-image change you can state as small") is NOT met; the
+  videos are unmeasured too.
+- Every other candidate scales the band down with its strength and none reaches the threshold on
+  IMG_6743 at the settings tried: (a) 0.25 leaves 0.30 x C; (e2) 0.2 leaves 0.26; (e1) 0 / 100
+  leaves 0.44 (and shifts the channel means up to 0.060). At equal band reduction, (a) and (e2)
+  cost the least whole-image change (for example IMG_6743 L1 at about 0.6-0.66 x C: (a) 0.5 mean
+  abs 0.033, (e2) 0.1 0.050; at about 0.26-0.30: (a) 0.25 0.048, (e2) 0.2 0.056).
+- Several candidates turn decided lines undecided (a cost, not a cure): (a) 0.5 / 0.25, (e1),
+  (e2) 0.1 / 0.2, (e3) on IMG_6739 line 3 (its band falls under its own noise level); (d)
+  `balanced` turns both IMG_6743 lines undecided at 0.11-0.26.
+- (d) `input1` (literal) shifts the channel means by about 0.05 on every photo (the tone change
+  the Q-d reproduction predicted) and makes a broad new feature on IMG_6739 line 1 at 3 sigma
+  (2.29 x C, FWHM 134 px, undecided).
+- (e3) shrinks the decided IMG_6743 bands (1.48 -> 1.32, 2.32 -> 2.00) at a small whole-image
+  cost (mean abs 0.013-0.024, channel-mean shift 0.002), so by Q-e3v it IS built for video at step
+  3.
+- (b) moves nothing material (the pyramid hypothesis stays rejected): IMG_6743 L1 falls by 0.004 x
+  C (0.3 %), the other decided bands rise by up to 0.03 x C. (c) shrinks every band by 4-22 % at a small
+  whole-image cost (mean abs at most 0.009).
+
+### Videos (step 3; not run)
+
+In contention: every candidate. Only one that made NO decided photo band smaller may be dropped,
+and every candidate made at least one smaller: (b) only by IMG_6743 L1's 0.004 x C (1.4787 ->
+1.4749 / 1.4755), which is within the literal rule; CHARC may judge that negligible and drop (b).
+
+Command (not committed; outputs folder): `bash C:/Users/rwsmy/clearwater/work/wp5.7/part2/run-videos.sh
+SETTING ...` (`df` check first, exits 3 under 25 GB): per setting, IMG_6738, GX011627 and the
+compilation excerpt (read in place from `work/wp5.3/excerpts/`), the Part 1 lines, times, crops
+and margins, the analysis cache `scratch/cache`, `--out part2/<setting>/<item>`. `e3-full` needs
+the video (e3) build first (Q-e3v design: one full-resolution decode pass over each whole clip).
+
+Estimate: `part1s` took 48 + 126 + 107 = 281 s for the three; a non-default run adds the baseline's
+second whole-clip analysis and one baseline render per frame (110 frames): about 6-7 min a
+setting. All 21 settings about 2.3 h; plus (e3) on video (its build, then a full-resolution pass:
+about 680 4K and 1,870 1080p frames, perhaps 10-15 min). A reduced set (defaults; (a) 0.5, 0.25;
+(e1) 0.01, 0/100; (e2) 0.1, 0.2; (d) unsharpened 1, 3; (e3); (b) 4; (c) 1.0: 12 settings) about
+80 min plus (e3).
+
+Depth at mid-build yield 2: DISPATCHER TO FILL
