@@ -5,6 +5,9 @@ see one), so a probe that measured nothing, or always measured something, fails 
 step-2A tests (Reviewer A round 0) add the reviewer's controls: a pure contrast remap reports no
 band, a one-sample spike or plateau noise never qualifies, a weak edge is undecided, the
 attribution adds up to the detected band, and every write stays inside ``<working>/wp5.7``.
+The step-2B tests (CHARC's rulings S1 and S2) add the pointwise controls (a sharpened source
+through x^1.5 or a 1.2 gain is no band at its own stage, still a band at input 2) and the
+attributed stage (fused first, input 2 attributed).
 """
 
 from __future__ import annotations
@@ -411,6 +414,8 @@ def test_attribution_adds_up_to_the_detected_added_band() -> None:
     assert fused["verdict"] == "band"
     attribution = record["attribution"]
     assert attribution["peak_index"] == fused["peak_index"]
+    assert record["attributed_stage"] == "input2"  # S2: the record carries both columns
+    assert record["first_stage_over_threshold"] in hp.PRODUCT_STAGES[1:]
     assert attribution["clip"] == pytest.approx(0.0, abs=1e-9)  # the clip does not bind here
     assert attribution["source_subtracted"]  # the source's own halo is under the peak
     target = attribution["excess_at_peak"]
@@ -434,6 +439,147 @@ def test_stretched_stage_matches_the_input2_formula() -> None:
     # At sharpen_strength 1, input2 = clip((I + N) / 2) with N the stretched high-pass.
     expected = ((stages["balanced"] + stages["stretched"]) / 2).clip(0, 1)
     np.testing.assert_allclose(stages["input2"], expected, atol=1e-6)
+
+
+# --- step 2B: CHARC's S1 (pointwise reference) and S2 (attributed stage) rulings -------------
+
+
+def _sharpened_step_profile(n: int = 241) -> np.ndarray:
+    """The S1 control source: the unsharp-masked 0.6 / 0.2 step (sigma 8), in-camera style."""
+    return _unsharp(_step(n), 8.0)
+
+
+@pytest.mark.parametrize(
+    ("stage", "remap", "face_value"),
+    [("input1", lambda x: x**1.5, 0.1185), ("balanced", lambda x: 1.2 * x, 0.0950)],
+)
+def test_s1_pointwise_remap_of_a_sharpened_source_is_no_band(
+    stage: str, remap: Any, face_value: float
+) -> None:
+    # S1: a pointwise stage is measured against the SOURCE remapped through its own operation,
+    # so a monotonic tone remap of a source that already overshoots is charged nothing. Step 2A
+    # measured the face values 0.1185 (x^1.5) and 0.0950 (a 1.2 gain) on these controls.
+    source = _sharpened_step_profile()
+    fits = hp.profile_fits(source)
+    profile = remap(source)
+    references = {"balanced": source, "input1": source, stage: profile}
+    assert hp.water_band(profile, source, fits)["band"] == pytest.approx(face_value, abs=1e-4)
+    stats = hp.stage_band(stage, profile, source, fits, references=references)
+    assert stats["reference"] == "remapped_source"
+    assert stats["band"] < 1e-9
+    assert stats["verdict"] == "none"
+    # The same profile at INPUT 2 is read at face value: its overshoot is still charged there.
+    face = hp.stage_band("input2", profile, source, fits, references=references)
+    assert face["reference"] == "source"
+    assert face["band"] == pytest.approx(face_value, abs=1e-4)
+
+
+def _sharpened_gray_image(height: int = 128) -> np.ndarray:
+    """The S1 control as an image: the sharpened step across x (bright water left), grey."""
+    plane = np.broadcast_to(_sharpened_step_profile(), (height, 241))
+    return np.ascontiguousarray(np.repeat(plane[..., None], 3, axis=2), dtype=np.float32)
+
+
+@pytest.mark.parametrize("gain", [None, 1.2])
+def test_s1_controls_through_the_real_staged_render(gain: float | None) -> None:
+    # S1 through the product at the shipped c3 defaults: grey, so compensation is an identity and
+    # the measured gray-world gains are 1; ``gain`` replaces them with a linear 1.2 (the render
+    # uses the supplied gains, as the export does). The step-2A probe charged input 1 0.1185
+    # (gains 1) and white balance 0.0950 (gain 1.2), and at gain 1.2 named input 1 first.
+    method = AncutiFusionMethod("c3")
+    params = hp.resolve_parameters(method, [])
+    image = Image(
+        pixels=_sharpened_gray_image(), device="cpu", color=SRGB, orientation_applied=True
+    )
+    statistics = hp.photo_statistics(method, image, params)
+    if gain is not None:
+        balance = {**statistics["white_balance"], "gains": np.array([gain, gain, gain])}
+        statistics = {**statistics, "white_balance": balance}
+    line = hp.Line(20.0, 64.0, 220.0, 64.0)
+    frame = hp.probe_frame(
+        method,
+        image,
+        params,
+        statistics,
+        lines=[line],
+        region=hp.region_for([line], image.pixels.shape, 10),
+        half_width=2,
+        threshold=0.1,
+        crops=None,
+        prefix="photo",
+    )
+    record = frame["lines"][0]
+    water = record["water"]
+    for stage in ("balanced", "input1"):
+        assert water[stage]["Y"]["band"] < 1e-4, stage
+        assert water[stage]["Y"]["verdict"] == "none", stage
+    assert record["first_stage_over_threshold"] not in ("compensated", "balanced", "input1")
+    for stage in ("balanced", "input1"):
+        assert water[stage]["Y"]["reference"] == "remapped_source", stage
+    # Input 2 stays at face value: it still reads the overshoot (its own and the source's).
+    input2 = water["input2"]["Y"]
+    assert input2["reference"] == "source"
+    assert input2["exceeds"]
+    assert water["fused"]["Y"]["reference"] == "source"
+
+
+def _attribution_scene() -> tuple[dict[str, dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    """S2: a synthetic line whose fused band qualifies while input 2's own band does not.
+
+    Input 2 carries a ring 1.6 times the fused one through sample-to-sample plateau noise
+    (+-0.04, 10 % of the contrast: amplified grain), which lifts its qualifying level to about
+    0.34 of C and breaks its support; the fused stage carries the clean ring (0.25 of C), 80 % of
+    it in input 2's terms. Returns the per-stage luma bands, the attribution and the fused band.
+    """
+    clean = _step(401)
+    fits = hp.profile_fits(clean)
+    noise = 0.04 * (-1.0) ** np.arange(clean.size)
+    noise[fits.edge + 1 :] = 0.0
+    ring = _ring(clean.size, fits.edge, height=0.1, sigma=4.0, offset=12)
+    input2 = clean + noise + 1.6 * ring
+    fused = clean + ring
+    bands = {
+        "compensated": hp.water_band(clean, clean, fits),
+        "balanced": hp.water_band(clean, clean, fits),
+        "input1": hp.water_band(clean, clean, fits),
+        "input2": hp.water_band(input2, clean, fits),
+        "fused": hp.water_band(fused, clean, fits),
+        "output": hp.water_band(fused, clean, fits),
+    }
+    profiles = {
+        "source": clean,
+        "fused": fused,
+        "prefused": fused,
+        "term_k1_l0": 0.5 * clean + 0.2 * ring,
+        "term_k2_l0": 0.5 * clean + 0.8 * ring,
+        "srcterm_k1_l0": 0.5 * clean,
+        "srcterm_k2_l0": 0.5 * clean,
+    }
+    attribution = hp.attribute_band(bands["fused"], profiles, fits)
+    assert attribution is not None
+    return bands, attribution, bands["fused"]
+
+
+def test_s2_fused_first_and_input2_attributed() -> None:
+    bands, attribution, fused = _attribution_scene()
+    assert bands["input2"]["exceeds"]
+    assert bands["input2"]["verdict"] == "undecided"  # its own level is noisier ...
+    assert fused["verdict"] == "band"  # ... while the fused band qualifies
+    assert hp.first_stage(bands) == "fused"
+    assert attribution["per_input"]["k2"] == pytest.approx(0.8 * fused["band"], abs=1e-9)
+    assert hp.attributed_stage(fused, attribution) == "input2"
+
+
+def test_s2_attributed_stage_rule_on_ties_and_unqualified_bands() -> None:
+    _bands, attribution, fused = _attribution_scene()
+    swapped = {**attribution, "per_input": {"k1": 0.6, "k2": 0.1}}
+    assert hp.attributed_stage(fused, swapped) == "input1"
+    tie = {**attribution, "per_input": {"k1": 0.2, "k2": 0.2 + hp.ATTRIBUTION_TIE / 2}}
+    assert hp.attributed_stage(fused, tie) == "undecided"
+    clipped = {**attribution, "per_input": {"k1": -0.01, "k2": -0.02}}
+    assert hp.attributed_stage(fused, clipped) == "undecided"  # the inputs carry none of it
+    assert hp.attributed_stage({**fused, "verdict": "undecided"}, attribution) == "undecided"
+    assert hp.attributed_stage({**fused, "verdict": "none"}, None) == "none"
 
 
 def test_resolve_parameters_overrides_by_type() -> None:
@@ -486,6 +632,9 @@ def test_main_on_a_synthetic_photo(tmp_path: Path, working: Path) -> None:
     assert frame["render_check_equal"] is True
     assert set(frame["lines"][0]["water"]) == set(hp.IMAGE_STAGES)
     assert "fwhm_sigma" in frame["lines"][0]["water"]["fused"]["Y"]
+    assert frame["lines"][0]["attributed_stage"] in ("input1", "input2", "undecided", "none")
+    assert "attributed=" in hp.summary(record)
+    assert (out / "photo-remap_input1.png").exists()  # the S1 reference is kept as a crop
     assert (out / "overview-output.png").exists()
     # A second run refuses to overwrite the record unless asked.
     assert hp.main([*argv, "--line", "30,48,90,48", "--margin", "8", "--force-cpu"]) == 2

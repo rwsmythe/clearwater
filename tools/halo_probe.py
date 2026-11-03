@@ -38,9 +38,10 @@ zero where it does not pass the line; the source's overshoot is measured the sam
 excess at each sample is the stage's overshoot minus the source's, divided by the SOURCE's
 signed water contrast ``C`` (the start plateau's line at the edge minus the median of the end
 segment); the band is the largest excess (0 when none is positive). A monotonic remap (gamma,
-white balance, a change of either plateau's level) moves no sample past its own water plateau,
-so it reports no band; an inward spread of the object's level into the water is not a band
-either. A band QUALIFIES only when the edge is not weak (``|C| >= MIN_CONTRAST``) and at least
+white balance, a change of either plateau's level) of a source with no overshoot moves no sample
+past its own water plateau, so it reports no band (a source that already overshoots is the
+pointwise-stage case below); an inward spread of the object's level into the water is not a
+band either. A band QUALIFIES only when the edge is not weak (``|C| >= MIN_CONTRAST``) and at least
 ``MIN_SUPPORT_SAMPLES`` consecutive samples around its peak each exceed both the threshold and
 ``NOISE_FACTOR`` times the water-side uncertainty there (:func:`water_uncertainty` of the stage
 and of the source in quadrature, over ``|C|``: the plateau fit's residual noise plus the error
@@ -51,6 +52,30 @@ qualifies, ``undecided`` when none does but one is undecided, None otherwise. Wi
 interpolated crossings of half the peak (``fwhm_px``) and of the threshold (``extent_px``), in
 pixels at the line's sample spacing. :func:`band_statistics` is a two-sided diagnostic (each
 side against its own plateau line, over the stage's own contrast), not the table's metric.
+
+The pointwise stages (CHARC's ruling S1, step 2B; :func:`stage_band`). White balance and input 1
+are per-pixel tone remaps; a source that already overshoots (in-camera sharpening) passes its
+overshoot through them scaled by the remap's local gain, which the face-value excess above
+would charge to the stage. So each pointwise stage subtracts the overshoot of the SOURCE
+REMAPPED through that stage's own operation instead of the source's: for ``balanced`` the
+source white-balanced with the gains the render used (``AncutiFusionMethod._white_balance``
+on the source, from the same record: the gray-world gains of that frame, smoothed for video,
+after the strength and the D99 clamp; never re-estimated); for ``input1`` that remapped source
+raised to the render's ``gamma`` and clipped as ``fusion_inputs`` forms input 1, so the two
+remaps chain as the product chains them. :func:`staged_render` yields the two references
+(``remap_balanced``, ``remap_input1``) after ``output``. Everything else is unchanged: the common
+denominator stays the SOURCE's signed contrast ``C`` (and the weak-edge test with it), the
+uncertainty is the stage's and the remapped reference's in quadrature, and compensation (3C is
+local: Gaussian means of the chroma under a smoothed mask), input 2, ``naive``, fused and output
+are read at face value against the source. Each luma and channel band records its
+``reference`` (``"remapped_source"`` or ``"source"``).
+
+The attributed stage (CHARC's ruling S2; :func:`attributed_stage`). Beside the first qualifying
+stage, each line names the input that carries its qualifying FUSED band: the input whose terms
+carry the larger share of the band at its peak (:func:`attribute_band`'s ``per_input``).
+``"none"`` when the fused verdict is ``none``; ``"undecided"`` when it is ``undecided``, when
+the two shares are within :data:`ATTRIBUTION_TIE` of each other (a tie), or when neither share
+is positive (the inputs carry none of it).
 
 Attribution (:func:`attribute_band`). The product's fused image is ``clip(prefused)`` with
 ``prefused`` the sum over inputs ``k`` and pyramid levels ``l`` of ``collapse(G_l{Wbar_k} *
@@ -185,6 +210,15 @@ IMAGE_STAGES = (
     "output",
 )
 """The image stages whose edge bands are measured, in pipeline order."""
+
+POINTWISE_REFERENCES = {"balanced": "remap_balanced", "input1": "remap_input1"}
+"""The pointwise stages (ruling S1) -> the staged array each is measured against: the source
+remapped through the stage's own operation (:func:`staged_render`). Every other stage is
+measured against the source (face value)."""
+
+ATTRIBUTION_TIE = 1e-4
+"""Two inputs' shares of a fused band (in units of the source contrast) closer than this are a
+tie (:func:`attributed_stage`): the order of float32 sums alone moves a share by about this."""
 
 _LUMA = np.array([0.2126, 0.7152, 0.0722])  # BT.709, as clearwater.core.luminance
 
@@ -626,6 +660,7 @@ def water_band(
     *,
     threshold: float = DEFAULT_THRESHOLD,
     spacing: float = 1.0,
+    remapped: FloatArray | None = None,
 ) -> dict[str, Any]:
     """Measure the band a stage ADDS beyond the source's water-side profile (the table's metric).
 
@@ -633,8 +668,12 @@ def water_band(
     textured). The excess at each water-side sample is the stage's outward overshoot past its
     own water-plateau line minus the source's (:func:`outward_overshoot`), divided by ONE common
     contrast: the source's signed water contrast (:func:`water_contrast` of ``reference``). A
-    monotonic remap (gamma, white balance, a plateau change) moves no sample past its own
-    plateau line and reports no band; an inward spread is not a band.
+    monotonic remap (gamma, white balance, a plateau change) of a source with no overshoot moves
+    no sample past its own plateau line and reports no band (of a source that already
+    overshoots it scales that overshoot: hence ``remapped``); an inward spread is not a band.
+    With ``remapped`` (a pointwise stage, ruling S1) the overshoot subtracted, and the second
+    uncertainty, are the remapped source's instead of the source's; the contrast stays the
+    source's.
 
     Args:
         profile: The stage's samples.
@@ -642,6 +681,8 @@ def water_band(
         fits: The source profile's layout (one edge for every stage).
         threshold: The band threshold, a fraction of the source contrast.
         spacing: The distance between samples in pixels (:func:`sample_spacing`).
+        remapped: The source remapped through the stage's own pointwise operation, on the same
+            line and channel; None measures against ``reference`` (face value).
 
     Returns:
         ``contrast`` (the source's signed contrast, the common denominator);
@@ -654,20 +695,22 @@ def water_band(
         over ``|contrast|``, at the peak); ``level`` (the qualifying level there, ``max(threshold,
         NOISE_FACTOR * noise_ratio)``); ``support_samples`` (consecutive samples around the peak
         each at or above its own level); ``weak_edge``;
-        ``exceeds`` (``band > threshold``); ``qualifies``; and ``verdict`` (``"band"``,
-        ``"undecided"`` or ``"none"``).
+        ``exceeds`` (``band > threshold``); ``qualifies``; ``verdict`` (``"band"``,
+        ``"undecided"`` or ``"none"``); and ``reference`` (``"remapped_source"`` or
+        ``"source"``).
     """
     contrast = water_contrast(reference, fits)
     weak = abs(contrast) < MIN_CONTRAST
     sign = 1.0 if contrast >= 0 else -1.0
     scale = 1.0 / abs(contrast) if contrast != 0.0 else 0.0
+    baseline = reference if remapped is None else remapped
     excess = (
-        outward_overshoot(profile, fits, sign) - outward_overshoot(reference, fits, sign)
+        outward_overshoot(profile, fits, sign) - outward_overshoot(baseline, fits, sign)
     ) * scale
     peak = int(np.argmax(excess))
     at_peak = float(excess[peak])
     band = max(at_peak, 0.0)
-    noise = np.hypot(water_uncertainty(profile, fits), water_uncertainty(reference, fits)) * scale
+    noise = np.hypot(water_uncertainty(profile, fits), water_uncertainty(baseline, fits)) * scale
     levels = np.maximum(threshold, NOISE_FACTOR * noise)
     support = _support(excess - levels, peak, 0.0) if band > 0 else 0
     exceeds = band > threshold
@@ -691,7 +734,64 @@ def water_band(
         "exceeds": exceeds,
         "qualifies": qualifies,
         "verdict": verdict,
+        "reference": "source" if remapped is None else "remapped_source",
     }
+
+
+def stage_band(
+    stage: str,
+    profile: FloatArray,
+    source: FloatArray,
+    fits: Fits,
+    *,
+    references: Mapping[str, FloatArray],
+    threshold: float = DEFAULT_THRESHOLD,
+    spacing: float = 1.0,
+) -> dict[str, Any]:
+    """Measure one stage's band against the reference ruling S1 assigns it.
+
+    Args:
+        stage: The stage name (an :data:`IMAGE_STAGES` entry).
+        profile: The stage's samples.
+        source: The source's samples on the same line and channel.
+        fits: The source profile's layout.
+        references: Pointwise stage name (a :data:`POINTWISE_REFERENCES` key) -> the source
+            remapped through that stage's operation, on the same line and channel.
+        threshold: The band threshold.
+        spacing: The distance between samples in pixels.
+
+    Returns:
+        :func:`water_band` of the stage: against ``references[stage]`` for a pointwise stage,
+        against the source (face value) for every other.
+    """
+    remapped = references[stage] if stage in POINTWISE_REFERENCES else None
+    return water_band(
+        profile, source, fits, threshold=threshold, spacing=spacing, remapped=remapped
+    )
+
+
+def attributed_stage(fused: Mapping[str, Any], attribution: Mapping[str, Any] | None) -> str:
+    """Name the input that carries a qualifying fused band (ruling S2).
+
+    Args:
+        fused: The fused stage's :func:`water_band` (luma) record.
+        attribution: :func:`attribute_band` of it (None when there is no positive excess).
+
+    Returns:
+        ``"none"`` when the fused verdict is ``none``; ``"undecided"`` when it is
+        ``undecided``, when there is no attribution, when neither input's share is positive, or
+        when the two shares are within :data:`ATTRIBUTION_TIE` (a tie); otherwise ``"input1"``
+        or ``"input2"``, the input whose terms carry the larger share at the band's peak.
+    """
+    if fused["verdict"] != "band":
+        return "none" if fused["verdict"] == "none" else "undecided"
+    if attribution is None:
+        return "undecided"
+    first = float(attribution["per_input"].get("k1", 0.0))
+    second = float(attribution["per_input"].get("k2", 0.0))
+    if max(first, second) <= 0.0 or abs(first - second) <= ATTRIBUTION_TIE:
+        return "undecided"
+    return "input1" if first > second else "input2"
 
 
 def first_stage(bands: Mapping[str, Mapping[str, Any]]) -> str | None:
@@ -831,7 +931,10 @@ def staged_render(
     """Render ``image`` as ``method.render`` does, yielding each intermediate on the device.
 
     The product functions are called in ``render``'s order with ``render``'s arguments. Images
-    are ``(H, W, 3)`` and maps ``(H, W)``. After ``output`` it yields, per input k, the
+    are ``(H, W, 3)`` and maps ``(H, W)``. After ``output`` it yields the two pointwise
+    references of ruling S1: ``remap_balanced`` (the SOURCE through the render's white balance,
+    the same gains) and ``remap_input1`` (that through the render's gamma, as input 1 is formed);
+    then, per input k, the
     attribution terms ``term_k<k>_l<l>`` (``collapse`` of input k's blended band at level l
     alone, zeros at the other levels) and the source's ``srcterm_k<k>_l<l>`` (the source's
     Laplacian band under the same weight pyramid), then ``prefused``: the collapse of the
@@ -911,6 +1014,10 @@ def staged_render(
     yield "fused", fused
     yield "output", blend_with_original(fused, pixels, params["blend_with_original"])
     del fused
+    remap_balanced = method._white_balance(backend, pixels, params, records["white_balance"])
+    yield "remap_balanced", remap_balanced
+    yield "remap_input1", (remap_balanced ** np.float32(float(params["gamma"]))).clip(0.0, 1.0)
+    del remap_balanced
     levels = pyramid_levels(inputs[0].shape, params["pyramid_min_level_size"])
     source_bands = laplacian_pyramid(backend, pixels, levels)
     summed: list[Any] = []
@@ -1247,12 +1354,14 @@ def _line_record(
 ) -> dict[str, Any]:
     """The record of one line: stage bands, the first qualifying stage, the attribution.
 
-    ``water`` (the table's metric) is :func:`water_band` per stage and channel against the
-    source, on the source's layout, at the line's sample spacing; ``two_sided`` is
+    ``water`` (the table's metric) is :func:`stage_band` per stage and channel (against the
+    remapped source for a pointwise stage, the source otherwise), on the source's layout, at the
+    line's sample spacing; ``two_sided`` is
     :func:`band_statistics` per stage and channel on each stage's own layout (meaningful when
     both sides are plateaus). ``first_stage_over_threshold`` is :func:`first_stage` of the luma
     bands; ``unqualified_exceedances`` lists the product stages over the threshold whose band
-    does not qualify; ``attribution`` is :func:`attribute_band` of the fused luma band.
+    does not qualify; ``attribution`` is :func:`attribute_band` of the fused luma band and
+    ``attributed_stage`` its :func:`attributed_stage`.
     """
     spacing = sample_spacing(line)
     source = profiles["source"][index]
@@ -1265,7 +1374,18 @@ def _line_record(
             c: band_statistics(per[c], threshold=threshold, spacing=spacing) for c in CHANNELS
         }
         water[name] = {
-            c: water_band(per[c], source[c], fits, threshold=threshold, spacing=spacing)
+            c: stage_band(
+                name,
+                per[c],
+                source[c],
+                fits,
+                references={
+                    stage: profiles[array][index][c]
+                    for stage, array in POINTWISE_REFERENCES.items()
+                },
+                threshold=threshold,
+                spacing=spacing,
+            )
             for c in CHANNELS
         }
     luma_bands = {name: water[name]["Y"] for name in PRODUCT_STAGES[1:]}
@@ -1304,6 +1424,7 @@ def _line_record(
         "edge_index": edge,
         "outer_samples": fits.outer,
         "first_stage_over_threshold": first_stage(luma_bands),
+        "attributed_stage": attributed_stage(water["fused"]["Y"], attribution),
         "unqualified_exceedances": unqualified,
         "water": water,
         "two_sided": two_sided,
@@ -1311,7 +1432,7 @@ def _line_record(
         "weights": weights,
         "profiles_Y": {
             name: [round(float(v), 5) for v in profiles[name][index]["Y"]]
-            for name in (*IMAGE_STAGES, "stretched")
+            for name in (*IMAGE_STAGES, "stretched", *POINTWISE_REFERENCES.values())
         },
         "profile_wbar_2": [round(float(v), 5) for v in maps["wbar_2"][index]]
         if "wbar_2" in maps
@@ -1793,7 +1914,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"halo_probe: FAILED, no record written: {exc}", file=sys.stderr)
         return 1
     record = {
-        "schema": 2,
+        "schema": 3,
         "tool": "halo_probe",
         "name": name,
         "source": source.name,
@@ -1807,8 +1928,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         "min_support_samples": MIN_SUPPORT_SAMPLES,
         "noise_factor": NOISE_FACTOR,
         "metric": "water: outward overshoot past the stage's own water plateau minus the "
-        "source's, over the source's signed contrast; qualifies when not weak, above "
-        "max(threshold, noise_factor * noise) over min_support_samples",
+        "source's (for the pointwise stages balanced and input1: minus the source remapped "
+        "through the stage's own gains / gamma, ruling S1), over the source's signed contrast; "
+        "qualifies when not weak, above max(threshold, noise_factor * noise) over "
+        "min_support_samples",
+        "attributed_stage_rule": "ruling S2: the input whose terms carry the larger share of a "
+        "qualifying fused band at its peak; none / undecided when the fused band is none / "
+        "undecided; undecided on a tie (within attribution_tie) or when neither share is "
+        "positive",
+        "attribution_tie": ATTRIBUTION_TIE,
         "started": began.isoformat(),
         "finished": datetime.now(UTC).isoformat(),
         **run,
@@ -1819,7 +1947,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def summary(record: Mapping[str, Any]) -> str:
-    """One text line per frame and line: the first qualifying stage and the luma bands.
+    """One text line per frame and line: the first qualifying and attributed stages, luma bands.
 
     Args:
         record: A run record.
@@ -1839,7 +1967,8 @@ def summary(record: Mapping[str, Any]) -> str:
             fused = line["water"]["fused"]["Y"]
             rows.append(
                 f"{record['name']} {when} line{number}: first>{record['threshold']:.2f}="
-                f"{line['first_stage_over_threshold']} fused fwhm={fused['fwhm_px']:.1f}px "
+                f"{line['first_stage_over_threshold']} "
+                f"attributed={line['attributed_stage']} fused fwhm={fused['fwhm_px']:.1f}px "
                 f"({fused['fwhm_sigma']:.2f} sigma) abs={fused['band_abs']:.3f}"
                 f"{' WEAK-EDGE' if fused['weak_edge'] else ''} | {bands} | "
                 f"render_check={frame['render_check_equal']}"

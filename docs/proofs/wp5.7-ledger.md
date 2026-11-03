@@ -330,3 +330,79 @@ attribution residuals at most 6e-6 of C.
 | 0 | A (Codex, at the orchestrator's seat) | 0 | 4 | 4 | 1 | 9 / 0 | 9 / 0 | 0 | 9 / 0 / 0 |
 
 Depth at step-2A end: 262949 (scripts/cell_depth.py, wp57-cell2, read by the orchestrator at the step-2A yield 2026-11-03)
+
+## Step 2B (fresh cell; S1-S3 rulings)
+
+Dispatch `clearwater-review-evidence/wp5.7/cell/dispatch-3.md` (orchestrator gen 37). Fresh cell
+(implementer-opus-high) on head `03b2614e` (main `0cafb374`; step 2A's instrument `648eb963`).
+CHARC's rulings (main `b4f9b99a`, in the brief) as implemented:
+
+- **S1 [instrument], implemented.** The pointwise stages, white-balanced and input 1, are
+  measured against the SOURCE REMAPPED through that stage's own pointwise operation; every other
+  stage (compensated, input 2, `naive`, fused, output) at face value against the source. The
+  definition (module docstring of `tools/halo_probe.py`, `stage_band`): the excess at each
+  water-side sample is the stage's outward overshoot past its own water-plateau line minus the
+  REFERENCE's, over the SOURCE's signed water contrast C (the common denominator and the
+  weak-edge test are unchanged); the reference is the source for a face-value stage and, for a
+  pointwise stage, the source remapped as the product remaps that stage: `remap_balanced` =
+  `AncutiFusionMethod._white_balance` applied to the SOURCE pixels with the same record the
+  render used (the frame's gray-world gains, smoothed for video, through the strength and the
+  D99 clamp, then `clip(a * gains)`; nothing re-estimated), and `remap_input1` =
+  `clip(remap_balanced ** gamma)` with the render's `gamma`, as `fusion_inputs` forms input 1,
+  so the two remaps chain as the product chains them. The uncertainty is the stage's and the
+  reference's `water_uncertainty` in quadrature; the qualifying rule (S3) is unchanged.
+  `staged_render` yields the two references after `output` (the pipeline order of the product
+  stages is untouched); they are profiled on every channel and saved as crops
+  (`<frame>-remap_balanced.png`, `<frame>-remap_input1.png`); every luma and channel band
+  records `reference` (`remapped_source` or `source`). Record schema 3.
+- **Compensated is not pointwise for the method measured.** 3C (`compensate_c3`, the shipped
+  default `c3`, every run of this package) is local: the chroma correction is a Gaussian mean of
+  Cb / Cr under a Gaussian-smoothed mask (`methods/compensation.py:250-253`). Not a STOP: S1 is
+  not extended. For the record only: the OTHER method's compensation, Ancuti 2018
+  (`compensate_ancuti2018`), IS a per-pixel operation of the frame's own statistics (channel
+  means and alphas); no run of this package uses it, and the probe reads it at face value.
+- **S2 [selector], implemented.** Two columns per line: `first_stage_over_threshold` (the first
+  qualifying stage, as built) and `attributed_stage` (`attributed_stage`): the input whose terms
+  carry the larger share of the qualifying FUSED band at its peak (`attribute_band`'s
+  `per_input`, step 2A's attribution). Rule: fused verdict `none` -> `none`; fused `undecided`
+  -> `undecided`; a qualifying fused band -> `input1` or `input2` by the larger share, except
+  `undecided` on a tie (the two shares within `ATTRIBUTION_TIE` = 1e-4 of C, the float32
+  summation-order scale) or when neither share is positive (the clip would carry it; the clip's
+  share was 0.000 on every step-2A line). The summary line prints `attributed=`.
+- **S3 [noise rule]: no code change** (factor 3, the extrapolation term, AR(1) effective count;
+  half width 4 of record, half width 12 as the photo sensitivity column; `undecided` is reported
+  as such).
+
+### RED (the new tests against `03b2614e`'s probe): 8 failed, 41 passed
+
+Log `work/c57-2b-red.log` in the worktree.
+
+- `test_s1_controls_through_the_real_staged_render[None]`: `AssertionError: input1` /
+  `assert 0.11854498960215555 < 0.0001` (the sharpened 0.6 / 0.2 step, sigma 8, through the real
+  c3 render at the shipped defaults: gamma 1.5 charged to input 1 at face value).
+- `test_s1_controls_through_the_real_staged_render[1.2]`: `AssertionError: balanced` /
+  `assert 0.0950130770721173 < 0.0001` (the same with the white-balance gains replaced by 1.2;
+  this probe also named `input1` first there).
+- `test_s1_pointwise_remap_of_a_sharpened_source_is_no_band[input1 / balanced]` (1-D, x^1.5 and
+  a 1.2 gain): `AttributeError: module 'halo_probe' has no attribute 'stage_band'` (x 2), after
+  the face-value preconditions 0.1185 and 0.0950 passed.
+- `test_s2_fused_first_and_input2_attributed`: `AttributeError: ... no attribute
+  'attributed_stage'`, after its preconditions passed on this probe (input 2 exceeds and is
+  undecided, the fused band qualifies, `first_stage` = `fused`).
+- `test_s2_attributed_stage_rule_on_ties_and_unqualified_bands`: the same AttributeError.
+- `test_attribution_adds_up_to_the_detected_added_band`, `test_main_on_a_synthetic_photo`:
+  `KeyError: 'attributed_stage'` (the record's new column).
+
+### GREEN
+
+`uv run pytest -q tests/test_tools_halo_probe.py` 49 passed (2.0 s); `uv run ruff check .` All
+checks passed; `uv run ruff format --check .` 313 files already formatted; `uv run mypy`
+Success, no issues found in 157 source files. One test-only calibration before RED was taken:
+the S2 scene's input-2 noise was first the correlated (Gaussian, sigma 2) plateau noise of the
+step-2A noise test, through which the input-2 ring QUALIFIED (the ring rides the noise's own
+excursion); it is now sample-to-sample noise of +-0.04 (amplified grain), which lifts input 2's
+level to 0.34 of C and breaks its support (1 sample), while the fused ring (0.25 of C) qualifies.
+Two docstring sentences from step 2A were corrected against the code ("a monotonic remap
+reports no band" holds only for a source with no overshoot).
+
+Depth at mid-build yield 1: DISPATCHER TO FILL
