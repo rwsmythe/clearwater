@@ -2199,3 +2199,30 @@ the re-check); its Limits gain the B4 line. Ledger row for the cumulative table:
 | B | B (Codex, the orchestrator's single pass) | 0 | 1 | 3 | 1 (out of envelope) | 4 / 1 | 5 / 0 | 0 | 4 (B1, B2, B3, B5, each with tests) / 0 / 0; B4 banked; plus 1 report line |
 
 Depth at Reviewer-B yield: 156,588 (wp57-cell9 at its yield, 44 turns, 2026-11-03 ~22:20Z; read by orchestrator gen 39 with scripts/cell_depth.py). The cell stays available for a Reviewer A round-7 fix (below the 250K evaluation point).
+
+#### Reviewer A round 7 (Codex, on the B fix at `ba61f0ed`; transcript `clearwater-review-evidence/wp5.7/A/r7/review.txt`)
+
+Two findings in the B fix, both FIX (the orchestrator's dispositions, binding). Round 7 confirmed
+the rest: the delivered folder's figures of record, the six invalid sequences rejected, exits
+5 / 0 / 4, the v3 refusal, containment, B2's staging, no collateral change.
+
+| # | Sev | Finding | Disposition / what changed (`893c94e7`) | Tests (RED on `ba61f0ed`: `work/c57-r7-red.log`, 1 failed / 51 passed) |
+|---|---|---|---|---|
+| R7-1 | MAJOR (in envelope) | runs sharing a `started` stamp passed the protocol check: with D1.started == S2.started the file-name order (candidate before shipped) and the stable sort kept the tie in protocol order, so six such runs read valid True, stop True | FIX: `n6_protocol_problems` (`tools/halo_part3.py:820`) adds one problem line per group of runs sharing a `started` instant (`_instant`, `:812`: the ISO 8601 stamp parsed, the text when it does not parse), so the summary is invalid (exit 5) and `stop` is not set | `test_n6_summary_refuses_runs_with_the_same_start` (`tests/test_tools_halo_part3.py:371`): six runs, S2 stamped as D1, candidate rates 1.2 x; RED at `assert not summary["valid"]` (valid True on the old code); also asserts the problem line, `stop` False and `main n6-summary` exit 5 |
+| R7-2 | MINOR (in envelope) | the switch-reach guard test used two runs, so the minimum-pair rule masked removal of the `calls <= 0` guard | FIX (test only): `test_n6_summary_refuses_a_run_the_switch_did_not_reach` (`:360`) rebuilt on an otherwise valid six-run population (one candidate run with 0 calls); it asserts the problems are exactly `["n6-candidate-3.json: fusion_inputs never called"]` | passes on both codes (a guard); mutation: the `calls <= 0` guard replaced by `if False` (`tools/halo_part3.py:780`) makes it FAIL (`work/c57-r7-mutation.log`, 1 failed), restored from the commit afterwards (LF, tree clean) |
+
+GREEN (`893c94e7`): the whole module, slow test included, 53 passed in 15.14 s
+(`work/c57-r7-green.log`); ruff check and format --check clean; mypy (strict) on
+`tools/halo_part3.py` "Success: no issues found in 1 source file".
+
+N6 re-check, read-only on `work/wp5.7/part3/n6/` again (15 entries, unchanged by the read; output
+`work/c57-r7-n6-recheck.txt` in the worktree): MEDIAN shipped 10.946698279693821, candidate
+12.434572079902537 min/min; effect +13.59 %; pair ratios 1.1349, 1.1447, 1.1389; VALID True,
+problems none; STOP True; exit would be 4. The report is unchanged (no sentence about these
+mechanics became false).
+
+| Round | Reviewer | Critical | Major | Minor | Advisory | In-envelope / out | NEW / REOPENED | Reverts | Fixes: instrument / test-only / product |
+|---|---|---|---|---|---|---|---|---|---|
+| 7 | A (Codex, at the orchestrator's seat; on the B fix) | 0 | 1 | 1 | 0 | 2 / 0 | 2 / 0 | 0 | 1 (R7-1, with a test) / 1 (R7-2) / 0 |
+
+Depth at round-7 yield: DISPATCHER TO FILL
