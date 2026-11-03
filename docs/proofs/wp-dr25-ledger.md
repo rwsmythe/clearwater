@@ -725,3 +725,143 @@ preservation and the analysis re-run are the dispatcher's responsibility.
 The report and its obligations above remain for the next turn after that run.
 
 Depth at turn-5 end: 174,724 input tokens of 258,400 (driver footer, session 01a1a0cb, 2026-11-03 turn 5).
+
+## Turn 6 (report)
+
+Fresh report session on `68caf100`, per orchestrator generation 38. The
+previous session's supplied turn-5 depth is recorded above; it is not this
+session's depth. Only the new completion report and this ledger are changed.
+No instrument/test edit, GPU phase or commit was performed by the cell.
+
+### Cumulative round ledger
+
+| Round | Critical | Major | Minor | Advisory | In / out of envelope | NEW / REOPENED | Reverts | Fix surface | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 prerequisite audit | 0 | 2 | 1 | D3 fit observation | All in | All new / 0 | 0 | Ruled instrument changes in turn 2 | CHARC ruled at `0f2d19c4` |
+| A1 | 0 | 0 | 2 | 6 | F1-F7 in; F8 out | 8 / 0 | 0 permanent | Instrument/tests in turn 3; report obligations completed in turn 6; no shipped product code | `NO_NEW_CRITICAL_MAJOR` |
+| A2 | 0 | 0 | 1 | 3 | F1-F4 in | 4 / 0 | 0 permanent | Tests F1/F3 in turn 5; report F2/F4 in turn 6 | CONVERGED |
+
+No additional reviewer round is invented for the report. Both Claude nets
+remain dispatcher-owned; the supplied A2 verdict and withheld transcript
+provenance are unchanged. Separately ruled **R1 was fixed in turn 5**;
+the successful `68caf100` analysis and report now record its real-footage
+consequence. No finding is reopened, no permanent revert and no product-
+code fix occurs in this turn.
+
+### Completion report sections
+
+`docs/reports/wp-dr25-staged-run.md` contains:
+
+1. Scope and durable evidence (runs2 only; results hashes).
+2. Excerpts and timing (requested/actual starts, stream duration source,
+   ticks, rate, frame counts and tags).
+3. Interior accounting and read-only audit (per-method/window reach,
+   frame/step counts, own slices and WP3.11's strict convention).
+4. Flicker levels and the WP1.4 figures (staged/flat own interiors,
+   separately matched unsmoothed baselines; Ancuti-only historical study).
+5. Ground-2 reading (own-interior and common-step 1 s / 2 s comparisons).
+6. Boundary exposure of the original 6 s figures (old PTS re-trims,
+   edge-free intersections and changed-reference qualification).
+7. Commands and resources (extract and both analyses, including failure).
+8. Limits and deep-step context (under-20 s limit, R1 crossings,
+   WP3.11 span and edge-free counts, no rerun).
+9. Verification and acceptance transfer (checks, verification loop,
+   ownership and outstanding seat actions).
+
+Report obligations discharged: A1 F4 / A2 F2 use each candidate's own
+`interior`, reach and counts and re-trim unsmoothed arrays to its slice;
+A2 F4 explains 20 s versus 6 s reference means at the historical
+comparison; A1 F8 excludes under-20 s chapters; A1 F3 gives the supplied
+resource record; CHARC R1 gives both 57-frame exceptions, their first
+crossing and the required prototype/product qualification.
+
+### Record audit and reading
+
+Read-only inputs: all 14 files under
+`C:\Users\rwsmy\clearwater-review-evidence\wp-dr25\runs2\`.
+Scratch script/log/exit and hashes are in this worktree's ignored `work/`:
+`cdr25-6-audit.py`, `.log`, `.exit`, and `cdr25-6-record-hashes.json`.
+The script checks both methods and all 12 candidate labels, all candidate
+reach/count/slice arithmetic, per-step `all`/`interior` means, tick identity
+in the saved raw/staged/flat and per-stage measurements, ordered saved
+N{} bounds, and the absence of any other unavailable row. Before/after
+SHA-256s of all 14 evidence files match. Observed exit 0:
+
+```text
+AUDIT_PASS sequence_records 110 max_mean_abs_error 2.7755575615628914e-17 unchanged_files 14
+```
+
+Both excerpts have 599 frames. Staged 2 s counts are 479 frames / 478
+steps for c3 and 419 / 418 for Ancuti; 4 s counts are 359 / 358 and
+239 / 238. GX011625's only unavailable rows are the two `linear_trend`
+rows: exactly 57 crossings each, indices 542..598, first ticks 8020012.
+No dispatch STOP condition was found, so the report was written after
+the audit passed.
+
+Own-interior 1 s -> 2 s staged levels (percent decrease computed at
+recorded precision):
+
+| Method | Chapter | 1 s | 2 s | Decrease |
+|---|---|---|---|---|
+| c3 | GX011627 | 0.032020 | 0.024577 | 23.24% |
+| c3 | GX011625 | 0.073744 | 0.066203 | 10.23% |
+| ancuti2018 | GX011627 | 0.117788 | 0.101864 | 13.52% |
+| ancuti2018 | GX011625 | 0.109015 | 0.100218 | 8.07% |
+
+Direction holds in all four cases; an approximately 20% gap does not
+hold uniformly. A matched 2 s-interior control also favors 2 s (c3
+24.62% / 14.54%, Ancuti 15.03% / 16.16%). Old-frame re-trims do not
+isolate boundary bias, because references differ and GX011625's left
+boundary remains in the full old span. The report states those limits;
+AD-3's status and DR-25 (3) disposition remain CHARC's accept actions.
+
+### Light verification
+
+Each runner's output was redirected to the named log; matching `.exit`
+files record exit 0. No code changed, so importers were not rerun.
+
+| Check | Observed summary | Worktree log |
+|---|---|---|
+| Required synthetic module, shim loaded | `22 passed in 4.53s` | `work/cdr25-6-green.log` |
+| Whole-tree Ruff | `All checks passed!` | `work/cdr25-6-ruff.log` |
+| Whole-tree format check | `312 files already formatted` | `work/cdr25-6-format.log` |
+| Whole configured mypy scope | `Success: no issues found in 156 source files` | `work/cdr25-6-mypy.log` |
+
+Final scratch document check: `work/cdr25-6-report-check.py` exited 0,
+with output `work/cdr25-6-report-check.log`:
+
+```text
+REPORT_CHECK_PASS table_rows 31 ASCII_LF 2 scope 2 links_exist True diff_check clean
+```
+
+It independently matches all 12 long-run flicker rows, four ground-2
+rows, nine count/slice rows and six historical re-trim rows to the durable
+data; confirms ASCII/LF, local link targets and the two-file ownership
+surface; and runs `git diff --check`. Git emitted only the prospective
+LF-to-CRLF warning from its configuration; on-disk CR-byte counts are zero.
+
+Exact commands are in the report's section 9. Pytest uses process-local
+`PYTHONPATH=scripts`, `sandbox_mkdir_shim`, `no:cacheprovider`, timeout
+120 and `--basetemp=work/cdr25-6-green`. The inherited main-tree
+`VIRTUAL_ENV` was cleared only in these processes. Static checks use
+this worktree's uv environment. No full gate, harness gate, serial test,
+GPU work or extract/analyse/render phase was run by this cell.
+
+| Suspected issue | Independent confirmation / rejection | Disposition |
+|---|---|---|
+| Saved interiors or candidate coverage contradict the instrument. | Re-trim all available sequence records; compare counts/slices to literal radii and staged multipliers; both methods/all windows present. | Rejected; no instrument defect or STOP. |
+| An unavailable row violates R1. | Recursive scan finds only GX011625's two trends; exactly 57 crossed pairs per method with aligned ticks. | Expected limitation confirmed; reported with CHARC's wording. |
+| Unsmoothed baselines use a different step population. | Re-trim separately to every candidate's own slice; add common-2 s-slice cross-window control. | Addressed in report, no code change. |
+| Old/new differences measure boundary bias alone. | Match original ticks, intersect with long edge-free slice, and trace constant reference construction to each span's raw mean. | Rejected; changed-reference and remaining-left-edge limits stated. |
+| The report omits carried review obligations or crosses ownership. | Final section/figure/obligation audit and path-limited diff check. | Report and ledger only; all carried report obligations covered. |
+
+Final verification pass found no new in-envelope issue. Binding locks
+honored: product/prototype and frozen interfaces unchanged; no dependency,
+OS-specific product code or default change; ASCII/LF owned artifacts;
+no footage/evidence/main-tree work write, deletion, mailbox post or `.git`
+mutation. The durable records were only read; scratch stays in-worktree.
+No deviations or new questions. Reviewer B and the specified final gate
+(parallel/serial, harness, collection identity) remain dispatcher work;
+CHARC owns the register/AD-3 note and WP1.4 erratum pointer.
+
+Depth at turn-6 end: 133,949 input tokens of 475,000 (driver footer, FRESH session 01a1a157-6f2b-7391-9242-5fa191ebfca1, 2026-11-03 turn 6).
