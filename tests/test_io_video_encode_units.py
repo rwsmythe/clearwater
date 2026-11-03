@@ -9,21 +9,27 @@ from __future__ import annotations
 import json
 import math
 import subprocess
-from collections.abc import Mapping
+import sys
+import threading
+import time
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 
-from clearwater.interfaces.image import ColorDescription
+from clearwater.interfaces.image import ColorDescription, Frame
 from clearwater.interfaces.video import (
     EditEntry,
     EncoderCapability,
     Fault,
     GoProInfo,
     ProbeResult,
+    SinkReport,
     VideoStreamInfo,
 )
 from clearwater.io.video import capability, encode, nut, verify
@@ -1260,3 +1266,290 @@ def test_a_failed_output_listing_is_an_error_a_source_listing_is_not(
     assert verify.read_packet_table(Path("cut.mp4")).video_index == 0  # cut short: tolerated
     with pytest.raises(VideoProbeError, match="exit status 1"):
         verify.read_packet_table(Path("out.mp4"), strict=True)
+
+
+# --- WP5.8: real pipe backpressure, with Python standing in for the encoder -------------------
+
+_WATCHDOG_PAYLOAD_BYTES = 36 * 1024 * 1024
+_WATCHDOG_READER = """
+import os
+import sys
+import time
+from pathlib import Path
+
+def read_exact(count):
+    while count:
+        chunk = os.read(0, min(count, 65536))
+        if not chunk:
+            raise RuntimeError('unexpected end of frame pipe')
+        count -= len(chunk)
+"""
+
+
+class _WatchdogSink(encode.FFmpegVideoSink):
+    """Keep the real lifecycle and transport; substitute media payloads and the encoder."""
+
+    def __init__(self, script: str, payload: bytes) -> None:
+        super().__init__()
+        self.script = script
+        self.payload = payload
+
+    def _command(self, command: list[str]) -> list[str]:
+        return [sys.executable, "-c", self.script]
+
+    def _payload(self, frame: Frame) -> tuple[int, bytes]:
+        # Quantisation is unrelated to pipe backpressure; avoid a 144 MiB float32 image.
+        assert frame.pts_ticks is not None
+        return frame.pts_ticks, self.payload
+
+    def _verify(self, end: int) -> SinkReport:
+        # The Python child consumes counted bytes, not NUT, and cannot make an MP4.
+        return SinkReport(len(self._written), (), ())
+
+
+def _watchdog_header() -> bytes:
+    probe = _probe()
+    return nut.stream_header(
+        width=probe.video.width,
+        height=probe.video.height,
+        bit_depth=8,
+        time_base=TB,
+        frame_rate=probe.video.frame_rate,
+    )
+
+
+def _watchdog_frame(index: int = 0) -> Frame:
+    return Frame(
+        pixels=np.zeros((1, 1, 3), dtype=np.float32),
+        color=_color(),
+        orientation_applied=False,
+        device="cpu",
+        pts=index * 1001 * TB,
+        pts_ticks=index * 1001,
+        time_base=TB,
+        index=index,
+    )
+
+
+def _watchdog_wait(path: Path, timeout: float = 1.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while not path.exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    return path.exists()
+
+
+@contextmanager
+def _watchdog_encoder(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    body: str,
+    *,
+    count: int = 1,
+) -> Iterator[tuple[_WatchdogSink, Path, threading.Event]]:
+    """Run a real Python child with a four-second rescue independent of the product watcher."""
+    pts = tuple(index * 1001 for index in range(count))
+    source = _table(pts)
+    source = replace(
+        source,
+        streams=(replace(source.video, duration_ts=count * 1001), *source.streams[1:]),
+    )
+    monkeypatch.setattr(encode, "read_packet_table", lambda *args, **kwargs: source)
+    monkeypatch.setattr(encode, "find_tool", lambda name: Path(sys.executable))
+    # raising=False permits the RED run against the unchanged module.
+    monkeypatch.setattr(encode, "STALL_TIMEOUT_S", 1.0, raising=False)
+    sink = _WatchdogSink(_WATCHDOG_READER + body, bytes(_WATCHDOG_PAYLOAD_BYTES))
+    monkeypatch.setattr(
+        sink, "capabilities", lambda: (EncoderCapability("libx265", True, None, (8,), False),)
+    )
+    out = tmp_path / "partial.mp4"
+    out.write_bytes(b"partial output")
+    rescued = threading.Event()
+
+    def rescue() -> None:
+        rescued.set()
+        process = sink._process
+        if process is not None and process.poll() is None:
+            process.kill()
+
+    timer = threading.Timer(4.0, rescue)
+    timer.daemon = True
+    timer.start()
+    try:
+        sink.open(
+            _probe(), out, encoder="libx265", quality="standard", bit_depth=8, provenance=None
+        )
+        yield sink, out, rescued
+    finally:
+        timer.cancel()
+        process = sink._process
+        if process is not None and process.poll() is None:
+            process.kill()
+        sink.abort()
+        timer.join(timeout=0.5)
+
+
+def test_watchdog_stalled_frame_fails_and_removes_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A live encoder that stops reading a pipe-filling frame fails before the rescue."""
+    first = len(_watchdog_header()) + len(nut.frame_header(0, _WATCHDOG_PAYLOAD_BYTES)) + 4096
+    with _watchdog_encoder(tmp_path, monkeypatch, f"\nread_exact({first})\ntime.sleep(60)\n") as (
+        sink,
+        out,
+        rescued,
+    ):
+        process = sink._process
+        assert process is not None
+        timeline: dict[str, float | None] = {}
+        kill = process.kill
+        remove = encode._remove
+
+        def timed_kill() -> None:
+            timeline["watcher_kill"] = time.monotonic()
+            timeline["waiting_since"] = getattr(sink, "_waiting_since", None)
+            kill()
+
+        def timed_remove(path: Path) -> None:
+            remove(path)
+            timeline["output_deleted"] = time.monotonic()
+
+        monkeypatch.setattr(process, "kill", timed_kill)
+        monkeypatch.setattr(encode, "_remove", timed_remove)
+        started = time.monotonic()
+        with pytest.raises(VideoEncodeError) as caught:
+            sink.write(_watchdog_frame())
+        timeline["writer_error_observed"] = time.monotonic()
+        assert caught.value.kind == "encoder_failed"
+        assert "stopped accepting frames" in str(caught.value)
+        assert "libx265" in str(caught.value)
+        assert not rescued.is_set() and time.monotonic() - started < 5
+        assert not out.exists() and process.poll() is not None
+        assert sink._watchdog_thread is not None and not sink._watchdog_thread.is_alive()
+        (tmp_path / "timeline.json").write_text(json.dumps(timeline), encoding="ascii")
+
+
+def test_watchdog_healthy_slow_encoder_completes_six_frames(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Six 0.3-second frame reads remain healthy although their total exceeds the threshold."""
+    sizes = [
+        len(nut.frame_header(index * 1001, _WATCHDOG_PAYLOAD_BYTES)) + _WATCHDOG_PAYLOAD_BYTES
+        for index in range(6)
+    ]
+    body = (
+        f"\nread_exact({len(_watchdog_header())})\n"
+        f"for size in {sizes!r}:\n    time.sleep(0.3)\n    read_exact(size)\n"
+        "while os.read(0, 65536):\n    pass\n"
+    )
+    with _watchdog_encoder(tmp_path, monkeypatch, body, count=6) as (sink, out, rescued):
+        for index in range(6):
+            sink.write(_watchdog_frame(index))
+        assert sink.close().frames_written == 6
+        assert getattr(sink, "_stalled", None) is None
+        assert not rescued.is_set() and out.exists()
+        watcher = getattr(sink, "_watchdog_thread", None)
+        assert watcher is None or not watcher.is_alive()
+
+
+def test_watchdog_stalled_sentinel_fails_before_finish_timeout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Append an invalid 36 MiB tail to the sentinel solely to fill the fake reader's pipe.
+
+    The Python child parses no NUT; a real sentinel is too small to force backpressure after
+    all frames have been read. Only this test replaces the sentinel bytes (CHARC R2).
+    """
+    consumed = (
+        len(_watchdog_header())
+        + len(nut.frame_header(0, _WATCHDOG_PAYLOAD_BYTES))
+        + _WATCHDOG_PAYLOAD_BYTES
+    )
+    sentinel = nut.sentinel
+    monkeypatch.setattr(nut, "sentinel", lambda pts: sentinel(pts) + bytes(_WATCHDOG_PAYLOAD_BYTES))
+    body = f"\nread_exact({consumed})\ntime.sleep(60)\n"
+    with _watchdog_encoder(tmp_path, monkeypatch, body) as (sink, out, rescued):
+        sink.write(_watchdog_frame())
+        started = time.monotonic()
+        with pytest.raises(VideoEncodeError) as caught:
+            sink.close()
+        assert caught.value.kind == "encoder_failed"
+        assert "stopped accepting frames" in str(caught.value)
+        assert "libx265" in str(caught.value)
+        assert not rescued.is_set() and time.monotonic() - started < 5 < encode.FINISH_TIMEOUT_S
+        assert not out.exists()
+        assert sink._process is not None and sink._process.poll() is not None
+
+
+def test_watchdog_normal_nonzero_exit_keeps_status_and_stderr(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An ordinary exit during a frame retains the existing error instead of a stall report."""
+    consumed = len(_watchdog_header()) + len(nut.frame_header(0, _WATCHDOG_PAYLOAD_BYTES)) + 4096
+    body = (
+        f"\nread_exact({consumed})\n"
+        "sys.stderr.write('fake encoder exit witness\\n')\nsys.stderr.flush()\nsys.exit(7)\n"
+    )
+    with _watchdog_encoder(tmp_path, monkeypatch, body) as (sink, out, rescued):
+        with pytest.raises(VideoEncodeError) as caught:
+            sink.write(_watchdog_frame())
+        assert caught.value.kind == "encoder_failed"
+        assert "exit status 7" in str(caught.value)
+        assert "fake encoder exit witness" in str(caught.value)
+        assert "stopped accepting frames" not in str(caught.value)
+        assert getattr(sink, "_stalled", None) is None
+        assert not rescued.is_set() and not out.exists()
+
+
+def test_watchdog_abort_during_wait_joins_watcher_without_thread_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cancellation releases a blocked writer and joins the watcher without a thread exception."""
+    ready = tmp_path / "reader-stopped"
+    consumed = len(_watchdog_header()) + len(nut.frame_header(0, _WATCHDOG_PAYLOAD_BYTES)) + 4096
+    body = f"\nread_exact({consumed})\nPath({str(ready)!r}).touch()\ntime.sleep(60)\n"
+    thread_errors: list[threading.ExceptHookArgs] = []
+    monkeypatch.setattr(threading, "excepthook", thread_errors.append)
+    with _watchdog_encoder(tmp_path, monkeypatch, body) as (sink, out, rescued):
+        errors: list[BaseException] = []
+
+        def write_frame() -> None:
+            try:
+                sink.write(_watchdog_frame())
+            except BaseException as error:
+                errors.append(error)
+
+        writer = threading.Thread(target=write_frame, daemon=True)
+        writer.start()
+        try:
+            assert _watchdog_wait(ready) and writer.is_alive()
+            sink.abort()
+        finally:
+            if sink._process is not None and sink._process.poll() is None:
+                sink._process.kill()
+            writer.join(timeout=1)
+        assert not writer.is_alive() and errors and isinstance(errors[0], VideoEncodeError)
+        assert not thread_errors and not rescued.is_set() and not out.exists()
+        assert sink._process is not None and sink._process.poll() is not None
+        watcher = getattr(sink, "_watchdog_thread", None)
+        assert watcher is not None, "abort must stop the started watchdog thread"
+        assert not watcher.is_alive()
+
+
+def test_watchdog_small_send_flushes_before_another_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A frame header smaller than Python's buffer reaches the child without another write."""
+    ready = tmp_path / "header-read"
+    header = nut.frame_header(0, _WATCHDOG_PAYLOAD_BYTES)
+    consumed = len(_watchdog_header()) + len(header)
+    body = f"\nread_exact({consumed})\nPath({str(ready)!r}).touch()\ntime.sleep(60)\n"
+    with _watchdog_encoder(tmp_path, monkeypatch, body) as (sink, _out, rescued):
+        sink._send(header)
+        assert _watchdog_wait(ready), "small _send was buffered instead of readable by the encoder"
+        assert not rescued.is_set()
