@@ -572,4 +572,4 @@ smoke wrote 174 MB, two publications of 87 MB).
 | 0 | A (Codex, at the orchestrator's seat) | 0 | 4 | 4 | 1 | 9 / 0 | 9 / 0 | 0 | 9 / 0 / 0 |
 | 1 | A (Codex, at the orchestrator's seat) | 0 | 1 | 3 | 0 | 4 / 0 | 4 / 0 | 0 | 3 / 1 / 0 |
 
-Depth at step-2C end: DISPATCHER TO FILL
+Depth at step-2C end: 275495 (scripts/cell_depth.py, wp57-cell3, read by the orchestrator at the step-2C yield 2026-11-03)
