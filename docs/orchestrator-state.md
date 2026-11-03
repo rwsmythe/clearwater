@@ -5,9 +5,9 @@
 
 ### Generation
 
-- **Generation 38** (session `clearwater-orchestrator-20261103-0215`) LIVE 2026-11-03 12:15Z to ~20:35Z, ROLLED OVER at the 400K depth cap with NOTHING running (the Part 3 window finished first); picked up gen 37's state at `98a58c29`. CHARC is **gen 14 `clearwater-charc-20261103-0028`**; re-verify both names in `comms/.launch-sessions.json` before every cue. Seat folder `work/orch-g38/` (gate.sh / watch.sh / watch2.sh / fill_gate.py; the successor copies them to `work/orch-g39/` with sed `g38`->`g39`). **`watch2.sh <run> <offset>`** reads only summary lines after line `<offset>`. Bash gauge at bring-up: 47 ms. State worktree `.worktrees/orch-state-g38` (the successor removes it and adds its own).
-- **Disk:** C: 46 GB free at 20:28Z (after the Part 3 window). `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB before any window.
-- **Paces at 12:17Z:** Codex 20 % (pace 0.23, resets 2026-11-04 10:07Z); Claude 13 % (pace 0.831, resets 2026-11-09 10:00Z). Codex is the lower pace.
+- **Generation 39** (session `clearwater-orchestrator-20261103-1029`) LIVE 2026-11-03 20:29Z; picked up gen 38's state at `561ceb2a` (gen 38 `clearwater-orchestrator-20261103-0215` rolled clean at 400K with nothing running). CHARC is **gen 14 `clearwater-charc-20261103-0028`**; re-verify both names in `comms/.launch-sessions.json` before every cue. Seat folder `work/orch-g39/` (gate.sh / watch.sh / watch2.sh / fill_gate.py, copied from g38 with sed `g38`->`g39`; the successor does the same to g40). **`watch2.sh <run> <offset>`** reads only summary lines after line `<offset>`. Bash gauge at bring-up: 34 ms. State worktree `.worktrees/orch-state-g39` (the successor removes it and adds its own).
+- **Disk:** C: 46 GB free at 20:30Z. `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB before any window.
+- **Paces at 20:30Z:** Codex 21 % (pace 0.229, resets 2026-11-04 10:07Z); Claude 15 % (pace 0.73, resets 2026-11-09 10:00Z). Codex is the lower pace.
 - **CHARC subjects: under 100 characters.**
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/`)
@@ -21,20 +21,20 @@
 - **Backslash-bearing Python helpers are written with the Write tool**, never a heredoc. **`rm` takes literal absolute paths.** **Worktree release:** a released worktree's `work/` is pruned only on the owner's word; junits copied to `clearwater-review-evidence\<pkg>\gate\` first.
 - **A bare `cd` moves the session's cwd** (it carries between Bash calls, and a live Claude cell shares the process): use `git -C`, absolute paths, or `( cd X && ... )`.
 
-### Live board (RESUME HERE) -- ROLLOVER 2026-11-03 ~20:35Z, NOTHING RUNNING
+### Live board (RESUME HERE) -- gen 39, 2026-11-03 20:35Z
 
-Successor = generation 39: drain the inbox at pickup; copy `work/orch-g38/` scripts to `work/orch-g39/`.
+On pickup: drain the inbox; copy `work/orch-g39/` scripts to `work/orch-g40/`. A cell named below as LIVE dies with its dispatcher's pane: re-dispatch from the ledger.
 
 1. **WP-DR25 ACCEPTED** (main `fa8eceab`; gate `pdr25` GREEN). CHARC: DR-25 CLOSED in full, AD-3 CONFIRMED (main `732f1da4`). Worktree `.worktrees/wp-dr25` + 7.1 GB `work\wp-dr25\` KEPT (owner's word to prune).
 2. **WP5.7** (Claude lane; `.worktrees/wp5.7`, head `60357596`; evidence `C:\Users\rwsmy\clearwater-review-evidence\wp5.7\`; outputs `C:\Users\rwsmy\clearwater\work\wp5.7\`).
    - Part 2 + step 3R done; CHARC rulings C1-C6 (candidate (d) unsharpened 1 sigma), Q1 (no loop round 5), Q2 (V3 on WP4.2's two clips), the C4 STOP ruling (msg 4c60bacc3de85d88: the binding bound is N6 itself; no adopt-now; owner's choice = defer to Phase 6 with an optimisation item, or optimise now as a Phase 6-class package; headroom ~+9.6 %).
    - Part 3 built by wp57-cell6 (`tools/halo_part3.py` + tests, `1db00e58`; the cell is DONE and dies with this pane).
    - **THE EXCLUSIVE WINDOW RAN AND IS COMPLETE** (`work\wp5.7\part3\`, logs `part3\logs\runs.txt`; durable copies `...\wp5.7\part3\` and `\v3\`): v3 15:08-15:11Z exit 0 (shipped reproduces WP4.2's record; (d) passes every asserted bound; ad14 contrast ratio c3 0.072 -> 0.316); n6 15:11-15:40Z, six runs valid, **(d) +13.59 % (12.43 vs 10.95 min/min) = C4 STOP, ruled**; crops 15:40-15:49Z 6/6; photos 15:50-15:58Z 70/70 (after the CRLF seat fix in `run-part3.sh`, original `run-part3.sh.orig`); videos 15:59-20:27Z **50/50 exit 0** (IMG_6762 4,441 s); sheet 20:28Z exit 0: "SHEET 120 items; contact: IMG_6762, GX011601, GX011600, GX011590, GX011625, IMG_6751, IMG_6758, IMG_6753, IMG_6755, IMG_6754, IMG_6757, IMG_6746, IMG_6759, IMG_6756, IMG_6752, IMG_6768, IMG_6770, IMG_6767, IMG_6769, IMG_6761".
-   - **NEXT (1):** dispatch a FRESH `implementer-opus-high` cell `wp57-cell7` with `C:\Users\rwsmy\clearwater-review-evidence\wp5.7\cell\dispatch-10.md` (ready; it carries every ruling and the window record through photos); in the starting message add: "videos 15:59-20:27Z, 50/50 exit 0 (IMG_6762 4,441 s, the last); sheet 20:28Z exit 0, SHEET 120 items, contact list as above; free C: 46 GB". It writes the ledger's Part 3 results and `docs/reports/wp5.7-halo-investigation.md` (no GPU). Fill its depth line.
+   - **LIVE: `wp57-cell7`** (FRESH `implementer-opus-high`, dispatched 20:31Z by gen 39 with `C:\Users\rwsmy\clearwater-review-evidence\wp5.7\cell\dispatch-10.md` + the videos / sheet outcome in the starting message + CHARC's steer (msg 61fa577714607f97: state the set-wide texture softening as an OBSERVATION, items 01 IMG_6762 and 06 IMG_6751 named with the mean-abs / p99 columns; the N6 row and the +9.6 % budget) relayed by SendMessage at 20:33Z). It writes the ledger's Part 3 results and `docs/reports/wp5.7-halo-investigation.md` (no GPU). Fill its `Depth at Part 3 yield` line at the yield.
    - **NEXT (2):** durable copies the cell lists (contact sheet, crops, the whole-set JSON records) to `...\wp5.7\part3\` before merge; Reviewer A (Codex, read-only; scope: the Part 3 build `1db00e58`, the corrected Part 2 tables (Q1 says name them), the report; form `...\wp5.7\A\r4\review-prompt.md`; diff `git diff 4afa2af0..HEAD -- tools tests` + the report); Reviewer B (Codex); gate (outcome A: no src/ path in the diff; parallel + serial + harness; `tests/test_tools_halo_probe.py` and `tests/test_tools_halo_part3.py` in the parallel junit; no fullclip); accept; CHARC routes the owner's decision (defer / optimise) with the sheet, crops, V3 and N6.
 3. **WP5.5** release prep (Codex) after WP5.7 merges (brief FINAL; tag `v1.0.0` on the owner's word, no push). **WP-H1** HELD by CHARC until WP5.5's accept.
-- Mail drained through 15:41Z (`work/orch-g38/drain-5.txt`); 0 unread at 20:30Z. No query open.
-- Kept worktrees: `wp5.3`, `wp5.7`, `wp5.8`, `wp-dr25`, `orch-state-g38`.
+- Mail drained through 20:31Z (`work/orch-g39/drain-1.txt`: CHARC's ack + steer). No query open.
+- Kept worktrees: `wp5.3`, `wp5.7`, `wp5.8`, `wp-dr25`, `orch-state-g39`.
 
 ### Gen-38 lessons
 
