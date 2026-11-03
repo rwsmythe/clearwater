@@ -25,6 +25,8 @@ from prototype.backend import CPU
 from prototype.pipeline import Statistics
 
 RATE = Fraction(30000, 1001)
+BASE_RUNNER_BLOB = "74019b47e56bb1b1d7d0ad0c15b3615150ba8925"
+PRE_R1_RUNNER_BLOB = "5bada347da89885c93453b57a2cc03053e4de4c2"
 DEFAULT_SPECS = (
     ("GX011627", "GX011627", 0.30, 6.0, True, True, (205205, 384384, 1001)),
     ("GX011625", "GX011625", 0.50, 6.0, False, False, None),
@@ -35,38 +37,66 @@ LONG_SPECS = (
 )
 
 
-def _revision_runner(revision):
-    """Load immutable historical instrument source, never the working source as an oracle."""
+def _revision_runner(blob_id):
+    """Load a historical instrument blob without depending on a rebased commit's reachability."""
+    repository = Path(__file__).resolve().parents[1]
+    object_type = subprocess.run(
+        ["git", "cat-file", "-t", blob_id],
+        cwd=repository,
+        capture_output=True,
+        encoding="utf-8",
+        timeout=10,
+        check=False,
+    )
+    assert object_type.returncode == 0 and object_type.stdout.strip() == "blob", (
+        f"Historical instrument blob {blob_id} is missing or is not a blob; "
+        "fetch the repository history containing the pinned instrument before running these tests."
+    )
     source = subprocess.check_output(
-        ["git", "show", f"{revision}:tools/statistics_experiments.py"],
-        cwd=Path(__file__).resolve().parents[1],
+        ["git", "cat-file", "blob", blob_id],
+        cwd=repository,
         encoding="utf-8",
         timeout=10,
     )
-    module = types.ModuleType(f"statistics_experiments_{revision}")
+    module = types.ModuleType(f"statistics_experiments_{blob_id}")
     module.__file__ = runner.__file__
     module.__package__ = "tools"
     sys.modules[module.__name__] = module
-    exec(
-        compile(source, f"git:{revision}:tools/statistics_experiments.py", "exec"), module.__dict__
-    )
+    exec(compile(source, f"git-blob:{blob_id}", "exec"), module.__dict__)
     return module
 
 
 @pytest.fixture(scope="module")
 def base_runner():
-    """Generate default-path golden records from the fixed WP1.4 base revision."""
-    module = _revision_runner("0cafb374")
+    """Generate default-path golden records from the fixed WP1.4 base blob."""
+    module = _revision_runner(BASE_RUNNER_BLOB)
     yield module
     del sys.modules[module.__name__]
 
 
 @pytest.fixture(scope="module")
 def pre_r1_runner():
-    """Keep all unaffected long measurements pinned to the diagnosis-turn revision."""
-    module = _revision_runner("6dfccdfc")
+    """Keep all unaffected long measurements pinned to the diagnosis instrument blob."""
+    module = _revision_runner(PRE_R1_RUNNER_BLOB)
     yield module
     del sys.modules[module.__name__]
+
+
+@pytest.mark.parametrize("blob_id", [BASE_RUNNER_BLOB, PRE_R1_RUNNER_BLOB])
+def test_revision_runner_loads_blob_without_resolving_commit(blob_id, monkeypatch):
+    """Load each historical source directly from its rebase-stable blob."""
+    # Restore any fixture's existing registration even when tests run in a different order.
+    monkeypatch.setitem(sys.modules, f"statistics_experiments_{blob_id}", None)
+    module = _revision_runner(blob_id)
+    assert callable(module.run_experiments)
+    assert module.RENDER_METHOD == "ancuti2018"
+
+
+def test_revision_runner_refuses_missing_blob_with_clear_message():
+    """Explain a missing history prerequisite before trying to execute its source."""
+    missing = "0" * 40
+    with pytest.raises(AssertionError, match=f"Historical instrument blob {missing} is missing"):
+        _revision_runner(missing)
 
 
 def _take_documents(folder):
@@ -478,6 +508,32 @@ def test_long_ordered_trend_keeps_full_record_unchanged(tmp_path, monkeypatch, p
     for method in ("ancuti2018", "c3"):
         assert "available" not in document["flicker"][method]["linear_trend"]
         assert len(document["flicker"][method]["linear_trend"]["per_step"]) == 599
+
+
+@pytest.mark.parametrize("method", ["ancuti2018", "c3"])
+def test_long_equal_trend_bounds_remain_available(tmp_path, monkeypatch, method):
+    """Keep a trend with one exactly equal bound pair available for each method."""
+    linear_trend = runner.temporal.linear_trend
+    witnessed = []
+
+    def trend_with_one_tie(series):
+        trend = linear_trend(series)
+        if series["normalisation_bounds.low"][0] == {"ancuti2018": 3, "c3": 5}[method]:
+            low = trend["normalisation_bounds.low"]
+            high = trend["normalisation_bounds.high"]
+            # Plant an exact tie after the real fit, avoiding OLS roundoff at equality.
+            high[3] = low[3]
+            assert np.flatnonzero(low == high).tolist() == [3]
+            witnessed.append(3)
+        return trend
+
+    monkeypatch.setattr(runner.temporal, "linear_trend", trend_with_one_tie)
+    document, *_ = _window_study(tmp_path, monkeypatch, 8, long=True, reject_crossed_trend=True)
+    assert witnessed == [3]
+    row = document["flicker"][method]["linear_trend"]
+    assert "available" not in row
+    assert len(row["per_step"]) == 7
+    assert row["all"] == pytest.approx(np.mean(row["per_step"]))
 
 
 @pytest.mark.parametrize("count", [600, 599])

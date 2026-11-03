@@ -944,7 +944,7 @@ def run_experiments(
     ``long=True``, a two-method window study replaces the Ancuti-only study,
     using each candidate's own staged or flat reach for its interior. An auxiliary
     linear-trend fit whose N{} bounds cross is recorded as unavailable on that
-    path, with every crossing frame and its fitted bounds, before rendering it.
+    path, with every crossing frame and its fitted bounds, instead of rendering it.
 
     Args:
         folder: The excerpt's folder.

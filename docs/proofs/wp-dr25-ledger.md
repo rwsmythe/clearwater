@@ -865,3 +865,167 @@ No deviations or new questions. Reviewer B and the specified final gate
 CHARC owns the register/AD-3 note and WP1.4 erratum pointer.
 
 Depth at turn-6 end: 133,949 input tokens of 475,000 (driver footer, FRESH session 01a1a157-6f2b-7391-9242-5fa191ebfca1, 2026-11-03 turn 6).
+
+## Turn 7 (Reviewer B remediation)
+
+Resumed session on `83ad9d69`, after the dispatcher's rebase onto main
+`6393cb35`. The supplied turn-6 depth is recorded above. This is Reviewer
+B's single remediation, not a new reviewer round or a new instrument run.
+The dispatcher-seat Claude B verdict on `83ad9d69` is
+`NEW_CRITICAL_MAJOR_FOUND`; transcript withheld. B independently recomputed
+the report figures without a mismatch and supplied seven findings with
+binding dispositions. The dispatcher owns the one B rerun and final gate.
+
+### Seven dispositions
+
+| Finding | Severity / envelope | Confirmation and disposition |
+|---|---|---|
+| B1 | MAJOR, in | FIXED. `_revision_runner` now takes a full blob id, asserts `git cat-file -t` succeeds and returns `blob`, then reads `git cat-file blob`. Both fixtures use fixed blob constants, with no commit/path or branch-relative lookup. Two direct-blob loading cases and a missing-blob diagnostic case cover this contract. The guard names the missing/non-blob object and explains the history prerequisite. |
+| B2 | MINOR, in | FIXED. The report identifies each analysis by its full instrument blob and commit subject. Old commit names appear only as parenthesized pre-rebase labels beside a stable blob; the code used for each run is no longer identified solely by an unreachable commit. |
+| B3 | ADVISORY, in | FIXED. The lead and section 5 explicitly identify the original approximately-one-fifth claim as Ancuti-only. The new c3 comparison is independent, with its first-chapter gap larger and second-chapter gap smaller than that historical margin; no c3 failure of an original c3 claim is implied. |
+| B4 | ADVISORY, in | FIXED in tests. Each method has a trend with exactly one equal low/high pair at index 3. Equality is planted after the real fit to avoid numerical pseudo-ties. The ordinary signal boundary rejects actual crossed pairs, and the test requires a complete available seven-step trend row. M8 now fails both method cases. The executable guard remains strict `>`, matching prototype `check_statistics`. |
+| B5 | ADVISORY, in | FIXED docstring only. `run_experiments` says an invalid trend is recorded unavailable "instead of rendering it". Byte comparison to the analysed instrument confirms this is the only instrument change; no executable or record-writing behavior changes. |
+| B6 | ADVISORY, out | NO CODE CHANGE. The report's Limits now states `_duration_source` assumes `streams[0]`; an empty list is outside this envelope because `probe_stream` succeeded first. No new malformed-probe handling is added. |
+| B7 | ADVISORY, accepted coverage limit | NO CHANGE. The default-extract golden covers only the GX011625 spec; this diff touches no full-frame extraction code. |
+
+### Rebase-stable source identity
+
+The three `git cat-file -t <id>` commands returned `blob` (captured in
+`work/cdr25-7-blobs.log`):
+
+| Role | Instrument blob |
+|---|---|
+| Fixed WP1.4 base / `base_runner` | `74019b47e56bb1b1d7d0ad0c15b3615150ba8925` |
+| Pre-R1 diagnosis / `pre_r1_runner`; also the failed first analysis | `5bada347da89885c93453b57a2cc03053e4de4c2` |
+| R1-fixed successful second analysis | `e346ca303cadf719c6b1f30eb9aaeaa80dcdbe61` |
+
+`git rev-parse 8abb3869:tools/statistics_experiments.py` independently
+returned the pre-R1 blob above. The dispatcher supplied the historical
+mapping: first analysis pre-rebase `45bca4db` -> `8abb3869`, successful
+second analysis pre-rebase `68caf100` -> `056d9d74`. The report includes
+both exact commit subjects, with blobs as the run identifiers. The old
+ledger entries are chronological records, not fixture source pins.
+
+The new valid-blob test restores any existing `sys.modules` registration
+through `monkeypatch`, so it does not remove a live historical fixture's
+module when test scheduling changes. The missing-blob case uses the null
+object id; it does not remove or rewrite any git object/ref. The existing
+whole-document goldens and pre-R1 comparisons retain their original data
+and exclusions; only their source-addressing mechanism changes.
+
+### RED, equality and M8
+
+All pytest runs use process-local `PYTHONPATH=scripts`,
+`PYTHONDONTWRITEBYTECODE=1`, `sandbox_mkdir_shim`, `no:cacheprovider` and
+timeout 120. The inherited `VIRTUAL_ENV` was cleared only in the runner
+process. Every runner's stdout/stderr is under this worktree's ignored
+`work/`; no log or temporary file was written to the main-tree work root.
+
+Before changing the loader, the new blob/guard/equality selection ran
+against the current instrument and old test helper:
+
+```text
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py -k "revision_runner or equal_trend_bounds" --timeout 120 --basetemp=work/cdr25-7-red
+```
+
+Observed exit 1: **`3 failed, 2 passed, 22 deselected in 1.29s`**
+(`work/cdr25-7-red.log`). The two direct-blob tests failed because the
+old loader appended `:tools/statistics_experiments.py` to a blob id;
+the missing-blob test failed because that loader emitted a subprocess
+failure rather than the required clear assertion. The two tie cases
+**passed on the current head**, as expected: the instrument already uses
+strict `>` and equality is valid. This is not a claim that equality
+needed an executable fix.
+
+The one-off M8 probe temporarily replaced only
+`np.flatnonzero(lows > highs)` with `np.flatnonzero(lows >= highs)`.
+Its child command was:
+
+```text
+python -m pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py -k equal_trend_bounds --timeout 120 --basetemp=work/cdr25-7-m8
+```
+
+The child used the exact interpreter selected by `uv run python -` and
+the environment above. Observed pytest exit 1:
+**`2 failed, 25 deselected in 5.40s`**, both
+`test_long_equal_trend_bounds_remain_available` method cases, because
+the trend row was incorrectly unavailable. The inline driver restored
+the instrument bytes in `finally`, printed **`RESTORED True`**, and
+exited 0 after asserting the expected mutant failures. Logs/exit files:
+`work/cdr25-7-m8.log`, `.exit`, and `work/cdr25-7-m8-driver.log`, `.exit`.
+No mutant is retained or committed; this temporary restoration is not
+a permanent code revert.
+
+### GREEN and light checks
+
+| Check | Final observed summary (exit 0) | Worktree log |
+|---|---|---|
+| New synthetic module | `27 passed in 2.16s` | `work/cdr25-7-green.log` |
+| Three previously commit-dependent pre-R1 tests, explicitly selected | `3 passed in 1.12s` | `work/cdr25-7-pre-r1.log` |
+| Existing importers, once | `85 passed, 4 deselected, 1 warning in 7.37s` | `work/cdr25-7-importers.log` |
+| Whole-tree Ruff | `All checks passed!` | `work/cdr25-7-ruff.log` |
+| Whole-tree format check | `312 files already formatted` | `work/cdr25-7-format.log` |
+| Whole configured mypy scope | `Success: no issues found in 156 source files` | `work/cdr25-7-mypy.log` |
+
+The explicit three-test selection names the two parametrized crossing
+cases and `test_long_ordered_trend_keeps_full_record_unchanged`. The
+full-module initial GREEN was 27 passed in 2.82 s; it was repeated after
+isolating the direct-blob test's module registration, giving the final
+result above. The initial format check requested one call-layout change;
+it was fixed before the final checks. Importers were not repeated because
+that later change affects only the new synthetic test's module cleanup.
+
+Exact commands, each redirected to its log (pytest environment as above):
+
+```text
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-7-green
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py::test_long_crossed_trend_is_unavailable_without_rendering_or_changing_other_records tests/test_tools_statistics_experiments.py::test_long_ordered_trend_keeps_full_record_unchanged --timeout 120 --basetemp=work/cdr25-7-pre-r1
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_footage_locator.py tests/test_prototype_temporal.py -m "not gpu and not footage and not gui and not slow" --timeout 120 --basetemp=work/cdr25-7-importers
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+```
+
+Only the importer process additionally set `CUDA_VISIBLE_DEVICES=-1`,
+proactively reusing the confirmed turn-2 collection workaround to avoid
+an import-time CUDA probe beside the host's batch. No new collection
+stall occurred and no selected test skipped. The warning is the existing
+CuPy undetected-CUDA-path warning, not a test failure. No GPU/footage
+test, full gate, extract/analyse/render phase or harness gate ran here.
+
+### Final verification and cumulative ledger
+
+The inline read-only audit (`work/cdr25-7-audit.log`, exit 0) compares
+the current instrument to the successful analysis blob byte for byte,
+allowing only the one ruled docstring replacement. All 62 report table
+rows match the committed report, except the two instrument-identifier
+cells and the corresponding header; all other cells are identical.
+Prose figures also match after excluding source identifiers/subjects,
+section references and the newly required empty-streams limit line.
+Thus no report figure or executable record-writing behavior changed.
+The initial prose-token check counted the new section-1 cross-reference;
+excluding section references resolved that audit false positive without
+changing any measured figure. Final summary:
+
+```text
+REMEDIATION_AUDIT_PASS instrument_docstring_only True report_table_rows 62 report_prose_figures_unchanged True ASCII_LF True
+```
+
+| Round | Critical | Major | Minor | Advisory | In / out of envelope | NEW / REOPENED | Reverts | Fix surface | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 prerequisite audit | 0 | 2 | 1 | D3 fit observation | All in | All new / 0 | 0 | Ruled instrument changes in turn 2 | CHARC ruled at `0f2d19c4` |
+| A1 | 0 | 0 | 2 | 6 | F1-F7 in; F8 out | 8 / 0 | 0 permanent | Instrument/tests in turn 3; report obligations in turn 6 | `NO_NEW_CRITICAL_MAJOR` |
+| A2 | 0 | 0 | 1 | 3 | F1-F4 in | 4 / 0 | 0 permanent | Tests F1/F3 in turn 5; report F2/F4 in turn 6 | CONVERGED |
+| B1 | 0 | 1 | 1 | 5 | B6 out; other six dispositioned in envelope / accepted coverage | 7 / 0 | 0 permanent | 3 test functions plus loader/fixture pins; 1 report; 1 instrument docstring; no executable product fix | `NEW_CRITICAL_MAJOR_FOUND`; single remediation complete, dispatcher rerun owed |
+
+The three new test functions supply five parameter cases (two blob loads,
+one missing-blob guard, two method ties). All seven findings are
+dispositioned above; none is reopened. No remaining in-envelope defect
+was found in the final verification pass. The only instrument edit is
+documentation, so no run-code or record-affecting STOP is triggered.
+Owned paths are the instrument, its test module, report and this ledger;
+ASCII/LF, diff and scope checks close this turn. No product/prototype,
+frozen interface, dependency, footage/evidence file, main-tree output,
+git history or mailbox is changed. No new question or deviation is raised.
+
+Depth at turn-7 end: 173,792 input tokens of 258,400 (driver footer, session 01a1a157, 2026-11-03 turn 7; the footer reported 475,000 at turn 6).

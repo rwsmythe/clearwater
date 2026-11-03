@@ -4,8 +4,9 @@ The 2 s `median_gaussian` leaves less staged flicker than 1 s on both
 20 s excerpts and both methods, using each candidate's own edge-free interior.
 The reductions are **23.24% / 10.23% for c3** and **13.52% / 8.07% for
 ancuti2018**, in GX011627 / GX011625 order. Thus the direction of WP1.4's
-ground 2 holds here, but its "about a fifth" margin is not reproduced on
-both chapters, including for the shipped default c3. AD-3's status remains
+ground 2 holds here, but the original (Ancuti-only) claim's "about a fifth"
+margin is not reproduced on both Ancuti chapters. The new c3 evidence
+supplies a separate comparison for the shipped default. AD-3's status remains
 CHARC's ruling at acceptance; this report changes no decision or default.
 
 ## 1. Scope and durable evidence
@@ -35,8 +36,15 @@ C:\Users\rwsmy\clearwater-review-evidence\wp-dr25\runs2\
   dr25-runs.txt
 ```
 
-The successful analysis ran on `68caf100`. The two `results.json` SHA-256s,
-in GX011627 / GX011625 order, are:
+The successful analysis used instrument blob
+`e346ca303cadf719c6b1f30eb9aaeaa80dcdbe61` (pre-rebase `68caf100`),
+from the commit with subject:
+
+```text
+fix(wp-dr25): R1 -- a crossing linear_trend is recorded unavailable under --long; test(wp-dr25): default records pinned whole (Reviewer A round 2)
+```
+
+The two `results.json` SHA-256s, in GX011627 / GX011625 order, are:
 
 ```text
 cfd5bb8cc029eb103095d130a974b2715870e5b173f9ebfab7745d83493617d6
@@ -201,9 +209,11 @@ re-trimming the 1 s staged per-step array to the **2 s staged interior**
 gives 1 s levels 0.032603 / 0.077469 for c3 and 0.119878 / 0.119530 for
 Ancuti. Relative to those values, the same 2 s levels are lower by
 24.62% / 14.54% and 15.03% / 16.16%, respectively. Both comparisons
-therefore favor 2 s on these excerpts; neither reproduces an approximately
-20% reduction uniformly. In particular the new c3 evidence supports the
-direction, with a smaller second-chapter gap than the original claim.
+therefore favor 2 s on these excerpts. The Ancuti comparisons do not
+reproduce the original (Ancuti-only) claim's approximately 20% reduction
+uniformly. The new c3 evidence independently supports the direction,
+with a larger first-chapter gap and a smaller second-chapter gap than
+the margin in the original (Ancuti-only) claim.
 CHARC determines what this means for AD-3 at acceptance.
 
 The 4 s own-interior levels are lower again in all four cases (section 4),
@@ -262,11 +272,20 @@ The second and third lines are the first failed and second successful
 analysis attempts, respectively. These resources are the dispatcher's
 records, not timings measured by this report cell:
 
-| Phase / head | UTC on 2026-11-03 | Exit / elapsed | C: free before -> after | Outcome |
+| Phase / instrument | UTC on 2026-11-03 | Exit / elapsed | C: free before -> after | Outcome |
 |---|---|---|---|---|
 | extract | 08:42:48-08:56:01 | 0 / recorded 791 s | 82 -> 72 GB | Both excerpts; 7.1 GB kept |
-| first analyse / `45bca4db` | ended 09:42:25 | 2 / elapsed not supplied | 72 GB after extract -> 71 GB at failure | GX011625 auxiliary linear fit crossed; superseded |
-| second analyse / `68caf100` | 10:49:48-12:14:08 | 0 / logged 5,056 s | 59 -> 64 GB | Both excerpts complete; R1 unavailable rows recorded |
+| first analyse / blob `5bada347da89885c93453b57a2cc03053e4de4c2` (pre-rebase `45bca4db`) | ended 09:42:25 | 2 / elapsed not supplied | 72 GB after extract -> 71 GB at failure | GX011625 auxiliary linear fit crossed; superseded |
+| second analyse / blob `e346ca303cadf719c6b1f30eb9aaeaa80dcdbe61` (pre-rebase `68caf100`) | 10:49:48-12:14:08 | 0 / logged 5,056 s | 59 -> 64 GB | Both excerpts complete; R1 unavailable rows recorded |
+
+The first analysis's instrument blob comes from the commit with subject:
+
+```text
+fix(wp-dr25): Reviewer A round 1 -- per-method and per-series signal witnesses, default not clamped, render --long refused, duration source recorded
+```
+
+The second analysis's commit subject is recorded in section 1. The blobs
+identify the run code independently of rebased commit names.
 
 `runs2\dr25-runs.txt` records the exits/disk snapshots;
 `runs2\cdr25-analyse-long-2.log` ends with `elapsed 5056 s` and both
@@ -289,6 +308,7 @@ configuration and the instrument's checked output roots.
   produce a negative start for a chapter shorter than 20 s. Both
   commissioned chapters exceed 20 s; no general short-chapter support
   is claimed or added.
+- `_duration_source` assumes `streams[0]` exists; an empty streams list is outside this run's envelope because `probe_stream` has already succeeded.
 - **GX011625's `linear_trend` is UNAVAILABLE for both methods.** Each
   record says `fitted normalisation_bounds.low exceeds normalisation_bounds.high`
   and lists 57 crossing frames, zero-based indices 542..598. The first
@@ -325,7 +345,8 @@ float32 NumPy area-average proxies.
 ## 9. Verification and acceptance transfer
 
 This report turn changes only this report and the owned ledger. The
-instrument/test changes through turn 5 remain at `68caf100`: long routing,
+instrument used through turn 5 is blob
+`e346ca303cadf719c6b1f30eb9aaeaa80dcdbe61` (pre-rebase `68caf100`): long routing,
 start/source records, method/reach-specific studies and the ruled R1
 diagnostic; synthetic controls pin default records to the WP1.4 base.
 No product/prototype code, frozen interface, dependency, smoother/default
