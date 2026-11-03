@@ -2225,4 +2225,4 @@ mechanics became false).
 |---|---|---|---|---|---|---|---|---|---|
 | 7 | A (Codex, at the orchestrator's seat; on the B fix) | 0 | 1 | 1 | 0 | 2 / 0 | 2 / 0 | 0 | 1 (R7-1, with a test) / 1 (R7-2) / 0 |
 
-Depth at round-7 yield: DISPATCHER TO FILL
+Depth at round-7 yield: 170,131 (wp57-cell9 at its yield, 58 turns, 2026-11-03 ~22:35Z; read by orchestrator gen 39 with scripts/cell_depth.py). The cell stays available for a round-8 fix (below the 250K evaluation point).
