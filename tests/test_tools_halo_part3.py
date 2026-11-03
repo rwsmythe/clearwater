@@ -310,7 +310,15 @@ def test_run_n6_runs_the_bench_of_record_inside_the_switch(
     assert record["clip_in_effect"] is (setting == "candidate")
 
 
-def _n6_run(folder: Path, index: int, setting: str, rate: float, *, calls: int = 700) -> None:
+def _n6_run(
+    folder: Path,
+    index: int,
+    setting: str,
+    rate: float,
+    *,
+    calls: int = 700,
+    started: str | None = None,
+) -> None:
     name = f"export-bench-GX011627-{index}.json"
     run = {
         "ok": True,
@@ -324,7 +332,7 @@ def _n6_run(folder: Path, index: int, setting: str, rate: float, *, calls: int =
     (folder / name).write_text(json.dumps({"runs": [run]}), encoding="utf-8")
     sidecar = {
         "setting": setting,
-        "started": f"2026-11-03T00:0{index}:00+00:00",
+        "started": started or f"2026-11-03T00:0{index}:00+00:00",
         "export_bench_exit": 0,
         "records": [name],
         "fusion_inputs_calls": calls,
@@ -350,9 +358,29 @@ def test_n6_summary_medians_effect_pairs_and_the_stop(
 
 
 def test_n6_summary_refuses_a_run_the_switch_did_not_reach(tmp_path: Path) -> None:
-    _n6_run(tmp_path, 0, "shipped", 10.9)
-    _n6_run(tmp_path, 1, "candidate", 11.0, calls=0)
-    assert not p3.n6_summary(tmp_path)["valid"]
+    # Round 7 finding 2: on an otherwise valid six-run population, so the only problem is the
+    # switch's reach (the old two-run form was also refused by the minimum-pair rule).
+    for index, rate in enumerate([10.9, 11.0, 10.8]):
+        _n6_run(tmp_path, 2 * index, "shipped", rate)
+        _n6_run(tmp_path, 2 * index + 1, "candidate", rate * 1.05, calls=0 if index == 1 else 700)
+    summary = p3.n6_summary(tmp_path)
+    assert not summary["valid"]
+    assert summary["problems"] == ["n6-candidate-3.json: fusion_inputs never called"]
+
+
+def test_n6_summary_refuses_runs_with_the_same_start(working: Path) -> None:
+    # Round 7 finding 1: D1 and S2 share a ``started`` stamp; the file-name order (candidate
+    # before shipped) and a stable sort kept the tie in protocol order, so the old check passed.
+    folder = working / "wp5.7" / "part3" / "n6"
+    folder.mkdir(parents=True)
+    for index, rate in enumerate([10.9, 11.0, 10.8]):
+        tie = "2026-11-03T00:01:00+00:00" if index == 1 else None
+        _n6_run(folder, 2 * index, "shipped", rate, started=tie)
+        _n6_run(folder, 2 * index + 1, "candidate", rate * 1.2)
+    summary = p3.n6_summary(folder)
+    assert not summary["valid"] and not summary["stop"]
+    assert any("same started" in line for line in summary["problems"]), summary["problems"]
+    assert p3.main(["n6-summary"]) == 5
 
 
 def test_n6_summary_reads_only_the_run_sidecars(tmp_path: Path) -> None:

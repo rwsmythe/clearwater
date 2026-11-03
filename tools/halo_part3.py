@@ -809,12 +809,22 @@ def n6_summary(folder: Path) -> dict[str, Any]:
     }
 
 
+def _instant(started: str) -> Any:
+    """A run's ``started`` as an instant (an ISO 8601 stamp); the text itself if it is not one."""
+    try:
+        return datetime.fromisoformat(started)
+    except ValueError:
+        return started
+
+
 def n6_protocol_problems(runs: Sequence[Mapping[str, Any]]) -> list[str]:
     """The ways a population of N6 runs departs from C4's protocol of record (none: it holds).
 
     The protocol: both settings of :data:`N6_SETTINGS` present; the runs, in ``started`` order,
     strictly alternate starting with ``shipped`` (S D S D ...); an even count, so every run is in
-    a complete shipped-then-candidate pair; and at least :data:`N6_MIN_PAIRS` pairs.
+    a complete shipped-then-candidate pair; and at least :data:`N6_MIN_PAIRS` pairs. No two runs
+    may share a ``started`` instant: within a tie the order is the sort's (file-name) order, not
+    time, so the alternation would be unproven (Reviewer A round 7 finding 1).
 
     Args:
         runs: The runs, sorted by ``started`` (each with its ``sidecar`` name and ``setting``).
@@ -824,6 +834,14 @@ def n6_protocol_problems(runs: Sequence[Mapping[str, Any]]) -> list[str]:
     """
     present = {run["setting"] for run in runs}
     problems = [f"no {setting} run" for setting in N6_SETTINGS if setting not in present]
+    by_start: dict[Any, list[str]] = {}
+    for run in runs:
+        by_start.setdefault(_instant(run["started"]), []).append(run["sidecar"])
+    for names in by_start.values():
+        if len(names) > 1:
+            problems.append(
+                f"{', '.join(names)}: the same started instant (the time order is not proven)"
+            )
     for index, run in enumerate(runs):
         expected = N6_SETTINGS[index % len(N6_SETTINGS)]
         if run["setting"] != expected:
