@@ -1,0 +1,61 @@
+# WP5.7 — Halo investigation (dispatch brief, DRAFT for the orchestrator's fill)
+
+**Status:** DRAFT 2026-11-03 by CHARC (generation 13, session `clearwater-charc-20261102-0046`), the DR-117 paydown named at CP5 (owner 2026-11-03: "Concur with your D65 recommendation" = CP5 PASS, halos recorded, a follow-on investigation before release). The orchestrator fills the dispatch section and CHARC marks it FINAL. Spec v0.5.8. **Owner decisions inside the package: any change to a shipped default (D16 / D100 / the 6.7 defaults) is owner-reserved and is NOT made here; the package PROPOSES, with evidence, and CHARC routes the proposal.**
+
+| Field | Content |
+|---|---|
+| ID and title | WP5.7 — Halo investigation: reproduce the six CP5 halo observations at the shipped defaults, localise the pipeline stage that produces them, propose the smallest change, and measure the proposal's effect over the whole CP5 set (DR-117) |
+| Lane | **CLAUDE**: `implementer-opus-high` (reasoning-dense: image-pipeline diagnosis with the owner's observations as the only oracle). Reviewer A = Codex `gpt-6.1-sol` / high at the cell's seat, to convergence, five-round gate. Reviewer B = the Codex pass at the orchestrator's seat. Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp5.7\`. |
+| Tier and size | STRONG. Size M (an instrument, a diagnosis, a measured proposal; no product default changes; product code changes only if a DEFECT is found: see "Two outcomes"). Cell depth: ~250K evaluation point, STOP at ~400K; a yield after each of the three parts. |
+| Base | main at dispatch (at or after `5cfe1bb4`). Worktree `.worktrees/wp5.7`, branch `wp5.7`. |
+| Goal | The owner observed halos (a bright or dark band along a high-contrast edge) on IMG_6739 ("around the turtle on the right side"), IMG_6743, IMG_6744 (photos), IMG_6738 (phone clip), GX011627 ("begin at the last second") and the compilation ("around the legs in the upper left starting at about 27 seconds"). The package explains them: which stage of spec 6.2 creates the band, on which input, and why on these items; and it measures what the smallest candidate change does to the halo items AND to the 120 other CP5 items (no regression of the look the owner preferred). |
+| Spec / decision clauses | D65 / V2 (the artifact clause; CP5 PASS stands); 6.2 steps 3-5 (sharpened input 2 with the whole-frame normalisation; the Laplacian contrast, saliency and saturation weights with δ = 0.1 regularisation; the multiscale fusion with the pyramid depth set by the minimum level size, D56 / 6.6); D16 (3C default); D100 (caps kept); D99 (gain clamp); 6.7 (the user parameters: sharpening strength, gamma, pyramid minimum level size, blend). |
+| Files owned | **NEW** `tools/halo_probe.py` (the instrument: renders an item at the shipped defaults with each stage's intermediate saved, and with one parameter varied; writes crops around a named region; a JSON record per run); **NEW** `docs/reports/wp5.7-halo-investigation.md`; `tests/test_tools_halo_probe.py` (unit tests on synthetic edges). Product code ONLY under outcome B below, limited to `src/clearwater/methods/fusion.py` and `src/clearwater/methods/ancuti_fusion.py`, with their tests. |
+| NOT owned | `src/clearwater/interfaces/` (FROZEN); `methods/compensation.py`; `analysis/`; any default value in the parameter schema or the starter presets (owner-reserved); `tools/reviewpack/`, `work/wp5.3` (read in place, never rewritten); the GUI. |
+| Locks | No frozen interface. No dependency. No write under the footage folder; the CP5 pack `work/wp5.3/` is read-only evidence (its pairs and the filled sheet are the record of what the owner saw: a rebuild would conflict with the owner's answers). Outputs under `work/wp5.7/`. **The owner's judgement is the oracle: the cell does not decide what "obvious" means; it measures edge-band amplitude and width and shows crops.** |
+| Markers | `tests/test_tools_halo_probe.py` parallel-leg on synthetic frames (a step edge, a disc on a gradient). Any test touching the six real items is `footage` (serial leg) and reads through `tools.local_config.find_footage_file`. |
+| Hardware flags | GPU preferred, not EXCLUSIVE (no timing figure is taken). The whole-set measurement (120 items at the shipped defaults versus the candidate) runs once, as a batch, with nothing else heavy beside it; about 1 h at CP5's pace; `df -h /c` before (STOP below 25 GB free). |
+| Out of scope | Changing any shipped default (proposed, not done); the video temporal path (the GX011627 and compilation halos appear on single frames: analyse the frames at those times, not the smoothing); WP5.4 (no shimmer was seen); the 3C or Ancuti compensation equations; a new user control (a spec change). |
+| Debt and decided items | At the accept CHARC writes: DR-117 note (cause localised, the proposal, the whole-set effect) and either CLOSED (outcome B, a defect fixed) or OPEN with the owner's decision pending (outcome A, a default change proposed); a possible AD note on the fusion stage. |
+| Done | Plan 4.5. ruff, format, mypy clean; the instrument's unit tests green; the six items reproduced with crops at the regions the owner named; the stage localised with before / after intermediates; at least one candidate measured on the six AND on the whole set; the report; Reviewer A converged; Reviewer B clean or its single remediation done. |
+
+## Why
+
+CP5 passed on preference (111 / 115) with five halo observations in the headline set, four of them on items the owner still preferred. A halo along a high-contrast edge against open water (a turtle, legs, a sudden pan) is the classic signature of multiscale fusion with a sharpened input: input 2's high-pass (`S = (I + N{I − G∗I}) / 2`) overshoots at the edge, the Laplacian-contrast weight favours that input exactly there, and the fusion carries the overshoot into the result; a pyramid that is too shallow for the image (6.6: depth from the minimum level size) leaves a visible band at the scale of the coarsest level. These are hypotheses, not findings: the package tests them on the owner's items.
+
+## The three parts (one yield after each)
+
+**Part 1 — reproduce and localise (the instrument).** `tools/halo_probe.py`:
+- Input: one source (photo, or a video and a time), the method and parameters (default: the shipped defaults, `c3`), a region (x, y, w, h in source pixels; the owner's words map to a region the cell chooses and records with a crop).
+- Renders the item through the product's method (`methods/ancuti_fusion.py`, the same code path `tools/headless_export.py` uses) with EVERY 6.2 intermediate saved for the region: compensated, white-balanced, input 1 (gamma), input 2 (sharpened), the three weight maps per input, the normalised weights, the fused result, and the blend. Writes 16-bit PNG crops and a JSON record (the region, the parameters, per-stage edge-band statistics: the overshoot amplitude and band width across the edge, measured on a line profile perpendicular to the edge the cell marks).
+- Runs on the six items at the shipped defaults. For the two videos: GX011627 at the last second (the frames from 21.7 s to 22.7 s; the owner said "begin at the last second") and the compilation at 27-29 s; decode the frames with the product's decoder at the shipped analysis (the smoothed statistics for that clip come from a real analysis run: use `tools/headless_export.py` with `--record` or the probe's own analysis call; state which).
+- Deliverable of part 1: a table "item, region, stage at which the band first exceeds X % overshoot, band width in pixels and in units of the sharpening sigma and of the coarsest pyramid level". The hypothesis is confirmed, refined or rejected here. YIELD with the table (round 0 for Reviewer A).
+
+**Part 2 — the smallest change, measured on the six.** For each candidate (in this order, stop early when one removes the band without changing the preferred look): (a) the sharpening strength (6.7 Basic) at steps below the default; (b) the pyramid minimum level size (6.7 Advanced) at smaller sizes = deeper pyramid; (c) the weight regularisation δ (a constant today; a change is an implementation detail if the paper's value is kept selectable: state it); (d) clipping input 2's overshoot to the local range of input 1 (an algorithm change inside `fusion_inputs`, outcome B territory). Measure the band statistics and save the crops for each; one line per candidate per item. No default changes: the candidates are passed as parameters or, for (c) and (d), as instrument-only switches on a branch.
+
+**Part 3 — the whole-set effect.** Render the 120 other CP5 items with the chosen candidate and at the shipped defaults; measure, with the probe's own whole-image statistics (the maximum edge-band overshoot found by scanning strong edges, the per-channel mean shift between the two renders, the clipped-pixel fraction; `tools/lookcheck/pack.py`'s `statistics_record` is the prototype's compensation / white-balance record, not an artifact metric, and is NOT what is meant here) for both; produce a contact sheet of the 20 items whose statistics move most, side by side, for CHARC and the owner to look at. No preference judgement is made by the cell.
+
+## Two outcomes
+
+- **A: a parameter proposal.** The band is the designed behaviour of the shipped parameters on these edges; a different default (sharpening, pyramid depth) removes it with a measured, small whole-set effect. The report proposes the value; CHARC takes it to the owner as a decision request (a default change is a spec 6.7 / D16 matter); nothing ships in this package.
+- **B: a defect.** The band comes from an implementation divergence from spec 6.2 (a wrong normalisation bound, a pyramid collapsed one level short, a weight not regularised as written, an off-by-one in the high-pass sigma). Fix it in `fusion.py` / `ancuti_fusion.py` with a test that fails on the old code; re-run the six and the whole set; V8 and V9 identity tests must stay green (the fix changes output: the WP5.1 reference figures that depend on the fused output are re-stated in the report, and CHARC rules on the acceptance consequence before merge).
+
+## Questions (CHARC's recommended answers; a round-0 dispute with evidence is a STOP to CHARC)
+
+- **Q1 the oracle.** Recommended: the band statistics (overshoot amplitude relative to the edge contrast, band width) plus crops are the evidence; the owner's six observations define the regions; no new owner viewing is requested inside the package (CHARC shows the owner the part-3 contact sheet at the accept).
+- **Q2 photos first.** Recommended: run the four photos end to end through parts 1-2 before the two video items (no analysis cache, faster iteration); the video frames join at part 2.
+- **Q3 the whole set.** Recommended: all 120 non-halo CP5 items, not a sample; one batch run, about 1 h.
+
+## Completion report (`docs/reports/wp5.7-halo-investigation.md`)
+
+The six reproductions (crops, regions, the stage table); the hypothesis verdict; each candidate's effect on the six and on the whole set (statistics and the contact sheet); the outcome (A: the proposed default with its whole-set effect; B: the defect, the fix, the re-stated figures); limits (the owner's eye is the only artifact oracle; the band metric is the cell's; display and viewer differences).
+
+## Yields and depth
+
+Part 1 → YIELD (round 0: the stage table, any Q dispute = STOP); part 2 → YIELD (the candidate table); part 3 → YIELD (the whole-set contact sheet) then Reviewer A; the report; the nets. ~250K evaluation point; STOP at ~400K.
+
+## Orchestrator dispatch fill (for CHARC to finalise)
+
+- Lane paces at dispatch; base commit; worktree; evidence folder.
+- Order: parallel with WP5.8 (Codex lane). Before WP5.5.
+- GATE_CHECKS: `docs/review-gate-clearwater.md` Part 2 on the final candidate; under outcome B the fullclip leg runs too (the fused output changed).
