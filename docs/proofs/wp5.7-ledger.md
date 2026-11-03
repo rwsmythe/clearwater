@@ -1209,4 +1209,10 @@ departs from the paper, needs a spec 6.2 amendment, changes the cached fusion st
 The owner's eye is the oracle for both; the cell does not judge the look, and CHARC rules the
 candidate.
 
-Depth at Part 2 return: DISPATCHER TO FILL
+Featured compilation frame of record (the orchestrator's ruling on the cell's open question,
+2026-11-03): 27.010 s **line 3** (the shin; Part 1's table and step 2B's featured frames, 3.22 /
+0.200 shipped). Dispatches 5 and 7 named line 1 in error (the dispatcher's slip); both lines are
+tabled above, so no measurement is lost.
+
+Depth at Part 2 return: 207,413 (scripts/cell_depth.py, wp57-cell5, read twice by the orchestrator
+at the return 2026-11-03; peak 207,413, 31 turns)
