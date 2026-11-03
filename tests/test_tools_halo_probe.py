@@ -568,6 +568,30 @@ def test_s1_controls_through_the_real_staged_render(gain: float | None) -> None:
     assert water["fused"]["Y"]["reference"] == "source"
 
 
+def test_s1_references_are_the_source_through_the_render_gains_and_gamma() -> None:
+    # Reviewer A round 2, finding 4: a CHROMATIC scene, where 3C is not an identity, so the
+    # source reference and the compensated image differ. Both references must be the SOURCE
+    # through the supplied gains (strength, then the D99 clamp) and then the gamma, computed
+    # here without the probe; the balanced and input-1 images themselves would fail this.
+    method = AncutiFusionMethod("c3")
+    params = hp.resolve_parameters(method, [])
+    image = Image(pixels=_scene(), device="cpu", color=SRGB, orientation_applied=True)
+    statistics = hp.photo_statistics(method, image, params)
+    stages = dict(hp.staged_render(method, image, params, statistics))
+    source = np.asarray(stages["source"], dtype=np.float64)
+    assert np.abs(np.asarray(stages["compensated"]) - source).max() > 1e-3  # 3C acts here
+    strength = params["white_balance_strength"]
+    requested = 1.0 + strength * (np.asarray(statistics["white_balance"]["gains"]) - 1.0)
+    gains = np.minimum(requested, params["max_white_balance_gain"])
+    balanced = np.clip(source * gains, 0.0, 1.0)
+    input1 = np.clip(balanced ** params["gamma"], 0.0, 1.0)
+    np.testing.assert_allclose(stages["remap_balanced"], balanced, atol=1e-6)
+    np.testing.assert_allclose(stages["remap_input1"], input1, atol=1e-6)
+    # The control discriminates: the stage images are not the references here.
+    assert np.abs(np.asarray(stages["balanced"]) - balanced).max() > 1e-3
+    assert np.abs(np.asarray(stages["input1"]) - input1).max() > 1e-3
+
+
 def _attribution_scene() -> tuple[dict[str, dict[str, Any]], dict[str, Any], dict[str, Any]]:
     """S2: a synthetic line whose fused band qualifies while input 2's own band does not.
 
@@ -786,16 +810,120 @@ def test_main_refuses_a_windows_device_name(tmp_path: Path, working: Path, name:
     # Round 1, fix 3: a device name (any case, with or without an extension) would send the
     # record to a device and report success; refused on every OS.
     source = _scene_file(tmp_path)
-    argv = ["--source", str(source), "--out", str(working / "o"), "--cache-dir", str(working)]
+    argv = ["--source", str(source), "--out", str(working / "o"), "--cache-dir", str(working / "c")]
     status = hp.main([*argv, "--name", name, "--line", "30,48,90,48", "--margin", "8"])
     assert status == 2
     assert not (working / "o").exists()
 
 
+def _failing_renames(
+    monkeypatch: pytest.MonkeyPatch, publish: BaseException, undo: BaseException | None
+) -> None:
+    """Make the publish rename (staging -> out) raise ``publish``; the rollback (replaced ->
+    out) raise ``undo`` when given. Every other rename runs."""
+    original = Path.rename
+
+    def rename(self: Path, target: Any) -> Any:
+        if self.name.startswith(".out.staging-") and Path(target).name == "out":
+            raise publish
+        if (
+            self.name.startswith("out.replaced-")
+            and undo is not None
+            and Path(target).name == "out"
+        ):
+            raise undo
+        return original(self, target)
+
+    monkeypatch.setattr(Path, "rename", rename)
+
+
+def _published(tmp_path: Path, working: Path) -> tuple[list[str], Path, dict[str, bytes]]:
+    """One successful publication in ``working/out``; the argv to replace it, and its files."""
+    source = _scene_file(tmp_path)
+    out = working / "out"
+    argv = ["--source", str(source), "--out", str(out), "--cache-dir", str(working / "c")]
+    argv += ["--line", "30,48,90,48", "--margin", "8", "--force-cpu"]
+    assert hp.main(argv) == 0
+    return [*argv, "--replace"], out, _snapshot(out)
+
+
+def test_main_failed_publish_and_failed_rollback_names_both_and_the_kept_folder(
+    tmp_path: Path,
+    working: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Round 2, fix 2: the publish rename fails, and so does putting the old publication back:
+    # the message names both failures and the folder that now holds the old publication.
+    replace, _out, before = _published(tmp_path, working)
+    capsys.readouterr()
+    _failing_renames(monkeypatch, OSError("publish-boom"), OSError("undo-boom"))
+    assert hp.main(replace) == 1
+    message = capsys.readouterr().err
+    kept = [p for p in working.iterdir() if p.name.startswith("out.replaced-")]
+    assert len(kept) == 1
+    assert _snapshot(kept[0]) == before  # the old publication, whole, in the kept folder
+    assert "publish-boom" in message
+    assert "undo-boom" in message
+    assert kept[0].name in message
+
+
+@pytest.mark.parametrize("undo_fails", [False, True])
+def test_main_interrupted_publish_rolls_back(
+    tmp_path: Path,
+    working: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    undo_fails: bool,
+) -> None:
+    # Round 2, fix 2: an interrupt during the publish rename still puts the old publication
+    # back (and is re-raised); if putting it back fails too, the kept folder is named.
+    replace, out, before = _published(tmp_path, working)
+    capsys.readouterr()
+    _failing_renames(monkeypatch, KeyboardInterrupt(), OSError("undo-boom") if undo_fails else None)
+    if not undo_fails:
+        with pytest.raises(KeyboardInterrupt):
+            hp.main(replace)
+        assert _snapshot(out) == before
+        assert not [p for p in working.iterdir() if p.name.startswith("out.replaced-")]
+        return
+    assert hp.main(replace) == 1
+    kept = [p for p in working.iterdir() if p.name.startswith("out.replaced-")]
+    assert len(kept) == 1
+    assert _snapshot(kept[0]) == before
+    message = capsys.readouterr().err
+    assert "KeyboardInterrupt" in message
+    assert "undo-boom" in message
+    assert kept[0].name in message
+
+
+@pytest.mark.parametrize(
+    "cache", ["out", "out/c", ".", "out.replaced-20261103T000000Z/c", ".out.staging-x"]
+)
+def test_main_refuses_a_cache_folder_in_the_publication_tree(
+    tmp_path: Path, working: Path, cache: str
+) -> None:
+    # Round 2, fix 3: the cache equal to, inside or containing the output folder, or inside one
+    # of its sibling folders (staging, failed, replaced), is refused before any write.
+    source = _scene_file(tmp_path)
+    out = working / "out"
+    argv = ["--source", str(source), "--out", str(out), "--cache-dir", str(working / cache)]
+    status = hp.main([*argv, "--line", "30,48,90,48", "--margin", "8", "--force-cpu"])
+    assert status == 2
+    assert sorted(p.name for p in working.iterdir()) == []
+
+
 def test_main_refuses_an_output_inside_the_footage_folder(tmp_path: Path, working: Path) -> None:
     source = _scene_file(tmp_path)
     footage = tmp_path / "footage"
-    argv = ["--source", str(source), "--out", str(footage / "out"), "--cache-dir", str(working)]
+    argv = [
+        "--source",
+        str(source),
+        "--out",
+        str(footage / "out"),
+        "--cache-dir",
+        str(working / "c"),
+    ]
     status = hp.main([*argv, "--line", "30,48,90,48", "--margin", "8", "--force-cpu"])
     assert status == 2
     assert not (footage / "out").exists()
@@ -809,7 +937,7 @@ def test_main_refuses_a_name_that_is_not_a_plain_stem(
     source = _scene_file(tmp_path)
     if name == "ABS":
         name = str(tmp_path / "absolute")
-    argv = ["--source", str(source), "--out", str(working / "o"), "--cache-dir", str(working)]
+    argv = ["--source", str(source), "--out", str(working / "o"), "--cache-dir", str(working / "c")]
     status = hp.main([*argv, "--name", name, "--line", "30,48,90,48", "--margin", "8"])
     assert status == 2
     assert not list(tmp_path.rglob("*.json"))
@@ -857,7 +985,7 @@ def test_main_fails_without_a_record_when_the_render_check_differs(
 
 def test_main_refusals(tmp_path: Path, working: Path) -> None:
     source = _scene_file(tmp_path)
-    base = ["--source", str(source), "--out", str(working / "o"), "--cache-dir", str(working)]
+    base = ["--source", str(source), "--out", str(working / "o"), "--cache-dir", str(working / "c")]
     base.append("--force-cpu")
     assert hp.main([*base, "--line", "30,48,90"]) == 2  # three numbers
     assert hp.main([*base, "--line", "30,48,90,48", "--method", "nope"]) == 2
@@ -870,7 +998,7 @@ def test_main_refuses_a_strip_that_leaves_the_region_or_the_image(
     # Fix 5: the line's ends lie inside the region but its averaging strip (half width 4) does
     # not; and a line at the image's top row, whose strip leaves the image.
     source = _scene_file(tmp_path)
-    base = ["--source", str(source), "--out", str(working / "o"), "--cache-dir", str(working)]
+    base = ["--source", str(source), "--out", str(working / "o"), "--cache-dir", str(working / "c")]
     base.append("--force-cpu")
     assert hp.main([*base, "--line", "30,42,90,42", "--region", "20,40,80,20"]) == 2
     assert hp.main([*base, "--line", "30,2,90,2", "--margin", "8"]) == 2

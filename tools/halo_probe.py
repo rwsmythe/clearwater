@@ -119,9 +119,19 @@ it is renamed aside, before the publish, to the kept sibling ``<out>.replaced-<s
 tool never deletes or writes into a published folder, so a link planted in it is never written
 through). A run that fails or is refused after the staging folder was made publishes nothing
 and leaves ``<out>`` untouched: an empty staging folder is removed (``os.rmdir``, which removes
-nothing else); one holding partial output is kept, renamed ``.<out>.failed-<stamp>``. The
+nothing else); one holding partial output is kept, renamed ``.<out>.failed-<stamp>``. When
+the publish rename fails or is interrupted after ``<out>`` was moved aside, the old
+publication is renamed back (for any exception, which is then re-raised); if that also fails,
+the run exits 1 naming both failures and the kept folder that holds the old publication. The
 analysis cache (``--cache-dir``) is the product's ``DiskProxyCache``, reused across runs by
-design, and keeps its own write discipline.
+design, and keeps its own write discipline; it is refused when it equals, lies inside or
+contains ``<out>``, or lies inside any of ``<out>``'s sibling folders (``<out>.*`` or
+``.<out>.*``), so the analysis never writes into a publication or a staging tree. Limits (out of
+the instrument's envelope, a seat-run tool on a single-user laptop): confinement is checked at
+start-up and holds against pre-existing files and links; it does not pin the ancestors against
+a concurrent process that swaps a directory for a junction during the run, nor against one that
+plants a link in the fresh staging folder; and on POSIX a rename can replace an existing EMPTY
+directory, so the publish-time collision refusals are Windows guarantees.
 
 A run FAILS (exit 1, no record) when the staged render's output differs from the product's
 ``render`` by any amount, when ``clip(prefused)`` differs from the staged ``fused``, or when the
@@ -142,7 +152,7 @@ import sys
 from collections.abc import Iterator, Mapping, Sequence
 from datetime import UTC, datetime
 from fractions import Fraction
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any
 
 import numpy as np
@@ -1856,6 +1866,11 @@ def _options(args: argparse.Namespace) -> tuple[Path, str, Path, dict[str, Any]]
         "failed": out.parent / f".{out.name}.failed-{stamp}",
         "replaced": out.parent / f"{out.name}.replaced-{stamp}",
     }
+    if _cache_conflict(cache_dir, out):
+        raise ProbeError(
+            f"--cache-dir {cache_dir} must lie outside the output folder {out.name}, its "
+            "sibling folders and every folder that contains them"
+        )
     footage = headless_export.configured_footage_folder()
     for target in (out, cache_dir, out / f"{name}.json", *siblings.values()):
         if not headless_export.inside(target, root):
@@ -1883,6 +1898,25 @@ def _options(args: argparse.Namespace) -> tuple[Path, str, Path, dict[str, Any]]
         **siblings,
     }
     return source, name, out, options
+
+
+def _cache_conflict(cache_dir: Path, out: Path) -> bool:
+    """True when the cache folder would share a tree with the publication.
+
+    That is: ``cache_dir`` equals, lies inside or contains ``out``, or lies inside a sibling of
+    ``out`` named ``<out>.*`` or ``.<out>.*`` (the staging, failed and replaced folders of any
+    run). Compared resolved and case-normalised (:func:`headless_export.inside` for the first
+    three).
+    """
+    if headless_export.inside(cache_dir, out) or headless_export.inside(out, cache_dir):
+        return True
+    parent = PurePath(os.path.normcase(str(out.parent.resolve())))
+    cache = PurePath(os.path.normcase(str(cache_dir.resolve())))
+    if not cache.is_relative_to(parent) or cache == parent:
+        return False
+    first = cache.relative_to(parent).parts[0]
+    stem = os.path.normcase(out.name)
+    return first.startswith((f"{stem}.", f".{stem}."))
 
 
 def _check_name(name: str) -> None:
@@ -2034,13 +2068,22 @@ def _abandon(staging: Path, failed: Path) -> str:
         return f" (partial output left in {staging.name}: {exc})"
 
 
+class RollbackError(OSError):
+    """The publish rename failed and putting the old publication back failed too."""
+
+
 def _publish(staging: Path, out: Path, replaced: Path | None) -> None:
     """Publish the staging folder as ``out``, keeping an existing ``out`` aside as ``replaced``.
 
+    When the publish rename fails or is interrupted (any exception) after ``out`` was moved
+    aside, ``replaced`` is renamed back to ``out`` and the exception re-raised, so ``out`` is
+    as it was and the staging folder stays.
+
     Raises:
-        OSError: ``out`` exists and ``replaced`` is None, or a rename fails; when the second
-            rename fails the first is undone, so ``out`` is as it was and the staging folder
-            stays.
+        OSError: ``out`` exists and ``replaced`` is None, or a rename fails.
+        RollbackError: Putting the old publication back failed as well; the message names the
+            publish failure, the rollback failure and ``replaced``, which holds the old
+            publication.
     """
     if os.path.lexists(out):
         if replaced is None:
@@ -2048,8 +2091,15 @@ def _publish(staging: Path, out: Path, replaced: Path | None) -> None:
         out.rename(replaced)
         try:
             staging.rename(out)
-        except OSError:
-            replaced.rename(out)
+        except BaseException as exc:
+            try:
+                replaced.rename(out)
+            except BaseException as undo:
+                raise RollbackError(
+                    f"publishing failed ({exc!r}) and putting the old publication back failed "
+                    f"({undo!r}); the old publication is kept in {replaced.name}, beside "
+                    f"{out.name}"
+                ) from exc
             raise
         return
     staging.rename(out)
