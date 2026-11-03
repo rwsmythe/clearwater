@@ -637,4 +637,4 @@ Success, no issues found in 157 source files.
 | 1 | A (Codex, at the orchestrator's seat) | 0 | 1 | 3 | 0 | 4 / 0 | 4 / 0 | 0 | 3 / 1 / 0 |
 | 2 | A (Codex, at the orchestrator's seat) | 0 | 1 (out of envelope by adjudication) | 3 | 1 (out of envelope) | 3 / 2 | 5 / 0 | 0 | 2 / 1 / 0 |
 
-Depth at step-2D end: DISPATCHER TO FILL
+Depth at step-2D end: 309001 (scripts/cell_depth.py, wp57-cell3, read by the orchestrator at the step-2D yield 2026-11-03; cell stood down)
