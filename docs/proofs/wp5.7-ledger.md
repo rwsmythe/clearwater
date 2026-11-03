@@ -510,4 +510,4 @@ No STOP: no input-1 or white-balanced band qualifies on any line; every qualifyi
 attributed to input 2; no featured frame changed its verdict. Reported, not a STOP: input-1 bands
 over 10 % (never qualifying) survive or appear on 9 non-weak lines, cause above.
 
-Depth at step-2B end: DISPATCHER TO FILL
+Depth at step-2B end: 221229 (scripts/cell_depth.py, wp57-cell3, read by the orchestrator at the step-2B yield 2026-11-03)
