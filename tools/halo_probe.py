@@ -140,7 +140,11 @@ are passed with ``--param``. The others are INSTRUMENT-ONLY switches that edit n
 ``src/`` and change no default: ``range_floor=F`` (the N{} range floor, (e2)),
 ``clip_overshoot=REF:R`` (input 2 clipped to the local range of REF over a window of half side
 R sharpening sigmas, (d)) and ``full_res_bounds`` (the N{} bounds measured on the
-full-resolution image, (e3); photos). :func:`applied` patches the product's module attributes
+full-resolution image, (e3): for a photo the image's; for a video a full-resolution decode
+pass measures each frame's bounds with its smoothed white balance (:func:`full_res_bounds_by_pts`)
+and a second whole-clip analysis takes them per frame in place of the proxy's, keyed by the pts
+whose proxy the engine reads, and smooths them and measures the saliency means as shipped).
+:func:`applied` patches the product's module attributes
 for a ``with`` block and restores them on exit, and the analysis, the staged render and the
 product's ``render`` of the render-equality check all run inside it, so the check compares the
 staged render with the product's render under the SAME switch. Every run whose parameters or
@@ -166,7 +170,7 @@ import json
 import math
 import os
 import sys
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from datetime import UTC, datetime
 from fractions import Fraction
 from pathlib import Path, PurePath
@@ -1125,7 +1129,8 @@ class Switches:
         clip_radius_sigma: Candidate (d): the half side of the square local window, in
             sharpening sigmas.
         full_res_bounds: Candidate (e3): the N{} bounds measured on the full-resolution
-            white-balanced image instead of the analysis proxy (photos).
+            white-balanced image instead of the analysis proxy (photos: the image's; videos:
+            each frame's, then smoothed by the analysis as shipped).
     """
 
     range_floor: float | None = None
@@ -1260,7 +1265,11 @@ def clipped_fusion_inputs(reference: str, radius_sigma: float) -> Any:
 
 
 @contextlib.contextmanager
-def applied(switches: Switches, *, bounds: Sequence[float] | None = None) -> Iterator[None]:
+def applied(
+    switches: Switches,
+    *,
+    bounds: Sequence[float] | Callable[[], Sequence[float]] | None = None,
+) -> Iterator[None]:
     """Apply the switches to the product's modules for the ``with`` block; restore on exit.
 
     Patched (each restored to the exact object it held, in reverse order, on any exit):
@@ -1268,13 +1277,14 @@ def applied(switches: Switches, *, bounds: Sequence[float] | None = None) -> Ite
     so ``fusion_inputs`` everywhere sees it); ``clearwater.methods.ancuti_fusion.fusion_inputs``
     (the name ``render`` and ``analyze`` call) and this module's ``fusion_inputs`` (the name
     :func:`staged_render` calls) for candidate (d); ``ancuti_fusion.normalisation_bounds`` (the
-    name ``analyze`` measures the bounds with) for candidate (e3), returning ``bounds``.
+    name ``analyze`` measures the bounds with) for candidate (e3), returning ``bounds`` (or, when
+    ``bounds`` is a function, what it returns at that call: the video path's per-frame lookup).
 
     Args:
         switches: The switches.
         bounds: Candidate (e3): the bounds the fusion stage's measurement returns instead of
-            measuring them (the caller measured them on the full-resolution image); None for no
-            override.
+            measuring them (the caller measured them on the full-resolution image), or a
+            function giving them per call; None for no override.
 
     Yields:
         Nothing; the switches hold inside the block.
@@ -1294,10 +1304,11 @@ def applied(switches: Switches, *, bounds: Sequence[float] | None = None) -> Ite
             patch(_ancuti_module, "fusion_inputs", wrapped)
             patch(sys.modules[__name__], "fusion_inputs", wrapped)
         if bounds is not None:
-            fixed = (float(bounds[0]), float(bounds[1]))
+            supplied = bounds
 
             def measured(backend: Any, a: Any, **_: Any) -> tuple[float, float]:
-                return fixed
+                pair = supplied() if callable(supplied) else supplied
+                return float(pair[0]), float(pair[1])
 
             patch(_ancuti_module, "normalisation_bounds", measured)
         yield
@@ -1910,6 +1921,85 @@ def _full_bounds(
     return [low, high]
 
 
+class _PtsRecordingCache:
+    """The analysis cache, recording the pts of the last proxy the engine read (candidate (e3)).
+
+    ``AnalysisEngine._measure`` reads a frame's stored proxy (``proxy(key, pts)``) immediately
+    before it calls ``analyze`` on it, so during the fusion stage ``current`` names the frame
+    whose bounds the patched ``normalisation_bounds`` must return. Every other attribute is the
+    wrapped cache's.
+    """
+
+    def __init__(self, inner: Any) -> None:
+        """Wrap ``inner``."""
+        self._inner = inner
+        self.current: int | None = None
+
+    def proxy(self, key: Any, pts_ticks: int) -> Any:
+        """Record ``pts_ticks``, then read the proxy from the wrapped cache."""
+        self.current = int(pts_ticks)
+        return self._inner.proxy(key, pts_ticks)
+
+    def __getattr__(self, name: str) -> Any:
+        """Every other attribute of the wrapped cache."""
+        return getattr(self._inner, name)
+
+
+def full_res_bounds_by_pts(
+    source: Any,
+    probe: Any,
+    method: AncutiFusionMethod,
+    backend: Any,
+    params: Mapping[str, Any],
+    engine: Any,
+) -> dict[int, list[float]]:
+    """Candidate (e3) on video: each frame's N{} bounds measured at full resolution.
+
+    One decode pass over the whole clip (software decode, as the probe's frames); each frame is
+    compensated and white-balanced with ITS smoothed record from ``engine`` (as the fusion stage
+    measures the bounds on the proxy) and the bounds are the percentiles of its full-resolution
+    high-pass (:func:`_full_bounds`).
+
+    Args:
+        source: The video source.
+        probe: Its probe of the clip.
+        method: The method.
+        backend: The backend.
+        params: The resolved parameters.
+        engine: A completed analysis of the clip under ``params`` (its smoothed white balance).
+
+    Returns:
+        pts ticks -> ``[low, high]``.
+
+    Raises:
+        ProbeFailedError: The decode did not deliver a frame of the analysis axis.
+    """
+    table: dict[int, list[float]] = {}
+    stream = source.frames(probe, hw_decode=False)
+    try:
+        for frame in stream:
+            pts = int(frame.pts_ticks)
+            record = engine.smoothed_record(pts, schema_hash=engine.schema_hash)
+            image = Image(
+                pixels=backend.asarray(np.asarray(frame.pixels, dtype=np.float32), np.float32),
+                device=backend.device,
+                color=frame.color,
+                orientation_applied=frame.orientation_applied,
+            )
+            table[pts] = _full_bounds(method, image, params, record)
+    finally:
+        close = getattr(stream, "close", None)
+        if close is not None:
+            close()
+    missing = sorted({int(p) for p in engine.store.axis()} - set(table))
+    if missing:
+        raise ProbeFailedError(
+            f"the full-resolution pass did not deliver {len(missing)} frames "
+            f"(first missing pts {missing[0]})"
+        )
+    return table
+
+
 def run_video(
     path: Path,
     method: AncutiFusionMethod,
@@ -1943,9 +2033,7 @@ def run_video(
         Settings(force_cpu=force_cpu), video.height, video.width, method.id
     )
     switches: Switches = options.get("switches") or Switches()
-    if switches.full_res_bounds:
-        raise ProbeError("--switch full_res_bounds is built for photos only (video: see Part 2)")
-    cache = DiskProxyCache(options["cache_dir"])
+    cache = _PtsRecordingCache(DiskProxyCache(options["cache_dir"]))
 
     def analysed(values: Mapping[str, Any]) -> AnalysisEngine:
         """A real analysis run of the whole clip under ``values``, as the export runs it."""
@@ -1969,7 +2057,26 @@ def run_video(
     baseline_engine = None
     if switches.active or dict(params) != defaults:  # the shipped defaults, unswitched
         baseline_engine = analysed(defaults)
-    with applied(switches):
+    lookup: Callable[[], Sequence[float]] | None = None
+    full_res_frames = None
+    if switches.full_res_bounds:  # (e3): the bounds of each full-resolution frame, then smoothed
+        others = dataclasses.replace(switches, full_res_bounds=False)
+        if baseline_engine is not None and not others.active and dict(params) == defaults:
+            before = baseline_engine
+        else:
+            with applied(others):
+                before = analysed(params)
+        with applied(others):
+            table = full_res_bounds_by_pts(source, probe, method, backend, params, before)
+        full_res_frames = len(table)
+
+        def lookup() -> Sequence[float]:
+            pts = cache.current
+            if pts is None or pts not in table:
+                raise ProbeFailedError(f"no full-resolution bounds for the proxy of pts {pts}")
+            return table[pts]
+
+    with applied(switches, bounds=lookup):
         engine = analysed(params)
     axis = sorted(int(p) for p in engine.store.axis())
     first = axis[0]
@@ -2068,6 +2175,7 @@ def run_video(
         "kind": "video",
         "device": reason,
         "switches": switches.describe(),
+        "full_res_bounds_frames": full_res_frames,
         "analysis": "AnalysisEngine.analysis_job over the whole clip (smoothing defaults, "
         "expected_frames as the export passes it)",
         "expected_frames": expected_frames(probe),

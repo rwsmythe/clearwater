@@ -1353,7 +1353,7 @@ def test_run_video_analyses_the_baseline_unswitched_and_the_candidate_switched(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # The candidate's whole-clip analysis runs INSIDE the switch (the floor it measures under is
-    # the switched one), the shipped-defaults baseline outside it; full_res_bounds is refused.
+    # the switched one), the shipped-defaults baseline outside it.
     method = AncutiFusionMethod("c3")
     params = hp.resolve_parameters(method, [])
     image = _photo(_scene())
@@ -1388,6 +1388,102 @@ def test_run_video_analyses_the_baseline_unswitched_and_the_candidate_switched(
     assert frame["baseline_statistics"] is not None
     assert frame["whole_image"]["mean_abs_difference"] > 0.0
     assert run["switches"] == {"range_floor": 0.3}
-    options["switches"] = hp.Switches(full_res_bounds=True)
-    with pytest.raises(hp.ProbeError):
+
+
+def _e3_video(
+    monkeypatch: pytest.MonkeyPatch, *, read_proxies: bool = True
+) -> tuple[AncutiFusionMethod, dict[str, Any], list[Any]]:
+    """Fakes for (e3) on video: five frames that differ, an engine that reads each proxy.
+
+    The fake engine measures every frame as the real one does (``cache.proxy(key, pts)``, then
+    ``analyze`` on that frame's proxy, here through :func:`hp.photo_statistics`); smoothing is
+    the identity. The proxy is forced to a 2 x 2 block mean so its bounds differ from the frame's.
+    """
+    method = AncutiFusionMethod("c3")
+    params = hp.resolve_parameters(method, [])
+    frames = [np.ascontiguousarray((_scene() * (0.6 + 0.1 * k)).clip(0, 1)) for k in range(5)]
+    video = SimpleNamespace(height=96, width=128, time_base=Fraction(1, 30), nb_frames=5)
+    probe = SimpleNamespace(video=video, faults=(), path=Path("clip.mp4"))
+    engines: list[Any] = []
+
+    class Source:
+        def probe(self, path: Path) -> SimpleNamespace:
+            return probe
+
+        def frames(self, probe: object, *, hw_decode: bool = False) -> Any:
+            for pts in range(5):
+                yield SimpleNamespace(
+                    pts_ticks=pts, pixels=frames[pts], color=SRGB, orientation_applied=True
+                )
+
+    class Cache:
+        def __init__(self, folder: Path) -> None:
+            self.folder = folder
+
+        def proxy(self, key: Any, pts_ticks: int) -> None:
+            return None
+
+    class Engine:
+        def __init__(self, **kwargs: Any) -> None:
+            self.params, self.cache = kwargs["params"], kwargs["cache"]
+            self.store = SimpleNamespace(axis=lambda: list(range(5)))
+            self.schema_hash = "h"
+            self.records: dict[int, Any] = {}
+            engines.append(self)
+
+        def analysis_job(self) -> Any:
+            def job(progress: Any) -> Any:
+                for pts in range(5):
+                    if read_proxies:
+                        self.cache.proxy("key", pts)
+                    self.records[pts] = hp.photo_statistics(
+                        method, _photo(frames[pts]), self.params
+                    )
+                return SimpleNamespace(ok=True, failure=None)
+
+            return job
+
+        def smoothed_record(self, pts: int, *, schema_hash: str) -> Any:
+            return self.records[pts]
+
+    monkeypatch.setattr(hp, "FFmpegVideoSource", Source)
+    monkeypatch.setattr(hp, "AnalysisEngine", Engine)
+    monkeypatch.setattr(hp, "DiskProxyCache", Cache)
+    monkeypatch.setattr(hp, "cache_key", lambda path: "key")
+    monkeypatch.setattr(hp, "proxy_factor", lambda height, width: 2)
+    return method, params, engines
+
+
+def test_run_video_full_res_bounds_takes_each_frames_full_resolution_bounds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # (e3) on video (Q-e3v): the candidate analysis's fusion bounds of each frame are that
+    # frame's full-resolution bounds (keyed by the pts whose proxy the engine read), not the
+    # proxy's (the baseline's) and not another frame's; the shipped-defaults analysis is reused
+    # for the white balance (two engines); the patch is gone afterwards.
+    method, params, engines = _e3_video(monkeypatch)
+    options = {**_video_options(tmp_path / "v"), "switches": hp.Switches(full_res_bounds=True)}
+    run = hp.run_video(Path("clip.mp4"), method, params, force_cpu=True, options=options)
+    _assert_restored()
+    assert len(engines) == 2
+    assert run["full_res_bounds_frames"] == 5
+    seen = []
+    for frame in run["frames"]:
+        bounds = frame["statistics"]["fusion"]["bounds"]
+        assert bounds == pytest.approx(frame["full_resolution_bounds"], rel=1e-6)
+        assert bounds != pytest.approx(frame["baseline_statistics"]["fusion"]["bounds"], rel=1e-3)
+        assert frame["render_check_equal"]
+        seen.append(tuple(bounds))
+    assert len(set(seen)) == len(seen)  # each frame its own bounds
+
+
+def test_run_video_full_res_bounds_fails_when_no_frame_is_named(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The lookup refuses to guess: an analysis that measures without reading a frame's proxy
+    # (no pts recorded) fails the run instead of taking some frame's bounds.
+    method, params, _engines = _e3_video(monkeypatch, read_proxies=False)
+    options = {**_video_options(tmp_path / "v"), "switches": hp.Switches(full_res_bounds=True)}
+    with pytest.raises(hp.ProbeFailedError, match="no full-resolution bounds"):
         hp.run_video(Path("clip.mp4"), method, params, force_cpu=True, options=options)
+    _assert_restored()

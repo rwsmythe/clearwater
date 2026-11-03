@@ -909,3 +909,45 @@ about 680 4K and 1,870 1080p frames, perhaps 10-15 min). A reduced set (defaults
 80 min plus (e3).
 
 Depth at mid-build yield 2: 268700 (scripts/cell_depth.py, wp57-cell4, read by the orchestrator at the yield 2026-11-03)
+
+### Step 3, half 1: (e3) on video (head `daa5df3a`)
+
+Orchestrator's video set (within the drop rule; every candidate represented): defaults; (a) 0.5,
+0.25; (e1) 0.01 / 99.99, 0 / 100; (e2) 0.1, 0.2; (d) unsharpened 1 and 3 sigma; (e3); (b) 4;
+(c) 1.0 (12 settings).
+
+Built per CHARC's Q-e3v design (`full_res_bounds_by_pts`, `_PtsRecordingCache`, `applied`'s
+`bounds` now also a function): (1) the white balance comes from a completed analysis under the run's
+parameters (the shipped-defaults baseline analysis when the run is (e3) alone, else an extra
+analysis under the other switches); (2) one software-decode pass over the WHOLE clip measures each
+frame's bounds on the full-resolution frame compensated and white-balanced with that frame's
+smoothed record (`_full_bounds`, the Part 1 diagnostic); (3) the candidate analysis runs with
+`ancuti_fusion.normalisation_bounds` patched to return the bounds of the frame whose proxy the
+engine read last (`AnalysisEngine._measure` reads `cache.proxy(key, pts)` immediately before
+`analyze`; the probe wraps the cache to record that pts), so the engine measures input 2's
+saliency mean with them on the proxy and smooths both as shipped. A measurement with no recorded
+pts, or one the pass did not deliver, fails the run (`ProbeFailedError`). The record carries
+`full_res_bounds_frames`. Not exercised on a real clip in half 1 (no GPU render; the first real
+run is the `e3-full` setting of the batch).
+
+RED (the two new tests against `daa5df3a`'s probe; log `work/c57-p2-e3v-red.log` in the worktree):
+2 failed, 86 passed, both `halo_probe.ProbeError: --switch full_res_bounds is built for photos
+only`. Tests: with five frames that differ and the proxy forced to a 2 x 2 block mean, each
+frame's smoothed fusion bounds equal that frame's full-resolution bounds and differ from the
+proxy-measured baseline's and from every other frame's, two engines (the baseline reused for the
+white balance), the patch restored; an analysis that reads no proxy fails with "no
+full-resolution bounds" and the patch is restored. The step-1 video test's refusal assertion is
+removed (the refusal is gone).
+
+GREEN: `uv run pytest -q tests/test_tools_halo_probe.py` 88 passed (12.7 s); `uv run ruff check .`
+All checks passed; `uv run ruff format --check .` 313 files already formatted; `uv run mypy`
+Success, no issues found in 157 source files.
+
+Video command (half 2, one setting per foreground call, each well under 10 min):
+`bash C:/Users/rwsmy/clearwater/work/wp5.7/part2/run-videos.sh <setting>` for defaults a-0.5
+a-0.25 e1-0.01 e1-0 e2-0.1 e2-0.2 d-unsharpened-1 d-unsharpened-3 e3-full b-4 c-1.0. Estimate
+about 6-7 min a setting (the baseline's second whole-clip analysis and one baseline render per
+frame on top of `part1s`' 281 s): about 75-85 min for the twelve, plus about 5-10 min for the
+`e3-full` full-resolution pass (a second whole-clip decode of each item).
+
+Depth at mid-build yield 2b: DISPATCHER TO FILL
