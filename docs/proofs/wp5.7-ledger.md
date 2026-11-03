@@ -1692,4 +1692,4 @@ about 10 GB in all; 56 GB free now, so about 46 GB at the end against the 25 GB 
    alternating S / D. Recommended: as built; CHARC may add a pair if the effect lands within a few
    points of 10 % (W52-1's three cold rows spanned 9.4 %).
 
-Depth at mid-build yield: DISPATCHER TO FILL
+Depth at mid-build yield: 364,008 (scripts/cell_depth.py, wp57-cell6, read by the orchestrator at the yield 2026-11-03; near the 400K stop: the report goes to a fresh cell)
