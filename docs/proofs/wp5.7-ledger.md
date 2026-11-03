@@ -2155,4 +2155,4 @@ texture readings stand.
 The Part 3 results section above is the window's record (`part3`), kept as run; where its video
 figures differ, these round-5 figures (`part3r`) supersede them, and the report cites `part3r`.
 
-Depth at round-5 final yield: DISPATCHER TO FILL
+Depth at round-5 final yield: 331,770 (wp57-cell8 at its final yield, 130 turns, 2026-11-03 ~21:55Z; read by orchestrator gen 39 with scripts/cell_depth.py). The cell is DONE; any round-6 remediation goes to a fresh cell.
