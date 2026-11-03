@@ -2,12 +2,13 @@
 
 Usage::
 
-    uv run python tools/statistics_experiments.py extract [--config FILE] [--device gpu|cpu|auto]
-    uv run python tools/statistics_experiments.py analyse [--config FILE] [--device ...]
+    uv run python tools/statistics_experiments.py extract [--long] [--config FILE] [--device ...]
+    uv run python tools/statistics_experiments.py analyse [--long] [--config FILE] [--device ...]
     uv run python tools/statistics_experiments.py render  [--config FILE] [--device ...]
 
 The footage folder is only ever an input. Every file is written under
-``<working folder>/wp1.4/`` after :class:`lookcheck.frames.OutputRoots` has checked it
+``<working folder>/wp1.4/`` (``wp-dr25/`` with ``--long``) after
+:class:`lookcheck.frames.OutputRoots` has checked it
 (inside that folder, outside the footage folder, no shared hard link); ``FFREPORT`` is
 stripped from every FFmpeg and ffprobe run (:func:`lookcheck.frames.tool_env`). A chapter is
 found by its stem anywhere under the footage folder (:func:`local_config.find_footage_file`);
@@ -39,6 +40,12 @@ the previous one wrote in ``wp1.4/<excerpt>/``:
     (:func:`lookcheck.pack.encode_verified_pair`: NVENC, the source's tags, every frame read
     back), writes ``render.json``, and then removes the full-resolution PNGs but for the
     first, middle and last of each set.
+
+``--long`` selects two 20 s excerpts for WP-DR25, with the same requested starts
+but clamped back to fit the chapters. It skips full-frame statistics and clip
+rendering. The window study covers both methods and records per-step flicker
+and edge-free counts, using each method's staged reach (flat: one filter radius).
+The default WP1.4 study and its fixed interior margin are unchanged.
 
 Exit status 0 on success; 2, with a one-line ``error: ...`` on standard error, on a
 configuration, probe, device, path, FFmpeg or premise failure.
@@ -174,7 +181,7 @@ class ExcerptSpec:
     """One excerpt of the study.
 
     Attributes:
-        name: Folder name under ``wp1.4/`` and the clips' stem.
+        name: Folder name under the selected output root and the clips' stem.
         chapter: The chapter file's stem in the footage folder.
         start_fraction: Start as a fraction of the probed stream duration.
         duration_s: Length in seconds.
@@ -198,6 +205,13 @@ EXCERPTS = (
 )
 """The first excerpt is WP1.3's flicker excerpt (WP1.3 report section 5); the second is 6 s at
 50 % of a second shallow chapter."""
+
+
+LONG_EXCERPTS = (
+    ExcerptSpec("GX011627-long", "GX011627", 0.30, 20.0, False, False),
+    ExcerptSpec("GX011625-long", "GX011625", 0.50, 20.0, False, False),
+)
+"""WP-DR25's 20 s excerpts; requested starts are clamped back when needed to fit."""
 
 
 # --- small checked writers ------------------------------------------------------------------------
@@ -357,7 +371,7 @@ def extract_excerpt(
     Args:
         spec: The excerpt.
         footage: The footage folder (read only).
-        roots: The output safety roots (``<working folder>/wp1.4``).
+        roots: The output safety roots under the configured working folder.
         backend: Where the measurements run.
 
     Returns:
@@ -374,6 +388,9 @@ def extract_excerpt(
     folder = roots.allowed / spec.name
     info = probe_stream(video)
     start = spec.start_fraction * info.duration_s
+    is_long = spec in LONG_EXCERPTS
+    if is_long:
+        start = min(start, info.duration_s - spec.duration_s)
     began = time.monotonic()
     frames = excerpt(video, start, spec.duration_s, folder / "frames", roots=roots, naming="index")
     print(
@@ -426,6 +443,8 @@ def extract_excerpt(
         "device": backend.name,
         "frames": entries,
     }
+    if is_long:
+        document["requested_start_s"] = spec.start_fraction * info.duration_s
     _write_json(roots, folder / "excerpt.json", document)
     raw: dict[str, Any] = {
         "schema": RECORD_SCHEMA,
@@ -835,24 +854,82 @@ def robust_study(loaded: Loaded, params: Params, backend: Backend) -> dict[str, 
     return {"candidates": out, "synthetic": synthetic}
 
 
+def _long_smoothing_study(
+    loaded: Loaded, backend: Backend, source_signals: NDArray[np.float64]
+) -> dict[str, Any]:
+    """Measure both methods' candidates with auditable, reach-specific interior records."""
+    rate = loaded.frame_rate
+    count = len(loaded.proxies)
+    methods: dict[str, Any] = {}
+    for name, params in METHODS.items():
+        reference_statistics = temporal.constant_statistics(loaded.raw[name])
+        reference = _signals(loaded.proxies, params, None, backend, reference_statistics)
+        candidates: dict[str, Any] = {}
+        for smoother in SMOOTHING_CANDIDATES:
+            flat = temporal.analyse_flat(loaded.raw[name], smoother, rate)
+            staged, _ = temporal.analyse_staged(
+                list(loaded.proxies), params, smoother, rate, backend
+            )
+            candidate: dict[str, Any] = {
+                "definition": _smoother_record(smoother, rate),
+                "step": temporal.step_response(smoother, rate),
+            }
+            for analysis, series, reach in (
+                ("flat", flat, smoother.radius(rate)),
+                ("staged", staged, staged_reach(name, smoother, rate)),
+            ):
+                steps = max(count - 1 - 2 * reach, 0)
+                interior = slice(reach, count - 1 - reach) if steps else None
+                record = _sequence_record(
+                    _signals(loaded.proxies, params, series, backend),
+                    reference,
+                    interior,
+                    source_signals,
+                    series=True,
+                )
+                record.update(
+                    reach_frames=reach,
+                    edge_free_frames=max(count - 2 * reach, 0),
+                    edge_free_steps=steps,
+                    interior_steps=None if interior is None else [interior.start, interior.stop],
+                )
+                candidate[analysis] = record
+            candidates[smoother.label] = candidate
+            print(
+                f"{loaded.folder.name}: {name} smoothing {smoother.label}: "
+                f"staged {candidate['staged']['edge_free_frames']} edge-free frames / "
+                f"{candidate['staged']['edge_free_steps']} steps; "
+                f"flat {candidate['flat']['edge_free_frames']} edge-free frames / "
+                f"{candidate['flat']['edge_free_steps']} steps",
+                file=sys.stderr,
+            )
+        methods[name] = candidates
+    return methods
+
+
 def run_experiments(
     folder: Path,
     roots: OutputRoots,
     backend: Backend,
     analyses: Mapping[str, Mapping[str, Series]],
+    *,
+    long: bool = False,
 ) -> dict[str, Any]:
     """Run the experiments on one excerpt's proxies and write ``results.json`` (``analyse``).
 
     The flicker measure (:func:`prototype.temporal.flicker`) is applied identically to every
     rendered sequence: its proxies rendered with the statistics under test, against the same
     proxies rendered with constant statistics (the mean of the raw series of the method), over
-    all frame steps and over the interior steps (:func:`interior_margin`).
+    all frame steps and over the interior steps (:func:`interior_margin`). With
+    ``long=True``, the window study additionally measures both methods using
+    each candidate's own staged or flat reach for its interior.
 
     Args:
         folder: The excerpt's folder.
         roots: The output safety roots.
         backend: Where the steps run.
         analyses: :func:`analyse_statistics`'s result for this excerpt.
+        long: Run WP-DR25's two-method, reach-specific window study instead of WP1.4's.
 
     Returns:
         The ``results.json`` document.
@@ -910,29 +987,35 @@ def run_experiments(
         )
         document["flicker"][name] = method_flicker
         print(f"{folder.name}: {name} staged/flat done", file=sys.stderr)
-    params = METHODS[RENDER_METHOD]
-    reference_statistics = temporal.constant_statistics(loaded.raw[RENDER_METHOD])
-    reference = _signals(loaded.proxies, params, None, backend, reference_statistics)
-    for smoother in SMOOTHING_CANDIDATES:
-        flat = temporal.analyse_flat(loaded.raw[RENDER_METHOD], smoother, rate)
-        staged, _ = temporal.analyse_staged(list(loaded.proxies), params, smoother, rate, backend)
-        document["smoothing"][smoother.label] = {
-            "definition": _smoother_record(smoother, rate),
-            "step": temporal.step_response(smoother, rate),
-            "flat": _sequence_record(
-                _signals(loaded.proxies, params, flat, backend),
-                reference,
-                interior,
-                source_signals,
-            ),
-            "staged": _sequence_record(
-                _signals(loaded.proxies, params, staged, backend),
-                reference,
-                interior,
-                source_signals,
-            ),
-        }
-        print(f"{folder.name}: smoothing {smoother.label} done", file=sys.stderr)
+    if long:
+        document["smoothing"] = _long_smoothing_study(loaded, backend, source_signals)
+        params = METHODS[RENDER_METHOD]
+    else:
+        params = METHODS[RENDER_METHOD]
+        reference_statistics = temporal.constant_statistics(loaded.raw[RENDER_METHOD])
+        reference = _signals(loaded.proxies, params, None, backend, reference_statistics)
+        for smoother in SMOOTHING_CANDIDATES:
+            flat = temporal.analyse_flat(loaded.raw[RENDER_METHOD], smoother, rate)
+            staged, _ = temporal.analyse_staged(
+                list(loaded.proxies), params, smoother, rate, backend
+            )
+            document["smoothing"][smoother.label] = {
+                "definition": _smoother_record(smoother, rate),
+                "step": temporal.step_response(smoother, rate),
+                "flat": _sequence_record(
+                    _signals(loaded.proxies, params, flat, backend),
+                    reference,
+                    interior,
+                    source_signals,
+                ),
+                "staged": _sequence_record(
+                    _signals(loaded.proxies, params, staged, backend),
+                    reference,
+                    interior,
+                    source_signals,
+                ),
+            }
+            print(f"{folder.name}: smoothing {smoother.label} done", file=sys.stderr)
     document["robust"] = robust_study(loaded, params, backend)
     _write_json(roots, folder / "results.json", document)
     flicker_plot = {
@@ -1174,26 +1257,31 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("phase", choices=("extract", "analyse", "render"))
     parser.add_argument("--config", type=Path, help="local configuration file")
     parser.add_argument("--device", choices=DEVICES, default="gpu")
+    parser.add_argument("--long", action="store_true", help="run WP-DR25's 20 s excerpt study")
     args = parser.parse_args(argv)
+    excerpts = LONG_EXCERPTS if args.long else EXCERPTS
     try:
         config = load_local_config(args.config)
-        roots = OutputRoots.from_config(config, subdir=WORK_SUBDIR)
+        roots = OutputRoots.from_config(config, subdir="wp-dr25" if args.long else WORK_SUBDIR)
         backend = select_backend(args.device)
         if backend.reason:
             print(f"note: running on the CPU: {backend.reason}", file=sys.stderr)
         if args.phase != "analyse":
-            # Every chapter the phase reads is looked up before the first write under wp1.4/.
-            for spec in EXCERPTS:
+            # Every chapter the phase reads is looked up before the first output write.
+            for spec in excerpts:
                 if args.phase == "extract" or spec.render:
                     find_footage_file(spec.chapter, config.footage_path)
         began = time.monotonic()
-        for spec in EXCERPTS:
+        for spec in excerpts:
             folder = roots.allowed / spec.name
             if args.phase == "extract":
                 extract_excerpt(spec, config.footage_path, roots, backend)
             elif args.phase == "analyse":
                 analyses = analyse_statistics(folder, roots, backend)
-                run_experiments(folder, roots, backend, analyses)
+                if args.long:
+                    run_experiments(folder, roots, backend, analyses, long=True)
+                else:
+                    run_experiments(folder, roots, backend, analyses)
             elif spec.render:
                 witness = config.working_path / "wp1.3" / "flicker" / "corrected"
                 render_clips(spec, config.footage_path, roots, backend, witness)
