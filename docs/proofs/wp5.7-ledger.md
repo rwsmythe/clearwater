@@ -1511,3 +1511,166 @@ defaults, D106 min/min).**
 Total about 2-2.2 h; plan for 2.5 h.
 
 Depth at the step-3R addendum: DISPATCHER TO FILL
+
+## Part 3 (build to the window)
+
+Dispatch `clearwater-review-evidence/wp5.7/cell/dispatch-9.md` (orchestrator gen 38). Fresh cell
+`wp57-cell6` (implementer-opus-high) on head `4afa2af0`; the branch also carries `368b02d2` (the
+previous cell's step-3R addendum: planning written before Q2). This build follows dispatch-9 and
+CHARC's C1-C6 / Q1-Q2 where the addendum differs: C3 is measured on WP4.2's two synthetic clips
+(Q2), not on GX011627's last second; the instruments live in a NEW module beside the probe. No GPU
+run, no render, no footage write: build, synthetic tests, and read-only pre-checks only.
+
+### Built
+
+Owned paths: NEW `tools/halo_part3.py`, NEW `tests/test_tools_halo_part3.py` (parallel leg except
+one `slow` test), this ledger. `tools/halo_probe.py` is unchanged; Part 3 reuses its `applied`,
+`parse_switches`, `Switches`, `whole_image`, `photo_statistics`, `resolve_parameters`,
+`find_footage_photo`, `water_band`, `line_profile`, `profile_fits`, `sample_spacing`, `luma` by
+import. No `src/` edit, no default changed, no dependency.
+
+- **`v3` (C3 as amended, Q2).** WP4.2's OWN code does the measuring: `suite()` appends the
+  repository's `tests/` folder to `sys.path` and imports `test_wp42_v3_product` (and the suite's
+  `fixture_plugin`) by name; `measure_v3` calls its `_v3(clip, method, mask, folder)` inside
+  `halo_probe.applied(switches)`. Both legs are WP4.2's: the smoothed leg is an export through the
+  composition root's engine IN THIS PROCESS (its recording sink keeps each frame's region
+  pre-encode), the per-frame leg renders each decoded frame from `provisional_record` of a second
+  in-process `AnalysisEngine`; so the switch reaches both legs' analyses and renders. The
+  statistic (`_figures`), the planted controls and the encoded characterisation are WP4.2's.
+  PASS / FAIL (`v3_verdict`) repeats the two acceptance tests' assertions with the suite's
+  predicates `_v3_holds` (V3 25 %) and `_ad14_holds` (AD-14 0.5/255), imported, not retyped (the
+  suite has no named bound constants: the bounds live inside those two functions): the jittering
+  clip asserts V3, `ad14-flicker` asserts AD-14 and records V3's ratios (CHARC V3-1). The clips:
+  `build_clips` is the body of WP4.2's `clips` fixture (pytest refuses a direct fixture call), on
+  the shared samples through the suite's `SampleProvider` (generated samples cached under the
+  run's folder); `v3_masks` is the `ad14_mask` fixture body plus `_jitter_mask()`; a `slow` test
+  checks both equal the fixtures frame for frame. Methods: WP4.2's `METHODS` (c3, the shipped
+  default, and ancuti2018; (d) patches the shared `fusion_inputs`), so the reproduction check
+  covers all four rows of record. Order: the shipped leg on both clips and methods first; it must
+  REPRODUCE WP4.2's figures of record (`V3_RECORD`, the report's "V3 ratios" table) within ONE
+  UNIT in the record's last printed place (AD-14 figures 1e-4 /255, ratios 1e-3); otherwise exit
+  4 (an instrument STOP) and the (d) leg is not run. Output `v3.json` and the side-by-side
+  `v3-table.md` (each clip and method: shipped beside (d), AD-14 per-frame -> smoothed, the four
+  ratios, the asserted bound's verdict, V3 at 25 %).
+- **`n6` / `n6-summary` (C4): the path of the instrument of record, not a substitute harness.**
+  `tools/export_bench.py` (V16 / N6 of record, WP5.2 W52-1) builds `ExportEngine` in its own
+  process (`build_engine`; the GUI's spawned worker, AD-31, is not on this path, nor was it on
+  N6's figures of record), and the engine's analysis thread and renders call
+  `ancuti_fusion.fusion_inputs`, the attribute `applied` patches. `run_n6` calls
+  `export_bench.main(["run", "GX011627", "--runs", "1", "--device-frames", "--subdir",
+  "wp5.7/part3/n6"])` (W52-1's form, one run) inside `applied` for (d), outside for the shipped
+  defaults, with `counted_inputs()` around the method's `fusion_inputs` in both settings (the
+  per-call overhead is common): the sidecar `n6-<setting>-<stamp>.json` records the bench's exit,
+  its new record, the call count and whether the clip was in effect. `n6-summary`: per run D106
+  min/min (the bench's `total.min_per_min` = `wall_s / frames * frame_rate`), the median per
+  setting, effect = median(d) / median(shipped) - 1, the three adjacent-pair ratios, validity
+  (every run ok, all frames, calls > 0, the clip in effect exactly on the (d) runs) and the STOP
+  (effect over 10 %, exit 4). A failed bench memory check (exit 3; (d) adds about three
+  full-resolution arrays per render) still leaves the run timed and recorded; it is reported per
+  run, not hidden. Caveat: the timed (d) is the instrument's clip (`backend.ndimage` minimum /
+  maximum filters, a 23 x 23 window at 4K), not an optimised product implementation.
+- **Whole set (Part 3; C1, C2, C3 (3)).** `wholeset_items`: the pack manifest
+  `work/wp5.3/records/pack.json`, the items whose status is `done` (126; the two `V-R` HLG items
+  are `refused`), which must equal the review sheet's 126 judged items, minus the six halo items:
+  120 (checked; 70 photos, 50 videos). Sources: photos through `find_footage_photo`; a video the
+  pack excerpted from `work/wp5.3/excerpts/<name>` (read in place, as the owner saw it), else
+  through `find_footage_file`. Per photo: the shipped-defaults proxy statistics and render
+  (unswitched), then (d)'s statistics and render (switched). Per video: two whole-clip analyses
+  (shipped unswitched, (d) switched; the analysis cache `part3/cache`), then the frames at the
+  pack's three still times (10 / 50 / 90 %, `stills[].source_pts_s`) rendered from each
+  analysis's smoothed records. Recorded per image: `whole_image` ((d) against shipped: mean
+  absolute and p99 difference, per-channel mean shift, both clipped fractions, the whole-frame
+  measures), the edge-band scan of both renders, the render walls (the download included, so the
+  device is synchronised; indicative only) and, for videos, both analysis walls; saved: both
+  renders as full-resolution 8-bit PNGs (`<tag>-shipped.png`, `<tag>-candidate.png`). Per video:
+  `statistics_movement`, per smoothed statistic the largest change over every frame and both
+  settings' temporal spread (the standard deviation of the frame-to-frame differences); its
+  headline is input 2's row of the fusion saliency means. Items publish by a staged rename; a
+  failed item is kept as `.<item>.failed-<stamp>` and the batch goes on; an existing item is
+  skipped (resumable).
+- **The edge-band scan (the brief's Part 3 statistic; the cell's design, for Reviewer A).** On
+  the source's BT.709 luma (Gaussian 1 px), the Sobel gradient; candidates at or above its 99.5th
+  percentile inside a margin that keeps every profile in the image; strongest first, at most one
+  per square cell of the line half-length, at most 48. Through each point a line along the
+  gradient, half-length 8 sharpening sigmas, measured from BOTH ends (each end once the start,
+  i.e. the side measured) with the probe's own `water_band` of the render's luma against the
+  source's (half width 4, threshold 0.10): the same sides for both renders. Per render: the sides
+  by verdict (band / none / undecided; undecided never counts as removal), the largest
+  qualifying band and the largest band.
+- **Sheet (`wholeset-sheet`).** `summary.tsv` (one row per item), `sheet.json`, and
+  `contact-sheet.html` with side-by-side previews (shipped | (d), 1200 px a half; links to the
+  full-resolution PNGs). The 20: first the 5 video items whose input-2 saliency mean moves most
+  (C3 (3)), then the largest whole-image mean absolute change; each item's frame is its largest
+  change. After the 20, every other item whose edge scan RISES under (d) (more qualifying sides or
+  a larger qualifying band), with its figures (the addendum's regression rule, kept). C2's crops:
+  the 11 lines that are not `none` under (d) 1 sigma in Part 2's records (`UNDECIDED_LINES`:
+  IMG_6739 line 3 (photo; Part 2's own crops, read only); IMG_6738 0.433 / 0.467 / 0.633 s line 2;
+  GX011627 22.155 / 22.356 / 22.389 / 22.422 / 22.456 s; the compilation 27.027 s line 1; plus the
+  one remaining BAND, the compilation 27.010 s line 3), shipped beside (d), from the window's probe
+  runs. The previews show 8-bit values, NOT display-converted (the CP5 pack converts video stills
+  BT.1886 -> sRGB); both halves alike.
+
+### RED / GREEN
+
+RED (the new module absent, as at `4afa2af0`; the module moved aside for the run, restored and
+compared byte for byte; log `work/c57-p3/red.log` in the worktree): `ModuleNotFoundError: No
+module named 'halo_part3'`, 1 collection error. Mutation probes (scratch, restored, `cmp`
+identical): (A) `measure_v3`, `run_n6` and the video candidate render each taken out of `applied`:
+3 failed (`test_the_switch_reaches_both_v3_legs_and_is_restored`,
+`test_the_switch_changes_a_render_made_inside_a_v3_leg`,
+`test_run_n6_runs_the_bench_of_record_inside_the_switch[candidate]`); the video-render mutant was
+NOT caught, so the video test gained a per-render switch recorder; (B) the video render alone out
+of `applied`: 1 failed (`test_process_video_analyses_twice_and_renders_the_still_frames`). One
+defect found by the tests and fixed before GREEN: the statistics-movement headline read column 1
+of the flattened (2 x 3) saliency record (input 1's a*), not input 2's row.
+
+GREEN: `uv run pytest -q tests/test_tools_halo_part3.py tests/test_tools_halo_probe.py` 121 passed
+(27 new, the `slow` clip-equality test included, 4.7 s); `uv run ruff check .` All checks passed;
+`uv run ruff format --check .` 315 files already formatted; `uv run mypy` Success, no issues found
+in 158 source files. Both new files ASCII, 0 CR.
+
+### Read-only pre-checks (no render)
+
+`wholeset-list` on the real pack: 120 items (exit 0); every source resolves to an existing file
+(70 photos 0.12 GB, 50 videos 5.4 GB of source); IMG_6762 is 1920 x 1080, 22,471 frames (the
+longest item, run last). Free C: 56 GB.
+
+### The window (the orchestrator's seat; one piece per call; check each before the next)
+
+`bash C:/Users/rwsmy/clearwater/work/wp5.7/part3/run-part3.sh <piece>` (not committed; `bash -n`
+clean, LF; each piece checks `df` first and exits 3 under 25 GB; logs `part3/logs/`, walls
+`part3/logs/runs.txt`):
+1. `v3`: about 4 min (sample generation and two lossless encodes, then 8 `_v3` legs; WP4.2's GPU
+   file took 91 s for 6 tests). Check: exit 0; the four `shipped` lines say "reproduces record:
+   yes" (else exit 4 = STOP, instrument; (d) not run); `part3/v3/v3-table.md`.
+2. `n6` (EXCLUSIVE, nothing else on the host): S D S D S D, one process each, about 4.5-5 min a
+   run, about 30 min; the last pair kept (`--keep`: the GX011627 export under each setting, for
+   viewing), then `n6-summary`. Check: six `ROW` lines with `tied True`; the summary `VALID True`;
+   the effect; a `STOP` line (exit 4) when over 10 %; any `memory_check False` reported.
+3. `crops`: six probe runs, about 13-15 min (Part 2's walls for these items 57-177 s a run).
+   Check: six `exit=0` in `runs.txt`; `part3/crops/<setting>/<item>/t*-output.png`.
+4. `photos`: 70 items in one process, about 15-25 min. Check: 70 `done`, no `FAILED`.
+5. `videos`: 50 items, one process each, IMG_6762 last; two analyses plus three stills per item:
+   about 1.5-3 min a 4K excerpt, under 1 min a phone clip, IMG_6762 about 10-15 min: about
+   90-120 min. Check: 50 `done` lines; `df` before each item.
+6. `sheet`: a few minutes. Check: `SHEET 120 items`; `part3/wholeset/sheet-<stamp>/`.
+Total about 2.5-3 h (the brief's "about 1 h" was CP5's pace for one render; here two analyses and
+two renders per item, plus the scan).
+
+Disk (estimates): the analysis cache about 2-3 GB (CP5's pack cache was 2.5 GB); the 8-bit renders
+about 6 GB (140 photo renders about 13 MB each; about 200 4K stills about 15 MB; phone stills about
+3 MB); N6 transient per run plus the kept pair about 1 GB; crops about 0.6 GB; V3 about 0.1 GB:
+about 10 GB in all; 56 GB free now, so about 46 GB at the end against the 25 GB STOP.
+
+### Open questions for the dispatcher (the cell's recommended answer first)
+
+1. The edge-band scan is built because the brief's Part 3 names it ("the maximum edge-band
+   overshoot found by scanning strong edges"); dispatch-9 step 3 does not list it. Recommended:
+   keep it (the brief's statistic; its design above, for Reviewer A).
+2. V3 runs both of WP4.2's methods (c3 and ancuti2018) so all four rows of record are reproduced.
+   Recommended: keep (about 2 min); c3 is the shipped default of record.
+3. N6: each run its own process (every run starts cold in its process, as W52-1's first row did),
+   alternating S / D. Recommended: as built; CHARC may add a pair if the effect lands within a few
+   points of 10 % (W52-1's three cold rows spanned 9.4 %).
+
+Depth at mid-build yield: DISPATCHER TO FILL
