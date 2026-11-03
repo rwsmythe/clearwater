@@ -5,4 +5,4 @@ section 8): ``interfaces``, ``core``, ``methods``, ``color``, ``io``, ``analysis
 ``jobs``, ``config``, ``gui`` and ``app``. Modules are added by their work packages.
 """
 
-__version__ = "0.0.0"
+__version__ = "1.0.0"

@@ -1885,7 +1885,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "wholeset-list":
             for item in items:
                 if args.kind is None or item["kind"] == args.kind:
-                    print(item["item"])
+                    sys.stdout.buffer.write(f"{item['item']}\n".encode())
             return 0
         out = checked_output(Path(args.out) if args.out else work / PART3 / "wholeset")
         if args.command == "wholeset-run":

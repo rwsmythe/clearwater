@@ -1,3 +1,11 @@
+# Clearwater, the application
+
+Clearwater corrects colour cast, contrast loss and haze in underwater photos and
+video. Version 1.0.0 installs from this repository with uv; there is no installer
+or packaged executable. Start with the [installation and user guide](docs/user-guide.md).
+See [third-party notices](THIRD_PARTY_NOTICES.md) and [LICENSE](LICENSE) for the
+GPL-2.0-or-later licence and component terms.
+
 # CHARC Harness
 
 A germinable multi-agent development scaffold: one standing director (CHARC),

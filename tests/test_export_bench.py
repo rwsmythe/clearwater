@@ -24,10 +24,16 @@ SAMPLE = "vid-hevc8-bt709-full"
 FAST = (0.05, 0.5)
 
 
-def test_d106_is_0_834_seconds_per_frame_at_29_97() -> None:
+def test_d106_is_0_4004_seconds_per_frame_at_29_97() -> None:
+    """D106 / N6 in spec v0.5.8 sets 12 min/min, about 0.4004 s at 30000/1001 fps."""
     frames = 1000
-    figures = bench.rate(0.834 * frames, frames, Fraction(30000, 1001))
+    figures = bench.rate(0.4004 * frames, frames, Fraction(30000, 1001))
     assert figures["min_per_min"] == pytest.approx(bench.D106_MIN_PER_MIN, abs=0.01)
+
+
+def test_d106_matches_spec_n6_12_minutes_per_minute() -> None:
+    """Prevent the bench label drifting from the owner's spec v0.5.8 N6 figure."""
+    assert bench.D106_MIN_PER_MIN == 12.0
 
 
 def test_v16_plan_is_ruling_q12() -> None:
@@ -77,6 +83,7 @@ def quick(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_run_once_records_the_row_and_deletes_its_folder(
     sample: Any, tmp_path: Path, quick: None, cache: str
 ) -> None:
+    """Record the measured rate against D106 and leave the source unchanged."""
     source = sample(SAMPLE)
     before = (source.read_bytes(), source.stat().st_mtime_ns)
     run_dir = tmp_path / "bench" / "run-0"
@@ -99,7 +106,7 @@ def test_run_once_records_the_row_and_deletes_its_folder(
     assert 0 < record["analysis_share"] < 1
     assert record["per_frame"]["n"] == 44 and len(record["per_frame_s"]) == 45
     assert record["total"]["s_per_frame"] == pytest.approx(record["wall_s"] / 45)
-    assert record["meets_d106"] == (record["total"]["min_per_min"] <= 25.0)
+    assert record["meets_d106"] == (record["total"]["min_per_min"] <= bench.D106_MIN_PER_MIN)
     assert record["telemetry"]["peak_tree_rss_bytes"] > 0
     assert record["nvenc_proof"]["tied"] is False
     assert record["sink_report"]["frames_written"] == 45

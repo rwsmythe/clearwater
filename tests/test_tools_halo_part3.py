@@ -10,8 +10,10 @@ items: the edge-band scan, the photo and video paths, the staged publication and
 from __future__ import annotations
 
 import csv
+import io
 import json
 import shutil
+import sys
 from fractions import Fraction
 from pathlib import Path
 from types import SimpleNamespace
@@ -80,6 +82,30 @@ def working(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         p3.headless_export, "configured_footage_folder", lambda config=None: footage
     )
     return work
+
+
+def test_wholeset_listing_writes_lf_bytes_on_a_crlf_stream(
+    working: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Keep redirected item names usable by consumers that split on LF (DR-119 b).
+
+    Args:
+        working: An isolated configured working folder, never the owner's pack.
+        monkeypatch: Redirects the item provider and the byte-backed stdout stream.
+    """
+    items = [
+        {"item": "IMG_0001", "kind": "photo"},
+        {"item": "GX000002", "kind": "video"},
+    ]
+    monkeypatch.setattr(p3, "wholeset_items", lambda pack: items)
+    raw = io.BytesIO()
+    stream = io.TextIOWrapper(raw, encoding="utf-8", newline="\r\n")
+    monkeypatch.setattr(sys, "stdout", stream)
+    assert p3.main(["wholeset-list"]) == 0
+    stream.flush()
+    output = raw.getvalue()
+    assert b"\r" not in output
+    assert output == b"IMG_0001\nGX000002\n"
 
 
 # --- V3 -----------------------------------------------------------------------------------------

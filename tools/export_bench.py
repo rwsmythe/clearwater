@@ -19,10 +19,11 @@ analysis thread's job returned, and the time the frame loop spent reading its re
 export's stall on the analysis).
 
 Per run the record holds: the frames, the wall time, seconds per frame and minutes of
-processing per minute of footage against D106's interim 25 min/min (0.834 s/frame at
-30000/1001 fps), the per-frame median / p90 / max (the first frame apart), the phase times and
-the analysis share, the strays over the whole run and the conditions (strays, graphics-card
-clocks and temperature, CPU) before and after, the peak resident memory of the process tree
+processing per minute of footage against D106 / N6's spec v0.5.8 figure of 12 min/min
+(0.4004 s/frame at 30000/1001 fps), the per-frame median / p90 / max (the first frame apart),
+the phase times and the analysis share, the strays over the whole run and the conditions
+(strays, graphics-card clocks and temperature, CPU) before and after, the peak resident memory
+of the process tree
 (FFmpeg children included) and the peak graphics memory in use (N4, both from WP3.10's
 :class:`~video_io_bench.Telemetry`), and the NVENC proof (DR-18 (1)). On the GPU backend the
 record also holds the two-instrument memory check (WP3.21 task 10, CHARC ruling
@@ -96,8 +97,8 @@ SUBDIR = Path("wp3.14") / "bench"
 """Where the outputs, cache folders, the synthetic clip and the records go, under the working
 folder."""
 
-D106_MIN_PER_MIN = 25.0
-"""D106's interim N6 figure: minutes of processing per minute of 4K footage, end to end."""
+D106_MIN_PER_MIN = 12.0
+"""D106 / N6 in spec v0.5.8: minutes of processing per minute of 4K footage, end to end."""
 
 DISK_MARGIN_BYTES = 4 * 1024**3
 """Free space wanted beyond the source's own size before a run starts (the output is at most
@@ -666,6 +667,7 @@ def _measure(
             "frames": frames,
             "wall_s": total,
             "total": figures,
+            # Spec v0.5.8 D106 / N6 target and the end-to-end rate's verdict against it.
             "d106_min_per_min": D106_MIN_PER_MIN,
             "meets_d106": None if figures is None else figures["min_per_min"] <= D106_MIN_PER_MIN,
             "phases_s": phases,
