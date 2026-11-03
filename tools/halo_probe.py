@@ -104,16 +104,31 @@ clip's first frame. Outputs go to ``--out`` (default ``<working folder>/wp5.7/pa
 16-bit PNG crops of the region per stage (``<frame>-<stage>.png``), an 8-bit overview of the
 source and the output with the region and lines marked, and one JSON record (``<name>.json``).
 Writes are confined: ``--name`` must be a plain file stem (no separator, drive, ``:`` or
-``..``); the output and cache folders must resolve inside ``<working folder>/wp5.7`` and pass
-the runner's footage write check; a run that breaks either is refused before anything is
-written.
+``..``, and not a Windows device name such as ``NUL`` or ``COM1``, on every system); the output
+and cache folders, and the run's three sibling folders below, must resolve inside ``<working
+folder>/wp5.7`` (the output strictly below it) and pass the runner's footage write check; a run
+that breaks either is refused before anything is written.
+
+Publication (Reviewer A round 1, fixes 1 and 2). No write opens a file that existed before the
+run: every output file is created inside a FRESH staging folder, ``.<out>.staging-<stamp>``
+beside the output folder (``<stamp>`` the run's UTC start, to the microsecond), made with an
+exclusive ``mkdir`` that fails if anything holds that name; the record is opened in exclusive
+mode too. Only a successful run publishes, by renaming the staging folder to ``<out>``. An
+existing ``<out>`` (or a link of that name) is refused unless ``--replace``; with ``--replace``
+it is renamed aside, before the publish, to the kept sibling ``<out>.replaced-<stamp>`` (the
+tool never deletes or writes into a published folder, so a link planted in it is never written
+through). A run that fails or is refused after the staging folder was made publishes nothing
+and leaves ``<out>`` untouched: an empty staging folder is removed (``os.rmdir``, which removes
+nothing else); one holding partial output is kept, renamed ``.<out>.failed-<stamp>``. The
+analysis cache (``--cache-dir``) is the product's ``DiskProxyCache``, reused across runs by
+design, and keeps its own write discipline.
 
 A run FAILS (exit 1, no record) when the staged render's output differs from the product's
 ``render`` by any amount, when ``clip(prefused)`` differs from the staged ``fused``, or when the
 video decode did not deliver every selected frame. The video analysis is given the clip's
 expected frame count (:func:`clearwater.jobs.export.expected_frames`), as the export gives it.
 
-Exit status: 0 on success, 2 on a usage refusal, 1 on a failure.
+Exit status: 0 on success, 2 on a usage refusal, 1 on a failure (nothing published).
 """
 
 from __future__ import annotations
@@ -122,6 +137,7 @@ import argparse
 import dataclasses
 import json
 import math
+import os
 import sys
 from collections.abc import Iterator, Mapping, Sequence
 from datetime import UTC, datetime
@@ -219,6 +235,13 @@ measured against the source (face value)."""
 ATTRIBUTION_TIE = 1e-4
 """Two inputs' shares of a fused band (in units of the source contrast) closer than this are a
 tie (:func:`attributed_stage`): the order of float32 sums alone moves a share by about this."""
+
+WINDOWS_DEVICE_NAMES = frozenset(
+    {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"}
+    | {f"{port}{digit}" for port in ("COM", "LPT") for digit in "123456789\u00b9\u00b2\u00b3"}
+)
+"""Names Windows maps to a device whatever their extension (``NUL.json`` is ``NUL``):
+:func:`_check_name` refuses them on every system (spec N1: one portable rule)."""
 
 _LUMA = np.array([0.2126, 0.7152, 0.0722])  # BT.709, as clearwater.core.luminance
 
@@ -1790,7 +1813,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--end", type=float, help="video: last time (s from the first frame)")
     parser.add_argument("--crop-at", type=float, action="append", default=[], metavar="S")
     parser.add_argument("--cache-dir", type=Path, help="video: the analysis cache folder")
-    parser.add_argument("--replace", action="store_true", help="overwrite an existing record")
+    parser.add_argument(
+        "--replace",
+        action="store_true",
+        help="keep an existing output folder aside (<out>.replaced-<stamp>) and publish anew",
+    )
     return parser
 
 
@@ -1798,7 +1825,9 @@ def _options(args: argparse.Namespace) -> tuple[Path, str, Path, dict[str, Any]]
     """Resolve the source, the run name, the output folder and the run options.
 
     The local configuration is read only when it is needed: for a footage stem, or for the
-    default output or cache folder.
+    default output or cache folder. ``options`` also names the run's three sibling folders of
+    the output (``staging``, ``failed``, ``replaced``; see the module docstring), each checked
+    like the output.
     """
     if (args.stem is None) == (args.source is None):
         raise ProbeError("give exactly one of STEM and --source")
@@ -1819,8 +1848,16 @@ def _options(args: argparse.Namespace) -> tuple[Path, str, Path, dict[str, Any]]
     root = load_local_config().working_path / "wp5.7"
     out = args.out or root / "part1" / name
     cache_dir = args.cache_dir or root / "cache"
+    if headless_export.inside(root, out):
+        raise ProbeError(f"{out} must be a folder below the working folder's wp5.7 folder")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    siblings = {
+        "staging": out.parent / f".{out.name}.staging-{stamp}",
+        "failed": out.parent / f".{out.name}.failed-{stamp}",
+        "replaced": out.parent / f"{out.name}.replaced-{stamp}",
+    }
     footage = headless_export.configured_footage_folder()
-    for target in (out, cache_dir, out / f"{name}.json"):
+    for target in (out, cache_dir, out / f"{name}.json", *siblings.values()):
         if not headless_export.inside(target, root):
             raise ProbeError(f"{target} is not inside the working folder's wp5.7 folder")
         if footage is not None:
@@ -1843,6 +1880,7 @@ def _options(args: argparse.Namespace) -> tuple[Path, str, Path, dict[str, Any]]
         "end": args.end,
         "crop_at": args.crop_at,
         "cache_dir": cache_dir,
+        **siblings,
     }
     return source, name, out, options
 
@@ -1852,7 +1890,9 @@ def _check_name(name: str) -> None:
 
     Raises:
         ProbeError: The name is empty, holds a path separator, a drive or stream ``:``, a
-            ``..`` or a control character, or is not its own last path component.
+            ``..`` or a control character, is not its own last path component, or is a Windows
+            device name (:data:`WINDOWS_DEVICE_NAMES`; any case, any extension, trailing spaces
+            before the extension ignored as Windows ignores them).
     """
     plain = (
         bool(name)
@@ -1861,6 +1901,7 @@ def _check_name(name: str) -> None:
         and all(ch.isprintable() for ch in name)
         and Path(name).name == name
         and name.strip(" .") == name
+        and name.split(".")[0].rstrip(" ").upper() not in WINDOWS_DEVICE_NAMES
     )
     if not plain:
         raise ProbeError(f"--name {name!r} is not a plain file stem")
@@ -1892,28 +1933,60 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not isinstance(method, AncutiFusionMethod):
             raise ProbeError(f"unknown method {args.method!r}")
         params = resolve_parameters(method, args.param)
-        record_path = out / f"{name}.json"
-        if record_path.exists() and not args.replace:
-            raise ProbeError(f"{record_path.name} exists; pass --replace to overwrite")
+        if os.path.lexists(out) and not args.replace:
+            raise ProbeError(f"{out.name} exists; pass --replace to keep it aside and publish anew")
         is_video = source.suffix.lower() in {".mp4", ".mov"}
         if is_video and (args.start is None or args.end is None):
             raise ProbeError("a video needs --start and --end")
     except (ProbeError, LocalConfigError) as exc:
         print(f"halo_probe: {exc}", file=sys.stderr)
         return 2
-    out.mkdir(parents=True, exist_ok=True)
+    staging: Path = options["staging"]
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        staging.mkdir()  # exclusive: fails when anything (a folder, a file, a link) has the name
+    except OSError as exc:
+        print(f"halo_probe: FAILED, cannot make the staging folder: {exc}", file=sys.stderr)
+        return 1
     began = datetime.now(UTC)
     try:
         run = (run_video if is_video else run_photo)(
-            source, method, params, force_cpu=args.force_cpu, options=options
+            source, method, params, force_cpu=args.force_cpu, options={**options, "out": staging}
         )
-    except ProbeError as exc:
-        print(f"halo_probe: {exc}", file=sys.stderr)
-        return 2
-    except ProbeFailedError as exc:
-        print(f"halo_probe: FAILED, no record written: {exc}", file=sys.stderr)
+        record = _record(args, name, source, method, params, options, began, run)
+        with (staging / f"{name}.json").open("x", encoding="utf-8") as handle:
+            handle.write(json.dumps(_plain(record), indent=1))
+    except BaseException as exc:
+        kept = _abandon(staging, options["failed"])
+        if isinstance(exc, ProbeError):
+            print(f"halo_probe: {exc}{kept}", file=sys.stderr)
+            return 2
+        if isinstance(exc, ProbeFailedError):
+            print(f"halo_probe: FAILED, nothing published: {exc}{kept}", file=sys.stderr)
+            return 1
+        raise
+    try:
+        _publish(staging, out, options["replaced"] if args.replace else None)
+    except OSError as exc:
+        kept = _abandon(staging, options["failed"])
+        print(f"halo_probe: FAILED to publish: {exc}{kept}", file=sys.stderr)
         return 1
-    record = {
+    print(summary(record))
+    return 0
+
+
+def _record(
+    args: argparse.Namespace,
+    name: str,
+    source: Path,
+    method: AncutiFusionMethod,
+    params: Mapping[str, Any],
+    options: Mapping[str, Any],
+    began: datetime,
+    run: Mapping[str, Any],
+) -> dict[str, Any]:
+    """The run record: the settings, the rules in words, the times and the run's results."""
+    return {
         "schema": 3,
         "tool": "halo_probe",
         "name": name,
@@ -1941,9 +2014,45 @@ def main(argv: Sequence[str] | None = None) -> int:
         "finished": datetime.now(UTC).isoformat(),
         **run,
     }
-    record_path.write_text(json.dumps(_plain(record), indent=1), encoding="utf-8")
-    print(summary(record))
-    return 0
+
+
+def _abandon(staging: Path, failed: Path) -> str:
+    """Retire a failed run's staging folder; return a note for the message (may be empty).
+
+    An empty folder is removed with ``os.rmdir`` (it removes nothing else); one holding partial
+    output is renamed ``failed`` and kept. Nothing is published either way.
+    """
+    try:
+        os.rmdir(staging)
+        return ""
+    except OSError:
+        pass
+    try:
+        staging.rename(failed)
+        return f" (partial output kept in {failed.name})"
+    except OSError as exc:
+        return f" (partial output left in {staging.name}: {exc})"
+
+
+def _publish(staging: Path, out: Path, replaced: Path | None) -> None:
+    """Publish the staging folder as ``out``, keeping an existing ``out`` aside as ``replaced``.
+
+    Raises:
+        OSError: ``out`` exists and ``replaced`` is None, or a rename fails; when the second
+            rename fails the first is undone, so ``out`` is as it was and the staging folder
+            stays.
+    """
+    if os.path.lexists(out):
+        if replaced is None:
+            raise FileExistsError(f"{out.name} appeared during the run; nothing published")
+        out.rename(replaced)
+        try:
+            staging.rename(out)
+        except OSError:
+            replaced.rename(out)
+            raise
+        return
+    staging.rename(out)
 
 
 def summary(record: Mapping[str, Any]) -> str:

@@ -15,6 +15,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import math
+import os
 from fractions import Fraction
 from pathlib import Path
 from types import SimpleNamespace
@@ -430,6 +431,50 @@ def test_attribution_adds_up_to_the_detected_added_band() -> None:
     assert abs(raw - target) > 100 * ATTRIBUTION_TOLERANCE
 
 
+def _dark_water_scene(height: int = 128, width: int = 176) -> np.ndarray:
+    """Near-black water (0.02) with a bright disc (0.5): the fused dark ring clips at 0."""
+    yy, xx = np.mgrid[0:height, 0:width].astype(np.float64)
+    rgb = np.stack([0.0 + 0.0001 * xx, 0.02 + 0.0001 * yy, 0.01 + 0.0001 * xx], axis=2)
+    rgb[np.hypot(xx - 110, yy - 64) <= 30] = [0.5, 0.53, 0.54]
+    rgb = ndimage.gaussian_filter(rgb, (1.0, 1.0, 0))
+    rgb = rgb + np.random.default_rng(5).normal(0, 0.002, rgb.shape)
+    return np.ascontiguousarray(rgb.clip(0, 1), dtype=np.float32)
+
+
+def test_attribution_carries_a_binding_clip() -> None:
+    # Reviewer A round 1, finding 4: the final clip BINDS at the band's peak (a dark ring on
+    # near-black water is cut at 0), so the clip's share is not zero, and the shares still add
+    # up to the detected band only WITH it. Forcing the record's ``clip`` to 0 fails this test.
+    method = AncutiFusionMethod("c3")
+    params = hp.resolve_parameters(method, ["sharpen_blur_fraction=0.03"])
+    image = Image(pixels=_dark_water_scene(), device="cpu", color=SRGB, orientation_applied=True)
+    statistics = hp.photo_statistics(method, image, params)
+    line = hp.Line(40.0, 64.0, 120.0, 64.0)
+    frame = hp.probe_frame(
+        method,
+        image,
+        params,
+        statistics,
+        lines=[line],
+        region=hp.region_for([line], image.pixels.shape, 10),
+        half_width=2,
+        threshold=0.1,
+        crops=None,
+        prefix="photo",
+    )
+    record = frame["lines"][0]
+    fused = record["water"]["fused"]["Y"]
+    attribution = record["attribution"]
+    assert fused["verdict"] == "band"
+    assert attribution["clip"] < -100 * ATTRIBUTION_TOLERANCE  # about -0.016 of C
+    target = attribution["excess_at_peak"]
+    by_input = sum(attribution["per_input"].values()) + attribution["clip"]
+    by_level = sum(attribution["per_level"].values()) + attribution["clip"]
+    assert by_input == pytest.approx(target, abs=ATTRIBUTION_TOLERANCE)
+    assert by_level == pytest.approx(target, abs=ATTRIBUTION_TOLERANCE)
+    assert abs(attribution["residual"]) <= ATTRIBUTION_TOLERANCE
+
+
 def test_stretched_stage_matches_the_input2_formula() -> None:
     method = AncutiFusionMethod("c3")
     params = hp.resolve_parameters(method, [])
@@ -640,6 +685,111 @@ def test_main_on_a_synthetic_photo(tmp_path: Path, working: Path) -> None:
     assert hp.main([*argv, "--line", "30,48,90,48", "--margin", "8", "--force-cpu"]) == 2
     replace = [*argv, "--line", "30,48,90,48", "--margin", "8", "--force-cpu", "--replace"]
     assert hp.main(replace) == 0
+    # Round 1, fix 2: the replaced publication is kept beside it, never deleted.
+    kept = [p for p in working.iterdir() if p.name.startswith("out.replaced-")]
+    assert len(kept) == 1
+    assert (kept[0] / "scene.json").is_file()
+    assert (out / "scene.json").is_file()
+    assert not [p for p in working.iterdir() if "staging" in p.name or "failed" in p.name]
+
+
+def _snapshot(folder: Path) -> dict[str, bytes]:
+    """Every file under ``folder`` (relative path -> bytes)."""
+    return {
+        p.relative_to(folder).as_posix(): p.read_bytes()
+        for p in sorted(folder.rglob("*"))
+        if p.is_file()
+    }
+
+
+def _drift_render(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the product's render differ from the staged one (the probe's render check fails)."""
+    original = AncutiFusionMethod.render
+
+    def drifted(self: AncutiFusionMethod, *args: Any, **kwargs: Any) -> Image:
+        result = original(self, *args, **kwargs)
+        return dataclasses.replace(result, pixels=result.pixels + np.float32(1e-3))
+
+    monkeypatch.setattr(AncutiFusionMethod, "render", drifted)
+
+
+def test_main_failed_replace_leaves_the_prior_publication_untouched(
+    tmp_path: Path, working: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Round 1, fix 2: a failed --replace run (render check, after the crops are made) neither
+    # mixes new crops into the old record's folder nor publishes anything.
+    source = _scene_file(tmp_path)
+    out = working / "out"
+    argv = ["--source", str(source), "--out", str(out), "--cache-dir", str(working / "c")]
+    assert hp.main([*argv, "--line", "30,48,90,48", "--margin", "8", "--force-cpu"]) == 0
+    before = _snapshot(out)
+    _drift_render(monkeypatch)
+    again = [*argv, "--line", "30,48,90,48", "--margin", "12", "--force-cpu", "--replace"]
+    assert hp.main(again) == 1
+    assert _snapshot(out) == before
+    assert not [p for p in working.iterdir() if p.name.startswith("out.replaced-")]
+    failed = [p for p in working.iterdir() if p.name.startswith(".out.failed-")]
+    assert len(failed) == 1  # the failed run's partial output, kept under a failed name
+    assert not (failed[0] / "scene.json").exists()
+
+
+def test_main_fresh_run_publishes_only_on_success(
+    tmp_path: Path, working: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _scene_file(tmp_path)
+    out = working / "fresh"
+    _drift_render(monkeypatch)
+    argv = ["--source", str(source), "--out", str(out), "--cache-dir", str(working / "c")]
+    assert hp.main([*argv, "--line", "30,48,90,48", "--margin", "8", "--force-cpu"]) == 1
+    assert not out.exists()
+    # A refusal inside the run, before anything was written, leaves no folder at all.
+    monkeypatch.undo()
+    refused = [*argv, "--line", "30,48,90,48", "--region", "0,0,20,20", "--force-cpu"]
+    assert hp.main(refused) == 2
+    assert not out.exists()
+    assert len([p for p in working.iterdir() if p.name.startswith(".fresh.failed-")]) == 1
+
+
+@pytest.mark.parametrize("kind", ["hard", "symbolic"])
+def test_main_never_writes_through_a_link_planted_in_a_prior_output(
+    tmp_path: Path, working: Path, kind: str
+) -> None:
+    # Round 1, fix 1: a prior output folder holding ``photo-source.png`` as a link to a
+    # protected file (a CP5 pack PNG) must not truncate it: the run writes a fresh folder.
+    source = _scene_file(tmp_path)
+    out = working / "out"
+    argv = ["--source", str(source), "--out", str(out), "--cache-dir", str(working / "c")]
+    assert hp.main([*argv, "--line", "30,48,90,48", "--margin", "8", "--force-cpu"]) == 0
+    protected = working.parent / "wp5.3" / "pair.png"
+    protected.parent.mkdir()
+    protected.write_bytes(b"CP5 evidence, read-only")
+    planted = out / "photo-source.png"
+    planted.unlink()
+    try:
+        if kind == "hard":
+            os.link(protected, planted)
+        else:
+            planted.symlink_to(protected)
+    except OSError as exc:  # symbolic links need a privilege on Windows
+        pytest.skip(f"cannot create a {kind} link here: {exc}")
+    replace = [*argv, "--line", "30,48,90,48", "--margin", "8", "--force-cpu", "--replace"]
+    assert hp.main(replace) == 0
+    assert protected.read_bytes() == b"CP5 evidence, read-only"
+    assert not (out / "photo-source.png").is_symlink()
+    assert (out / "photo-source.png").read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+@pytest.mark.parametrize(
+    "name", ["NUL", "nul", "CON", "prn.json", "Aux.txt", "COM1", "com9.x", "LPT1", "lpt9", "NUL .x"]
+)
+def test_main_refuses_a_windows_device_name(tmp_path: Path, working: Path, name: str) -> None:
+    # Round 1, fix 3: a device name (any case, with or without an extension) would send the
+    # record to a device and report success; refused on every OS.
+    source = _scene_file(tmp_path)
+    argv = ["--source", str(source), "--out", str(working / "o"), "--cache-dir", str(working)]
+    status = hp.main([*argv, "--name", name, "--line", "30,48,90,48", "--margin", "8"])
+    assert status == 2
+    assert not (working / "o").exists()
 
 
 def test_main_refuses_an_output_inside_the_footage_folder(tmp_path: Path, working: Path) -> None:
@@ -702,6 +852,7 @@ def test_main_fails_without_a_record_when_the_render_check_differs(
     status = hp.main([*argv, "--line", "30,48,90,48", "--margin", "8", "--force-cpu"])
     assert status == 1
     assert not (out / "scene.json").exists()
+    assert not out.exists()  # round 1, fix 2: nothing is published
 
 
 def test_main_refusals(tmp_path: Path, working: Path) -> None:
