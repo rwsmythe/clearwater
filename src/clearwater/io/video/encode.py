@@ -45,6 +45,7 @@ from __future__ import annotations
 import collections
 import contextlib
 import json
+import logging
 import subprocess
 import threading
 import time
@@ -147,10 +148,24 @@ STDERR_TAIL_BYTES = 8 * 1024
 """How much of FFmpeg's standard error is kept for an error message."""
 
 POLL_S = 0.2
-"""The polling interval while waiting for FFmpeg (a dead encoder is seen within this)."""
+"""Requested interval for encoder-exit waits and watchdog polls; scheduling can delay either."""
+
+STALL_TIMEOUT_S = 300.0
+"""Accumulated capped polling seconds a pending pipe operation must exceed before a kill."""
+
+SUSPEND_GAP_S = 5.0
+"""Maximum seconds counted per watchdog gap, including its first observation of an operation.
+
+This estimates awake time: a suspend or scheduling delay contributes at most this much, so
+a starved watcher detects a stall later than one polled at the requested interval.
+"""
 
 FINISH_TIMEOUT_S = 1800.0
-"""How long ``close`` waits for FFmpeg to finish after the last frame before giving up."""
+"""Encoder-exit deadline after the sentinel is sent and stdin.close returns.
+
+This is separate from the watchdog's pending-I/O deadline; polling and scheduling can delay
+the observation of expiry.
+"""
 
 _REMOVE_TRIES = 20
 _REMOVE_PAUSE_S = 0.1
@@ -527,8 +542,15 @@ class FFmpegVideoSink:
 
     One sink writes one output: ``open``, ``write`` per frame in pts order, then ``close`` (or
     ``abort``). Any failure is final: the sink accepts nothing more except ``abort``. A refusal
-    at ``open`` leaves ``out_path`` to ``abort`` (or the caller's ``SafeWrite``); every other
-    failure stops the encoder and deletes the output, and ``abort`` then only repeats that.
+    at ``open`` leaves ``out_path`` to ``abort`` (or the caller's ``SafeWrite``). Other failures
+    attempt to stop the encoder and delete the output, and ``abort`` repeats that cleanup.
+
+    A daemon watchdog monitors pending write-and-flush operations and the final stdin close.
+    It counts capped monotonic poll intervals, resets for each new operation, and excludes
+    rendering gaps. Once the total exceeds :data:`STALL_TIMEOUT_S`, it records the stall and
+    attempts to kill the live encoder. The writer reports ``encoder_failed`` with the encoder
+    name and retained stderr tail through the existing failure path. This estimates awake
+    waiting time; it observes neither individual accepted bytes nor FFmpeg's decode progress.
     """
 
     def __init__(self, *, device_backend: object | None = None) -> None:
@@ -548,6 +570,12 @@ class FFmpegVideoSink:
         self._phase_lock = threading.Lock()  # close's and abort's transitions (DR-63)
         self._process: subprocess.Popen[bytes] | None = None
         self._stdin: IO[bytes] | None = None
+        self._encoder = "unknown"
+        self._watchdog_thread: threading.Thread | None = None
+        self._watchdog_stop = threading.Event()
+        # All mutable watchdog observations use _phase_lock; never hold it across pipe I/O.
+        self._waiting_since: float | None = None
+        self._stalled: float | None = None
         self._stderr_thread: threading.Thread | None = None
         self._stderr_tail: collections.deque[bytes] = collections.deque()
         self._stderr_size = 0
@@ -617,6 +645,7 @@ class FFmpegVideoSink:
                 "state", f"A video output cannot be opened twice ({self._phase})."
             )
         self._out_path = out_path  # first: abort() deletes it even after a refusal below
+        self._encoder = encoder  # immutable after open, before the watcher starts
         try:
             command, header = self._prepare(
                 probe,
@@ -899,7 +928,15 @@ class FFmpegVideoSink:
         return command
 
     def _start(self, command: list[str]) -> None:
-        """Start FFmpeg with stdin piped and a thread draining its stderr into a bounded tail."""
+        """Start FFmpeg, its bounded stderr drain, and the pending-I/O watchdog.
+
+        Args:
+            command: The encoder command, with the existing subprocess pipe defaults.
+
+        Raises:
+            VideoEncodeError: ``encoder_failed`` if process or thread startup fails, after
+                attempting cleanup. Watchdog startup and stderr startup have distinct text.
+        """
         try:
             process = subprocess.Popen(
                 command,
@@ -917,21 +954,93 @@ class FFmpegVideoSink:
         self._process = process
         self._stdin = process.stdin
         self._phase = "open"
+        start_failure = "FFmpeg's error output cannot be read"
         try:  # FFmpeg runs from here: any failure goes through _fail (round-4 #1)
             stderr = process.stderr
             assert stderr is not None  # stderr=PIPE
             thread = threading.Thread(target=self._drain, args=(stderr,), daemon=True)
             thread.start()
+            self._stderr_thread = thread
+            start_failure = f"The video encoder ({self._encoder}) watchdog could not be started"
+            watcher = threading.Thread(
+                target=self._watch_encoder, name="video-encoder-watchdog", daemon=True
+            )
+            watcher.start()
+            self._watchdog_thread = watcher
         except BaseException as error:
             if isinstance(error, Exception):
                 failure = VideoEncodeError(
                     "encoder_failed",
-                    f"FFmpeg's error output cannot be read: {ascii_text(str(error))}",
+                    f"{start_failure}: {ascii_text(str(error))}",
                 )
                 failure.__cause__ = error
                 error = failure
             self._fail(error)
-        self._stderr_thread = thread
+
+    def _watch_encoder(self) -> None:
+        """Attempt to kill a live encoder after excessive accumulated pending-I/O time.
+
+        The first observation counts min(now - waiting_since, SUSPEND_GAP_S); later polls
+        add min(now - previous_poll, SUSPEND_GAP_S). A distinct pending timestamp resets
+        the total; sends starting in one clock tick may share it and carry over that tick.
+        An idle poll clears the total. Capping estimates awake time rather than measuring
+        it: suspend and scheduling gaps each
+        contribute at most SUSPEND_GAP_S, so a starved watcher detects a stall more slowly.
+
+        Shared timestamps, process state and the stall record use _phase_lock; the pending
+        identity and accumulated total are watcher-local. The stop Event, a non-open phase,
+        or encoder exit ends polling. A stall records the total, warns once, then attempts
+        kill; the writer handles the resulting pipe failure and cleanup. Exceptions are logged here.
+        """
+        try:
+            previous_poll = time.monotonic()
+            pending_since: float | None = None
+            elapsed = 0.0
+            while not self._watchdog_stop.wait(POLL_S):
+                with self._phase_lock:
+                    now = time.monotonic()
+                    poll_gap = min(now - previous_poll, SUSPEND_GAP_S)
+                    previous_poll = now
+                    process = self._process
+                    if self._phase != "open" or process is None or process.poll() is not None:
+                        return
+                    waiting = self._waiting_since
+                    if waiting is None:
+                        pending_since = None
+                        elapsed = 0.0
+                        continue  # renderer work and gaps between frames are not a stall
+                    if waiting != pending_since:
+                        pending_since = waiting
+                        elapsed = min(now - waiting, SUSPEND_GAP_S)
+                    else:
+                        elapsed += poll_gap
+                    if elapsed <= STALL_TIMEOUT_S:
+                        continue
+                    self._stalled = elapsed
+                    logging.getLogger(__name__).warning(
+                        "Video encoder (%s) stalled after %.3f s of pending I/O; stopping export",
+                        self._encoder,
+                        elapsed,
+                    )
+                    try:
+                        process.kill()
+                    except OSError:
+                        if process.poll() is not None:  # normal exit raced the kill
+                            self._stalled = None
+                        else:
+                            logging.getLogger(__name__).exception(
+                                "Cannot stop stalled video encoder"
+                            )
+                    return
+        except Exception:
+            logging.getLogger(__name__).exception("Video encoder watchdog failed")
+
+    def _stop_watchdog(self) -> None:
+        """Signal the watcher to end and wait up to one second outside the phase lock."""
+        self._watchdog_stop.set()
+        thread = self._watchdog_thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=1)
 
     def _drain(self, stream: IO[bytes]) -> None:
         """Read FFmpeg's stderr to its end, keeping only the last few kilobytes."""
@@ -1012,22 +1121,55 @@ class FFmpegVideoSink:
             raise self._encoder_failed(process.returncode)
 
     def _encoder_failed(self, status: int | None) -> VideoEncodeError:
-        """Build the error for an encoder that stopped, with the end of its stderr."""
+        """Build a stall error if recorded, otherwise an exit-status error, with stderr tail.
+
+        Args:
+            status: Observed exit status, or None if the encoder has not exited.
+
+        Returns:
+            An ``encoder_failed`` error using the shared ASCII-safe stderr tail.
+        """
         if self._stderr_thread is not None:
             self._stderr_thread.join(timeout=2)
         tail = self._stderr_text() or "no error output"
+        with self._phase_lock:
+            stalled = self._stalled
+        if stalled is not None:
+            return VideoEncodeError(
+                "encoder_failed",
+                f"The video encoder ({self._encoder}) stopped accepting data for {stalled:.0f} s; "
+                f"the export was stopped. {tail}",
+            )
         return VideoEncodeError(
             "encoder_failed", f"The video encoder stopped (exit status {status}): {tail}"
         )
 
     def _send(self, data: bytes) -> None:
-        """Write bytes to FFmpeg's stdin; a closed pipe means the encoder has stopped."""
+        """Write and flush bytes within one pending-I/O window watched for a stall.
+
+        Returning means both write and flush returned, so Python no longer buffers these
+        bytes. It does not prove that FFmpeg has decoded them. The pending timestamp stays
+        set during the bounded exit-status wait on a pipe error and is cleared on every exit.
+
+        Args:
+            data: Stream header, frame header, frame payload, or end sentinel bytes.
+
+        Raises:
+            VideoEncodeError: ``encoder_failed`` on a write or flush OSError, with stall
+                text if the watcher recorded one, otherwise the observed exit status.
+        """
         stdin = self._stdin
         assert stdin is not None
+        with self._phase_lock:
+            self._waiting_since = time.monotonic()
         try:
             stdin.write(data)
+            stdin.flush()
         except (BrokenPipeError, OSError) as error:
             raise self._encoder_failed(self._exit_status()) from error
+        finally:
+            with self._phase_lock:
+                self._waiting_since = None
 
     def _exit_status(self) -> int | None:
         """Wait briefly for FFmpeg to end and return its exit status (None if it still runs)."""
@@ -1055,17 +1197,35 @@ class FFmpegVideoSink:
         return self._verify(self._end_stream())
 
     def _end_stream(self) -> int:
-        """Send the end sentinel, close stdin and wait for FFmpeg; return the sentinel's pts."""
+        """Send the sentinel, watch stdin close separately, then wait for encoder exit.
+
+        The sentinel's write-and-flush uses _send's watched window. A second window covers
+        stdin.close, including any final flush. Only after close returns does the separate
+        FINISH_TIMEOUT_S exit deadline begin. A successful exit stops the watchdog and
+        briefly joins the stderr drain; output verification is the caller's next step.
+
+        Returns:
+            The end sentinel's pts in source time-base ticks.
+
+        Raises:
+            VideoEncodeError: ``encoder_failed`` for a sentinel/close pipe error, nonzero
+                exit, or expiry of the encoder-exit deadline.
+        """
         probe, source = self._probe, self._source
         process, stdin = self._process, self._stdin
         assert probe is not None and source is not None
         assert process is not None and stdin is not None
         end = frame_end(probe, source, self._written[-1])
         self._send(nut.sentinel(end))
+        with self._phase_lock:
+            self._waiting_since = time.monotonic()
         try:
             stdin.close()
         except (BrokenPipeError, OSError) as error:
             raise self._encoder_failed(self._exit_status()) from error
+        finally:
+            with self._phase_lock:
+                self._waiting_since = None
         deadline = time.monotonic() + FINISH_TIMEOUT_S
         while True:
             try:
@@ -1079,6 +1239,7 @@ class FFmpegVideoSink:
                     ) from None
         if status != 0:
             raise self._encoder_failed(status)
+        self._stop_watchdog()
         if self._stderr_thread is not None:
             self._stderr_thread.join(timeout=5)
         return end
@@ -1131,7 +1292,8 @@ class FFmpegVideoSink:
 
     def _fail(self, error: BaseException) -> NoReturn:
         """Stop the encoder, delete the output and raise ``error`` (never a cleanup error)."""
-        self._phase = "failed"
+        with self._phase_lock:
+            self._phase = "failed"
         try:
             self._cleanup()
         except Exception as cleanup:
@@ -1145,6 +1307,7 @@ class FFmpegVideoSink:
         process step's error, or the deletion's (with the process step's as its context).
         """
         try:
+            self._stop_watchdog()
             process = self._process
             if process is not None:
                 if process.poll() is None:

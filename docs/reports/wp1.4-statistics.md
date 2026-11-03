@@ -307,6 +307,11 @@ window 2.0 s** (s = 0.33 s; 90 % of a step after 0.45 s; 10-90 % rise 0.87 s). G
    (`results.json`): 0.168 and 0.036 at 2 s against 0.183 and 0.048 at 1 s, 8 % and 25 % less.
    Grounds 1, 3 and 4 are properties of the filter and do not depend on the excerpts; the size
    of ground 2 is provisional until a staged run on an excerpt of at least 182 frames.
+   *Erratum 2026-11-03 (WP-DR25 `fa8eceab`; DR-25 (3) CLOSED):* that run exists:
+   `docs/reports/wp-dr25-staged-run.md`. On 20 s excerpts with an edge-free staged interior the
+   2 s advantage over 1 s is 23.2 % / 10.2 % on the shipped method c3 (the figures above were
+   Ancuti-only; Ancuti gives 13.5 % / 8.1 %); section 6 there re-trims these 6 s figures. AD-3
+   is CONFIRMED on the c3 figures.
 3. A diver turning from sand to blue water in about a second is followed within half a second; 4.0 s
    lags 0.85 s and smears the turn over 1.7 s.
 4. The median makes a single corrupt or flash frame vanish, at no measured cost.
