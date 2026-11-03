@@ -405,4 +405,109 @@ level to 0.34 of C and breaks its support (1 sample), while the fused ring (0.25
 Two docstring sentences from step 2A were corrected against the code ("a monotonic remap
 reports no band" holds only for a source with no overshoot).
 
-Depth at mid-build yield 1: DISPATCHER TO FILL
+Depth at mid-build yield 1: 176,019 (scripts/cell_depth.py, read by the orchestrator at the mid-build yield 2026-11-03)
+
+### Re-run (step 3; instrument `d2afd75b`; GPU; outputs `work/wp5.7/part1s/`)
+
+All six items and the half-width-12 photo sensitivity, the same lines, margins and frames as step
+2A, one process at a time (`uv --directory <worktree> run python tools/halo_probe.py ...`, the
+commands of the mid-build yield; cache `scratch/cache` reused; the compilation read in place
+from `work/wp5.3/excerpts/`). Every run exit 0 on the GPU, so every frame's render check and
+prefused check held: IMG_6739 34 s, IMG_6743 22 s, IMG_6744 17 s, IMG_6738 48 s, compilation
+107 s, GX011627 126 s; hw12 9 / 16 / 17 s (396 s in all; IMG_6739's first run carries the
+process warm-up). Free disk 82 GB before, 79 GB after. Records `part1s/<item>/<item>.json`
+(schema 3), rows `part1s/table-<item>.txt`, logs `part1s/logs/` (`runs.txt` the walls),
+hw12 `part1s/sensitivity-hw12/`; the comparison against `part1r` (a scratch tabulator, not
+committed) `part1s/table-2b.txt`. Determinism: every fused and input-2 band equals step 2A's
+exactly (max difference 0), so only the pointwise stages and the new column moved.
+
+### The re-issued stage table (luma, half width 4 of record; hw12 = the photo sensitivity)
+
+"First qualifying" = the selector; "attributed" = S2; "first over 10 %" = the first product
+stage whose band exceeds the threshold, qualifying or not; counts over the non-weak frame-lines.
+The fused band, widths, k2 / k1 shares, Wbar and N{} columns of step 2A's table are unchanged
+(identical numbers) and are not repeated.
+
+| Item | Region (line) | First qualifying | Attributed | First over 10 % | Fused band x C / abs (verdict) | Pointwise bands (balanced / input1) | hw12: first / attributed |
+|---|---|---|---|---|---|---|---|
+| IMG_6739 | shell left edge | undecided | undecided | input2 | 1.04 / 0.071 (undecided) | 0.000 / 0.020 | undecided / undecided |
+| IMG_6739 | flipper (weak, C 0.016) | undecided | undecided | input2 | 1.55 / 0.025 (undecided) | 0.000 / 0.099 (undecided, weak) | undecided / undecided |
+| IMG_6739 | right flank (no clean edge) | input2 | input2 | **input2** (was input1) | 3.07 / 0.142 (band) | 0.000 / 0.064 (was 0.052 / 0.309) | undecided / undecided |
+| IMG_6743 | object tip | input2 | input2 | input2 | 1.48 / 0.174 (band) | 0.000 / 0.017 | input2 / input2 |
+| IMG_6743 | lower edge | input2 | input2 | input2 | 2.32 / 0.179 (band) | 0.000 / 0.015 | input2 / input2 |
+| IMG_6744 | lower edge | undecided | undecided | input2 | 2.38 / 0.172 (undecided) | 0.000 / 0.024 | input2 / input2 |
+| IMG_6744 | tip | undecided | undecided | input2 | 0.80 / 0.118 (undecided) | 0.000 / 0.003 | undecided / undecided |
+| IMG_6738 | 49 frames x 2 lines (83 non-weak) | input2 16, fused 3, undecided 59, none 5 (was input2 14, fused 3, **input1 2**) | input2 17, undecided 57, none 9 | input2 70, input1 8, none 5 (was 71 / 7 / 5) | 17 band, 57 undecided, 9 none; 0.833 s flipper 1.45 / 0.163 (band) | max balanced 0.005; input1 0.26, none qualifies | - |
+| GX011627 | 30 frames (14 non-weak) | input2 7, fused 2, undecided 5 (unchanged) | input2 9, undecided 3, none 2 | input2 14 (was input1 8, input2 6) | 9 band, 3 undecided, 2 none; 22.122 s 1.84 / 0.162 (band) | none over 0.05 on non-weak lines | - |
+| compilation (excerpt) | 3 lines (56 non-weak) | input2 4, fused 2, undecided 35, none 15 (unchanged) | input2 5, undecided 36, none 15 | input2 40, input1 1, none 15 (was 38 / 3 / 15) | 5 band, 36 undecided, 15 none; 27.010 s shin 3.22 / 0.200 (band) | input1 max 0.106 (undecided) | - |
+
+No compensated, balanced or input-1 band qualifies on any frame-line, at half width 4 or 12
+(largest non-weak: compensated 0.000, balanced 0.005, input1 0.261, all `none` or `undecided`).
+Every qualifying fused band (34 at half width 4: 3 photo lines + 17 + 9 + 5 video frame-lines;
+3 photo lines at half width 12) is attributed to input 2: input 2's terms carry 0.89-1.10 of each
+band at its peak, the clip's share 0.000. Undecided counts (S3, not evidence either way): first qualifying 1 + 2
+photo lines (IMG_6739 shell, IMG_6744 both; plus the weak flipper), 59 / 83, 5 / 14, 35 / 56
+video frame-lines; at hw12 4 of 7 photo lines.
+
+### What changed from step 2A, line by line
+
+- **Input 1 named first (S1's target): gone.** IMG_6738 0.633 s and 0.700 s line 2: input1
+  (0.288, 0.162, band) -> input1 0.194 and 0.137, undecided (support 0, under their levels
+  0.205 / 0.143); the first qualifying stage is now input2 on both (fused 1.97 / 2.44, band,
+  attributed input2).
+- **"First over 10 %" = input1 that VANISHED** (non-weak): IMG_6739 right flank (0.309 ->
+  0.064); IMG_6738 line 2 at 0.000 s (0.136 -> 0.000), 0.567 s (0.148 -> 0.096), 0.600 s (0.114 ->
+  0.070), line 1 at 1.567 s (0.156 -> 0.000); GX011627 all eight (22.356, 22.389, 22.422, 22.456,
+  22.489, 22.623, 22.656, 22.689 s: 0.10-0.25 -> 0.009-0.045); the compilation 27.010 s line 3
+  (0.163 -> 0.028) and 27.094 s line 3 (0.197 -> 0.008). Every one now reads input2 first over 10
+  %. The two weak GX011627 lines whose first over 10 % was `balanced` (21.755 s 0.103, 22.189 s
+  0.113) now read 0.000 and 0.014 there.
+- **"First over 10 %" = input1 that SURVIVED, or appeared** (non-weak; none qualifies, so the
+  first-qualifying column does not change): survived IMG_6738 0.633 s and 0.700 s line 2 (above),
+  1.600 s line 2 (0.249 -> 0.159, level 0.878); compilation 27.027 s line 1 (0.141 -> 0.106, level
+  1.354). Appeared IMG_6738 line 2 at 0.433, 0.467, 0.500, 0.667, 0.767 s (0.03-0.09 -> 0.11-0.26;
+  support 0-1, under their levels). These are a REAL input-1 contribution relative to the ruled
+  reference, reported, not suppressed. Its cause, reproduced on the records
+  (`profiles_Y`): input1 - remap_input1 = gamma(gains * compensated) - gamma(gains * source) by
+  construction, i.e. 3C's chroma change, which leaves the compensated luma equal to the source's
+  (difference 0.0000 along these lines) and the balanced luma within 1e-4 of its reference, made
+  luma-visible by input 1's PER-CHANNEL gamma. At the appearing peaks the source's own outward
+  luma overshoot (0.10-0.22 of C) is carried into input 1 at x 1.25-1.28 (water luma 0.56-0.59),
+  while the remap reference, the per-channel gamma of the uncompensated, cast source, carries
+  only 0.002-0.058 of C there; on these weak-contrast edges (C 0.028-0.077) the residual
+  reads 0.11-0.26 of C. A reference chained from the COMPENSATED image instead of the source
+  would read 0 for both pointwise stages by construction; the ruling names the source, so that is
+  CHARC's call, not made here.
+- **S2 on the lines named `fused` first:** all seven are attributed to input 2 (IMG_6738 0.500,
+  0.667, 0.967 s line 2; GX011627 22.489, 22.589 s; the compilation 27.010 s and 27.044 s line 1).
+- **Featured frames: no verdict changed.** IMG_6738 0.833 s line 2: input2 first, attributed
+  input2, fused 1.45 / 0.163 band (input1 0.018 -> 0.066). GX011627 22.122 s: input2, input2,
+  1.84 / 0.162 band (input1 0.061 -> 0.004). Compilation 27.010 s line 3: input2, input2, 3.22 /
+  0.200 band (its first over 10 % input1 0.163 -> input2).
+- **Weak-edge frame-lines** (never decided): the first-over-10 % stage moved on 19 of them
+  (IMG_6738 4, GX011627 8, the compilation 7), between none, input1, balanced and input2 either
+  way.
+- **hw12 (photos):** as step 2A: IMG_6743 both and IMG_6744's lower edge input2 (attributed
+  input2); the IMG_6739 shell and right flank, IMG_6744's tip undecided.
+
+### Hypothesis verdicts (re-issued)
+
+- **The sharpened input carries the band: CONFIRMED** on every decided line: the first
+  qualifying stage is input 2 on every decided photo line and on 27 video frame-lines (was 25:
+  the two IMG_6738 input-1 lines resolved to input 2), `fused` on 7 more, and every qualifying
+  fused band (34 at half width 4, 3 photo lines at 12) is ATTRIBUTED to input 2 (its terms
+  0.89-1.10 of the band). Not decided: IMG_6744 both lines and the IMG_6739 shell at half width
+  4 (IMG_6744's lower edge decides input2 at 12).
+- **No pointwise or compensation stage carries a qualifying band** (S1 applied): the input-1
+  residuals over 10 % are the 3C x per-channel-gamma interaction above, none qualifying.
+- **The Laplacian weight favours input 2 at the edge: CONFIRMED** (unchanged).
+- **A shallow pyramid: REJECTED** (unchanged).
+- **The N{} saturation refinement: stands** (unchanged).
+
+### STOP check (dispatch step 3)
+
+No STOP: no input-1 or white-balanced band qualifies on any line; every qualifying fused band is
+attributed to input 2; no featured frame changed its verdict. Reported, not a STOP: input-1 bands
+over 10 % (never qualifying) survive or appear on 9 non-weak lines, cause above.
+
+Depth at step-2B end: DISPATCHER TO FILL
