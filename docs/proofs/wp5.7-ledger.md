@@ -1898,6 +1898,15 @@ saliency movement: GX011621 0.241, GX011592 0.239, GX011616 0.227.
   texture, which the clip limits everywhere; whether that is the look the owner preferred is the
   owner's judgement (the contact sheet's photos 6-20). std L* does not separate noise from
   texture.
+- **CHARC's addendum (msg 61fa577714607f97, relayed by the orchestrator): stated as an
+  OBSERVATION.** CHARC viewed the sheet and saw the clip visibly soften fine texture wherever
+  the local range is narrow, not only at halo edges: the fabric pattern on item 01, IMG_6762, and
+  the grain on item 06, IMG_6751. The sighting is CHARC's; the cell has no eye on it. CHARC's
+  counts were verified against the records and agree: 963 -> 39 over 50 videos, 248 -> 13 over
+  70 photos, and a clipped fraction of 0 under (d). The measurement columns from the records:
+  IMG_6762 f90 mean abs 0.0191, p99 0.1254, std L* 18.37 -> 17.93 (only 2.4 %: a local texture
+  loss does not show in the whole-frame measure), input-2 saliency 0.684; IMG_6751 mean abs
+  0.0856, p99 0.1526, std L* 11.75 -> 2.57. No preference judgement.
 - **No clipping under (d)** on any image (shipped up to 0.0047): input 2 is held inside the local
   range of its unsharpened form, which lies in [0, 1].
 - **The cached statistics.** Only input 2's smoothed saliency mean moves (0.070-0.684 Lab; largest

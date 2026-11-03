@@ -41,6 +41,9 @@ evidence folder is `C:\Users\rwsmy\clearwater-review-evidence\wp5.7\`):
   record. On `ad14-flicker` the contrast ratio rises (section 6).
 - **N6:** shipped runs at 10.95 min/min median and (d) at 12.43 (+13.59 %). As measured, (d) is
   OVER N6 (about 12 min/min) on the clip of record (section 7).
+- **Observation (CHARC's viewing; section 5):** beyond the halo edges, the clip visibly softens
+  fine texture wherever the local range is narrow. Examples are the fabric on IMG_6762 (mean abs
+  0.0191, p99 0.1254) and the grain on IMG_6751 (0.0856, 0.1526).
 - **Outcome (CHARC's A-prime):** nothing is proposed or shipped for v1.0.x. (d) at 1 sigma is
   stated as an amendment of spec 6.2 step 3. The owner has two options: (i) defer to Phase 6 with
   DR-117 open, or (ii) commission the optimisation now (section 8).
@@ -229,6 +232,23 @@ look judgement):
   2.57). This is consistent with section 3: the saturated N{} amplifies noise and fine texture,
   and the clip limits that everywhere. std L* does not separate noise from texture, and whether
   this is the look the owner preferred is the owner's judgement.
+- **OBSERVATION: the clip softens fine texture wherever the local range is narrow, not only at
+  halo edges.** The visual sighting is CHARC's, from viewing the contact sheet (CHARC msg
+  61fa577714607f97): the fabric pattern on item 01, IMG_6762, and the grain on item 06,
+  IMG_6751, are visibly softer under (d). The cell has no eye on it; its part is the measurement
+  columns below, from the item records (`P3/wholeset/items/<item>/<item>.json`) and the sheet's
+  `summary.tsv`. CHARC's set-wide counts were checked against the records and agree: qualifying
+  scan sides 963 -> 39 over the 50 videos and 248 -> 13 over the 70 photos, and a clipped fraction
+  of 0 under (d) on every image. No preference judgement is made here.
+
+  | # | Item | Frame | Mean abs change | p99 abs change | Max channel-mean shift | Whole-frame std L* shipped -> (d) | Scan b / n / u shipped -> (d) |
+  |---|---|---|---|---|---|---|---|
+  | 01 | IMG_6762 (V-P) | f90 | 0.0191 | 0.1254 | 0.0086 | 18.37 -> 17.93 | 60/82/146 -> 1/204/83 |
+  | 06 | IMG_6751 (P-A) | photo | 0.0856 | 0.1526 | 0.0092 | 11.75 -> 2.57 | 0/0/96 -> 0/0/96 |
+
+  On IMG_6762 the whole-frame std L* moves by only 2.4 %, so a texture loss on part of the frame
+  (a fabric pattern) is not visible in the whole-frame measure. The mean absolute and p99 columns
+  carry it, alongside the item's input-2 saliency movement (0.684 Lab, the set's largest).
 - **No clipped pixel under (d)** on any image.
 - **The smoothed statistics:** only input 2's saliency mean moves. White-balance records and
   fusion bounds are unchanged on all 50 videos.
@@ -350,7 +370,10 @@ summary).
   fix.
 - **Adoption costs:** the spec amendment (owner-reserved); a code path in `fusion_inputs`; a
   cache / schema version bump, because (d) changes input 2's smoothed saliency mean and is not in
-  the schema hash (DR-14 / spec 7); and an implementation whose cost fits N6's headroom (section 7).
+  the schema hash (DR-14 / spec 7); and an implementation whose cost fits N6's headroom.
+- **Cost as measured** (section 7): (d) at 12.43 min/min against shipped 10.95 on GX011627, which
+  is OVER N6 (about 12). Any implementation of the clip has a budget of about +9.6 % (12 / 10.95)
+  and must fit it with margin.
 - **The owner's choice** (CHARC routes it at the accept, not this package):
   - **(i) DEFER to Phase 6.** DR-117 stays open, with an optimisation item that re-measures the
     clip against N6.
