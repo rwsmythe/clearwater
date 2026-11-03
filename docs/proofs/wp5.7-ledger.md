@@ -511,3 +511,65 @@ attributed to input 2; no featured frame changed its verdict. Reported, not a ST
 over 10 % (never qualifying) survive or appear on 9 non-weak lines, cause above.
 
 Depth at step-2B end: 221229 (scripts/cell_depth.py, wp57-cell3, read by the orchestrator at the step-2B yield 2026-11-03)
+
+## Step 2C (Reviewer A round 1 remediation)
+
+Dispatch `clearwater-review-evidence/wp5.7/cell/dispatch-4.md` (orchestrator gen 37), the same
+cell (wp57-cell3) resumed on head `1e166e26`. Reviewer A round 1 (Codex gpt-6.1-sol / high,
+read-only, at the orchestrator's seat, on `1e166e26`): `NEW_CRITICAL_MAJOR_FOUND`, nothing
+against the measurement (it confirmed S1's gains and gamma, S2's rule, the full-frame equality
+checks, no 6.2 / 6.6 divergence).
+
+### Dispositions
+
+| # | Sev | Finding | What changed | Tests |
+|---|---|---|---|---|
+| 1 | MAJOR | crops and overviews written into `out` unchecked; a link planted there (to a CP5 PNG or a footage file) is truncated through `write_png`'s `"wb"` | every output file is created inside a FRESH staging folder `.<out>.staging-<UTC stamp>` beside `out`, made with an exclusive `mkdir` (fails on any existing name); the record opened with `"x"`; the staging, failed and replaced sibling names pass the same `inside(<working>/wp5.7)` and `write_target_refusal` checks as `out`; `out` itself must lie strictly below `wp5.7`; publication = renaming the staging folder to `out` | a prior `out` whose `photo-source.png` is a hard link, and (second case) a symbolic link, to `<work>/wp5.3/pair.png`: after `--replace` the target is unchanged and `out` holds a fresh PNG (both cases ran; neither skipped) |
+| 2 | MINOR | a failed `--replace` mixed new crops with the old record | a failed or refused run publishes nothing and leaves `out` untouched: an EMPTY staging folder is removed (`os.rmdir`, removes nothing else); one holding partial output is KEPT, renamed `.<out>.failed-<stamp>` (no deletion code); `--replace` on success renames the existing `out` aside to the kept sibling `<out>.replaced-<stamp>`, then the staging folder to `out` (a failed second rename undoes the first); an existing `out` (or link of that name) without `--replace` is refused (exit 2) | a failed `--replace` (render drift, a different margin so the crops would differ) leaves the prior folder byte-identical, publishes nothing, keeps one `.out.failed-*` without a record; a fresh failed run leaves no `out`; a refusal inside the run (region) leaves no folder; a successful `--replace` keeps exactly one `out.replaced-*` with its record |
+| 3 | MINOR | Windows device names pass `--name` | `_check_name` refuses `WINDOWS_DEVICE_NAMES` (CON, PRN, AUX, NUL, CONIN$, CONOUT$, COM1-9, LPT1-9 and the superscript-digit forms) on every OS, any case, with or without an extension, trailing spaces before the dot ignored | 10 names (`NUL`, `nul`, `CON`, `prn.json`, `Aux.txt`, `COM1`, `com9.x`, `LPT1`, `lpt9`, `NUL .x`): exit 2, no `out` |
+| 4 | MINOR (test only) | no test exercises a binding clip | a dark-water scene (water 0.02, bright disc 0.5) whose fused dark ring is cut at 0 at the band peak | the clip's share -0.016 of C (`< -100 x` tolerance) and per-input + clip and per-level + clip = the band within 1e-4; one-off mutation probe (the record's `clip` forced to 0): `assert 0.0 < (-100 * 0.0001)`, FAILED (log `work/c57-2c-mutation.log`) |
+
+No measurement code changed (the band, record and crop values are untouched: the record assembly
+moved into `_record` unchanged); the smoke run below confirms it byte for byte.
+
+### RED (the new tests against `1e166e26`'s probe): 16 failed, 48 passed
+
+Log `work/c57-2c-red.log` in the worktree.
+
+- planted link, hard and symbolic: `assert b'\x89PNG\r\n...' == b'CP5 evidence, read-only'` (the
+  protected file truncated and rewritten through the link) x 2.
+- failed `--replace`: `AssertionError: assert {...} == {...}` / `Differing items:
+  {'photo-wbar_2.png': ...} {'photo-input2.png': ...}` (new crops beside the old record).
+- fresh failed run, and the existing render-drift test: `assert not True` / `where True =
+  .../wp5.7/fresh').exists` and `.../wp5.7/o').exists` (a failed run left its folder).
+- device names x 10: `assert 0 == 2` (accepted, the record written to the device, exit 0).
+- the synthetic-photo test: `assert 0 == 1` / `where 0 = len([])` (no kept `out.replaced-*`).
+- the binding-clip test PASSES on `1e166e26` (finding 4 is test-only); its RED is the mutation
+  probe above.
+
+### GREEN
+
+`uv run pytest -q tests/test_tools_halo_probe.py` 64 passed (3.7 s); `uv run ruff check .` All
+checks passed; `uv run ruff format --check .` 313 files already formatted; `uv run mypy`
+Success, no issues found in 157 source files.
+
+### Smoke run (the real tool, GPU)
+
+`uv --directory <worktree> run python tools/halo_probe.py IMG_6743 --line 2450,600,1850,600
+--line 835,1008,1132,670 --margin 120 --out <work>/wp5.7/smoke-2c/IMG_6743`, then the same with
+`--replace`: exit 0 / 17 s, exit 0 / 17 s. `smoke-2c/` then holds `IMG_6743/` (the second
+publication) and `IMG_6743.replaced-20261103T084724801016Z/` (the first, kept), each with the
+same 25 files (`IMG_6743.json`, 2 overviews, 22 stage crops including `photo-remap_*`), and no
+staging or failed folder. Both records equal `part1s/IMG_6743/IMG_6743.json` in every field but
+`started` / `finished` (0 differences; 128 band fields each), and every PNG is byte-identical to
+part1s'. Free disk 65 GB at the smoke (79 GB at step 2B's end; the drop is not this step's: the
+smoke wrote 174 MB, two publications of 87 MB).
+
+### Round ledger (cumulative)
+
+| Round | Reviewer | Critical | Major | Minor | Advisory | In-envelope / out | NEW / REOPENED | Reverts | Fixes: instrument / test-only / product |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | A (Codex, at the orchestrator's seat) | 0 | 4 | 4 | 1 | 9 / 0 | 9 / 0 | 0 | 9 / 0 / 0 |
+| 1 | A (Codex, at the orchestrator's seat) | 0 | 1 | 3 | 0 | 4 / 0 | 4 / 0 | 0 | 3 / 1 / 0 |
+
+Depth at step-2C end: DISPATCHER TO FILL
