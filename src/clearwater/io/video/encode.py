@@ -151,7 +151,10 @@ POLL_S = 0.2
 """The polling interval while waiting for FFmpeg (a dead encoder is seen within this)."""
 
 STALL_TIMEOUT_S = 300.0
-"""How long one pending encoder pipe operation may take before the encoder is killed."""
+"""How much awake polling time one pending encoder pipe operation may take before a kill."""
+
+SUSPEND_GAP_S = 5.0
+"""A poll gap longer than this is treated as suspend and contributes at most this many seconds."""
 
 FINISH_TIMEOUT_S = 1800.0
 """How long ``close`` waits for FFmpeg to finish after the last frame before giving up."""
@@ -557,9 +560,7 @@ class FFmpegVideoSink:
         self._watchdog_stop = threading.Event()
         # All mutable watchdog observations use _phase_lock; never hold it across pipe I/O.
         self._waiting_since: float | None = None
-        self._last_accepted: float | None = None
-        self._bytes_in_flight = 0
-        self._stalled: tuple[float, int] | None = None
+        self._stalled: float | None = None
         self._stderr_thread: threading.Thread | None = None
         self._stderr_tail: collections.deque[bytes] = collections.deque()
         self._stderr_size = 0
@@ -930,12 +931,14 @@ class FFmpegVideoSink:
         self._process = process
         self._stdin = process.stdin
         self._phase = "open"
+        start_failure = "FFmpeg's error output cannot be read"
         try:  # FFmpeg runs from here: any failure goes through _fail (round-4 #1)
             stderr = process.stderr
             assert stderr is not None  # stderr=PIPE
             thread = threading.Thread(target=self._drain, args=(stderr,), daemon=True)
             thread.start()
             self._stderr_thread = thread
+            start_failure = f"The video encoder ({self._encoder}) watchdog could not be started"
             watcher = threading.Thread(target=self._watch_encoder, daemon=True)
             watcher.start()
             self._watchdog_thread = watcher
@@ -943,27 +946,44 @@ class FFmpegVideoSink:
             if isinstance(error, Exception):
                 failure = VideoEncodeError(
                     "encoder_failed",
-                    f"FFmpeg's error output cannot be read: {ascii_text(str(error))}",
+                    f"{start_failure}: {ascii_text(str(error))}",
                 )
                 failure.__cause__ = error
                 error = failure
             self._fail(error)
 
     def _watch_encoder(self) -> None:
-        """Kill a live encoder whose pending pipe operation exceeds the stall threshold."""
+        """Kill a live encoder after a pending operation exceeds the awake-poll threshold.
+
+        The timestamps and process state use _phase_lock; the accumulated time is local to
+        this watcher. Cap each poll gap so a suspend cannot consume the stall deadline.
+        A new pending timestamp resets the total, even if an idle interval was not polled.
+        """
         try:
+            previous_poll = time.monotonic()
+            pending_since: float | None = None
+            elapsed = 0.0
             while not self._watchdog_stop.wait(POLL_S):
                 with self._phase_lock:
+                    now = time.monotonic()
+                    poll_gap = min(now - previous_poll, SUSPEND_GAP_S)
+                    previous_poll = now
                     process = self._process
                     if self._phase != "open" or process is None or process.poll() is not None:
                         return
                     waiting = self._waiting_since
                     if waiting is None:
+                        pending_since = None
+                        elapsed = 0.0
                         continue  # renderer work and gaps between frames are not a stall
-                    elapsed = time.monotonic() - waiting
+                    if waiting != pending_since:
+                        pending_since = waiting
+                        elapsed = min(now - waiting, SUSPEND_GAP_S)
+                    else:
+                        elapsed += poll_gap
                     if elapsed <= STALL_TIMEOUT_S:
                         continue
-                    self._stalled = (elapsed, self._bytes_in_flight)
+                    self._stalled = elapsed
                     try:
                         process.kill()
                     except OSError:
@@ -1070,12 +1090,10 @@ class FFmpegVideoSink:
         with self._phase_lock:
             stalled = self._stalled
         if stalled is not None:
-            seconds, _bytes_in_flight = stalled
-            # One synchronous writer can wait on only one frame (or the stream sentinel).
             return VideoEncodeError(
                 "encoder_failed",
-                f"The video encoder ({self._encoder}) stopped accepting frames for {seconds:.0f} s "
-                f"while 1 frame waited; the export was stopped. {tail}",
+                f"The video encoder ({self._encoder}) stopped accepting data for {stalled:.0f} s; "
+                f"the export was stopped. {tail}",
             )
         return VideoEncodeError(
             "encoder_failed", f"The video encoder stopped (exit status {status}): {tail}"
@@ -1087,18 +1105,14 @@ class FFmpegVideoSink:
         assert stdin is not None
         with self._phase_lock:
             self._waiting_since = time.monotonic()
-            self._bytes_in_flight = len(data)
         try:
             stdin.write(data)
             stdin.flush()
-            with self._phase_lock:
-                self._last_accepted = time.monotonic()
         except (BrokenPipeError, OSError) as error:
             raise self._encoder_failed(self._exit_status()) from error
         finally:
             with self._phase_lock:
                 self._waiting_since = None
-                self._bytes_in_flight = 0
 
     def _exit_status(self) -> int | None:
         """Wait briefly for FFmpeg to end and return its exit status (None if it still runs)."""
@@ -1135,7 +1149,6 @@ class FFmpegVideoSink:
         self._send(nut.sentinel(end))
         with self._phase_lock:
             self._waiting_since = time.monotonic()
-            self._bytes_in_flight = 0
         try:
             stdin.close()
         except (BrokenPipeError, OSError) as error:
@@ -1143,7 +1156,6 @@ class FFmpegVideoSink:
         finally:
             with self._phase_lock:
                 self._waiting_since = None
-                self._bytes_in_flight = 0
         deadline = time.monotonic() + FINISH_TIMEOUT_S
         while True:
             try:

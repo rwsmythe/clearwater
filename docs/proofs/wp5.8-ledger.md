@@ -177,3 +177,142 @@ stop, the nominal kill would be about 17:07:57Z; the counters do not establish t
 The brief's roughly 9.9 s/frame CPU-route feed interval is about 30 times below the threshold,
 but is not a direct measurement of one _send's duration. No real-hardware recurrence was run.
 FINISH_TIMEOUT_S still governs an encoder that has accepted EOF but then does not finish.
+
+## Turn 3 (fresh session; Reviewer A round 1 remediation)
+
+Depth at turn-3 end: 93,669 input tokens of 258,400 (driver footer; FRESH session 01a1a049-871e-7ab2-a47e-aab7fd77055d, 2026-11-03)
+
+Base: `5a957919`, verified on arrival with a clean worktree. Reviewer A is the dispatcher's
+Claude pass on that head, verdict **NEW_CRITICAL_MAJOR_FOUND**. The eleven findings and
+their dispositions below are the binding packet supplied in the turn-3 dispatch; no review
+transcript or other evidence outside this worktree was read. Durable reviewer evidence is
+dispatcher-owned under `C:\Users\rwsmy\clearwater-review-evidence\wp5.8\` (exact round path,
+transport, model/version and mechanical assertions to be filled by the dispatcher).
+
+### Round 1 adjudication and changes
+
+| ID | Severity | Disposition | Evidence / change |
+| --- | --- | --- | --- |
+| 1 | MAJOR | Confirmed, fixed | `_watch_encoder` no longer subtracts the pending timestamp from the current clock on every poll. It accumulates capped poll deltas, resets on a new pending timestamp, and clears on an idle poll. `SUSPEND_GAP_S = 5.0` caps suspend-sized gaps. The injected-clock test fails on the base and passes on the fix. |
+| 2 | MINOR | Confirmed, fixed (test coverage) | Ported `test_render_gap_real_code` from the authorized reviewer probe into `test_watchdog_render_gap_between_frames_is_not_a_stall`. A 1.6 s render gap with a 1.0 s threshold passes the real watcher and fails the reviewer's idle-arming mutation. |
+| 3 | MINOR | Confirmed, fixed (test coverage) | Added `test_watchdog_nonzero_exit_races_stall_with_one_error`: the child stops consuming and exits 7 after 1.0 s, near the 1.0 s threshold. Exactly one writer error must contain either exit status 7 or the stall wording, exclusively; no thread exception, output deleted, process and watcher ended. The quick-exit test remains. |
+| 4 | ADVISORY | Already satisfied, retained | The existing abort test installs `threading.excepthook` and asserts its recorder is empty. Source inspection confirmed both before edits; the test passed in both final unit runs. No duplicate recorder added. |
+| 5 | ADVISORY | Fixed | The abort and small-send tests now call `_watchdog_wait(..., timeout=3.0)`, below the independent four-second rescue. |
+| 6 | ADVISORY | Fixed | Stall text is now `The video encoder (<name>) stopped accepting data for <N> s; the export was stopped.` This applies truthfully to header, payload, sentinel and close. The existing shared stderr-tail construction, including `no error output`, is unchanged. The earlier watchdog assertions now expect `data`. |
+| 7 | ADVISORY | Accepted limit, no change | A pending write that raises while the process remains alive can reach the stall deadline during `_exit_status()`'s bounded wait. The stall text can replace the eventual status text; the export fails and removes output either way. |
+| 8 | ADVISORY | Accepted limit, no change | A failed kill while the process remains alive, or a process that does not end after kill (for example a stuck driver call), can leave the writer blocked after the watcher returns. Exceptions are logged. The supplied W52-2 user-mode spin is the case kill ends; no real recurrence was run here. |
+| 9 | ADVISORY | Fixed | Removed unread `_last_accepted`, `_bytes_in_flight`, and the unused byte member of `_stalled`. The stall record now holds only accumulated seconds. The threshold applies to the CURRENT pending I/O, with awake time estimated by capped polling; renderer time never counts. |
+| 10 | ADVISORY | Confirmed, fixed | `_start` now chooses a watchdog-specific startup message before creating/starting that thread, separately from the stderr-drain message. Added an injected thread-start failure test proving `encoder_failed`, the true message, a dead child, and deleted output. |
+| 11 | ADVISORY | Accepted pre-existing limit, no change | Abort may close stdin between write and flush, producing `ValueError` for I/O on a closed file. The pre-existing header/payload gap has the same class of race. The caller's cancel state decides the outcome; no new exception policy is introduced. |
+
+The implementation follows the required capped-poll design. Each loop samples monotonic time
+under `_phase_lock`. For an already-observed pending operation it adds
+`min(now - previous_poll, SUSPEND_GAP_S)`. A newly observed pending timestamp starts a new
+total of `min(now - waiting_since, SUSPEND_GAP_S)`, accounting for the first partial poll
+interval while also capping a suspend before the first observation. Every poll, including an
+idle poll, advances `previous_poll`; an idle poll clears the pending identity and total.
+The accumulated total and pending identity are watcher-local; shared timestamps, process
+state, and the stall record use the existing lock. The thread still waits on the stop Event.
+
+The timing boundary is the start of the CURRENT pending I/O (design item 2). For the
+single-writer sink this is the brief's acceptance boundary: completed sends have returned
+from write AND flush before the next send starts. Time spent rendering between those sends
+is excluded. Partial kernel acceptance inside an outstanding write is not observable here;
+the watcher tracks the pending operation, not per-byte transport progress. No command,
+encoder preference, pipe size, finish timeout, dependency, or frozen interface changes.
+
+The suspend test uses a real non-reading Python child and replaces ONLY `encode.time` with
+a small namespace around a controlled monotonic clock (pytest, subprocess waits, timer and
+test coordination retain real time). After the watcher observes the pending write, the test
+adds 400 s to that clock, checks that the write and process survive the jump, then checks
+that continued awake polling produces the stall error and deletes output. Because the test
+threshold is shortened from 300 s to 1 s, it also shortens the suspend cap from 5 s to 0.1 s
+and the poll interval to 0.02 s. Keeping the production 5 s cap against a 1 s test threshold
+would intentionally exhaust the test deadline in a single capped jump.
+
+### RED evidence
+
+All pytest runs set `PYTHONPATH=scripts`, load `-p sandbox_mkdir_shim`, and disable the
+cacheprovider. These sandbox additions are required by the dispatch protocol. Outputs go
+only to the named `work/c58-3-*` files. Base product code was unchanged for both RED runs.
+
+1. Command: `uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider
+   tests/test_io_video_encode_units.py -k 'suspend_gap or render_gap_between or nonzero_exit_races'
+   --timeout 120 --basetemp=work/c58-3-red`.
+   Exit 1: **1 failed, 2 passed, 132 deselected in 3.60s**.
+   Log: `work/c58-3-red.log`. RED line:
+   `FAILED ...::test_watchdog_suspend_gap_does_not_count_as_awake_stall`,
+   `AssertionError: suspend clock jump killed a healthy pending operation`.
+   The new render-gap and near-threshold exit tests pass against the base, as expected:
+   findings 2 and 3 concern coverage, not a confirmed failure in those paths.
+2. Command: `uv run python work/c58-3-mut-probe.py` (same PYTHONPATH).
+   Exit 1: **1 failed, 134 deselected in 1.85s**.
+   Log: `work/c58-3-mut-red.log`. RED line:
+   `FAILED ...::test_watchdog_render_gap_between_frames_is_not_a_stall`, with
+   `VideoEncodeError: The video encoder (libx265) stopped accepting frames ...`.
+   The one-off script ports the reviewer's `idle_watch` mutation into an autouse pytest
+   plugin, replaces `_watch_encoder` in memory only, and selects the new render-gap test.
+   It arms from `_last_accepted` even when no I/O is pending. No mutation was applied to a
+   source file or committed. The probe file is an untracked/ignored work artifact, not a
+   deliverable. The base watcher without this mutation passed that test in command 1.
+
+### GREEN evidence
+
+| Check | Command (with PYTHONPATH as above) | Exit / summary | Log |
+| --- | --- | --- | --- |
+| Initial units | `uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_io_video_encode_units.py --timeout 120 --basetemp=work/c58-3-green` | 0: 136 passed in 9.30s | work/c58-3-green.log |
+| Final units | `uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_io_video_encode_units.py --timeout 120 --basetemp=work/c58-3-green-final` | 0: 136 passed in 9.02s | work/c58-3-green-final.log |
+| Four-worker units | `uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_io_video_encode_units.py --timeout 120 -n 4 --basetemp=work/c58-3-n4` | 0: 136 passed in 4.93s | work/c58-3-n4.log |
+| Existing encoder tests | `uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_io_video_encode.py -m 'not gpu and not footage and not slow' --timeout 300 --basetemp=work/c58-3-enc` | 0: 115 passed, 22 deselected in 184.37s (0:03:04) | work/c58-3-enc.log |
+| Ruff | `uv run ruff check src/clearwater/io/video/encode.py tests/test_io_video_encode_units.py` | 0: All checks passed! | work/c58-3-ruff-final.log |
+| Format | `uv run ruff format --check src/clearwater/io/video/encode.py tests/test_io_video_encode_units.py` | 0: 2 files already formatted | work/c58-3-format-final.log |
+| Mypy | `uv run mypy` | 0: Success: no issues found in 156 source files | work/c58-3-mypy-final.log |
+
+The existing encoder test run completed normally, with log progress observed at 62 percent
+before its final summary; no five-minute stall interval occurred. No other pytest run was
+started while it ran. Only the three turn-owned paths are modified. `git diff --check`
+is clean. `git diff --exit-code` confirms no edits to `tests/test_io_video_encode.py`,
+`tests/test_io_video_encode_bench.py`, `tests/test_app_export_worker.py`, or
+`tests/test_jobs_export_process.py`. The latter two were not run in this turn; their serial
+gate remains the dispatcher's task. No footage path was read or written, and no writes
+were directed outside this worktree.
+
+Free disk was checked before the RED run (81.93 GiB), before four-worker units (81.90 GiB),
+and before the existing encoder run (81.90 GiB), all above the dispatch's 25 GiB stop line.
+Logs: `work/c58-3-disk.log`, `work/c58-3-disk-n4.log`, `work/c58-3-disk-enc.log`.
+No whole-suite, GPU/footage/gui/slow, sync, or real-hardware export was run. Unit timings
+are fake-encoder safety checks on the shared host, not exclusive product performance data.
+uv's inherited `VIRTUAL_ENV` warning is emitted on stderr (PowerShell labels that stream
+`NativeCommandError`); the native process exit status and actual pytest summaries above
+are the reported outcomes, not that wrapper label.
+
+### Verification loop and round ledger
+
+- Suspected suspend false positive: independently confirmed by the injected-clock RED on
+  the base; fixed with capped deltas and confirmed GREEN in both unit modes.
+- Suspected render-gap coverage hole: confirmed by the planted idle-arming mutation;
+  the real watcher passes the new witness. No product change for finding 2.
+- Suspected lack of a near-deadline exit witness: confirmed by the original child script's
+  immediate exit; added the delayed child. Both immediate and delayed cases pass.
+- Suspected missing abort exception recorder: rejected as already satisfied by source
+  inspection and the passing test. No removal or weakening of that assertion.
+- Startup-failure wording: inspected the shared exception handler and confirmed it named
+  stderr even after stderr startup succeeded; separated the text and injected the watcher
+  startup failure to verify both error routing and cleanup.
+- Initial lint found one SIM117 in the new start-failure test. Combined the context
+  managers, then repeated units, ruff, format and mypy successfully. Product logic did not
+  change after the first GREEN run.
+- Final source pass checked reset-on-new-pending, idle exclusion, capped first observation,
+  stop/join paths, stderr-tail retention, lock order and removal of all unused progress
+  fields. No additional in-envelope finding. The three disclosed limits (7, 8, 11) remain
+  accepted for this turn and must be carried into the later completion report.
+
+| Round | Critical | Major | Minor | Advisory | In / out | NEW / REOPENED | Reverts | Product / tests | Status |
+| --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- |
+| 0 (carried) | 0 | 2 | 1 | 0 | 3 / 0 | 3 / 0 | 0 | fixed in turn 2 / yes | R1-R3 ruled and built |
+| A1 | 0 | 1 | 2 | 8 | 11 / 0 | 11 / 0 | 0 | yes / yes | 7 fixed, 1 already satisfied, 3 accepted limits; YIELD for A2 |
+
+No finding was reclassified, reopened or routed out of the envelope. Reviewer A convergence,
+the completion report, Reviewer B and the final gate remain later/dispatcher work; this turn
+does not claim package acceptance. One logical remediation change is offered to the dispatcher;
+no git writes or commits were attempted.
