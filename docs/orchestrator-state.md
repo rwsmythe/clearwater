@@ -5,8 +5,8 @@
 
 ### Generation
 
-- **Generation 39** (session `clearwater-orchestrator-20261103-1029`) LIVE 2026-11-03 20:29Z; picked up gen 38's state at `561ceb2a` (gen 38 `clearwater-orchestrator-20261103-0215` rolled clean at 400K with nothing running). CHARC is **gen 14 `clearwater-charc-20261103-0028`**; re-verify both names in `comms/.launch-sessions.json` before every cue. Seat folder `work/orch-g39/` (gate.sh / watch.sh / watch2.sh / fill_gate.py, copied from g38 with sed `g38`->`g39`; the successor does the same to g40). **`watch2.sh <run> <offset>`** reads only summary lines after line `<offset>`. Bash gauge at bring-up: 34 ms. State worktree `.worktrees/orch-state-g39` (the successor removes it and adds its own).
-- **Disk:** C: 46 GB free at 20:30Z. `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB before any window.
+- **Generation 39** (session `clearwater-orchestrator-20261103-1029`) LIVE 2026-11-03 20:29Z to ~23:30Z, ROLLED OVER at ~360K on CHARC's ruling (msg 651b26806bce4ad9: roll in this gap; gen 40 fills and dispatches WP5.5) with NOTHING running; picked up gen 38's state at `561ceb2a`. CHARC is **gen 14 `clearwater-charc-20261103-0028`**; re-verify both names in `comms/.launch-sessions.json` before every cue. Seat folder `work/orch-g39/` (gate.sh / watch.sh / watch2.sh / fill_gate.py; the successor copies them to `work/orch-g40/` with sed `g39`->`g40`). **`watch2.sh <run> <offset>`** reads only summary lines after line `<offset>`. Bash gauge at bring-up: 34 ms. State worktree `.worktrees/orch-state-g39` (the successor removes it and adds its own).
+- **Disk:** C: 42 GB free at 23:13Z (after gate p57). `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB before any window; the fullclip leg needs its basetemp.
 - **Paces at 20:30Z:** Codex 21 % (pace 0.229, resets 2026-11-04 10:07Z); Claude 15 % (pace 0.73, resets 2026-11-09 10:00Z). Codex is the lower pace.
 - **CHARC subjects: under 100 characters.**
 
@@ -21,14 +21,15 @@
 - **Backslash-bearing Python helpers are written with the Write tool**, never a heredoc. **`rm` takes literal absolute paths.** **Worktree release:** a released worktree's `work/` is pruned only on the owner's word; junits copied to `clearwater-review-evidence\<pkg>\gate\` first.
 - **A bare `cd` moves the session's cwd** (it carries between Bash calls, and a live Claude cell shares the process): use `git -C`, absolute paths, or `( cd X && ... )`.
 
-### Live board (RESUME HERE) -- gen 39, 2026-11-03 23:16Z, NOTHING RUNNING (no cell live, no job)
+### Live board (RESUME HERE) -- ROLLOVER 2026-11-03 ~23:30Z, NOTHING RUNNING (no cell live, no job)
 
-On pickup: drain the inbox; copy `work/orch-g39/` scripts to `work/orch-g40/`. A cell named below as LIVE dies with its dispatcher's pane: re-dispatch from the ledger.
+Successor = generation 40: drain the inbox at pickup; copy `work/orch-g39/` scripts to `work/orch-g40/`; read the paces fresh.
 
 1. **WP-DR25 ACCEPTED** (main `fa8eceab`; gate `pdr25` GREEN). CHARC: DR-25 CLOSED in full, AD-3 CONFIRMED (main `732f1da4`). Worktree `.worktrees/wp-dr25` + 7.1 GB `work\wp-dr25\` KEPT (owner's word to prune).
 2. **WP5.7 ACCEPTED** (main `ce20a176`; record `docs/proofs/wp5.7-accept.md`; gate `p57` GREEN on `d4644511`: parallel 6,781 / serial 1,262 / harness 382; main merged INTO the branch `--no-ff` twice so every cited hash stays reachable, then ff). Nets: A r0-r8 (r6 converged on the package, r8 on the B fix); B on `faf592de` (B1 MAJOR fixed by wp57-cell9); B re-run on `5eb92a51` (MAJOR = DR-119 (a), adjudicated at my seat, CHARC concurring `21f92b6c81d8c978`). Banked: DR-119 (a)-(d), DR-120. DR-117 OPEN: CHARC sends the owner the DEFER / OPTIMISE-NOW decision request (posted 23:15Z). Kept until the owner's word: `.worktrees/wp5.7`, `work\wp5.7\` (part1s, part2 7.6 GB, part3, part3r). Every record durable under `C:\Users\rwsmy\clearwater-review-evidence\wp5.7\`.
-3. **WP5.5** release prep (Codex) after WP5.7 merges (brief FINAL; tag `v1.0.0` on the owner's word, no push). **WP-H1** HELD by CHARC until WP5.5's accept.
-- Mail drained through 22:30Z (`work/orch-g39/drain-5.txt`); 0 unread at 23:14Z. No query open; WP5.5 awaits CHARC's go.
+3. **NEXT: WP5.5 release preparation** (Codex lane; brief `docs/briefs/wp5.5-brief.md` FINAL except its dispatch section). CHARC RULED (msg 651b26806bce4ad9): gen 40 FILLS the dispatch section (CHARC marks it FINAL on the fill) and DISPATCHES it WITHOUT waiting for the owner's halo answer: the N13 licence audit (transitive deps included), the notices and the user guide do not depend on it; ONLY the tag step (`v1.0.0`, no push) waits for the owner's word. If the owner answers OPTIMISE, a product package precedes the tag and WP5.5's guide gets a one-line amendment at that package's accept. The fill must say: DR-119 (a)-(b) IN or OUT of WP5.5's scope (if in: two lines + two tests); the release gate = three legs (parallel, serial, fullclip) + harness with logs archived; `df -h /c` before it. Paces: read both readings fresh, record them in the dispatch row. **WP-H1** HELD by CHARC until WP5.5's accept.
+4. **Owner-pending (CHARC holds it):** the DR-117 decision request sent 23:20Z (DEFER recommended / OPTIMISE NOW). Prunes of `work\wp5.7\` (part2 7.6 GB), `work\wp-dr25\` (7.1 GB) and the kept worktrees only on the owner's word.
+- Mail drained through 23:2xZ (`work/orch-g39/drain-6.txt`: CHARC's roll ruling). 0 unread at the announce. No query open.
 - Kept worktrees: `wp5.3`, `wp5.7`, `wp5.8`, `wp-dr25`, `orch-state-g39`.
 
 ### Gen-39 lessons
