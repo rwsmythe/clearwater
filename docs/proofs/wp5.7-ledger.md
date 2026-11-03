@@ -166,3 +166,167 @@ GX011627) and `table-compilation.txt`; every number above is read from the run J
 video runs).
 
 Depth at part-1 end: 290,002 (scripts/cell_depth.py, current = peak, 116 turns, read by the orchestrator at the Part 1 yield 2026-11-03)
+
+## Step 2A (fresh cell; Reviewer A round 0 remediation)
+
+Dispatch `clearwater-review-evidence/wp5.7/cell/dispatch-2.md` (orchestrator gen 36). Fresh cell
+(implementer-opus-high) on head `1e9909f4` (main `7395906b`). Instrument commit `cec81506`.
+
+### The band, as now defined (module docstring of `tools/halo_probe.py`)
+
+On the water side of a line (from the end of the start plateau to the source's edge), a stage's
+OUTWARD overshoot is its rise past its own water-plateau line away from the object, zero where it
+does not pass the line; the source's is measured the same way. The excess at each sample is the
+stage's overshoot minus the source's, over ONE common contrast, the source's signed water
+contrast C; the band is the largest excess (0 when none is positive). A band QUALIFIES only on a
+non-weak edge (|C| >= 0.02) when at least 3 consecutive samples around its peak each exceed both
+the 10 % threshold and 3 x the water-side uncertainty there: the stage's and the source's
+`water_uncertainty` in quadrature over |C|, i.e. the plateau fit's residual RMS plus the error of
+its line extrapolated to that sample, with an AR(1) effective sample count. Verdicts: `band`,
+`undecided` (weak edge, or over the threshold without qualifying), `none`. The first-stage
+selector names the first product stage whose band qualifies; `undecided` when none does but one
+is undecided. Widths: interpolated crossings at the line's real sample spacing.
+
+Why the extrapolation term: a fixed 3 x residual RMS let correlated plateau noise qualify in 10-37
+% of 300 seeds (noise 5 % of C, correlation 1-4 px; up to 29-sample runs), because the line fit
+absorbs low-frequency noise and its extrapolation over the zone adds error the RMS does not see.
+With the term: 0-4 % (correlation up to 4 px), 7-13 % at 8 px (a lag-1 AR(1) under-counts long
+correlation): a stated limit.
+
+### Dispositions (Reviewer A round 0, Codex gpt-6.1-sol / high, `NEW_CRITICAL_MAJOR_FOUND`)
+
+| # | Sev | Finding | What changed (`cec81506`) | Tests |
+|---|---|---|---|---|
+| 1 | MAJOR | band = per-profile normalised deviation difference; object-side changes and gamma read as bands | `water_band` rewritten as above (outward overshoot vs the source's, over the source's C); `normalised_water_side` removed; an inward spread is no band | object-plateau control (was 0.4751); gamma on a monotonic step through the real c3 staged render (input1 was 0.1193) |
+| 2 | MAJOR | attribution measured raw deviations, not the detected quantity; pre-clip terms | `staged_render` also yields `srcterm_k<k>_l<l>` (the source's Laplacian bands under the same weight pyramids; they add up to the source since sum Wbar = 1) and `prefused` (multiscale_fusion's sum before the clip); `attribute_band` splits the fused band's excess at its peak exactly: per (k, l) `sign (dev(term) - [s] dev(srcterm)) / abs(C)` (`[s]` = 1 when the source is outward at the peak) plus the clip's share `sign (dev(fused) - dev(prefused)) / abs(C)`; the record carries terms, per input, per level, clip, residual and the raw shares | per-input and per-level sums + clip = band within 1e-4 of C on a scene where the clip does not bind (residual about 5e-8); the raw (unsubtracted) sum misses by 0.061 (> 100 x the tolerance) |
+| 3 | MAJOR | noise and weak edges decide the first stage | the qualification rule above; weak edge -> `undecided`; `first_stage` reads qualifying bands only; `unqualified_exceedances` recorded | 1-sample spike (10.25 %, support 1, undecided); correlated plateau noise (a 0.20-of-C excursion, undecided) with a real ring through it qualifying; weak edge undecided; selector undecided on the spike and on a weak edge |
+| 4 | MAJOR | writes not confined | `--name` must be a plain stem (`_check_name`: no separator, drive or stream `:`, `..`, control character, leading or trailing dot or space); out, cache and the record path must be `inside` `<working>/wp5.7` and pass `write_target_refusal`; refused before any write | 7 bad names; out or cache outside wp5.7, a `..` escape, `work/wp5.3/records` |
+| 5 | MINOR | strip and interpolation silently clamped at the crop | `line_profile` refuses a strip that leaves the array; `_check_region` checks every line's whole strip (`strip_bounds`) inside the region | strip off the array (row -1, column 60); strip leaving the region; a line on the image's top row |
+| 6 | MINOR | render equality recorded, not enforced | a render mismatch or `clip(prefused) != fused` raises `ProbeFailedError`: exit 1, no record | a drifted render -> exit 1, no JSON |
+| 7 | MINOR | no test of `first_stage_over_threshold` | `first_stage` public; the record field is its result | a band planted in each of the 6 product stages alone (a constant selector fails 5 of 6); a band persisting from each stage on; none -> None |
+| 8 | MINOR | video completeness | `expected_frames=expected_frames(probe)` passed to `AnalysisEngine` (as `jobs/export.py` passes it); every selected pts must be rendered or `ProbeFailedError` | fake source and engine: the count reaches the engine; a skipped selected frame fails |
+| 9 | ADVISORY | integer widths, 1 px spacing assumed | `_width` interpolates the crossings; `sample_spacing = length / round(length)` applied to fwhm, extent and peak distance (water and two-sided) | Gaussian ring FWHM 5.89 (was 5); a spacing of 2 doubles the widths |
+
+Fix 6, second part (which intermediates are recomputed): every saved stage comes from ONE pass of
+`staged_render`, whose `output` is compared bit for bit with `method.render` and whose `fused`
+equals `clip(prefused)` bit for bit (both enforced). `render` exposes no intermediate, so equality
+with the product's internal arrays rests on calling the same functions, in `render`'s order, with
+`render`'s arguments. Recomputed outside the product's own call: `high_pass` (the same call
+`fusion_inputs` makes), `stretched` (formed as `fusion_inputs` forms N{}; test: input2 =
+clip((balanced + stretched) / 2) at strength 1), the three weight components (the product's
+`laplacian_weight`, `saliency_weight` and `saturation_weight` called separately; `wbar_k` is
+`weight_maps`' own output), the attribution terms (checked through `prefused`), `naive` (a
+counterfactual) and the full-resolution bounds (a diagnostic).
+
+### RED (the new tests against `1e9909f4`'s probe): 31 failed, 12 passed
+
+`DID NOT RAISE ValueError` (strip); `KeyError 'verdict'` / `'qualifies'` / `'support_samples'`
+(new fields); `assert 0.47506491051416905 < 1e-09` (object plateau); `AssertionError: input1 /
+assert 0.11934356334726515 < 0.01` (gamma); `assert False` (noise precondition); `assert 5 ==
+5.887 +- 0.15` (width); `AttributeError: no attribute 'first_stage'` (x 8); `assert 0 == (2 * 3)`
+(source terms); `assert 0 == 2` (names `../escape`, `C:escape`, `..`, empty, absolute; a strip
+leaving the region); `FileNotFoundError ... o\a\b.json` (names `a/b`, `a\b`); out-outside
+AssertionError; `assert 0 == 1` (render drift); `KeyError 'expected_frames'`; `AttributeError:
+no attribute 'ProbeFailure'` (skipped frame). Log `work/c57-2a-red.log` in the worktree.
+
+### GREEN (`cec81506`)
+
+`uv run pytest -q tests/test_tools_halo_probe.py` 43 passed (1.7 s); `ruff check .` All checks
+passed; `ruff format --check .` 313 files already formatted; `mypy` Success, no issues in 157
+source files. Two test calibrations after the first green attempt (test-only): the noise
+control's amplitude and seed (the first draft's noise did not cross 10 %), and the attribution
+scene (sharpening fraction 0.03 so the ring spans more than 3 samples on a 128-px frame; the
+in-camera halo sigma 6).
+
+### Re-measurement (corrected instrument; the same items, lines, margins and frames; GPU)
+
+Commands: Part 1's six, each with `--out <work>/wp5.7/part1r/<item>` (cache `scratch/cache`
+reused). Exit 0 on all six, so every frame's render check and prefused check held: IMG_6739 8
+s, IMG_6743 14 s, IMG_6744 14 s, IMG_6738 44 s, compilation 100 s, GX011627 114 s. Free disk
+83 GB. Records `part1r/<item>/<item>.json`, rows `part1r/table-<item>.txt`, logs
+`part1r/logs/`. Sensitivity (photos only, half width 12): `part1r/sensitivity-hw12/`.
+
+The re-issued stage table (luma; "first qualifying" = the selector; "first over 10 %" = the
+first product stage whose band exceeds the threshold, qualifying or not; band = the fused
+stage's, over the source's C and absolute; k2 / k1 = the per-input shares of the fused band at
+its peak):
+
+| Item | Region (line) | First qualifying | First over 10 % | Fused band x C / abs (verdict) | FWHM px | / sigma | / coarsest | k2 / k1 (top k2 levels) | Wbar2 edge / plateau | N{} range proxy / full |
+|---|---|---|---|---|---|---|---|---|---|---|
+| IMG_6739 | shell left edge | **undecided** (input2: level 1.49 vs band 1.82, support 2) | input2 | 1.04 / 0.071 (undecided) | 14.7 | 0.97 | 0.115 (128) | +1.107 / -0.063 (l3, l2, l0) | 0.65 / 0.51 | 0.0512 / 0.0772 |
+| IMG_6739 | flipper | **undecided** (weak edge, C 0.016) | input2 | 1.55 / 0.025 | 2.1 | 0.14 | 0.017 | +1.525 / +0.021 | 0.48 / 0.50 | same |
+| IMG_6739 | right flank (no clean edge) | input2 (peak 124 px off the edge) | input1 (0.31, undecided) | 3.07 / 0.142 (band) | 7.1 | 0.47 | 0.055 | +2.959 / +0.113 (l1, l0, l2) | 0.42 / 0.54 | same |
+| IMG_6743 | object tip | input2 | input2 | 1.48 / 0.174 (band) | 31.7 | 1.48 | 0.124 (256) | +1.543 / -0.064 (l4, l3, l5) | 0.63 / 0.52 | 0.0206 / 0.0332 |
+| IMG_6743 | lower edge | input2 | input2 | 2.32 / 0.179 (band) | 22.1 | 1.03 | 0.086 | +2.369 / -0.048 (l3, l4, l2) | 0.61 / 0.56 | same |
+| IMG_6744 | lower edge | **undecided** (fused: level 2.39 vs band 2.38; input2: level 3.88 vs band 3.66) | input2 | 2.38 / 0.172 (undecided) | 7.8 | 0.36 | 0.030 (256) | +2.387 / -0.007 (l3, l2, l4) | 0.67 / 0.58 | 0.0183 (floor) / 0.0321 |
+| IMG_6744 | tip | **undecided** | input2 | 0.80 / 0.118 (undecided), outward, 35 px off the edge | 4.7 | 0.22 | 0.018 | +0.830 / -0.032 (l4, l3, l1) | 0.71 / 0.55 | same |
+| IMG_6738 | fin, flipper; 49 frames x 2 lines (83 non-weak) | input2 14, **fused 3, input1 2**, undecided 59, none 5 | input2 71, input1 7, none 5 | median 0.54, max 5.40; 0.833 s flipper 1.45 / 0.163 (band) | 9.6 at 0.833 s | 1.34 | 0.150 (64) | +1.439 / +0.007 (l2, l1, l3) | 0.60 / 0.57 | 0.0234-0.0239 / 0.0208-0.0230 |
+| GX011627 | fin edge; 30 frames (14 non-weak) | input2 7, **fused 2**, undecided 5 | input1 8, input2 6 | median 1.14, max 7.42; 22.122 s 1.84 / 0.162 (band) | 20.3 | 1.88 | 0.159 (128) | +1.797 / +0.046 (l3, l4, l2) | 0.68 / 0.48 | 0.0349-0.0361 / 0.0318-0.0341 |
+| compilation (excerpt) | 3 lines, 27.0-27.5 s (56 non-weak) | input2 4, **fused 2**, undecided 35, none 15 | input2 38, input1 3, none 15 | median 0.42, max 6.77; 27.010 s shin 3.22 / 0.200 (band) | 6.2 | 1.15 | 0.097 (64) | +3.165 / +0.054 (l1, l0, l2) | 0.65 / 0.51 | 0.0315-0.0319 / 0.0365-0.0369 |
+
+No compensated or balanced band qualifies on any frame-line (the largest is 0.05 of C). Every
+qualifying fused band is carried by input 2's terms: input 2's share of the band at the peak is
+0.89-1.55 (above 1 where input 1's share is negative); the clip's share is 0.000 everywhere;
+attribution residuals at most 6e-6 of C.
+
+### What changed from Part 1, item by item
+
+- IMG_6739: shell edge input2 -> undecided (band 1.04 vs 1.17; input 2's own plateau noise,
+  sigma 0.023 against the source's 0.002, lifts the level); flipper -> undecided (a weak edge
+  now forces it); right flank input1 -> input2 (input 1's 0.31 no longer qualifies; still not the
+  owner's halo, peak 124 px off the edge).
+- IMG_6743: unchanged (input2 on both lines; 1.48 / 2.32 vs 1.50 / 2.34; FWHM 31.7 / 22.1 vs 32 /
+  22).
+- IMG_6744: lower edge input2 -> undecided (by 0.01 of C: band 2.38 vs level 2.39); tip: Part 1's
+  INWARD -0.89 is no band by the new definition; the new metric finds an outward ring of 0.80, 35
+  px from the edge, undecided. Half width 12 resolves the lower edge to input2 (2.11, band).
+- IMG_6738: Part 1 input2 on 83 / 83 -> input2 14, fused 3, input1 2, undecided 59, none 5. The
+  featured flipper frame (0.833 s) stands: input2, 1.45 (was 1.38).
+- GX011627: Part 1 input2 on 12 / 14 -> input2 7, fused 2, undecided 5. 22.122 s stands: input2,
+  1.84 (was 1.86).
+- Compilation: Part 1 input2 on 54 / 56 -> input2 4, fused 2, undecided 35, none 15. The 27.010 s
+  shin stands: input2, 3.22 (was 2.93).
+
+### Hypothesis verdicts (re-issued)
+
+- **The sharpened input carries the band:** CONFIRMED where the instrument decides: the first
+  qualifying stage is input 2 on every decided photo line and on 25 video frame-lines; input 2's
+  terms carry 0.89-1.55 of every qualifying fused band (including the 7 named `fused`). NOT
+  decided on IMG_6744 (both lines) and the IMG_6739 shell at half width 4: see the STOP.
+- **The Laplacian weight favours input 2 at the edge:** CONFIRMED (unchanged: Wbar2 0.60-0.71 at
+  the edge against 0.47-0.58 on the water plateau).
+- **A shallow pyramid:** REJECTED (stands: FWHM 0.017-0.26 of a coarsest pixel; attribution in
+  levels 0-5; clip share 0).
+- **The N{} saturation refinement:** stands, with a second face: input 2's (and the fused) water
+  plateau is 10-20 x noisier than the source's (sigma 0.02-0.07 vs 0.002-0.003), which is what
+  makes many frame-lines undecided.
+
+### STOP (dispatch step 3: a stage other than input 2 now carries the band on some items)
+
+- **S1 (instrument; disposition 1 not fully met). A monotonic remap of a source that already
+  overshoots still reports a band.** IMG_6738 0.633 s and 0.700 s, line 2: input 1 qualifies
+  (0.288, 0.162) because gamma's local gain (1.16 at the water level 0.60) multiplies the
+  source's own in-camera overshoot (0.073 and 0.055 abs): the input1 / balanced overshoot ratio
+  is 1.19, the plateau-measured gain 1.17. Synthetic repro: source = unsharp(0.6 / 0.2 step,
+  sigma 8), stage = source^1.5 -> band 0.1185 (a linear gain of 1.2 -> 0.0950; identity ->
+  0.0000). The same effect is behind the input1 "first over 10 %" counts (GoPro in-camera
+  sharpening). Needs a ruling on how the source's overshoot is credited through a stage's tone
+  gain (no stage-agnostic local-gain estimate works for input 2, whose plateau gain on noise is
+  about 10-20).
+- **S2 (selector). `fused` is named first on 7 video frame-lines** where input 2 exceeds but stays
+  under its own (noisier) level and the fused band qualifies; attribution puts 0.92-1.10 of each
+  such fused band in input 2's terms. Ruling: per-stage first qualifying (as built), or
+  attribution-informed.
+- **S3 (noise rule vs strip width).** At half width 4 the stated rule leaves IMG_6744 wholly, the
+  IMG_6739 shell, and 59 / 83, 5 / 14 and 35 / 56 of the video frame-lines undecided; half width
+  12 resolves IMG_6744's lower edge (input2) but not the curved shell edge (0.73, undecided) and
+  turns the right flank undecided. The factor (3), the extrapolation term and the strip width
+  are the cell's choices: a ruling before Part 2 measures candidates with them.
+
+### Round ledger (cumulative)
+
+| Round | Reviewer | Critical | Major | Minor | Advisory | In-envelope / out | NEW / REOPENED | Reverts | Fixes: instrument / test-only / product |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | A (Codex, at the orchestrator's seat) | 0 | 4 | 4 | 1 | 9 / 0 | 9 / 0 | 0 | 9 / 0 / 0 |
+
+Depth at step-2A end: DISPATCHER TO FILL
