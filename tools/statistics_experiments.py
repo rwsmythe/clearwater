@@ -80,6 +80,7 @@ from lookcheck.frames import (
     excerpt,
     probe_stream,
     read_png16,
+    run_ffprobe,
     tool_version,
 )
 from lookcheck.pack import encode_verified_pair, plot_series
@@ -357,6 +358,20 @@ def require_frames(name: str, count: int) -> None:
         )
 
 
+def _duration_source(video: Path) -> str:
+    """Recover the stream/container duration choice discarded by ``StreamInfo``."""
+    document = run_ffprobe(
+        [
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=duration:format=duration",
+            str(video),
+        ]
+    )
+    return "container" if document["streams"][0].get("duration") in (None, "N/A") else "stream"
+
+
 def extract_excerpt(
     spec: ExcerptSpec, footage: Path, roots: OutputRoots, backend: Backend
 ) -> dict[str, Any]:
@@ -367,6 +382,8 @@ def extract_excerpt(
     ``excerpt.json`` and ``statistics-raw.json`` (each frame's own statistics on the proxy
     for both methods, and on the full frame when ``spec.full_frame``). When ``spec.render``
     is false the full-resolution PNGs are then removed but for the first, middle and last.
+    Long specs also record the requested start and duration source (stream or container),
+    recovered with an additional read-only timing probe; default records are unchanged.
 
     Args:
         spec: The excerpt.
@@ -389,8 +406,10 @@ def extract_excerpt(
     info = probe_stream(video)
     start = spec.start_fraction * info.duration_s
     is_long = spec in LONG_EXCERPTS
+    duration_source = None
     if is_long:
         start = min(start, info.duration_s - spec.duration_s)
+        duration_source = _duration_source(video)
     began = time.monotonic()
     frames = excerpt(video, start, spec.duration_s, folder / "frames", roots=roots, naming="index")
     print(
@@ -445,6 +464,7 @@ def extract_excerpt(
     }
     if is_long:
         document["requested_start_s"] = spec.start_fraction * info.duration_s
+        document["duration_source"] = duration_source
     _write_json(roots, folder / "excerpt.json", document)
     raw: dict[str, Any] = {
         "schema": RECORD_SCHEMA,
@@ -921,8 +941,8 @@ def run_experiments(
     rendered sequence: its proxies rendered with the statistics under test, against the same
     proxies rendered with constant statistics (the mean of the raw series of the method), over
     all frame steps and over the interior steps (:func:`interior_margin`). With
-    ``long=True``, the window study additionally measures both methods using
-    each candidate's own staged or flat reach for its interior.
+    ``long=True``, a two-method window study replaces the Ancuti-only study,
+    using each candidate's own staged or flat reach for its interior.
 
     Args:
         folder: The excerpt's folder.
@@ -1259,6 +1279,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--device", choices=DEVICES, default="gpu")
     parser.add_argument("--long", action="store_true", help="run WP-DR25's 20 s excerpt study")
     args = parser.parse_args(argv)
+    if args.long and args.phase == "render":
+        print(
+            "error: --long supports extract and analyse only; render is disabled", file=sys.stderr
+        )
+        return 2
     excerpts = LONG_EXCERPTS if args.long else EXCERPTS
     try:
         config = load_local_config(args.config)

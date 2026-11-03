@@ -184,3 +184,142 @@ No Reviewer A round has run yet; the dispatcher runs it after this turn. No
 GPU instrument phase, full suite, harness gate or serial-leg footage/GPU test
 was run by the cell. The report is deferred until the dispatcher's instrument
 records exist. No AD-3 ruling is made here.
+
+## Turn 3 (Reviewer A round 1 remediation)
+
+Base: `71806c5e`, the dispatcher's commit of turn 2. Depth at turn-2 end:
+176,708 of 475,000 (driver footer, supplied by the dispatcher).
+
+Depth at turn-3 end: 211,019 input tokens of 475,000 (driver footer, 2026-11-03 turn 3)
+
+Reviewer A: dispatcher-seat Claude pass on `71806c5e`, verdict
+`NO_NEW_CRITICAL_MAJOR`. The dispatcher reports claims 1-5 and 7 HOLD by
+execution, claim 6 PARTIAL (9 of 13 mutants killed). The full transcript is
+held by the dispatcher in the package's evidence folder; its exact filename
+and model/version were not supplied to this cell. This ledger records the
+supplied findings and independently executed remediation evidence, not a new
+review pass.
+
+### Cumulative round ledger
+
+| Round | Critical | Major | Minor | Advisory | In / out of envelope | NEW / REOPENED | Reverts | Fix surface | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 prerequisite audit | 0 | 2 | 1 | D3 fit observation | All in | All new / 0 | 0 | No turn-1 edits; ruled changes implemented in turn 2 | CHARC ruled at `0f2d19c4` |
+| A1 | 0 | 0 | 2 | 6 | F1-F7 in; F8 out | 8 / 0 | 0 permanent | Tests: F1/F2/F5/F7; instrument: F5/F6/F7; no shipped product code | `NO_NEW_CRITICAL_MAJOR`; cleanup performed once |
+
+The four temporary mutation edits below were restored in `finally` after each
+probe and are not permanent reverts. No code under `src/clearwater/`, shared
+prototype or dependency file changed. Both review nets remain dispatcher-owned.
+
+### Dispositions
+
+| Finding | Severity / envelope | Independent confirmation and action | Disposition |
+|---|---|---|---|
+| F1 | MINOR, in | The old `_signals` fake ignored method, series and reference. It now emits time-varying slopes keyed by params method and staged/flat/unsmoothed/linear-trend series. Reference slopes use the real `temporal.constant_statistics` applied to distinct per-method raw bounds. Tests assert literal per-method residual offsets, unsmoothed arrays, reference fields and every candidate's staged/flat per-step arrays and interior. M5/M6/M8 now fail. | FIXED in tests. |
+| F2 | ADVISORY, in | The previous default probe duration left enough room for 6 s, so broadening the clamp was invisible. Added duration 10 s for the default 0.50/6 s spec: start must stay 5 s, while the mutant moves it to 4 s. | FIXED in tests; M13 now fails at the start assertion. |
+| F3 | ADVISORY, seat | Resource estimates supplied by the dispatcher: about 15-25 GB transient disk per excerpt during extraction, about 7 GB persistent `.npy`, about 7 GB RAM peak. These are not cell measurements. The dispatcher raises the free-disk floor to 50 GB before extraction and runs nothing heavy beside it. | SEAT responsibility; no cell code change or GPU run. |
+| F4 | ADVISORY, report | Top-level `interior_margin_frames` / `interior_steps` describe only `flicker`, not the candidate-specific long interiors. | REPORT OBLIGATION: re-trim each method's unsmoothed `flicker` per-step array to each candidate/analysis record's own `interior_steps` before comparing its baseline. Explain the top-level fields' scope. |
+| F5 | ADVISORY, in | `render --long` previously selected no render-enabled spec and exited successfully. It now returns 2 with `error: --long supports extract and analyse only; render is disabled`, before configuration, path or device access. A test forbids those accesses. | FIXED in instrument and test. Normal render is unchanged. |
+| F6 | ADVISORY, in | The long branch replaces the default window-study branch. | FIXED docstring: explicitly says a two-method study replaces the Ancuti-only study. |
+| F7 | ADVISORY, in | `StreamInfo` exposes only the resolved duration. A long-only read-only `run_ffprobe` query recovers stream/container source using the shared probe's exact missing/`N/A` fallback predicate; the long record adds `duration_source`. Tests cover present stream duration, missing duration and `N/A` for both clamped/fitting cases, and forbid the additional query/default field on normal extraction. | FIXED within the owned instrument; the shared probe/interface and default records remain unchanged. |
+| F8 | MINOR, out | The clamp can produce a negative start when total duration is under 20 s. Both commissioned chapters exceed 20 s; the dispatcher explicitly excludes a code change. | REPORT LIMIT obligation, not loop-driving; no code change. |
+
+Signal-witness arithmetic is independent of the instrument's smoothing helpers.
+The constructed boundary step levels remain 100 versus 1 in the interior.
+Method keys are Ancuti=2 and c3=7, staged/flat series keys 11/17, and raw-reference
+keys Ancuti=3 and c3=5. Thus staged/flat residual offsets are 16/28 for Ancuti
+and 42/84 for c3. Unsmoothed offsets are 40 and 126. A constant signal offset
+would cancel in flicker; these keys are slopes and survive the real difference
+calculation. The 4 s Ancuti staged interior is therefore 17 (1 + 16), while the
+old margin still includes marker steps. Counts/re-trimming remain checked at
+both N=600 and N=599.
+
+### RED for newly required behavior
+
+Before changing the instrument, the revised module ran with:
+
+```powershell
+$env:PYTHONPATH='scripts'
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-3-red > work/cdr25-3-red.log 2>&1
+```
+
+Exit 1: `7 failed, 10 passed in 0.89s`. The long-render refusal failed on its
+forbidden configuration access; all six long clamp/source combinations failed
+on missing `duration_source`. The strengthened witnesses and the new default
+short-duration case passed on the correct pre-mutation instrument, as intended.
+
+### Mutation probes (all killed)
+
+Each probe read the current instrument into a PowerShell string, required one
+exact match for its replacement, wrote the mutant as UTF-8/LF, ran the command
+below, and restored the saved original in `finally`. Afterward it asserted
+byte-equivalent original text was restored. Each pytest invocation exited 1;
+the wrapper required that exit and exited 0 only after restoration. No mutant
+is committed or left on disk.
+
+| Mutant | Exact temporary change in the long helper (or clamp) | Result / failing test |
+|---|---|---|
+| M5 | `("staged", staged, staged_reach(name, smoother, rate))` -> `("staged", flat, staged_reach(name, smoother, rate))` | `2 failed, 15 passed in 0.85s`; both `[600]` and `[599]` long-window tests fail their keyed per-step witness. |
+| M6 | In the long helper's `_sequence_record` call, `_signals(loaded.proxies, params, series, backend)` -> `_signals(loaded.proxies, METHODS["ancuti2018"], series, backend)` | `2 failed, 15 passed in 0.85s`; both long-window tests reject the wrong c3 render params. |
+| M8 | Only the long helper's reference construction: `temporal.constant_statistics(loaded.raw[name])` -> `temporal.constant_statistics(loaded.raw["ancuti2018"])` | `2 failed, 15 passed in 0.83s`; both long-window tests reject the wrong c3 reference slope. |
+| M13 | Move `start = min(start, info.duration_s - spec.duration_s)` outside the `if is_long` guard; keep the extra duration probe guarded. | `1 failed, 16 passed in 0.83s`; `test_default_extract_keeps_start_and_record_schema[short-unclamped]` observes 4 s instead of 5 s. |
+
+Exact pytest commands, each with process-local `PYTHONPATH=scripts`:
+
+```text
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-3-m5 > work/cdr25-3-m5.log 2>&1
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-3-m6 > work/cdr25-3-m6.log 2>&1
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-3-m8 > work/cdr25-3-m8.log 2>&1
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-3-m13 > work/cdr25-3-m13.log 2>&1
+```
+
+This is fresh evidence for the four requested survivors, not a claim that all
+13 original mutations were re-executed in this turn.
+
+### GREEN and checks
+
+| Check | Observed summary (exit 0) | Log |
+|---|---|---|
+| New synthetic module | `17 passed in 0.96s`; after probes/restoration and formatting: `17 passed in 0.76s` | `work/cdr25-3-green.log`, `work/cdr25-3-green-final.log` |
+| Importers' non-hardware selection | `85 passed, 4 deselected, 1 warning in 1.99s` | `work/cdr25-3-old.log` |
+| Ruff, two Python files | `All checks passed!` | `work/cdr25-3-ruff.log` |
+| Ruff format, two Python files | `2 files already formatted` | `work/cdr25-3-format.log` |
+| Whole configured mypy scope | `Success: no issues found in 156 source files` | `work/cdr25-3-mypy.log` |
+
+Commands (all stdout/stderr redirected to the named worktree logs):
+
+```powershell
+$env:PYTHONPATH='scripts'
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-3-green > work/cdr25-3-green.log 2>&1
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_tools_statistics_experiments.py --timeout 120 --basetemp=work/cdr25-3-green-final > work/cdr25-3-green-final.log 2>&1
+```
+
+The importer command used `CUDA_VISIBLE_DEVICES=-1` proactively in its own
+process, reusing turn 2's confirmed collection workaround rather than repeating
+the stalled CUDA-probe attempt. No new stall occurred. The selected tests had
+no skips. The one warning is CuPy's undetected CUDA path; GPU/footage tests stay
+deselected and remain the dispatcher's serial-gate obligation.
+
+```powershell
+$env:PYTHONPATH='scripts'
+$env:CUDA_VISIBLE_DEVICES='-1'
+uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider tests/test_footage_locator.py tests/test_prototype_temporal.py -m "not gpu and not footage and not gui and not slow" --timeout 300 --basetemp=work/cdr25-3-old > work/cdr25-3-old.log 2>&1
+```
+
+```text
+uv run ruff check tools/statistics_experiments.py tests/test_tools_statistics_experiments.py
+uv run ruff format --check tools/statistics_experiments.py tests/test_tools_statistics_experiments.py
+uv run mypy
+```
+
+The initial lint/format pass found one overlong refusal-message call and a test
+comprehension layout; both were corrected before the final passing checks.
+uv's inherited-`VIRTUAL_ENV` warning remains informational: it ignores the
+main-tree environment and uses this worktree's environment, without `--active`.
+
+Final verification pass: the requested survivors are killed, normal starts and
+record schema remain pinned, the new source probe is long-only, and no mutant
+remains. No new in-envelope issue found after cleanup. F3 remains at the seat;
+F4/F8 are explicit obligations for the later report, not claimed completed.
+This is one logical review-cleanup turn; no instrument or footage run, whole
+suite, harness gate, dependency change, commit or AD-3 decision was made here.
