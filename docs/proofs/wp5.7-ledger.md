@@ -2114,8 +2114,10 @@ mean abs .0187 -> .0186, p99 .1110 -> .1101, scan 3/114/171 (largest 3.895) -> 1
 shipped and 0/177/111 -> 0/175/113 (d); GX011603 .0184 -> .0183, .1188 -> .1193, 4/96/188 (1.862)
 -> 8/102/178 (4.325) and 0/177/111 -> 0/170/118; GX011609 .0156 -> .0155, .1370 -> .1368,
 9/84/195 (5.439) -> 7/84/197 (6.463) and 1/154/133 (0.413) -> 1/155/132 (1.124). The largest
-channel-mean shift and the input-2 saliency movement are unchanged on all three (the analyses are
-the same clip's; only the rendered frames moved); the worst-change frame is unchanged (f90, f90,
+channel-mean shift is unchanged AT PRINTED PRECISION (Reviewer A round 6: GX011590 0.00281 -> 0.00284,
+GX011603 0.00294 -> 0.00289, GX011609 0.00154 -> 0.00154; the whole-set video median 0.00283 -> 0.00284;
+the rendered frames moved, so these per-frame measures move) and the input-2 saliency movement is
+unchanged (the analyses are the same clip's); the worst-change frame is unchanged (f90, f90,
 f50). Walls: 368.3 / 376.9 / 371.6 s -> 400.0 / 375.8 / 370.5 s (shipped analyses 279.9 / 286.5 /
 281.9 -> 306.6 / 283.6 / 281.1 s).
 
@@ -2135,7 +2137,7 @@ The whole set (only the video column moves; the photo column is unchanged):
 | Whole-frame std L* (d) / shipped: min / median / max | 0.5218 / 0.8954 / 1.0055 | 0.5218 / 0.8955 / 1.0055 (0.895 at the printed places) |
 | Whole-frame mean L* shift (d) - shipped: min / median / max | -1.1247 / -0.1687 / +0.0751 | -1.1247 / -0.1687 / +0.0716 (+0.08 -> +0.07 printed) |
 | Mean abs change: min / median / max | 0.0086 / 0.0172 / 0.0293 | unchanged |
-| p99, largest channel-mean shift, clipped fractions, input-2 saliency movement | (as recorded) | unchanged |
+| p99, largest channel-mean shift, clipped fractions, input-2 saliency movement | (as recorded) | unchanged at printed precision (the channel-mean shift moves below it: Reviewer A round 6) |
 | Group V-D mean abs: max (median) | 0.0187 (0.0131) | 0.0186 (0.0131) |
 | Shipped analysis walls, all 50 | 12,146 s | 12,170 s |
 

@@ -477,8 +477,8 @@ summary).
     (Reviewer A round 5); `records/part3r/`: the round-5 re-render (the three items' records, the
     sheet of record, every log);
   - `cell-scratch/c57-p2h2/`, `cell-scratch/c57-p3r/`: the scratch tabulators and their outputs;
-    round 5's are in the worktree's `work/c57-r5/` (its durable copy, `cell-scratch/c57-r5/`, is
-    the orchestrator's to make);
+    round 5's in `cell-scratch/c57-r5/` (with its RED / GREEN / mutation logs beside it, copied
+    by the orchestrator from the worktree's `work/`);
   - `part3/`: `runs.txt`, `n6-*.log`, `n6-summary.log`, `v3.log`, `wholeset-photos.log`,
     `wholeset-sheet.log`, `run-part3.sh` and `.orig`; and `v3/`.
 - **Not copied, deliberately** (viewing outputs; no figure here is read from them): the two kept
