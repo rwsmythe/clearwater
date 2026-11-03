@@ -4,19 +4,28 @@ Spec v0.5.8. Brief `docs/briefs/wp5.7-brief.md` (FINAL); cell ledger `docs/proof
 (the measurement of record, part by part, with every command, RED / GREEN and review round).
 Instruments: `tools/halo_probe.py` (Parts 1-2), `tools/halo_part3.py` (Part 3), with their tests.
 No `src/` change, no default changed, no dependency, no frozen interface touched. Every render ran
-through the product's own method code (`methods/ancuti_fusion.py`, `methods/fusion.py`) with a
-bit-for-bit equality check against `method.render`. The cell takes no decision: this report states
+through the product's own method code (`methods/ancuti_fusion.py`, `methods/fusion.py`). The
+probe runs (Parts 1-2 and the Part 3 crops, `tools/halo_probe.py`) also rebuilt each render from
+its saved stages and checked it bit for bit against `method.render`. The Part 3 whole-set renders
+(`tools/halo_part3.py`) call `method.render` directly: they ARE the product's `method.render`
+output, with no separate equality check. The cell takes no decision: this report states
 measurements and CHARC's rulings; the owner's eye is the only artifact oracle.
 
-Evidence aliases (the configured working folder is `C:\Users\rwsmy\clearwater\work\`; the durable
-evidence folder is `C:\Users\rwsmy\clearwater-review-evidence\wp5.7\`):
+Evidence aliases. The configured working folder is `C:\Users\rwsmy\clearwater\work\`. The durable
+evidence folder is `C:\Users\rwsmy\clearwater-review-evidence\wp5.7\` (`evidence/` below):
 
 | Alias | Path | Durable copy |
 |---|---|---|
-| `P1` | `work/wp5.7/part1s/` (the Part 1 table of record, step 2B) | to be made (section 10) |
-| `P2` | `work/wp5.7/part2/` (the candidate runs; `table-photos.txt`; `logs/runs.txt`, `runs-video.txt`) | to be made |
-| `P3` | `work/wp5.7/part3/` (the Part 3 window) | partly: `evidence/part3/` (runs.txt, the N6 logs and summary, the photo and sheet logs, both run scripts), `evidence/v3/` (v3.json, v3-table.md, the clips, fixtures and legs) |
+| `P1` | `work/wp5.7/part1s/` (the Part 1 table of record, step 2B) | `evidence/records/part1s/`: the records, the `table-*.txt` files, the marked crops |
+| `P2` | `work/wp5.7/part2/` (the candidate runs; `table-photos.txt`; `logs/runs.txt`, `runs-video.txt`) | `evidence/records/part2/`: the records `<setting>/<item>/<item>.json`, `table-photos.txt`, `logs/`, the two IMG_6739 photo crops of section 5 |
+| `P3` | `work/wp5.7/part3/` (the Part 3 window) | `evidence/records/part3/`: `crops/` whole, `logs/`, `n6/` (the bench records, the sidecars, the summary), `wholeset/items/<item>/<item>.json` (the 120 records), the sheet folder; also `evidence/part3/` (runs.txt, the N6, V3, photo and sheet logs, both run scripts) and `evidence/v3/` (v3.json, v3-table.md, the clips, fixtures and legs) |
+| scratch | the worktree's `work/c57-p2h2/`, `work/c57-p3r/` (the tabulators and their outputs) | `evidence/cell-scratch/c57-p2h2/`, `evidence/cell-scratch/c57-p3r/` |
 | `CP5` | `work/wp5.3/` (the CP5 pack, read-only) | the pack itself |
+
+The durable copies under `evidence/records/` are byte-identical to the working copies (862 files,
+checked by Reviewer A round 5). Deliberately NOT copied, as viewing outputs only: the two kept N6
+exports (`P3/n6/run-*`, 282 MB) and the whole-set 8-bit renders (`P3/wholeset/items/*/*.png`,
+4.5 GB); no figure in this report is read from them. The analysis caches are not copied either.
 
 ## 1. Summary
 
@@ -35,7 +44,8 @@ evidence folder is `C:\Users\rwsmy\clearwater-review-evidence\wp5.7\`):
   bounds shrinks the photo bands slightly and grows the video bands slightly. Candidate (d) clips input 2 to the local range of its unsharpened form (1 sigma). It
   shows the band absent on 2 of 3 photo lines and 21 of 31 video frame-lines.
 - **(d) on the 120 other CP5 items (Part 3):** the edge-scan qualifying sides fall from 963 to 39
-  (video) and from 248 to 13 (photo). No item's scan rises. Texture changes set-wide: the
+  (video; three items' stills pending the round-5 re-render, section 5) and from 248 to 13
+  (photo). No item's scan rises. Texture changes set-wide: the
   whole-frame std L* falls on 219 of 220 images, by up to 81 % on a group of P-A photos.
   OBSERVATION (CHARC's viewing of the contact sheet; the cell has no eye on it): CHARC, viewing
   the sheet, reports that (d) visibly softens fine texture wherever the local range is narrow,
@@ -123,29 +133,31 @@ set is 3 photo lines (IMG_6739 line 3, IMG_6743 lines 1 and 2) and 31 video fram
 candidate; only `none` shows the band absent. Whole-image change is the mean absolute per-value
 difference against the run's own shipped-defaults render. Records `P2/<setting>/<item>/<item>.json`;
 tables `P2/table-photos.txt` and the worktree scratch `work/c57-p2h2/table-videos.txt` /
-`threeway.txt` (ledger Part 2 step 3).
+`threeway.txt` (ledger Part 2 step 3). Rounding: each figure is its unrounded record value rounded
+once, half to even, to the places shown (Reviewer A round 5 corrected five cells that had been
+rounded from 4-decimal figures).
 
 | Setting | Photo b / n / u (of 3) | Photo mean abs (6739 / 6743 / 6744) | Video b / n / u (of 31) (+ new) | Video mean abs (6738 / GX / comp) | Video p99 | (i) statistics change | Whole-frame diagnostic, NOT V3 (GX011627 mean L* / std L*) |
 |---|---|---|---|---|---|---|---|
 | shipped | 3 / 0 / 0 | - | 31 / 0 / 0 | - | - | - | - |
 | (a) 0.75 | 3 / 0 / 0 | .010/.017/.017 | not run | - | - | YES | - |
 | (a) 0.5 | 1 / 0 / 2 | .020/.033/.034 | 22 / 0 / 9 (+1) | .017/.018/.023 | .086 | YES | 1.10 / 1.10 |
-| (a) 0.25 | 1 / 0 / 2 | .030/.048/.049 | 10 / 1 / 20 | .025/.027/.034 | .123 | YES | 1.17 / 1.15 |
+| (a) 0.25 | 1 / 0 / 2 | .030/.048/.048 | 10 / 1 / 20 | .025/.027/.034 | .123 | YES | 1.17 / 1.15 |
 | (e1) 0.1/99.9 | 2 / 0 / 1 | .021/.031/.025 | not run | - | - | YES | - |
 | (e1) 0.01/99.99 | 2 / 0 / 1 | .039/.049/.054 | 22 / 0 / 9 (+2) | .021/.018/.015 | .100 | YES | 1.48 / 1.11 |
 | (e1) 0/100 | 1 / 0 / 2 | .065/.062/.071 | 13 / 3 / 15 | .026/.026/.023 | .134 | YES | 1.60 / 1.13 |
 | (e2) 0.05 | 3 / 0 / 0 | .000/.037/.039 | not run | - | - | YES | - |
 | (e2) 0.1 | 2 / 0 / 1 | .019/.050/.051 | 22 / 1 / 8 (+2) | .019/.012/.014 | .101 | YES | 0.95 / 1.07 |
-| (e2) 0.2 | 1 / 0 / 2 | .029/.056/.057 | 12 / 3 / 16 (+1) | .022/.015/.017 | .121 | YES | 0.98 / 1.09 |
-| **(d) unsharpened 1 sigma** | **0 / 2 / 1** | .034/.059/.060 | **1 / 21 / 9** | .024/.015/.019 | .140 | YES | 1.02 / 1.11 |
+| (e2) 0.2 | 1 / 0 / 2 | .029/.056/.057 | 12 / 3 / 16 (+1) | .022/.015/.017 | .121 | YES | 0.98 / 1.08 |
+| **(d) unsharpened 1 sigma** | **0 / 2 / 1** | .034/.059/.060 | **1 / 21 / 9** | .024/.015/.018 | .140 | YES | 1.02 / 1.11 |
 | (d) unsharpened 3 sigma | 0 / 2 / 1 | .032/.057/.058 | 1 / 17 / 13 | .023/.014/.017 | .137 | YES | 1.02 / 1.11 |
 | (d) balanced 1 / 3 sigma (rows) | 0 / 0 / 3 | .030/.055/.056; .025/.052/.053 | not run | - | - | YES | - |
-| (d) input1 1 / 3 sigma (rows) | 0 / 1 / 2 | .058/.067/.069; .052/.063/.065 | not run | - | - | YES | - |
+| (d) input1 1 / 3 sigma (rows) | 0 / 1 / 2 | .058/.067/.069; .051/.063/.065 | not run | - | - | YES | - |
 | (e3) full-res bounds | 2 / 0 / 1 | .013/.024/.024 | 30 / 0 / 1 (+1) | .002/.006/.003 | .011 | YES | 1.03 / 1.00 |
 | (b) 8 | 3 / 0 / 0 | .001/.001/.001 | not run | - | - | NO | - |
 | (b) 4 | 3 / 0 / 0 | .002/.002/.002 | 31 / 0 / 0 | .002/.001/.001 | .007 | NO | 1.00 / 1.00 |
 | (c) 0.3 | 3 / 0 / 0 | .003/.005/.005 | not run | - | - | NO | - |
-| (c) 1.0 | 3 / 0 / 0 | .005/.009/.009 | 25 / 0 / 6 (+1) | .004/.002/.003 | .020 | NO | 0.98 / 0.98 |
+| (c) 1.0 | 3 / 0 / 0 | .005/.008/.009 | 25 / 0 / 6 (+1) | .004/.002/.003 | .020 | NO | 0.98 / 0.98 |
 
 - **The whole-frame diagnostic is NOT V3** (Reviewer A round 4 finding 1). It is the population
   standard deviation of the 29 frame-to-frame differences of each WHOLE-frame measure over GX011627
@@ -185,6 +197,14 @@ smoothed records (150 frames; 51,445 frames analysed per setting). Records:
 `P3/wholeset/items/<item>/<item>.json` with both 8-bit renders per frame; the sheet is
 `P3/wholeset/sheet-20261103T202754214375Z/` (`summary.tsv` one row per item, `sheet.json`,
 `contact-sheet.html`).
+
+**Pending re-statement (Reviewer A round 5 finding 1).** On GX011590, GX011603 and GX011609 all
+three stills were taken one frame late: CP5 records a still's ABSOLUTE source time, these clips'
+first pts is not 0 (510 and 570 ticks of 1/30000 s), and the instrument matched the still time
+on the time from the first frame. The three items are re-rendered at the corrected frames under
+`work/wp5.7/part3r/`, and the video figures, counts and contact sheet of this section are
+re-stated from that run (ledger, Reviewer A round 5). The other 47 videos and the 70 photos are
+unaffected (their selected frames are the stills' frames).
 
 **The edge-band scan** (the brief's "maximum edge-band overshoot found by scanning strong edges";
 the cell's design, `tools/halo_part3.py`):
@@ -427,23 +447,19 @@ summary).
 
 ## 10. Evidence, durable copies, review
 
-- **Durable already** (`C:\Users\rwsmy\clearwater-review-evidence\wp5.7\`): the dispatches
-  (`cell/`), Reviewer A rounds 0-4 (`A/r0`-`A/r4`), `v3/`, and `part3/`. `part3/` holds `runs.txt`,
-  `n6-*.log`, `n6-summary.log`, `v3.log`, `wholeset-photos.log`, `wholeset-sheet.log`,
-  `run-part3.sh` and `.orig`; all are byte-identical to the working copies (checked with `cmp`).
-- **Working-folder outputs that need a durable copy before merge** (the dispatcher makes them):
-  - `P3/n6/`: the six bench records, the six sidecars and the summary JSON, 1.6 MB, plus the two
-    kept exports, `run-*`, 282 MB for viewing.
-  - `P3/logs/`: the 50 video logs and the 6 crop logs.
-  - `P3/wholeset/sheet-20261103T202754214375Z/`: the contact sheet, 95 MB.
-  - `P3/wholeset/items/*/*.json`: the 120 item records, without the 8-bit renders; the renders
-    total 4.5 GB, so whether to archive them is the dispatcher's call.
-  - `P3/crops/`: 518 MB, or at least the 20 `t*-output.png` named in section 5 and the six JSONs.
-  - `P1/`: the records `*/*.json`, the `table-*.txt` files and the marked crops.
-  - `P2/`: the records `*/*/*.json`, `table-photos.txt`, `logs/runs*.txt`, and the two IMG_6739
-    photo crops of section 5.
-  - The worktree's scratch tabulators and their outputs (`work/c57-p2h2/`, `work/c57-p3r/`).
-- **Review:** Reviewer A (Codex) rounds 0-4 are in the ledger's cumulative round table. Round 3
-  converged the instrument; round 4 corrected the conclusions (V3 relabelled, three-way counts).
-  Reviewer A next reviews the Part 3 build, the corrected Part 2 tables and this report. Reviewer B
-  and the gate follow.
+- **Durable** (`C:\Users\rwsmy\clearwater-review-evidence\wp5.7\`, the evidence aliases above):
+  - the dispatches (`cell/`) and the Reviewer A transcripts (`A/r0` ... `A/r5`);
+  - `records/part1s/`, `records/part2/`, `records/part3/`: every record, table, log, crop and the
+    sheet folder this report cites; 862 files, byte-identical to the working copies (Reviewer A
+    round 5);
+  - `cell-scratch/c57-p2h2/`, `cell-scratch/c57-p3r/`: the scratch tabulators and their outputs;
+  - `part3/`: `runs.txt`, `n6-*.log`, `n6-summary.log`, `v3.log`, `wholeset-photos.log`,
+    `wholeset-sheet.log`, `run-part3.sh` and `.orig`; and `v3/`.
+- **Not copied, deliberately** (viewing outputs; no figure here is read from them): the two kept
+  N6 exports `P3/n6/run-*` (282 MB), the whole-set 8-bit renders `P3/wholeset/items/*/*.png`
+  (4.5 GB) and the analysis caches.
+- **Review:** Reviewer A (Codex) rounds 0-5 are in the ledger's cumulative round table. Round 3
+  converged the instrument; round 4 corrected the conclusions (V3 relabelled, three-way counts);
+  round 5 found the three one-frame-late video items, the sheet's staging-folder count, the
+  `n6-summary` re-read and five rounding cells (ledger, Reviewer A round 5). Reviewer B and the
+  gate follow.

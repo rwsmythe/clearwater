@@ -844,9 +844,9 @@ on any run (IMG_6739 0.0004 shipped; the others 0.0000 shipped and switched): no
 | shipped | 3.07* w7 | 1.48* w32 | 2.32* w22 | 2/0/2 | - | - | - |
 | (a) 0.75 | 2.27* w7 | 1.05* w31 | 1.63* w22 | 2/0/2 | .010/.017/.017 | .004 | .048 |
 | (a) 0.5 | 1.52? | 0.66* w31 | 1.00? | 3/1/2 | .020/.033/.034 | .007 | .092 |
-| (a) 0.25 | 0.82? | 0.30* w26 | 0.43? | 3/1/2 | .030/.048/.049 | .010 | .131 |
+| (a) 0.25 | 0.82? | 0.30* w26 | 0.43? | 3/1/2 | .030/.048/.048 | .010 | .131 |
 | (e1) 0.1/99.9 | 1.93? | 1.43* w28 | 1.98* w12 | 3/0/2 | .021/.031/.025 | .016 | .093 |
-| (e1) 0.01/99.99 | 0.77? | 0.94* w25 | 0.97* w11 | 3/0/2 | .039/.049/.054 | .039 | .154 |
+| (e1) 0.01/99.99 | 0.77? | 0.94* w25 | 0.97* w11 | 3/0/2 | .039/.049/.054 | .038 | .154 |
 | (e1) 0/100 | 0.21? | 0.44* w23 | 0.43? | 2/1/2 | .065/.062/.071 | .060 | .198 |
 | (e2) 0.05 | 3.07* w7 (floor not binding: range 0.0512) | 1.20* w27 | 1.48* w11 | 2/0/2 | .000/.037/.039 | .005 | .104 |
 | (e2) 0.1 | 1.73? | 0.61* w24 | 0.61* w11 | 3/0/2 | .019/.050/.051 | .007 | .139 |
@@ -856,12 +856,12 @@ on any run (IMG_6739 0.0004 shipped; the others 0.0000 shipped and switched): no
 | (d) balanced 1 sigma (row) | 0.75? | 0.11? | 0.11? | 2/2/1 | .030/.055/.056 | .012 | .161 |
 | (d) balanced 3 sigma (row) | 0.93? | 0.17? | 0.26? | 3/2/1 | .025/.052/.053 | .011 | .158 |
 | (d) input1 1 sigma (row) | 0.54? | 0.11? | 0.07- | 2/1/0 | .058/.067/.069 | .054 | .216 |
-| (d) input1 3 sigma (row) | 0.35? | 0.10- | 0.12? | 3/1/1 | .052/.063/.065 | .049 | .212 |
+| (d) input1 3 sigma (row) | 0.35? | 0.10- | 0.12? | 3/1/1 | .051/.063/.065 | .049 | .212 |
 | (e3) full-res bounds | 2.33? | 1.32* w30 | 2.00* w17 | 3/0/2 | .013/.024/.024 | .002 | .064 |
 | (b) 8 | 3.10* | 1.47* (1.4749) | 2.33* | 2/0/2 | .001/.001/.001 | .000 | .004 |
 | (b) 4 | 3.10* | 1.48* (1.4755) | 2.33* | 2/0/2 | .002/.002/.002 | .000 | .007 |
-| (c) 0.3 | 2.94* | 1.30* | 2.04* | 2/0/2 | .003/.005/.005 | .004 | .024 |
-| (c) 1.0 | 2.83* | 1.16* | 1.84* | 2/0/2 | .005/.009/.009 | .006 | .039 |
+| (c) 0.3 | 2.94* | 1.30* | 2.04* | 2/0/2 | .003/.005/.005 | .003 | .024 |
+| (c) 1.0 | 2.83* | 1.16* | 1.84* | 2/0/2 | .005/.008/.009 | .006 | .039 |
 
 Readings (measurement, not a look judgement):
 
@@ -1110,7 +1110,7 @@ smoothed N{} range (high - low) over the same frames, baseline 0.000476. AD-14's
 | (e1) 0.01/99.99 | 1.48 / 0.98 / 1.00 / 1.11 | 1.42 |
 | (e1) 0/100 | 1.60 / 1.00 / 1.00 / 1.13 | 1.61 |
 | (e2) 0.1 | 0.95 / 0.97 / 0.99 / 1.07 | 1.00 |
-| (e2) 0.2 | 0.98 / 0.98 / 0.99 / 1.09 | 1.00 |
+| (e2) 0.2 | 0.98 / 0.98 / 0.99 / 1.08 | 1.00 |
 | (d) unsharpened 1 sigma | 1.02 / 1.00 / 1.00 / 1.11 | 1.00 |
 | (d) unsharpened 3 sigma | 1.02 / 0.97 / 0.99 / 1.11 | 1.00 |
 | (e3) full-res bounds | 1.03 / 1.01 / 1.00 / 1.00 | 1.14 |
@@ -1170,24 +1170,24 @@ every row.
 | shipped | 3 / 0 / 0 | - | 31 / 0 / 0 | - | - | - | - | - |
 | (a) 0.75 | 3 / 0 / 0 | .010/.017/.017 | not run | - | - | YES | UNMEASURED | - |
 | (a) 0.5 | 1 / 0 / 2 | .020/.033/.034 | 22 / 0 / 9 (+1) | .017/.018/.023 | .086 | YES | UNMEASURED | 1.10 / 1.10 |
-| (a) 0.25 | 1 / 0 / 2 | .030/.048/.049 | 10 / 1 / 20 | .025/.027/.034 | .123 | YES | UNMEASURED | 1.17 / 1.15 |
+| (a) 0.25 | 1 / 0 / 2 | .030/.048/.048 | 10 / 1 / 20 | .025/.027/.034 | .123 | YES | UNMEASURED | 1.17 / 1.15 |
 | (e1) 0.1/99.9 | 2 / 0 / 1 | .021/.031/.025 | not run | - | - | YES | UNMEASURED | - |
 | (e1) 0.01/99.99 | 2 / 0 / 1 | .039/.049/.054 | 22 / 0 / 9 (+2) | .021/.018/.015 | .100 | YES | UNMEASURED | 1.48 / 1.11 |
 | (e1) 0/100 | 1 / 0 / 2 | .065/.062/.071 | 13 / 3 / 15 | .026/.026/.023 | .134 | YES | UNMEASURED | 1.60 / 1.13 |
 | (e2) 0.05 | 3 / 0 / 0 | .000/.037/.039 | not run | - | - | YES | UNMEASURED | - |
 | (e2) 0.1 | 2 / 0 / 1 | .019/.050/.051 | 22 / 1 / 8 (+2) | .019/.012/.014 | .101 | YES | UNMEASURED | 0.95 / 1.07 |
-| (e2) 0.2 | 1 / 0 / 2 | .029/.056/.057 | 12 / 3 / 16 (+1) | .022/.015/.017 | .121 | YES | UNMEASURED | 0.98 / 1.09 |
-| **(d) unsharpened 1 sigma** | **0 / 2 / 1** | .034/.059/.060 | **1 / 21 / 9** | .024/.015/.019 | .140 | YES | UNMEASURED | 1.02 / 1.11 |
+| (e2) 0.2 | 1 / 0 / 2 | .029/.056/.057 | 12 / 3 / 16 (+1) | .022/.015/.017 | .121 | YES | UNMEASURED | 0.98 / 1.08 |
+| **(d) unsharpened 1 sigma** | **0 / 2 / 1** | .034/.059/.060 | **1 / 21 / 9** | .024/.015/.018 | .140 | YES | UNMEASURED | 1.02 / 1.11 |
 | **(d) unsharpened 3 sigma** | **0 / 2 / 1** | .032/.057/.058 | **1 / 17 / 13** | .023/.014/.017 | .137 | YES | UNMEASURED | 1.02 / 1.11 |
 | (d) balanced 1 sigma (row) | 0 / 0 / 3 | .030/.055/.056 | not run | - | - | YES | UNMEASURED | - |
 | (d) balanced 3 sigma (row) | 0 / 0 / 3 | .025/.052/.053 | not run | - | - | YES | UNMEASURED | - |
 | (d) input1 1 sigma (row) | 0 / 1 / 2 | .058/.067/.069 | not run | - | - | YES | UNMEASURED | - |
-| (d) input1 3 sigma (row) | 0 / 1 / 2 | .052/.063/.065 | not run | - | - | YES | UNMEASURED | - |
+| (d) input1 3 sigma (row) | 0 / 1 / 2 | .051/.063/.065 | not run | - | - | YES | UNMEASURED | - |
 | (e3) full-res bounds | 2 / 0 / 1 | .013/.024/.024 | 30 / 0 / 1 (+1) | .002/.006/.003 | .011 | YES | UNMEASURED | 1.03 / 1.00 |
 | (b) 8 | 3 / 0 / 0 | .001/.001/.001 | not run | - | - | NO | UNMEASURED | - |
 | (b) 4 | 3 / 0 / 0 | .002/.002/.002 | 31 / 0 / 0 | .002/.001/.001 | .007 | NO | UNMEASURED | 1.00 / 1.00 |
 | (c) 0.3 | 3 / 0 / 0 | .003/.005/.005 | not run | - | - | NO | UNMEASURED | - |
-| (c) 1.0 | 3 / 0 / 0 | .005/.009/.009 | 25 / 0 / 6 (+1) | .004/.002/.003 | .020 | NO | UNMEASURED | 0.98 / 0.98 |
+| (c) 1.0 | 3 / 0 / 0 | .005/.008/.009 | 25 / 0 / 6 (+1) | .004/.002/.003 | .020 | NO | UNMEASURED | 0.98 / 0.98 |
 
 The video split per item (IMG_6738 of 17 / GX011627 of 9 / the compilation of 5, band / none /
 undecided): (a) 0.5 13/0/4, 6/0/3, 3/0/2; (a) 0.25 7/1/9, 1/0/8, 2/0/3; (e1) 0.01 13/0/4, 7/0/2,
@@ -1917,3 +1917,126 @@ saliency movement: GX011621 0.241, GX011592 0.239, GX011616 0.227.
   reproduced the record. The stale `D106 25` label (above) is outside the owned files.
 
 Depth at Part 3 yield: 221,426 (wp57-cell7 at its yield, 45 turns, 2026-11-03 ~20:38Z); 237,390 at retirement after the two addendum commits d7ac41f3 / 203d1b1f (55 turns, ~20:44Z); read by orchestrator gen 39 with scripts/cell_depth.py.
+
+### Step 5R (Reviewer A round 5 remediation)
+
+Dispatch `clearwater-review-evidence/wp5.7/cell/dispatch-11.md` (orchestrator gen 39, binding).
+Fresh cell `wp57-cell8` (implementer-opus-high) on head `6b447b3f`. Reviewer A round 5 (Codex,
+read-only, at the orchestrator's seat, on `6b447b3f`; transcript
+`clearwater-review-evidence/wp5.7/A/r5/review.txt`): `NEW_CRITICAL_MAJOR_FOUND`, two MAJOR, four
+MINOR, one ADVISORY, all in envelope. It confirmed by recomputation V3 (eight verdicts), N6 (the
+medians, effect and pair ratios), the whole-set counts as recorded, the rises, the contact
+selection, C2, and every three-way split of step 3R and report section 4. Dispositions are the
+orchestrator's (binding). No GPU run and no render in this step (the re-render is the
+orchestrator's, below); scratch under the worktree's `work/c57-r5/` (uncommitted).
+
+| # | Sev | Finding | Disposition / what changed | Test that fails on the old code (RED log `work/c57-r5-red.log`) |
+|---|---|---|---|---|
+| 1 | MAJOR | `process_video` matched CP5's `source_pts_s` on `(p - first) * time_base`; CP5 stores ABSOLUTE source time and the decoder keeps pts (`-copyts`), so on a clip whose first pts is not 0 the still can be a frame late | FIX (`3ba8f7a1`): `still_pts` matches on `pts * time_base` and REFUSES a still within no frame (1e-6 s; `ProbeFailedError`); the convention in its docstring with the code that makes it true: `tools/reviewpack/build.py:227` `_frame_time` (ffprobe `best_effort_timestamp` x time base, no offset removed), stored at `build.py:1141`; `src/clearwater/io/video/decode.py:247` (`-copyts`) and `:553` (`pts_ticks` = `showinfo`'s pts). Each frame record now also carries `source_pts_s` (`pts * time_base`) beside `time_s` (from the first frame). Affected set below | `test_process_video_matches_the_pack_still_on_absolute_source_time` (GX011590's axis, first pts 510 at 1/30000): `assert [2512, 4514] == [1511, 3513]`; `test_process_video_refuses_a_pack_still_with_no_frame_at_its_time`: `DID NOT RAISE ProbeFailedError` |
+| 2 | MAJOR | the sheet loaded `items/*/*.json`, so a staging (or failed) folder's complete record entered it beside the resumed publication | FIX (`3ba8f7a1`): `published_records` reads only published folders (a name starting with `.` = staging / failed is skipped; files skipped), exactly one `<item>.json` per folder with `item` = the folder name, and FAILS (`ProbeError`, exit 2, before the sheet folder is made) unless the records are exactly `wholeset_items(pack)` (70 photos + 50 videos: the `wholeset-list` set). The delivered `part3/wholeset/items/` holds NO dot-prefixed folder (this cell's `ls -a`, 2026-11-03, and the orchestrator's check before dispatch; the reviewer found none either) | `test_build_sheet_ignores_staging_and_failed_folders`: `assert 4 == 2` (records); `test_build_sheet_fails_unless_the_records_are_exactly_the_listed_items[missing / duplicated / unlisted]`: `DID NOT RAISE ProbeError` x 3 |
+| 3 | MINOR | `n6-summary` globbed `n6-*.json`, its own `n6-summary-*.json` included: `KeyError: 'setting'` on a second summary | FIX (`3ba8f7a1`): only `n6-<setting>-*.json` for the two settings. The figures of record stand: the fixed function on the delivered `part3/n6/` (which holds the summary) gives medians 10.946698 / 12.434572, effect +13.59 %, pair ratios 1.1349 / 1.1447 / 1.1389, VALID True (`work/c57-r5/n6check.txt`) | `test_n6_summary_reads_only_the_run_sidecars`: `KeyError: 'setting'` |
+| 4 | MINOR | five report cells (section 4) differ from the records at the stated precision | FIX (report and ledger, below): recomputed from the records (`work/c57-r5/cells.py`, `ledger_cells.py`); my values equal the reviewer's on all five; two more cells of the same class found in the ledger only | none (text); the recomputation re-run after the edit: 0 mismatches in both |
+| 5 | MINOR | the report's durable-evidence index said the P1 / P2 copies were "to be made"; section 10 listed records awaiting copying | FIX (report): the alias table names `evidence/records/part1s/`, `records/part2/`, `records/part3/` and `cell-scratch/`; section 10 rewritten; the outputs NOT copied named (the two N6 exports, 282 MB; the 4.5 GB whole-set renders; the caches: viewing only) | none (text) |
+| 6 | MINOR | report line 7: "every render" had a bit-for-bit equality check against `method.render` | FIX (report): the check scoped to the probe runs (Parts 1-2 and the Part 3 crops); the whole-set renders stated as `method.render`'s own output, with no separate check | none (text) |
+| 7 | ADVISORY | the scan tests did not discriminate exact band / none / undecided counts or their partition | FIX (test only, `3ba8f7a1`) | `test_scan_counts_are_exact_and_partition_the_sides` passes on the old code (no defect); RED by mutation probe (`work/c57-r5/halo_part3.orig.py`, restored, `cmp` identical): mutant A `"band": 2 * count` and mutant B `"none": 0` in `_scan_summary`, each `1 failed, 1 passed` (the new test failed; the old `test_scan_finds_a_planted_ring...` passed both) (`work/c57-r5-mutA.log`, `-mutB.log`) |
+
+Also changed (needed by the re-render, no finding): `checked_output` accepts `<working>/wp5.7/part3r`
+beside `part3` (`OUTPUT_ROOTS`); `test_checked_output_accepts_the_rerun_folder` (RED: the old
+code refused `part3r`).
+
+**The affected set (finding 1), from the records** (`work/c57-r5/affected.py`, output
+`affected.txt`): for each of the 50 video items, the decoder's axis from the source's packet pts
+(ffprobe, read-only; the packet count equals the record's `frames_in_clip` and every recorded pts
+is on it), the old selector recomputed (it reproduces all 150 recorded pts), and the fixed one.
+17 of the 50 clips have a nonzero first pts (180-570 ticks of 1/30000 s); the old selector chose a
+different frame only where that offset is near half a frame. Under the fixed selector every one of
+the 150 stills lands EXACTLY on CP5's still time (gap 0.0 s).
+
+| Item (first pts) | f10 recorded -> fixed | f50 | f90 |
+|---|---|---|---|
+| GX011590 (510) | 92602 -> 91601 | 454964 -> 453963 | 817326 -> 816325 |
+| GX011603 (570) | 93663 -> 92662 | 461030 -> 460029 | 828397 -> 827396 |
+| GX011609 (570) | 93663 -> 92662 | 463032 -> 462031 | 832401 -> 831400 |
+
+3 items, 9 stills, each one frame (1,001 ticks) late; the reviewer's list exactly. The other 47
+videos (141 stills) and the 70 photos are unaffected: their records stand. Both settings rendered
+the same (late) frame, so no shipped / (d) frame mismatch. GX011590 is contact-sheet item 4.
+
+**`tools/halo_probe.py` (Parts 1-2) checked for the same convention: NO defect, no STOP.** Every
+place it maps seconds to a pts (`run_video`, `halo_probe.py:2086-2110`) uses time from the clip's
+first frame, as its interface documents (`--start` / `--end` "s from the first frame",
+`:2268-2269`; `run_video`'s docstring, `:2019`); its times are the cell's own (the owner's words
+mapped to windows, then the Part 1 records' `time_s`), never a CP5 absolute time, and the Part 3
+crop runs' bands equal Part 2's records for the same pts (Part 3 results, C2). No Part 1 / 2
+figure is in question.
+
+**The rounding cells (finding 4).** Rule: each figure is its unrounded record value rounded ONCE,
+half to even, to the places shown (the five had been rounded from the 4-decimal figures of the
+per-item tables: .0485 -> .049 and the like). Report section 4 and the ledger's full candidate
+table (both: the reviewer's five):
+
+| Cell | Was | Record (unrounded) | Now |
+|---|---|---|---|
+| (a) 0.25, IMG_6744 photo mean abs | .049 | 0.0484781218 | .048 |
+| (c) 1.0, IMG_6743 photo mean abs | .009 | 0.0084799964 | .008 |
+| (d) input1 3 sigma, IMG_6739 photo mean abs | .052 | 0.0514800585 | .051 |
+| (d) unsharpened 1 sigma, compilation video mean abs (mean over frames) | .019 | 0.0184579494 | .018 |
+| (e2) 0.2, GX011627 std-L* diagnostic | 1.09 | 1.0846670805 | 1.08 |
+
+The same five cells were also corrected where they appear in this ledger: step 2's photo table
+(three photo cells), half 2's diagnostic table (std L* of (e2) 0.2) and the full candidate table
+(all five). Two more cells of the same class, ledger only (step 2's photo table, "Max mean
+shift"; not in the report): (e1) 0.01/99.99 .039 -> .038 (0.0384932900) and (c) 0.3 .004 ->
+.003 (0.0034521913). The recomputation covered every mean-abs, p99 and diagnostic cell of report
+section 4 (18 rows) and of the ledger's step-2 photo table and diagnostic table (65 cells OK
+after the edit); no other cell differs.
+
+RED (the new tests against `6b447b3f`'s code, the module as committed there; log
+`work/c57-r5-red.log`): `8 failed, 28 passed`: the eight above, each for its stated reason (the
+`unlisted` case plants the item's renders too, so the old code reaches its count, not a missing
+preview). GREEN (`3ba8f7a1`): `uv run pytest -q tests/test_tools_halo_part3.py
+tests/test_tools_halo_probe.py` 130 passed (19.9 s, `work/c57-r5-green.log`); `uv run ruff
+check .` All checks passed; `uv run ruff format --check .` 315 files already formatted; `uv run
+mypy` Success, no issues found in 158 source files. Both files ASCII, 0 CR in the blobs.
+
+**The re-render (the orchestrator's seat; GPU; nothing else heavy).** Script
+`work/c57-r5/run-part3r.sh` in the worktree (uncommitted, LF, `bash -n` clean), one piece per call,
+each checked before the next; every write under `work/wp5.7/part3r/` (NEW; never into `part3/`,
+which is read: the copy source, the diff, the C2 crops the sheet links):
+1. `bash .../work/c57-r5/run-part3r.sh copy`: refuses if `part3r` exists or `part3/wholeset/items`
+   holds a dot-prefixed folder; copies the 117 unaffected published item folders (the
+   `wholeset-list` set minus the three; record and renders) to `part3r/wholeset/items/`; then
+   `diff -rq part3/wholeset/items part3r/wholeset/items`: exactly the 3 lines `Only in
+   .../part3/wholeset/items: GX011590` (GX011603, GX011609) and no `differ` line (exit 0 only
+   then). About 4.4 GB, a few minutes.
+2. `... run-part3r.sh videos`: `wholeset-run <item> --out part3r/wholeset --cache-dir
+   part3r/cache`, one process each, GX011590, GX011603, GX011609 (a fresh cache: two analyses per
+   item as in the window). Check: three `ITEM <item> done` lines, `RUN ... exit=0`. The window
+   took 368 / 377 / 372 s for these three: about 19 min.
+3. `... run-part3r.sh verify` (read-only): the affected-set tabulator on `part3r`. Expect `OLD
+   SELECTOR REPRODUCES THE RECORDED PTS on 141 stills`, `AFFECTED ... items 0; stills 0`,
+   `PROBLEMS 0` (the three new records' `source_pts_s` equal to CP5's still times).
+4. `... run-part3r.sh sheet`: `wholeset-sheet --out part3r/wholeset` over all 120 published
+   records (it fails unless they are exactly the listed 120). Check: `SHEET 120 items; contact:
+   ...`, the sheet folder `part3r/wholeset/sheet-<stamp>/`.
+Disk: about +4.4 GB (the copy) + the three items' cache and renders (under 0.5 GB) + the sheet
+(about 0.1 GB): about 5 GB; 51 GB free at dispatch, so about 46 GB after (STOP under 25 GB is
+checked before each piece). Wall about 25 min in all. Logs and walls in `part3r/logs/`
+(`runs.txt`, `copy-diff.txt`, `wholeset-video-<item>.log`, `affected-after.txt`,
+`wholeset-sheet.log`).
+
+Round ledger (cumulative):
+
+| Round | Reviewer | Critical | Major | Minor | Advisory | In-envelope / out | NEW / REOPENED | Reverts | Fixes: instrument / test-only / product |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | A (Codex, at the orchestrator's seat) | 0 | 4 | 4 | 1 | 9 / 0 | 9 / 0 | 0 | 9 / 0 / 0 |
+| 1 | A (Codex, at the orchestrator's seat) | 0 | 1 | 3 | 0 | 4 / 0 | 4 / 0 | 0 | 3 / 1 / 0 |
+| 2 | A (Codex, at the orchestrator's seat) | 0 | 1 (out of envelope by adjudication) | 3 | 1 (out of envelope) | 3 / 2 | 5 / 0 | 0 | 2 / 1 / 0 |
+| 3 | A (Codex, at the orchestrator's seat) | 0 | 1 (out of envelope by adjudication) | 2 | 0 | 2 / 1 | 3 / 0 | 0 | 2 / 0 / 0 |
+| 4 | A (Codex, at the orchestrator's seat) | 0 | 2 | 1 | 1 | 4 / 0 | 4 / 0 | 0 | 1 (docstring + test) / 1 / 0; plus 2 conclusions (ledger) |
+| 5 | A (Codex, at the orchestrator's seat) | 0 | 2 | 4 | 1 | 7 / 0 | 7 / 0 | 0 | 3 (findings 1-3, each with tests) / 1 (7) / 0; plus 3 report / ledger (4-6) |
+
+Round 5 is the round the five-round gate names: approval to continue is the dispatcher's. Its results (the re-rendered three, the whole-set figures and the sheet) follow
+the orchestrator's re-run.
+
+Depth at round-5 yield: DISPATCHER TO FILL
