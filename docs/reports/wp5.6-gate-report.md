@@ -1,9 +1,10 @@
 # WP5.6 - Phase 5 gate report
 
-**Status: DRAFT, 2026-11-02.** **CP5 / V2: PENDING** is the only
-DRAFT-pending field. **N6: SET = about 12 min/min at 4K**, owner ruling
+**Status: FINAL, 2026-11-03 (CHARC gen 13).** **CP5 / V2: PASS**, owner's
+review 2026-11-03, headline 111 / 115 = 96.5 % preferred, five halo observations
+recorded as DR-117 (record `../proofs/cp5-visual-review.md`). **N6: SET = about 12 min/min at 4K**, owner ruling
 recorded in spec v0.5.8 on main `1db84842` (D106 / N6 / V16; AD-21 SET).
-CHARC fills CP5 / V2 and marks the report FINAL after the owner's review.
+CHARC filled CP5 / V2 and Result 4's DR-116 / DR-117 rows at the FINAL mark; the body below is otherwise the accepted DRAFT (`ef31c68a`).
 Gate p5b is GREEN as
 recorded below; this report makes no release claim.
 Authority: [WP5.6 brief](../briefs/wp5.6-brief.md), status and Done.
@@ -136,7 +137,7 @@ identify the handoff.
 | ID | Result of record and disposition | Source |
 |---|---|---|
 | V1 | PASS: stage correctness on CPU/GPU, both compensation methods, caps, kernels, statistics ordering and edge cases. | WP5.1 Acceptance matrix and V1 discussion; accept `0e8f0e00` |
-| V2 | PENDING CP5: owner's preference >=80% and no obvious artifacts (D65); no automated preference oracle. | WP5.1 V2; spec D65 / V2; WP5.3 current report |
+| V2 | PASS at CP5 (2026-11-03): owner's preference 111 / 115 = 96.5 % on the headline set (bar 80 %); halos observed on five items, recorded as DR-117 and ruled not blocking by the owner; banding, colour errors, shimmer, flicker 0; WP5.4 (D96) not triggered. | `../proofs/cp5-visual-review.md`; tally of record `e8d5ff0f`; spec D65 / V2 |
 | V3 | PASS: region-based synthetic flicker <=25% of unsmoothed for each measure. No truly static real clip identified; real subjective flicker belongs to V2. Chapter seam deferred with chapter handling to v2 (CP1). | WP5.1 Acceptance matrix / V3 discussion; spec D64 / V3 and v0.5.3 change note |
 | V4 | PASS: fixture and real-trim mandatory/required fidelity; best-effort creation-time loss remains DR-111. Raw PCM product check fixed by WP-D112; V4 instrument GREEN on IMG_6731.MOV, 46 items, mandatory/required all SAME, best-effort DIFFERENT 9. | WP5.1 V4 observations; WP-D112 accept; WP-DR113 accept, GREEN witness |
 | V5 | PASS: photo metadata, depth, ICC and orientation; two independent decoders stand in for multiple viewers. Windows Photos/browser viewing remains an optional owner CP5 leg. | WP5.1 Acceptance matrix / V5 observations |
@@ -157,11 +158,10 @@ identify the handoff.
 | D91 | PASS: default-on parseable provenance with app version, parameters and the source name without a path; disabled video comment absent; photo coverage in V5. | WP5.1 Acceptance matrix / provenance discussion, line 322 |
 
 Decision: carry these results and their stated limits into Phase 5 close.
-The owner decides V2 at CP5; N6 is SET in spec v0.5.8 (D106 / N6 / V16,
-main `1db84842`). CHARC records the remaining CP5 result.
-The current CP5 pack is ready at `work/wp5.3/index.html`: 128 items,
-126 done and 2 expected HLG refusals, failed 0, pending 0. Its 115 headline
-items and 11 candidates are available and unjudged. Coverage is not preference.
+V2 PASSED at CP5 on 2026-11-03 (`../proofs/cp5-visual-review.md`); N6 is SET in spec v0.5.8 (D106 / N6 / V16,
+main `1db84842`). The CP5 pack at `work/wp5.3/index.html`: 128 items,
+126 done and 2 expected HLG refusals, failed 0, pending 0; all 115 headline
+items and 11 candidates judged by the owner (coverage 115 / 115).
 Source: WP5.3 report, opening status and empty tally. Its earlier accept record
 still records 117 done / 9 V-P failures; the subsequent nine-item WP-D112
 witness in the current report supersedes that historical build state.
@@ -184,11 +184,12 @@ was refused; WP5.2's video post-encode characterisation does not prove
 pre-encode AD-11. CHARC's accept disposition needs no new D111 row
 (WP5.2 accept, Windows / Dispositions and Reviewer B B-6).
 
-## Result 4 - Debt register through DR-115
+## Result 4 - Debt register through DR-117
 
-Source of authority: [debt register](../debt-register.md), rows DR-1..DR-115.
-This snapshot has **64 rows not wholly CLOSED** (including PARTLY and the
-DR-44 row still headed OPEN) and **51 wholly CLOSED rows**. A row with a
+Source of authority: [debt register](../debt-register.md), rows DR-1..DR-117.
+The accepted DRAFT snapshot (through DR-115) had **64 rows not wholly CLOSED** (including PARTLY and the
+DR-44 row still headed OPEN) and **51 wholly CLOSED rows**; at the FINAL mark two rows were added
+(DR-116 at the WP5.6 accept, DR-117 at CP5): **66 not wholly CLOSED, 51 CLOSED**. A row with a
 closed subpart remains listed below. Paydowns/triggers are carried from the
 register; where it names only a trigger, no new remedy is invented.
 CHARC owns register changes; the owner commissions phase-boundary paydown.
@@ -208,7 +209,7 @@ CHARC owns register changes; the owner commissions phase-boundary paydown.
 | DR-16 | Spike containment check/use junction race, outside threat model. Product 8.4 safe writing must prove its form. |
 | DR-20 | Instrument-only items (2),(3),(5),(8),(9): PTS deduplication, percent paths, cover art, record provenance and test gaps. Any reuse beyond WP1.4 re-reads row; product ownership/paydowns remain as recorded. |
 | DR-22 | Temp guard limits. Early plugin if pre-conftest writes revisited; next guard/helper touch fixes (4)-(9), retests fixture containment. Trigger is guard itself, not additive conftest changes. |
-| DR-25 | Only (3) open: provisional staged smoothing/default evidence. The >=182-frame staged run is assigned to WP5.2 by the register; WP5.2 accepted at `2da5d0c7` without it (neither report nor accept record mentions DR-25 or a staged run). AD-3 remains PROVISIONAL; disposition CHARC's. |
+| DR-25 | Only (3) open: provisional staged smoothing/default evidence. The >=182-frame staged run was assigned to WP5.2 by the register; WP5.2 accepted at `2da5d0c7` without it. CHARC's disposition at the accept (`d156ed49`): re-assigned to the tools-only follow-on WP-DR25, commissioned with WP5.5; AD-3 remains PROVISIONAL. |
 | DR-27 | Unreadable footage lookup can skip; stale chapter docstring. Next local-config/affected-test touch distinguishes unreadable from absent and corrects text. |
 | DR-29 | Look-check CLI/cache validation limits. Next lookcheck touch or WP5.3 reuse rejects shallow --part and hashes changing sources. |
 | DR-30 | Noise edge-test and GPMF strict parsing gaps. Reuser adds Immerkaer edge test / strict nesting, padding and SCAL rules or reference parser. |
@@ -237,7 +238,7 @@ CHARC owns register changes; the owner commissions phase-boundary paydown.
 | DR-69 | Device-wide job estimate bench-only, frozen IF-8 gap. If GUI shows total, CHARC interface decision; otherwise remains bench-only. |
 | DR-70 | Export analysis-bound; optimise analysis, not stream step. Owner wish below N6 / WP5.2 remeasure; shipped-build reread leaves lever unchanged. |
 | DR-83 | Cache write through planted link. Next cache touch checks is_link before every write, with junction test. |
-| DR-86 | Further serial-cost candidates, not additive predictions. Owner suite-cost commission or phase-end serial wall >about 25 min triggers. Trigger FIRES at p5b: 2,046 s >1,500 s; paydown CHARC's / the owner's. |
+| DR-86 | Further serial-cost candidates, not additive predictions. Trigger FIRED at p5b: 2,046 s >1,500 s. CHARC's disposition at the accept (`d156ed49`): the suite-cost pass is DEFERRED to Phase 6; the serial-wall series is DR-116. |
 | DR-88 | Trim fixture self-check trusts plan. Next fixture touch adds independent cut derivation beside plan time. |
 | DR-89 | Missing removable-drive journal entry discarded. Next startup-journal touch or stale-partial report; keep entry until seen again is a design candidate. |
 | DR-90 | Clear cache can fail another clip's export. Next Clear/export-cache coupling touch exposes export activity and refuses Clear during it. |
@@ -259,6 +260,8 @@ CHARC owns register changes; the owner commissions phase-boundary paydown.
 | DR-111 | Best-effort creation time lost on three carriers. Owner export-date sorting report or next metadata mapping carries container/stream tags and reruns real-trim V4. |
 | DR-114 | WDDM per-process free memory hides external GPU pressure. Real held-export evidence benign; failure/stall with another GPU app triggers device-wide-read vs documented-limit owner decision, post-v1 candidate. |
 | DR-115 | No encoder-stall detector; force-cpu processing still feeds NVENC. Single repeat completed, so intermittent. Stopped progress with live encoder triggers; post-Phase-5 owner scopes watchdog and encoder preference. |
+| DR-116 | (added at the FINAL mark) The serial gate leg's wall at 2,000-2,750 s for six runs against WP-T6's 1,389 s (series in Result 1); cause not isolated. Paydown: the suite-cost pass, deferred to Phase 6. |
+| DR-117 | (added at the FINAL mark) Halos observed by the owner at CP5 on five headline items and one candidate (IMG_6739, IMG_6743, IMG_6744, IMG_6738, GX011627 last second; the compilation at ~27 s); CP5 PASS ruled with the halos recorded. Paydown: WP5.7 halo investigation, commissioned with WP5.5. |
 
 The **two product findings of Phase 5 performance/memory work** are DR-114
 and DR-115 (the brief's Phase 5 findings pair). This does not erase earlier
@@ -459,17 +462,14 @@ This report supplies candidates, not deletion authority.
 
 ## Open with the owner / next
 
-- **CP5 / V2:** owner reviews the WP5.3 pack and returns the sheet.
-  The orchestrator tallies it separately; D65 requires >=80% preference
-  and no obvious artifacts. CHARC records the owner's result.
-- **Serial cost, CHARC action:** DR-86's trigger fired and condition
-  `d4224524` is due at this report. Disposition is CHARC's: a DR row or
-  the DR-86 paydown, with the serial-wall series in Result 1.
+- **CP5 / V2:** DONE 2026-11-03, PASS (`../proofs/cp5-visual-review.md`);
+  halos on five items recorded as DR-117 with the WP5.7 follow-on.
+- **Serial cost, CHARC action:** DONE at the accept (`d156ed49`): DR-116 opened
+  for the serial-wall series; the suite-cost pass deferred to Phase 6.
 - **DR-115 scope:** CHARC brings the encoder-watchdog and CPU-route
   encoder-choice question at the Phase 5 close.
-- **DR-25(3), CHARC action:** reconcile the register's WP5.2 assignment
-  for the >=182-frame staged smoothing run with accepted WP5.2's absent
-  evidence. Disposition is CHARC's; no owner decision is asserted here.
+- **DR-25(3), CHARC action:** DONE at the accept (`d156ed49`): re-assigned to
+  the tools-only WP-DR25, commissioned with WP5.5.
 - **WP5.5:** release preparation is commissioned after the close;
   dependency-license compatibility/notices, installation/usage and version
   tagging belong there (plan Phase 5 / N13).
