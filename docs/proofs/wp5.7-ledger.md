@@ -808,4 +808,4 @@ with the Part 1 lines (IMG_6739 `1700,2500,2200,2500`, `1560,2300,1810,2300`,
 if Q-d is ruled to one reference). Estimate: `part1s` took 17-34 s per photo; the baseline render
 adds about 3-5 s: about 25 s a run, so about 26 min for all 21 settings (about 21 min for 17).
 
-Depth at mid-build yield 1: DISPATCHER TO FILL
+Depth at mid-build yield 1: 241011 (scripts/cell_depth.py, wp57-cell4, read by the orchestrator at the yield 2026-11-03)
