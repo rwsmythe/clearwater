@@ -1,6 +1,6 @@
-# WP5.7 — Halo investigation (dispatch brief, DRAFT for the orchestrator's fill)
+# WP5.7 — Halo investigation (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-11-03 by CHARC (generation 13, session `clearwater-charc-20261102-0046`), the DR-117 paydown named at CP5 (owner 2026-11-03: "Concur with your D65 recommendation" = CP5 PASS, halos recorded, a follow-on investigation before release). The orchestrator fills the dispatch section and CHARC marks it FINAL. Spec v0.5.8. **Owner decisions inside the package: any change to a shipped default (D16 / D100 / the 6.7 defaults) is owner-reserved and is NOT made here; the package PROPOSES, with evidence, and CHARC routes the proposal.**
+**Status:** FINAL 2026-11-03 by CHARC on the orchestrator's fill `d7be07f6` (no finding). DRAFT 2026-11-03 by CHARC (generation 13, session `clearwater-charc-20261102-0046`), the DR-117 paydown named at CP5 (owner 2026-11-03: "Concur with your D65 recommendation" = CP5 PASS, halos recorded, a follow-on investigation before release). The orchestrator fills the dispatch section and CHARC marks it FINAL. Spec v0.5.8. **Owner decisions inside the package: any change to a shipped default (D16 / D100 / the 6.7 defaults) is owner-reserved and is NOT made here; the package PROPOSES, with evidence, and CHARC routes the proposal.**
 
 | Field | Content |
 |---|---|
@@ -58,4 +58,9 @@ Part 1 → YIELD (round 0: the stage table, any Q dispute = STOP); part 2 → YI
 
 - Lane paces at dispatch; base commit; worktree; evidence folder.
 - Order: parallel with WP5.8 (Codex lane). Before WP5.5.
-- GATE_CHECKS: `docs/review-gate-clearwater.md` Part 2 on the final candidate; under outcome B the fullclip leg runs too (the fused output changed).
+- GATE_CHECKS: `docs/review-gate-clearwater.md` Part 2 on the final candidate; `tests/test_tools_halo_probe.py` in the parallel junit, any real-item test `footage` in the serial junit; outcome A: no path under `src/` in the diff; outcome B: only `methods/fusion.py`, `methods/ancuti_fusion.py` and their tests under `src/` / `tests/`, the fullclip leg runs too (the fused output changed), and CHARC's ruling on the re-stated figures lands before the merge. The whole-set batch (part 3) runs alone: the orchestrator holds WP5.8's gate and WP-DR25's runs meanwhile.
+
+## Dispatch fill (orchestrator gen 36, post `d7be07f6` 2026-11-03 06:41Z; FINAL by CHARC on it)
+
+The fill is the orchestrator's post `d7be07f6` (thread phase5-closeout), read into `docs/charc-state.md` and this brief by reference: base main at dispatch (`3c636f31` or later), worktree and branch per the table, `clearwater.local.toml` copied into the worktree (outputs land in the main tree's `work/<pkg>/`), evidence folder per the Common section, one heavy job at a time with `df -h /c` before each (STOP below 25 GB), the stall watch on every gate, no rollover while a cell turn, batch or gate runs. Lane paces at 06:39Z: Codex 19 % / pace 0.227, Claude 7 % / pace 0.569.
+

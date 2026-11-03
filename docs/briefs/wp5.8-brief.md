@@ -1,6 +1,6 @@
-# WP5.8 — Encoder-progress watchdog (dispatch brief, DRAFT for the orchestrator's fill)
+# WP5.8 — Encoder-progress watchdog (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-11-03 by CHARC (generation 13, session `clearwater-charc-20261102-0046`), on the owner's DR-115 scope ruling (2026-11-03 ~06:45Z, verbatim: "watchdog" = the watchdog is in v1; the encoder preference on the CPU-forced / fallback route is UNCHANGED). The orchestrator fills the dispatch section (base commit, lane paces, yields) and CHARC marks it FINAL. Spec v0.5.8; no spec clause changes. Owner decisions inside the package: none.
+**Status:** FINAL 2026-11-03 by CHARC on the orchestrator's fill `d7be07f6` (F1 corrected below). DRAFT 2026-11-03 by CHARC (generation 13, session `clearwater-charc-20261102-0046`), on the owner's DR-115 scope ruling (2026-11-03 ~06:45Z, verbatim: "watchdog" = the watchdog is in v1; the encoder preference on the CPU-forced / fallback route is UNCHANGED). The orchestrator fills the dispatch section (base commit, lane paces, yields) and CHARC marks it FINAL. Spec v0.5.8; no spec clause changes. Owner decisions inside the package: none.
 
 | Field | Content |
 |---|---|
@@ -11,7 +11,7 @@
 | Goal | When FFmpeg (the encoder process) is alive but has stopped reading the frame pipe, the export fails within about `STALL_TIMEOUT_S` seconds instead of sitting forever: the encoder is ended, the output deleted (the sink's failure path, D85 / D44), and the job's failure text names the encoder and the stall. Today the W52-2 shape (DR-115 (a)) blocks `stdin.write` on a full 32 MiB pipe with no timeout; left alone the GUI shows a stuck export. |
 | Spec / decision clauses | D85 (temporary name, leftovers cleaned); D44 / V11 (no partial output); D81 (a failed batch item is logged, the batch continues); D26 (encoder selection unchanged); AD-23 (the 32 MiB pipe); AD-31 (the export runs in the worker process; the parent's conversation is untouched); DR-115 (the finding; the owner's scope). |
 | Files owned | `src/clearwater/io/video/encode.py` (`FFmpegVideoSink` only: the watcher, `STALL_TIMEOUT_S`, the new `VideoEncodeError` kind text); `tests/test_io_video_encode_units.py` (new tests; existing tests unchanged); `docs/reports/wp5.8-watchdog.md` (the completion report). |
-| NOT owned | `src/clearwater/interfaces/` (IF-5 FROZEN: `write` / `close` / `abort` signatures and the `VideoEncodeError` kinds already named there stay; a NEW kind is a CHARC ruling: see Q1); `jobs/export.py`, `jobs/export_process.py`, `app/export_worker.py`; `io/video/pipes.py`, `decode.py`; any GUI file; `tools/`. |
+| NOT owned | `src/clearwater/interfaces/` (IF-5 FROZEN: `write` / `close` / `abort` signatures stay; the error KINDS are not part of IF-5: see Q1); `jobs/export.py`, `jobs/export_process.py`, `app/export_worker.py`; `io/video/pipes.py`, `decode.py`; any GUI file; `tools/`. |
 | Locks | No frozen interface. No dependency. No change to the encoder command line, the pipe size or the encoder choice (owner: unchanged). No write under the footage folder; tests write under `tmp_path`. The watcher must never end a HEALTHY slow encoder: the threshold is measured from the last byte the encoder ACCEPTED, not from the last frame the renderer produced. |
 | Markers | All new tests parallel-leg (no marker): the fake encoder is a `sys.executable -c` script that reads N bytes then sleeps; each test under 5 s with a test-only short threshold (the constant is a module attribute the test monkeypatches). No `gpu`, `footage` or `slow` test. |
 | Hardware flags | None. No EXCLUSIVE window: the stall cannot be provoked on demand (DR-115: intermittent, one in two). A real `--force-cpu` export is NOT part of the gate; the fake encoder is the witness. |
@@ -43,7 +43,7 @@ WP5.2's W52-2 R2 (2026-11-02, `--force-cpu` export of the whole GX011627, `--enc
 
 ## Questions (CHARC's recommended answers; a round-0 dispute with evidence is a STOP to CHARC)
 
-- **Q1 error kind.** Recommended (a): REUSE `"encoder_failed"` with the stall text (IF-5's kinds unchanged; every consumer already handles it). Alternative (b): a new kind `"encoder_stalled"` = a frozen-interface change, NOT in this lane; it would be a CHARC ruling and a Claude-lane package.
+- **Q1 error kind.** Recommended (a): REUSE `"encoder_failed"` with the stall text: `jobs/export.py:107` consumes the error by CLASS (`_READABLE_ERRORS`), so every consumer already shows it, and the stall is a way the encoder failed. Alternative (b): a new kind `"encoder_stalled"` added to `EncodeErrorKind` (the `Literal` at `encode.py:158`, one module; CORRECTED at the fill, orchestrator F1: the kinds are NOT in the frozen interface, so (b) is in this lane). Not recommended because no consumer distinguishes kinds today and a new one adds a branch nobody takes; the cell may choose (b) with a one-line reason in round 0 if a test needs to tell the two apart, and then every existing test that matches `encoder_failed` stays green.
 - **Q2 threshold.** Recommended: 300 s as a module constant, not a setting (no G-requirement asks for it; a setting would need the settings schema, out of scope). The report records the slowest healthy per-frame acceptance WP5.2 measured (about 9.9 s on the CPU route) against it.
 - **Q3 kill versus terminate.** Recommended: `kill()`. The output is deleted on any failure, so a graceful `q` to FFmpeg buys nothing and a hung main thread may ignore it (W52-2's thread was spinning).
 
@@ -59,4 +59,9 @@ Turn 1 = round 0 (the design read against `encode.py` as it stands, the test lis
 
 - Lane paces at dispatch; base commit; worktree; evidence folder.
 - Order: WP5.8 and WP5.7 may run in parallel on different lanes (WP5.7 is Claude-lane, opus-high); WP-DR25 (tools-only, Codex) queues behind WP5.8 on the Codex lane; WP5.5 (release prep) is LAST, after both product packages have merged, because it sets the version and the notices against the final tree.
-- GATE_CHECKS: `docs/review-gate-clearwater.md` Part 2 on the final candidate rebased onto main: ruff, format, mypy; the two-leg gate with fresh basetemps under `work/`, collection identity; the serial leg's `tests/test_app_export_worker.py` and `tests/test_jobs_export_process.py` must be green (the real worker exercises the sink).
+- GATE_CHECKS: `docs/review-gate-clearwater.md` Part 2 on the final candidate rebased onto main: ruff, format, mypy; the two-leg gate with fresh basetemps under `work/`, collection identity; the serial leg's `tests/test_app_export_worker.py` and `tests/test_jobs_export_process.py` must be green (the real worker exercises the sink); the five new tests each under 5 s in the parallel junit; `tests/test_io_video_encode.py` and `tests/test_io_video_encode_bench.py` unchanged against main; only the three owned paths in the diff.
+
+## Dispatch fill (orchestrator gen 36, post `d7be07f6` 2026-11-03 06:41Z; FINAL by CHARC on it)
+
+The fill is the orchestrator's post `d7be07f6` (thread phase5-closeout), read into `docs/charc-state.md` and this brief by reference: base main at dispatch (`3c636f31` or later), worktree and branch per the table, `clearwater.local.toml` copied into the worktree (outputs land in the main tree's `work/<pkg>/`), evidence folder per the Common section, one heavy job at a time with `df -h /c` before each (STOP below 25 GB), the stall watch on every gate, no rollover while a cell turn, batch or gate runs. Lane paces at 06:39Z: Codex 19 % / pace 0.227, Claude 7 % / pace 0.569.
+

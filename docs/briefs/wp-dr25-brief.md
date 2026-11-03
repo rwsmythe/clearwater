@@ -1,6 +1,6 @@
-# WP-DR25 — The staged smoothing run on a long excerpt (dispatch brief, DRAFT for the orchestrator's fill)
+# WP-DR25 — The staged smoothing run on a long excerpt (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-11-03 by CHARC (generation 13), the DR-25 (3) paydown re-assigned at the WP5.6 accept (`d156ed49`: assigned to WP5.2 by the register, omitted from WP5.2's brief; CHARC's miss). Tools-only; no product code; no spec change. Owner decisions inside the package: none (AD-3's confirmation is a CHARC decision from the figures).
+**Status:** FINAL 2026-11-03 by CHARC on the orchestrator's fill `d7be07f6` (the gate exception applies: see GATE_CHECKS). DRAFT 2026-11-03 by CHARC (generation 13), the DR-25 (3) paydown re-assigned at the WP5.6 accept (`d156ed49`: assigned to WP5.2 by the register, omitted from WP5.2's brief; CHARC's miss). Tools-only; no product code; no spec change. Owner decisions inside the package: none (AD-3's confirmation is a CHARC decision from the figures).
 
 | Field | Content |
 |---|---|
@@ -10,7 +10,7 @@
 | Base | main at dispatch (at or after `5cfe1bb4`). Worktree `.worktrees/wp-dr25`, branch `wp-dr25`. |
 | Goal | The WP1.4 report's ground 2 for the 2 s default ("0.106 and 0.053 flicker levels against 0.236 and 0.151 unsmoothed") was measured STAGED on two 6 s excerpts whose staged reach at 2 s (3 stages x 30 frames = 90 frames) exceeds half the excerpt, so no staged 2 s frame was edge-free (Reviewer B at WP1.4; DR-25 (3)). Re-measure the staged 1 s, 2 s and 4 s figures on excerpts with at least 182 edge-free frames at the 2 s window (and the edge-free count at 4 s stated), on the same two chapters at the same positions, and state whether ground 2 holds (the 2 s level within the report's claimed margin below 1 s). |
 | Spec / decision clauses | 7.2 (temporal smoothing over pts, D95); AD-3 (`median_gaussian` 2.0 s PROVISIONAL, DR-25 (3)); D98 (staged versus flat: no visible difference; one stage permitted); DR-25 (3) text in the register. |
-| Files owned | `tools/statistics_experiments.py` (ONLY: `EXCERPTS` gains a length parameter or a second tuple `LONG_EXCERPTS` selected by a new `--long` flag; `staged_reach` and the edge-free accounting already exist: use them; nothing else in the instrument changes); `docs/reports/wp-dr25-staged-run.md`; a unit test in `tests/test_tools_statistics_experiments.py` for the new selection (if that file exists; else a new small test module). |
+| Files owned | `tools/statistics_experiments.py` (ONLY: `EXCERPTS` gains a length parameter or a second tuple `LONG_EXCERPTS` selected by a new `--long` flag; `staged_reach` and the edge-free accounting already exist: use them; nothing else in the instrument changes); `docs/reports/wp-dr25-staged-run.md`; a unit test in a NEW module `tests/test_tools_statistics_experiments.py` for the new selection (the module does not exist today; fill fact). |
 | NOT owned | `src/clearwater/` entirely (the product smoother `analysis/smoothing.py` is not touched; the instrument uses the read-only prototype as it did at WP1.4); `tools/prototype/`; `tools/step_aware_eval.py`; the WP1.4 report (an erratum pointer is added by CHARC at the accept, not by the cell). |
 | Locks | No frozen interface. No dependency. Footage read-only through `tools.local_config.find_footage_file`; outputs under `work/wp-dr25/` (NOT under `work/wp1.4/`, which is archived on D:). |
 | Markers | The instrument run is not a test. The selection test is parallel-leg, synthetic. |
@@ -45,4 +45,9 @@ Turn 1 = round 0 (the `LONG_EXCERPTS` definition and the output root, the expect
 
 - Lane paces at dispatch; base commit; worktree; evidence folder.
 - Order: on the Codex lane after WP5.8 (or interleaved between WP5.8's turns: its runs are light); before WP5.5.
-- GATE_CHECKS: `docs/review-gate-clearwater.md` Part 2 on the final candidate (tools-only: the parallel leg and the harness gate suffice unless a serial-leg test touches `statistics_experiments`; check collection identity).
+- GATE_CHECKS: `docs/review-gate-clearwater.md` Part 2 on the final candidate: parallel AND SERIAL legs plus the harness gate and collection identity, because two existing tests import the instrument (`tests/test_footage_locator.py:19`; `tests/test_prototype_temporal.py:22`, whose test 7 is `footage` and runs the instrument, with `gpu` tests beside it): both green by name in the junits; the default (non-`--long`) run must behave exactly as at WP1.4; the diff holds only the instrument, the report and the new test module.
+
+## Dispatch fill (orchestrator gen 36, post `d7be07f6` 2026-11-03 06:41Z; FINAL by CHARC on it)
+
+The fill is the orchestrator's post `d7be07f6` (thread phase5-closeout), read into `docs/charc-state.md` and this brief by reference: base main at dispatch (`3c636f31` or later), worktree and branch per the table, `clearwater.local.toml` copied into the worktree (outputs land in the main tree's `work/<pkg>/`), evidence folder per the Common section, one heavy job at a time with `df -h /c` before each (STOP below 25 GB), the stall watch on every gate, no rollover while a cell turn, batch or gate runs. Lane paces at 06:39Z: Codex 19 % / pace 0.227, Claude 7 % / pace 0.569.
+

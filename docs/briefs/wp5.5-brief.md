@@ -1,6 +1,6 @@
-# WP5.5 — Release preparation (dispatch brief, DRAFT for the orchestrator's fill)
+# WP5.5 — Release preparation (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-11-03 by CHARC (generation 13), the plan's WP5.5 ("confirms the license compatibility of every bundled dependency and adds the required notices (N13), writes the installation and usage instructions, and tags the version; no installer; delivery is a repository that installs with uv"). Dispatched LAST in Phase 5, after WP5.8, WP5.7 and WP-DR25 have merged (the notices and the user guide describe the final tree). Spec v0.5.8. **Owner decisions inside the package: the version tag itself is applied by the orchestrator on the owner's word at the accept (the release checkpoint); the licence findings, if any dependency is incompatible, go to the owner through CHARC.**
+**Status:** FINAL 2026-11-03 by CHARC on the orchestrator's fill `d7be07f6` (transitive dependencies added to the audit). DRAFT 2026-11-03 by CHARC (generation 13), the plan's WP5.5 ("confirms the license compatibility of every bundled dependency and adds the required notices (N13), writes the installation and usage instructions, and tags the version; no installer; delivery is a repository that installs with uv"). Dispatched LAST in Phase 5, after WP5.8, WP5.7 and WP-DR25 have merged (the notices and the user guide describe the final tree). Spec v0.5.8. **Owner decisions inside the package: the version tag itself is applied by the orchestrator on the owner's word at the accept (the release checkpoint); the licence findings, if any dependency is incompatible, go to the owner through CHARC.**
 
 | Field | Content |
 |---|---|
@@ -33,6 +33,7 @@ The installed program uses, directly or through the listed packages, at least th
 | pyside6-essentials (Qt 6) | the GUI | LGPL-3.0 (also offered under GPL-2.0 / GPL-3.0); the notice must say which terms Clearwater relies on and that Qt is dynamically linked |
 | cupy-cuda12x (optional `gpu` extra) with the CUDA runtime it bundles (`[ctk]`) | the device backend | CuPy MIT; the NVIDIA CUDA runtime libraries under NVIDIA's EULA (redistributable components): state that the EULA permits redistribution of the runtime but is not GPL-compatible as a combined work, and that CuPy is an OPTIONAL extra the user installs, so Clearwater does not bundle it (the system-library / optional-component position; the cell quotes the clause, CHARC and the owner judge) |
 | FFmpeg (`ffmpeg`, `ffprobe`; the gyan.dev "full" build at WP0.1, 9.0.2) | decode, encode, mux, run as a separate process | GPL-3.0 (the full build includes GPL components; a user may substitute any build with hevc_nvenc / libx265); NOT bundled: the guide tells the user to install it and names the build tested; the notice says the program invokes it as a separate process |
+| Every TRANSITIVE runtime package in `uv.lock` reachable from the `dependencies` and the `gpu` extra (`shiboken6`, the CUDA runtime wheels, Pillow's and tifffile's dependencies, ...) | installed with the program | read from `uv.lock` + `importlib.metadata`; one row each; nothing omitted because it is indirect |
 | The dev / comms groups (pytest, ruff, mypy, fastapi, ...) | development only | listed in a separate "not part of the installed program" table, licences recorded, no notice required in the program |
 
 Verdict form per row: COMPATIBLE (and the notice text), COMPATIBLE-WITH-CONDITION (state it: e.g. LGPL dynamic linking, the EULA position), or INCOMPATIBLE (= STOP). The notices file carries each component's copyright line and licence text pointer as its licence requires; GPL-2.0-or-later for Clearwater's own code with the "or later" stated so the GPL-3.0 FFmpeg combination is addressed (FFmpeg runs as a separate process in any case: say so).
@@ -68,4 +69,10 @@ Turn 1 = round 0 (the audit table skeleton with the installed versions and licen
 
 - Lane paces at dispatch; base commit (after WP5.8, WP5.7 and WP-DR25); worktree; evidence folder.
 - GATE_CHECKS: the FULL three-leg gate (parallel, serial, fullclip) plus the harness gate on the final candidate: this is the release gate, and its logs are the figures of record for 1.0.0 (archive them to `clearwater-review-evidence\release-1.0.0\`).
-- At the accept: the owner's word for the tag ("tag 1.0.0" in chat to CHARC), then `git tag -a v1.0.0 <merge commit> -m "Clearwater 1.0.0"`; CHARC writes `docs/proofs/release-1.0.0.md`.
+- At the accept: the owner's word for the tag ("tag 1.0.0" in chat to CHARC), then `git tag -a v1.0.0 <merge commit> -m "Clearwater 1.0.0"`, no push (no remote action without the owner's word); CHARC writes `docs/proofs/release-1.0.0.md`.
+- Fill facts: `src/clearwater/__init__.py` and `pyproject.toml` both say `0.0.0` today; provenance carries `app_version` from `clearwater.__version__` (`app/composition.py`), so the provenance leg of `tests/test_version.py` is a unit test on that field; photo fixtures under `tests/fixtures/stills/`; the offscreen smoke is `tests/test_app_startup.py`.
+
+## Dispatch fill (orchestrator gen 36, post `d7be07f6` 2026-11-03 06:41Z; FINAL by CHARC on it)
+
+The fill is the orchestrator's post `d7be07f6` (thread phase5-closeout), read into `docs/charc-state.md` and this brief by reference: base main at dispatch (`3c636f31` or later), worktree and branch per the table, `clearwater.local.toml` copied into the worktree (outputs land in the main tree's `work/<pkg>/`), evidence folder per the Common section, one heavy job at a time with `df -h /c` before each (STOP below 25 GB), the stall watch on every gate, no rollover while a cell turn, batch or gate runs. Lane paces at 06:39Z: Codex 19 % / pace 0.227, Claude 7 % / pace 0.569.
+
