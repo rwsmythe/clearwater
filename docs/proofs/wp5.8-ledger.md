@@ -416,3 +416,144 @@ Final on-disk checks: all four changed files are ASCII with **0 CR bytes** (LF o
 `git diff --check` is clean; status lists only the four authorized paths. The encode source
 diff contains docstrings only. The separate existing encode/bench and worker/process test
 files have an empty diff. No further source or test edits followed the successful checks.
+
+## Turn 5 (Reviewer B remediation)
+
+Depth at turn-5 end: 166,833 input tokens of 258,400 (driver footer, session 01a1a049, 2026-11-03 turn 5; the window reported 475,000 at turn 4)
+
+Base `56b0deeb`, clean on arrival, after the dispatcher's content-preserving rebase onto
+main `b4f9b99a`. Dispatcher supplied turn-4 depth: **125,904 of 475,000** (filled above).
+Reviewer B is a Claude pass at the dispatcher's seat on this base, transcript withheld;
+verdict **NO_NEW_CRITICAL_MAJOR**, all seven claims confirmed. This is the package's
+single B remediation turn, with the following binding dispositions.
+
+### Findings and dispositions
+
+| ID | Severity | Disposition | Change / evidence |
+| --- | --- | --- | --- |
+| B1 | MINOR | Confirmed by reviewer's load reproduction; fixed in tests only | Every fake child now signals interpreter readiness before open's first watched send. Four-second rescue starts after open. Default test threshold is 2 s; immediate-exit status control uses 3 s. Healthy six-frame and render-gap controls use 64 KiB payloads; the former uses six 0.4 s reads, the latter a 2.6 s gap, both exceeding the 2 s threshold overall. Stall witnesses keep 36 MiB payloads. Fake clocks freeze during coordination and advance 0.1 s per explicitly enabled watcher poll. All five all-core-loaded runs and the unloaded run pass, with all watchdog case durations below 5 s. |
+| B2 | MINOR | Confirmed, fixed | A kill that silently does nothing previously had no diagnostic. `_watch_encoder` now emits ONE module-logger warning per firing BEFORE kill, including encoder and accumulated seconds. Existing exception logging remains. The stalled-frame test's caplog assertion requires exactly one warning with those values. Removing only that warning produces RED. |
+| B3 | ADVISORY | Reported; no algorithm change | New operations are distinguished by timestamps, and this interpreter's 15.625 ms monotonic tick can merge a header and payload started in that tick. At most one tick carries over; no false 300 s fire or missed stall. Corrected report and watcher docstring. |
+| B4 | ADVISORY | Reported; no code change | No test discriminates removal of the close window (close follows successful flush), or removal of the watcher's encoder-exit check (writer's pipe-error path reports exit). Both checks remain; report explicitly disclaims witnesses for these surviving mutations. |
+| B5 | ADVISORY | Report corrected | W52-2's blocked write is INFERRED: 34 waiting worker threads, zero worker/decoder I/O, encoder not reading, but no captured worker stack. The report no longer presents the exact blocked call as measured fact. |
+| B6 | ADVISORY | Fixed | Watcher is named `video-encoder-watchdog`; stderr drain is unnamed. The stalled-frame test checks the name. |
+
+No production constants, encoder choice/command, pipe configuration or frozen interface
+changed. Product changes are only warning, thread name and the timestamp docstring correction.
+The original 126 units cases remain unchanged. All scripts and output below live only in
+this worktree's gitignored `work/c58-5-*`; no burner or mutation script is a deliverable.
+
+### RED mutation probes
+
+Command for each mode: `PYTHONPATH=scripts uv run python work/c58-5-mutations.py <mode>`.
+The script runs only selected cases in `tests/test_io_video_encode_units.py`, with the
+sandbox shim, cacheprovider disabled, `--timeout 120`, and a fresh
+`--basetemp=work/c58-5-mut-<mode>`. It patches methods only in the live Python process;
+no mutated product source was written or committed. Each native process exited 1 because
+the intended named test failed, not because the probe failed to initialize.
+
+| Mutation | RED line / discrimination | Summary | Log |
+| --- | --- | --- | --- |
+| no-warning | `test_watchdog_stalled_frame_fails_and_removes_output`: `AssertionError: watchdog must warn once even when kill returns silently` | 1 failed, 136 deselected in 2.44s | work/c58-5-mut-no-warning.log |
+| first-uncapped | `test_watchdog_first_observation_caps_suspend_gap`: `uncapped first observation killed a pending operation` | 1 failed, 136 deselected in 0.39s | work/c58-5-mut-first-uncapped.log |
+| later-uncapped | `test_watchdog_suspend_gap_does_not_count_as_awake_stall`: `suspend clock jump killed a healthy pending operation` | 1 failed, 136 deselected in 0.41s | work/c58-5-mut-later-uncapped.log |
+| idle | `test_watchdog_render_gap_between_frames_is_not_a_stall`: unexpected encoder-failure error after idle arming | 1 failed, 136 deselected in 2.87s | work/c58-5-mut-idle.log |
+| cumulative | `test_watchdog_healthy_slow_encoder_completes_six_frames`: encoder killed after cumulative frame time | 1 failed, 136 deselected in 2.43s | work/c58-5-mut-cumulative.log |
+| no-flush | `test_watchdog_small_send_flushes_before_another_write`: `small _send was buffered instead of readable by the encoder` | 1 failed, 136 deselected in 3.23s | work/c58-5-mut-no-flush.log |
+| no-watch | BOTH `test_watchdog_stalled_frame_fails_and_removes_output` and `test_watchdog_stalled_sentinel_fails_before_finish_timeout`: stall wording absent after rescue | 2 failed, 135 deselected in 8.38s | work/c58-5-mut-no-watch.log |
+
+The missing-watchdog probe preserves separate frame/sentinel witnesses after the margin
+changes. The cap mutations preserve both fake-clock discriminators. Idle and cumulative
+controls still fail their respective faulty timing models despite the larger margin.
+The missing-flush witness still detects buffering. Warning removal leaves the real kill
+and error path intact and fails specifically on the missing caplog record.
+
+### GREEN and saturated-host evidence
+
+All pytest runs set `PYTHONPATH=scripts`, load `-p sandbox_mkdir_shim`, disable
+cacheprovider, and target ONLY the units file with `--timeout 120`.
+
+Initial unloaded command: `uv run pytest -q -p sandbox_mkdir_shim -p no:cacheprovider
+tests/test_io_video_encode_units.py --timeout 120 --basetemp=work/c58-5-green --durations=0`.
+Exit 0: **137 passed in 14.68s**; `work/c58-5-green.log`.
+The report's per-test call table is from this run (range 0.01-2.68 s).
+
+Load command: `uv run python work/c58-5-burner.py > work/c58-5-burner.log 2>&1`.
+The stdlib driver spawned one CPU-bound process per `os.cpu_count()` = **16**, waited
+for all ready Events, and ran exactly five sequential pytest subprocesses with `-n 4`.
+Every run also writes a JUnit file and reports `--durations=0`; these are reporting-only
+additions. Its exact command arrays and result rows are in `work/c58-5-burner.log` and
+`work/c58-5-runs.json`. Each label below has its own fresh basetemp `work/c58-5-<label>`,
+log `.log` and JUnit `.xml`.
+
+| Label | Load | Exit / summary | Slowest of 11 watchdog cases, including setup/teardown |
+| --- | --- | --- | ---: |
+| 1 | 16 burners | 0: 137 passed in 19.28s | 3.834 s |
+| 2 | 16 burners | 0: 137 passed in 24.77s | 3.441 s |
+| 3 | 16 burners | 0: 137 passed in 28.20s | 3.892 s |
+| 4 | 16 burners | 0: 137 passed in 25.93s | 3.589 s |
+| 5 | 16 burners | 0: 137 passed in 25.10s | 3.612 s |
+| unloaded | burners ended | 0: 137 passed in 7.09s | 2.701 s |
+
+JUnit audit: every file contains exactly **11** watchdog cases, none at or above 5 s;
+extracted maxima: `work/c58-5-durations.json`. Worst observed case was the healthy
+six-frame control, 3.892 s, in loaded run 3.
+
+Burner lifetime: all ready **2026-11-03 08:33:05.818413Z**, ended
+**08:35:55.159883Z**. Exact child PIDs were
+29428, 9016, 11892, 38436, 43648, 34352, 35012, 29976, 6652, 30212, 14724, 41992,
+7108, 22272, 2932, 37448. Driver `finally` sets its stop Event, joins those child handles,
+and can terminate only its own still-running children. All 16 exited cooperatively with
+**exit code 0**, so that fallback was not used. Driver recorded
+`remaining_burner_pids: []`; a subsequent `Get-Process` check of that exact PID set found
+**0** present. No unrelated process was killed. The final unloaded run started after this
+cleanup. The burner is ended before this yield.
+
+Final static checks, after the loaded/unloaded runs:
+
+- `uv run ruff check src/clearwater/io/video/encode.py tests/test_io_video_encode_units.py`:
+  exit 0, **All checks passed!**; `work/c58-5-ruff-final.log`.
+- `uv run ruff format --check src/clearwater/io/video/encode.py tests/test_io_video_encode_units.py`:
+  exit 0, **2 files already formatted**; `work/c58-5-format-final.log`.
+- `uv run mypy`: exit 0, **Success: no issues found in 156 source files**;
+  `work/c58-5-mypy-final.log`.
+
+Initial format check required formatting one file; `ruff format` changed only test layout
+before the loaded and final unloaded runs. Lint and types passed initially and finally.
+Free disk before testing: **78.81 GiB**; `work/c58-5-disk.log`, above the stop line.
+No whole suite, marked hardware test, real FFmpeg export or dependency sync was run.
+
+### Report corrections and verification loop
+
+Updated report test timings and all six xdist results, readiness/payload/threshold choices,
+controlled fake-clock advancement, one-warning semantics, watcher name, timestamp-tick
+aliasing, both unwitnessed mutations, inferred W52-2 blockage, and current source anchors.
+Retained all accepted limits without claiming an ineffective kill always raises. Fresh
+stall artifact `work/c58-5-green/test_watchdog_stalled_frame_fa0/timeline.json`: pending
+start **178126.375**, kill **178128.546** (+2.171 s), output deleted and caller error both
+**178128.546**. Blocking instant and within-tick event separation remain unmeasured.
+
+Verification loop: accepted B's reproduced load sensitivity, removed startup from watched
+windows and reduced irrelevant healthy-transfer cost, increased test-only margins, then
+confirmed five saturated and one unloaded xdist pass. Independently removed the warning
+to confirm the caplog regression and repeated timing/buffering mutations to guard against
+weakened witnesses. Final source/report pass checked log-before-kill order, one-fire return,
+thread name, unchanged constants/command/pipe, startup gating, rescue lifecycle, fake-clock
+coordination, test durations and burner cleanup. No additional in-envelope issue found.
+
+| Round | Critical | Major | Minor | Advisory | In / out | NEW / REOPENED | Reverts | Product / tests | Status |
+| --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- |
+| A1 (carried) | 0 | 1 | 2 | 8 | 11 / 0 | 11 / 0 | 0 | yes / yes | 7 fixed, 1 already satisfied, 3 accepted limits |
+| A2 (carried) | 0 | 0 | 2 | 4 | 6 / 0 | 6 / 0 | 0 | docstrings only / yes | NO_NEW_CRITICAL_MAJOR; minors fixed, advisories reported |
+| B | 0 | 0 | 2 | 4 | 6 / 0 | 6 / 0 | 0 | yes / yes | NO_NEW_CRITICAL_MAJOR; 2 minors fixed, B6 fixed, B3-B5 reported |
+
+Single B remediation complete for dispatcher recheck; this is not a claim of final gate
+or acceptance. Dispatcher owns the commit, B recheck and final gate; architect owns register
+updates. No git writes or commits were attempted, and no writes targeted outside this worktree.
+
+Final on-disk audit: exactly the four authorized paths are modified, all ASCII and LF
+(0 CR bytes). `git diff --check` is clean. Source diff confirms all production constants,
+command and pipe are unchanged; only warning/name and the stated docstring changed.
+Separate encode/bench and worker/process test files have an empty diff. Report search found
+no stale first-version thresholds/timeline or pending-result placeholder. No source/test
+edit followed the final loaded/unloaded and static checks. Burner absence is confirmed above.

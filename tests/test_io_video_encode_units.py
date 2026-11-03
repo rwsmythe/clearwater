@@ -7,6 +7,7 @@ The end-to-end tests are in ``test_io_video_encode.py``.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import subprocess
 import sys
@@ -1290,10 +1291,16 @@ def read_exact(count):
 class _WatchdogSink(encode.FFmpegVideoSink):
     """Keep the real lifecycle and transport; substitute media payloads and the encoder."""
 
-    def __init__(self, script: str, payload: bytes) -> None:
+    def __init__(self, script: str, payload: bytes, ready: Path) -> None:
         super().__init__()
         self.script = script
         self.payload = payload
+        self.ready = ready
+
+    def _start(self, command: list[str]) -> None:
+        super()._start(command)
+        # open's first watched send happens only after the child's interpreter is ready.
+        assert _watchdog_wait(self.ready, timeout=3.0), "fake encoder did not start"
 
     def _command(self, command: list[str]) -> list[str]:
         return [sys.executable, "-c", self.script]
@@ -1339,6 +1346,35 @@ def _watchdog_wait(path: Path, timeout: float = 1.0) -> bool:
     return path.exists()
 
 
+class _WatchdogClock:
+    """Freeze clock time for coordination, then advance it on explicitly enabled awake polls."""
+
+    def __init__(self, sink: _WatchdogSink) -> None:
+        self.sink = sink
+        self.pending = threading.Event()
+        self.jumped = threading.Event()
+        self.advance = threading.Event()
+        self._lock = threading.Lock()
+        self._now = time.monotonic()
+        self._did_jump = False
+
+    def jump(self) -> None:
+        with self._lock:
+            self._now += 400.0
+            self._did_jump = True
+
+    def __call__(self) -> float:
+        with self._lock:
+            if threading.current_thread() is self.sink._watchdog_thread:
+                if self._did_jump:
+                    self.jumped.set()
+                elif self.sink._waiting_since is not None:
+                    self.pending.set()
+                if self.advance.is_set():
+                    self._now += 0.1
+            return self._now
+
+
 @contextmanager
 def _watchdog_encoder(
     tmp_path: Path,
@@ -1346,8 +1382,10 @@ def _watchdog_encoder(
     body: str,
     *,
     count: int = 1,
+    payload_bytes: int = _WATCHDOG_PAYLOAD_BYTES,
+    stall_timeout: float = 2.0,
 ) -> Iterator[tuple[_WatchdogSink, Path, threading.Event]]:
-    """Run a real Python child with a four-second rescue independent of the product watcher."""
+    """Ready the child before any send; rescue four seconds after open independently of watching."""
     pts = tuple(index * 1001 for index in range(count))
     source = _table(pts)
     source = replace(
@@ -1357,8 +1395,10 @@ def _watchdog_encoder(
     monkeypatch.setattr(encode, "read_packet_table", lambda *args, **kwargs: source)
     monkeypatch.setattr(encode, "find_tool", lambda name: Path(sys.executable))
     # raising=False permits the RED run against the unchanged module.
-    monkeypatch.setattr(encode, "STALL_TIMEOUT_S", 1.0, raising=False)
-    sink = _WatchdogSink(_WATCHDOG_READER + body, bytes(_WATCHDOG_PAYLOAD_BYTES))
+    monkeypatch.setattr(encode, "STALL_TIMEOUT_S", stall_timeout, raising=False)
+    ready = tmp_path / "encoder-ready"
+    script = _WATCHDOG_READER + f"\nPath({str(ready)!r}).touch()\n" + body
+    sink = _WatchdogSink(script, bytes(payload_bytes), ready)
     monkeypatch.setattr(
         sink, "capabilities", lambda: (EncoderCapability("libx265", True, None, (8,), False),)
     )
@@ -1374,11 +1414,11 @@ def _watchdog_encoder(
 
     timer = threading.Timer(4.0, rescue)
     timer.daemon = True
-    timer.start()
     try:
         sink.open(
             _probe(), out, encoder="libx265", quality="standard", bit_depth=8, provenance=None
         )
+        timer.start()
         yield sink, out, rescued
     finally:
         timer.cancel()
@@ -1386,14 +1426,17 @@ def _watchdog_encoder(
         if process is not None and process.poll() is None:
             process.kill()
         sink.abort()
-        timer.join(timeout=0.5)
+        if timer.ident is not None:
+            timer.join(timeout=0.5)
 
 
 def test_watchdog_stalled_frame_fails_and_removes_output(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A live encoder that stops reading a pipe-filling frame fails before the rescue."""
+    caplog.set_level(logging.WARNING, logger=encode.__name__)
     first = len(_watchdog_header()) + len(nut.frame_header(0, _WATCHDOG_PAYLOAD_BYTES)) + 4096
     with _watchdog_encoder(tmp_path, monkeypatch, f"\nread_exact({first})\ntime.sleep(60)\n") as (
         sink,
@@ -1427,6 +1470,15 @@ def test_watchdog_stalled_frame_fails_and_removes_output(
         assert not rescued.is_set() and time.monotonic() - started < 5
         assert not out.exists() and process.poll() is not None
         assert sink._watchdog_thread is not None and not sink._watchdog_thread.is_alive()
+        assert sink._watchdog_thread.name == "video-encoder-watchdog"
+        warnings = [
+            record
+            for record in caplog.records
+            if record.name == encode.__name__ and record.levelno == logging.WARNING
+        ]
+        assert len(warnings) == 1, "watchdog must warn once even when kill returns silently"
+        assert "libx265" in warnings[0].getMessage()
+        assert f"{sink._stalled:.3f} s" in warnings[0].getMessage()
         (tmp_path / "timeline.json").write_text(json.dumps(timeline), encoding="ascii")
 
 
@@ -1434,17 +1486,21 @@ def test_watchdog_healthy_slow_encoder_completes_six_frames(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Six 0.3-second frame reads remain healthy although their total exceeds the threshold."""
+    """Six 0.4-second small-frame reads exceed two seconds overall without a stalled operation."""
+    payload_bytes = 64 * 1024
     sizes = [
-        len(nut.frame_header(index * 1001, _WATCHDOG_PAYLOAD_BYTES)) + _WATCHDOG_PAYLOAD_BYTES
-        for index in range(6)
+        len(nut.frame_header(index * 1001, payload_bytes)) + payload_bytes for index in range(6)
     ]
     body = (
         f"\nread_exact({len(_watchdog_header())})\n"
-        f"for size in {sizes!r}:\n    time.sleep(0.3)\n    read_exact(size)\n"
+        f"for size in {sizes!r}:\n    time.sleep(0.4)\n    read_exact(size)\n"
         "while os.read(0, 65536):\n    pass\n"
     )
-    with _watchdog_encoder(tmp_path, monkeypatch, body, count=6) as (sink, out, rescued):
+    with _watchdog_encoder(tmp_path, monkeypatch, body, count=6, payload_bytes=payload_bytes) as (
+        sink,
+        out,
+        rescued,
+    ):
         for index in range(6):
             sink.write(_watchdog_frame(index))
         assert sink.close().frames_written == 6
@@ -1494,7 +1550,7 @@ def test_watchdog_normal_nonzero_exit_keeps_status_and_stderr(
         f"\nread_exact({consumed})\n"
         "sys.stderr.write('fake encoder exit witness\\n')\nsys.stderr.flush()\nsys.exit(7)\n"
     )
-    with _watchdog_encoder(tmp_path, monkeypatch, body) as (sink, out, rescued):
+    with _watchdog_encoder(tmp_path, monkeypatch, body, stall_timeout=3.0) as (sink, out, rescued):
         with pytest.raises(VideoEncodeError) as caught:
             sink.write(_watchdog_frame())
         assert caught.value.kind == "encoder_failed"
@@ -1566,25 +1622,11 @@ def test_watchdog_suspend_gap_does_not_count_as_awake_stall(
     ready = tmp_path / "reader-stopped"
     consumed = len(_watchdog_header()) + len(nut.frame_header(0, _WATCHDOG_PAYLOAD_BYTES)) + 4096
     body = f"\nread_exact({consumed})\nPath({str(ready)!r}).touch()\ntime.sleep(60)\n"
-    # Scale the suspend cap along with the one-second test threshold (production: 5 / 300).
+    # Keep the cap well below the two-second test threshold (production: 5 / 300).
     monkeypatch.setattr(encode, "SUSPEND_GAP_S", 0.1, raising=False)
     monkeypatch.setattr(encode, "POLL_S", 0.02)
     with _watchdog_encoder(tmp_path, monkeypatch, body) as (sink, out, rescued):
-        observed_pending = threading.Event()
-        observed_jump = threading.Event()
-        clock_lock = threading.Lock()
-        offset = 0.0
-
-        def clock() -> float:
-            with clock_lock:
-                value = time.monotonic() + offset
-                if threading.current_thread() is sink._watchdog_thread:
-                    if offset:
-                        observed_jump.set()
-                    elif sink._waiting_since is not None:
-                        observed_pending.set()
-                return value
-
+        clock = _WatchdogClock(sink)
         # Replace only encode's time namespace, leaving pytest, subprocess and rescue clocks real.
         monkeypatch.setattr(encode, "time", SimpleNamespace(monotonic=clock, sleep=time.sleep))
         errors: list[BaseException] = []
@@ -1598,15 +1640,15 @@ def test_watchdog_suspend_gap_does_not_count_as_awake_stall(
         writer = threading.Thread(target=write_frame, daemon=True)
         writer.start()
         try:
-            assert _watchdog_wait(ready, timeout=3.0) and observed_pending.wait(timeout=0.5)
-            with clock_lock:
-                offset = 400.0
-            assert observed_jump.wait(timeout=0.5)
+            assert _watchdog_wait(ready, timeout=3.0) and clock.pending.wait(timeout=3.0)
+            clock.jump()
+            assert clock.jumped.wait(timeout=3.0)
             time.sleep(0.1)  # let the watcher evaluate the jump and several ordinary polls
             assert writer.is_alive(), "suspend clock jump killed a healthy pending operation"
             assert sink._stalled is None
             assert sink._process is not None and sink._process.poll() is None
-            writer.join(timeout=2.0)
+            clock.advance.set()
+            writer.join(timeout=3.0)
             assert not writer.is_alive(), "continued awake polling did not detect the stall"
             assert len(errors) == 1 and isinstance(errors[0], VideoEncodeError)
             assert errors[0].kind == "encoder_failed" and "stopped accepting" in str(errors[0])
@@ -1630,20 +1672,14 @@ def test_watchdog_first_observation_caps_suspend_gap(
     with _watchdog_encoder(tmp_path, monkeypatch, body) as (sink, out, rescued):
         parked = threading.Event()
         allow_poll = threading.Event()
-        observed_jump = threading.Event()
         real_wait = sink._watchdog_stop.wait
-        offset = 0.0
+        clock = _WatchdogClock(sink)
 
         def park_before_poll(timeout: float) -> bool:
             # Park outside _phase_lock BEFORE starting the write, so it cannot be observed yet.
             parked.set()
-            allow_poll.wait(timeout=3.0)
+            allow_poll.wait()
             return real_wait(timeout)
-
-        def clock() -> float:
-            if threading.current_thread() is sink._watchdog_thread and offset:
-                observed_jump.set()
-            return time.monotonic() + offset
 
         monkeypatch.setattr(sink._watchdog_stop, "wait", park_before_poll)
         monkeypatch.setattr(encode, "time", SimpleNamespace(monotonic=clock, sleep=time.sleep))
@@ -1657,18 +1693,19 @@ def test_watchdog_first_observation_caps_suspend_gap(
 
         writer = threading.Thread(target=write_frame, daemon=True)
         try:
-            assert parked.wait(timeout=1.0)
+            assert parked.wait(timeout=3.0)
             writer.start()
             assert _watchdog_wait(ready, timeout=3.0) and writer.is_alive()
             # The event publishes this jump before the watcher's first poll of the new send.
-            offset = 400.0
+            clock.jump()
             allow_poll.set()
-            assert observed_jump.wait(timeout=0.5)
+            assert clock.jumped.wait(timeout=3.0)
             time.sleep(0.1)
             assert writer.is_alive(), "uncapped first observation killed a pending operation"
             assert sink._stalled is None
             assert sink._process is not None and sink._process.poll() is None
-            writer.join(timeout=2.0)
+            clock.advance.set()
+            writer.join(timeout=3.0)
             assert not writer.is_alive(), "continued awake polling did not detect the stall"
             assert len(errors) == 1 and isinstance(errors[0], VideoEncodeError)
             assert errors[0].kind == "encoder_failed" and "stopped accepting" in str(errors[0])
@@ -1685,19 +1722,23 @@ def test_watchdog_render_gap_between_frames_is_not_a_stall(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A healthy encoder survives a 1.6-second render gap with a one-second threshold."""
+    """A healthy encoder survives a 2.6-second render gap with a two-second threshold."""
+    payload_bytes = 64 * 1024
     sizes = [
-        len(nut.frame_header(index * 1001, _WATCHDOG_PAYLOAD_BYTES)) + _WATCHDOG_PAYLOAD_BYTES
-        for index in range(2)
+        len(nut.frame_header(index * 1001, payload_bytes)) + payload_bytes for index in range(2)
     ]
     body = (
         f"\nread_exact({len(_watchdog_header())})\n"
         f"for size in {sizes!r}:\n    read_exact(size)\n"
         "while os.read(0, 65536):\n    pass\n"
     )
-    with _watchdog_encoder(tmp_path, monkeypatch, body, count=2) as (sink, out, rescued):
+    with _watchdog_encoder(tmp_path, monkeypatch, body, count=2, payload_bytes=payload_bytes) as (
+        sink,
+        out,
+        rescued,
+    ):
         sink.write(_watchdog_frame(0))
-        time.sleep(1.6)
+        time.sleep(2.6)
         sink.write(_watchdog_frame(1))
         assert sink.close().frames_written == 2
         assert sink._stalled is None and not rescued.is_set() and out.exists()
@@ -1710,7 +1751,7 @@ def test_watchdog_nonzero_exit_races_stall_with_one_error(
     """A non-reading encoder exiting near the deadline produces one of the two failure paths."""
     consumed = len(_watchdog_header()) + len(nut.frame_header(0, _WATCHDOG_PAYLOAD_BYTES)) + 4096
     body = (
-        f"\nread_exact({consumed})\ntime.sleep(1.0)\n"
+        f"\nread_exact({consumed})\ntime.sleep(2.0)\n"
         "sys.stderr.write('fake encoder exit race\\n')\nsys.stderr.flush()\nsys.exit(7)\n"
     )
     thread_errors: list[threading.ExceptHookArgs] = []

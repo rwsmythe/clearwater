@@ -962,7 +962,9 @@ class FFmpegVideoSink:
             thread.start()
             self._stderr_thread = thread
             start_failure = f"The video encoder ({self._encoder}) watchdog could not be started"
-            watcher = threading.Thread(target=self._watch_encoder, daemon=True)
+            watcher = threading.Thread(
+                target=self._watch_encoder, name="video-encoder-watchdog", daemon=True
+            )
             watcher.start()
             self._watchdog_thread = watcher
         except BaseException as error:
@@ -979,15 +981,16 @@ class FFmpegVideoSink:
         """Attempt to kill a live encoder after excessive accumulated pending-I/O time.
 
         The first observation counts min(now - waiting_since, SUSPEND_GAP_S); later polls
-        add min(now - previous_poll, SUSPEND_GAP_S). A new pending timestamp resets the
-        total, even if no idle interval was polled, and an idle poll clears it. Capping
-        estimates awake time rather than measuring it: suspend and scheduling gaps each
+        add min(now - previous_poll, SUSPEND_GAP_S). A distinct pending timestamp resets
+        the total; sends starting in one clock tick may share it and carry over that tick.
+        An idle poll clears the total. Capping estimates awake time rather than measuring
+        it: suspend and scheduling gaps each
         contribute at most SUSPEND_GAP_S, so a starved watcher detects a stall more slowly.
 
         Shared timestamps, process state and the stall record use _phase_lock; the pending
         identity and accumulated total are watcher-local. The stop Event, a non-open phase,
-        or encoder exit ends polling. A stall records the total and attempts kill; the
-        writer handles the resulting pipe failure and cleanup. Exceptions are logged here.
+        or encoder exit ends polling. A stall records the total, warns once, then attempts
+        kill; the writer handles the resulting pipe failure and cleanup. Exceptions are logged here.
         """
         try:
             previous_poll = time.monotonic()
@@ -1014,6 +1017,11 @@ class FFmpegVideoSink:
                     if elapsed <= STALL_TIMEOUT_S:
                         continue
                     self._stalled = elapsed
+                    logging.getLogger(__name__).warning(
+                        "Video encoder (%s) stalled after %.3f s of pending I/O; stopping export",
+                        self._encoder,
+                        elapsed,
+                    )
                     try:
                         process.kill()
                     except OSError:
