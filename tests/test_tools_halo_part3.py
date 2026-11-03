@@ -368,6 +368,105 @@ def test_n6_summary_reads_only_the_run_sidecars(tmp_path: Path) -> None:
     assert len(again["runs"]) == 6
 
 
+def _n6_sequence(folder: Path, order: str) -> None:
+    """Write one run per letter of ``order`` in time order: ``S`` shipped, ``D`` candidate."""
+    folder.mkdir(parents=True, exist_ok=True)
+    for index, letter in enumerate(order):
+        setting = "shipped" if letter == "S" else "candidate"
+        _n6_run(folder, index, setting, 10.9 if letter == "S" else 12.0)
+
+
+@pytest.mark.parametrize(
+    ("order", "problem"),
+    [
+        ("", "no shipped run"),  # an empty population
+        ("SSS", "no candidate run"),  # one setting only
+        ("SSDD", "candidate expected"),  # not alternating (Reviewer B: an effect, no pair ratio)
+        ("SDS", "odd count"),  # an incomplete pair
+        ("DSDSDS", "shipped expected"),  # alternating, but the candidate first
+        ("SDSD", "at least 3"),  # complete and alternating, short of the window's six runs
+    ],
+)
+def test_n6_summary_is_valid_only_for_the_protocol_of_record(
+    working: Path, order: str, problem: str
+) -> None:
+    # Reviewer B finding 1: a resumed or interrupted window must not read as a valid N6 row.
+    folder = working / "wp5.7" / "part3" / "n6"
+    _n6_sequence(folder, order)
+    summary = p3.n6_summary(folder)
+    assert not summary["valid"]
+    assert any(problem in line for line in summary["problems"]), summary["problems"]
+    assert "VALID False" in p3.n6_text(summary)
+    assert p3.main(["n6-summary"]) == 5  # invalid: distinct from the STOP's 4
+
+
+@pytest.mark.parametrize(("factor", "status"), [(1.05, 0), (1.12, 4)])
+def test_n6_summary_exit_is_the_stop_only_on_a_valid_row(
+    working: Path, factor: float, status: int
+) -> None:
+    folder = working / "wp5.7" / "part3" / "n6"
+    folder.mkdir(parents=True)
+    for index, rate in enumerate([10.9, 11.0, 10.8]):
+        _n6_run(folder, 2 * index, "shipped", rate)
+        _n6_run(folder, 2 * index + 1, "candidate", rate * factor)
+    assert p3.main(["n6-summary"]) == status
+
+
+class _TornHandle:
+    """A text handle whose ``write`` writes part of its text, then fails (an interrupt)."""
+
+    def __init__(self, handle: Any) -> None:
+        self.handle = handle
+
+    def __enter__(self) -> _TornHandle:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.handle.close()
+
+    def write(self, text: str) -> int:
+        self.handle.write(text[:20])
+        self.handle.flush()
+        raise OSError("interrupted mid-write")
+
+
+def test_write_json_interrupted_mid_write_leaves_nothing_under_the_final_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Reviewer B finding 2: the old writer opened the final name, so an interrupt left a torn
+    # sidecar that the next summary failed to parse.
+    real_open = Path.open
+
+    def torn_open(self: Path, *args: Any, **kwargs: Any) -> Any:
+        return _TornHandle(real_open(self, *args, **kwargs))
+
+    monkeypatch.setattr(Path, "open", torn_open)
+    final = tmp_path / "n6-candidate-20261103T000000000000Z.json"
+    with pytest.raises(OSError, match="interrupted mid-write"):
+        p3._write_json(final, {"setting": "candidate"})
+    assert not final.exists()
+    assert list(tmp_path.iterdir()) == []  # the temporary is removed too
+
+
+def test_write_json_publishes_by_rename_and_refuses_an_existing_name(tmp_path: Path) -> None:
+    final = tmp_path / "n6-shipped-1.json"
+    p3._write_json(final, {"setting": "shipped"})
+    assert json.loads(final.read_text(encoding="utf-8")) == {"setting": "shipped"}
+    with pytest.raises(FileExistsError):
+        p3._write_json(final, {"setting": "candidate"})
+    assert json.loads(final.read_text(encoding="utf-8")) == {"setting": "shipped"}
+    assert [p.name for p in tmp_path.iterdir()] == [final.name]
+
+
+def test_n6_summary_ignores_a_torn_temporary(tmp_path: Path) -> None:
+    # A temporary left by a killed writer (no clean-up ran) is not a run sidecar.
+    _n6_sequence(tmp_path, "SDSDSD")
+    torn = p3._temporary(tmp_path / "n6-candidate-9.json")
+    torn.write_text('{\n "setting": "candi', encoding="utf-8")
+    summary = p3.n6_summary(tmp_path)
+    assert summary["valid"] and len(summary["runs"]) == 6
+
+
 # --- the edge-band scan -------------------------------------------------------------------------
 
 
@@ -818,6 +917,30 @@ def test_build_sheet_fails_unless_the_records_are_exactly_the_listed_items(
     assert not list(out.glob("sheet-*"))
 
 
+def test_build_sheet_interrupted_publishes_no_sheet_folder(
+    working: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Reviewer B finding 2: the old sheet made its final ``sheet-*`` folder before filling it.
+    out = _sheet_items(working, monkeypatch)
+
+    def failing(summaries: Any) -> str:
+        raise OSError("interrupted while filling the sheet")
+
+    monkeypatch.setattr(p3, "summary_tsv", failing)  # the sheet's last file
+    with pytest.raises(OSError, match="interrupted while filling"):
+        p3.build_sheet(out, working)
+    assert not list(out.glob("sheet-*"))
+
+
+def test_build_sheet_leaves_no_staging_folder_on_success(
+    working: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = _sheet_items(working, monkeypatch)
+    p3.build_sheet(out, working)
+    assert len(list(out.glob("sheet-*"))) == 1
+    assert [p.name for p in out.iterdir() if p.name.startswith(".")] == []
+
+
 def test_checked_output_accepts_the_rerun_folder(working: Path) -> None:
     # Round 5: the re-render of the affected items writes under wp5.7/part3r (never into the
     # window's part3); every other place stays refused.
@@ -830,6 +953,46 @@ def test_checked_output_accepts_the_rerun_folder(working: Path) -> None:
 def test_main_refuses_outputs_outside_part3(working: Path) -> None:
     assert p3.main(["v3", "--out", str(working / "elsewhere")]) == 2
     assert p3.main(["n6", "--setting", "shipped", "--subdir", "wp5.7/other"]) == 2
+
+
+def test_checked_output_returns_the_resolved_path(
+    working: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Reviewer B finding 3: a relative output inside the root was accepted but returned relative.
+    monkeypatch.chdir(working / "wp5.7")
+    relative = Path("..") / "wp5.7" / "part3" / "wholeset"
+    checked = p3.checked_output(relative)
+    assert checked.is_absolute()
+    assert checked == (working / "wp5.7" / "part3" / "wholeset").resolve()
+
+
+def test_wholeset_sheet_accepts_a_relative_out(
+    working: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The sheet's links are file URIs, which a relative path cannot give (``as_uri``).
+    out = _sheet_items(working, monkeypatch)
+    monkeypatch.chdir(working / "wp5.7")
+    assert (
+        p3.main(["wholeset-sheet", "--out", str(Path("..") / "wp5.7" / "part3" / "wholeset")]) == 0
+    )
+    (sheet,) = out.glob("sheet-*")
+    assert out.resolve().as_uri() in (sheet / "contact-sheet.html").read_text(encoding="ascii")
+
+
+def test_v3_refuses_the_full_res_bounds_switch(
+    working: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Reviewer B advisory 5: nothing in the V3 legs overrides the bounds, so the switch would be
+    # recorded without taking effect. Part 3's contracted V3 candidate is (d).
+    def unreachable(*args: Any, **kwargs: Any) -> Any:
+        pytest.fail("the V3 legs were reached")
+
+    monkeypatch.setattr(p3, "suite", unreachable)
+    monkeypatch.setattr(p3, "run_v3", unreachable)
+    out = working / "wp5.7" / "part3" / "v3-e3"
+    assert p3.main(["v3", "--out", str(out), "--switch", "full_res_bounds"]) == 2
+    assert "full_res_bounds" in capsys.readouterr().err
+    assert not out.exists()
 
 
 @pytest.mark.slow

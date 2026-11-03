@@ -25,7 +25,9 @@ frame) from the shared samples through the suite's ``fixture_plugin.SampleProvid
 generated samples under the run's folder). The shipped-defaults leg runs first and must REPRODUCE
 WP4.2's figures of record (:data:`V3_RECORD`) within :data:`AD14_TOLERANCE` and
 :data:`RATIO_TOLERANCE`, one unit in the record's last printed place; otherwise the run STOPS
-(exit 4) before the candidate leg runs (an instrument STOP, not a candidate result).
+(exit 4) before the candidate leg runs (an instrument STOP, not a candidate result). ``v3``
+refuses ``--switch full_res_bounds`` (exit 2): nothing in its legs overrides the bounds, so (e3)
+would be recorded without taking effect; Part 3's contracted V3 candidate is (d).
 
 ``n6`` and ``n6-summary`` (C4). ONE timed export of the whole GX011627 under one setting, by the
 V16 / N6 instrument of record, ``tools/export_bench.py`` (``run GX011627 --runs 1 --device-frames``,
@@ -36,8 +38,12 @@ thread and its renders; a counter around the method's ``fusion_inputs`` proves i
 the clip was in effect) on every run. Each run writes the bench's own record and a sidecar
 ``n6-<setting>-<stamp>.json``; ``n6-summary`` (:func:`n6_summary`) reads them: D106 min/min per run
 (``wall_s / frames * frame_rate``, the bench's ``total.min_per_min``), the median per setting,
-the effect ``median(candidate) / median(shipped) - 1`` and each adjacent pair's ratio; an effect
-over :data:`N6_STOP_FRACTION` is C4's STOP.
+the effect ``median(candidate) / median(shipped) - 1`` and each adjacent pair's ratio. The summary
+is valid only for C4's protocol of record (:func:`n6_protocol_problems`: S D alternating from
+shipped, complete pairs, at least :data:`N6_MIN_PAIRS`); an invalid one exits
+:data:`N6_INVALID_EXIT`, and on a valid one an effect over :data:`N6_STOP_FRACTION` is C4's STOP
+(exit 4). Every JSON record this tool writes is staged, then published by rename
+(:func:`_write_json`).
 
 ``wholeset-list``, ``wholeset-run`` and ``wholeset-sheet`` (Part 3; C1, C2, C3 (3)). The 120 other
 CP5 items (:func:`wholeset_items`: the pack's manifest ``records/pack.json``, the items whose
@@ -93,6 +99,7 @@ import html
 import importlib
 import json
 import math
+import os
 import statistics
 import sys
 import tempfile
@@ -195,7 +202,15 @@ N6_STOP_FRACTION = 0.10
 """CHARC C4: an N6 effect over this fraction is a STOP to CHARC before the proposal."""
 
 N6_SETTINGS = ("shipped", "candidate")
-"""The two settings of the timed row."""
+"""The two settings of the timed row, in the order each pair runs them (shipped first)."""
+
+N6_MIN_PAIRS = 3
+"""The fewest complete shipped / candidate pairs of a valid row: CHARC C4's six alternating cold
+runs S1 D1 S2 D2 S3 D3 (ledger, "C4 sizing"; CHARC may add a further pair or two, never fewer)."""
+
+N6_INVALID_EXIT = 5
+"""The ``n6-summary`` exit status when the runs are not the protocol of record (no N6 row; the
+STOP's 4 is given only on a valid summary)."""
 
 # --- the whole set ------------------------------------------------------------------------------
 
@@ -276,7 +291,9 @@ def checked_output(target: Path) -> Path:
         target: The planned output folder or file.
 
     Returns:
-        ``target``.
+        ``target`` resolved (absolute), the path the checks accepted: a relative ``target`` would
+        otherwise reach callers that need an absolute one (the sheet's ``as_uri`` links;
+        Reviewer B finding 3).
 
     Raises:
         hp.ProbeError: It lies outside ``<working>/wp5.7/part3`` and ``<working>/wp5.7/part3r``,
@@ -290,13 +307,43 @@ def checked_output(target: Path) -> Path:
         refusal = headless_export.write_target_refusal(target, footage)
         if refusal is not None:
             raise hp.ProbeError(refusal)
-    return target
+    return target.resolve()
+
+
+def _temporary(path: Path) -> Path:
+    """The staging name of a record :func:`_write_json` publishes as ``path``.
+
+    Dot-prefixed, in the same folder (so the publish is one rename on one volume), and so never
+    matched by a pattern that starts with a name (``n6-<setting>-*.json``, ``sheet-*``).
+    """
+    return path.with_name(f".{path.name}.staging-{_stamp()}")
 
 
 def _write_json(path: Path, record: Mapping[str, Any]) -> None:
-    """Write a record to a NEW file (exclusive create)."""
-    with path.open("x", encoding="utf-8") as handle:
-        handle.write(json.dumps(hp._plain(record), indent=1))
+    """Write a record to a NEW file, staged: written whole to a temporary, then renamed.
+
+    The record is written to :func:`_temporary` (exclusive create) and published by renaming it
+    to ``path``, so an interrupt never leaves a partial file under the final name (Reviewer B
+    finding 2); on any exception the temporary is removed and the exception re-raised. ``path``
+    must not exist: refused before writing, and the rename refuses it again on Windows (on POSIX
+    a rename replaces a file that appeared in between, the same platform limit as the probe's
+    folder publication).
+
+    Raises:
+        FileExistsError: ``path`` exists.
+    """
+    if os.path.lexists(path):
+        raise FileExistsError(f"{path} exists")
+    text = json.dumps(hp._plain(record), indent=1)
+    temporary = _temporary(path)
+    try:
+        with temporary.open("x", encoding="utf-8") as handle:
+            handle.write(text)
+        temporary.rename(path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            temporary.unlink()
+        raise
 
 
 def _stamp() -> str:
@@ -681,11 +728,18 @@ def n6_summary(folder: Path) -> dict[str, Any]:
     Args:
         folder: The bench folder holding ``n6-<setting>-*.json`` and ``export-bench-*.json``.
 
+    ``valid`` holds only for the protocol of record (:func:`n6_protocol_problems`): both
+    settings, the runs in ``started`` order strictly alternating from ``shipped``, complete pairs
+    only, at least :data:`N6_MIN_PAIRS` of them, and every run finished whole with the switch
+    where it belongs. An interrupted or resumed window therefore never reads as a row (Reviewer
+    B finding 1).
+
     Returns:
         ``runs`` (in time order), ``medians`` (min/min per setting), ``effect``
         (``median(candidate) / median(shipped) - 1``), ``pair_ratios`` (candidate / shipped of
-        each adjacent run pair in time order), ``valid`` with its ``problems``, and ``stop`` (the
-        effect over :data:`N6_STOP_FRACTION`).
+        each adjacent run pair in time order), ``valid`` with its ``problems``, and ``stop`` (a
+        VALID summary whose effect is over :data:`N6_STOP_FRACTION`; never set on an invalid
+        one, whose effect is not C4's measurement).
     """
     runs: list[dict[str, Any]] = []
     problems: list[str] = []
@@ -729,6 +783,7 @@ def n6_summary(folder: Path) -> dict[str, Any]:
             problems.append(f"{path.name}: the clip in effect does not match the setting")
         runs.append(run)
     runs.sort(key=lambda r: r["started"])
+    problems += n6_protocol_problems(runs)
     medians: dict[str, float | None] = {}
     for setting in N6_SETTINGS:
         values = [r["min_per_min"] for r in runs if r["setting"] == setting and r.get("ok")]
@@ -741,16 +796,47 @@ def n6_summary(folder: Path) -> dict[str, Any]:
         for a, b in zip(timed_runs[::2], timed_runs[1::2], strict=False)
         if a["setting"] == "shipped" and b["setting"] == "candidate"
     ]
+    valid = not problems
     return {
         "runs": runs,
         "medians": medians,
         "effect": effect,
         "pair_ratios": pair_ratios,
-        "valid": not problems,
+        "valid": valid,
         "problems": problems,
         "stop_fraction": N6_STOP_FRACTION,
-        "stop": effect is not None and effect > N6_STOP_FRACTION,
+        "stop": valid and effect is not None and effect > N6_STOP_FRACTION,
     }
+
+
+def n6_protocol_problems(runs: Sequence[Mapping[str, Any]]) -> list[str]:
+    """The ways a population of N6 runs departs from C4's protocol of record (none: it holds).
+
+    The protocol: both settings of :data:`N6_SETTINGS` present; the runs, in ``started`` order,
+    strictly alternate starting with ``shipped`` (S D S D ...); an even count, so every run is in
+    a complete shipped-then-candidate pair; and at least :data:`N6_MIN_PAIRS` pairs.
+
+    Args:
+        runs: The runs, sorted by ``started`` (each with its ``sidecar`` name and ``setting``).
+
+    Returns:
+        One problem line per departure.
+    """
+    present = {run["setting"] for run in runs}
+    problems = [f"no {setting} run" for setting in N6_SETTINGS if setting not in present]
+    for index, run in enumerate(runs):
+        expected = N6_SETTINGS[index % len(N6_SETTINGS)]
+        if run["setting"] != expected:
+            problems.append(
+                f"{run['sidecar']}: run {index + 1} in time order is {run['setting']}, {expected} "
+                "expected (the runs alternate, shipped first)"
+            )
+    if len(runs) % len(N6_SETTINGS):
+        problems.append(f"{len(runs)} runs: an odd count leaves an incomplete pair")
+    pairs = len(runs) // len(N6_SETTINGS)
+    if pairs < N6_MIN_PAIRS:
+        problems.append(f"{pairs} complete pairs, at least {N6_MIN_PAIRS} expected (CHARC C4)")
+    return problems
 
 
 def n6_text(summary: Mapping[str, Any]) -> str:
@@ -773,6 +859,8 @@ def n6_text(summary: Mapping[str, Any]) -> str:
         f"{', '.join(f'{r:.4f}' for r in summary['pair_ratios']) or 'none'}"
     )
     lines.append(f"VALID {summary['valid']}" + "".join(f"; {p}" for p in summary["problems"]))
+    if not summary["valid"]:
+        lines.append("INVALID: not the protocol of record; no N6 row (the effect is not C4's)")
     if summary["stop"]:
         lines.append(f"STOP: the N6 effect is over {100 * N6_STOP_FRACTION:.0f} % (CHARC C4)")
     return "\n".join(lines) + "\n"
@@ -1540,7 +1628,12 @@ def build_sheet(out: Path, work: Path) -> dict[str, Any]:
 
     The records are :func:`published_records` of ``out/items`` against the whole set
     (:func:`wholeset_items` of the CP5 pack: 70 photos and 50 videos); any other population
-    fails before the sheet folder is made.
+    fails before the sheet folder is made. The sheet is built in a fresh staging folder,
+    ``.sheet-<stamp>.staging-<stamp>``, and published as ``sheet-<stamp>`` by one rename with the
+    probe's own helpers (:func:`halo_probe._publish`; on any exception
+    :func:`halo_probe._abandon` removes an empty staging folder or keeps a partial one as
+    ``.sheet-<stamp>.failed-<stamp>``), so an interrupt never leaves a ``sheet-*`` folder
+    (Reviewer B finding 2).
 
     Args:
         out: The whole-set folder (``items/`` inside it; the sheet is written beside it).
@@ -1558,8 +1651,44 @@ def build_sheet(out: Path, work: Path) -> dict[str, Any]:
     chosen = select_contact(summaries)
     regressions = scan_regressions(summaries, chosen)
     stamp = _stamp()
-    sheet_dir = out / f"sheet-{stamp}"
-    sheet_dir.mkdir()
+    sheet = out / f"sheet-{stamp}"
+    staging = out / f".{sheet.name}.staging-{stamp}"
+    staging.mkdir()  # exclusive, as the probe's staging folder
+    try:
+        record = _write_sheet(staging, out, work, summaries, chosen, regressions)
+        hp._publish(staging, sheet, None)
+    except BaseException as exc:
+        note = hp._abandon(staging, out / f".{sheet.name}.failed-{stamp}")
+        if note:
+            exc.add_note(f"halo_part3: the sheet was not published{note}")
+        raise
+    return record
+
+
+def _write_sheet(
+    sheet_dir: Path,
+    out: Path,
+    work: Path,
+    summaries: Sequence[Mapping[str, Any]],
+    chosen: Sequence[str],
+    regressions: Sequence[str],
+) -> dict[str, Any]:
+    """Write the sheet's files into ``sheet_dir`` (:func:`build_sheet`'s staging folder).
+
+    Nothing written names ``sheet_dir`` itself (the page's previews are relative), so the
+    folder publishes by rename.
+
+    Args:
+        sheet_dir: The staging folder (exists, empty).
+        out: The whole-set folder (the items' renders are linked in place).
+        work: The working folder (C2's crops).
+        summaries: :func:`item_summary` of every item.
+        chosen: :func:`select_contact`'s items.
+        regressions: :func:`scan_regressions`' items.
+
+    Returns:
+        The summary record (also written as ``sheet.json``).
+    """
     by_name = {s["item"]: s for s in summaries}
     cards = []
     for rank, name in enumerate([*chosen, *regressions], start=1):
@@ -1690,9 +1819,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: The arguments; ``sys.argv[1:]`` when None.
 
     Returns:
-        The exit status: 0 done; 1 a failure (an item, or the bench); 2 a refusal; 3 the bench's
-        failed memory check (``n6``); 4 a STOP (``v3``: no reproduction; ``n6-summary``: the
-        effect over 10 % or an invalid run).
+        The exit status: 0 done; 1 a failure (an item, or the bench); 2 a refusal (among them
+        ``v3 --switch full_res_bounds``); 3 the bench's failed memory check (``n6``); 4 a STOP
+        (``v3``: no reproduction; ``n6-summary``: a VALID summary's effect over 10 %);
+        :data:`N6_INVALID_EXIT` (5) ``n6-summary`` on runs that are not the protocol of record.
     """
     args = _parser().parse_args(argv)
     try:
@@ -1704,6 +1834,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             if out.exists():
                 raise hp.ProbeError(f"{out} exists; each V3 run writes a new folder")
             switches = hp.parse_switches(args.switch or [CANDIDATE])
+            if switches.full_res_bounds:
+                raise hp.ProbeError(
+                    "v3 does not take --switch full_res_bounds: nothing in the V3 legs overrides "
+                    "the bounds, so it would be recorded without taking effect (Part 3's V3 "
+                    f"candidate is (d), {CANDIDATE})"
+                )
             modules = suite()
             methods = tuple(args.method or modules.wp42.METHODS)
             out.mkdir(parents=True)
@@ -1724,7 +1860,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(text, end="")
             folder = checked_output(work / args.subdir)
             _write_json(folder / f"n6-summary-{_stamp()}.json", result)
-            return 4 if result["stop"] or not result["valid"] else 0
+            if not result["valid"]:
+                return N6_INVALID_EXIT
+            return 4 if result["stop"] else 0
         items = wholeset_items(pack)
         if args.command == "wholeset-list":
             for item in items:
