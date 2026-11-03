@@ -20,12 +20,15 @@ evidence folder is `C:\Users\rwsmy\clearwater-review-evidence\wp5.7\` (`evidence
 | `P2` | `work/wp5.7/part2/` (the candidate runs; `table-photos.txt`; `logs/runs.txt`, `runs-video.txt`) | `evidence/records/part2/`: the records `<setting>/<item>/<item>.json`, `table-photos.txt`, `logs/`, the two IMG_6739 photo crops of section 5 |
 | `P3` | `work/wp5.7/part3/` (the Part 3 window) | `evidence/records/part3/`: `crops/` whole, `logs/`, `n6/` (the bench records, the sidecars, the summary), `wholeset/items/<item>/<item>.json` (the 120 records), the sheet folder; also `evidence/part3/` (runs.txt, the N6, V3, photo and sheet logs, both run scripts) and `evidence/v3/` (v3.json, v3-table.md, the clips, fixtures and legs) |
 | scratch | the worktree's `work/c57-p2h2/`, `work/c57-p3r/` (the tabulators and their outputs) | `evidence/cell-scratch/c57-p2h2/`, `evidence/cell-scratch/c57-p3r/` |
+| `P3R` | `work/wp5.7/part3r/` (the round-5 re-render: the three corrected videos, the 117 other published items copied byte-identical from `P3`, the rebuilt sheet; the whole set of record) | `evidence/records/part3r/`: the three re-rendered items' records, the sheet folder, every log (`runs.txt`, `copy-diff.txt`, `affected-before.txt` / `affected-after.txt`, the render and sheet logs), the seat's `part3r_finish.sh`; the 117 copied records are the ones under `evidence/records/part3/` |
 | `CP5` | `work/wp5.3/` (the CP5 pack, read-only) | the pack itself |
 
-The durable copies under `evidence/records/` are byte-identical to the working copies (862 files,
-checked by Reviewer A round 5). Deliberately NOT copied, as viewing outputs only: the two kept N6
+The durable copies under `evidence/records/part1s|part2|part3/` are byte-identical to the working
+copies (862 files, checked by Reviewer A round 5); `evidence/records/part3r/` was copied by the
+orchestrator after the re-render. Deliberately NOT copied, as viewing outputs only: the two kept N6
 exports (`P3/n6/run-*`, 282 MB) and the whole-set 8-bit renders (`P3/wholeset/items/*/*.png`,
-4.5 GB); no figure in this report is read from them. The analysis caches are not copied either.
+4.5 GB, and their `P3R` copies); no figure in this report is read from them. The analysis caches
+are not copied either.
 
 ## 1. Summary
 
@@ -44,8 +47,7 @@ exports (`P3/n6/run-*`, 282 MB) and the whole-set 8-bit renders (`P3/wholeset/it
   bounds shrinks the photo bands slightly and grows the video bands slightly. Candidate (d) clips input 2 to the local range of its unsharpened form (1 sigma). It
   shows the band absent on 2 of 3 photo lines and 21 of 31 video frame-lines.
 - **(d) on the 120 other CP5 items (Part 3):** the edge-scan qualifying sides fall from 963 to 39
-  (video; three items' stills pending the round-5 re-render, section 5) and from 248 to 13
-  (photo). No item's scan rises. Texture changes set-wide: the
+  (video) and from 248 to 13 (photo). No item's scan rises. Texture changes set-wide: the
   whole-frame std L* falls on 219 of 220 images, by up to 81 % on a group of P-A photos.
   OBSERVATION (CHARC's viewing of the contact sheet; the cell has no eye on it): CHARC, viewing
   the sheet, reports that (d) visibly softens fine texture wherever the local range is narrow,
@@ -206,18 +208,25 @@ photos (P-A 61, P-Z 9) and 50 videos (V-D 8, V-P 16, V-S 25, V-Z 1). Each video 
 pack's excerpt where the pack excerpted it. Per photo, two full renders (shipped defaults
 unswitched; (d) switched), each from its own proxy statistics. Per video, two whole-clip analyses
 and the frames at the pack's three still positions (10 / 50 / 90 %), rendered from each analysis's
-smoothed records (150 frames; 51,445 frames analysed per setting). Records:
-`P3/wholeset/items/<item>/<item>.json` with both 8-bit renders per frame; the sheet is
-`P3/wholeset/sheet-20261103T202754214375Z/` (`summary.tsv` one row per item, `sheet.json`,
+smoothed records (150 frames; 51,445 frames analysed per setting). Records of the whole set:
+`P3R/wholeset/items/<item>/<item>.json` with both 8-bit renders per frame (durable
+`evidence/records/part3r/` and, for the 117 copied items, `evidence/records/part3/`); the sheet is
+`P3R/wholeset/sheet-20261103T213732053153Z/` (`summary.tsv` one row per item, `sheet.json`,
 `contact-sheet.html`).
 
-**Pending re-statement (Reviewer A round 5 finding 1).** On GX011590, GX011603 and GX011609 all
-three stills were taken one frame late: CP5 records a still's ABSOLUTE source time, these clips'
-first pts is not 0 (510 and 570 ticks of 1/30000 s), and the instrument matched the still time
-on the time from the first frame. The three items are re-rendered at the corrected frames under
-`work/wp5.7/part3r/`, and the video figures, counts and contact sheet of this section are
-re-stated from that run (ledger, Reviewer A round 5). The other 47 videos and the 70 photos are
-unaffected (their selected frames are the stills' frames).
+**Re-stated at Reviewer A round 5 (finding 1).** In the Part 3 window (`P3`) all three stills of
+GX011590, GX011603 and GX011609 were taken one frame late: CP5 records a still's ABSOLUTE source
+time, these clips' first pts is not 0 (510 and 570 ticks of 1/30000 s), and the instrument matched
+the still time on the time from the first frame. The instrument was fixed (it matches absolute
+time and refuses a still with no frame), the three items were re-rendered at the corrected frames
+and the sheet rebuilt over all 120 (`P3R`; the other 117 items' records copied byte-identical from
+`P3`, whose frames were already the stills' frames). Every figure of this section is from `P3R`.
+What moved, old -> new (the ledger's step 5R "Round 5 results" has every figure): the video (d)
+scan sides 39 / 8,196 / 6,165 -> 39 / 8,188 / 6,173; the shipped band sides under (d) 37 / 567 /
+359 -> 37 / 569 / 357; the sides with a larger band under (d) 380 -> 377 video; the largest
+whole-frame mean L* shift +0.08 -> +0.07; contact-sheet item 4 (GX011590). The shipped video scan
+totals, the qualifying-item counts, the largest bands, every photo figure, the contact list and
+CHARC's two items are unchanged.
 
 **The edge-band scan** (the brief's "maximum edge-band overshoot found by scanning strong edges";
 the cell's design, `tools/halo_part3.py`):
@@ -236,26 +245,27 @@ the cell's design, `tools/halo_part3.py`):
 | Largest channel-mean shift: median / max | 0.0037 / 0.0189 | 0.0028 / 0.0109 |
 | Clipped fraction shipped -> (d): max | 0.0041 -> 0.0000 | 0.0047 -> 0.0000 |
 | Scan sides b / n / u, shipped | 248 / 1,709 / 4,763 (of 6,720) | 963 / 3,894 / 9,543 (of 14,400) |
-| Scan sides b / n / u, (d) | 13 / 3,403 / 3,304 | 39 / 8,196 / 6,165 |
+| Scan sides b / n / u, (d) | 13 / 3,403 / 3,304 | 39 / 8,188 / 6,173 |
 | Items with a qualifying side, shipped -> (d) | 50 -> 11 | 49 -> 18 |
 | Largest qualifying band x C, shipped -> (d) | 13.79 -> 2.57 | 15.20 -> 2.05 |
-| Shipped `band` sides under (d): band / none / undecided | 12 / 105 / 131 | 37 / 567 / 359 |
+| Shipped `band` sides under (d): band / none / undecided | 12 / 105 / 131 | 37 / 569 / 357 |
 | Whole-frame std L*, (d) / shipped: min / median / max | 0.189 / 0.895 / 0.980 | 0.522 / 0.895 / 1.006 |
-| Whole-frame mean L* shift: min / median / max | -2.09 / -0.34 / +0.06 | -1.12 / -0.17 / +0.08 |
+| Whole-frame mean L* shift: min / median / max | -2.09 / -0.34 / +0.06 | -1.12 / -0.17 / +0.07 |
 | Input-2 smoothed saliency mean moved (Lab): min / median / max | - | 0.070 / 0.167 / 0.684 |
 
-Per-item figures: `summary.tsv`, and the ledger's Part 3 results. Readings (measurement, not a
+Per-item figures: `P3R`'s `summary.tsv`, and the ledger's Part 3 results with step 5R's round-5
+results. Readings (measurement, not a
 look judgement):
 
-- **The scanned band falls set-wide.** Of the shipped qualifying sides, 567 / 963 (video) and
-  105 / 248 (photo) go to `none`. 359 and 131 go to `undecided`, which is not removal. 37 and 12
+- **The scanned band falls set-wide.** Of the shipped qualifying sides, 569 / 963 (video) and
+  105 / 248 (photo) go to `none`. 357 and 131 go to `undecided`, which is not removal. 37 and 12
   stay `band`.
 - **Which items' scans rise under (d): none.** By the sheet's rule (more qualifying sides, or a
   larger largest qualifying band) no item rises, and no frame either (`scan_regressions: []`).
 - **At the side level, three sides qualify only under (d).** Two are smaller bands that now clear
   their noise level: GX011610 f90, 1.68 -> 0.21 x C, and IMG_6716 f50, 3.56 -> 1.26. On the third
   the band rises: IMG_6800, a photo, side 5 at (5343, 4032), 0.11 -> 0.56 x C.
-- **Bands larger under (d) at the side level:** 154 photo sides and 380 video sides, of 21,120.
+- **Bands larger under (d) at the side level:** 154 photo sides and 377 video sides, of 21,120.
   On 180 of these the (d) band is at least 0.10 x C on a non-weak edge: 115 go none -> undecided,
   64 stay undecided, and 1 is IMG_6800 above.
 - **Texture changes set-wide, most on a group of P-A photos.** The whole-frame std L* falls on
@@ -272,7 +282,7 @@ look judgement):
   01 (IMG_6762; whole-image mean abs 0.0191, p99 0.1254) and the grain on item 06 (IMG_6751;
   0.0856 / 0.1526). No preference judgement.
 - **The measurement columns for CHARC's two items.** The cell's part is the columns below, from
-  the item records (`P3/wholeset/items/<item>/<item>.json`) and the sheet's
+  the item records (`P3R/wholeset/items/<item>/<item>.json`) and the sheet's
   `summary.tsv`. CHARC's set-wide counts were checked against the records and agree: qualifying
   scan sides 963 -> 39 over the 50 videos and 248 -> 13 over the 70 photos, and a clipped fraction
   of 0 under (d) on every image. No preference judgement is made here.
@@ -300,7 +310,7 @@ regression item was added.
 | 1 | IMG_6762 | V-P | f90 | 0.0191 | 0.1254 | 0.0086 | 0.684 | 60/82/146 -> 1/204/83 |
 | 2 | GX011601 | V-D | f10 | 0.0135 | 0.0956 | 0.0024 | 0.409 | 3/163/122 -> 0/225/63 |
 | 3 | GX011600 | V-D | f10 | 0.0127 | 0.1016 | 0.0025 | 0.329 | 2/109/177 -> 0/173/115 |
-| 4 | GX011590 | V-D | f90 | 0.0187 | 0.1110 | 0.0028 | 0.302 | 3/114/171 -> 0/177/111 |
+| 4 | GX011590 | V-D | f90 | 0.0186 | 0.1101 | 0.0028 | 0.302 | 1/108/179 -> 0/175/113 |
 | 5 | GX011625 | V-S | f10 | 0.0172 | 0.1268 | 0.0045 | 0.267 | 15/55/218 -> 0/128/160 |
 | 6 | IMG_6751 | P-A | photo | 0.0856 | 0.1526 | 0.0092 | - | 0/0/96 -> 0/0/96 |
 | 7 | IMG_6758 | P-A | photo | 0.0700 | 0.1842 | 0.0166 | - | 0/0/96 -> 0/1/95 |
@@ -463,14 +473,17 @@ summary).
 - **Durable** (`C:\Users\rwsmy\clearwater-review-evidence\wp5.7\`, the evidence aliases above):
   - the dispatches (`cell/`) and the Reviewer A transcripts (`A/r0` ... `A/r5`);
   - `records/part1s/`, `records/part2/`, `records/part3/`: every record, table, log, crop and the
-    sheet folder this report cites; 862 files, byte-identical to the working copies (Reviewer A
-    round 5);
+    window's sheet folder this report cites; 862 files, byte-identical to the working copies
+    (Reviewer A round 5); `records/part3r/`: the round-5 re-render (the three items' records, the
+    sheet of record, every log);
   - `cell-scratch/c57-p2h2/`, `cell-scratch/c57-p3r/`: the scratch tabulators and their outputs;
+    round 5's are in the worktree's `work/c57-r5/` (its durable copy, `cell-scratch/c57-r5/`, is
+    the orchestrator's to make);
   - `part3/`: `runs.txt`, `n6-*.log`, `n6-summary.log`, `v3.log`, `wholeset-photos.log`,
     `wholeset-sheet.log`, `run-part3.sh` and `.orig`; and `v3/`.
 - **Not copied, deliberately** (viewing outputs; no figure here is read from them): the two kept
   N6 exports `P3/n6/run-*` (282 MB), the whole-set 8-bit renders `P3/wholeset/items/*/*.png`
-  (4.5 GB) and the analysis caches.
+  (4.5 GB, and their `P3R` copies) and the analysis caches.
 - **Review:** Reviewer A (Codex) rounds 0-5 are in the ledger's cumulative round table. Round 3
   converged the instrument; round 4 corrected the conclusions (V3 relabelled, three-way counts);
   round 5 found the three one-frame-late video items, the sheet's staging-folder count, the

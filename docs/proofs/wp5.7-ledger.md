@@ -1800,6 +1800,10 @@ folder also holds the stage crops, `*-output-marked.png` and the overviews.
 
 #### The whole set (120 items; `part3/wholeset/items/<item>/<item>.json`; sheet `part3/wholeset/sheet-20261103T202754214375Z/`)
 
+(Round 5: the three videos GX011590, GX011603 and GX011609 were measured here one frame late; their
+re-rendered figures and the whole-set video figures that move are in step 5R's "Round 5 results"
+(`part3r`), which supersede this window record where they differ.)
+
 Per item (the full 120-row table is `summary.tsv` in the sheet folder and `work/c57-p3r/table.txt`
 in the worktree): whole-image change ((d) against shipped, the largest over the item's frames: the
 mean absolute and 99th-percentile per-value difference, the largest per-channel mean shift, the
@@ -2062,3 +2066,93 @@ Round 5 is the round the five-round gate names: approval to continue is the disp
 the orchestrator's re-run.
 
 Depth at round-5 yield: 270,973 (wp57-cell8 at its mid-build yield, 100 turns, 2026-11-03 ~21:15Z; read by orchestrator gen 39 with scripts/cell_depth.py). Past the ~250K evaluation point; the cell continues for step 6 only (a bounded ledger / report update from the part3r records). FIVE_ROUND_GATE (dispatcher): CONTINUE to round 6 -- round 5 brought new in-envelope MAJORs and its fixes change instrument figures (the re-rendered stills).
+
+#### Round 5 results (the re-render as run; dispatch-11 step 6)
+
+The re-render ran at the orchestrator's seat (orchestrator gen 39, 2026-11-03), recorded here as
+the orchestrator reported it. Outputs `work/wp5.7/part3r/` (NEW; `part3/` untouched, kept for the
+diff); durable copy `clearwater-review-evidence/wp5.7/records/part3r/` (the three items' records,
+the sheet folder, every log, `runs.txt`, `affected-before.txt` / `affected-after.txt`, the seat's
+`part3r_finish.sh` and the CURRENT `run-part3r.sh`).
+
+| Piece | Window (Z) | As run | Outcome |
+|---|---|---|---|
+| copy | 21:16:52-21:17:25 | under the ORIGINAL `run-part3r.sh` (the version of `d515351d`'s yield, the affected names hard-coded: GX011590 GX011603 GX011609); the version with the set derived from the records (written 21:18:24Z, after the yield of `8ab3b7ee`) did not run this piece, so `part3r/` holds no `affected-items.txt` | exit 0: 117 unaffected published items copied; `diff -rq` exactly the three `Only in .../part3/wholeset/items: <item>` lines, 0 unexpected (copy + diff 23 s). Afterwards the orchestrator ran `affected.py` read-only on `part3/wholeset/items` (`part3r/logs/affected-before.txt`): items 3, stills 9 (GX011603, GX011609, GX011590, each 1,001 ticks), OLD SELECTOR REPRODUCES 150, PROBLEMS 0: the set derived from the records is the hard-coded one |
+| videos | 21:17:25-21:36:55 | started under the ORIGINAL script; the cell's rewrite landed while it ran, so the orchestrator killed only the bash wrappers (GX011590's render left running) and finished by hand with the original command (`uv --directory <worktree> run python tools/halo_part3.py wholeset-run <item> --out part3r/wholeset --cache-dir part3r/cache`; seat script `part3r_finish.sh`, durable) | GX011590 `ITEM GX011590 done wall=400.0s` (exit not captured: the process was orphaned from its wrapper; its ITEM line and the verify are the evidence); GX011603 exit 0, 377 s; GX011609 exit 0, 372 s. No staging or failed folder left; 120 item folders |
+| verify | after the videos | the rewritten script's read-only piece | exit 0: OLD SELECTOR REPRODUCES 141, VIDEOS 50, STILLS 150, AFFECTED items 0 / stills 0, PROBLEMS 0 (every new record's `source_pts_s` equals CP5's still time) |
+| sheet | 21:37:31-21:37:54 | `wholeset-sheet --out part3r/wholeset` (the fixed `published_records`: exactly the listed 120) | exit 0, "SHEET 120 items; contact: IMG_6762, GX011601, GX011600, GX011590, GX011625, IMG_6751, IMG_6758, IMG_6753, IMG_6755, IMG_6754, IMG_6757, IMG_6746, IMG_6759, IMG_6756, IMG_6752, IMG_6768, IMG_6770, IMG_6767, IMG_6769, IMG_6761" (the same 20, the same order); `part3r/wholeset/sheet-20261103T213732053153Z/` |
+
+Free C: 51 GB at the copy, 47 GB from the first video to the sheet.
+
+Lesson recorded (the cell's): the cell rewrote a seat script after yielding it, while the
+dispatcher could be running it; a yielded command is frozen until the dispatcher's next word.
+
+**What moved, from the records** (scratch `work/c57-r5/p3/`: the Part 3 tabulators of
+`work/c57-p3r/` re-pointed by argument, run on `part3` and on `part3r` and diffed; on `part3` they
+reproduce the window's `table.txt` byte for byte and `siderise.txt` up to line endings; outputs
+`table-old.txt` / `table-new.txt`, `siderise-*`, `newband-*`, `stdl-*`, `frames3.txt`,
+`sheetcmp.py`). The sheets' per-item summaries differ on exactly the three items; the other 117
+summaries, the C2 crops, the contact list and `scan_regressions` (empty) are identical.
+
+The nine stills (pts in 1/30000 s ticks; whole-image change (d) against shipped; scan b / n / u
+and the largest qualifying band x C, shipped -> (d); whole-frame std L* shipped -> (d)):
+
+| Item still | pts old -> new | Mean abs | p99 | Scan shipped | Scan (d) | std L* |
+|---|---|---|---|---|---|---|
+| GX011590 f10 | 92602 -> 91601 | .0158 -> .0156 | .0995 -> .0992 | 0/37/59 -> 0/44/52 | 0/58/38 -> 0/62/34 | 16.83->14.65 -> 16.71->14.56 |
+| GX011590 f50 | 454964 -> 453963 | .0166 -> .0162 | .1110 -> .1101 | 3/29/64 q3.895 -> 1/20/75 q0.739 | 0/51/45 -> 0/47/49 | 13.60->11.72 -> 13.58->11.83 |
+| GX011590 f90 | 817326 -> 816325 | .0187 -> .0186 | .1053 -> .1058 | 0/48/48 -> 0/44/52 | 0/68/28 -> 0/66/30 | 18.26->16.06 -> 18.18->16.02 |
+| GX011603 f10 | 93663 -> 92662 | .0129 -> .0130 | .1159 -> .1167 | 1/38/57 q1.055 -> 2/40/54 q3.357 | 0/66/30 -> 0/60/36 | 10.98->9.76 -> 10.96->9.72 |
+| GX011603 f50 | 461030 -> 460029 | .0119 -> .0119 | .1118 -> .1116 | 3/22/71 q1.862 -> 5/31/60 q2.420 | 0/49/47 -> 0/57/39 | 8.97->7.95 -> 8.95->7.94 |
+| GX011603 f90 | 828397 -> 827396 | .0184 -> .0183 | .1188 -> .1193 | 0/36/60 -> 1/31/64 q4.325 | 0/62/34 -> 0/53/43 | 9.17->7.44 -> 9.14->7.41 |
+| GX011609 f10 | 93663 -> 92662 | .0130 -> .0130 | .1261 -> .1257 | 2/23/71 q2.432 -> 3/25/68 q4.377 | 0/45/51 -> 1/46/49 q1.124 | 6.08->4.88 -> 6.10->4.91 |
+| GX011609 f50 | 463032 -> 462031 | .0156 -> .0155 | .1370 -> .1368 | 2/35/59 q5.439 -> 0/34/62 | 0/59/37 -> 0/62/34 | 7.00->5.04 -> 7.03->5.08 |
+| GX011609 f90 | 832401 -> 831400 | .0133 -> .0133 | .1227 -> .1217 | 5/26/65 q4.437 -> 4/25/67 q6.463 | 1/50/45 q0.413 -> 0/47/49 | 7.68->6.87 -> 7.66->6.86 |
+
+Per item (the sheet's figures: the largest over the item's three frames, the scan summed): GX011590
+mean abs .0187 -> .0186, p99 .1110 -> .1101, scan 3/114/171 (largest 3.895) -> 1/108/179 (0.739)
+shipped and 0/177/111 -> 0/175/113 (d); GX011603 .0184 -> .0183, .1188 -> .1193, 4/96/188 (1.862)
+-> 8/102/178 (4.325) and 0/177/111 -> 0/170/118; GX011609 .0156 -> .0155, .1370 -> .1368,
+9/84/195 (5.439) -> 7/84/197 (6.463) and 1/154/133 (0.413) -> 1/155/132 (1.124). The largest
+channel-mean shift and the input-2 saliency movement are unchanged on all three (the analyses are
+the same clip's; only the rendered frames moved); the worst-change frame is unchanged (f90, f90,
+f50). Walls: 368.3 / 376.9 / 371.6 s -> 400.0 / 375.8 / 370.5 s (shipped analyses 279.9 / 286.5 /
+281.9 -> 306.6 / 283.6 / 281.1 s).
+
+The whole set (only the video column moves; the photo column is unchanged):
+
+| Figure (videos, 50; 150 frames) | Window (`part3`) | Re-render (`part3r`) |
+|---|---|---|
+| Scan sides b / n / u, shipped | 963 / 3,894 / 9,543 | 963 / 3,894 / 9,543 (unchanged: the three items' shipped totals sum to 16 / 294 / 554 both times) |
+| Scan sides b / n / u, (d) | 39 / 8,196 / 6,165 | 39 / 8,188 / 6,173 |
+| Items with a qualifying side, shipped -> (d) | 49 -> 18 | 49 -> 18 |
+| Largest qualifying band x C, shipped -> (d) | 15.20 -> 2.05 | 15.20 -> 2.05 |
+| Shipped `band` sides under (d): band / none / undecided | 37 / 567 / 359 | 37 / 569 / 357 |
+| Shipped `undecided` sides under (d): band / none / undecided | 2 / 3,813 / 5,728 | 2 / 3,803 / 5,738 |
+| Shipped `none` sides under (d): none / undecided | 3,816 / 78 | 3,816 / 78 |
+| Sides with a larger band under (d) | 380 of 14,400 | 377 of 14,400 |
+| ... of them 0.10 x C or more on a non-weak edge (photo + video) | 180: 115 none -> undecided, 64 stay undecided, 1 undecided -> band | the same 180 split (123 video), the video sides' identities changed on the three items |
+| Whole-frame std L* (d) / shipped: min / median / max | 0.5218 / 0.8954 / 1.0055 | 0.5218 / 0.8955 / 1.0055 (0.895 at the printed places) |
+| Whole-frame mean L* shift (d) - shipped: min / median / max | -1.1247 / -0.1687 / +0.0751 | -1.1247 / -0.1687 / +0.0716 (+0.08 -> +0.07 printed) |
+| Mean abs change: min / median / max | 0.0086 / 0.0172 / 0.0293 | unchanged |
+| p99, largest channel-mean shift, clipped fractions, input-2 saliency movement | (as recorded) | unchanged |
+| Group V-D mean abs: max (median) | 0.0187 (0.0131) | 0.0186 (0.0131) |
+| Shipped analysis walls, all 50 | 12,146 s | 12,170 s |
+
+Unchanged as well: no item and no frame whose scan rises (`scan_regressions: []`); the three sides
+that qualify only under (d) (GX011610 f90 side 83, IMG_6716 f50 side 24, IMG_6800 side 5); the one
+video frame whose std L* does not fall (IMG_6742 f10); every photo figure; CHARC's two items
+(IMG_6762 and IMG_6751: their sheet summaries are identical).
+
+The contact sheet: the same 20 in the same order; item 4, GX011590 (f90), now shows the corrected
+frame: mean abs 0.0187 -> 0.0186, p99 0.1110 -> 0.1101, max shift 0.0028 (unchanged), saliency
+0.302 (unchanged), scan 3/114/171 -> 0/177/111 becomes 1/108/179 -> 0/175/113. The 21st by mean
+absolute change stays IMG_6766 (0.0395); the sixth to eighth videos by saliency movement stay
+GX011621 0.241, GX011592 0.239, GX011616 0.227. No reading of the Part 3 results changes: the
+scanned band falls set-wide under (d) (963 -> 39 and 248 -> 13), no item's scan rises, and the
+texture readings stand.
+
+The Part 3 results section above is the window's record (`part3`), kept as run; where its video
+figures differ, these round-5 figures (`part3r`) supersede them, and the report cites `part3r`.
+
+Depth at round-5 final yield: DISPATCHER TO FILL
