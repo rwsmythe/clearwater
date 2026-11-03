@@ -950,4 +950,4 @@ about 6-7 min a setting (the baseline's second whole-clip analysis and one basel
 frame on top of `part1s`' 281 s): about 75-85 min for the twelve, plus about 5-10 min for the
 `e3-full` full-resolution pass (a second whole-clip decode of each item).
 
-Depth at mid-build yield 2b: DISPATCHER TO FILL
+Depth at mid-build yield 2b: 286396 (scripts/cell_depth.py, wp57-cell4, read by the orchestrator at the yield 2026-11-03)
