@@ -1510,7 +1510,7 @@ defaults, D106 min/min).**
 6. The contact sheet (CPU), a few minutes.
 Total about 2-2.2 h; plan for 2.5 h.
 
-Depth at the step-3R addendum: DISPATCHER TO FILL
+Depth at the step-3R addendum: 379,559 (scripts/cell_depth.py, wp57-cell5, read by the orchestrator 2026-11-03; the cell is stood down)
 
 ## Part 3 (build to the window)
 
@@ -1661,6 +1661,25 @@ Disk (estimates): the analysis cache about 2-3 GB (CP5's pack cache was 2.5 GB);
 about 6 GB (140 photo renders about 13 MB each; about 200 4K stills about 15 MB; phone stills about
 3 MB); N6 transient per run plus the kept pair about 1 GB; crops about 0.6 GB; V3 about 0.1 GB:
 about 10 GB in all; 56 GB free now, so about 46 GB at the end against the 25 GB STOP.
+
+### The step-3R addendum: what this build adopted (orchestrator's correction to dispatch-9)
+
+- C3 (`--v3-region` on GX011627's last second): NOT built, superseded by CHARC's Q2 (V3 on
+  WP4.2's two synthetic clips); GX011627's last second stays a Limits note. Its pointers to the
+  acceptance statistic (`_figures`, `_v3_holds`, `provisional_record`) are what `v3` reuses, by
+  calling WP4.2's own `_v3`.
+- C4: ADOPTED (export_bench in-process, the switch reaching `fusion_inputs` with no `src/` edit,
+  six alternating cold runs, the median ratio with the pair ratios beside, the decidability
+  caveat). Amended: the runner is a committed `n6` subcommand, not an uncommitted seat script, so it
+  carries tests; the call counter runs in BOTH settings (equal overhead) and records whether the
+  clip was in effect instead of asserting a count.
+- Part 3: ADOPTED (the 120 items, the excerpts read in place, the three stills, the edge-band scan,
+  the contact sheet with the regression rule, the six crop runs). Amended: the scan's points are the
+  top 0.5 % gradient pixels one per cell (not grid local maxima with |C| >= 0.05), measured with the
+  probe's own `water_band` (its weak-edge, noise and support rules) so a side is band / none /
+  undecided as Part 1's lines are; the 20 reserve 5 places for the videos whose statistics move
+  most (C3 (3), dispatch-9), then the largest change; a video's sheet frame is its largest change,
+  not always the 50 % still; crops go to `part3/crops/`.
 
 ### Open questions for the dispatcher (the cell's recommended answer first)
 
