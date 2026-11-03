@@ -20,23 +20,50 @@ calls them (the method's private ``_records``, ``_compensate`` and ``_white_bala
 run checks that its ``output`` equals ``render``'s result (``render_check`` in the record): a
 probe that drifted from the product would say so.
 
-Edge-band statistics (:func:`band_statistics`). The caller marks a line across an edge (two
-points in source pixels, the edge near its middle). Along the line each stage's BT.709 luma (and
-each channel) is sampled at 1-pixel steps, averaged over ``2 * half_width + 1`` parallel lines.
-A straight line is fitted to each outer quarter of the profile (the plateaus, so a background
-gradient is not read as a band); the edge is where the profile crosses the mid level of the two
-fits nearest the middle. The edge contrast ``C`` is the gap between the fits at the edge. The
-**band** is the larger of the overshoot (the bright side above its fit) and the undershoot (the
-dark side below its fit), between the edge and the outer quarter; ``band_ratio = band / C``. Its
-width is the full width at half maximum of the deviation around its peak (``fwhm_px``) and the
-run above ``threshold * C`` (``extent_px``). The deviations inward of the fits (the edge's own
-ramp) are not a band and are not counted.
+Profiles. The caller marks a line across an edge (two points in source pixels, the edge near
+its middle), starting in open water and ending inside the object. Along the line each stage's
+BT.709 luma (and each channel) is sampled ``round(length) + 1`` times, ``length /
+round(length)`` pixels apart (:func:`sample_spacing`), each sample the mean of ``2 * half_width
++ 1`` parallel lines; the whole strip (and its bilinear support) must lie inside the sampled
+array, never clamped to it. A straight line is fitted to each outer quarter of the source's
+profile (the plateaus, so a background gradient is not read as a band); the edge is where the
+profile crosses the mid level of the two fits nearest the middle. Every stage is measured on the
+source's layout (one edge, one zone).
 
-Attribution. The fused image is the sum over inputs ``k`` and pyramid levels ``l`` of
-``collapse(G_l{Wbar_k} * L_l{I_k})`` (before the final clip). The probe samples each term on the
-line and reports its deviation from its own outer-quarter fit at the band's peak: the terms add
-up to the fused band (least squares is linear), so the record says which input and which
-pyramid level carry it.
+The band (:func:`water_band`, the table's metric) is what a stage ADDS beyond the source's
+water-side profile, over ONE common contrast. On the water side (from the end of the start
+plateau to the edge) the stage's OUTWARD overshoot is its rise past its own water-plateau line
+away from the object (above the line beside a darker object, below it beside a brighter one),
+zero where it does not pass the line; the source's overshoot is measured the same way. The
+excess at each sample is the stage's overshoot minus the source's, divided by the SOURCE's
+signed water contrast ``C`` (the start plateau's line at the edge minus the median of the end
+segment); the band is the largest excess (0 when none is positive). A monotonic remap (gamma,
+white balance, a change of either plateau's level) moves no sample past its own water plateau,
+so it reports no band; an inward spread of the object's level into the water is not a band
+either. A band QUALIFIES only when the edge is not weak (``|C| >= MIN_CONTRAST``) and at least
+``MIN_SUPPORT_SAMPLES`` consecutive samples around its peak each exceed both the threshold and
+``NOISE_FACTOR`` times the water-side uncertainty there (:func:`water_uncertainty` of the stage
+and of the source in quadrature, over ``|C|``: the plateau fit's residual noise plus the error
+of its line extrapolated to that sample, with an AR(1) effective sample count). Each
+stage's verdict is ``band`` (qualifies), ``undecided`` (a weak edge, or over the threshold
+without qualifying) or ``none``; :func:`first_stage` names the first product stage whose band
+qualifies, ``undecided`` when none does but one is undecided, None otherwise. Widths are the
+interpolated crossings of half the peak (``fwhm_px``) and of the threshold (``extent_px``), in
+pixels at the line's sample spacing. :func:`band_statistics` is a two-sided diagnostic (each
+side against its own plateau line, over the stage's own contrast), not the table's metric.
+
+Attribution (:func:`attribute_band`). The product's fused image is ``clip(prefused)`` with
+``prefused`` the sum over inputs ``k`` and pyramid levels ``l`` of ``collapse(G_l{Wbar_k} *
+L_l{I_k})``. Because ``sum_k Wbar_k = 1``, the source decomposes the same way:
+``S = sum_k,l collapse(G_l{Wbar_k} * L_l{S})``. At the fused band's peak the added band is
+``sign(C) * dev(fused) - overshoot(source)`` over ``|C|`` (``dev`` = the deviation from the
+profile's own water-plateau line, linear in the profile). The probe splits it exactly into
+per-input, per-level terms ``sign(C) * (dev(term_kl) - [s] dev(srcterm_kl)) / |C|`` (``[s]`` = 1
+when the source is outward at the peak, so its overshoot is the one subtracted; 0 otherwise)
+plus the clip's share ``sign(C) * (dev(fused) - dev(prefused)) / |C|``; the record carries the
+terms, their sums per input and per level, the clip's share and the residual against the
+detected band. The terms are computed pre-clip and the clip's share is reported, never folded
+into a term.
 
 Command line (from the repository root)::
 
@@ -51,7 +78,15 @@ names a file elsewhere (a pack excerpt, a synthetic test image). Times are secon
 clip's first frame. Outputs go to ``--out`` (default ``<working folder>/wp5.7/part1/<name>``):
 16-bit PNG crops of the region per stage (``<frame>-<stage>.png``), an 8-bit overview of the
 source and the output with the region and lines marked, and one JSON record (``<name>.json``).
-Nothing is written inside the footage folder (the runner's write check refuses it).
+Writes are confined: ``--name`` must be a plain file stem (no separator, drive, ``:`` or
+``..``); the output and cache folders must resolve inside ``<working folder>/wp5.7`` and pass
+the runner's footage write check; a run that breaks either is refused before anything is
+written.
+
+A run FAILS (exit 1, no record) when the staged render's output differs from the product's
+``render`` by any amount, when ``clip(prefused)`` differs from the staged ``fused``, or when the
+video decode did not deliver every selected frame. The video analysis is given the clip's
+expected frame count (:func:`clearwater.jobs.export.expected_frames`), as the export gives it.
 
 Exit status: 0 on success, 2 on a usage refusal, 1 on a failure.
 """
@@ -92,6 +127,7 @@ from clearwater.interfaces import Image, Settings
 from clearwater.io.photo import read_photo
 from clearwater.io.photo.png import write_png
 from clearwater.io.video import FFmpegVideoSource
+from clearwater.jobs.export import expected_frames
 from clearwater.methods import AncutiFusionMethod, available_methods
 from clearwater.methods.ancuti_fusion import blend_with_original
 from clearwater.methods.fusion import (
@@ -118,7 +154,16 @@ DEFAULT_THRESHOLD = 0.10
 
 MIN_CONTRAST = 0.02
 """A line whose source contrast is below this (in [0, 1] units) is flagged ``weak_edge``: its
-ratios divide by a near-zero contrast and are not read."""
+ratios divide by a near-zero contrast, so its bands are ``undecided``, never a stage."""
+
+MIN_SUPPORT_SAMPLES = 3
+"""A band qualifies only when at least this many consecutive samples (about 1 px apart) around
+its peak stay above the qualifying level: a one- or two-sample excursion is not a band."""
+
+NOISE_FACTOR = 3.0
+"""A band qualifies only above this many times the water-side uncertainty
+(:func:`water_uncertainty` of the stage and of the source, in quadrature, over the source
+contrast) at each sample of its support."""
 
 OUTER_FRACTION = 0.25
 """The share of the profile at each end taken as a plateau for the linear fit."""
@@ -146,6 +191,15 @@ _LUMA = np.array([0.2126, 0.7152, 0.0722])  # BT.709, as clearwater.core.luminan
 
 class ProbeError(Exception):
     """A usage or input problem the command line reports with exit status 2."""
+
+
+class ProbeFailedError(Exception):
+    """A run whose measurement cannot be trusted (exit status 1, no record written).
+
+    Raised when the staged render's output differs from the product's ``render``, when
+    ``clip(prefused)`` differs from the staged ``fused``, or when the video decode did not deliver
+    every selected frame.
+    """
 
 
 @dataclasses.dataclass(frozen=True)
@@ -194,8 +248,10 @@ def line_profile(plane: NDArray[Any], line: Line, *, half_width: int = 0) -> Flo
     """Sample a 2-D array along a line at 1-pixel steps, averaged across parallel lines.
 
     Bilinear interpolation; the samples run from ``(x0, y0)`` to ``(x1, y1)`` inclusive,
-    ``round(length) + 1`` of them; each is the mean of ``2 * half_width + 1`` samples on the
-    perpendicular through it, 1 pixel apart. Coordinates outside the array are clamped to it.
+    ``round(length) + 1`` of them (:func:`sample_spacing` apart); each is the mean of
+    ``2 * half_width + 1`` samples on the perpendicular through it, 1 pixel apart. Every sample
+    of the strip must lie inside the array (``0 <= x <= W - 1``, ``0 <= y <= H - 1``, so its
+    bilinear support does too): nothing is clamped.
 
     Args:
         plane: An ``(H, W)`` array.
@@ -206,8 +262,8 @@ def line_profile(plane: NDArray[Any], line: Line, *, half_width: int = 0) -> Flo
         The profile, float64.
 
     Raises:
-        ValueError: ``plane`` is not 2-D, the line is shorter than 4 pixels, or ``half_width``
-            is negative.
+        ValueError: ``plane`` is not 2-D, the line is shorter than 4 pixels, ``half_width`` is
+            negative, or the strip leaves the array.
     """
     if plane.ndim != 2:
         raise ValueError(f"need an (H, W) array, got shape {plane.shape}")
@@ -216,6 +272,13 @@ def line_profile(plane: NDArray[Any], line: Line, *, half_width: int = 0) -> Flo
     length = line.length
     if length < 4:
         raise ValueError(f"the line is {length:.1f} px long; at least 4 px is needed")
+    left, top, right, bottom = strip_bounds(line, half_width)
+    height, width = plane.shape
+    tolerance = 1e-9
+    if left < -tolerance or top < -tolerance:
+        raise ValueError(f"the profile strip of {line} leaves the array (above or left)")
+    if right > width - 1 + tolerance or bottom > height - 1 + tolerance:
+        raise ValueError(f"the profile strip of {line} leaves the {width} x {height} array")
     count = round(length) + 1
     t = np.linspace(0.0, 1.0, count)
     ux, uy = (line.x1 - line.x0) / length, (line.y1 - line.y0) / length
@@ -229,10 +292,39 @@ def line_profile(plane: NDArray[Any], line: Line, *, half_width: int = 0) -> Flo
     return out
 
 
+def strip_bounds(line: Line, half_width: int) -> tuple[float, float, float, float]:
+    """The bounding box of a line's averaging strip (the corners of its outermost parallels).
+
+    Args:
+        line: The line.
+        half_width: The number of parallel lines on each side, 1 pixel apart.
+
+    Returns:
+        ``(left, top, right, bottom)`` in the line's pixel coordinates.
+    """
+    length = line.length
+    ux, uy = (line.x1 - line.x0) / length, (line.y1 - line.y0) / length
+    xs = [x - o * uy for x in (line.x0, line.x1) for o in (-half_width, half_width)]
+    ys = [y + o * ux for y in (line.y0, line.y1) for o in (-half_width, half_width)]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def sample_spacing(line: Line) -> float:
+    """The distance in pixels between two profile samples: ``length / round(length)``.
+
+    Args:
+        line: The line.
+
+    Returns:
+        The spacing (1 for a line whose length is a whole number of pixels).
+    """
+    return line.length / round(line.length)
+
+
 def _bilinear(data: FloatArray, xs: FloatArray, ys: FloatArray) -> FloatArray:
-    """Bilinear samples of ``data`` at ``(xs, ys)``, clamped to the array."""
+    """Bilinear samples of ``data`` at ``(xs, ys)`` (inside the array: see line_profile)."""
     height, width = data.shape
-    xs = np.clip(xs, 0.0, width - 1.0)
+    xs = np.clip(xs, 0.0, width - 1.0)  # only rounding below 1e-9: line_profile checked bounds
     ys = np.clip(ys, 0.0, height - 1.0)
     x0 = np.minimum(np.floor(xs).astype(np.int64), width - 2) if width > 1 else np.zeros_like(xs)
     y0 = np.minimum(np.floor(ys).astype(np.int64), height - 2) if height > 1 else np.zeros_like(ys)
@@ -344,21 +436,27 @@ def band_statistics(
     *,
     threshold: float = DEFAULT_THRESHOLD,
     fits: Fits | None = None,
+    spacing: float = 1.0,
 ) -> dict[str, Any]:
-    """Measure the edge band (halo) of one profile.
+    """Measure the two-sided edge band of one profile (a diagnostic, not the table's metric).
+
+    Each side's outward deviation from its own plateau line, over the profile's own contrast:
+    meaningful when both sides are plateaus.
 
     Args:
-        profile: The samples, at 1-pixel steps across the edge.
+        profile: The samples, ``spacing`` pixels apart across the edge.
         threshold: The band threshold as a fraction of the edge contrast.
         fits: The layout to use; :func:`profile_fits` of ``profile`` when None.
+        spacing: The distance between samples in pixels (:func:`sample_spacing`).
 
     Returns:
         ``edge_index``; ``contrast`` (C); ``overshoot`` and ``undershoot`` (absolute, the
         image's units) with their ratios to C; ``band`` (the larger), ``band_ratio``,
         ``band_side`` (``"bright"`` or ``"dark"``), ``peak_index``, ``peak_distance_px``
-        (from the edge); ``fwhm_px``; ``extent_px`` (the run around the peak above
-        ``threshold * C``; 0 when the peak is below it); ``exceeds`` (``band_ratio >
-        threshold``); and ``noise`` (the RMS residual of the two plateau fits).
+        (from the edge); ``fwhm_px`` (the interpolated width at half the peak); ``extent_px``
+        (the interpolated width above ``threshold * C``; 0 when the peak is below it);
+        ``exceeds`` (``band_ratio > threshold``); and ``noise`` (the RMS residual of the two
+        plateau fits).
     """
     layout = profile_fits(profile) if fits is None else fits
     bright, dark, contrast = deviations(profile, layout)
@@ -378,25 +476,56 @@ def band_statistics(
         "band_ratio": ratio,
         "band_side": side,
         "peak_index": peak,
-        "peak_distance_px": abs(peak - layout.edge),
-        "fwhm_px": _run(dev, peak, band / 2.0) if band > 0 else 0,
-        "extent_px": _run(dev, peak, threshold * contrast) if band > threshold * contrast else 0,
+        "peak_distance_px": abs(peak - layout.edge) * spacing,
+        "fwhm_px": _width(dev, peak, band / 2.0) * spacing if band > 0 else 0.0,
+        "extent_px": _width(dev, peak, threshold * contrast) * spacing
+        if band > threshold * contrast
+        else 0.0,
         "exceeds": bool(ratio > threshold),
         "noise": _noise(profile, layout),
     }
 
 
-def _run(dev: FloatArray, peak: int, level: float) -> int:
-    """The length of the contiguous run around ``peak`` where ``dev >= level``."""
-    if dev[peak] < level:
-        return 0
+def _run_bounds(values: FloatArray, peak: int, level: float) -> tuple[int, int] | None:
+    """The first and last index of the contiguous run around ``peak`` where ``values >= level``.
+
+    None when ``values[peak]`` is below ``level``.
+    """
+    if values[peak] < level:
+        return None
     lo = peak
-    while lo > 0 and dev[lo - 1] >= level:
+    while lo > 0 and values[lo - 1] >= level:
         lo -= 1
     hi = peak
-    while hi < dev.size - 1 and dev[hi + 1] >= level:
+    while hi < values.size - 1 and values[hi + 1] >= level:
         hi += 1
-    return hi - lo + 1
+    return lo, hi
+
+
+def _support(values: FloatArray, peak: int, level: float) -> int:
+    """The number of consecutive samples around ``peak`` at or above ``level`` (0 if none)."""
+    bounds = _run_bounds(values, peak, level)
+    return 0 if bounds is None else bounds[1] - bounds[0] + 1
+
+
+def _width(values: FloatArray, peak: int, level: float) -> float:
+    """The width, in samples, of the run around ``peak`` above ``level``, crossings interpolated.
+
+    Each end is the linear interpolation between the last sample at or above ``level`` and the
+    first below it; a run that reaches the array's end stops at that sample. A single sample
+    whose neighbours are 0, at half its height, is 1 sample wide.
+    """
+    bounds = _run_bounds(values, peak, level)
+    if bounds is None:
+        return 0.0
+    lo, hi = bounds
+    left = float(lo)
+    if lo > 0:
+        left = lo - 1 + (level - values[lo - 1]) / (values[lo] - values[lo - 1])
+    right = float(hi)
+    if hi < values.size - 1:
+        right = hi + (values[hi] - level) / (values[hi] - values[hi + 1])
+    return float(right - left)
 
 
 def _noise(profile: FloatArray, fits: Fits) -> float:
@@ -407,6 +536,40 @@ def _noise(profile: FloatArray, fits: Fits) -> float:
         index = np.arange(start, stop, dtype=np.float64)
         residuals.append(profile[start:stop] - np.polyval(_fit(profile, start, stop), index))
     return float(np.sqrt(np.mean(np.concatenate(residuals) ** 2)))
+
+
+def water_uncertainty(profile: FloatArray, fits: Fits) -> FloatArray:
+    """The standard uncertainty of each sample's deviation from the water-plateau line.
+
+    From the start plateau's line fit (``n = fits.outer`` samples at ``x``): ``sigma`` the RMS
+    residual (``n - 2`` degrees of freedom), ``rho`` the residuals' lag-1 autocorrelation
+    (clamped to [0, 0.99]) and ``n_eff = max(2, n (1 - rho) / (1 + rho))`` (AR(1)). At sample
+    ``i`` the deviation's uncertainty is ``sigma * sqrt(1 + (1 / n + (i - mean(x))^2 / Sxx) *
+    n / n_eff)``: the sample's own noise plus the error of the line extrapolated to it, which a
+    spatially correlated noise (texture, codec blocks, amplified grain) makes much larger than
+    the residual alone suggests.
+
+    Args:
+        profile: The samples.
+        fits: The layout.
+
+    Returns:
+        The uncertainty at every sample, in the profile's units.
+    """
+    n = fits.outer
+    x = np.arange(n, dtype=np.float64)
+    residual = profile[:n] - np.polyval(_fit(profile, 0, n), x)
+    energy = float(np.sum(residual**2))
+    sigma = math.sqrt(energy / max(n - 2, 1))
+    rho = float(np.sum(residual[1:] * residual[:-1]) / energy) if energy > 0 else 0.0
+    rho = min(max(rho, 0.0), 0.99)
+    n_eff = max(2.0, n * (1.0 - rho) / (1.0 + rho))
+    centre = float(x.mean())
+    sxx = float(np.sum((x - centre) ** 2))
+    index = np.arange(fits.count, dtype=np.float64)
+    spread = (1.0 / n + (index - centre) ** 2 / sxx) * n / n_eff
+    out: FloatArray = sigma * np.sqrt(1.0 + spread)
+    return out
 
 
 def water_contrast(profile: FloatArray, fits: Fits) -> float:
@@ -424,28 +587,35 @@ def water_contrast(profile: FloatArray, fits: Fits) -> float:
     return float(line - np.median(profile[fits.count - fits.outer :]))
 
 
-def normalised_water_side(profile: FloatArray, fits: Fits) -> FloatArray:
-    """The start side's deviation from its plateau line, over the signed contrast.
-
-    Positive is OUTWARD (away from the object's level: a bright ring beside a dark object, a
-    dark ring beside a bright one); negative is inward (a glow or spread of the object's level
-    into the water). Samples outside ``[outer, edge]`` are 0.
+def water_deviation(profile: FloatArray, fits: Fits) -> FloatArray:
+    """Each sample's deviation from the profile's own water-plateau line (linear in the profile).
 
     Args:
         profile: The samples.
         fits: The layout.
 
     Returns:
-        The normalised deviation.
+        ``profile`` minus the least-squares line through its start segment, at every sample.
     """
-    contrast = water_contrast(profile, fits)
-    if contrast == 0.0:
-        return np.zeros(fits.count)
     index = np.arange(fits.count, dtype=np.float64)
-    deviation = profile - np.polyval(_fit(profile, 0, fits.outer), index)
+    out: FloatArray = profile - np.polyval(_fit(profile, 0, fits.outer), index)
+    return out
+
+
+def outward_overshoot(profile: FloatArray, fits: Fits, sign: float) -> FloatArray:
+    """The water side's rise past its own plateau line, away from the object (absolute units).
+
+    Args:
+        profile: The samples.
+        fits: The layout.
+        sign: +1 when the water is brighter than the object (outward is up), -1 otherwise.
+
+    Returns:
+        ``max(0, sign * water_deviation)`` on the zone ``[outer, edge]``; 0 elsewhere.
+    """
     zone = np.zeros(fits.count, dtype=bool)
     zone[fits.outer : fits.edge + 1] = True
-    out: FloatArray = np.where(zone, deviation / contrast, 0.0)
+    out: FloatArray = np.where(zone, np.maximum(sign * water_deviation(profile, fits), 0.0), 0.0)
     return out
 
 
@@ -455,55 +625,103 @@ def water_band(
     fits: Fits,
     *,
     threshold: float = DEFAULT_THRESHOLD,
+    spacing: float = 1.0,
 ) -> dict[str, Any]:
-    """Measure the band a stage ADDS on the open-water side, relative to the source.
+    """Measure the band a stage ADDS beyond the source's water-side profile (the table's metric).
 
     The line's start lies in open water (a plateau); its end inside the object (which may be
-    textured). Each profile's start-side deviation is normalised by its own signed contrast
-    (:func:`normalised_water_side`); the stage's band is its normalised deviation minus the
-    reference's (the source's), so the source's own edge ramp and any in-camera halo cancel.
+    textured). The excess at each water-side sample is the stage's outward overshoot past its
+    own water-plateau line minus the source's (:func:`outward_overshoot`), divided by ONE common
+    contrast: the source's signed water contrast (:func:`water_contrast` of ``reference``). A
+    monotonic remap (gamma, white balance, a plateau change) moves no sample past its own
+    plateau line and reports no band; an inward spread is not a band.
 
     Args:
         profile: The stage's samples.
         reference: The source's samples on the same line and channel.
         fits: The source profile's layout (one edge for every stage).
-        threshold: The band threshold, a fraction of the contrast.
+        threshold: The band threshold, a fraction of the source contrast.
+        spacing: The distance between samples in pixels (:func:`sample_spacing`).
 
     Returns:
-        ``contrast`` (signed, the stage's), ``band`` (the signed excess at the peak: positive
-        outward, negative inward), ``band_ratio`` (its magnitude), ``direction``,
-        ``peak_index``, ``peak_distance_px`` (from the edge), ``fwhm_px`` and ``extent_px``
-        (the same-sign run around the peak at or above half the peak, and above
-        ``threshold``), ``exceeds`` (``band_ratio > threshold``), ``band_abs`` (the band in
-        the image's units, ``band * |contrast|``) and ``weak_edge`` (the source's contrast is
-        under :data:`MIN_CONTRAST`).
+        ``contrast`` (the source's signed contrast, the common denominator);
+        ``stage_contrast`` (the stage's own, for reading); ``band`` (the largest excess, 0 when
+        none is positive) and ``band_ratio`` (the same); ``excess_at_peak`` (the excess at
+        ``peak_index``, which may be negative when there is no band); ``band_abs`` (``band *
+        |contrast|``, the image's units); ``peak_index``; ``peak_distance_px``; ``fwhm_px``
+        and ``extent_px`` (interpolated widths at half the band and at ``threshold``);
+        ``noise_ratio`` (the stage's and the source's :func:`water_uncertainty` in quadrature,
+        over ``|contrast|``, at the peak); ``level`` (the qualifying level there, ``max(threshold,
+        NOISE_FACTOR * noise_ratio)``); ``support_samples`` (consecutive samples around the peak
+        each at or above its own level); ``weak_edge``;
+        ``exceeds`` (``band > threshold``); ``qualifies``; and ``verdict`` (``"band"``,
+        ``"undecided"`` or ``"none"``).
     """
-    excess = normalised_water_side(profile, fits) - normalised_water_side(reference, fits)
-    peak = int(np.argmax(np.abs(excess)))
-    band = float(excess[peak])
-    signed = excess if band >= 0 else -excess
-    ratio = abs(band)
-    contrast = water_contrast(profile, fits)
+    contrast = water_contrast(reference, fits)
+    weak = abs(contrast) < MIN_CONTRAST
+    sign = 1.0 if contrast >= 0 else -1.0
+    scale = 1.0 / abs(contrast) if contrast != 0.0 else 0.0
+    excess = (
+        outward_overshoot(profile, fits, sign) - outward_overshoot(reference, fits, sign)
+    ) * scale
+    peak = int(np.argmax(excess))
+    at_peak = float(excess[peak])
+    band = max(at_peak, 0.0)
+    noise = np.hypot(water_uncertainty(profile, fits), water_uncertainty(reference, fits)) * scale
+    levels = np.maximum(threshold, NOISE_FACTOR * noise)
+    support = _support(excess - levels, peak, 0.0) if band > 0 else 0
+    exceeds = band > threshold
+    qualifies = (not weak) and band > levels[peak] and support >= MIN_SUPPORT_SAMPLES
+    verdict = "band" if qualifies else "undecided" if weak or exceeds else "none"
     return {
         "contrast": contrast,
-        "weak_edge": abs(water_contrast(reference, fits)) < MIN_CONTRAST,
+        "stage_contrast": water_contrast(profile, fits),
+        "weak_edge": weak,
         "band": band,
+        "band_ratio": band,
+        "excess_at_peak": at_peak,
         "band_abs": band * abs(contrast),
-        "band_ratio": ratio,
-        "direction": "outward" if band >= 0 else "inward",
         "peak_index": peak,
-        "peak_distance_px": abs(fits.edge - peak),
-        "fwhm_px": _run(signed, peak, ratio / 2.0) if ratio > 0 else 0,
-        "extent_px": _run(signed, peak, threshold) if ratio > threshold else 0,
-        "exceeds": bool(ratio > threshold),
+        "peak_distance_px": abs(fits.edge - peak) * spacing,
+        "fwhm_px": _width(excess, peak, band / 2.0) * spacing if band > 0 else 0.0,
+        "extent_px": _width(excess, peak, threshold) * spacing if exceeds else 0.0,
+        "noise_ratio": float(noise[peak]),
+        "level": float(levels[peak]),
+        "support_samples": support,
+        "exceeds": exceeds,
+        "qualifies": qualifies,
+        "verdict": verdict,
     }
 
 
-def term_deviation(term: FloatArray, fits: Fits, peak: int) -> float:
-    """Return one additive term's start-side deviation from its own plateau line at ``peak``.
+def first_stage(bands: Mapping[str, Mapping[str, Any]]) -> str | None:
+    """Name the first product stage whose band qualifies.
 
     Args:
-        term: The term's profile (one input's and one level's share of the fused profile).
+        bands: Product stage name -> its :func:`water_band` (luma) record; the stages after
+            ``source`` in :data:`PRODUCT_STAGES` are read in pipeline order.
+
+    Returns:
+        The first stage whose verdict is ``band``; ``"undecided"`` when the edge is weak, or
+        when no stage qualifies but one is ``undecided``; None when no stage exceeds the
+        threshold. A stage over the threshold that does not qualify never decides the answer.
+    """
+    stages = [name for name in PRODUCT_STAGES[1:] if name in bands]
+    if any(bands[name]["weak_edge"] for name in stages):
+        return "undecided"
+    for name in stages:
+        if bands[name]["verdict"] == "band":
+            return name
+    if any(bands[name]["verdict"] == "undecided" for name in stages):
+        return "undecided"
+    return None
+
+
+def term_deviation(term: FloatArray, fits: Fits, peak: int) -> float:
+    """Return one additive term's deviation from its own water-plateau line at ``peak``.
+
+    Args:
+        term: The term's profile (one input's and one level's share of a profile).
         fits: The layout.
         peak: The sample index.
 
@@ -513,6 +731,80 @@ def term_deviation(term: FloatArray, fits: Fits, peak: int) -> float:
     """
     line = np.polyval(_fit(term, 0, fits.outer), peak)
     return float(term[peak] - line)
+
+
+def attribute_band(
+    band: Mapping[str, Any],
+    profiles: Mapping[str, FloatArray],
+    fits: Fits,
+) -> dict[str, Any] | None:
+    """Split the fused stage's detected band, at its peak, over inputs and pyramid levels.
+
+    The added band at the peak is ``(sign * dev(fused) - overshoot(source)) / |C|``. With the
+    product's decomposition ``prefused = sum_kl term_kl`` and the source's ``S = sum_kl
+    srcterm_kl`` (same weights; :func:`staged_render`), the share of input ``k`` at level ``l``
+    is ``sign * (dev(term_kl) - [s] dev(srcterm_kl)) / |C|`` with ``[s]`` 1 when the source is
+    outward at the peak (its overshoot is what was subtracted) and 0 otherwise; the clip's share
+    is ``sign * (dev(fused) - dev(prefused)) / |C|``. The shares and the clip add up to
+    ``excess_at_peak`` exactly in real arithmetic (``residual`` is the float difference).
+
+    Args:
+        band: The fused stage's :func:`water_band` (luma) record.
+        profiles: Luma profiles: ``source``, ``fused``, ``prefused``, every ``term_k<k>_l<l>``
+            and ``srcterm_k<k>_l<l>``.
+        fits: The source's layout.
+
+    Returns:
+        None when there is no positive excess to split (``excess_at_peak <= 0``) or the
+        contrast is 0; otherwise ``peak_index``, ``excess_at_peak``, ``source_subtracted``,
+        ``terms`` (``k<k>_l<l>`` -> share), ``per_input`` (``k<k>``), ``per_level`` (``l<l>``),
+        ``clip``, ``total`` (the shares plus the clip), ``residual`` (``total -
+        excess_at_peak``) and ``raw_per_input`` (each input's terms without the source
+        subtraction, for comparison).
+    """
+    contrast = band["contrast"]
+    at_peak = band["excess_at_peak"]
+    if contrast == 0.0 or at_peak <= 0.0:
+        return None
+    peak = band["peak_index"]
+    sign = 1.0 if contrast > 0 else -1.0
+    scale = sign / abs(contrast)
+    subtract = sign * term_deviation(profiles["source"], fits, peak) > 0.0
+    terms: dict[str, float] = {}
+    raw: dict[str, float] = {}
+    for name, term in profiles.items():
+        if not name.startswith("term_"):
+            continue
+        key = name.removeprefix("term_")
+        own = term_deviation(term, fits, peak)
+        source = term_deviation(profiles[f"srcterm_{key}"], fits, peak) if subtract else 0.0
+        terms[key] = scale * (own - source)
+        raw[key] = scale * own
+    clip = scale * (
+        term_deviation(profiles["fused"], fits, peak)
+        - term_deviation(profiles["prefused"], fits, peak)
+    )
+    per_input: dict[str, float] = {}
+    per_level: dict[str, float] = {}
+    raw_per_input: dict[str, float] = {}
+    for key, share in terms.items():
+        k, level = key.split("_")
+        per_input[k] = per_input.get(k, 0.0) + share
+        per_level[level] = per_level.get(level, 0.0) + share
+        raw_per_input[k] = raw_per_input.get(k, 0.0) + raw[key]
+    total = sum(terms.values()) + clip
+    return {
+        "peak_index": peak,
+        "excess_at_peak": at_peak,
+        "source_subtracted": subtract,
+        "terms": terms,
+        "per_input": per_input,
+        "per_level": per_level,
+        "clip": clip,
+        "total": total,
+        "residual": total - at_peak,
+        "raw_per_input": raw_per_input,
+    }
 
 
 def luma(rgb: NDArray[Any]) -> FloatArray:
@@ -539,9 +831,12 @@ def staged_render(
     """Render ``image`` as ``method.render`` does, yielding each intermediate on the device.
 
     The product functions are called in ``render``'s order with ``render``'s arguments. Images
-    are ``(H, W, 3)`` and maps ``(H, W)``. After ``output`` it yields the attribution terms
-    ``term_k<k>_l<l>``: ``collapse`` of input k's blended band at level l alone (zeros at the
-    other levels), whose sum over k and l is the fused image before its clip.
+    are ``(H, W, 3)`` and maps ``(H, W)``. After ``output`` it yields, per input k, the
+    attribution terms ``term_k<k>_l<l>`` (``collapse`` of input k's blended band at level l
+    alone, zeros at the other levels) and the source's ``srcterm_k<k>_l<l>`` (the source's
+    Laplacian band under the same weight pyramid), then ``prefused``: the collapse of the
+    blended pyramid summed as :func:`multiscale_fusion` sums it, before its clip (the terms add
+    up to it; the source terms add up to the source because the weights sum to 1).
 
     Args:
         method: The method.
@@ -617,18 +912,28 @@ def staged_render(
     yield "output", blend_with_original(fused, pixels, params["blend_with_original"])
     del fused
     levels = pyramid_levels(inputs[0].shape, params["pyramid_min_level_size"])
+    source_bands = laplacian_pyramid(backend, pixels, levels)
+    summed: list[Any] = []
     for k, (fusion_input, weight) in enumerate(zip(inputs, weights, strict=True), start=1):
-        bands = [
-            w[..., None] * band
-            for w, band in zip(
-                gaussian_pyramid(backend, weight, levels),
-                laplacian_pyramid(backend, fusion_input, levels),
-                strict=True,
-            )
+        weight_pyramid = gaussian_pyramid(backend, weight, levels)
+        pairs = zip(weight_pyramid, laplacian_pyramid(backend, fusion_input, levels), strict=True)
+        bands = [w[..., None] * band for w, band in pairs]  # as multiscale_fusion forms them
+        summed = bands if not summed else [f + b for f, b in zip(summed, bands, strict=True)]
+        for level in range(levels):
+            yield f"term_k{k}_l{level}", collapse_pyramid(backend, _alone(backend, bands, level))
+        source_weighted = [
+            w[..., None] * band for w, band in zip(weight_pyramid, source_bands, strict=True)
         ]
-        for level, band in enumerate(bands):
-            alone = [band if i == level else backend.xp.zeros_like(b) for i, b in enumerate(bands)]
-            yield f"term_k{k}_l{level}", collapse_pyramid(backend, alone)
+        for level in range(levels):
+            alone = _alone(backend, source_weighted, level)
+            yield f"srcterm_k{k}_l{level}", collapse_pyramid(backend, alone)
+        del bands, source_weighted, weight_pyramid
+    yield "prefused", collapse_pyramid(backend, summed)  # multiscale_fusion's sum, before the clip
+
+
+def _alone(backend: CoreBackend, bands: Sequence[Any], level: int) -> list[Any]:
+    """A pyramid holding ``bands[level]`` and zeros at every other level."""
+    return [band if i == level else backend.xp.zeros_like(band) for i, band in enumerate(bands)]
 
 
 def _backend(image: Image) -> CoreBackend:
@@ -844,21 +1149,30 @@ def probe_frame(
 ) -> dict[str, Any]:
     """Run the staged render of one image and measure the band on each line at each stage.
 
+    Two checks make the measurement trustworthy, and either failing raises
+    :class:`ProbeFailedError`: the staged ``output`` equals ``method.render``'s result bit for bit,
+    and ``clip(prefused)`` equals the staged ``fused`` bit for bit (so the attribution terms
+    decompose the very image that was measured).
+
     Args:
         method: The method.
         image: The image on its device.
         params: The resolved parameters.
         statistics: The stage records used for the render.
         lines: The profile lines, in source pixels.
-        region: The crop region (contains the lines).
+        region: The crop region (contains every line's strip).
         half_width: The profile's half width.
         threshold: The band threshold.
         crops: The folder for the 16-bit crops, or None for none.
         prefix: The crops' file-name prefix.
 
     Returns:
-        The frame's record: per line, per stage, per channel band statistics; the attribution
-        per input and level; the weight profiles; the render check; the saved crops.
+        The frame's record: per line, per stage, per channel band statistics; the first stage
+        whose band qualifies; the attribution per input and level; the weight profiles; the
+        two checks; the saved crops.
+
+    Raises:
+        ProbeFailedError: Either check fails.
     """
     backend = _backend(image)
     local = [_shifted(line, region) for line in lines]
@@ -866,12 +1180,19 @@ def probe_frame(
     maps: dict[str, list[FloatArray]] = {}
     saved: dict[str, Any] = {}
     output_full: Any = None
+    fused_full: Any = None
+    prefused_difference = math.inf
     shape = image.pixels.shape
     for name, array in staged_render(method, image, params, statistics):
         crop = _crop(backend, array, region)
         if name == "output":
             output_full = array
-        if crops is not None and not name.startswith("term_"):
+        elif name == "fused":
+            fused_full = array
+        elif name == "prefused":
+            prefused_difference = float(abs(array.clip(0.0, 1.0) - fused_full).max())
+            fused_full = None
+        if crops is not None and not name.startswith(_UNSAVED):
             path = crops / f"{prefix}-{name}.png"
             saved[name] = {"file": path.name, "scale": save_crop(path, crop)}
             if name in ("source", "output"):  # an 8-bit view with the lines, for reading
@@ -879,8 +1200,9 @@ def probe_frame(
                 save_overview(crops / f"{prefix}-{name}-marked.png", crop, whole, local, 1400)
         if crop.ndim == 3:
             planes = channel_planes(crop)
+            channels = ("Y",) if name.startswith(("term_", "srcterm_")) else CHANNELS
             profiles[name] = [
-                {c: line_profile(planes[c], line, half_width=half_width) for c in CHANNELS}
+                {c: line_profile(planes[c], line, half_width=half_width) for c in channels}
                 for line in local
             ]
         else:
@@ -888,17 +1210,31 @@ def probe_frame(
     rendered = method.render(image, params, dict(statistics)).pixels
     difference = float(abs(rendered - output_full).max())  # one device-to-host read
     del rendered, output_full
+    if difference != 0.0:
+        raise ProbeFailedError(
+            f"the staged output differs from the product's render by up to {difference:.3g}"
+        )
+    if prefused_difference != 0.0:
+        raise ProbeFailedError(
+            f"clip(prefused) differs from the staged fused image by up to {prefused_difference:.3g}"
+        )
     results = []
     for index, line in enumerate(lines):
         results.append(_line_record(index, line, profiles, maps, threshold=threshold))
     return {
         "render_check_max_abs_difference": difference,
-        "render_check_equal": difference == 0.0,
+        "render_check_equal": True,
+        "prefused_check_max_abs_difference": prefused_difference,
+        "prefused_check_equal": True,
         "shape": list(shape),
         "lines": results,
         "crops": saved,
         "pyramid_levels": pyramid_levels(shape, params["pyramid_min_level_size"]),
     }
+
+
+_UNSAVED = ("term_", "srcterm_", "prefused")
+"""Name prefixes of the staged arrays that are measured but not saved as crops."""
 
 
 def _line_record(
@@ -909,29 +1245,48 @@ def _line_record(
     *,
     threshold: float,
 ) -> dict[str, Any]:
-    """The record of one line: stage bands, the first stage over threshold, the attribution.
+    """The record of one line: stage bands, the first qualifying stage, the attribution.
 
     ``water`` (the table's metric) is :func:`water_band` per stage and channel against the
-    source, on the source's layout; ``two_sided`` is :func:`band_statistics` per stage and
-    channel on each stage's own layout (meaningful when both sides are plateaus).
+    source, on the source's layout, at the line's sample spacing; ``two_sided`` is
+    :func:`band_statistics` per stage and channel on each stage's own layout (meaningful when
+    both sides are plateaus). ``first_stage_over_threshold`` is :func:`first_stage` of the luma
+    bands; ``unqualified_exceedances`` lists the product stages over the threshold whose band
+    does not qualify; ``attribution`` is :func:`attribute_band` of the fused luma band.
     """
+    spacing = sample_spacing(line)
     source = profiles["source"][index]
     fits = profile_fits(source["Y"])
     two_sided: dict[str, Any] = {}
     water: dict[str, Any] = {}
     for name in IMAGE_STAGES:
         per = profiles[name][index]
-        two_sided[name] = {c: band_statistics(per[c], threshold=threshold) for c in CHANNELS}
-        water[name] = {
-            c: water_band(per[c], source[c], fits, threshold=threshold) for c in CHANNELS
+        two_sided[name] = {
+            c: band_statistics(per[c], threshold=threshold, spacing=spacing) for c in CHANNELS
         }
-    first_over = next((n for n in PRODUCT_STAGES[1:] if water[n]["Y"]["exceeds"]), None)
-    peak = water["fused"]["Y"]["peak_index"]
-    attribution: dict[str, float] = {}
-    for name, term in profiles.items():
-        if name.startswith("term_"):
-            attribution[name] = term_deviation(term[index]["Y"], fits, peak)
-    fused_y = profiles["fused"][index]["Y"]
+        water[name] = {
+            c: water_band(per[c], source[c], fits, threshold=threshold, spacing=spacing)
+            for c in CHANNELS
+        }
+    luma_bands = {name: water[name]["Y"] for name in PRODUCT_STAGES[1:]}
+    unqualified = [
+        name for name, band in luma_bands.items() if band["exceeds"] and not band["qualifies"]
+    ]
+    terms = {
+        name: values[index]["Y"]
+        for name, values in profiles.items()
+        if name.startswith(("term_", "srcterm_"))
+    }
+    attribution = attribute_band(
+        water["fused"]["Y"],
+        {
+            "source": source["Y"],
+            "fused": profiles["fused"][index]["Y"],
+            "prefused": profiles["prefused"][index]["Y"],
+            **terms,
+        },
+        fits,
+    )
     edge = fits.edge
     weights = {
         name: {
@@ -945,14 +1300,14 @@ def _line_record(
     return {
         "line": dataclasses.asdict(line),
         "length_px": line.length,
+        "sample_spacing_px": spacing,
         "edge_index": edge,
         "outer_samples": fits.outer,
-        "first_stage_over_threshold": first_over,
+        "first_stage_over_threshold": first_stage(luma_bands),
+        "unqualified_exceedances": unqualified,
         "water": water,
         "two_sided": two_sided,
-        "attribution_at_fused_peak": attribution,
-        "attribution_sum": float(sum(attribution.values())),
-        "fused_deviation_at_peak": term_deviation(fused_y, fits, peak),
+        "attribution": attribution,
         "weights": weights,
         "profiles_Y": {
             name: [round(float(v), 5) for v in profiles[name][index]["Y"]]
@@ -1043,7 +1398,7 @@ def run_photo(
     )
     statistics = photo_statistics(method, on_device, params)
     region = options["region"] or region_for(options["lines"], pixels.shape, options["margin"])
-    _check_region(region, pixels.shape, options["lines"])
+    _check_region(region, pixels.shape, options["lines"], options["half_width"])
     frame = probe_frame(
         method,
         on_device,
@@ -1147,6 +1502,7 @@ def run_video(
         probe=probe,
         params=dict(params),
         hw_decode=backend.device != "cpu",
+        expected_frames=expected_frames(probe),
     )
     result = engine.analysis_job()(_Progress())
     if not result.ok:
@@ -1164,9 +1520,9 @@ def run_video(
     }
     shape = (video.height, video.width, 3)
     region = options["region"] or region_for(options["lines"], shape, options["margin"])
-    _check_region(region, shape, options["lines"])
+    _check_region(region, shape, options["lines"], options["half_width"])
     scales = scale_facts(shape, params)
-    frames = []
+    frames: list[dict[str, Any]] = []
     out: Path = options["out"]
     stream = source.frames(probe, hw_decode=False)
     try:
@@ -1222,10 +1578,18 @@ def run_video(
         close = getattr(stream, "close", None)
         if close is not None:
             close()
+    missing = sorted(set(chosen) - {frame["pts_ticks"] for frame in frames})
+    if missing:
+        raise ProbeFailedError(
+            f"the decode did not deliver {len(missing)} of the {len(chosen)} selected frames "
+            f"(first missing pts {missing[0]})"
+        )
     return {
         "kind": "video",
         "device": reason,
-        "analysis": "AnalysisEngine.analysis_job over the whole clip (smoothing defaults)",
+        "analysis": "AnalysisEngine.analysis_job over the whole clip (smoothing defaults, "
+        "expected_frames as the export passes it)",
+        "expected_frames": expected_frames(probe),
         "frames_in_clip": len(axis),
         "scales": scales,
         "region": dataclasses.asdict(region),
@@ -1233,17 +1597,27 @@ def run_video(
     }
 
 
-def _check_region(region: Region, shape: tuple[int, ...], lines: Sequence[Line]) -> None:
-    """Refuse a region outside the image or a line outside the region."""
+def _check_region(
+    region: Region, shape: tuple[int, ...], lines: Sequence[Line], half_width: int
+) -> None:
+    """Refuse a region outside the image, or a line whose averaging strip leaves the region.
+
+    The whole footprint is checked (:func:`strip_bounds`: both ends of every parallel line),
+    so no profile sample is clamped at the crop's border.
+    """
     if region.w < 8 or region.h < 8 or region.x < 0 or region.y < 0:
         raise ProbeError(f"region {region} is too small or negative")
     if region.x + region.w > shape[1] or region.y + region.h > shape[0]:
         raise ProbeError(f"region {region} exceeds the image {shape[1]} x {shape[0]}")
     for line in lines:
-        for x, y in ((line.x0, line.y0), (line.x1, line.y1)):
-            inside_x = region.x <= x <= region.x + region.w - 1
-            if not (inside_x and region.y <= y <= region.y + region.h - 1):
-                raise ProbeError(f"line {line} leaves the region {region}")
+        if line.length < 4:
+            raise ProbeError(f"line {line} is shorter than 4 px")
+        left, top, right, bottom = strip_bounds(line, half_width)
+        inside_x = region.x <= left and right <= region.x + region.w - 1
+        if not (inside_x and region.y <= top and bottom <= region.y + region.h - 1):
+            raise ProbeError(
+                f"the strip of line {line} (half width {half_width}) leaves the region {region}"
+            )
 
 
 def _plain(value: Any) -> Any:
@@ -1319,12 +1693,16 @@ def _options(args: argparse.Namespace) -> tuple[Path, str, Path, dict[str, Any]]
             source = find_footage_photo(Path(args.stem).stem, footage_path)
         else:
             source = find_footage_file(args.stem, footage_path)
-    name = args.name or source.stem
-    out = args.out or load_local_config().working_path / "wp5.7" / "part1" / name
-    cache_dir = args.cache_dir or load_local_config().working_path / "wp5.7" / "cache"
+    name = source.stem if args.name is None else args.name
+    _check_name(name)
+    root = load_local_config().working_path / "wp5.7"
+    out = args.out or root / "part1" / name
+    cache_dir = args.cache_dir or root / "cache"
     footage = headless_export.configured_footage_folder()
-    if footage is not None:
-        for target in (out, cache_dir):
+    for target in (out, cache_dir, out / f"{name}.json"):
+        if not headless_export.inside(target, root):
+            raise ProbeError(f"{target} is not inside the working folder's wp5.7 folder")
+        if footage is not None:
             refusal = headless_export.write_target_refusal(target, footage)
             if refusal is not None:
                 raise ProbeError(refusal)
@@ -1346,6 +1724,25 @@ def _options(args: argparse.Namespace) -> tuple[Path, str, Path, dict[str, Any]]
         "cache_dir": cache_dir,
     }
     return source, name, out, options
+
+
+def _check_name(name: str) -> None:
+    """Refuse a run name that is not a plain file stem (it becomes a path component).
+
+    Raises:
+        ProbeError: The name is empty, holds a path separator, a drive or stream ``:``, a
+            ``..`` or a control character, or is not its own last path component.
+    """
+    plain = (
+        bool(name)
+        and not any(ch in name for ch in '/\\:<>"|?*')
+        and ".." not in name
+        and all(ch.isprintable() for ch in name)
+        and Path(name).name == name
+        and name.strip(" .") == name
+    )
+    if not plain:
+        raise ProbeError(f"--name {name!r} is not a plain file stem")
 
 
 def _is_photo_stem(stem: str, root: Path) -> bool:
@@ -1392,8 +1789,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ProbeError as exc:
         print(f"halo_probe: {exc}", file=sys.stderr)
         return 2
+    except ProbeFailedError as exc:
+        print(f"halo_probe: FAILED, no record written: {exc}", file=sys.stderr)
+        return 1
     record = {
-        "schema": 1,
+        "schema": 2,
         "tool": "halo_probe",
         "name": name,
         "source": source.name,
@@ -1403,6 +1803,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         "threshold": options["threshold"],
         "half_width": options["half_width"],
         "outer_fraction": OUTER_FRACTION,
+        "min_contrast": MIN_CONTRAST,
+        "min_support_samples": MIN_SUPPORT_SAMPLES,
+        "noise_factor": NOISE_FACTOR,
+        "metric": "water: outward overshoot past the stage's own water plateau minus the "
+        "source's, over the source's signed contrast; qualifies when not weak, above "
+        "max(threshold, noise_factor * noise) over min_support_samples",
         "started": began.isoformat(),
         "finished": datetime.now(UTC).isoformat(),
         **run,
@@ -1413,7 +1819,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def summary(record: Mapping[str, Any]) -> str:
-    """One text line per frame and line: the first stage over the threshold and the bands.
+    """One text line per frame and line: the first qualifying stage and the luma bands.
 
     Args:
         record: A run record.
@@ -1426,18 +1832,23 @@ def summary(record: Mapping[str, Any]) -> str:
         when = "photo" if frame["time_s"] is None else f"{frame['time_s']:.3f}s"
         for number, line in enumerate(frame["lines"], start=1):
             bands = " ".join(
-                f"{stage}={line['water'][stage]['Y']['band']:+.2f}" for stage in IMAGE_STAGES
+                f"{stage}={line['water'][stage]['Y']['band']:.2f}"
+                f"{_MARK[line['water'][stage]['Y']['verdict']]}"
+                for stage in IMAGE_STAGES
             )
             fused = line["water"]["fused"]["Y"]
             rows.append(
                 f"{record['name']} {when} line{number}: first>{record['threshold']:.2f}="
-                f"{line['first_stage_over_threshold']} fused fwhm={fused['fwhm_px']}px "
-                f"({fused['fwhm_sigma']:.2f} sigma) {fused['direction']} "
-                f"abs={fused['band_abs']:+.3f}"
+                f"{line['first_stage_over_threshold']} fused fwhm={fused['fwhm_px']:.1f}px "
+                f"({fused['fwhm_sigma']:.2f} sigma) abs={fused['band_abs']:.3f}"
                 f"{' WEAK-EDGE' if fused['weak_edge'] else ''} | {bands} | "
                 f"render_check={frame['render_check_equal']}"
             )
     return "\n".join(rows)
+
+
+_MARK = {"band": "*", "undecided": "?", "none": ""}
+"""The summary's mark after a band: qualifies (``*``), undecided (``?``) or neither."""
 
 
 if __name__ == "__main__":
