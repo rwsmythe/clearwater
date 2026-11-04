@@ -5,7 +5,8 @@ The branches of this entry (WP6.1, AD-34):
 - ``<entry> --export-worker [args]`` runs :func:`clearwater.app.export_worker.main` with the
   remaining arguments. A packaged (frozen) build spawns its video export worker this way,
   because its executable cannot run ``-m clearwater.app.export_worker``. This branch imports
-  no Qt-bearing module (AD-31).
+  no Qt-bearing module (AD-31). Frozen only, it first moves the request pipe off the
+  standard-input slot (:func:`isolate_worker_stdin`, CHARC's F-E ruling; TEMPORARY, see there).
 - Frozen only, an INTERPRETER RE-ENTRY (:func:`interpreter_reentry`: ``-m`` / ``-c`` in any
   form CPython accepts, after interpreter flags; :func:`run_interpreter_option`): a library
   inside the GPU pack re-enters ``sys.executable -m <its module>`` (``cuda.pathfinder``'s
@@ -31,6 +32,7 @@ branch imports what it needs.
 from __future__ import annotations
 
 import contextlib
+import io
 import os
 import re
 import sys
@@ -63,6 +65,64 @@ LEADING_FLAGS = frozenset({"-I", "-E", "-s", "-S", "-B", "-u", "-O", "-q"})
 
 VALUED_FLAGS = frozenset({"-X", "-W"})
 """Interpreter flags that take the next argument as their value (both dropped)."""
+
+STD_INPUT_HANDLE = -10
+"""Win32's ``STD_INPUT_HANDLE`` (``(DWORD)-10``), the slot ``SetStdHandle`` re-points."""
+
+
+def isolate_worker_stdin() -> bool:
+    """Frozen worker only: read the request pipe privately; children inherit NUL (F-E).
+
+    The export worker's cancel thread blocks reading its standard input (the request pipe)
+    for the whole job. A child spawned with ``stdin=None`` inherits that pipe, and on Windows
+    a Python child (``cuda.pathfinder``'s canary probe, ``sys.executable -m ...``) then hangs
+    in its own start-up while the parent's read is pending (WP6.1 finding F-E). So the pipe is
+    duplicated to a private descriptor (not inheritable, PEP 446) that becomes ``sys.stdin``,
+    and descriptor 0 is pointed at the null device. On Windows the process's Win32
+    standard-input handle is pointed there too with ``SetStdHandle``, because the windowed
+    executable is a GUI-subsystem process whose C runtime does not update it on ``dup2``, and
+    ``subprocess`` gives a child that handle (CHARC's ruling; the one N1 site, AD-34).
+
+    Must run before the worker's first read and before anything that can spawn a child (the
+    GPU pack loader, the worker import, its backend probe, any CuPy import). A source run is
+    unchanged (1.0.0): nothing is duplicated and nothing re-pointed.
+
+    TEMPORARY: DR-125's package moves this isolation into the worker itself, for source and
+    frozen runs alike, and then removes this function from ``__main__``.
+
+    Returns:
+        True when the standard input was moved; False when not frozen, or when the process
+        has no standard input to move.
+
+    Raises:
+        OSError: ``SetStdHandle`` failed (the Win32 slot would name a closed handle).
+    """
+    if not getattr(sys, "frozen", False):
+        return False
+    try:
+        private = os.dup(0)  # PEP 446: the duplicate is not inheritable
+    except OSError:
+        return False  # no standard input at all: nothing a child could inherit
+    null = os.open(os.devnull, os.O_RDONLY)
+    try:
+        if sys.platform == "win32":
+            import ctypes
+            import msvcrt
+
+            os.dup2(null, 0)
+            done = ctypes.windll.kernel32.SetStdHandle(
+                ctypes.c_ulong(STD_INPUT_HANDLE & 0xFFFFFFFF),
+                ctypes.c_void_p(msvcrt.get_osfhandle(0)),
+            )
+            if not done:
+                raise ctypes.WinError()
+        else:
+            os.dup2(null, 0)
+    finally:
+        os.close(null)
+    encoding = getattr(sys.stdin, "encoding", None) or "utf-8"
+    sys.stdin = io.TextIOWrapper(open(private, "rb"), encoding=encoding)  # noqa: SIM115
+    return True
 
 
 def prepend_executable_folder(environ: MutableMapping[str, str] | None = None) -> bool:
@@ -217,6 +277,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv if argv is None else argv)
     prepend_executable_folder()
     if arguments[1:2] == [WORKER_FLAG]:
+        # F-E: before the worker's first read and before anything that can spawn a child
+        # (the loader, the worker import, its backend probe, any CuPy import).
+        isolate_worker_stdin()
         gpu_pack.activate()
         from clearwater.app import export_worker
 

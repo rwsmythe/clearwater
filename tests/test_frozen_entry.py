@@ -13,6 +13,7 @@ import ast
 import importlib
 import importlib.abc
 import importlib.util
+import json
 import logging
 import os
 import shutil
@@ -345,9 +346,235 @@ def test_the_entry_sets_path_before_either_branch(
     executable = _frozen(monkeypatch, tmp_path)
     monkeypatch.setenv("PATH", os.pathsep.join(["/x", "/y"]))
     entry, _ = _fresh_entry(monkeypatch)
+    # in-process and frozen: the F-E shim must not re-point THIS process's standard input
+    monkeypatch.setattr(entry, "isolate_worker_stdin", lambda: False, raising=False)
     entry.main([executable, "--export-worker"])
     first = os.environ["PATH"].split(os.pathsep)[0]
     assert first == os.path.dirname(executable)
+
+
+# CHARC's F-E ruling: the frozen worker reads its request pipe privately; children get NUL.
+# TEMPORARY with the shim itself (DR-125's package moves the isolation into the worker).
+
+_NO_GUI_PRELUDE = """
+import importlib.abc
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+
+class NoGui(importlib.abc.MetaPathFinder):
+    def find_spec(self, name, path, target=None):
+        if name.split(".")[0] in ("PySide6", "shiboken6") or name == "clearwater.app.main" or (
+            name == "clearwater.gui" or name.startswith("clearwater.gui.")
+        ):
+            raise ImportError("blocked by the test: " + name)
+        return None
+
+
+sys.meta_path.insert(0, NoGui())  # no window can open, whatever branch runs, on any revision
+sys.path.insert(0, sys.argv[1])
+sys.frozen = True
+import clearwater.__main__ as entry
+from clearwater import gpu_pack
+"""
+"""What each F-E child runs first: the GUI unimportable, the entry imported as frozen."""
+
+_SPAWN_BEFORE_THE_PROBE = (
+    _NO_GUI_PRELUDE
+    + """
+set_std_handle = []
+if sys.platform == "win32":
+    import ctypes
+
+    kernel32 = ctypes.windll.kernel32
+    real = kernel32.SetStdHandle
+
+    def counting(*args):
+        set_std_handle.append(1)
+        return real(*args)
+
+    kernel32.SetStdHandle = counting
+
+
+def spawn_first():
+    early = sorted(
+        m for m in sys.modules if m.split(".")[0] == "cupy" or m == "clearwater.app.export_worker"
+    )
+    try:
+        done = subprocess.run(
+            [sys.executable, "-I", "-c", "import sys; print(len(sys.stdin.buffer.read()))"],
+            capture_output=True,
+            text=True,
+            timeout=float(sys.argv[2]),
+        )
+        child = done.stdout.strip()
+    except subprocess.TimeoutExpired:
+        child = "timeout"
+    print(json.dumps({
+        "child_read": child,
+        "early": early,
+        "set_std_handle": len(set_std_handle),
+        "stdin_fd": sys.stdin.fileno(),
+    }), flush=True)
+    raise SystemExit(0)
+
+
+gpu_pack.activate = spawn_first  # the branch's first call after the shim: before any probe
+entry.main(["Clearwater.exe", "--export-worker"])
+"""
+)
+"""The frozen worker branch, whose loader call is replaced by a spawn: a child with
+``stdin=None`` reads its standard input to the end and prints how many bytes it got."""
+
+
+def _app_data_environ(root: Path) -> dict[str, str]:
+    """This environment with every app-data variable under ``root`` (never the user's)."""
+    environ = dict(os.environ)
+    for variable in (
+        "APPDATA",
+        "LOCALAPPDATA",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+    ):
+        environ[variable] = str(root / variable.lower())
+    return environ
+
+
+def test_a_child_of_the_frozen_worker_branch_inherits_nul_not_the_request_pipe(
+    tmp_path: Path,
+) -> None:
+    """F-E (i): spawned from the branch BEFORE the loader and the probe, a child reads EOF.
+
+    The worker process's standard input is a pipe this test holds open and never writes to,
+    as the parent holds the request pipe during a job. A child spawned with ``stdin=None``
+    that inherited it would block until its 10 s bound; with the shim it inherits the null
+    device and reads 0 bytes at once. At the spawn, neither the worker module nor CuPy is
+    imported yet; the worker's own ``sys.stdin`` is the private descriptor, not 0; on Windows
+    ``SetStdHandle`` was called once.
+    """
+    import clearwater
+
+    src_root = Path(clearwater.__file__).resolve().parents[1]
+    process = subprocess.Popen(
+        [sys.executable, "-I", "-c", _SPAWN_BEFORE_THE_PROBE, str(src_root), "10"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=_app_data_environ(tmp_path),
+    )
+    try:
+        status = process.wait(timeout=60)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        raise
+    finally:
+        assert process.stdin is not None
+        process.stdin.close()
+    assert process.stdout is not None and process.stderr is not None
+    out, err = process.stdout.read().decode(), process.stderr.read().decode()
+    assert status == 0, err
+    seen = json.loads(out.strip().splitlines()[-1])
+    assert seen["child_read"] == "0"
+    assert seen["early"] == []
+    assert seen["stdin_fd"] != 0
+    assert seen["set_std_handle"] == (1 if sys.platform == "win32" else 0)
+
+
+_CANCEL_THROUGH_THE_SHIM = (
+    _NO_GUI_PRELUDE
+    + """
+from clearwater.app import export_worker
+
+gpu_pack.activate = lambda: None
+
+
+def run(stdin, protocol):
+    def send(obj):
+        protocol.write(json.dumps(obj).encode("ascii") + b"\\n")
+        protocol.flush()
+
+    request = json.loads(stdin.readline())
+    send({"progress": [1, 100, "working"]})
+    cancel = stdin.readline()
+    Path(sys.argv[2]).write_text(json.dumps({
+        "fd": stdin.fileno(),
+        "request_keys": sorted(request),
+        "cancel": cancel.decode("ascii"),
+    }), encoding="utf-8")
+    send({"result": {"ok": False, "outputs": [], "warnings": [], "failure": "cancelled",
+                     "device": "cpu", "elapsed_s": 1.0}})
+    return 0
+
+
+export_worker.run = run  # the real main: stdout taken over, then run(sys.stdin.buffer, ...)
+raise SystemExit(entry.main(["Clearwater.exe", "--export-worker"]))
+"""
+)
+"""The frozen worker branch with the real ``export_worker.main`` and a stand-in ``run`` that
+reads the request, reports once, reads the parent's cancel line, records both, and ends."""
+
+
+def test_the_frozen_worker_reads_its_request_and_the_cancel_line_through_the_private_fd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F-E (ii): ``test_cancel_is_delivered_on_stdin_and_the_child_ends``, re-pointed.
+
+    The same parent (``ProcessExportJobs`` and its progress double from
+    ``test_jobs_export_process``, cancelling after the first report), with the child running
+    the frozen worker branch instead of a fake script: the request and the
+    ``{"cancel": true}`` line still arrive, through the private descriptor (not 0).
+    """
+    process_tests = importlib.import_module("test_jobs_export_process")
+    import clearwater
+    from clearwater.jobs.export_process import CANCEL_LINE
+    from clearwater.jobs.export_seam import CANCELLED
+
+    for variable, value in _app_data_environ(tmp_path / "app-data").items():
+        if variable.startswith(("APPDATA", "LOCALAPPDATA", "XDG_")):
+            monkeypatch.setenv(variable, value)  # the child inherits these
+    src_root = Path(clearwater.__file__).resolve().parents[1]
+    seen = tmp_path / "seen.json"
+    command = [sys.executable, "-I", "-c", _CANCEL_THROUGH_THE_SHIM, str(src_root), str(seen)]
+    result, _ = process_tests._run(tmp_path, command, process_tests._Progress(cancel_after=1))
+    assert result.failure is CANCELLED
+    record = json.loads(seen.read_text(encoding="utf-8"))
+    assert record["cancel"].encode("ascii") == CANCEL_LINE == b'{"cancel": true}\n'
+    assert "format_version" in record["request_keys"]
+    assert record["fd"] != 0
+
+
+def test_the_worker_branch_moves_no_standard_input_when_not_frozen(
+    monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]]
+) -> None:
+    """F-E (iii): the 1.0.0 lock. A source run duplicates nothing and calls no ``SetStdHandle``."""
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    entry, _ = _fresh_entry(monkeypatch)
+    dups: list[int] = []
+    set_std_handle: list[object] = []
+
+    def no_dup(fd: int) -> int:
+        dups.append(fd)
+        raise AssertionError("the source worker branch duplicated a descriptor")
+
+    monkeypatch.setattr(os, "dup", no_dup)
+    if sys.platform == "win32":
+        import ctypes
+
+        def counting(*args: object) -> int:
+            set_std_handle.append(args)
+            return 1
+
+        monkeypatch.setattr(ctypes.windll.kernel32, "SetStdHandle", counting, raising=False)
+    stdin = sys.stdin
+    assert entry.main(["python -m clearwater", "--export-worker"]) == 7
+    assert calls == [("activate", None), ("worker", [])]
+    assert dups == []
+    assert set_std_handle == []
+    assert sys.stdin is stdin
 
 
 # Reviewer A r2 #11: the worker branch's import graph, in a fresh interpreter.

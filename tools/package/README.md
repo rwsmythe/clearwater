@@ -115,6 +115,18 @@ PyInstaller runs, and so does a pack distribution that is not installed in the b
 environment. So a lock bump that brings a new standard-library need fails the build or
 bundles the module; it never reaches a user's GPU as an import error.
 
+## The frozen worker's standard input (a TEMPORARY shim)
+
+`cuda.pathfinder` checks a CUDA library in a child process (`sys.executable -m ...`, its
+canary probe) that inherits the parent's standard input. In the frozen export worker that is
+the request pipe, which the worker's cancel thread is reading, and on Windows the child then
+hangs at start-up until pathfinder kills it at 10 s: the GPU is reported unusable (WP6.1
+finding F-E). So the frozen `--export-worker` branch of `clearwater.__main__`
+(`isolate_worker_stdin`) first moves the pipe to a private descriptor and points the standard
+input (descriptor 0 and, on Windows, the Win32 handle) at the null device. A source run is
+unchanged. The shim is TEMPORARY: DR-125's package moves this isolation into the worker
+itself, for source and frozen runs alike, and removes the shim from `__main__`.
+
 ## The GPU pack manifest
 
 The frozen application loads CuPy and the CUDA wheels from a per-user folder, the GPU pack
