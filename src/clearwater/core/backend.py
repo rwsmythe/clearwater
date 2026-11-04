@@ -51,6 +51,7 @@ import functools
 import importlib
 import logging
 import math
+import sys
 from collections.abc import Buffer, Sequence
 from typing import Any
 
@@ -928,6 +929,9 @@ def check_sigma(sigma_px: float) -> None:
 
 _NUMPY_BACKEND = NumpyBackend()
 
+MACOS_CPU_REASON = "CPU: graphics-card processing is not available on macOS"
+"""The AD-9 reason on macOS when CuPy is absent, as it always is there (WP6.4 Q3; spec N1)."""
+
 
 @functools.cache
 def _probe_gpu() -> tuple[CupyBackend | None, str]:
@@ -940,7 +944,11 @@ def _probe_gpu() -> tuple[CupyBackend | None, str]:
         # included, is an installed CuPy that fails to load.
         if isinstance(exc, ModuleNotFoundError) and exc.name == "cupy":
             _LOG.info("CuPy not installed: %s", exc)
-            return None, "CPU: CuPy not installed"
+            if sys.platform == "darwin":  # nothing CUDA can be installed there (AD-35)
+                reason = MACOS_CPU_REASON
+            else:
+                reason = "CPU: CuPy not installed"
+            return None, reason
         _LOG.info("CuPy failed to load: %s: %s", type(exc).__name__, exc)
         return None, "CPU: CuPy failed to load"
     try:

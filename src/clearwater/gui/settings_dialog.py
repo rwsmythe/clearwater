@@ -92,8 +92,11 @@ MAX_CACHE_GB = 100_000
 SAME_FOLDER_TEXT = "Same folder as the source"
 """What the output folder control shows for ``output_folder`` None (D34)."""
 
-AUTO_TEXT = "Automatic (NVENC when available)"
-"""The text of the automatic encoder item."""
+AUTO_TEXT = "Automatic (the hardware encoder when available)"
+"""The text of the automatic encoder item (G12 v0.6.1: platform-neutral)."""
+
+ENCODER_FAMILIES = {"hevc_nvenc": "NVENC", "hevc_videotoolbox": "VideoToolbox"}
+"""The family name the automatic item's tool tip gives a hardware encoder."""
 
 DETECTING_TEXT = "Detecting encoders..."
 """Shown while the capability job runs."""
@@ -108,6 +111,31 @@ NOT_FOUND_REASON = "not found on this computer"
 """Why a stored encoder the sink does not report is shown unavailable."""
 
 type EncoderResolver = Callable[[str, Sequence[EncoderCapability]], str]
+
+
+def auto_tooltip(capabilities: Sequence[EncoderCapability]) -> str:
+    """Return the automatic item's tool tip: what ``"auto"`` tries, in the roster's order.
+
+    The capability report lists this platform's roster in preference order (NVENC on Windows,
+    VideoToolbox on macOS, then libx265), so the tip names the hardware encoder of the
+    platform without the dialog knowing which platform it runs on.
+
+    Args:
+        capabilities: The sink's capability report, in roster order.
+
+    Returns:
+        For example ``"Uses NVENC (hevc_nvenc) when it is available, else libx265."``; the
+        empty string while nothing is reported.
+    """
+    hardware = [f"{ENCODER_FAMILIES.get(c.name, c.name)} ({c.name})" for c in capabilities if c.hw]
+    software = [c.name for c in capabilities if not c.hw]
+    if hardware and software:
+        return f"Uses {', '.join(hardware)} when it is available, else {', '.join(software)}."
+    if hardware or software:
+        return f"Uses {', '.join(hardware or software)}."
+    return ""
+
+
 """``resolve_encoder(setting, capabilities) -> name``: the one "auto" rule (WP3.10)."""
 
 
@@ -505,6 +533,9 @@ class SettingsDialog(QDialog):
         combo.blockSignals(True)
         combo.clear()
         combo.addItem(AUTO_TEXT, AUTO)
+        tip = auto_tooltip(self._catalog.capabilities())
+        if tip:
+            combo.setItemData(0, tip, Qt.ItemDataRole.ToolTipRole)
         reported = {c.name for c in self._catalog.capabilities()}
         for capability in self._catalog.capabilities():
             if capability.available:
