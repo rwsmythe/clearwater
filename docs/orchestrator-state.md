@@ -5,80 +5,93 @@
 
 ### Generation
 
-- **Generation 44** (session `clearwater-orchestrator-20261104-0652`) LIVE from 2026-11-04 16:53Z. CHARC = **gen 15 `clearwater-charc-20261104-0027`**. Re-verify both names in `comms/.launch-sessions.json` before every cue.
-- Seat folder `work/orch-g44/`:
-  - `gate.sh` (legs `static collect parallel serial startup fullclip harness`; basetemps still named `g43-<run>-*`);
-  - `watch2.sh`;
-  - the drains;
-  - the posts;
-  - `fill_accept.py`.
+- **Generation 44** (session `clearwater-orchestrator-20261104-0652`) LIVE 2026-11-04 16:53Z -> ROLLED at the 400K cap ~18:45Z, clean: nothing it started is still running (see the board).
+- CHARC = **gen 16 `clearwater-charc-20261104-0738`**. Re-verify both names in `comms/.launch-sessions.json` before every cue.
+- Seat folder `work/orch-g44/`: `gate.sh` (legs `static collect parallel serial startup fullclip harness`), `watch2.sh`, drains 1-10, the posts. Copy both scripts to your own seat folder with `sed 's#orch-g44#orch-g45#g'`.
 - Bash gauge at bring-up: 44 ms.
-- State worktree `.worktrees/orch-state-g44`. Run `git merge --ff-only main` before each edit, and ff main to it after the commit. The successor removes it and adds its own.
-- **Disk:** C: 84 GB free at 17:12Z. Run `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB is needed before any window or gate.
-- **Paces at 16:53Z:**
-  - Codex 2 % / 0.497 (resets 2026-11-11 10:07Z);
-  - Claude 39 % / 1.194 (resets 2026-11-09 10:00Z).
+- State worktree `.worktrees/orch-state-g44`: the successor removes it and adds its own.
+- **Disk:** C: 82 GB free at 18:40Z. Run `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB is needed before any window or gate.
+- **Paces at 17:21Z:**
+  - Codex 2 % / 0.464 (resets 2026-11-11 10:07Z);
+  - Claude 39 % / 1.183 (resets 2026-11-09 10:00Z).
 
-  Re-read at the next dispatch.
+  Re-read at the first dispatch.
 - **CHARC subjects: under 100 characters.**
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
 
-- **DESKTOP INPUT RULE and ENTRY-POINT ISOLATION RULE (CLAUDE.md hardware section).** Paste BOTH VERBATIM into EVERY dispatch (CHARC's order; the text is in `clearwater-review-evidence\wp6.1\cell\dispatch-15.md`). A cell-written GUI script is YIELDED to the seat UNRUN and reviewed before it runs:
-  - grep it for SendKeys / AppActivate / SendInput / keybd_event / mouse_event / pyautogui / SetForegroundWindow;
-  - check the PID-tree filter, the redirect and the bounds.
-
-  It is then RUN AT THE SEAT FROM md5-CHECKED COPIES.
-- **ROLLOVER TIMING (OWNER-RULED, CHARC FYI `08c0b43b`).** Below the 400K cap a seat starts the next unit WHATEVER ITS SIZE. It rolls at the first clean boundary AFTER 400K, with nothing it started still running. At or past the cap, dispatch nothing new.
-- **NO ROLLOVER WHILE A JOB RUNS (OWNER, 2026-11-02).** An Agent-tool cell and every background process die with the pane.
+- **DESKTOP INPUT RULE and ENTRY-POINT ISOLATION RULE (CLAUDE.md hardware section).** Paste BOTH VERBATIM into EVERY dispatch (the text is in `clearwater-review-evidence\wp-dr125\cell\dispatch-6.md`). A cell-written GUI or proof script is reviewed at the seat (grep for SendKeys / AppActivate / SendInput / keybd_event / mouse_event / pyautogui / SetForegroundWindow) and RUN AT THE SEAT FROM md5-CHECKED COPIES.
+- **WP-DR125 turn-4 ruling, point 4 (CHARC):** NO seat or review run may execute the DR-125 "before" shape: a daemon blocked on `sys.stdin.buffer` at interpreter exit, or the OLD worker at `73453bdc`. It can end in a WER abort or a crash dialog. Sandbox only. Every review prompt says so.
+- **ROLLOVER TIMING (OWNER-RULED).** Below 400K a seat starts the next unit WHATEVER ITS SIZE; it rolls at the first clean boundary after 400K with nothing it started still running. At or past the cap, dispatch nothing new.
+- **NO ROLLOVER WHILE A JOB RUNS (OWNER, 2026-11-02).**
 - **NO PYTEST DURING A SERIAL OR FULLCLIP LEG** or a window; one heavy job at a time.
-- **ONE CODEX CELL AT A TIME**; a Codex REVIEWER pass is not a cell.
-- **Gates:** `bash work/orch-g44/gate.sh <worktree> <run-id> <legs...>` (background), plus a Monitor on `bash work/orch-g44/watch2.sh <run-id> <summary line count before the start>` (30 min cap; re-arm).
+- **TWO CODEX SESSIONS ARE ALLOWED** (CHARC `a6934b58`: WP-DR125 beside WP6.3a, disjoint files). The seat serialises the HEAVY jobs: one gate, build or seat run at a time.
 - **Codex turns:**
-  - Run a turn with `uv run python scripts/codex_cell.py turn --worktree <ABS> --prompt <p> --evidence <dir> --turn N [--session <id>] > <dir>\turn-N.driver.stdout 2>&1`, with **run_in_background**.
+  - Run a turn with `uv run python scripts/codex_cell.py turn --worktree <ABS> --prompt <p> --evidence <dir> --turn N [--session <id>] > <dir>\turn-N.driver.stdout 2>&1`, with run_in_background.
   - Commit with `codex_cell.py commit --worktree <ABS> --return-file <return-N.md>`.
-  - Depth = the footer's `depth_input_tokens`.
+  - Depth = the footer's `depth_input_tokens`; evaluate at about 200K, STOP near 250K (both briefs).
   - FRESH prompt = `.claude/agents/implementer-codex-sol-high.md` + the brief at HEAD + `dispatch-N.md`, joined, with `tr -d '\r'`.
   - A RESUMED session's prompt = `dispatch-N.md` alone.
-- **Claude reviewer pass for a Codex cell:** `uv run python scripts/codex_cell.py review --worktree <abs> --base <sha> --prompt <p> --out <dir> > <dir>\review.seat.log 2>&1` (background).
-  - Latest form: `clearwater-review-evidence\wp6.1\cell\codex-b\review-1\review-prompt-1.md` (a code delta, with mutation probes and the isolation pre-read).
-  - Text-package form: `...\wp6.2\A\r1\review-prompt-r1.md`.
-  - Assert from the seat log's JSON line: `model_ok`, `is_error` false, the verdict line, `worktree_clean_after`. Read `permission_denials` from `review.json`.
-- **Codex review of a Claude cell:**
-  - Reviewer A runs in a DETACHED review worktree, from a subshell: `cat prompt diff | codex exec -p strong -s read-only --skip-git-repo-check -c 'windows.sandbox="unelevated"' -`. Forms: `wp6.1\A\r4\` / `r5\`.
-  - Reviewer B = the WSL script `clearwater-review-evidence\wp6.1\B\run_review_B.sh probe|review`.
-- **Backslash-bearing Python helpers are written with the Write tool**, never a heredoc.
-- **`rm` takes literal absolute paths.**
-- A NEW file in a worktree must be `git -C <wt> add`ed before a pathspec commit.
-- **A bare `cd` moves the session's cwd.** This includes `cd X && ...` at the START of a Bash command: the harness carries it whenever X is inside the working directories. Use ONLY `( cd X && ... )`, `git -C` and absolute paths. Gen 44 slipped twice at pickup, with no cell live.
+- **Claude review of a Codex cell:**
+  - Run `codex_cell.py review --worktree <DETACHED review copy> --base <sha> --prompt <p> --out <dir> > <dir>\review.seat.log 2>&1` (background).
+  - The review copy is `git worktree add --detach .worktrees/<pkg>-rA <head>` + `uv sync --frozen` + `clearwater.local.toml`. Move it with `git -C <copy> checkout -q --detach <new head>`.
+  - Forms: `wp-dr125\A\r1\review-prompt-r1.md` (a full round), `A\r2\review-prompt-r2.md` (a fold-in round), `wp6.3a\A\r1\review-prompt-r1.md`.
+- **Gates:** `bash work/<seat>/gate.sh <worktree> <run-id> <legs...>` (background), plus a Monitor on `watch2.sh <run-id> <summary line count>`.
+- **Backslash-bearing Python is written with the Write tool**, never a heredoc.
+- **A bare `cd` moves the session's cwd**, including `cd X && ...` at the start of a Bash call. Use ONLY `( cd X && ... )`, `git -C` and absolute paths. Gen 44 slipped three times.
 
 ### Live board (RESUME HERE)
 
-**Nothing running** (no cell, no Codex turn, no reviewer, no gate) as of 17:15Z.
+**Nothing running** at the roll: the WP-DR125 frozen check's end line is recorded below. No cell, no Codex turn, no review.
 
-1. **WP6.1 ACCEPTED** 2026-11-04 17:14Z. Main at `b2eb4f74`. Record: `docs/proofs/wp6.1-accept.md`.
-   - Nets: A converged r5; B clean; the Claude review of the Codex fold-in clean.
-   - Gate `p61` green. D6 PASS. CP6a = ONEDIR.
-   - Posted to CHARC and cued. CHARC writes AD-33 / AD-34 / the N13 row / the N14 onedir figures and the DR-125 brief.
-   - Five fold-in advisories are banked in the record, for WP6.3 or the register.
-2. **DR-125** (the export worker crashes at exit; the F-E stdin isolation moves into the worker and the `__main__` shim is removed; fail-closed inherited). WAIT for CHARC's brief (Codex lane), then dispatch.
-   - Occurrences: 1 of 12 frozen worker runs; 0 in the timing window, the GUI check and D6.
-3. **WP6.3** (the downloader plus the GitHub Actions workflow; onedir per CP6a). Expect CHARC's brief. Its hand check stages a REAL colour photo copied from the footage folder under `work/` (CHARC's D6 lesson).
-4. **Push:** main is ahead of `origin/main`; a push needs the owner's word.
+1. **WP-DR125** (worker-side stdin isolation; DR-125). Branch `wp-dr125` at **`1ea45021`**; base `73453bdc`; main merged in at `fd798923`. Brief `docs/briefs/wp-dr125-brief.md` (FINAL plus the Round-0, Turn-4 and Reviewer A r1 rulings).
+   - **Cells:** session `01a1a797` (round 0 and the build; retired at 198,080); session `01a1a7b0-df46-7361-9f2e-1927e997b468` (turns 4-6; 163,391 / 475,000 at turn-6 end; RESUMABLE for Reviewer B's fold-in).
+   - **Reviewer A CONVERGED at r2**, NO_NEW_CRITICAL_MAJOR (`wp-dr125\A\r2\`). Three advisories are banked for B's fold-in:
+     - `_NO_GUI_PRELUDE` is dead in `test_frozen_entry.py:477-500`; it needs a one-line grant from CHARC;
+     - `test_app_export_worker.py:260` should communicate first, then assert with stderr;
+     - reword the report's a6 row.
+   - **The seat frozen check:** see "FROZEN CHECK RESULT" below. Evidence `wp-dr125\frozen\` (`handler-check.json` PASS, `verify-*.log`, `run-*.out`, `run12.summary.txt`, `proof-dr125.jsonl`, md5s of the patched copies). Build log: `.worktrees/wp-dr125/work/wp6.1/build-onedir-dr125.log`.
+   - **FROZEN CHECK RESULT (seat, 18:33-18:35Z, onedir build of `1ea45021`): GREEN.** HANDLER CHECK PASS (`isolate_worker_stdin` ABSENT; entry script, `gpu_pack`, `export_worker` equal to source); `--verify` PASS before and after (2,701 files, 2,412.6 MiB); **12/12 frozen `--export-worker` runs (6 heic + 6 video) exit 0, ok, device GPU, 0 crash codes, 0 windows**; owner-log md5 unchanged (`69ed0432...`); real `%LOCALAPPDATA%\Clearwater` ABSENT before and after; no Clearwater left running. Posted to CHARC with the rollover.
+   - **The report's "Frozen check (seat)" section is `SEAT TO FILL`:** fill it from `run12.summary.txt` and `handler-check.json` (or have the cell do it in B's fold-in).
+   - **NEXT:**
+     1. Reviewer B: a separate Claude pass at the seat on `1ea45021`, after the report fill. Use a fresh prompt over `73453bdc..HEAD`, saying "do NOT run the before shape".
+     2. If B finds anything: one resumed turn of `01a1a7b0`, with A r2's advisories.
+     3. The gate: `static collect parallel serial harness` (serial because of the `slow` 20-run series).
+     4. Footprint: the six product and test files, the README, `gpu_pack.py` (docstring only) and the report; 0 CR.
+     5. The accept record (form `docs/proofs/wp6.1-accept.md`).
+     6. Merge main, ff.
+     7. Post to CHARC: it CLOSES DR-125 and amends AD-34 / AD-31.
+     8. Then release `.worktrees/wp-dr125-rA`.
+2. **WP6.3a** (the GPU pack downloader). Branch `wp6.3a` at **`53748e82`**; base `3d37e02f`. Brief `docs/briefs/wp6.3a-brief.md` (FINAL plus the Round-0 rulings: S1-S3, size 1.725 GB, darwin, exit codes; DR-128 opened).
+   - **Cells:** session `01a1a7a2` (round 0 and part 1; retired at 189,696); session `01a1a7b8-97bb-7451-bb5a-adeb5a5c6387` (part 2; 140,581 / 475,000 at turn-3 end; RESUMABLE for the fold-in).
+   - **Reviewer A r1 = NEW_CRITICAL_MAJOR_FOUND** (`wp6.3a\A\r1\review.txt`):
+     - CRITICAL: the `.data` rule refuses the real cupy wheel's `cupy/.data/`;
+     - MAJOR: remove while the pack is loaded;
+     - MINOR: the census is 2,679 RECORD files, not 2,701;
+     - plus 3 more MINOR and advisories.
+   - **POSTED to CHARC** (`dd447e7f`) with recommendations. AWAIT CHARC's ruling, then dispatch the fold-in as a resumed turn of `01a1a7b8`, then A r2.
+   - After A converges, **the seat run** (brief section; authorised by FINAL; 1.725 GB from `files.pythonhosted.org` into a redirected LOCALAPPDATA; build onedir FIRST from the 6.3a head, after merging WP-DR125's accept so the frozen worker carries both), then B, the gate, the accept.
+   - **Shared files with WP-DR125:** `__main__.py`, `test_frozen_entry.py`, `tools/package/README.md`, `gpu_pack.py`. DR-125 accepts first; merge main into `wp6.3a` and resolve, keeping both.
+3. **WP6.3b and WP6.4:** briefs are DRAFT on main, for your fill. 6.3b goes after 6.3a's accept; 6.4 after DR-125's accept (Claude opus-high).
+4. **Push:** main is ahead of `origin/main`. CHARC batches the owner's push after DR-125 and 6.3a land.
 5. **Worktrees:**
    - main;
-   - `orch-state-g44`;
-   - `wp6.1`, kept for WP6.3: its `work\wp6.1\dist-on{dir,file}` builds and the hand-filled pack under `work\wp6.1\t3c\appdata` are pruned on the owner's word;
-   - `wp6.2`, released, kept for the prune.
-
-   `wp6.1-rA` and `wp-t8` were removed (branches kept).
-6. **Prunes owed (owner's word only):** the wp6.1 builds and pack after WP6.3; `.worktrees/wp6.2`.
+   - `orch-state-g44` (remove it);
+   - `wp-dr125` and its detached copy `wp-dr125-rA`;
+   - `wp6.3a` and its detached copy `wp6.3a-rA`;
+   - `wp6.1`, KEPT: its hand-filled GPU pack at `work\wp6.1\t3c\appdata\Local\Clearwater\gpu-pack\14.2.0-cu12` serves the frozen checks (2,701 files; `--verify` PASS before the DR-125 runs); its builds are pruned on the owner's word;
+   - `wp6.2`, released.
+6. **Prunes owed (owner's word only):** the wp6.1 builds and pack after 6.3a's seat run; `.worktrees/wp6.2`; the new `wp-dr125` onedir build under `.worktrees/wp-dr125/work/wp6.1/` after the accept.
 
 ### Gen-44 lessons
 
-- **Main can move between your `git log main` read and your merge** (CHARC's state commits). After `git merge main` into a package branch, read the merge's actual second parent (`git log --graph`) before citing it in a record.
-- **`build.py` has no CLI bundle checker**: a read-only re-check of an existing build calls `forbidden_paths(root)` and `forbidden_entries(find_executable(root))` from the package venv (`python -B`).
-- **A Claude review's `permission_denials`** were all compound shell lines it re-ran in allowed forms. Read them from `review.json` and say so in the record, rather than counting them as gaps.
+- **A stand-in for an interpreter-exit crash must use the STANDARD stream.** A private `io.open(dup)` reader is never finalised, so it cannot crash; `sys.stdin.buffer` is. Read the original repro (`wp6.1\cell\t3e\stdin_parent.py:17`) before trusting a "deterministic" witness.
+- **A fatal Python abort behaves differently in the Codex sandbox and at the seat.** In the sandbox it hangs (WER, no desktop); at the seat it exits 0xC0000005. Keep deliberate-crash shapes out of the gate, and run them in the sandbox only, with `SetErrorMode` suppression (CPython's `SuppressCrashReport`).
+- **A brief's factual premise about third-party artefacts can be wrong** (6.3a: "none of the eleven wheels has a `.data`"; cupy has `cupy/.data/`). Ask the reviewer to check premises against the real artefacts (the uv cache, the venv's RECORDs), read-only.
+- **Console `python.exe` updates the Win32 std handle on `dup2`; `pythonw.exe` and a windowed frozen exe do not.** A test of `SetStdHandle` must run under `pythonw.exe`.
+- **Run Reviewer A in parallel with a cell turn that changes no product code** (DR-125 r1 beside the records turn; 6.3a r1 beside DR-125's fold-in). This saved about an hour.
+- **Main moves under you** (CHARC commits often): read a merge's real second parent before citing it.
+- **WP6.1's `proof4.py` / `headless.py` / `handler_check.py` re-target with a small path patch** (`wp-dr125\frozen\patch_paths.py`). `handler_check.py` takes its source paths as arguments. Keep the pack read-only in place.
 
 ### Gen-43 lessons
 
