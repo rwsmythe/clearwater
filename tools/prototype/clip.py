@@ -62,6 +62,9 @@ memory and ambient readings; this command line is the runner without them.
 
 Exit status 0 on success; 2, with a one-line ``error: ...`` on standard error, on a
 configuration, probe, path, pipe or FFmpeg failure.
+
+Windows / NVIDIA evidence; not a Mac instrument (WP6.4, audit row T34): the prototype encodes
+with NVENC only; its algorithms are not ported to the Mac.
 """
 
 from __future__ import annotations

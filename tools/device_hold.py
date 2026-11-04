@@ -8,6 +8,9 @@ Before release, a second flushed JSON line reports {"stopped": "stop-file"} or
 {"stopped": "timeout"} for a normal exit.
 Normal stop or timeout exits 0; argument errors exit 2. Python-level exits release in finally;
 process teardown releases the context even when an external kill cannot execute finally.
+
+Windows / NVIDIA evidence; not a Mac instrument (WP6.4, audit row T42): an intentional CuPy
+device allocation, CUDA only; it is not part of the Mac suite.
 """
 
 from __future__ import annotations

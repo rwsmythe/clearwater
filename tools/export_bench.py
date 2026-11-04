@@ -55,6 +55,10 @@ exit status 0 when every run finished with an ok result and no failed memory che
 footage-lookup or disk-space error before any run; 3 when the memory check failed
 (a breach, or the device peak unmeasured). Exit 3 takes precedence over a job failure;
 both failures are preserved, and the plan stops with all earlier records kept.
+
+Windows / NVIDIA evidence; not a Mac instrument (WP6.4, audit row T38): every non-x265 leg gets
+the NVIDIA sampler, so a VideoToolbox leg would be misclassified; Mac telemetry is separate
+work.
 """
 
 from __future__ import annotations

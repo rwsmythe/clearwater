@@ -52,6 +52,9 @@ an item or a record.
 
 Exit status 0 when the comparison ran; 1 when an encode failed; 2 on a usage, configuration,
 probe or output-path error.
+
+Windows / NVIDIA evidence; not a Mac instrument (WP6.4, audit row T36): its NVENC proof uses
+nvidia-smi pmon, which proves nothing about VideoToolbox; the VT V4 evidence is WP6.5's.
 """
 
 from __future__ import annotations

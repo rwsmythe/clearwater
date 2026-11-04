@@ -28,6 +28,9 @@ FFmpeg runs as a separate process, always with ``-nostdin -hide_banner``; ``-y``
 
 Exit status 0 on success; 2, with a one-line ``error: ...`` on standard error, on a
 configuration, probe, path or FFmpeg failure.
+
+Windows / NVIDIA evidence; not a Mac instrument (WP6.4, audit row T35): its encoders and its
+NVIDIA proof sampler are the 1.0.0 Windows legs; a Mac leg is separate work.
 """
 
 from __future__ import annotations

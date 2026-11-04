@@ -63,6 +63,9 @@ an FFmpeg decode to a pipe; nothing is written outside the working folder. Usage
 
     uv run python tools/core_speed.py GX011627 [--cpu-frames 10] [--gpu-frames N]
     uv run python tools/core_speed.py GX011627 --whole [--memory] [--cpu-frames 10]
+
+Windows / NVIDIA evidence; not a Mac instrument (WP6.4, audit row T39): its GPU telemetry is
+NVIDIA's and reads unavailable elsewhere; the Mac CPU figure is WP6.5's.
 """
 
 from __future__ import annotations

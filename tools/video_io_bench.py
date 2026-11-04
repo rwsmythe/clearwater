@@ -64,6 +64,10 @@ where OPTIONS, after the subcommand, are ``--config FILE``, ``--keep``, ``--soft
 for every leg before the first run and again before each run. Exit status 0 when every run
 finished; 1 when a run failed or the disk filled up between runs (the record says which and
 why); 2 on a usage, configuration, footage-lookup or disk-space error before any run.
+
+Windows / NVIDIA evidence; not a Mac instrument (WP6.4, audit row T13, T37): its sampler is
+nvidia-smi and its plan is fixed to NVENC and x265; a Mac plan is new WP6.5 work, not a retiming
+of these results.
 """
 
 from __future__ import annotations

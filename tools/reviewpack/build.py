@@ -1,4 +1,9 @@
-"""Build CP5 evidence through the shipped headless runner, with no agent judgement."""
+"""Build CP5 evidence through the shipped headless runner, with no agent judgement.
+
+Windows / NVIDIA evidence; not a Mac instrument (WP6.4, audit row T33): the pair encoder is x265
+under force CPU and NVENC otherwise; a VideoToolbox or Mac CPU option is added only if a Mac
+review pack is commissioned.
+"""
 
 from __future__ import annotations
 
