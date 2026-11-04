@@ -16,6 +16,7 @@ import importlib.util
 import json
 import logging
 import os
+import site
 import sys
 import sysconfig
 import tomllib
@@ -224,6 +225,7 @@ def isolated(monkeypatch: pytest.MonkeyPatch) -> list[str]:
         The folders the loader asked ``os.add_dll_directory`` to add.
     """
     monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.setattr(site, "PREFIXES", list(site.PREFIXES))  # F-F: never this process's
     added: list[str] = []
 
     class Handle:
@@ -1143,6 +1145,85 @@ def test_activate_loads_from_the_pack_root_when_frozen(
     status = gpu_pack.activate()
     assert status is not None and status.outcome == "loaded"
     assert sys.path[0] == str(root / gpu_pack.STAMP / gpu_pack.SITE_PACKAGES_NAME)
+
+
+def test_a_frozen_activation_puts_the_pack_folder_first_in_site_prefixes(
+    tmp_path: Path, isolated: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CHARC's F-F ruling: ``getsitepackages()[0]`` is ``<pack>/site-packages``, exactly.
+
+    The FOLDER is the prefix (never ``<pack>``); ``site.ENABLE_USER_SITE`` is unchanged; and
+    ``sys.path`` gains the one pack entry only. A second activation adds nothing.
+    """
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    root = tmp_path / "local" / "Clearwater" / "gpu-pack"
+    make_pack(root)
+    folder = root / gpu_pack.STAMP
+    entry = str(folder / gpu_pack.SITE_PACKAGES_NAME)
+    path_before, prefixes_before = list(sys.path), list(site.PREFIXES)
+    user_site_before = site.ENABLE_USER_SITE
+    status = gpu_pack.activate()
+    assert status is not None and status.outcome == "loaded"
+    assert [entry, *prefixes_before] == site.PREFIXES
+    assert str(folder) not in site.PREFIXES
+    if os.sep == "\\":  # the Windows spelling of getsitepackages() (P, P/Lib/site-packages)
+        assert site.getsitepackages()[0] == entry
+        assert site.getsitepackages()[1] == os.path.join(entry, "Lib", "site-packages")
+    assert site.ENABLE_USER_SITE is user_site_before
+    assert [p for p in sys.path if p not in path_before] == [entry]
+    gpu_pack.activate()
+    assert site.PREFIXES.count(entry) == 1
+    assert sys.path.count(entry) == 1
+
+
+def test_a_source_run_leaves_site_prefixes_untouched(
+    tmp_path: Path, isolated: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F-F, the 1.0.0 lock: not frozen, ``activate()`` changes no ``site.PREFIXES``."""
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    make_pack(tmp_path / "local" / "Clearwater" / "gpu-pack")
+    before = list(site.PREFIXES)
+    assert gpu_pack.activate() is None
+    assert before == site.PREFIXES
+
+
+def test_a_rejected_pack_adds_no_site_prefix(
+    tmp_path: Path, isolated: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F-F: only a LOADED pack becomes a prefix."""
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    folder = make_pack(tmp_path / "local" / "Clearwater" / "gpu-pack")
+    (_site(folder) / "stray.pth").write_text("", encoding="utf-8")  # an unowned entry
+    before = list(site.PREFIXES)
+    status = gpu_pack.activate()
+    assert status is not None and status.outcome == "rejected"
+    assert before == site.PREFIXES
+
+
+def test_the_full_verify_lists_every_unlisted_nested_file(
+    tmp_path: Path, isolated: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """CHARC's Q2 ruling: ``--verify`` fails on a nested ``.pyc`` and ``.py`` no RECORD names.
+
+    The start-up check stays top-level (both files sit inside the owned ``cupy``), so it still
+    passes; ``__pycache__`` is not excluded.
+    """
+    folder = make_pack(tmp_path)
+    cache = _site(folder) / "cupy" / "__pycache__"
+    cache.mkdir()
+    (cache / "__init__.cpython-312.pyc").write_bytes(b"pyc")
+    (_site(folder) / "cupy" / "planted.py").write_text("# planted\n", encoding="utf-8")
+    assert gpu_pack.check_pack(folder) is None
+    status, lines = _verify(folder, capsys)
+    assert status == 1
+    text = "\n".join(lines)
+    assert "unlisted file in site-packages: cupy/__pycache__/__init__.cpython-312.pyc" in text
+    assert "unlisted file in site-packages: cupy/planted.py" in text
 
 
 # The build script's manifest helper.

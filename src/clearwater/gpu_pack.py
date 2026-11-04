@@ -14,7 +14,11 @@ At start-up, before anything imports ``cupy``, :func:`activate` checks the pack'
 against the lock (:data:`LOCKED_DISTRIBUTIONS`) and, when it passes, puts its
 ``site-packages`` at the front of ``sys.path``. On Windows it also adds each
 ``site-packages/nvidia/*/bin`` folder to the DLL search path (``os.add_dll_directory``), because
-CuPy's library finder does not search ``sys.path`` for the CUDA DLLs. It logs one line:
+CuPy's library finder does not search ``sys.path`` for the CUDA DLLs, and it puts the
+``site-packages`` folder first in ``site.PREFIXES`` (:func:`add_site_prefix`), because
+``cuda.pathfinder`` looks for the CUDA headers through ``site.getsitepackages()`` (F-F; on a
+future Linux leg the spelling would be ``lib/python3.12/site-packages`` under the prefix, not
+handled here). It logs one line:
 ``gpu pack <stamp>: loaded``, ``absent`` or ``rejected: <reason>``. An absent or rejected
 pack changes nothing: the backend probe then reports the CPU path exactly as 1.0.0 does.
 
@@ -31,7 +35,9 @@ with the size that ``RECORD`` gives; and ``site-packages`` holds no top-level en
 ``RECORD`` owns (so nothing unlisted, a ``.pth`` file or a second ``numpy`` say, can shadow
 the bundle). It hashes no file but the ``RECORD`` files. Hashing every file is the
 installer's job, once, at install time (:func:`pack_problems` with ``full=True``, which the
-build script's ``--verify`` runs on a pack filled by hand).
+build script's ``--verify`` runs on a pack filled by hand); the full check also walks every
+file under ``site-packages`` and fails on any that no ``RECORD`` row names, ``__pycache__``
+included (CHARC's Q2 ruling; the start-up check stays top-level).
 """
 
 from __future__ import annotations
@@ -702,7 +708,8 @@ def _pack_problems(
        ``RECORD`` could not be read, since ownership is then unknown.
 
     With ``full`` each row's file is also hashed and compared with the row's ``sha256``, and a
-    row without a hash (other than the ``RECORD`` file's own) is a problem: the install-time
+    row without a hash (other than the ``RECORD`` file's own) is a problem, and so is every file
+    under ``site-packages`` that no row names (:func:`_unlisted_files`; Q2): the install-time
     check (``tools/package/build.py --verify``). Without it no file but the ``RECORD`` files is
     read.
 
@@ -753,6 +760,7 @@ def _pack_problems(
         return
     interpreter, platform = platform_tags() if tags is None else tags
     owned: set[str] = set()
+    listed: set[str] = set()
     every_record_read = True
     for entry in entries:
         locked = expected[entry["name"]]
@@ -768,6 +776,7 @@ def _pack_problems(
         yield from _wheel_tag_problems(site, locked, interpreter, platform)
         for row in rows:
             owned.add(os.path.normcase(PurePosixPath(row.path).parts[0]))
+            listed.add(_listed_key(row.path))
             yield from _row_problems(site, locked, row, full=full)
     if every_record_read:
         with os.scandir(site) as listing:
@@ -775,6 +784,40 @@ def _pack_problems(
         for name in names:
             if os.path.normcase(name) not in owned:
                 yield f"unlisted entry in site-packages: {_safe(name)}"
+        if full:
+            yield from _unlisted_files(site, owned, listed)
+
+
+def _listed_key(path: str) -> str:
+    """Return a ``RECORD`` path (or a walked one, ``/``-joined) in its comparison form."""
+    return os.path.normcase("/".join(part for part in re.split(r"[/\\]", path) if part))
+
+
+def _unlisted_files(site: Path, owned: set[str], listed: set[str]) -> Iterator[str]:
+    """Yield every file under ``site-packages`` that no ``RECORD`` row names (the full check).
+
+    CHARC's Q2 ruling: no exclusions (``__pycache__`` included). A top-level entry that no
+    ``RECORD`` owns is already reported by the ownership check, so its files are not repeated.
+
+    Raises:
+        OSError: A folder cannot be listed (``os.walk`` reports it).
+    """
+
+    def fail(error: OSError) -> None:
+        raise error
+
+    for top, folders, files in os.walk(site, onerror=fail):
+        folders.sort()
+        relative = Path(top).relative_to(site).parts
+        if relative and os.path.normcase(relative[0]) not in owned:
+            folders[:] = []
+            continue
+        for name in sorted(files):
+            if not relative and os.path.normcase(name) not in owned:
+                continue
+            path = "/".join([*relative, name])
+            if _listed_key(path) not in listed:
+                yield f"unlisted file in site-packages: {_safe(path)}"
 
 
 def _record_problems(
@@ -1009,7 +1052,44 @@ def activate() -> PackStatus | None:
     """
     if not getattr(sys, "frozen", False):
         return None
-    return load(pack_root())
+    status = load(pack_root())
+    if status.outcome == "loaded" and status.site_packages is not None:
+        add_site_prefix(status.site_packages)
+    return status
+
+
+def add_site_prefix(site_packages: Path) -> bool:
+    """Put the pack's ``site-packages`` folder FIRST in ``site.PREFIXES`` (CHARC's F-F ruling).
+
+    ``cuda.pathfinder`` finds the CUDA headers (and its wheel libraries) through
+    ``site.getsitepackages()``, not ``sys.path``, so a frozen process that only has the pack on
+    ``sys.path`` never finds the pack's ``nvidia/*/include``. On Windows ``getsitepackages()``
+    lists each prefix ``P`` as ``P`` and ``P/Lib/site-packages``, so with the folder itself as
+    the first prefix its first entry is exactly ``<pack>/site-packages`` (the second does not
+    exist and is harmless). The FOLDER is inserted, never ``<pack>``. ``site`` is the bundled
+    module: importing it in a frozen build runs nothing (``no_site``), and
+    ``site.ENABLE_USER_SITE`` and ``sys.path`` are not changed here. On a future Linux leg the
+    prefix spelling would differ (``getsitepackages()`` appends ``lib/python3.12/site-packages``
+    there); it is not handled here.
+
+    Called by :func:`activate` only, so only in a frozen build, after the ``sys.path``
+    insertion; a source run never touches ``site.PREFIXES`` (1.0.0).
+
+    Args:
+        site_packages: The loaded pack's ``site-packages`` folder.
+
+    Returns:
+        True when the prefix was added; False when it was already first.
+    """
+    import site
+
+    entry = str(site_packages)
+    if site.PREFIXES[:1] == [entry]:
+        return False
+    if entry in site.PREFIXES:
+        site.PREFIXES.remove(entry)
+    site.PREFIXES.insert(0, entry)
+    return True
 
 
 def _inside(path: str, folder: str) -> bool:
