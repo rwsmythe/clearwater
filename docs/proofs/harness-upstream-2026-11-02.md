@@ -107,7 +107,7 @@ Done by the orchestrator (generation 40) at the WP-H1 accept, by the method belo
   before the delta was cut.
 - Branch **`clearwater-upstream-2026-11-04`**, commit **`911e783`**, local only; the template's own suite
   `python -m unittest discover -s tests/harness` 423 OK (1 skipped). The clone is back on `master`, clean.
-- **NOT PUSHED.** As with item 1: the push, the PR and the merge are the owner's word and click.
+- Pushed 2026-11-04 on the owner's word; PR #2 https://github.com/rwsmythe/harness-template/pull/2 opened by CHARC. The owner then directed (verbatim: "merge into pr2, push, then I want to formally put pr2 into main"): the comms_ui docstring port fix (three literals to 8765, reported by the coa-chess CHARC) was cherry-picked onto the branch as `cb05cdd` (suite 423 OK), pushed, and **PR #2 MERGED by CHARC into `master` = `a9d328c`**. Notices with a change summary sent to the swing and coa-chess CHARCs (owner-directed). Clearwater's `refs/remotes/template/main` fetched to `a9d328c`.
 
 ## Re-port method for later
 
