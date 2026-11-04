@@ -47,7 +47,7 @@ Order: WP6.1 and WP6.2 in parallel (6.1 exclusive for its timings; 6.2 is a read
 
 ## 4. Prune request (D-I)
 
-Worktrees `.worktrees/wp5.3`, `wp5.5`, `wp5.7`, `wp5.8`, `wp-dr25`, `wp-h1` (branches kept, every commit on main or reachable) and their `work/` folders; `orch-state-g40` stays (the live orchestrator's seat). Sizes: see the figures CHARC posts with this proposal. Evidence folders under `clearwater-review-evidence\` are untouched. On the owner's word "prune", the orchestrator removes them and CHARC writes `docs/proofs/prune-2026-11-04.md`.
+Worktrees `.worktrees/wp5.3`, `wp5.5`, `wp5.7`, `wp5.8`, `wp-dr25`, `wp-h1` (branches kept, every commit on main or reachable) and their `work/` folders; `orch-state-g40` stays (the live orchestrator's seat). Sizes measured 2026-11-04 ~07:10Z: worktrees (each with its own `.venv`) wp5.3 5.4 GB, wp5.5 5.7 GB, wp5.7 5.4 GB, wp5.8 5.1 GB, wp-dr25 5.2 GB, wp-h1 3.0 GB = 29.8 GB; `work/` folders wp5.7 22.8 GB, wp5.3 16.0 GB, wp-dr25 7.2 GB = 46.0 GB (`work/` total 48.0 GB). About 76 GB freed; C: is at 34 GB free (97 % used), so the prune is needed before the WP6.1 spike's builds. Evidence folders under `clearwater-review-evidence\` are untouched. On the owner's word "prune", the orchestrator removes them and CHARC writes `docs/proofs/prune-2026-11-04.md`.
 
 ## 5. What the owner says
 
