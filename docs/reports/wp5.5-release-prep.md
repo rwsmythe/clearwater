@@ -449,7 +449,43 @@ gate; it does not open another review round.
 
 ## Release gate
 
-**PENDING: the orchestrator's release gate.** No package-targeted result above
+**RESULT (filled by the orchestrator at the accept, generation 40): GREEN.**
+
+The release gate `p55`, figures of record for 1.0.0:
+
+- **Candidate:** `4742f69f`, the package plus main merged `--no-ff`.
+- **Script:** `work/orch-g40/gate.sh` (WP-T7's flags, a per-leg free-space check), run from Git Bash with `PYTEST_ADDOPTS` unset and `QT_QPA_PLATFORM=offscreen`.
+- **Conditions:** stall watch armed; one leg at a time; nothing else heavy running.
+
+| Leg | Result | Wall | Free on C: at the leg's start |
+|---|---|---|---|
+| static | `ruff check` exit 0; `ruff format --check` 317 files already formatted; `mypy` no issues in 158 source files | - | 39 GB |
+| collection | all **8,067** = parallel 6,787 + serial 1,273 + fullclip 7; 0 duplicates; union identical to collect-all | - | 39 GB |
+| parallel | **6,786 passed, 1 skipped**, exit 0 (the standing swscale refusal, `tests/test_color_roundtrip.py:123`). The junit carries `test_version` (3), `test_export_bench` (16) and `test_tools_halo_part3` (53), all green. | 591 s | 39 GB |
+| serial | **1,262 passed, 11 skipped**, exit 0 (the standing look-check frames archived to D:) | 2,053 s | 37 GB |
+| fullclip | **7 passed**, exit 0 | 1,583 s | 37 GB |
+| harness | first run on `4742f69f`: **2 FAILED** (the genericity guard and the manifest accounting refused `THIRD_PARTY_NOTICES.md`, `docs/user-guide.md` and `docs/release-checklist.md`, which were not yet registered as instance surface). Fixed by the orchestrator in `8e83fa76` (three entries in `tests/harness/genericity_lists.py`). Then **382 tests OK (1 skipped)** on the final head `d6bed59d` | 19 s | 37 GB |
+
+**Between the gated head and the final head:**
+- `d6bed59d` = `4742f69f` + `8e83fa76` (the harness registration) + main's docs-only `05ee369f` merged `--no-ff`.
+- The only paths changed are `tests/harness/genericity_lists.py` (outside every pytest leg: `norecursedirs`) and `docs/orchestrator-state.md`. So the pytest legs stand for `d6bed59d`, and the harness gate was re-run on it.
+
+**Records:**
+- Archived to `clearwater-review-evidence\release-1.0.0\`: the summary, every log, the three junits and `MD5SUMS.txt`.
+- Log md5s:
+
+  | Log | md5 |
+  |---|---|
+  | `parallel.log` | `d4e374f232f937b56375fc61ce371c94` |
+  | `serial.log` | `7f2904df5bceb8840ef8df293a7341ac` |
+  | `fullclip.log` | `c211d119cd01f990129332a61f684ed4` |
+  | `harness-final.txt` | `10f087366205f37d80b2250cd72421fe` |
+
+- C: had 39 GB free at the start (01:08:36Z) and 37 GB at the end (02:20:06Z).
+
+The procedure below is the one the gate followed.
+
+No package-targeted result above
 is a release-gate figure. The [checklist](../release-checklist.md) delegates
 the exact collection/outcome/stall-watch rules to
 [the review/gate fill](../review-gate-clearwater.md). The orchestrator runs
