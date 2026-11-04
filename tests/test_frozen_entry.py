@@ -1,6 +1,7 @@
 """The frozen-build entry: the worker re-entry and the bundled-tool PATH (WP6.1, AD-34, D1).
 
-Parallel leg, synthetic: ``sys.frozen`` and ``sys.executable`` are monkeypatched, the export
+Synthetic (parallel except the marked wall-clock check): ``sys.frozen`` and
+``sys.executable`` are monkeypatched, the export
 worker's ``main``, the GPU pack loader, the log set-up and the GUI's ``main`` are stubbed, so no
 window opens and no real app-data folder is touched. One check runs in a fresh interpreter
 (``python -I -c``), because only a fresh import graph shows what the worker branch imports. The
@@ -93,7 +94,14 @@ def calls(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[tuple[str, An
     def locations(**_: Any) -> config_paths.Locations:
         return config_paths.Locations(config_dir=tmp_path / "cfg", cache_dir=tmp_path / "cache")
 
-    for variable in ("APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
+    for variable in (
+        "APPDATA",
+        "LOCALAPPDATA",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+    ):
         monkeypatch.setenv(variable, str(tmp_path / variable.lower()))  # never the user's
     monkeypatch.setattr(gpu_pack, "activate", activate)
     monkeypatch.setattr(export_worker, "main", worker_main)
@@ -317,7 +325,14 @@ def test_a_source_run_starts_the_gui_as_1_0_0_did(
     redirected under ``tmp_path``; only the GUI is a stand-in, which looks for the log folder.
     """
     monkeypatch.delattr(sys, "frozen", raising=False)
-    for variable in ("APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
+    for variable in (
+        "APPDATA",
+        "LOCALAPPDATA",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+    ):
         monkeypatch.setenv(variable, str(tmp_path / variable.lower()))
     log_dir = config_paths.app_locations().log_dir
     assert log_dir.is_relative_to(tmp_path)
@@ -569,22 +584,22 @@ def _app_data_environ(root: Path) -> dict[str, str]:
     return environ
 
 
-def _within(read: Callable[[], bytes], timeout: float, what: str) -> bytes:
-    """Run one blocking read of a child's pipe on a daemon thread; fail the test at the deadline.
+def _within[T](read: Callable[[], T], timeout: float, what: str) -> T:
+    """Run a blocking child operation on a daemon thread; fail the test at the deadline.
 
     Reviewer A r5 #1: no raw ``read`` / ``readline`` on a child pipe without a deadline. The
     thread is a daemon, so a read still blocked at the deadline cannot hold pytest open; the
     caller's ``finally`` ends the child it started.
 
     Args:
-        read: The bound read (``stream.readline`` or ``stream.read``).
+        read: A blocking call (a pipe read or a complete worker job).
         timeout: Seconds to wait for it.
         what: What is read, for the failure message.
 
     Returns:
-        The bytes read.
+        The blocking call's result.
     """
-    got: list[bytes] = []
+    got: list[T] = []
     failed: list[BaseException] = []
 
     def target() -> None:
@@ -706,7 +721,34 @@ def test_the_frozen_worker_reads_its_request_and_the_cancel_line_through_the_pri
     src_root = Path(clearwater.__file__).resolve().parents[1]
     seen = tmp_path / "seen.json"
     command = [sys.executable, "-I", "-c", _CANCEL_THROUGH_THE_SHIM, str(src_root), str(seen)]
-    result, _ = process_tests._run(tmp_path, command, process_tests._Progress(cancel_after=1))
+    spawned: list[subprocess.Popen[bytes]] = []
+    real_popen = subprocess.Popen
+    spawn_lock = threading.Lock()
+    closing = False
+
+    def popen(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+        with spawn_lock:
+            if closing:
+                raise RuntimeError("the test deadline passed before the worker spawned")
+            process = real_popen(*args, **kwargs)
+            spawned.append(process)
+            return process
+
+    monkeypatch.setattr(subprocess, "Popen", popen)
+    try:
+        result, _ = _within(
+            lambda: process_tests._run(tmp_path, command, process_tests._Progress(cancel_after=1)),
+            60,
+            "worker cancellation through the shim",
+        )
+    finally:
+        # Also covers a worker stuck before its first progress report; no late spawn escapes.
+        with spawn_lock:
+            closing = True
+        for process in spawned:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=60)
     assert result.failure is CANCELLED
     record = json.loads(seen.read_text(encoding="utf-8"))
     assert record["cancel"].encode("ascii") == CANCEL_LINE == b'{"cancel": true}\n'
@@ -771,6 +813,8 @@ time.sleep(120)  # killed by the test long before this ends
 killed by the test while still holding the request pipe's write end."""
 
 
+# Real elapsed-time bound (waited_s < 20): serial leg, per CLAUDE.md.
+@pytest.mark.slow
 @pytest.mark.parametrize("ending", ["parent-closes", "parent-dies"])
 def test_the_end_of_the_request_pipe_reaches_the_workers_reader_through_the_shim(
     tmp_path: Path, ending: str
@@ -1080,9 +1124,7 @@ def _probe_worker_imports(src_root: Path, app_data: Path) -> str:
     Returns:
         The probe's output line.
     """
-    environ = dict(os.environ)
-    for variable in ("APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
-        environ[variable] = str(app_data / variable.lower())
+    environ = _app_data_environ(app_data)
     done = subprocess.run(
         [sys.executable, "-I", "-c", _WORKER_IMPORT_PROBE, str(src_root), *BLOCKED],
         capture_output=True,
@@ -1154,7 +1196,14 @@ def _no_real_app_data(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, seen: list[tuple[str, Any]]
 ) -> None:
     """App data under ``tmp_path`` and the log set-up stubbed (recorded), whatever runs."""
-    for variable in ("APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
+    for variable in (
+        "APPDATA",
+        "LOCALAPPDATA",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+    ):
         monkeypatch.setenv(variable, str(tmp_path / variable.lower()))
 
     def configure(folder: Path, **_: Any) -> Path:
@@ -1435,7 +1484,14 @@ def test_the_real_pathfinder_canary_module_runs_through_the_frozen_dash_m(
     module = "cuda.pathfinder._dynamic_libs.dynamic_lib_subprocess"
     src_root = Path(clearwater.__file__).resolve().parents[1]
     environ = dict(os.environ)
-    for variable in ("APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
+    for variable in (
+        "APPDATA",
+        "LOCALAPPDATA",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+    ):
         environ[variable] = str(tmp_path / variable.lower())
     done = subprocess.run(
         [sys.executable, "-I", "-c", _PATHFINDER_PROBE, str(src_root), str(site), module],

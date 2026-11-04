@@ -81,13 +81,13 @@ FORBIDDEN_TOP_LEVEL: tuple[str, ...] = (
 """Top-level names that must not reach the dist or the frozen-module archive."""
 
 FORBIDDEN_DIST_INFO_PREFIXES: tuple[str, ...] = (
-    "cupy_cuda",
-    "cuda_pathfinder",
-    "cuda_toolkit",
-    "nvidia_",
+    "cupy-cuda",
+    "cuda-pathfinder",
+    "cuda-toolkit",
+    "nvidia-",
     "fastrlock",
 )
-"""Distribution metadata folders (``<name>-<version>.dist-info``) that must not be bundled."""
+"""PEP 503-normalized prefixes of GPU distribution metadata / data folders to exclude."""
 
 FORBIDDEN_LIBRARY_PREFIXES: tuple[str, ...] = (
     "cublas",
@@ -401,10 +401,10 @@ def name_violations(parts: Sequence[str], *, module_root: bool) -> list[str]:
         if stem in GPU_MODULE_NAMES and index not in excepted:
             rules.add("gpu-module")
     for part in lowered:
-        if part.endswith((".dist-info", ".egg-info")) and part.startswith(
-            FORBIDDEN_DIST_INFO_PREFIXES
-        ):
-            rules.add("gpu-metadata")
+        if part.endswith((".dist-info", ".egg-info", ".data")):
+            normalized = re.sub(r"[-_.]+", "-", part.rsplit(".", 1)[0])
+            if normalized.startswith(FORBIDDEN_DIST_INFO_PREFIXES):
+                rules.add("gpu-metadata")
     if lowered[0].split(".", 1)[0] == "tests":
         rules.add("tests")
     if CUDA_LIBRARY.fullmatch(lowered[-1]):
@@ -548,6 +548,7 @@ class _Package(Protocol):
     """The part of PyInstaller's ``CArchiveReader`` the checks use."""
 
     toc: dict[str, tuple[int, int, int, int, str]]
+    options: list[str]
 
     def extract(self, name: str) -> bytes:
         """Return one entry's data, decompressed."""
@@ -597,6 +598,11 @@ def forbidden_entries(executable: Path) -> list[str]:
     readers = importlib.import_module("PyInstaller.archive.readers")
     package = read_package(executable)
     found: list[str] = []
+    # CArchiveReader separates runtime options from the TOC; each still meets the name rules.
+    for option in package.options:
+        parts = split_name(option)
+        label = f"pkg:{'/'.join(parts)}"
+        found += [f"{label} ({rule})" for rule in name_violations(parts, module_root=False)]
     for name, entry in package.toc.items():
         typecode = entry[-1]
         parts = split_name(name)
@@ -611,8 +617,8 @@ def forbidden_entries(executable: Path) -> list[str]:
             module = name.replace("\\", ".").replace("/", ".")
             found += [f"{label} ({r})" for r in module_violations(module, allow_boot=True)]
             continue
-        if typecode in (readers.PKG_ITEM_PYSOURCE, readers.PKG_ITEM_RUNTIME_OPTION):
-            # The entry script and the run-time hooks (options are not files): no allowlist,
+        if typecode == readers.PKG_ITEM_PYSOURCE:
+            # The entry script and the run-time hooks: no allowlist,
             # but their names are checked for GPU content like every entry's (r2 #5).
             found += [f"{label} ({rule})" for rule in name_violations(parts, module_root=False)]
             continue
@@ -1182,30 +1188,36 @@ def pack_sources(names: Iterable[str] | None = None) -> list[tuple[str, Path]]:
     """
     import importlib.metadata
 
-    if names is None:
-        sys.dont_write_bytecode = True  # importing clearwater must not write into src (F8)
-        from clearwater import gpu_pack
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True  # importing clearwater must not write into src (F8)
+    try:
+        if names is None:
+            from clearwater import gpu_pack
 
-        names = [locked.name for locked in gpu_pack.LOCKED_DISTRIBUTIONS]
-        versions = {locked.name: locked.version for locked in gpu_pack.LOCKED_DISTRIBUTIONS}
-    else:
-        versions = {}
-    rows: list[tuple[str, Path]] = []
-    for name in names:
-        distribution = importlib.metadata.distribution(name)
-        expected = versions.get(name)
-        if expected is not None and distribution.version != expected:
-            # a stale build environment would describe other pack code (Reviewer A r3 #12)
-            raise ValueError(f"{name}: installed {distribution.version}, the lock has {expected}")
-        files = distribution.files
-        if files is None:
-            raise ValueError(f"{name}: no RECORD")
-        for file in files:
-            if file.suffix == ".py":
-                rows.append(
-                    (f"{name}:{file.as_posix()}", Path(str(distribution.locate_file(file))))
+            names = [locked.name for locked in gpu_pack.LOCKED_DISTRIBUTIONS]
+            versions = {locked.name: locked.version for locked in gpu_pack.LOCKED_DISTRIBUTIONS}
+        else:
+            versions = {}
+        rows: list[tuple[str, Path]] = []
+        for name in names:
+            distribution = importlib.metadata.distribution(name)
+            expected = versions.get(name)
+            if expected is not None and distribution.version != expected:
+                # a stale build environment would describe other pack code (Reviewer A r3 #12)
+                raise ValueError(
+                    f"{name}: installed {distribution.version}, the lock has {expected}"
                 )
-    return sorted(rows)
+            files = distribution.files
+            if files is None:
+                raise ValueError(f"{name}: no RECORD")
+            for file in files:
+                if file.suffix == ".py":
+                    rows.append(
+                        (f"{name}:{file.as_posix()}", Path(str(distribution.locate_file(file))))
+                    )
+        return sorted(rows)
+    finally:
+        sys.dont_write_bytecode = previous
 
 
 def hidden_imports(

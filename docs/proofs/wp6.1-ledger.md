@@ -3109,3 +3109,88 @@ Fact check (every figure re-read from its source; sources named in the report):
   after a worker kill or crash).
 
 Depth at turn-4 report end: DISPATCHER TO FILL
+
+## Reviewer B fold-in (Codex turn, 2026-11-04)
+
+Dispatch 15, starting head `68cc1f33`. Reviewer B reviewed `dc784b4f` and returned
+`NO_NEW_CRITICAL_MAJOR`: four MINOR, two ADVISORY. All six accepted and fixed in this
+one authorized fold-in. Reviewer B's transcript was read from
+`C:/Users/rwsmy/clearwater-review-evidence/wp6.1/B/review-B.txt` (read-only).
+
+| Finding | Fix | Test / evidence | Mutation result |
+|---|---|---|---|
+| B1 MINOR, in-envelope: runtime options escape the TOC walk | `forbidden_entries` walks `package.options` with name rules only; `_Package` describes options; dead runtime-option branch removed | Real synthetic CArchives: `cupy/runtime.pyd` rejected; `pyi-runtime-tmpdir work/tmp` and `u` accepted | In-memory deletion of the options walk makes the new test fail (KILLED) |
+| B2 MINOR, in-envelope: cancellation test lacks its own deadline / cleanup | `_within` accepts a generic result; the entire job has a 60 s deadline; captured children are killed if alive and always waited in `finally`; a locked closing flag prevents late captured spawns | Normal cancellation test passes; in-memory blocked-before-progress and exception-after-spawn probes propagate the expected failures, kill/wait the child, and confirm the job thread finishes | Injected blocked progress is caught at the probe's accelerated 2 s deadline; injected job exception also exercises cleanup |
+| B3 MINOR, in-envelope: real elapsed-time bound in parallel selection | Marked the pipe-EOF test `slow`, with the CLAUDE.md reason; `waited_s < 20` unchanged | Both `parent-closes` and `parent-dies` pass; collection excludes both from parallel and includes both in serial | Not requested; selection checked with both exact marker expressions |
+| B4 MINOR, in-envelope: `pack_sources` leaks `sys.dont_write_bytecode` | Save the incoming flag, suppress bytecode during the scan, restore in `finally` | Four cases: incoming False / True, successful scan / injected scan exception; the scan also asserts suppression is active | In-memory removal of the restore fails both incoming-False cases (2/4, KILLED) |
+| B5 ADVISORY, Linux / out-of-envelope: import probe omits `XDG_DATA_HOME` | `_probe_worker_imports` uses `_app_data_environ`; the other four explicit app-data loops in this owned module also include XDG data/state | Import graph tests pass; a subprocess-boundary probe confirms all six app-data variables are under the disposable root without running a child | Not requested; boundary environment inspected directly |
+| B6 ADVISORY, noncanonical metadata / out-of-envelope: hyphenated GPU names missed | Lower-case metadata names and collapse runs of hyphens, underscores and dots before prefix matching; cover `.dist-info`, `.data` and existing `.egg-info`; README states these rules | 18 name/suffix combinations cover hyphenated, dotted, mixed-case and mixed-separator names; every case also checks non-GPU numpy metadata remains allowed | Before-fix red run distinguishes the normalization / data-folder gap; no extra mutation requested |
+
+Cumulative fold-in row: NEW = 4 MINOR + 2 ADVISORY; CRITICAL = 0; MAJOR = 0;
+REOPENED = 0; in-envelope = 4; out-of-envelope = 2 (explicitly authorized fixes);
+reverts = 0; product-code fixes = 0; build-tool fixes = 3; test-only fixes = 3.
+The dispatcher's Claude review of this delta remains the next review step.
+
+### Commands and results
+
+Runner outputs are under the worktree's gitignored `work/c61j-evidence/`. No output was
+written to the read-only evidence directory. PowerShell runs set
+`$env:PYTHONPATH='scripts'`; pytest always loads `-p sandbox_mkdir_shim -p no:cacheprovider`.
+For final validation `$env:VIRTUAL_ENV` points to this worktree's `.venv` and `--no-sync`
+is used throughout. The initial red/green logs include uv's harmless warning that the
+inherited main-tree VIRTUAL_ENV was ignored in favor of the worktree environment.
+
+- Red, before the build-tool changes (new tests already present):
+  `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_tools_package_build.py -k 'runtime_options_are or gpu_metadata_names or pack_sources_restores' --basetemp=work/c61j-1`
+  -> **19 failed, 4 passed, 40 deselected**, exit 1 (`red.log`). Failures were the expected
+  missed option / metadata names and leaked flag, not fixture or sandbox errors.
+- Green, same selection with `--basetemp=work/c61j-2` -> **23 passed, 40 deselected**,
+  exit 0 (`green.log`).
+- `uv run --no-sync ruff check .` -> **All checks passed**, exit 0 (`ruff-check.log`).
+- `uv run --no-sync ruff format --check .` -> **323 files already formatted**, exit 0
+  (`ruff-format.log`).
+- `uv run --no-sync mypy` -> **no issues in 161 source files**, exit 0 (`mypy.log`).
+- `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_tools_package_build.py tests/test_frozen_entry.py tests/test_gpu_pack.py --basetemp=work/c61j-3`
+  -> **330 passed in 18.73 s**, exit 0 (`modules.log`); includes both slow cases.
+- `uv run --no-sync pytest --collect-only -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_tools_package_build.py tests/test_frozen_entry.py tests/test_gpu_pack.py -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/c61j-collect-parallel`
+  -> **328/330 collected, 2 deselected**, exit 0 (`collect-parallel.log`); neither EOF case
+  appears.
+- Same collection with `-m "(gpu or footage or gui or slow) and not fullclip"`
+  and `--basetemp=work/c61j-collect-serial` -> **2/330 collected, 328 deselected**, exit 0
+  (`collect-serial.log`); exactly the two EOF cases appear.
+- In-memory AST mutation probes (`uv run --no-sync python -`, no on-disk code mutation):
+  B1 options-walk deletion KILLED, B4 restore deletion KILLED on success and exception
+  (`mutations.log`, exit 0).
+- In-memory cleanup / environment probes (`uv run --no-sync python -`): blocked-before-progress
+  and exception-after-spawn both clean up their child and finish the job thread; all six
+  environment variables redirected (`cleanup-isolation-probes.log`, exit 0). The deliberately
+  killed worker produces the expected ended-without-result stderr log; no sandbox failure.
+- Final rerun after the helper docstring correction and ledger write: the same static
+  commands pass again (ruff: all checks passed; format: 323 files; mypy: 161 source files),
+  and the same three-module pytest command with `--basetemp=work/c61j-4` gives
+  **330 passed in 18.12 s**, exit 0 (`ruff-check-final.log`, `ruff-format-final.log`,
+  `mypy-final.log`, `modules-final.log`). `git diff --check` exits 0; changed paths are
+  exactly the five owned files; `git diff --quiet -- src` exits 0. The ledger is ASCII and
+  all five owned files have zero CR bytes (`final-encoding.log`).
+
+### Verification loop and scope
+
+1. Suspected B1/B4/B6; confirmed independently by the red synthetic tests (19 failures).
+   Fixed; green targeted tests pass; B1/B4 mutations demonstrate discrimination.
+2. Suspected B2 could leave a child before the first report; confirmed by injecting that
+   blockage in memory, with an accelerated probe deadline. Fixed deadline/cleanup catches it;
+   a second probe confirms exception cleanup as well as timeout cleanup.
+3. Confirmed B3 by the existing elapsed-time assertion and missing marker. Fixed; independent
+   collection of both gate legs confirms routing, and both cases pass without weakening the bound.
+4. Confirmed B5 by the omitted environment key. Fixed the probe and the same omission in the
+   owned module's other isolation loops; boundary probe confirms XDG_DATA_HOME is disposable.
+5. Rejected as false positive: none. Final delta inspection found no additional issue.
+
+Only this turn's five owned files changed. No `src/`, dependency, frozen-interface or harness
+change; no build, frozen executable, GUI launch, old-revision run, real-pack verification,
+network fetch, desktop input, footage/profile write or git write. Tests use disposable
+app-data roots, GUI blockers/stubs and bounded subprocess waits. No sandbox-only failure
+occurred. The dispatch bundles the six requested non-blocking fixes into one logical fold-in;
+no additional owner ruling or out-of-scope code change is needed.
+
+Depth at the B fold-in end: DISPATCHER TO FILL

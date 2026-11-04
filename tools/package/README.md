@@ -69,7 +69,9 @@ violations:
   PyInstaller's boot modules included; one exception: SciPy's own vendored adapter
   `scipy/_external/array_api_compat/cupy`, which is SciPy's code, `GPU_NAME_EXCEPTIONS`);
 - `tests` as the first component;
-- a GPU-pack `.dist-info` / `.egg-info` folder at any depth;
+- a GPU-pack `.dist-info`, `.egg-info` or `.data` folder at any depth, with distribution
+  names normalized per PEP 503 (case ignored; runs of hyphens, underscores and dots treated
+  as one hyphen);
 - a CUDA library file name (`cublas*`, `cudart*`, `cudnn*`, `cufft*`, `curand*`,
   `cusolver*`, `cusparse*`, `cutensor*`, `nccl*`, `nvblas*`, `nvjitlink*`, `nvrtc*`, `nvtx*`,
   with or without `lib`, ending `.dll`, `.so` or `.so.<n>`; a test checks every DLL the locked

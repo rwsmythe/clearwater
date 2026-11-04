@@ -23,7 +23,7 @@ import sys
 import zipfile
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
@@ -478,6 +478,35 @@ def test_script_and_boot_module_entries_are_checked_for_gpu_names(tmp_path: Path
     assert len(found) == 3, found
 
 
+def test_runtime_options_are_checked_by_name_without_a_module_allowlist(tmp_path: Path) -> None:
+    """Reviewer B #1: options live outside the TOC but still meet every-entry name rules."""
+    executable = make_exe(tmp_path, [("cupy/runtime.pyd", b"", "o")])
+    assert build.forbidden_entries(executable) == ["pkg:cupy/runtime.pyd (gpu-module)"]
+    clean = make_exe(
+        tmp_path / "clean",
+        [("pyi-runtime-tmpdir work/tmp", b"", "o"), ("u", b"", "o")],
+    )
+    assert build.forbidden_entries(clean) == []
+
+
+@pytest.mark.parametrize("suffix", [".dist-info", ".data", ".egg-info"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "nvidia-cublas-cu12-12.9.2.10",
+        "nvidia.cublas.cu12-12.9.2.10",
+        "NvIdIa_-CuBlAs.Cu12-12.9.2.10",
+        "CuPy-CuDa12x-14.2.0",
+        "CUDA.PathFinder-1.8.3",
+        "cuda-toolkit-12.9.2.0",
+    ],
+)
+def test_gpu_metadata_names_use_pep503_normalization(name: str, suffix: str) -> None:
+    """Reviewer B #6: hyphens, dots, underscores and case cannot hide GPU metadata."""
+    assert "gpu-metadata" in build.name_violations([name + suffix, "RECORD"], module_root=False)
+    assert build.name_violations(["numpy-2.x" + suffix, "RECORD"], module_root=False) == []
+
+
 def test_an_extension_module_beside_the_executable_is_found(tmp_path: Path) -> None:
     """#8: ``av.pyd`` at the release root or beside the executable meets the allowlist."""
     tree(tmp_path, ["av.pyd", "Clearwater/av.pyd", "Clearwater/yaml/__init__.pyc"])
@@ -747,6 +776,35 @@ def test_the_real_pack_scan_finds_ctypes_wintypes() -> None:
     assert scan.unparsable == []
     assert any(p.startswith("cuda-pathfinder:") for p in scan.modules["ctypes.wintypes"])
     assert "graphlib" not in scan.modules  # the extension-only need the list carries
+
+
+@pytest.mark.parametrize("before", [False, True])
+@pytest.mark.parametrize("fails", [False, True])
+def test_pack_sources_restores_bytecode_setting_after_success_or_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, before: bool, fails: bool
+) -> None:
+    """Reviewer B #4: scanning suppresses bytecode only until it returns or raises."""
+    monkeypatch.setattr(sys, "dont_write_bytecode", before)
+
+    def distribution(name: str) -> Any:
+        assert sys.dont_write_bytecode is True
+        if fails:
+            raise RuntimeError("injected scan failure")
+        return SimpleNamespace(
+            version=next(row.version for row in gpu_pack.LOCKED_DISTRIBUTIONS if row.name == name),
+            files=[importlib.metadata.PackagePath("sample.py")],
+            locate_file=lambda file: tmp_path / file,
+        )
+
+    monkeypatch.setattr(importlib.metadata, "distribution", distribution)
+    if fails:
+        with pytest.raises(RuntimeError, match="injected scan failure"):
+            build.pack_sources()
+    else:
+        rows = build.pack_sources()
+        assert len(rows) == 11
+        assert all(path == tmp_path / "sample.py" for _, path in rows)
+    assert sys.dont_write_bytecode is before
 
 
 # Reviewer A r3 #9, #11, #12.
