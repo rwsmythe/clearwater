@@ -2730,4 +2730,217 @@ the same 67 paths in each of the four runs, and the SAME SET as 2b-4's `t3f/mapp
 unchanged). The new builds are at `work/wp6.1/dist-on{dir,file}/` (of `926bfdfa`); they replace
 `49150ccf`'s. The pack is unchanged at `work/wp6.1/t3c/appdata/Local/Clearwater/gpu-pack/14.2.0-cu12`.
 
-Depth at turn-3 group-2b-6 end: DISPATCHER TO FILL
+Depth at turn-3 group-2b-6 end: 179,394 (wp61-cell8, at its yield; read by the dispatcher)
+
+## Turn 3 group 2c-a (Reviewer A r5 fold-in, the final-code rebuild, the two scripts) (2026-11-04 ~15:25-15:42Z)
+
+Same cell (wp61-cell8), dispatch `clearwater-review-evidence/wp6.1/cell/dispatch-12.md`, on
+Reviewer A round 5 (`clearwater-review-evidence/wp6.1/A/r5/review.txt`, on `49150ccf..926bfdfa`:
+VERDICT NO_NEW_CRITICAL_MAJOR; one MINOR, three ADVISORY, all test or docstring only). Evidence:
+`clearwater-review-evidence/wp6.1/cell/t3i/`. Code + tests: commit `dc784b4f`.
+
+- NO frozen run and NO GUI launch in this group; neither Part-3 script was run. No desktop input,
+  no network. Nothing under the real `%APPDATA%\Clearwater` or `%LOCALAPPDATA%\Clearwater` (the
+  latter absent). Nothing under the pack was run or imported.
+- `jobs/export_process.py`, `io/video/pipes.py` and `app/export_worker.py` are untouched.
+- **Owner log** md5 `69ed0432c562db9445daecbe8f15fe27` before (15:27:46Z) and after (15:41:03Z)
+  (`t3i/owner-log-md5-{before,after}.txt`; a check only).
+
+### The fold-in table
+
+| # (r5) | Disposition | Fix (file) | Test(s) | Result |
+|---|---|---|---|---|
+| 1 MINOR | FIX | `tests/test_frozen_entry.py`: new helper `_within(read, timeout, what)` runs one blocking pipe read on a daemon thread and FAILS the test at its deadline. The parent-dies case reads the worker PID through it (60 s) inside a `try` / `finally` that kills and waits the parent if it is alive and kills the worker when no record came. Without a PID, the worker ends by itself: its pipe closes with the parent and its wait is bounded at 30 s. The sweep of the three owned test modules for other raw child-pipe reads found one more: the F-E (i) test (`..._inherits_nul_not_the_request_pipe`) read `stdout` / `stderr` with plain `read()` after the wait. Both now go through `_within` (30 s each), and the child is killed in a `finally`. Every other child call in the three modules is a `subprocess.run(..., timeout=...)` or a `communicate(timeout=...)`. | The three changed tests: `test_a_child_of_the_frozen_worker_branch_inherits_nul_not_the_request_pipe` and `test_the_end_of_the_request_pipe_reaches_the_workers_reader_through_the_shim[parent-closes, parent-dies]` | 4 passed (`t3i/pytest-changed-c61h-4.log`, with #2's test) |
+| 2 ADVISORY | FIX | `test_the_long_options_are_cpythons_by_execution`: the values come from an independent literal, `{"always", "default", "never"}` (CPython 3.12's own), plus near misses (`ALWAYS`, `Default`, `checked`, `unchecked`, `none`, `bogus`). Each is run through CPython; the accepted set must equal the literal AND `LONG_VALUE_OPTIONS[...]`. | the same test | **Mutation** (`t3i/mutation_long_option.py` -> `t3i/mutation-long-option.log`: in memory, no file changed): the constant as committed -> PASS; `"never"` dropped -> **FAIL** (`AssertionError` at the table comparison) |
+| 3 ADVISORY | FIX | `gpu_pack.activate` docstring: a named `-m` target activates the pack BEFORE it is judged (an absent or rejected pack, or a module not from the pack, is refused after the call); `-c`, the multiprocessing flags, `-m` without a module name and a failed worker stdin isolation are refused before it. Checked against `__main__.main` / `run_interpreter_option` (`:379`, `:342-350`, `:388-392`). | docstring only | read-out below: the new builds carry it |
+| 4 ADVISORY (OUT of envelope) | FIX | The parent-closes case: `communicate(input=<request>, timeout=60)` with NO prior `stdin.close()`. `communicate` writes the request and then closes the parent's end, which is still the pipe-close EOF the test proves. The child is killed and waited in a `finally` if it is still alive. | the parent-closes case (the `eof` / `waited_s` / fd / inheritable assertions unchanged) | PASS |
+
+No before-record (test and docstring only, as the dispatch allows).
+
+### Commands (worktree root, Git Bash, `PYTEST_ADDOPTS` unset; logs in `t3i/`)
+
+| Command | Exit | Summary |
+|---|---|---|
+| the three owned modules (`c61h-2`) | 0 | **307 passed in 18.97 s** |
+| the WIDER run (dispatch-11's 8 modules, `-m "not gpu"`, `--timeout 120`, `c61h-3`) | 0 | **500 passed, 41 deselected in 41.28 s** |
+| the changed tests after the last docstring edit (`c61h-4`) | 0 | 4 passed |
+| `ruff check .` / `ruff format --check .` | 0 / 0 | All checks passed / 323 files already formatted |
+| `mypy` (strict, configured set) | 0 | no issues in 161 source files |
+| `mypy --strict` on the 2 touched files, `--platform win32` and `--platform darwin` | 0 / 0 | no issues in 2 source files, each |
+
+Every pytest run used `-p no:cacheprovider` and `--timeout 120`. 0 CR in both committed blobs.
+
+### Both rebuilds (from `dc784b4f`; `src` and `tools` clean)
+
+| Form | Command (worktree root) | `df -h /c` before | Exit | Wall (shell / build.py) | Result |
+|---|---|---|---|---|---|
+| onedir | `uv run --no-sync python tools/package/build.py --form onedir --with-ffmpeg > work/wp6.1/build-onedir-t3i.log 2>&1` | 77 GB free (15:29:53Z) | 0 | 71 s / 61.8 s | `Clearwater.exe` 10,678,999 B, `_internal` 234,668,819 B; 668.3 MiB release; bundle checks 7.6 s |
+| onefile | `... --form onefile --with-ffmpeg > work/wp6.1/build-onefile-t3i.log 2>&1` | 77 GB free (15:31:06Z) | 0 | 84 s / 80.7 s | `Clearwater.exe` 93,876,201 B (89.5 MiB); 523.9 MiB release; bundle checks 0.8 s |
+
+- Both logs: `61 hidden imports from 376 pack files`, `hidden-import site (scan; named 1x)`,
+  `hidden-import check: PASS (61 modules, each in the bundle)`, `bundle check: PASS`. The one
+  warning is the usual `scipy.special._cdflib`. FFmpeg / ffprobe 9.0.2 were copied beside each
+  executable.
+- **The resolved set** (`t3i/hidden-imports-on{dir,file}-t3i.json`) is EQUAL, as JSON, to 2b-6's.
+  Logs: `t3i/build-on{dir,file}-t3i.log`.
+
+**The read-out** (`t3i/handler_check.py`, 2b-6's tool unchanged -> `t3i/handler-check-t3i.json`;
+the source is `git show dc784b4f:...` in `t3i/src-dc784b4f/`). Nothing was executed.
+
+| Read in each `Clearwater.exe` (onedir and onefile alike) | Result |
+|---|---|
+| entry script, every function (incl. `interpreter_reentry`, `run_interpreter_option`, `isolate_worker_stdin`, `multiprocessing_reentry`, `main`) | **10 of 10 equal** (bytecode and constants, by qualified name); module-level bytecode and constants equal |
+| the six constants (`FLAG_LETTERS` with `R` and `t`, `VALUE_LETTERS`, `LONG_VALUE_OPTIONS`, `MULTIPROCESSING_FLAGS`, `GRAMMAR_PYTHON_VERSION`, `GRAMMAR_PYTHON_VERSION_INFO`) | rebuilt from the bundle's bytecode; each equal to the source (values as in 2b-6) |
+| PYZ `clearwater.gpu_pack`, every function | **53 of 53 equal**; `add_site_prefix` and `activate` equal, `activate` calls `add_site_prefix`; module-level equal |
+| `clearwater.__main__` in the PYZ | no |
+
+**READ-OUT: PASS on both. Build commit `dc784b4f`.**
+
+Two controls, read only:
+
+- `t3c/exp` (`t3i/handler-check-t3i-control-t3c-exp.json`): **FAIL**, exit 1. Its entry script
+  has 1 of 10 functions equal and none of the constants; `gpu_pack` has 28 of 53.
+- The NEW builds against the OLD source `926bfdfa` (`t3i/handler-check-t3i-vs-926bfdfa.json`):
+  **FAIL**, exit 1, on exactly one item: `gpu_pack.activate`, whose bytecode is equal but whose
+  constants (the docstring) are not. So the builds carry `dc784b4f`'s docstring, and the check
+  sees a one-docstring change.
+
+**No frozen run in this group.** The 2b-6 refusals and proof stand for behaviour, because the
+only product change is that docstring. These are the builds for groups 2c and turn 4.
+
+### The two scripts (WRITTEN, NOT RUN)
+
+Under `clearwater-review-evidence/wp6.1/cell/t3i/`:
+
+| File | md5 | Role |
+|---|---|---|
+| `gui_check.py` | `0e05e8e7171f73c74ece4715f87a75eb` | group 2c's GUI check (modes `check` and `owner`) |
+| `timings.py` | `db50def86b7fc2df1c27e8148501e94e` | turn 4's exclusive timings |
+| `launch_common.py` | `1ab40e7d381809a2b06c5ff4a7f6e4da` | the shared launch / window / bound helpers both import |
+| `uia_tree.ps1` | `10963628c6e35dfc1fa6f8d69b729d7f` | the read-only UIA element-tree dump `gui_check.py` calls |
+
+Static checks only:
+
+- `compile()` of the three Python files: OK.
+- PowerShell `Parser.ParseFile` of `uia_tree.ps1`: 0 errors.
+- `ruff check --isolated --select E,F,W,B,UP,SIM`: clean.
+- `mypy --check-untyped-defs` (static analysis, nothing imported or run): clean in the three
+  files; its one error is in the 2b-1 helper `t3b/headless.py:253`, which is not changed here.
+- `grep -nE "SendKeys|AppActivate|SendInput|keybd_event|mouse_event|pyautogui|SetForegroundWindow|PostMessage.*WM_KEY|WM_CHAR"`
+  over all four: **0 hits** (comments included).
+- 0 CR in each file.
+
+**`launch_common.py`** (shared):
+
+- **Environment.** Every frozen launch gets APPDATA, LOCALAPPDATA, TEMP / TMP, CUPY_CACHE_DIR
+  and the five XDG_* variables under `work\wp6.1\t3c\appdata\`, so the pack under it is the one
+  found. `CUDA_PATH*` and `PYTHON*` are removed and `PATH = C:\Windows\System32;C:\Windows`. The
+  environment goes to `Popen(env=...)`; the script's own `os.environ` is never changed, and the
+  owner's profile is only READ (its log's md5).
+- **Refusals before any launch.** The read-out JSON must be PASS, name both dist executables,
+  and be newer than them; no `Clearwater.exe` may be running.
+- **The tree.** The launched PID plus every psutil descendant, gathered while it runs (create
+  times kept, so a reused PID is never touched).
+- **Windows.** `EnumWindows` is walked. For a window whose `GetWindowThreadProcessId` owner is
+  not in the tree, nothing else is called (no title, no class, no message). A tree window is
+  read, captured by `PrintWindow(hwnd, ..., PW_RENDERFULLCONTENT)` into a memory DC of that
+  window's own DC, and closed by `PostMessageW(hwnd, WM_CLOSE)`. The owner PID is re-checked
+  just before each capture and close.
+- **No activation.** A GUI launch sets `STARTUPINFO.wShowWindow = SW_SHOWNOACTIVATE`, which
+  Windows applies to the application's first `ShowWindow`, so the owner's typing stays in the
+  window the owner has in front. Best effort: an explicit activation by Qt would override it.
+- **The hard bound.** A watchdog `threading.Timer` kills the whole tree by PID at the bound,
+  whatever step is running.
+- **The worker spawn.** As `jobs/export_process.py` does it: `tool_spawn_kwargs()`'s creation
+  flags, and its no-FFREPORT rule applied to the redirected environment.
+- **Pack helpers.** The pack's full `build.py --verify`, and an md5 of its listing
+  (path, size, mtime).
+
+**`gui_check.py check`** (both forms, or `--form`). Per form, two launches of `Clearwater.exe`
+with no arguments: `with` (the pack present) and `absent` (the pack renamed
+`14.2.0-cu12.renamed` for that launch only, renamed back in a `finally`). Each launch has a
+**60 s** hard bound and runs these steps:
+
+1. Wait for the first visible window of the tree (10 ms poll).
+2. Read the redirected log's NEW lines, from its size before the launch (nothing deleted),
+   until the loader's line appears (20 s). Record it VERBATIM; it must end
+   `gpu pack 14.2.0-cu12: loaded` or `...: absent`.
+3. Wait 3 s, then, on `with` only, take a PrintWindow PNG of the tree's window titled
+   `Clearwater` (`t3i\shots\first-window-<form>.png`; it must print every row and not be all
+   black).
+4. Take the UIA element tree of the tree's own top-level windows (`uia_tree.ps1`: a
+   `ProcessId` condition, the Control view to depth 4, at most 300 elements, no pattern
+   invoked). There must be a top element named `Clearwater`.
+5. Post `WM_CLOSE` to that window. The exit (0) is awaited 30 s and the tree's end 10 s;
+   otherwise the tree is killed and the launch FAILS.
+6. Record the exit, the leftovers, and the `_MEI*` folders before and after.
+
+Once per script run it also records the owner-log md5, the pack's `--verify` and its listing
+md5 (before and after), and `tasklist`. Records go to `t3i\gui-check.jsonl` and `t3i\gui\`.
+Exit status: 0 PASS, 1 FAIL, 2 refused.
+
+**`gui_check.py owner --form <f>`** is the D6 hand check, for the owner at the keyboard; see
+the step list below. It stages copies of the three fixtures into a NEW
+`work\wp6.1\t3i\hand\<form>\` (it refuses an existing folder), then launches that form's GUI
+with the same redirect and the pack present. It sends nothing to the window and waits for the
+owner's close (45 min bound). It then lists the folder's files with their sizes, the EXIF entry
+count of each PNG, and the log's new lines.
+
+**`timings.py`** (turn 4, EXCLUSIVE; estimated wall about 15 min, printed at the top):
+
+- **Refusals.** The read-out guard; under 25 GB free; any running `Clearwater.exe`, pytest or
+  PyInstaller process; a cold folder that already exists (nothing is overwritten or deleted).
+- **Per form, n = 1..3:**
+  - `robocopy <release> work\wp6.1\cold-<form>-<n> /E /J` (unbuffered);
+  - the copy's FIRST launch: COLD start, spawn to the first visible window of the tree;
+  - an immediate relaunch: WARM start;
+  - each start launch posts `WM_CLOSE` to its own window 3 s after the window appears, waits
+    30 s for the exit, and has a 60 s bound.
+- **First export**, through `cold-<form>-1`'s `Clearwater.exe --export-worker`:
+  `heic10-gradient-display-p3.heic` -> PNG, spawn to the `result` line, 300 s bound. The rows:
+  - `gpu-warmup`: empty cache, untimed for the medians;
+  - `gpu-warm` x3, the medians;
+  - `gpu-empty-cache` x1: a new, empty cache;
+  - `cpu-no-pack` x1: the pack renamed away for that run.
+- **Pack and kernel-cache state, stated in every record.** Starts run with the pack PRESENT (the
+  shipped GPU path; the loader's cheap check runs). Their cache `t4-start-<form>` is empty before
+  the form's first cold launch, and its file count is recorded per launch.
+- **Brackets.** The owner-log md5; the pack's `--verify` and listing md5 (before and after);
+  `tasklist`; the cold copies' total size, printed (they are KEPT, to be deleted only on the
+  owner's word).
+- **Output.** Records go to `clearwater-review-evidence\wp6.1\timings\t4\timings.jsonl`. The
+  summary (median, min, max, spread for cold, warm and gpu-warm; the single rows with their
+  device and cache state) goes to `summary.json` and stdout.
+- This follows the dispatch's default, with the empty-cache GPU row added: it is the first export
+  a user ever makes, and the one that pays for kernel compilation.
+
+### The owner's hand check (D6), for CHARC to relay
+
+D22: a photo's output is always PNG. So "PNG and JPEG" reads here as a HEIC input and a JPEG
+input, each exported to PNG.
+
+1. Ask the orchestrator to start it (or run it yourself) from
+   `C:\Users\rwsmy\clearwater\.worktrees\wp6.1`:
+   `.venv\Scripts\python.exe -B C:\Users\rwsmy\clearwater-review-evidence\wp6.1\cell\t3i\gui_check.py owner --form onedir`.
+   Clearwater opens without taking focus: click its window. It uses a test profile under
+   `work\wp6.1\t3c\appdata`, never your own settings.
+2. **File > Open...**, go to `C:\Users\rwsmy\clearwater\.worktrees\wp6.1\work\wp6.1\t3i\hand\onedir\`
+   and open `heic-ad24-both.heic`. When the picture shows, **File > Export...**. The result
+   `heic-ad24-both_corrected.png` appears in the same folder. Check that it is corrected and the
+   right way up.
+3. The same with `jpeg-gradient-display-p3.jpg`; the result is `jpeg-gradient-display-p3_corrected.png`.
+4. Open `vfr.mp4`, wait until Export is available (the analysis completes), then **File >
+   Export...**. Play `vfr_corrected.mp4` in your usual player.
+5. **File > Quit**. The script prints the files, their sizes, each PNG's EXIF entry count and
+   Clearwater's log lines.
+6. Repeat steps 1-5 with `--form onefile` (folder `...\work\wp6.1\t3i\hand\onefile\`). Tell
+   CHARC, per form, whether each of the three exports worked, and anything odd.
+
+### Files changed this group
+
+`src/clearwater/gpu_pack.py` (docstring), `tests/test_frozen_entry.py` (`dc784b4f`), and this
+ledger. Evidence tools (not committed): the four scripts above,
+`t3i/mutation_long_option.py`, and `t3i/handler_check.py` (2b-6's, unchanged). The new builds
+are at `work/wp6.1/dist-on{dir,file}/` (of `dc784b4f`); they replace `926bfdfa`'s.
+
+Depth at turn-3 group-2c-a end: DISPATCHER TO FILL
