@@ -5,9 +5,9 @@
 
 ### Generation
 
-- **Generation 40** (session `clearwater-orchestrator-20261103-1316`) LIVE from 2026-11-03 23:17Z; picked up gen 39's state at `6f8cc6c1`. CHARC is **gen 14 `clearwater-charc-20261103-0028`**; re-verify both names in `comms/.launch-sessions.json` before every cue. Seat folder `work/orch-g40/` (gate.sh / watch.sh / watch2.sh / fill_gate.py copied from g39 with sed `g39`->`g40`). Bash gauge at bring-up: 35 ms. State worktree `.worktrees/orch-state-g40` (the successor removes it and adds its own).
-- **Disk:** C: 43 GB free at 23:17Z. `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB before any window or gate; the fullclip leg needs its basetemp.
-- **Paces at 23:17Z:** Codex 22 % (pace 0.235, resets 2026-11-04 10:07Z); Claude 17 % (pace 0.766, resets 2026-11-09 10:00Z). Codex is the lower pace.
+- **Generation 41** (session `clearwater-orchestrator-20261103-2220`) LIVE from 2026-11-04 08:20Z; picked up gen 40's state at `3821a5d8`. CHARC is **gen 14 `clearwater-charc-20261103-0028`**; re-verify both names in `comms/.launch-sessions.json` before every cue. Seat folder `work/orch-g41/` (gate.sh / watch.sh / watch2.sh / fill_gate.py copied from g40 with sed `g40`->`g41`). Bash gauge at bring-up: 37 ms. State worktree `.worktrees/orch-state-g41`.
+- **Disk:** C: 97 GB free at 08:21Z. `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB before any window or gate.
+- **Paces at 08:21Z:** Codex 23 % / 0.232 (resets 2026-11-04 10:07Z); Claude 23 % / 0.833 (resets 2026-11-09 10:00Z).
 - **CHARC subjects: under 100 characters.**
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/`)
@@ -21,9 +21,9 @@
 - **Backslash-bearing Python helpers are written with the Write tool**, never a heredoc. **`rm` takes literal absolute paths.** **Worktree release:** a released worktree's `work/` is pruned only on the owner's word; junits copied to `clearwater-review-evidence\<pkg>\gate\` first.
 - **A bare `cd` moves the session's cwd** (it carries between Bash calls, and a live Claude cell shares the process): use `git -C`, absolute paths, or `( cd X && ... )`.
 
-### Live board (RESUME HERE) -- gen 40 ROLLED 2026-11-04 ~08:35Z at ~340K, CLEAN: NOTHING RUNNING (no cell, no job, no gate)
+### Live board (RESUME HERE) -- gen 41, from 08:20Z
 
-**Gen 41: your first act is to dispatch WP6.1's round 0.** The brief is FINAL; gen 40 rolled before dispatching it because an opus-high cell dies with the outgoing pane.
+**LIVE (gen 41, 08:23Z):** WP6.1 round 0 = Claude opus-high cell `wp61-cell1` (Agent-tool subagent, read-only), worktree `.worktrees/wp6.1` branch `wp6.1` at `c051306f`, dispatch `clearwater-review-evidence\wp6.1\cell\dispatch-1.md`. WP6.2 round 0 = Codex turn 1 (read-only), worktree `.worktrees/wp6.2` branch `wp6.2` at `5671a927`, prompt `clearwater-review-evidence\wp6.2\cell\prompt-1.md`. A successor RE-DISPATCHES both from these files (a cell dies with the pane). Online post `f02c1100`. Gen 40's board follows (items 1-2 = the packages now live).
 
 1. **WP6.1, packaging spike. FINAL at `223b33f4`** (`docs/briefs/wp6.1-brief.md`, gen 40's fill `dadf3013`).
    - Rulings: Q5 = the `--export-worker` argv, dispatched in `__main__` before any Qt import and built by `composition.py:461` when frozen (both files owned). Q6 = the pack root per platform (`None` on macOS).
