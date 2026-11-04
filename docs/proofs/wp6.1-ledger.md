@@ -1460,5 +1460,50 @@ Commits:
 
 0 CR in every blob.
 
+### CHARC's rulings at the first mid-build yield (gen 15, 12:06Z), applied
+
+- **(A)** The entry-point isolation rule is now in CLAUDE.md (main `9b25535d`). Every
+  entry-point test in `tests/test_frozen_entry.py` was checked against it before the
+  before-record on `584d711d`: `t3d/rule-check.txt` (an AST listing; 19 of 19 OK). Every
+  pytest run since uses `--timeout 120`, and its children use 60 / 120 s.
+- **(B)** F-D is WIDENED (`fd330049`, `src/clearwater/__main__.py`).
+  - `interpreter_reentry(arguments)` applies only when frozen. It skips any `-I -E -s -S -B
+    -u -O -q`, and `-X` / `-W` with their value. The next argument must fullmatch
+    `REENTRY_ARGUMENT` = `-([BdEhiIOPqsSuvVWxX]*)([mc])(.*)`.
+  - The flags are dropped, and the result is `["-m" | "-c", <attached operand, if any>,
+    *rest]`. `run_interpreter_option` then applies the 584d711d rule unchanged.
+  - Anything else goes to the GUI as before: `-I` alone, `-X utf8` alone, `-platform ...`,
+    `-style ...`, `-reverse`, `-widgetcount`, a file. A re-entry is recognised only from the
+    first argument onwards, so `photo.heic -m x` goes to the GUI.
+  - **Collateral (named for the report):** `-qmljsdebugger=...` matches the grammar (`-q`
+    then `-m`) and is refused (`-m 'ljsdebugger=...': not a GPU pack module`). Clearwater has
+    no QML.
+- **(C)** The resolution rule is concurred.
+
+| Tests (`tests/test_frozen_entry.py`, all under rule (A)) | On `584d711d` (`t3d/pytest-11.log`: 35 failed, 52 passed) |
+|---|---|
+| `test_interpreter_reentry_follows_cpythons_grammar[22]`: the normalisation table, re-entries and non-re-entries | all 22 FAIL, `:786` `AttributeError` (no `interpreter_reentry`) |
+| `test_every_spelling_of_dash_m_runs_a_pack_module[5]`: `-mfoo`, `-I -m`, `-Im`, `-X utf8 -m`, `-I -W ignore -sm`; the planted module runs as `__main__`, no Qt | all 5 FAIL, `:48`: the old code went to the GUI branch, and the test's import blocker refused `clearwater.app.main` (no window) |
+| `test_every_spelling_of_dash_c_and_of_a_foreign_dash_m_refuses[8]`: `-cCODE`, `-I -c CODE`, `-Ic CODE`, `-mhttp.server`, `-I -m http.server`, `-X utf8 -m json.tool`, `-qmljsdebugger=port:1234`, `-I -m` | all 8 FAIL, `:840` `assert 3 == 2` (the GUI stand-in ran) |
+| `test_qt_options_and_non_reentries_reach_the_gui_as_before_when_frozen[7]` | PASS (by design: they pin the unchanged GUI path) |
+| `test_a_source_run_sends_every_spelling_to_the_gui_as_before[7]` | PASS (by design: the source run is 1.0.0) |
+| the existing `-m` tests, separate `-m` included (the pathfinder canary test) | PASS on both |
+
+Runs under the host note (WP-T8's serial leg active), focused modules only:
+
+| Command | Exit | Summary |
+|---|---|---|
+| `pytest -q -rs -p no:cacheprovider --timeout 120 --basetemp=<wt>/work/c61e-12 tests/test_gpu_pack.py tests/test_frozen_entry.py tests/test_tools_package_build.py` | 0 | **207 passed in 10.96 s** |
+| `tests/test_frozen_entry.py` against `584d711d` (`c61e-11`) | 1 | 35 failed, 52 passed |
+| `ruff check .` / `ruff format --check` (touched) / `mypy` / `mypy --strict --platform darwin` (touched) | 0 | clean (`mypy`: 160 files) |
+
+The owner's log md5 is `69ed0432...` before and after. `%LOCALAPPDATA%\Clearwater` is absent.
+
+**DEFERRED to the dispatcher's word (host note):** item 3's WIDER run, the c61e-7 set on the
+final head (`test_jobs_export_process`, `test_app_composition`, `test_wp42_composition`,
+`test_core_backend -m "not gpu"`). It last ran green on `e27fa134`, before the widening
+(309 passed).
+
+
 MID-BUILD YIELD here. The builds and the with-pack proof (items 4-5) follow on the
 dispatcher's word.
