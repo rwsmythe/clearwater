@@ -103,12 +103,10 @@ current). State hygiene is a custodian-of-FORM concern, hence its place here.
 context has REACHED the cap the project's prompting standard sets (~400K tokens by default) --
 never before it (operator-directed 2026-09-25: a roll is not considered until the cap is hit,
 then it happens at the next available opportunity; a seat does not roll early because its next
-unit would cross the cap). **The ONE exception, operator-ruled 2026-11-02 (it resolves the
-2026-10-20 director ruling against the 2026-09-25 direction):** a seat about to start a unit it
-cannot see finish before the cap -- a dispatch of cells whose expected life exceeds the seat's
-remaining depth, or a long job spawned from its pane -- rolls BEFORE that unit, at that boundary,
-with the arithmetic stated in its rollover post. Pre-dispatch only, never mid-round, never
-mid-job. The same text binds `docs/model-prompting-standard.md`. -- and
+unit would cross the cap). **NO early-roll exception, operator-ruled 2026-11-03 (to a sibling instance of this harness, verbatim: "I do not want rollovers to happen until after 400k is hit. Once it is hit, rollovers should happen as soon as practicable."), applied to this harness and the template on the operator's word to CHARC 2026-11-04 (verbatim: "drop the exception", to align the instances):** a seat below the cap starts
+the unit before it whatever its size; the roll comes at the first clean boundary AFTER 400K with
+nothing the seat started still running. The pre-dispatch exception of 2026-11-02 is WITHDRAWN.
+The same text binds `docs/model-prompting-standard.md`. -- and
 it rolls at a BOUNDARY -- after an accept, before a dispatch -- because the per-turn cost of a
 session scales with its depth while the handoff a compact state pointer enables costs a fixed
 few tens of thousands of tokens. The prompt hook reports the depth every turn; rolling is the
@@ -124,9 +122,9 @@ pane closes, whatever the state file says about it: on 2026-11-01 an orchestrato
 at ~405K with a 95-minute background job running as its pane's child; the piece died
 mid-export when the pane closed, its 20 finished outputs were orphaned, and the whole piece re-ran.
 So the roll goes in the GAP between pieces: at the cap with a job running, the generation waits for
-the job's exit line, records it, and then rolls; and a generation near the cap starts NO long job
-it cannot see finish (the depth check comes BEFORE the dispatch, not after). The mirror
-holds too: AT OR PAST the cap, dispatch nothing new -- that dispatch is the successor's. The cell form of the
+the job's exit line, records it, and then rolls; a generation BELOW the cap starts the unit before
+it whatever its size and rolls after it (no early roll, operator-ruled 2026-11-03 / 2026-11-04). The
+mirror holds too: AT OR PAST the cap, dispatch nothing new -- that dispatch is the successor's. The cell form of the
 same precondition:
 A subagent does not die when its parent announces a rollover; it dies when the parent SESSION
 ends, and the three acts leave the old session alive. So a generation with a working cell rolls
