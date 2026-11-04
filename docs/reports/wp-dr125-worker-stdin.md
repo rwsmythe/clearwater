@@ -315,4 +315,31 @@ report and ignored `work/wp-dr125/` scratch. No product file changed.
 
 ## Frozen check (seat)
 
-SEAT TO FILL
+Filled by the orchestrator (gen 45) from gen 44's seat run, 2026-11-04
+18:33-18:35Z. Evidence is in
+`clearwater-review-evidence\wp-dr125\frozen\` (md5: `handler-check.json`
+`422aa005`, `run12.summary.txt` `55a863eb`, `proof-dr125.jsonl` `81d879f8`).
+
+- **Build.** This is a onedir build of `1ea45021` from this worktree
+  (`work/wp6.1/build-onedir-dr125.log`): 668.3 MiB. Both the hidden-import
+  check (61 modules) and the bundle check PASS.
+- **Handler check: PASS.** The entry script `__main__`, `gpu_pack` and
+  `export_worker` in the bundle are bytecode- and constant-equal to the
+  source (every function equal: 9/9 in `__main__`, 26/26 in the worker).
+  `isolate_worker_stdin` is ABSENT, and `main` does not name it.
+- **Pack bracket.** The hand-filled pack under
+  `.worktrees/wp6.1/work/wp6.1/t3c/` was used read-only in place. `--verify`
+  PASSES before and after: 11 distributions, 2,701 RECORD rows, 2,701 files,
+  2,412.6 MiB.
+- **Twelve frozen `--export-worker` runs** (6 heic + 6 video, alternating,
+  through WP6.1's `proof4.py` re-targeted by `patch_paths.py`) with the pack
+  present. Every run exits 0 with `ok: true`, device GPU, no failure and no
+  warnings. Wall times are 1.7-20.8 s; the first run is cold. In every run:
+  0 window hits, 0 timeout kills and no process left alive. The CUDA files
+  mapped in every run are 59 from the pack, 8 from the Windows driver and
+  0 from anywhere else. There were no crash exit codes: no `0xC0000005`, no
+  WER abort.
+- **Isolation.** The real `%LOCALAPPDATA%\Clearwater` is ABSENT before and
+  after. The owner log's md5 is unchanged (`69ed0432...`). No
+  `Clearwater.exe` is left running. No GUI or desktop input was used, and
+  the DR-125 before shape was not run at the seat.
