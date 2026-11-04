@@ -19,18 +19,25 @@ writing to it.
 
 Selectors: --all (the default) reads every discovered cell; --live HOURS
 reads fresh cells plus older cells whose parent main transcript is fresh
-(flagged parked); repeatable --agent ID reads agent-a<ID>*.jsonl at any age.
+(flagged parked); repeatable --agent ID reads an exact cell identity at any age:
+its parsed name (or anonymous hash) must equal ID, or its filename stem must
+equal agent-a<ID>. Prefix siblings are excluded, and an empty ID is invalid.
 These three selectors are mutually exclusive. --sessions switches to direct
 <project>/<session-id>.jsonl main transcripts, named by session id; it works
 with --all or --live, but not --agent. --session restricts discovery literally
 in either mode, and the positional substring filters the reported names.
+The --live window must be nonnegative and not NaN; positive infinity is also
+accepted to include transcripts of every age.
 
 Every row appends age=<hours to one decimal>h and flag=ok, OVER, parked, or
 OVER,parked. The PEAK cap applies to all selected rows, including parked ones.
 Exit codes: 0 clean (also a nonempty discovery with an empty live window);
 1 no transcripts discovered, loudly reported as NO CELLS FOUND; 2 PEAK over
 cap; 3 incomplete measurement; 4 usage/configuration error, including unknown
-agent IDs. Exit 2 wins over 3. An empty live window prints one stdout line:
+agent IDs after a clean listing. A failed listing that prevents an agent
+lookup exits 3. If any requested ID is missing after a clean listing, exit 4
+without measuring the other requested IDs. Exit 2 wins over 3 for measured
+rows. An empty live window prints one stdout line:
 no cells written in the last <H>h (cap <N>); nothing to check
 (sessions instead of cells in --sessions mode).
 
@@ -448,21 +455,24 @@ def discover_sessions(project: Path, session: str | None,
 
 def find_agents(cells: list[_Transcript], project: Path, session: str | None,
                 agent_ids: list[str]) -> tuple[list[_Transcript], list[str]]:
-    """Select requested filename prefixes at any age and report missing patterns.
+    """Select exact cell identities at any age and report missing search forms.
 
     Reuse already discovered cells so named/anonymous parsing and scandir
     failures retain the cell reader's contract. Each path is returned once,
-    even when requested IDs repeat or overlap. IDs are literal prefixes of
-    the filename portion following agent-a, not additional filesystem globs.
+    even when requested IDs repeat. A parsed name (or anonymous hash) must
+    equal the ID, or its filename stem must equal agent-a<ID>; a longer
+    sibling's name does not match. No additional filesystem glob is run.
     """
     selected: set[Path] = set()
     missing: list[str] = []
     for agent_id in agent_ids:
-        matches = [path for _, _, path in cells
-                   if path.name.startswith(f"agent-a{agent_id}")]
+        matches = [path for name, _, path in cells
+                   if name == agent_id or path.stem == f"agent-a{agent_id}"]
         if not matches:
-            missing.append(str(project / (session if session is not None else "*")
-                               / "subagents" / f"agent-a{agent_id}*.jsonl"))
+            directory = project / (session if session is not None else "*") / "subagents"
+            missing.append(f"{directory / f'agent-a{agent_id}.jsonl'} or "
+                           f"{directory / f'agent-a{agent_id}-<16hex>.jsonl'} "
+                           "(exact parsed name or filename stem)")
         selected.update(matches)
     return [cell for cell in cells if cell[2] in selected], missing
 
@@ -569,12 +579,14 @@ def _build_parser() -> argparse.ArgumentParser:
     selectors.add_argument(
         "--live", type=float, metavar="HOURS",
         help="report transcripts written within HOURS; cell mode also includes "
-             "older cells with fresh parent transcripts, flagged parked")
+             "older cells with fresh parent transcripts, flagged parked; "
+             "HOURS must be >= 0 and not NaN (positive infinity is accepted)")
     selectors.add_argument(
         "--all", action="store_true", help="report every discovered transcript (the default)")
     selectors.add_argument(
         "--agent", action="append", metavar="ID",
-        help="read agent-a<ID>*.jsonl at any age; repeatable; incompatible with --sessions")
+        help="read an exact parsed cell name/anonymous hash or filename stem agent-a<ID> "
+             "at any age; no prefix match; nonempty and repeatable; incompatible with --sessions")
     parser.add_argument(
         "--sessions", action="store_true",
         help="read main <project>/<session-id>.jsonl transcripts instead of cells; "
@@ -589,7 +601,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "wins over 3 when both apply); 4 usage/configuration error (bad "
         "--project, bad --session, an invalid --cap, an unknown --agent ID, "
         "--agent with --sessions, or any other argument "
-        "error -- the measurement never ran).")
+        "error -- the measurement never ran). If agent lookup fails with "
+        "discovery errors, exit 3 instead: absence cannot be established. "
+        "If any requested agent ID is missing after a clean listing, exit 4 "
+        "without measuring the other requested IDs.")
     return parser
 
 
@@ -598,6 +613,10 @@ def main(argv: list[str] | None = None) -> int:
         args = _build_parser().parse_args(argv)
         if args.agent and args.sessions:
             raise _ConfigError("--agent reads cells; it cannot be combined with --sessions")
+        if args.agent and any(not agent_id for agent_id in args.agent):
+            raise _ConfigError("--agent ID must not be empty")
+        if args.live is not None and (math.isnan(args.live) or args.live < 0):
+            raise _ConfigError("--live HOURS must be >= 0 and not NaN")
     except _ConfigError as exc:
         print(f"USAGE ERROR: {exc}", file=sys.stderr)
         return 4
@@ -632,6 +651,8 @@ def main(argv: list[str] | None = None) -> int:
         if missing:
             for error in discovery_errors:
                 print(f"DISCOVERY ERROR: {error}", file=sys.stderr)
+            if discovery_errors:
+                return 3  # An incomplete listing cannot establish that an ID is absent.
             for pattern in missing:
                 print(f"USAGE ERROR: no cell transcript found; searched: {pattern}",
                       file=sys.stderr)

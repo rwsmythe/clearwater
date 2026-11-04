@@ -105,14 +105,16 @@ and any deviation / simplification / stop-and-flag.
 **Context is spend (2026-09-06; reader amended 2026-09-07).** A cell CANNOT read its own depth:
 the `[ctx]` line is printed by the UserPromptSubmit hook, which never fires for a subagent
 (verified 09-07: 0 of 70 cell transcripts carry a hook-produced line). YOUR DISPATCHER reads a
-Claude cell's depth and tells it the figure. Before assigning work, read the dispatcher's own main
-session with `uv run python scripts/cell_depth.py --project "<project>" --sessions --session="<session-id>"`;
-take the in-flight cell census with `uv run python scripts/cell_depth.py --project "<project>" --live 6`;
-at every round gate read the named cell at any age with
-`uv run python scripts/cell_depth.py --project "<project>" --session="<session-id>" --agent "<ID>"`,
-where ID is the filename portion following `agent-a`. The census also lists older cells whose
-parent session transcript is fresh, flagged `parked`; an empty live window exits 0 when discovery
-found transcripts. Put the dispatcher-provided figure in the ledger, never an estimate.
+Claude cell's depth and tells it the figure. BEFORE assigning the cell work (the PRECONDITION)
+and at every ROUND GATE, read that exact cell at any age with
+`uv run python scripts/cell_depth.py --project "<project>" --session="<session-id>" --agent "<name>"`.
+The name must equal the parsed cell name (an anonymous cell's hash), or the filename stem must
+equal `agent-a<name>` for a full name-hash ID; a longer sibling's name never matches. Take the
+in-flight cell census with `uv run python scripts/cell_depth.py --project "<project>" --live 6`.
+The census also lists older cells whose parent session transcript is fresh, flagged `parked`;
+an empty live window exits 0 when discovery found transcripts. Read the dispatcher's own main
+session with `uv run python scripts/cell_depth.py --project "<project>" --sessions --session="<session-id>"`.
+Put the dispatcher-provided figure in the ledger, never an estimate.
 Never `cat` a runner or reviewer log into your context -- route it to a scratch file and grep the
 summary lines; never re-read a document you have already read (the brief quotes what you need);
 add the round LEDGER to context per round, not the reviewer's transcript. When your dispatcher

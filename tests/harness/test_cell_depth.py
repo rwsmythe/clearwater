@@ -12,6 +12,7 @@ silently reporting "no cells" as if that were a clean result.
 from __future__ import annotations
 
 import contextlib
+import errno
 import io
 import itertools
 import json
@@ -944,7 +945,7 @@ class SelectorCliTest(unittest.TestCase, TmpDirMixin):
         rc, out, err = self._run("--agent", "missing")
         self.assertEqual(rc, 4)
         self.assertIn("subagents", err)
-        self.assertIn("agent-amissing*.jsonl", err)
+        self.assertIn("agent-amissing.jsonl", err)
         self.assertEqual(out, "")
         err.encode("ascii")
 
@@ -1050,7 +1051,7 @@ class SelectorCliTest(unittest.TestCase, TmpDirMixin):
                 self.assertEqual(rc, 1)
                 self.assertEqual(out, "")
                 self.assertIn("NO CELLS FOUND", err)
-        # A listing failure must remain incomplete, never become empty-window success.
+        # With no discovered transcript, a listing failure is incomplete, not absent.
         with mock.patch.object(cd, "_scan_dir_entries", side_effect=PermissionError("simulated")):
             rc, _, err = self._run("--sessions", "--live", "1")
         self.assertEqual(rc, 3)
@@ -1060,8 +1061,8 @@ class SelectorCliTest(unittest.TestCase, TmpDirMixin):
         self._cell("present", 100_000, session="sess-1")
         self._cell("elsewhere", 100_000, session="sess-2")
         for extra, pattern in (
-            (("--agent", "present", "--agent", "missing"), "agent-amissing*.jsonl"),
-            (("--session", "sess-1", "--agent", "elsewhere"), "agent-aelsewhere*.jsonl"),
+            (("--agent", "present", "--agent", "missing"), "agent-amissing.jsonl"),
+            (("--session", "sess-1", "--agent", "elsewhere"), "agent-aelsewhere.jsonl"),
         ):
             with self.subTest(extra=extra):
                 rc, out, err = self._run(*extra)
@@ -1109,6 +1110,148 @@ class SelectorCliTest(unittest.TestCase, TmpDirMixin):
                 self.assertEqual(rc, 0)
                 self.assertNotIn("UNREADABLE", err)
                 self.assertEqual(out, f"no {kind} written in the last 6h (cap 400,000); nothing to check\n")
+
+
+    def test_live_unreadable_cell_is_incomplete(self) -> None:
+        self._cell("unreadable", 100_000)
+        with mock.patch.object(cd, "read_transcript",
+                               side_effect=PermissionError(errno.EACCES, "simulated")):
+            rc, out, err = self._run("--live", "1")
+        self.assertEqual(rc, 3)
+        self.assertIn("UNREADABLE", err)
+        self.assertNotIn("nothing to check", out)
+
+    def test_live_cell_age_stat_failure_is_incomplete(self) -> None:
+        cell = self._cell("unstatable", 100_000)
+        real_stat = Path.stat
+
+        def _stat(path: Path, *args, **kwargs):
+            if path == cell:
+                raise PermissionError(errno.EACCES, "simulated")
+            return real_stat(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "stat", _stat):
+            rc, out, err = self._run("--live", "1")
+        self.assertEqual(rc, 3)
+        self.assertIn("UNREADABLE", err)
+        self.assertNotIn("nothing to check", out)
+
+    def test_live_parent_stat_failure_is_incomplete(self) -> None:
+        self._cell("old", 100_000, age=5)
+        parent = self._session()
+        real_stat = Path.stat
+
+        def _stat(path: Path, *args, **kwargs):
+            if path == parent:
+                raise PermissionError(errno.EACCES, "simulated")
+            return real_stat(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "stat", _stat):
+            rc, out, err = self._run("--live", "1")
+        self.assertEqual(rc, 3)
+        self.assertIn("DISCOVERY ERROR", err)
+        self.assertNotIn("nothing to check", out)
+
+    def test_sessions_live_unreadable_or_unstatable_is_incomplete(self) -> None:
+        session = self._session(100_000)
+        real_stat = Path.stat
+
+        def _stat(path: Path, *args, **kwargs):
+            if path == session:
+                raise PermissionError(errno.EACCES, "simulated")
+            return real_stat(path, *args, **kwargs)
+
+        for failure in (mock.patch.object(cd, "read_transcript",
+                                          side_effect=PermissionError(errno.EACCES, "simulated")),
+                        mock.patch.object(Path, "stat", _stat)):
+            with self.subTest(failure=failure.attribute), failure:
+                rc, out, err = self._run("--sessions", "--live", "1")
+            self.assertEqual(rc, 3)
+            self.assertIn("UNREADABLE", err)
+            self.assertNotIn("nothing to check", out)
+
+    def test_live_invalid_window_is_usage_error(self) -> None:
+        self._cell("old", 100_000, age=5)
+        for window in ("-1", "nan", "-inf"):
+            with self.subTest(window=window):
+                rc, out, err = self._run(f"--live={window}")
+                self.assertEqual(rc, 4)
+                self.assertIn("USAGE ERROR", err)
+                self.assertEqual(out, "")
+
+    def test_live_zero_and_infinity_are_valid(self) -> None:
+        self._cell("old", 100_000, age=5)
+        rc, out, _ = self._run("--live", "0")
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, "no cells written in the last 0h (cap 400,000); nothing to check\n")
+        rc, out, _ = self._run("--live", "inf")
+        self.assertEqual(rc, 0)
+        self.assertIn("old  current=100000", out)
+
+    def test_agent_exact_name_excludes_longer_sibling(self) -> None:
+        self._cell("wp57-cell", 100_000)
+        self._cell("wp57-cell9", 900_000)
+        rc, out, _ = self._run("--agent", "wp57-cell")
+        self.assertEqual(rc, 0)
+        self.assertIn("wp57-cell  current=100000", out)
+        self.assertNotIn("wp57-cell9", out)
+
+    def test_agent_missing_exact_name_with_prefix_sibling_exits_4(self) -> None:
+        self._cell("wp57-cell9", 100_000)
+        rc, out, err = self._run("--agent", "wp57-cell")
+        self.assertEqual(rc, 4)
+        self.assertEqual(out, "")
+        self.assertIn("searched:", err)
+        self.assertIn("agent-awp57-cell.jsonl", err)
+        self.assertIn("agent-awp57-cell-<16hex>.jsonl", err)
+
+    def test_agent_full_name_hash_selects_one_transcript(self) -> None:
+        self._cell("same-name", 100_000, identity="0123456789abcdef")
+        self._cell("same-name", 900_000, identity="fedcba9876543210")
+        rc, out, _ = self._run("--agent", "same-name-0123456789abcdef")
+        self.assertEqual(rc, 0)
+        self.assertIn("current=100000", out)
+        self.assertNotIn("current=900000", out)
+        self.assertEqual(len(out.splitlines()), 1)
+
+    def test_agent_empty_id_is_usage_error(self) -> None:
+        self._cell("present", 100_000)
+        rc, out, err = self._run("--agent", "")
+        self.assertEqual(rc, 4)
+        self.assertEqual(out, "")
+        self.assertIn("USAGE ERROR", err)
+
+    def test_agent_listing_failure_is_incomplete_not_unknown(self) -> None:
+        self._cell("hidden", 100_000)
+        real_scan = cd._scan_dir_entries
+
+        def _scan(path: Path):
+            if path == self.tmp / "sess-1" / "subagents":
+                raise PermissionError(errno.EACCES, "simulated")
+            return real_scan(path)
+
+        with mock.patch.object(cd, "_scan_dir_entries", side_effect=_scan):
+            rc, out, err = self._run("--agent", "hidden")
+        self.assertEqual(rc, 3)
+        self.assertEqual(out, "")
+        self.assertIn("DISCOVERY ERROR", err)
+        self.assertNotIn("USAGE ERROR", err)
+
+    def test_future_mtime_is_clamped_to_zero_age(self) -> None:
+        self._cell("future", 100_000, age=-1)
+        with mock.patch.object(cd.time, "time", return_value=self.now):
+            rc, out, _ = self._run("--live", "0")
+        self.assertEqual(rc, 0)
+        self.assertRegex(out, r"age=0\.0h {2}flag=ok\s*$")
+
+    def test_cell_exactly_at_live_boundary_is_listed(self) -> None:
+        self.now = 1_800_000_000.0
+        self._cell("boundary", 100_000, age=6)
+        with mock.patch.object(cd.time, "time", return_value=self.now):
+            rc, out, _ = self._run("--live", "6")
+        self.assertEqual(rc, 0)
+        self.assertIn("boundary  current=100000", out)
+        self.assertRegex(out, r"age=6\.0h {2}flag=ok\s*$")
 
 
 if __name__ == "__main__":
