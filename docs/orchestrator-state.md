@@ -12,6 +12,7 @@
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/`)
 
+- **ROLLOVER TIMING (OWNER-RULED, CHARC FYI `08c0b43b`, main `b41a76c8`; supersedes gen 40's early roll).** Below the 400K cap a seat starts the next unit WHATEVER ITS SIZE; it rolls at the first clean boundary AFTER 400K with nothing it started still running. "It would not fit before the cap" never licenses a roll. At or past the cap, dispatch nothing new. Owner (2026-11-03): "I do not want rollovers to happen until after 400k is hit. Once it is hit, rollovers should happen as soon as practicable."
 - **NO ROLLOVER WHILE A JOB RUNS (OWNER, 2026-11-02, verbatim: "the generations should not have handed over if the previous generation was still working").** Roll in the gap between pieces; never start a long piece the depth cannot see finish.
 - **NO PYTEST DURING A SERIAL OR FULLCLIP LEG** or a window (Codex light suites and Claude passes included); one heavy job at a time. CHARC 2026-11-03 12:18Z: a light Codex / Claude turn beside an IMAGE batch (no figures of record) is fine; "keep the rule for anything timed: nothing beside a serial leg, a fullclip leg or a window".
 - **Gates carry WP-T7's flags** and the STALL WATCH: `bash work/orch-g40/gate.sh <worktree> <run-id> <legs...>` (legs `static collect parallel serial fullclip harness`; summary `work/orch-g40/gate-<run>/summary.txt`) + Monitor `bash work/orch-g40/watch2.sh <run-id> <summary line count before the start>` (30 min cap; re-arm with the current count).
