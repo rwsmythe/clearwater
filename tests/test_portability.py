@@ -44,6 +44,8 @@ from clearwater.io.video.capability import resolve_encoder, trial_encode_command
 from clearwater.io.video.encode import FFmpegVideoSink, VideoEncodeError, encode_command
 from clearwater.io.video.verify import HevcLevel
 
+importlib.import_module("gui_support")  # QT_QPA_PLATFORM=offscreen before any QApplication
+
 # --- the Windows encoder snapshots (W-CODEC / W-V4 lock) ------------------------------------
 
 SOURCE, OUT = "<SOURCE>", "<OUT>"
@@ -823,6 +825,52 @@ def _codec_x43(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         assert tuple(c.name for c in capability._detect(Path("ffmpeg"), roster)) == roster
 
 
+HISTORICAL_LABEL = "Windows / NVIDIA evidence; not a Mac instrument"
+"""The module-docstring label of a historical tool (CHARC round-0 D4 (a); audit section 9)."""
+
+
+def labelled_rows(relative: str) -> str:
+    """Return the label paragraph's audit rows in a tool module's docstring, or ""."""
+    doc = ast.get_docstring(ast.parse((TOOLS / relative).read_text(encoding="utf-8"))) or ""
+    flat = " ".join(doc.split())
+    if HISTORICAL_LABEL not in flat:
+        return ""
+    return flat.split(HISTORICAL_LABEL, 1)[1].split(":", 1)[0]
+
+
+def _labelled(relative: str, row: str, *mechanic: str) -> None:
+    assert row in labelled_rows(relative), relative
+    source = (TOOLS / relative).read_text(encoding="utf-8")
+    for text in mechanic:  # the Windows / NVIDIA mechanic the label names is still there
+        assert text in source, (relative, text)
+    assert labelled_rows("inventory.py") == ""  # the control: a portable tool carries no label
+
+
+def _codec_t33(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T33: the review pack's pair encoder (x265 under force CPU, else NVENC) is labelled."""
+    _labelled("reviewpack/build.py", "T33", "libx265", "hevc_nvenc")
+
+
+def _codec_t34(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T34: the NVENC-only prototype encoder is labelled, not ported."""
+    _labelled("prototype/clip.py", "T34", "hevc_nvenc")
+
+
+def _codec_t35(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T35: the container spike's encoders and NVIDIA proof sampler are labelled."""
+    _labelled("container_spike/spike.py", "T35", "hevc_nvenc", "libx265")
+
+
+def _codec_t36(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T36: the fidelity instrument's NVENC proof (nvidia-smi pmon) is labelled."""
+    _labelled("video_fidelity.py", "T36", "pmon")
+
+
+def _codec_t37(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T37: the fixed NVENC / x265 benchmark plan is labelled."""
+    _labelled("video_io_bench.py", "T37", "hevc_nvenc", "libx265")
+
+
 CODEC_CASES = {
     "P07": _codec_p07,
     "P09": _codec_p09,
@@ -835,8 +883,13 @@ CODEC_CASES = {
     "X41": _codec_x41,
     "X42": _codec_x42,
     "X43": _codec_x43,
+    "T33": _codec_t33,
+    "T34": _codec_t34,
+    "T35": _codec_t35,
+    "T36": _codec_t36,
+    "T37": _codec_t37,
 }
-"""W-CODEC sites built in group A; T33-T37 (the historical tool labels) join with group B."""
+"""W-CODEC: the audit's 16 rows (group A 11; T33-T37, the historical tool labels, group B)."""
 
 
 @pytest.mark.parametrize("site", sorted(CODEC_CASES))
@@ -1698,8 +1751,612 @@ def _fs_p73(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     assert calls == [("rename", "look.json", "Look.json")]
 
 
-FS_CASES = {"P29": _fs_p29, "P30": _fs_p30, "P70": _fs_p70, "P73": _fs_p73}
-"""W-FS sites built in group A; group B adds the remaining rows of the audit's W-FS list."""
+def _settings() -> Any:
+    from clearwater.interfaces import Settings
+
+    return Settings()
+
+
+def _fs_p28(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P28: the open route lower-cases the suffix, so every case of one extension routes alike."""
+    from clearwater.gui.sources import route
+
+    assert route(Path("clip.MP4")) == route(Path("clip.mp4")) == route(Path("clip.Mp4"))
+    assert route(Path("img.HEIC")) == route(Path("img.heic"))
+    assert route(Path("clip.MP4")) != route(Path("img.heic"))
+
+
+def _fs_p39(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P39: the Windows-forbidden characters and device names are refused on every platform."""
+    from clearwater.config.presets import PresetError, validate_preset_name
+
+    for name in ("a:b", "a/b", "a\\b", "a|b", "CON", "nul.json", "Lpt1"):
+        with pytest.raises(PresetError):
+            validate_preset_name(name)
+    assert validate_preset_name("Reef dusk") == "Reef dusk"
+
+
+def _fs_p40(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P40 / P49: an NFC / casefold twin is refused without overwrite, the bytes unchanged."""
+    from clearwater.config.presets import PresetError, PresetStore
+
+    test_presets = importlib.import_module("test_config_presets")
+    store = PresetStore(tmp_path / "presets")
+    first = store.save("Caf\u00e9 LOOK", test_presets._set())
+    before = first.read_bytes()
+    for twin in ("cafe\u0301 look", "CAF\u00c9 look"):  # NFD and another case: one preset
+        with pytest.raises(PresetError, match="already exists"):
+            store.save(twin, test_presets._set(), overwrite=False)
+    assert first.read_bytes() == before
+    assert sorted(p.name for p in (tmp_path / "presets").iterdir()) == [first.name]
+    other = store.save("Reef", test_presets._set())  # a distinct name is a second file
+    assert other != first and first.read_bytes() == before
+
+
+def _fs_p41(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P41: the preset panel's name identity is the store's (NFC + casefold)."""
+    from clearwater.config import presets
+    from clearwater.gui import preset_panel
+
+    corpus = ["Look", "LOOK", "caf\u00e9", "cafe\u0301", "Stra\u00dfe", "STRASSE", "\u0131", "I"]
+    for a in corpus:
+        for b in corpus:
+            same = presets._name_key(a) == presets._name_key(b)
+            assert (preset_panel._name_key(a) == preset_panel._name_key(b)) is same, (a, b)
+    assert presets._name_key("cafe\u0301") == presets._name_key("CAF\u00c9")
+
+
+def _fs_p42(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P42: the output suffix refuses both separators and the Windows punctuation everywhere."""
+    from clearwater.jobs.naming import validate_suffix
+
+    for bad in ("/x", "\\x", "a:b", "a*b", "a?b", 'a"b', "a<b", "a>b", "a|b"):
+        with pytest.raises(ValueError):
+            validate_suffix(bad)
+    validate_suffix("_corrected")
+    validate_suffix("")
+
+
+def _fs_p43(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P43: a temporary groups under its casefolded final name (conservative no-clobber)."""
+    from clearwater.jobs import naming
+
+    for final in (Path("Dive_corrected.MP4"), Path("dive_CORRECTED.mp4")):
+        temp = naming.temporary_path(tmp_path / final, naming.new_token())
+        assert naming._final_name_of_temporary(temp.name) == "dive_corrected.mp4"
+    assert naming._final_name_of_temporary("a/b" + naming.TEMP_MARKER) is None
+
+
+def _fs_p44(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P44: the reservation key casefolds on every platform (it may over-reserve, never clobber)."""
+    from clearwater.jobs import naming
+
+    a, b = tmp_path / "Clip_corrected.mp4", tmp_path / "CLIP_corrected.MP4"
+    assert naming._path_key(a) == naming._path_key(b)
+    assert naming._path_key(a) != naming._path_key(tmp_path / "Clip_corrected2.mp4")
+
+
+def _fs_p45(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P45: the source guard asks the file system first (samefile), then the lexical key."""
+    from clearwater.jobs.naming import is_same_path
+
+    one, two = tmp_path / "clip.mp4", tmp_path / "other.mp4"
+    one.write_bytes(b"1")
+    two.write_bytes(b"2")
+    assert is_same_path(one, tmp_path / "." / "clip.mp4")
+    assert not is_same_path(one, two)  # two distinct objects
+    seen: list[tuple[str, str]] = []
+
+    def fake_samefile(a: object, b: object) -> bool:
+        seen.append((Path(str(a)).name, Path(str(b)).name))
+        return False  # a case-sensitive volume: one name per object
+
+    monkeypatch.setattr(os.path, "samefile", fake_samefile)
+    assert not is_same_path(one, two)
+    assert seen == [("clip.mp4", "other.mp4")]
+    assert is_same_path(tmp_path / "gone.mp4", tmp_path / "GONE.MP4")  # lexical fallback
+
+
+def _fs_p46(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P46: a .MOV / .mov source writes ``_corrected.mp4`` (D25), whatever the suffix case."""
+    from clearwater.jobs import naming
+
+    for suffix in (".MOV", ".mov", ".Mov"):
+        out = naming.final_output_path(
+            tmp_path / f"IMG_1{suffix}", _settings(), naming.MediaKind.VIDEO
+        )
+        assert out == tmp_path / "IMG_1_corrected.mp4"
+    keep = naming.final_output_path(tmp_path / "GX01.MP4", _settings(), naming.MediaKind.VIDEO)
+    assert keep == tmp_path / "GX01_corrected.MP4"
+
+
+def _fs_p47(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P47: Windows device names are refused as outputs on every platform."""
+    from clearwater.jobs.export import is_reserved_device_name
+
+    for name in ("NUL.MP4", "con.png", "COM1 .x", "lpt9", "Aux.mov"):
+        assert is_reserved_device_name(name), name
+    for name in ("console.mp4", "nul_corrected.mp4", "COM10.mp4", "dive.MP4"):
+        assert not is_reserved_device_name(name), name
+
+
+def _fs_p48(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P48: link promotion, then the rename fallback when links are refused; never a replace."""
+    from clearwater.jobs import safe_write
+
+    final = tmp_path / "out.mp4"
+    temp = tmp_path / "out.tmp"
+    temp.write_bytes(b"new")
+    assert safe_write._install(temp, final) is True
+    assert final.read_bytes() == b"new" and not temp.exists()
+    temp.write_bytes(b"second")
+    assert safe_write._install(temp, final) is False  # taken: no replacement
+    assert final.read_bytes() == b"new" and temp.read_bytes() == b"second"
+
+    def refused(a: object, b: object) -> None:
+        raise OSError(errno.EPERM, "links are not supported on this volume (exFAT)")
+
+    monkeypatch.setattr(safe_write.os, "link", refused)
+    other = tmp_path / "other.mp4"
+    assert safe_write._install(temp, other) is True  # the rename fallback
+    assert other.read_bytes() == b"second"
+    temp.write_bytes(b"third")
+    assert safe_write._install(temp, final) is False  # the fallback refuses a taken name too
+    assert final.read_bytes() == b"new"
+
+
+def _fs_p50(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P50 / P51: the cache never follows a link; the scan excludes them through is_link."""
+    from clearwater.cache import keys
+
+    plain = tmp_path / "pack.bin"
+    plain.write_bytes(b"x")
+    assert not keys.is_link(plain) and not keys.is_link(tmp_path)
+    monkeypatch.setattr(Path, "is_symlink", lambda self: self.name == "link.bin")
+    assert keys.is_link(tmp_path / "link.bin")  # a symlink, on any platform
+    monkeypatch.setattr(os.path, "isjunction", lambda path: str(path).endswith("junction"))
+    assert keys.is_link(tmp_path / "junction")  # a Windows junction (False elsewhere)
+    store = ast.parse((SRC / "cache" / "store.py").read_text(encoding="utf-8"))
+    discover = next(
+        n for n in ast.walk(store) if isinstance(n, ast.FunctionDef) and n.name == "_discover"
+    )
+    assert "item.is_symlink() or item.is_junction()" in ast.unparse(discover)
+
+
+def _fs_p52(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P52: a sidecar is recognised by suffix in any case."""
+    from clearwater.io.video.inputs import is_sidecar
+
+    for name in ("GL010001.LRV", "gl010001.lrv", "GX010001.THM", "a.Thm"):
+        assert is_sidecar(Path(name)), name
+    assert not is_sidecar(Path("GX010001.MP4")) and not is_sidecar(Path("._GX010001.LRV.txt"))
+
+
+def _fs_p53(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P53: the PNG writer accepts .png in any case and refuses another suffix before writing."""
+    import numpy as np
+
+    from clearwater.io.photo.png import write_png
+
+    pixels = np.zeros((2, 2, 3), dtype=np.float32)
+    for name in ("a.png", "b.PNG"):
+        write_png(tmp_path / name, pixels, bit_depth=8, icc=None, exif=None, provenance_json=None)
+        assert (tmp_path / name).read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    with pytest.raises(ValueError, match=r"must end in \.png"):
+        write_png(
+            tmp_path / "c.tif", pixels, bit_depth=16, icc=None, exif=None, provenance_json=None
+        )
+    assert not (tmp_path / "c.tif").exists()
+
+
+def _fs_p54(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P54: a .DNG in any case is refused as unsupported before decoding."""
+    from clearwater.io.photo.errors import PhotoReadError
+    from clearwater.io.photo.reader import PhotoReader
+
+    for name in ("raw.DNG", "raw.dng"):
+        (tmp_path / name).write_bytes(b"not really a dng")
+        with pytest.raises(PhotoReadError) as caught:
+            PhotoReader().read(tmp_path / name)
+        assert caught.value.kind == "unsupported"
+
+
+def _fs_p67(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P67: the cache's unlink retries a PermissionError a bounded number of times."""
+    from clearwater.cache import store
+
+    calls: list[str] = []
+    outcomes: list[BaseException | None] = []
+
+    def unlink(path: str) -> None:
+        calls.append(path)
+        error = outcomes.pop(0) if outcomes else None
+        if error is not None:
+            raise error
+
+    monkeypatch.setattr(store.os, "unlink", unlink)
+    monkeypatch.setattr(store.time, "sleep", lambda s: None)
+    outcomes[:] = [PermissionError("open elsewhere"), None]
+    assert store._unlink("p") is True and len(calls) == 2
+    calls.clear()
+    outcomes[:] = [PermissionError("held")] * (store._UNLINK_TRIES + 1)
+    assert store._unlink("p") is False and len(calls) == store._UNLINK_TRIES  # bounded
+    outcomes[:] = [FileNotFoundError("gone")]
+    assert store._unlink("p") is True
+    outcomes[:] = [OSError(errno.EIO, "io")]
+    assert store._unlink("p") is False
+
+
+def _fs_p68(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P68: the encoder's cleanup retries a PermissionError, then raises; missing is fine."""
+    tries: list[int] = []
+
+    def unlink(self: Path, missing_ok: bool = False) -> None:
+        tries.append(1)
+        raise PermissionError("held by the child")
+
+    monkeypatch.setattr(encode.time, "sleep", lambda s: None)
+    encode._remove(tmp_path / "absent.mp4")  # nothing there: no error
+    monkeypatch.setattr(Path, "unlink", unlink)
+    with pytest.raises(PermissionError):
+        encode._remove(tmp_path / "held.mp4")
+    assert len(tries) == encode._REMOVE_TRIES
+
+
+def _stub_probes(monkeypatch: pytest.MonkeyPatch) -> Any:
+    inventory = importlib.import_module("inventory")
+
+    def video(path: Path) -> Any:
+        return inventory._failed_video(path, 1, "stubbed probe")
+
+    def photo(path: Path) -> Any:
+        return inventory._failed_photo(path, 1, "stubbed probe")
+
+    monkeypatch.setattr(inventory, "probe_video", video)
+    monkeypatch.setattr(inventory, "probe_photo", photo)
+    return inventory
+
+
+def _fs_t14(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T14: AppleDouble ``._`` files are counted apart, never rows, whatever their suffix."""
+    inventory = _stub_probes(monkeypatch)
+    root = tmp_path / "footage"
+    (root / "Dive").mkdir(parents=True)
+    for name in ("clip.MP4", "._clip.MP4", "._IMG_1.HEIC", "IMG_1.HEIC", "._notes.txt"):
+        (root / "Dive" / name).write_bytes(b"x")
+    result = inventory.scan_tree(root)
+    assert [str(r.path.as_posix()) for r in result.records] == ["Dive/IMG_1.HEIC", "Dive/clip.MP4"]
+    assert (result.appledouble, result.ignored) == (3, 0)
+    csv_path, summary = inventory.write_inventory(
+        result.records, tmp_path / "work", appledouble=result.appledouble, stamp="20261104T000000Z"
+    )
+    text = summary.read_text(encoding="utf-8")
+    assert "- AppleDouble files (._ names, macOS metadata; not rows): 3" in text
+    assert "._clip" not in csv_path.read_text(encoding="utf-8-sig")
+
+
+def _fs_t15(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T15: the LRV sidecar match ignores case on every volume."""
+    inventory = importlib.import_module("inventory")
+    video = tmp_path / "GX010001.MP4"
+    video.write_bytes(b"v")
+    assert not inventory.lrv_beside(video)
+    (tmp_path / "gl010001.lrv").write_bytes(b"s")
+    assert inventory.lrv_beside(video)
+
+
+def _fs_t16(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T16: --exclude casefolds both sides on every platform (exact and varied case)."""
+    inventory = _stub_probes(monkeypatch)
+    root = tmp_path / "footage"
+    for folder in ("Insta360", "Insta3600", "Phone"):
+        (root / folder).mkdir(parents=True)
+        (root / folder / "a.MP4").write_bytes(b"x")
+    for exclude in ("Insta360", "INSTA360", "insta360"):
+        kept = {r.path.parts[0] for r in inventory.scan_tree(root, exclude=exclude).records}
+        assert kept == {"Insta3600", "Phone"}, exclude
+    source = (TOOLS / "inventory.py").read_text(encoding="utf-8")
+    assert "os.path.normcase(exclude)" not in source
+
+
+def _fs_t18(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T18: a report is never overwritten; a same-stamp run takes the -1 suffix."""
+    inventory = importlib.import_module("inventory")
+    first = inventory.write_inventory([], tmp_path, stamp="20261104T000000Z")
+    before = [p.read_bytes() for p in first]
+    second = inventory.write_inventory([], tmp_path, stamp="20261104T000000Z")
+    assert [p.name for p in second] == [
+        "inventory-20261104T000000Z-1.csv",
+        "inventory-20261104T000000Z-1-summary.md",
+    ]
+    assert [p.read_bytes() for p in first] == before
+
+
+def _fs_t19(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T19: a footage stem holding either separator is refused on every platform."""
+    local_config = importlib.import_module("local_config")
+    for stem in ("a/b", "a\\b", "", "GX01.MP4"):
+        with pytest.raises(ValueError):
+            local_config._check_stem(stem)
+    local_config._check_stem("GX011627")
+
+
+def _fs_t20(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T20 / X19: two distinct files with one casefolded stem are an explicit ambiguity."""
+    local_config = importlib.import_module("local_config")
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    (tmp_path / "a" / "GX01.MP4").write_bytes(b"1")
+    assert local_config.find_footage_file("gx01", tmp_path) == tmp_path / "a" / "GX01.MP4"
+    (tmp_path / "b" / "gx01.mp4").write_bytes(b"2")
+    with pytest.raises(local_config.FootageLookupError):
+        local_config.find_footage_file("GX01", tmp_path)
+    locator = (Path(__file__).parent / "test_footage_locator.py").read_text(encoding="utf-8")
+    assert ".mp4" in locator and ".MP4" in locator  # X19: the mixed-case roster stays
+
+
+def _fs_t21(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T21: the headless runner routes by lower-cased suffix, as the GUI does."""
+    he = importlib.import_module("headless_export")
+    assert he.route(Path("a.MP4")) == he.route(Path("a.mov")) == "video"
+    assert he.route(Path("b.HEIC")) == he.route(Path("b.jpg")) == "photo"
+    assert he.route(Path("c.LRV")) not in ("video", "photo")
+
+
+def _fs_t22(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T22 / X22: the extended prefix is stripped only from Windows spellings (data, not host)."""
+    he = importlib.import_module("headless_export")
+    assert str(he.plain_path(Path("\\\\?\\C:\\clips\\a.mp4"))) == str(Path("C:\\clips\\a.mp4"))
+    posix_name = Path("/Volumes/Dive/clips/a.mp4")
+    assert he.plain_path(posix_name) == posix_name  # no prefix surgery on a POSIX spelling
+    import ntpath
+    import posixpath
+
+    assert ntpath.splitdrive("C:x")[0] == "C:" and posixpath.splitdrive("C:x")[0] == ""
+
+
+def _fs_t23(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T23: the runner's containment: text, then the samestat identity of existing ancestors."""
+    he = importlib.import_module("headless_export")
+    root = tmp_path / "Footage"
+    (root / "Dive").mkdir(parents=True)
+    assert he.inside(root / "Dive" / "new" / "out.mp4", root)
+    assert not he.inside(tmp_path / "Footage-out" / "a.mp4", root)
+    assert not he.inside(tmp_path / "Foot", root)
+
+
+def _fs_t24(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T24: stream, extended and device forms are refused as write targets on every platform."""
+    he = importlib.import_module("headless_export")
+    footage = tmp_path / "footage"
+    for target in ("a.mp4:stream", "\\\\?\\C:\\a.mp4", "\\\\.\\NUL"):
+        assert he._write_form_refusal(Path(target)) == he.REFUSED_FORM, target
+    assert he._write_form_refusal(tmp_path / "plain.mp4") is None
+    assert he.write_target_refusal(tmp_path / "plain.mp4", footage) is None
+
+
+def _fs_t30(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T30: halo_probe's cache-conflict check (noted only) reuses headless_export.inside."""
+    tree = ast.parse((TOOLS / "halo_probe.py").read_text(encoding="utf-8"))
+    conflict = next(
+        n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_cache_conflict"
+    )
+    assert "headless_export.inside(cache_dir, out)" in ast.unparse(conflict)
+
+
+def _fs_t31(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T31: the halo run name refuses separators, drives, streams and device names everywhere."""
+    halo = importlib.import_module("halo_probe")
+    for name in ("a:b", "a\\b", "a/b", "CON", "nul.txt", ".."):
+        with pytest.raises(halo.ProbeError):
+            halo._check_name(name)
+    halo._check_name("run-1")
+
+
+def _fs_t32(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T32: the review pack's photo lookup casefolds the name; two matches stay explicit."""
+    select = importlib.import_module("reviewpack.select")
+    name = select.PHOTO_A[0]
+    (tmp_path / "a").mkdir()
+    (tmp_path / "a" / name.upper()).write_bytes(b"1")
+    assert select.find_photo(name.lower(), tmp_path) == tmp_path / "a" / name.upper()
+    (tmp_path / "b").mkdir()
+    (tmp_path / "b" / name.lower()).write_bytes(b"2")
+    with pytest.raises(select.FootageLookupError):
+        select.find_photo(name, tmp_path)
+
+
+def _fs_t45(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T45: the GoPro placeholder names keep their upper-case suffixes."""
+    files = importlib.import_module("fixtures.files")
+    assert files.GOPRO_NAMES == ("GX010001.MP4", "GX020001.MP4", "GL010001.LRV", "GX010001.THM")
+
+
+def _fs_t46(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T46: photo discovery lower-cases the suffix (A.JPG and b.heic both found)."""
+    photo_check = importlib.import_module("photo_check")
+    for name in ("A.JPG", "b.heic", "c.txt"):
+        (tmp_path / name).write_bytes(b"x")
+    assert [p.name for p in photo_check.collect([tmp_path])] == ["A.JPG", "b.heic"]
+
+
+def _fs_t47(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T47 / T48: the photo rosters' casefold duplicate check and lower-case PNG suffix stay."""
+    verify = (TOOLS / "photo_verify.py").read_text(encoding="utf-8")
+    assert "file.casefold() in seen" in verify
+    memory = (TOOLS / "photo_memory.py").read_text(encoding="utf-8")
+    assert 'source.suffix.lower() != ".png"' in memory
+
+
+def _fs_t52(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T52 / X46: the oracle's record name refuses ``:`` and a backslash on every host."""
+    eo = importlib.import_module("export_oracle")
+    for name in ("C:x", "a\\b", "a:b", "x\\", ":"):
+        with pytest.raises(eo.OracleError, match="not a plain folder name"):
+            eo.record_name(name)
+    assert eo.record_name("ref-GX011627-c3") == "ref-GX011627-c3"
+    oracle_tests = (Path(__file__).parent / "test_export_oracle.py").read_text(encoding="utf-8")
+    assert 'os.sep == "/"' not in oracle_tests  # X46: the POSIX skip is gone (D4 (b))
+
+
+def _fs_x20(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """X20: every distinct path is one row, whatever the suffix case (MP4 / mp4 / MOV / HEIC)."""
+    inventory = _stub_probes(monkeypatch)
+    for name in ("A.MP4", "b.mp4", "C.MOV", "d.HEIC"):
+        (tmp_path / name).write_bytes(b"x")
+    rows = [r.path.as_posix() for r in inventory.scan_tree(tmp_path).records]
+    assert rows == ["A.MP4", "C.MOV", "b.mp4", "d.HEIC"]
+
+
+def _fs_x29(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """X29: a case-distinct name blocks the plan where the volume says it is the same file, and a
+    temporary of any case always blocks (conservative grouping; no clobber on either volume)."""
+    from clearwater.jobs import naming
+
+    plan = naming.plan_output(tmp_path / "Clip.MP4", _settings(), naming.MediaKind.VIDEO)
+    assert not naming.is_taken(plan, {})
+    assert naming.is_taken(plan, {plan.path.name.upper().casefold(): [tmp_path / "x"]})
+    (tmp_path / plan.path.name.upper()).write_bytes(b"another file, another case")
+    same_object = os.path.lexists(tmp_path / plan.path.name)  # True on a case-insensitive volume
+    assert naming.is_taken(plan, {}) is same_object
+
+
+def _guard_seams(monkeypatch: pytest.MonkeyPatch) -> Any:
+    """Make footage_guard behave as on a case-insensitive APFS volume, on any host.
+
+    POSIX ``normcase`` folds nothing and macOS's ``realpath`` keeps the typed case, while the
+    real ``os.stat`` of this NTFS host still gives one identity to both spellings, as APFS does.
+    """
+    footage_guard = importlib.import_module("footage_guard")
+    monkeypatch.setattr(footage_guard, "_normcase", lambda text: text)
+    monkeypatch.setattr(footage_guard, "_realpath", lambda text: text)
+    return footage_guard
+
+
+def _old_text_inside(path: Path, root: Path) -> bool:
+    """The pre-WP6.4 tool check under the same seams: resolved text, no identity."""
+    a, b = os.path.abspath(path), os.path.abspath(root)  # exact text, as POSIX compares it
+    return a == b or a.startswith(b.rstrip(os.sep) + os.sep)
+
+
+def _snapshot(root: Path) -> list[tuple[str, int]]:
+    return sorted(
+        (p.relative_to(root).as_posix(), p.stat().st_size) for p in root.rglob("*") if p.is_file()
+    )
+
+
+def _planted(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
+    """A synthetic footage root under a differently cased existing ancestor."""
+    root = tmp_path / "Dive" / "Footage"
+    (root / "clips").mkdir(parents=True)
+    (root / "clips" / "GX01.MP4").write_bytes(b"synthetic")
+    alias = tmp_path / "DIVE" / "FOOTAGE"  # the same existing folder, typed otherwise
+    sibling = tmp_path / "DIVE" / "Footage-out"
+    return root, alias, alias / "out", sibling / "out"
+
+
+def _guard_refusals(site: str, root: Path, target: Path) -> Any:
+    """Run one tool site's guard; return its refusal (an exception or exit status) or None."""
+    if site == "T17":
+        inventory = importlib.import_module("inventory")
+        return inventory.main(["--footage", str(root), "--out", str(target)]) == 2 or None
+    if site in ("T26", "T27"):
+        module = importlib.import_module(
+            "lookcheck.frames" if site == "T26" else "container_spike.compare"
+        )
+        try:
+            module.check_output_path(target / "x.png", target.parents[2], root)
+        except module.OutputPathError as error:
+            return error
+        return None
+    module = importlib.import_module("analysis_breakdown" if site == "T28" else "export_oracle")
+    try:
+        if site == "T28":
+            module.refuse_inside(target, root)
+        else:
+            module.refuse_inside(target, root, "record folder")
+    except (getattr(module, "BreakdownError", OSError), getattr(module, "OracleError", OSError)):
+        return True
+    return None
+
+
+def _fs_guard_site(site: str) -> Any:
+    def case(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """T17 / T26-T29: an aliased footage root is refused BEFORE any write; a sibling passes."""
+        guard = _guard_seams(monkeypatch)
+        root, alias, unsafe, safe = _planted(tmp_path)
+        if sys.platform != "win32" and not alias.exists():
+            pytest.skip("a case-sensitive host volume: M-FS covers the native alias")
+        assert not _old_text_inside(unsafe, root)  # the control: a text check lets it through
+        assert guard.is_inside(unsafe, root) and not guard.is_inside(safe, root)
+        before = _snapshot(tmp_path)
+        assert _guard_refusals(site, root, unsafe)
+        assert _snapshot(tmp_path) == before  # refused before any write
+        if site == "T17":
+            inventory = _stub_probes(monkeypatch)
+            monkeypatch.setattr(
+                inventory, "scan_tree", lambda *a, **k: inventory.ScanResult((), 0, 0, 0)
+            )
+        assert not _guard_refusals(site, root, safe)
+        assert _snapshot(root) == [("clips/GX01.MP4", 9)]
+
+    return case
+
+
+FS_CASES = {
+    "P28": _fs_p28,
+    "P29": _fs_p29,
+    "P30": _fs_p30,
+    "P39": _fs_p39,
+    "P40": _fs_p40,
+    "P41": _fs_p41,
+    "P42": _fs_p42,
+    "P43": _fs_p43,
+    "P44": _fs_p44,
+    "P45": _fs_p45,
+    "P46": _fs_p46,
+    "P47": _fs_p47,
+    "P48": _fs_p48,
+    "P49": _fs_p40,
+    "P50": _fs_p50,
+    "P51": _fs_p50,
+    "P52": _fs_p52,
+    "P53": _fs_p53,
+    "P54": _fs_p54,
+    "P67": _fs_p67,
+    "P68": _fs_p68,
+    "P70": _fs_p70,
+    "P73": _fs_p73,
+    "T14": _fs_t14,
+    "T15": _fs_t15,
+    "T16": _fs_t16,
+    "T17": _fs_guard_site("T17"),
+    "T18": _fs_t18,
+    "T19": _fs_t19,
+    "T20": _fs_t20,
+    "T21": _fs_t21,
+    "T22": _fs_t22,
+    "T23": _fs_t23,
+    "T24": _fs_t24,
+    "T26": _fs_guard_site("T26"),
+    "T27": _fs_guard_site("T27"),
+    "T28": _fs_guard_site("T28"),
+    "T29": _fs_guard_site("T29"),
+    "T30": _fs_t30,
+    "T31": _fs_t31,
+    "T32": _fs_t32,
+    "T45": _fs_t45,
+    "T46": _fs_t46,
+    "T47": _fs_t47,
+    "T48": _fs_t47,
+    "T52": _fs_t52,
+    "X19": _fs_t20,
+    "X20": _fs_x20,
+    "X22": _fs_t22,
+    "X29": _fs_x29,
+    "X46": _fs_t52,
+}
+"""W-FS: the audit's 51 W-FS rows (group A: P29 P30 P70 P73; group B the rest)."""
 
 
 @pytest.mark.parametrize("site", sorted(FS_CASES))
@@ -1895,8 +2552,158 @@ def _gui_p71(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
     assert steps == ["in", "in"]
 
 
-GUI_CASES = {"P22": _gui_p22, "P37": _gui_p37, "P63": _gui_p63, "P71": _gui_p71}
-"""W-GUI sites built in group A; group B adds the remaining rows of the audit's W-GUI list."""
+def _gui_p27(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P27: the open filter lists the lower-case globs of every accepted suffix (M-GUI checks
+    the native Cocoa dialog's case behaviour; upper-case globs only if it needs them)."""
+    from clearwater.gui import sources
+
+    text = sources.file_filter()
+    for suffix in (*sources.PHOTO_SUFFIXES, *sources.VIDEO_SUFFIXES):
+        assert f"*{suffix}" in text and suffix == suffix.lower()
+    assert text.endswith(";;All files (*)")
+
+
+def _gui_p31(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P31: File / View / Tools; Settings is Tools' sole action (a Cocoa merge may empty it)."""
+    window = _gui_window(qtbot, tmp_path)
+    menus = [a.text() for a in window.menuBar().actions()]
+    assert menus == ["&File", "&View", "&Tools"]
+    tools = window.menuBar().actions()[2].menu()
+    assert [a.text() for a in tools.actions()] == ["&Settings..."]
+    quit_action = window.shell_actions.quit
+    assert quit_action.text() == "&Quit" and window.shell_actions.settings.text() == "&Settings..."
+
+
+def _gui_p32(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P32: the View shortcuts say Ctrl (Qt maps it to Command on macOS); Open / Quit standard."""
+    from PySide6.QtGui import QKeySequence
+
+    window = _gui_window(qtbot, tmp_path)
+    shortcuts = {k: a.shortcut().toString() for k, a in window.view_actions.items()}
+    assert shortcuts == {
+        "fit": "Ctrl+0",
+        "one_to_one": "Ctrl+1",
+        "zoom_in": "Ctrl++",
+        "zoom_out": "Ctrl+-",
+        "reset_split": "Ctrl+R",
+    }
+    assert window.shell_actions.open.shortcut() == QKeySequence(QKeySequence.StandardKey.Open)
+    assert "Meta" not in " ".join(shortcuts.values())  # no mechanical Meta substitution
+
+
+def _gui_p33(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P33 / P34: the open dialogs pass the filter; spaces and non-ASCII names; cancel is None."""
+    from PySide6.QtWidgets import QFileDialog, QWidget
+
+    from clearwater.gui import batch_panel, shell, sources
+
+    chosen = str(tmp_path / "dive café 01.MP4")
+    seen: list[str] = []
+
+    def one(parent: object, caption: str, folder: str, filters: str) -> tuple[str, str]:
+        seen.append(filters)
+        return (chosen if len(seen) == 1 else "", "")
+
+    def many(parent: object, caption: str, folder: str, filters: str) -> tuple[list[str], str]:
+        seen.append(filters)
+        return ([chosen, str(tmp_path / "IMG_1.HEIC")] if len(seen) == 3 else [], "")
+
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", staticmethod(one))
+    monkeypatch.setattr(QFileDialog, "getOpenFileNames", staticmethod(many))
+    parent = QWidget()
+    qtbot.addWidget(parent)
+    assert shell._choose_file(parent) == Path(chosen)
+    assert shell._choose_file(parent) is None  # cancelled
+    assert batch_panel._choose_files(parent) == [Path(chosen), tmp_path / "IMG_1.HEIC"]
+    assert batch_panel._choose_files(parent) == []
+    assert seen == [sources.file_filter()] * 4
+
+
+def _gui_p35(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P35: preset import / export: the JSON filter, .json added, our own overwrite question."""
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+    from clearwater.gui.preset_panel import QtPresetDialogs
+
+    options: list[object] = []
+
+    def save(*args: object, **kwargs: object) -> tuple[str, str]:
+        options.append(kwargs.get("options"))
+        return (str(tmp_path / "Reef dusk"), "")
+
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", staticmethod(save))
+    monkeypatch.setattr(
+        QFileDialog, "getOpenFileName", staticmethod(lambda *a: (str(tmp_path / "p.json"), ""))
+    )
+    monkeypatch.setattr(
+        QMessageBox, "question", staticmethod(lambda *a: QMessageBox.StandardButton.No)
+    )
+    dialogs = QtPresetDialogs(None)
+    assert dialogs.save_file("Reef dusk") == tmp_path / "Reef dusk.json"
+    assert options == [QFileDialog.Option.DontConfirmOverwrite]  # the panel asks itself
+    assert dialogs.open_file() == tmp_path / "p.json"
+    assert dialogs.confirm("Replace?") is False  # the default answer is No
+
+
+def _gui_p36(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P36: the folder chooser starts at the saved folder and returns None on cancel."""
+    from PySide6.QtWidgets import QFileDialog
+
+    from clearwater.gui.settings_dialog import QtChoosers
+
+    starts: list[str] = []
+
+    def choose(parent: object, caption: str, folder: str) -> str:
+        starts.append(folder)
+        return str(tmp_path / "out") if len(starts) == 1 else ""
+
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", staticmethod(choose))
+    choosers = QtChoosers(None)
+    assert choosers.choose_folder(tmp_path / "saved") == tmp_path / "out"
+    assert choosers.choose_folder(None) is None
+    assert starts == [str(tmp_path / "saved"), ""]
+
+
+def _gui_p38(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P38 / X40: 1:1 honours the device-pixel ratio (offscreen DPR 1 here; the DPR 2 child
+    of test_gui_preview stays; M-GUI is the Retina evidence)."""
+    from clearwater.gui.preview import PreviewWidget
+
+    widget = PreviewWidget()
+    qtbot.addWidget(widget)
+    assert widget.devicePixelRatioF() == 1.0
+    source = (SRC / "gui" / "preview.py").read_text(encoding="utf-8")
+    assert source.count("self.devicePixelRatioF()") >= 4
+    child = (Path(__file__).parent / "test_gui_preview.py").read_text(encoding="utf-8")
+    assert 'QT_SCALE_FACTOR="2"' in child
+
+
+def _gui_x39(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """X39: the unit suite runs on Qt's offscreen platform unless the developer chose another."""
+    from PySide6.QtGui import QGuiApplication
+
+    support = (Path(__file__).parent / "gui_support.py").read_text(encoding="utf-8")
+    assert 'os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")' in support
+    assert QGuiApplication.platformName() == os.environ.get("QT_QPA_PLATFORM", "offscreen")
+
+
+GUI_CASES = {
+    "P22": _gui_p22,
+    "P27": _gui_p27,
+    "P31": _gui_p31,
+    "P32": _gui_p32,
+    "P33": _gui_p33,
+    "P34": _gui_p33,
+    "P35": _gui_p35,
+    "P36": _gui_p36,
+    "P37": _gui_p37,
+    "P38": _gui_p38,
+    "P63": _gui_p63,
+    "P71": _gui_p71,
+    "X39": _gui_x39,
+    "X40": _gui_p38,
+}
+"""W-GUI: the audit's 13 W-GUI rows plus P37's dialog half (group A: P22 P37 P63 P71)."""
 
 
 @pytest.mark.gui
@@ -1906,3 +2713,741 @@ def test_portability_gui_contract(
 ) -> None:
     """W-GUI: the AD-9 reason, the encoder rows and label, the wheel, offscreen only."""
     GUI_CASES[site](qtbot, monkeypatch, tmp_path)
+
+
+# --- W-DEVICE: the CPU selection, the AD-9 reasons and the CUDA-only figures -----------------
+
+
+def _missing_cupy(name: str) -> Any:
+    raise ModuleNotFoundError(f"No module named {name!r}", name="cupy")
+
+
+def _device_p05(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P05: a CPU decode short-circuits the CUDA trial (``hw_decode and ...``, no extra child)."""
+    from clearwater.io.video import decode
+
+    source = (SRC / "io" / "video" / "decode.py").read_text(encoding="utf-8")
+    assert "cuda = hw_decode and cuda_decode_available()" in source
+    for module, needle in (
+        ("jobs/export.py", "hw_decode"),
+        ("app/analysis_adapter.py", "hw_decode"),
+        ("gui/analysis_service.py", "hw_decode"),
+        ("gui/sources.py", "hw_decode=False"),
+    ):
+        assert needle in (SRC / module).read_text(encoding="utf-8"), module
+
+    def trial() -> bool:
+        raise AssertionError("the CUDA trial ran on a CPU decode")
+
+    monkeypatch.setattr(decode, "cuda_decode_available", trial)
+    hw_decode = False
+    assert (hw_decode and decode.cuda_decode_available()) is False
+
+
+def _device_p18(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P18: the D111 estimate is the CUDA working-array bound, recomputed independently."""
+    import math
+
+    from clearwater.core.memory import memory_estimate_bytes
+
+    for height, width in ((2160, 3840), (1080, 1920), (1, 1)):
+        expected = math.ceil((25 + 40 / 3 + 11.75) * 1.25 * 4 * height * width) + (1 << 20)
+        assert abs(memory_estimate_bytes(height, width, "c3") - expected) <= 1
+    with pytest.raises(ValueError):
+        memory_estimate_bytes(0, 10, "c3")
+    with pytest.raises(ValueError):
+        memory_estimate_bytes(10, 10, "unknown")
+
+
+def _device_p19(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P19: the session constants are NVIDIA's (NVDEC / NVENC) and only the GPU path reads them."""
+    from clearwater.core import memory
+
+    assert memory.SESSION_KINDS == ("nvdec", "nvenc")
+    assert "RTX 4070" in (SRC / "core" / "memory.py").read_text(encoding="utf-8")
+    backend_source = (SRC / "core" / "backend.py").read_text(encoding="utf-8")
+    assert "session_bytes" not in backend_source  # never a CPU RAM admission rule
+
+
+def _device_p20(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P20: the CPU backend reports no device memory (never compared with the estimate)."""
+    from clearwater.core.backend import NumpyBackend
+
+    assert NumpyBackend().free_device_bytes() is None
+
+
+def _device_p21(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P21: CUDA free memory is the driver figure plus the pool's reusable blocks (CUDA only)."""
+    from clearwater.core.backend import CupyBackend
+
+    fake = SimpleNamespace(
+        cuda=SimpleNamespace(runtime=SimpleNamespace(memGetInfo=lambda: (1000, 4000))),
+        get_default_memory_pool=lambda: SimpleNamespace(free_bytes=lambda: 24),
+    )
+    assert CupyBackend.free_device_bytes(SimpleNamespace(xp=fake)) == 1024  # type: ignore[arg-type]
+
+
+def _device_p22(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P22: no CuPy on darwin gives the macOS reason; a CuPy that fails to load stays so."""
+    from clearwater.core import backend
+
+    def broken(name: str) -> Any:
+        raise ImportError("DLL load failed while importing cupy_backends")
+
+    results = {}
+    for label, loader in (("missing", _missing_cupy), ("broken", broken)):
+        for platform in ("darwin", "win32"):
+            backend._probe_gpu.cache_clear()
+            with monkeypatch.context() as patched:
+                patched.setattr(backend, "importlib", SimpleNamespace(import_module=loader))
+                patched.setattr(backend.sys, "platform", platform)  # no Windows API is called
+                results[label, platform] = backend._probe_gpu()
+    backend._probe_gpu.cache_clear()
+    assert results["missing", "darwin"] == (None, backend.MACOS_CPU_REASON)
+    assert results["missing", "win32"] == (None, "CPU: CuPy not installed")
+    assert (
+        results["broken", "darwin"]
+        == results["broken", "win32"]
+        == (
+            None,
+            "CPU: CuPy failed to load",
+        )
+    )
+
+
+def _device_p23(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P23: force CPU returns before any probe or free-memory query; a lost device is named."""
+    from clearwater.core import backend
+    from clearwater.interfaces import Settings
+
+    def probe() -> Any:
+        raise AssertionError("the GPU was probed under force CPU")
+
+    monkeypatch.setattr(backend, "_probe_gpu", probe)
+    chosen, reason = backend.select_backend(Settings(force_cpu=True), 2160, 3840, "c3")
+    assert (chosen.name, reason) == ("numpy", "CPU: forced")
+
+    class Lost:
+        def free_device_bytes(self) -> int:
+            raise RuntimeError("device lost")
+
+    monkeypatch.setattr(backend, "_probe_gpu", lambda: (Lost(), "GPU"))
+    chosen, reason = backend.select_backend(Settings(), 2160, 3840, "c3")
+    assert (chosen.name, reason) == ("numpy", "CPU: CUDA device unusable")
+
+
+def _device_t42(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T42: the device-hold instrument is labelled GPU-only and imports CuPy only when run."""
+    assert "T42" in labelled_rows("device_hold.py")
+    tree = ast.parse((TOOLS / "device_hold.py").read_text(encoding="utf-8"))
+    top = [n for n in tree.body if isinstance(n, ast.Import | ast.ImportFrom)]
+    assert not any("cupy" in ast.unparse(n) for n in top)
+
+
+def _device_t43(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T43: the prototype falls back to the CPU on auto and refuses an explicit GPU request."""
+    prototype_backend = importlib.import_module("prototype.backend")
+    monkeypatch.setattr(prototype_backend, "_probe_gpu", lambda: (None, "cupy is not installed"))
+    assert prototype_backend.select_backend("auto").name == "cpu"
+    assert prototype_backend.select_backend("auto").reason == "cupy is not installed"
+    with pytest.raises(RuntimeError, match="no usable CUDA device: cupy is not installed"):
+        prototype_backend.select_backend("gpu")
+
+
+def _device_x44(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """X44: the core backend tests keep CuPy behind the gpu marker (the CPU leg runs alone)."""
+    text = (Path(__file__).parent / "test_core_backend.py").read_text(encoding="utf-8")
+    assert 'pytest.param("cupy", marks=pytest.mark.gpu)' in text
+
+
+DEVICE_CASES = {
+    "P05": _device_p05,
+    "P18": _device_p18,
+    "P19": _device_p19,
+    "P20": _device_p20,
+    "P21": _device_p21,
+    "P22": _device_p22,
+    "P23": _device_p23,
+    "T42": _device_t42,
+    "T43": _device_t43,
+    "X44": _device_x44,
+}
+
+
+@pytest.mark.parametrize("site", sorted(DEVICE_CASES))
+def test_portability_cpu_selection(
+    site: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """W-DEVICE: the CPU path without CuPy, the AD-9 reasons, CUDA-only figures kept CUDA's."""
+    DEVICE_CASES[site](monkeypatch, tmp_path)
+
+
+# --- W-TEXT: FFmpeg text, reasons, provenance and redaction --------------------------------
+
+MAC_SHOWINFO = (
+    "[Parsed_showinfo_0 @ 0x600001b0c000] [info] config in time_base: 1/30000, frame_rate: 30",
+    "[Parsed_showinfo_0 @ 0x600001b0c000] [info] n:   0 pts:      0 pts_time:0  duration:1001",
+)
+"""SYNTHETIC macOS-shaped showinfo lines (a 0x address); WP6.5 replaces them with a capture."""
+
+
+def _text_p06(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P06: the showinfo parser reads the frame and time-base fields whatever the address form."""
+    from clearwater.io.video import decode
+
+    windows = tuple(line.replace("0x600001b0c000", "000001ee23623e00") for line in MAC_SHOWINFO)
+    for config, frame in (MAC_SHOWINFO, windows):
+        assert decode._SHOWINFO_CONFIG.match(config).groups() == ("1", "30000")  # type: ignore[union-attr]
+        assert decode._SHOWINFO_FRAME.match(frame).groups() == ("0", "0")  # type: ignore[union-attr]
+    assert decode._SHOWINFO_FRAME.match(MAC_SHOWINFO[1].replace("pts:", "pt:")) is None
+
+
+def _text_p08(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P08: the listing parse reads the six-flag lines; VT present, absent, or a failed listing."""
+    for listing, wanted, absent in (
+        (_fixture_text("vt-encoders.txt"), {"hevc_videotoolbox", "libx265"}, "hevc_nvenc"),
+        (WINDOWS_LISTING, {"hevc_nvenc", "libx265"}, "hevc_videotoolbox"),
+    ):
+        _stub_ffmpeg(monkeypatch, listing, {})
+        names, error = capability._listed(Path("ffmpeg"))
+        assert error is None and wanted <= names and absent not in names
+
+    monkeypatch.setattr(capability, "_run", lambda command: (1, "boom\nUnknown option"))
+    names, error = capability._listed(Path("ffmpeg"))
+    assert names == set() and error
+
+
+def _text_p10(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P10: the NVIDIA markers explain NVENC only; VT has its own; otherwise the generic tail."""
+    nvidia = capability._NO_DEVICE_MARKERS[0]
+    vt = capability._VT_NO_SESSION_MARKERS[0]
+    assert "NVIDIA" in capability._reason("hevc_nvenc", [nvidia])
+    assert "NVIDIA" not in capability._reason("hevc_videotoolbox", [nvidia])
+    assert "VideoToolbox" in capability._reason("hevc_videotoolbox", [vt])
+    assert "VideoToolbox" not in capability._reason("hevc_nvenc", [vt])
+    generic = capability._reason("libx265", ["x265 [error]: odd"])
+    assert generic == "The libx265 test encode failed: x265 [error]: odd"
+    for reason in (capability._reason(e, [nvidia, vt]) for e in capability.KNOWN_ENCODERS):
+        assert reason.isascii()
+
+
+def _text_p66(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P66: the 16 KiB provenance cap stays (not a Mac ARG_MAX figure); the refusal is ASCII."""
+    assert encode.PROVENANCE_MAX_BYTES == 16 * 1024
+    fits = encode.provenance_comment({"note": "x" * 1000})
+    assert len(fits) <= encode.PROVENANCE_MAX_BYTES
+    with pytest.raises(VideoEncodeError) as caught:
+        encode.provenance_comment({"note": "\u00e9" * (encode.PROVENANCE_MAX_BYTES // 2)})
+    assert caught.value.kind == "refused" and str(caught.value).isascii()
+
+
+def _text_p72(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P72: the displaymatrix text parse (version-dependent, not OS-dependent)."""
+    probe = importlib.import_module("clearwater.io.video.probe")
+    text = (
+        "\n00000000:            0       65536           0\n"
+        "00000001:       -65536           0           0\n"
+        "00000002:            0           0  1073741824\n"
+    )
+    assert probe._matrix_rows(text) == [(0, 65536, 0), (-65536, 0, 0), (0, 0, 1073741824)]
+    assert probe._matrix_rows(text.replace("\n", "\r\n")) == probe._matrix_rows(text)
+    assert probe._matrix_rows(None) == [] and probe._matrix_rows("garbage") == []
+
+
+def _text_t25(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T25: the runner's redaction: POSIX, spaces, NFC / NFD names and Windows spellings."""
+    he = importlib.import_module("headless_export")
+    folder = Path("/Users/diver/My Dives/caf\u00e9")
+    redact = he.Redactor([folder])
+    for leak in (
+        "/Users/diver/My Dives/caf\u00e9/GX01.MP4 failed",
+        "'/Users/diver/My Dives/caf\u00e9/GX01.MP4'",
+    ):
+        assert "/Users/diver" not in redact(leak), leak
+    assert redact("GX01.MP4 done") == "GX01.MP4 done"
+    windows = he.Redactor([Path("C:\\Users\\diver\\footage")])
+    assert "diver" not in windows("C:\\Users\\diver\\footage\\GX01.MP4: refused")
+
+
+def _text_x25(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """X25: the decode-rules scan still allows OS code only in pipes.py; a planted hit fails."""
+    pattern = r"sys\.platform|_winapi|msvcrt|os\.name|platform\.system"
+    import re
+
+    pipes_text = (SRC / "io" / "video" / "pipes.py").read_text(encoding="utf-8")
+    decode_text = (SRC / "io" / "video" / "decode.py").read_text(encoding="utf-8")
+    assert sorted(set(re.findall(pattern, pipes_text))) == ["_winapi", "msvcrt", "sys.platform"]
+    assert re.findall(pattern, decode_text) == []
+    assert re.findall(pattern, decode_text + "\nif os.name == 'nt':\n    pass\n") == ["os.name"]
+    rules = (Path(__file__).parent / "test_io_video_decode_rules.py").read_text(encoding="utf-8")
+    assert "def test_the_only_os_specific_code_is_the_pipe" in rules
+
+
+def _text_x45(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """X45: the privacy assertion catches POSIX, Windows and NFD folder spellings."""
+    support = importlib.import_module("acceptance_support")
+    for leak in ("/Users/diver/x.mp4 failed", "C:\\Users\\diver\\x.mp4", "see /Volumes/Dive"):
+        with pytest.raises(AssertionError):
+            support.assert_names_only(leak)
+    support.assert_names_only("GX01.MP4 done")
+    folder = tmp_path / "caf\u00e9"
+    with pytest.raises(AssertionError):
+        support.assert_names_only({"where": f"under {folder}"}, folders=[folder])
+
+
+TEXT_CASES = {
+    "P06": _text_p06,
+    "P08": _text_p08,
+    "P10": _text_p10,
+    "P66": _text_p66,
+    "P72": _text_p72,
+    "T25": _text_t25,
+    "X25": _text_x25,
+    "X45": _text_x45,
+}
+
+
+@pytest.mark.parametrize("site", sorted(TEXT_CASES))
+def test_portability_tool_text_and_redaction(
+    site: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """W-TEXT: FFmpeg text from either platform's shape, reasons, the cap and the redaction."""
+    TEXT_CASES[site](monkeypatch, tmp_path)
+
+
+# --- W-SPACE: the disk estimate and the disk-full classifier (D87, DR-48) ------------------
+
+
+def _space_p64(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P64: the D87 arithmetic, recomputed; injected free bytes; no purgeable bytes counted."""
+    import collections
+
+    from clearwater.interfaces import Settings
+    from clearwater.jobs import disk_space
+
+    for quality in ("high", "standard", "draft"):
+        settings = Settings(quality_level=quality)  # type: ignore[arg-type]
+        got = disk_space.estimate_video_bytes(
+            10**9,
+            settings,
+            width=3840,
+            height=2160,
+            frame_rate=Fraction(60),
+            duration_s=Fraction(60),
+        )
+        ceiling = (
+            Fraction(encode.NVENC_BITS_PER_PIXEL)
+            / encode.NVENC_RATE_SHARE[quality]
+            * 3840
+            * 2160
+            * Fraction(60)
+        )
+        bound = max(disk_space.QUALITY_RATIO[quality] * 10**9, ceiling * 60 / 8)
+        assert abs(got - bound * disk_space.MARGIN) <= 1, quality
+    usage = collections.namedtuple("usage", "total used free")
+    monkeypatch.setattr(disk_space.shutil, "disk_usage", lambda path: usage(100, 90, 10))
+    check = disk_space.check_free_space(tmp_path, 11)
+    assert (check.free, check.needed, check.ok) == (10, 11, False)
+    assert disk_space.check_free_space(tmp_path, 10).ok
+    source = (SRC / "jobs" / "disk_space.py").read_text(encoding="utf-8")
+    assert "purgeable" not in source.casefold()
+
+
+def _space_p69(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P69: ENOSPC / EDQUOT, Windows 112 / 39, an absent winerror; others are not disk-full."""
+    from clearwater.jobs.safe_write import is_disk_full
+
+    assert is_disk_full(OSError(errno.ENOSPC, "full"))
+    assert is_disk_full(OSError(getattr(errno, "EDQUOT", errno.ENOSPC), "quota"))
+    for code in (112, 39):
+        error = OSError(errno.EINVAL, "windows")
+        error.winerror = code  # type: ignore[attr-defined]
+        assert is_disk_full(error)
+    assert not is_disk_full(OSError(errno.EACCES, "denied"))  # no winerror attribute at all
+    assert not is_disk_full(ValueError("not an OSError"))
+
+
+SPACE_CASES = {"P64": _space_p64, "P69": _space_p69}
+
+
+@pytest.mark.parametrize("site", sorted(SPACE_CASES))
+def test_portability_disk_space_estimate(
+    site: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """W-SPACE: the Windows disk estimate and the portable disk-full classifier unchanged."""
+    SPACE_CASES[site](monkeypatch, tmp_path)
+
+
+# --- W-GUARD: the footage guard and the test helpers' platform guards ----------------------
+
+PLATFORM_TEXTS = ("os.name", "sys.platform", "WINDOWS")
+"""What a platform guard mentions (``WINDOWS`` is a module constant built on sys.platform)."""
+
+
+def platform_guard_offenders(source: str, markers: Sequence[str], name: str) -> list[str]:
+    """Return ``name:line`` for each line holding a marker outside any platform guard.
+
+    A line is guarded when it mentions a platform test itself, or when its innermost enclosing
+    function (decorators included) does, calls a helper that does (a skip off Windows), or is
+    only called from functions that are guarded.
+    """
+    tree = ast.parse(source)
+    lines = source.splitlines()
+    functions = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
+
+    def span(node: ast.FunctionDef) -> tuple[int, int]:
+        first = min([node.lineno, *(d.lineno for d in node.decorator_list)])
+        return first, node.end_lineno or node.lineno
+
+    def text(node: ast.FunctionDef) -> str:
+        first, last = span(node)
+        return "\n".join(lines[first - 1 : last])
+
+    def direct(node: ast.FunctionDef) -> bool:
+        body = text(node)
+        return any(t in body for t in PLATFORM_TEXTS) or "monkeypatch.setattr(subprocess" in body
+
+    skipping = {f.name for f in functions if direct(f)}  # helpers that skip off Windows
+
+    def guarded(node: ast.FunctionDef, depth: int = 0) -> bool:
+        body = text(node)
+        if direct(node) or any(f"{name}(" in body for name in skipping - {node.name}):
+            return True
+        callers = [f for f in functions if f is not node and f"{node.name}(" in text(f)]
+        return depth < 3 and bool(callers) and all(guarded(f, depth + 1) for f in callers)
+
+    offenders = []
+    for number, line in enumerate(lines, start=1):
+        if not any(m in line for m in markers) or any(t in line for t in PLATFORM_TEXTS):
+            continue
+        around = [f for f in functions if span(f)[0] <= number <= span(f)[1]]
+        inner = max(around, key=lambda f: span(f)[0], default=None)
+        if inner is None or not guarded(inner):
+            offenders.append(f"{name}:{number}")
+    return offenders
+
+
+GUARD_SITES = {
+    "X05": ("test_conftest_guard.py", ('"\\\\\\\\?\\\\"',)),
+    "X06": ("test_conftest_guard.py", ("letter case matters only",)),
+    "X07": ("test_conftest_guard.py", ("extended-length prefixes exist only",)),
+    "X08": ("test_conftest_guard.py", ("GetShortPathNameW",)),
+    "X09": ("test_conftest_guard.py", ("mklink",)),
+    "X10": ("test_conftest_guard.py", ("GetVolumeNameForVolumeMountPointW",)),
+    "X11": ("test_conftest_guard.py", ("same entry only on NTFS",)),
+    "X12": ("test_conftest_guard.py", ("volume GUID paths exist only",)),
+    "X17": ("test_app_wiring.py", ('Path(f"{carrier}:{name}")',)),
+    "X18": ("test_footage_locator.py", ("mklink",)),
+    "X21": ("test_headless_export.py", ("mklink",)),
+    "X30": ("test_jobs_naming.py", ("mklink",)),
+    "X31": ("test_reviewpack.py", ("mklink",)),
+    "X32": ("test_wp42a_runner_hardening.py", ("src.drive[0]",)),
+    "X33": ("test_wp42a_runner_hardening.py", ("one-letter",)),
+    "X34": ("test_wp42a_runner_hardening.py", ('["powershell"',)),
+    "X35": ("test_wp42a_runner_hardening.py", ("os.link(",)),
+    "X36": ("test_wp42a_runner_hardening.py", ("mklink",)),
+    "X37": ("test_wp42b_naming_guard.py", ("real alternate-data-stream source requires",)),
+    "X38": ("test_wp42_runner_video.py", ("mklink",)),
+}
+"""For each test-helper row: the module and the Windows-only constructs its guard must cover."""
+
+
+def _guard_helpers(site: str) -> Any:
+    def case(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """X05-X38: every Windows-only control in the helper is behind a platform guard."""
+        module, markers = GUARD_SITES[site]
+        source = (Path(__file__).parent / module).read_text(encoding="utf-8")
+        assert any(m in source for m in markers), (site, markers)  # the construct is there
+        assert platform_guard_offenders(source, markers, module) == []
+        planted = "def helper(p):\n    subprocess.run(['cmd', '/c', 'mklink', '/J', p, p])\n"
+        assert platform_guard_offenders(planted, ("mklink",), "planted") == ["planted:2"]
+
+    return case
+
+
+def _conftest() -> Any:
+    return sys.modules.get("conftest") or importlib.import_module("conftest")
+
+
+def _guard_x01(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """X01: the temp-root guard strips an extended prefix only on Windows (an os.name branch)."""
+    conftest = _conftest()
+    if sys.platform == "win32":
+        assert conftest._canonical("\\\\?\\" + str(tmp_path)) == conftest._canonical(tmp_path)
+    else:
+        assert str(conftest._canonical(tmp_path)) == str(tmp_path.resolve())
+    tree = ast.parse((Path(__file__).parent / "conftest.py").read_text(encoding="utf-8"))
+    canonical = next(
+        n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_canonical"
+    )
+    branch = next(n for n in ast.walk(canonical) if isinstance(n, ast.If))
+    assert ast.unparse(branch.test) == "os.name == 'nt'" and "extended" in ast.unparse(branch)
+
+
+def _guard_x02(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """X02 / X04: TMPDIR, TEMP, TMP precedence, stopping at the first usable one; both lists."""
+    import tempfile
+
+    conftest = _conftest()
+    usable = tmp_path / "usable"
+    usable.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", None)
+    monkeypatch.setenv("TMPDIR", str(tmp_path / "absent"))
+    monkeypatch.setenv("TEMP", str(usable))
+    monkeypatch.setenv("TMP", str(tmp_path / "never"))
+    assert conftest._temp_root_candidates() == [str(tmp_path / "absent"), str(usable)]
+    source = (Path(__file__).parent / "conftest.py").read_text(encoding="utf-8")
+    assert '"/tmp", "/var/tmp", "/usr/tmp"' in source and "AppData\\Local\\Temp" in source
+
+
+def _guard_x03(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """X03: containment by an existing ancestor's identity; a distinct sibling stays outside."""
+    conftest = _conftest()
+    footage = tmp_path / "Footage"
+    footage.mkdir()
+    alias = tmp_path / "ALIAS"
+    candidate = alias / "new" / "basetemp"
+
+    def samefile(a: object, b: object) -> bool:  # a fake identity: ALIAS is the footage folder
+        names = {Path(str(a)).name, Path(str(b)).name}
+        return names == {"ALIAS", "Footage"} or str(a) == str(b)
+
+    monkeypatch.setattr(conftest.os.path, "samefile", samefile)
+    assert conftest._inside_or_equal(candidate, footage)
+    assert not conftest._inside_or_equal(tmp_path / "sibling" / "basetemp", footage)
+
+
+GUARD_CASES: dict[str, Any] = {
+    "X01": _guard_x01,
+    "X02": _guard_x02,
+    "X03": _guard_x03,
+    "X04": _guard_x02,
+    **{site: _guard_helpers(site) for site in GUARD_SITES},
+}
+
+
+@pytest.mark.parametrize("site", sorted(GUARD_CASES))
+def test_portability_footage_guard_and_test_helpers(
+    site: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """W-GUARD: the temp-root guard's helpers and every Windows-only control's platform guard."""
+    GUARD_CASES[site](monkeypatch, tmp_path)
+
+
+def test_portability_footage_guard_matches_the_reference_checks(tmp_path: Path) -> None:
+    """Q4 / D3: footage_guard agrees with headless_export.inside on containment, and with
+    jobs.naming.is_same_path on the equality subset (mutual containment), on one corpus."""
+    from clearwater.jobs.naming import is_same_path
+
+    footage_guard = importlib.import_module("footage_guard")
+    he = importlib.import_module("headless_export")
+    root = tmp_path / "Footage"
+    (root / "clips").mkdir(parents=True)
+    (tmp_path / "Footage-out").mkdir()
+    corpus = {
+        root: True,
+        root / "clips": True,
+        root / "clips" / "new" / "out.mp4": True,
+        root / "." / "clips": True,
+        tmp_path / "Footage-out": False,
+        tmp_path / "Footage-out" / "x": False,
+        tmp_path / "Foot": False,
+        root / ".." / "Footage-out": False,
+        tmp_path: False,
+    }
+    if sys.platform == "win32":
+        corpus[tmp_path / "FOOTAGE" / "clips"] = True  # one NTFS object, two spellings
+    for path, expected in corpus.items():
+        assert footage_guard.is_inside(path, root) is expected, path
+        assert he.inside(path, root) is expected, path
+    for path in (root, root / ".", root / "clips" / ".."):
+        mutual = footage_guard.is_inside(path, root) and footage_guard.is_inside(root, path)
+        assert mutual is is_same_path(path, root) is True, path
+    for path in (root / "clips", tmp_path / "Footage-out"):
+        mutual = footage_guard.is_inside(path, root) and footage_guard.is_inside(root, path)
+        assert mutual is is_same_path(path, root) is False, path
+
+
+# --- W-TOOL: the tools' platform reporting, no fake telemetry ------------------------------
+
+
+def _tool_report(monkeypatch: pytest.MonkeyPatch, platform: str, smi: str | None) -> Any:
+    environment_report = importlib.import_module("environment_report")
+    ran: list[str] = []
+
+    def run(command: list[str], cwd: Path | None = None) -> str:
+        ran.append(command[0])
+        if command[0] == "nvidia-smi":
+            if smi is None:
+                raise environment_report.ProbeError("nvidia-smi not found")
+            return smi
+        return f"{command[0]} 1.0"
+
+    monkeypatch.setattr(environment_report, "_run", run)
+    monkeypatch.setattr(environment_report.sys, "platform", platform)  # no Windows API follows
+    monkeypatch.setattr(
+        environment_report.cpuinfo, "get_cpu_info", lambda: {"brand_raw": "Test CPU"}
+    )
+    monkeypatch.setattr(environment_report, "_correction_backend", lambda: ("numpy", "CPU: x"))
+    rows = [{"name": "libx265", "available": True, "hardware": False, "bit_depths": [8, 10]}]
+    monkeypatch.setattr(environment_report, "_encoder_rows", lambda: rows)
+    return environment_report, ran
+
+
+def _tool_t01(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T01: the OS facts stay; --platform-facts adds machine, architecture, backend, roster."""
+    import platform
+    import sysconfig
+
+    environment_report, _ran = _tool_report(monkeypatch, sys.platform, "GPU, 8188, 560.94")
+    plain = environment_report.collect()
+    assert not set(environment_report._PLATFORM_KEYS) & set(plain)
+    report = environment_report.collect(platform_facts=True)
+    keys = list(report)
+    assert keys[-6:] == [*environment_report._PLATFORM_KEYS, "unavailable"]
+    assert report["machine"] == (platform.machine() or None)
+    assert report["process_architecture"] == sysconfig.get_platform()
+    assert (report["correction_backend"], report["correction_backend_reason"]) == (
+        "numpy",
+        "CPU: x",
+    )
+    assert report["encoders"][0]["name"] == "libx265"
+    assert report["os_name"] == platform.system()
+
+
+def _tool_t02(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T02: macOS never runs nvidia-smi (null, not applicable); elsewhere its absence is named."""
+    environment_report, ran = _tool_report(monkeypatch, "darwin", "GPU, 1, 1")
+    report = environment_report.collect()
+    assert "nvidia-smi" not in ran
+    for key in ("gpu_model", "gpu_memory_bytes", "gpu_driver_version"):
+        assert report[key] is None
+        assert report["unavailable"][key].startswith("not applicable on this platform")
+    environment_report, ran = _tool_report(monkeypatch, "win32", None)
+    report = environment_report.collect()
+    assert "nvidia-smi" in ran and report["gpu_model"] is None
+    assert report["unavailable"]["gpu_model"] == "nvidia-smi not found"
+
+
+def _bench() -> Any:
+    return importlib.import_module("prototype.bench")
+
+
+def _tool_t03(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T03 / T05 / T09: the AD-36 statement form in bench and the spike transport; the readings."""
+    for relative in ("prototype/bench.py", "spike_io/transport.py"):
+        source = (TOOLS / relative).read_text(encoding="utf-8")
+        assert guard_form_offenders(source, relative) == []
+        assert 'os.name == "nt"' not in source
+    record = _bench()._windows_power()
+    assert set(record) == {"power_scheme", "power_overlay", "power_overlay_name"}
+    if sys.platform != "win32":
+        assert set(record.values()) == {None}
+    name = _bench()._platform_name()
+    assert name.startswith("Windows ") if sys.platform == "win32" else name
+
+
+def _tool_t04(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T04: the processor name without WMI on Windows; the py-cpuinfo fallback elsewhere."""
+    bench = _bench()
+    if sys.platform == "win32":
+        monkeypatch.setenv("PROCESSOR_IDENTIFIER", "Test Family 6")
+        assert bench._cpu_brand() == "Test Family 6"
+        monkeypatch.delenv("PROCESSOR_IDENTIFIER")
+        assert bench._cpu_brand() == "unknown"  # recorded honestly
+    else:
+        assert isinstance(bench._cpu_brand(), str)
+    tree = ast.parse((TOOLS / "prototype" / "bench.py").read_text(encoding="utf-8"))
+    brand = next(
+        n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_cpu_brand"
+    )
+    branch = next(n for n in brand.body if isinstance(n, ast.If))
+    assert "cpuinfo" in ast.unparse(ast.Module(body=branch.orelse, type_ignores=[]))
+
+
+def _tool_t06(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T06 / T10: the ambient-process attribution names Windows processes (historical scope)."""
+    assert {"MsMpEng.exe", "WmiPrvSE.exe"} == _bench().WATCHED_PROCESSES
+    transport = importlib.import_module("spike_io.transport")
+    assert {"System", "Registry", "csrss.exe"} <= transport.SYSTEM_PROCESSES  # Windows names
+
+
+def _tool_t09(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T09: the PowerShell idle gate runs nothing without its script, and nothing off Windows."""
+    transport = importlib.import_module("spike_io.transport")
+
+    def no_child(*args: object, **kwargs: object) -> None:
+        raise AssertionError("a child process was started")
+
+    monkeypatch.setattr(transport.subprocess, "run", no_child)
+    assert transport.idle_gate(tmp_path / "absent.ps1", tmp_path / "out")["ran"] is False
+
+
+def _tool_t11(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T11 / T12: the licence scan keeps its Windows forms; the Mac forms are candidate DR 3
+    (deferred: tools/spike_io/licences.py is not this package's)."""
+    licences = importlib.import_module("spike_io.licences")
+    assert {".pyd", ".dll", ".exe"} <= set(licences._CODE_SUFFIXES)
+    source = (TOOLS / "spike_io" / "licences.py").read_text(encoding="utf-8")
+    assert "av.libs" in source and ".dylib" in source  # pillow-heif's native scan already
+
+
+def _tool_t13(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T13: the NVIDIA sampler of the I/O bench is labelled historical Windows evidence."""
+    assert "T13" in labelled_rows("video_io_bench.py")
+    assert "nvidia-smi" in (TOOLS / "video_io_bench.py").read_text(encoding="utf-8")
+
+
+def _tool_t38(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T38: the export bench's NVIDIA sampler per non-x265 leg is labelled (no fake VT proof)."""
+    assert "T38" in labelled_rows("export_bench.py")
+    tree = ast.parse((TOOLS / "export_bench.py").read_text(encoding="utf-8"))
+    assert any(isinstance(n, ast.FunctionDef) and n.name == "_gpu_sampler" for n in ast.walk(tree))
+
+
+def _tool_t39(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """T39 / T40 / T41: a missing nvidia-smi is an honest 'unavailable', never a figure."""
+    core_speed = importlib.import_module("core_speed")
+    breakdown = importlib.import_module("analysis_breakdown")
+    photo_verify = importlib.import_module("photo_verify")
+    assert "T39" in labelled_rows("core_speed.py")
+
+    def missing(*args: object, **kwargs: object) -> Any:
+        raise FileNotFoundError("nvidia-smi")
+
+    for module in (core_speed, photo_verify):
+        monkeypatch.setattr(module.subprocess, "run", missing)
+    monkeypatch.setattr(breakdown.subprocess, "Popen", missing)
+    assert core_speed.gpu_snapshot() == {"unavailable": "nvidia-smi did not run: FileNotFoundError"}
+    assert photo_verify.device_memory() is None
+    sampler = breakdown.OccupancySampler()
+    sampler.start()
+    assert sampler.unavailable == "nvidia-smi did not start: FileNotFoundError"
+    assert sampler.samples == []
+
+
+TOOL_CASES = {
+    "T01": _tool_t01,
+    "T02": _tool_t02,
+    "T03": _tool_t03,
+    "T04": _tool_t04,
+    "T05": _tool_t03,
+    "T06": _tool_t06,
+    "T09": _tool_t09,
+    "T10": _tool_t06,
+    "T11": _tool_t11,
+    "T12": _tool_t11,
+    "T13": _tool_t13,
+    "T38": _tool_t38,
+    "T39": _tool_t39,
+    "T40": _tool_t39,
+    "T41": _tool_t39,
+}
+
+
+@pytest.mark.parametrize("site", sorted(TOOL_CASES))
+def test_portability_tool_reporting(
+    site: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """W-TOOL: the environment report per platform, honest absences, the historical labels."""
+    TOOL_CASES[site](monkeypatch, tmp_path)
