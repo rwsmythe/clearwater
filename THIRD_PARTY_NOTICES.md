@@ -36,7 +36,7 @@ The verdicts and any conditions are stated for each component below.
 | nvidia-cusparse-cu12 | 12.5.10.65 | NVIDIA CUDA EULA (proprietary) | **COMPATIBLE-WITH-CONDITION**: Optional, user-installed component; not redistributed by Clearwater and not GPL-compatible as a combined work. Retain NVIDIA copyright/EULA and component notices below if redistributing under its terms. | [Source](https://developer.nvidia.com/cuda-zone); [text](#text-26) |
 | nvidia-nvjitlink-cu12 | 12.9.86 | NVIDIA CUDA EULA (proprietary) | **COMPATIBLE-WITH-CONDITION**: Optional, user-installed component; not redistributed by Clearwater and not GPL-compatible as a combined work. Retain NVIDIA copyright/EULA and component notices below if redistributing under its terms. | [Source](https://developer.nvidia.com/cuda-zone); [text](#text-26) |
 | pillow | 12.3.0 | MIT-CMU (PIL/HPND family); bundled codec/font terms | **COMPATIBLE-WITH-CONDITION**: Retain the complete aggregate below, including FreeType and libjpeg acknowledgements. | [Source](https://github.com/python-pillow/Pillow); [text](#text-27) |
-| pillow-heif | 1.8.1 | BSD-3-Clause wrapper; binary wheel GPLv2 with LGPLv3/GPLv2-or-later components | **COMPATIBLE-WITH-CONDITION**: Retain wrapper and bundled manifest, native component notices and corresponding-source pointers below; LGPL libraries remain replaceable. | [Source](https://github.com/bigcat88/pillow_heif); [text](#text-28), [text](#text-29) |
+| pillow-heif | 1.8.1 | BSD-3-Clause wrapper; binary wheel GPLv2 with LGPLv3/GPLv2-or-later components | **COMPATIBLE-WITH-CONDITION**: Retain wrapper and bundled manifest, native component notices and corresponding-source pointers below; LGPL libraries remain replaceable. | [Source](https://github.com/bigcat88/pillow_heif); [text](#text-28), [text](#text-29), [text](#text-37), [text](#text-38), [text](#text-39), [text](#text-40), [text](#text-41), [text](#text-42), [text](#text-43), [text](#text-44) |
 | pyside6-essentials | 6.12.0 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only (metadata) | **COMPATIBLE-WITH-CONDITION**: Clearwater relies on LGPL-3.0 for dynamically linked, replaceable QtCore/QtGui/QtWidgets; Qt notice below. | [Source](https://code.qt.io/cgit/pyside/pyside-setup.git/); see notices below |
 | scipy | 1.18.1 | BSD-3-Clause; bundled library terms | **COMPATIBLE-WITH-CONDITION**: Retain aggregate OpenBLAS/LAPACK/GCC notices plus uarray, duccfft, DOP and Qhull texts below. | [Source](https://github.com/scipy/scipy); [text](#text-30), [text](#text-31), [text](#text-32), [text](#text-33), [text](#text-34) |
 | shiboken6 | 6.12.0 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only (metadata) | **COMPATIBLE-WITH-CONDITION**: LGPL-3.0 binding runtime, dynamically linked and replaceable; Qt notice below. | [Source](https://code.qt.io/cgit/pyside/pyside-setup.git/); see notices below |
@@ -68,7 +68,7 @@ The verdicts and any conditions are stated for each component below.
   corresponding-source access and LGPL replacement/relinking rights.
   The wheel manifest names no MinGW-w64 or winpthreads version, so a tagged
   copy matching the shipped runtime cannot be identified. The two unversioned
-  upstream notices below identify their turn-2 copy provenance explicitly.
+  upstream notices below were copied on 2026-11-03.
 - **CuPy:** Preferred Infrastructure, Inc. / Preferred Networks, Inc.; the
   complete aggregate includes NumPy/SciPy and cuSignal notices, with separate
   CCCL, DLPack, Jitify and ndimage texts below. Apache-bearing combinations rely
@@ -149,7 +149,7 @@ installed program. MPL-2.0 development packages are not linked into Clearwater.
 | psutil | 7.2.2 | dev | BSD-3-Clause | [Source](https://github.com/giampaolo/psutil); installed METADATA / licence file |
 | py-cpuinfo | 9.0.0 | dev | MIT | [Source](https://github.com/workhorsy/py-cpuinfo); installed METADATA / licence file |
 | pydantic | 2.14.1 | comms | MIT | [Source](https://github.com/pydantic/pydantic); installed METADATA / licence file |
-| pydantic-core | 2.50.1 | comms | MIT | [Source](https://github.com/pydantic/pydantic/tree/main/pydantic-core); installed METADATA / licence file |
+| pydantic-core | 2.50.1 | comms | MIT | [Source](https://pypi.org/project/pydantic-core/2.50.1/); installed METADATA / licence file |
 | pygments | 2.21.0 | dev | BSD-2-Clause | [Source](https://github.com/pygments/pygments); installed METADATA / licence file |
 | pytest | 8.4.2 | dev | MIT | [Source](https://github.com/pytest-dev/pytest); installed METADATA / licence file |
 | pytest-qt | 4.5.0 | dev | MIT | [Source](http://github.com/pytest-dev/pytest-qt); installed METADATA / licence file |
@@ -8165,7 +8165,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 Source: `https://raw.githubusercontent.com/qt/qtbase/v6.12.0/LICENSES/LGPL-3.0-only.txt`. SHA-256: `97628afebc60f026f5c2b25d7491c46a5c4ee61f693e7cfa07fbd2c03605979b`. UTF-8/LF bytes: 7652.
 
-Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision.
+Copied from this URL on 2026-11-03.
 
 ````text
                    GNU LESSER GENERAL PUBLIC LICENSE
@@ -8342,7 +8342,7 @@ Library.
 
 Source: `https://raw.githubusercontent.com/Multicorewareinc/x265/4.3/COPYING`. SHA-256: `0daef7961f72671c6bbdf2afc64cb3001597bfb626a5f2882214f0736da9a532`. UTF-8/LF bytes: 18121.
 
-Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision.
+Copied from this URL on 2026-11-03.
 
 ````text
 		    GNU GENERAL PUBLIC LICENSE
@@ -8697,7 +8697,7 @@ For more information, contact us at license @ x265.com.
 
 Source: `https://raw.githubusercontent.com/Multicorewareinc/x265/4.3/source/x265.h`. SHA-256: `e8557aeb23ac7c220cc9298b485864e87df4ae9d7418ef0359cd0e5ccec34d01`. UTF-8/LF bytes: 1143.
 
-Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. Selection: initial copyright/licence comment through */ plus LF. The common licence texts are supplied separately below.
+Copied from this URL on 2026-11-03. Selection: initial copyright/licence comment through */ plus LF. The common licence texts are supplied separately below.
 
 ````text
 /*****************************************************************************
@@ -8731,7 +8731,7 @@ Copied from this URL as it stood at turn 2; no re-fetch was possible for this re
 
 Source: `https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/COPYING`. SHA-256: `b9e2b836cce4c53bd189668e18467d0d88fbfa0fc4a9ff092fb275ce08e60b4a`. UTF-8/LF bytes: 285.
 
-Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. Selection: project notice preceding common LGPLv3/GPLv3 texts. The common licence texts are supplied separately below.
+Copied from this URL on 2026-11-03. Selection: project notice preceding common LGPLv3/GPLv3 texts. The common licence texts are supplied separately below.
 
 ````text
 * The library `libheif` is distributed under the terms of the GNU Lesser General Public License.
@@ -8747,7 +8747,7 @@ License texts below and in the `COPYING` files of the corresponding subfolders.
 
 Source: `https://raw.githubusercontent.com/strukturag/libde265/v1.1.3/COPYING`. SHA-256: `df06f23f556f4cac64ab2af63995d81cdc4412a2cb44696947bb62f11c6a70d0`. UTF-8/LF bytes: 258.
 
-Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. Selection: project notice preceding common LGPLv3/GPLv3 texts. The common licence texts are supplied separately below.
+Copied from this URL on 2026-11-03. Selection: project notice preceding common LGPLv3/GPLv3 texts. The common licence texts are supplied separately below.
 
 ````text
 * The library `libde265` is distributed under the terms of the GNU Lesser General Public License.
@@ -8763,7 +8763,7 @@ License texts below and in the `COPYING` files of the corresponding subfolders.
 
 Source: `https://raw.githubusercontent.com/mingw-w64/mingw-w64/master/COPYING`. SHA-256: `8f604966c08c3b8490f543a60b4952c42b951d466dce20a5ab81c3515d757d73`. UTF-8/LF bytes: 2327.
 
-Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. The pillow-heif wheel manifest names no MinGW-w64 or winpthreads version, so no version-matched tagged copy can be identified; this unversioned source is disclosed rather than assigning an unverified tag.
+Copied from this URL on 2026-11-03. The pillow-heif wheel manifest names no MinGW-w64 or winpthreads version, so no version-matched tagged copy can be identified; this unversioned source is disclosed rather than assigning an unverified tag.
 
 ````text
 With exception of certain parts that are prominently marked as being
@@ -8818,7 +8818,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Source: `https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/libheif/api/libheif/heif.h`. SHA-256: `c0acdafc58cf45f394ab796d279001f16b7748a3b74d63dab34574d95ac8a42f`. UTF-8/LF bytes: 774.
 
-Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. Selection: initial copyright/licence comment through */ plus LF. The common licence texts are supplied separately below.
+Copied from this URL on 2026-11-03. Selection: initial copyright/licence comment through */ plus LF. The common licence texts are supplied separately below.
 
 ````text
 /*
@@ -8848,7 +8848,7 @@ Copied from this URL as it stood at turn 2; no re-fetch was possible for this re
 
 Source: `https://raw.githubusercontent.com/strukturag/libde265/v1.1.3/libde265/de265.h`. SHA-256: `01810f59b757ca00a898b869481ea776f8478d75a900868970f7d151fcf0c9ab`. UTF-8/LF bytes: 794.
 
-Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. Selection: initial copyright/licence comment through */ plus LF. The common licence texts are supplied separately below.
+Copied from this URL on 2026-11-03. Selection: initial copyright/licence comment through */ plus LF. The common licence texts are supplied separately below.
 
 ````text
 /*
@@ -8878,7 +8878,7 @@ Copied from this URL as it stood at turn 2; no re-fetch was possible for this re
 
 Source: `https://raw.githubusercontent.com/mingw-w64/mingw-w64/master/mingw-w64-libraries/winpthreads/COPYING`. SHA-256: `7cc7c4b3acea31b22251b3610ec898d13d081e9860766d725754e6c18472a1e0`. UTF-8/LF bytes: 2884.
 
-Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. The pillow-heif wheel manifest names no MinGW-w64 or winpthreads version, so no version-matched tagged copy can be identified; this unversioned source is disclosed rather than assigning an unverified tag.
+Copied from this URL on 2026-11-03. The pillow-heif wheel manifest names no MinGW-w64 or winpthreads version, so no version-matched tagged copy can be identified; this unversioned source is disclosed rather than assigning an unverified tag.
 
 ````text
 Copyright (c) 2011 mingw-w64 project

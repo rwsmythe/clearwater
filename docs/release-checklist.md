@@ -28,8 +28,9 @@ signing or packaged executable is part of this release.
    These fresh release-gate figures supersede earlier package-gate figures for
    the 1.0.0 release record. A failed gate is a STOP for acceptance.
 4. Archive those logs, collection lists, JUnits and the run conditions to
-   **<evidence-folder>\release-1.0.0\**. This is the harness's review-evidence
-   folder outside the repository. Record their hashes and candidate commit.
+   **clearwater-review-evidence\release-1.0.0\**. This is the harness's
+   review-evidence folder beside the repository clone, outside it. Record their
+   hashes and candidate commit.
    Preserve the package review evidence under the separate wp5.5 evidence folder.
 5. Merge the accepted candidate to main at the orchestrator's seat. Record the
    base, candidate and merge commit; prove patch identity over any rebase and

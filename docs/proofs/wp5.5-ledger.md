@@ -226,3 +226,109 @@ next pass remains at the dispatcher seat; no convergence claim is made here.
 `work/wp5.5/t3-scope-verify.log`, exit 0: exactly five owned paths changed;
 all UTF-8/LF-only; export_bench AST identical with its module docstring excluded;
 version/dependency files unchanged; git diff --check clean.
+
+## Round 2
+
+Reviewer A: Claude, read-only process at the orchestrator's seat on `6135c496`.
+Findings copy: `work/wp5.5/A-r2-review.txt`; verdict
+**NO_NEW_CRITICAL_MAJOR**. Reviewer baseline: **72 passed, 1 deselected in
+68.50s**. Driver transport / CLI version is dispatcher-owned and not supplied
+in the findings copy; no version is inferred. The previous session ended at
+192,011 of 258,400; this cleanup uses a fresh re-seated Codex session.
+
+| Round | Critical | Major | Minor | Reopened partial | Advisory | In / out of envelope | NEW / REOPENED / carried | Reverts | Product-code fixes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A r2 | 0 | 0 | 2 (F8 regression, N1) | 1 (F7) | 4 (F5 remainder, N2-N4) | 7 / 0 | 4 / 1 / 2 | 0 | 0 |
+
+NEW: N1-N4. REOPENED: F7 (minor, counted separately as reopened partial).
+Carried: F5's advisory remainder and F8's regression. All seven findings are
+in-envelope and text-bearing; all confirmed, none rejected. No new blocking
+finding: Reviewer A's loop has converged under the fill; this turn performs
+its terminating non-blocking cleanup, not another review round.
+
+### Per-finding adjudication
+
+| Finding | Severity | Confirmation and fix |
+| --- | --- | --- |
+| F7 | REOPENED partial / MINOR | CONFIRMED. Replaced the native summary's turn-2 vocabulary with the copy date and all nine stale upstream copy notes with "Copied from this URL on 2026-11-03." Reviewer A independently fetched all nine on 2026-11-03 and found five whole-file matches and four exact declared selections. Removed the stale no-re-fetch caveat; no licence text changed. |
+| F5 remainder | ADVISORY | CONFIRMED. Pinned the dev-table pydantic-core URL to its 2.50.1 PyPI release page. MinGW/winpthreads version absence remains explicitly disclosed and accepted; no version guessed. |
+| F8 regression | MINOR | CONFIRMED. Checklist now names `clearwater-review-evidence\release-1.0.0\`, the harness's review-evidence folder beside the clone, outside it, without a home prefix. |
+| N1 | MINOR / NEW | CONFIRMED against `ShellWindow._build_actions` (`gui/shell.py:458-489`) and `ExportPanel.__init__` (`gui/export_panel.py:55-88`). Step 5 starts through File > Export. Step 6 identifies the Export panel's status, progress and Cancel button; it no longer suggests that the panel starts an export. Batch Start remains a separate panel button. |
+| N2 | ADVISORY / NEW | CONFIRMED. Linked all eight native anchors text-37 through text-44 directly from the pillow-heif runtime row; existing wrapper/manifest links retained. |
+| N3 | ADVISORY / NEW | CONFIRMED against `BatchPanel` button creation/wiring (`gui/batch_panel.py:196-244`). Guide now says in the Batch panel, Add files..., then Start. Checked the remaining button instructions for the same panel/menu confusion. |
+| N4 | ADVISORY / NEW | CONFIRMED. Guide pins temporary diagnostic packages to `psutil>=6,<8` and `py-cpuinfo>=9,<10`, matching the dev ranges. Not executed in the network-restricted sandbox, per dispatch. **PENDING at the orchestrator's seat:** run the revised ranged command in the lean environment; the prior unpinned command's successful result does not substitute for it. |
+
+F1-F4, F6 and F9 remain fixed; F10 remains no change. Reviewer A r2 independently
+confirmed all 44 texts and re-ran both fixture exports successfully. Its mutation
+of app_version to 0.0.0 made the real photo-provenance test fail, establishing
+that the version check detects lost composition wiring.
+
+## Turn 4
+
+Depth at turn-4 end: 110,421 of 258,400 (driver footer; fresh session 01a1a3eb)
+
+N4 closed by the dispatcher: **Run at the orchestrator's seat** (2026-11-04 00:26Z, network available; lean environment `work\wp5.5\walkthrough\lean-venv` via `UV_PROJECT_ENVIRONMENT`, output folder `work/wp5.5/walkthrough/environment`): exit 0; report `environment-20261104T002627Z.json`; `python_version` 3.12.13; `ffmpeg_version` "ffmpeg version 9.0.2-full_build-www.gyan.dev"; `unavailable` {}; `uv_version` 0.10.9.
+
+Built the completion report `docs/reports/wp5.5-release-prep.md` from the existing
+audit, corrected inventory, walkthrough and review evidence. It includes every
+runtime/external row (18 distributions plus Python/FFmpeg), the compact 43-row
+dev/comms table, R1-R4, RED/GREEN and mutation evidence, per-round verification,
+limitations and lock dispositions. It explicitly states **PENDING: the
+orchestrator's release gate**, supplies the checklist/fill commands and assigns
+Reviewer B, acceptance, release figures and tag to their owners. The revised
+ranged diagnostic remains pending at the orchestrator seat. No audit or notices
+generation was repeated.
+
+### Validation
+
+After all notices edits, `work/wp5.5/verify_notices_utf8.py` ->
+`work/wp5.5/t4-notices-verify.log`, exit 0:
+
+```text
+TEXTS: 44; MISMATCHES: 0
+SOURCE RECORDS: 54; every duplicate also byte-equal to its original source
+MARKER U+00C2: SOURCE=0; NOTICES=0
+MARKER U+00C3: SOURCE=0; NOTICES=0
+MARKER U+00E2 U+20AC: SOURCE=0; NOTICES=0
+MARKER U+FFFD: SOURCE=0; NOTICES=0
+HASHES/BYTES: all 44 match LF-normalised SOURCE bytes
+NOTICES SIZE: 433096 bytes
+SOURCES: no work/ paths; no harness/ruling references
+EULA: complete section 1.1.1(3) quote matches installed License.txt
+```
+
+The corrected 44-text / 54-source inventory remains at
+`work/wp5.5/notices-inventory.json` and `notices-inventory.md`. The final notices
+contain 399,470 bytes of distinct LF-normalised source texts; only the specified
+navigation/source-date/dev-link prose changed this turn. No upstream fetch ran.
+
+Prescribed targeted pytest command (sandbox_mkdir_shim, no cacheprovider,
+basetemp `work/wp5.5/t4`), `work/wp5.5/t4.log`, exit 0:
+**72 passed, 1 deselected in 70.20s (0:01:10)**.
+
+Static checks, all exit 0:
+
+- `work/wp5.5/t4-ruff.log`: **All checks passed!**
+- `work/wp5.5/t4-format.log`: **317 files already formatted**
+- `work/wp5.5/t4-mypy.log`: **Success: no issues found in 158 source files**
+
+uv reported the inherited VIRTUAL_ENV did not match the project environment and
+was ignored; these checks used this worktree's `.venv`. The warning is not a
+test/lint failure. No sync, whole-suite, -n or heavy gate was run at this seat.
+
+`work/wp5.5/t4-scope-verify.log`, exit 0: five authorized files UTF-8/LF-only;
+notices size/date/native links verified; report has 20 runtime/external rows,
+no generation placeholders and explicit pending gate/diagnostic; guide/checklist/
+report local links resolve and contain no personal home paths. Git status
+names exactly the five owned documentation paths; no src/tools/tests/project/
+lockfile diff; notices diff is exactly 12 replacement lines; git diff --check
+is clean. The five-file change includes the new report (untracked until the
+dispatcher commits it).
+
+Turn 4 bundles the directed round-2 documentation cleanup and completion report
+as one handoff. Only the five authorized documentation paths changed; there is
+no code/test/dependency/lockfile change, revert or footage/main-work/other-worktree
+read. All output/log writes remain inside this worktree. No git write, mailbox
+post, remote action or new dependency occurred. Reviewer B, the revised ranged
+lean diagnostic and the final release gate remain at the orchestrator's seat;
+the owner's word still controls tagging. YIELD.

@@ -86,7 +86,7 @@ as libx265 or hevc_nvenc; only the named full build was exercised for this relea
 Run the environment check from the repository folder:
 
 ```powershell
-uv run --no-sync --with psutil --with py-cpuinfo python tools/environment_report.py --out work/environment
+uv run --no-sync --with "psutil>=6,<8" --with "py-cpuinfo>=9,<10" python tools/environment_report.py --out work/environment
 ```
 
 This diagnostic temporarily supplies its two hardware-reporting tools without
@@ -151,12 +151,14 @@ uv run python -m clearwater
    each source. For a read-only source collection, always choose a separate
    working/output folder. The default **Output suffix** is _corrected; change it
    here if desired. Choose PNG bit depth or video encoder/quality as appropriate,
-   then use the **Export** panel or **File > Export**.
-6. The progress display shows the running work. **Cancel** stops the current job
-   and removes its unfinished output; the source and any already completed
-   exports remain. For video, export becomes available when analysis is complete.
+   then choose **File > Export** to start the export.
+6. The **Export** panel shows the export's status and progress. Its **Cancel**
+   button stops the current job and removes its unfinished output; the source
+   and any already completed exports remain. For video, export becomes available
+   when analysis is complete.
    Cancelling analysis leaves export unavailable until you use **Analyse** again.
-7. For several items, use **Batch > Add files...**, check the list, and **Start**.
+7. For several items, in the **Batch** panel, use **Add files...**, check the list,
+   and choose **Start**.
    **Remove selected** and **Clear** edit the queue before starting. **Cancel**
    stops the unfinished work and leaves completed batch outputs in place.
 
