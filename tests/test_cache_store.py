@@ -595,6 +595,36 @@ def test_a_write_refuses_a_preplanted_junction(
     assert sorted(path.name for path in target.iterdir()) == ["data.pack"]
 
 
+@pytest.mark.parametrize("writer", ["proxy", "statistics"])
+def test_a_write_refuses_a_preplanted_file(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, writer: str
+) -> None:
+    """A nondirectory entry gets the readable refusal without changing its bytes (DR-118)."""
+    folder = tmp_path / "cache"
+    folder.mkdir()
+    entry = folder / entry_name(KEY)
+    original = b"keep this entry file untouched"
+    entry.write_bytes(original)
+    with lossless_cache(folder) as cache:
+        with (
+            caplog.at_level(logging.WARNING, logger="clearwater.cache"),
+            pytest.raises(OSError, match="refusing cache entry path"),
+        ):
+            if writer == "proxy":
+                cache.store_proxy(KEY, 0, pixels(0))
+            else:
+                cache.store_source_statistics(KEY, "s", 0, {"means": np.zeros(3)})
+        assert any(
+            record.levelno == logging.WARNING
+            and str(entry) in record.getMessage()
+            and "refusing cache entry path" in record.getMessage()
+            for record in caplog.records
+        )
+        assert entry.is_file() and entry.read_bytes() == original
+    assert entry.read_bytes() == original
+    assert sorted(path.name for path in folder.iterdir()) == [entry.name]
+
+
 def test_other_versions_and_unreadable_entries_are_removed_when_opening(tmp_path: Path) -> None:
     folder = tmp_path / "c"
     with lossless_cache(folder) as first:

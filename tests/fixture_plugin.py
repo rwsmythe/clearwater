@@ -12,8 +12,8 @@ the bare list because the WP-T1 guard tests (``tests/test_conftest_guard.py``) c
   from ``fixtures-generated`` under an explicit pytest basetemp, otherwise from the MAIN
   checkout's ``work/fixtures/generated``, generated first when it is absent or stale, and its
   decoded frames are hashed against the manifest before it is handed out; a mismatch after
-  regeneration fails the test. If the main cache cannot be written the clip is made under
-  pytest's basetemp instead. FFmpeg being absent skips the test with a reason.
+  regeneration fails the test. Failed Git discovery uses this checkout's work cache; an
+  unwritable cache falls back to pytest's basetemp. FFmpeg being absent skips with a reason.
 - ``sample_entry``: a callable ``sample_entry(sample_id) -> dict`` giving the manifest entry.
 - ``sample_ids``: a callable ``sample_ids(group=None) -> list[str]``.
 - ``ffmpeg_tools``: skips the test with a reason when ``ffmpeg``/``ffprobe`` are not on the PATH.
@@ -285,7 +285,8 @@ def sample_provider(
     """Provide samples under an explicit basetemp, else the main checkout's work cache.
 
     Git's common directory locates the MAIN checkout without writing Git metadata.
-    A main cache that is not writable falls back to this session's basetemp.
+    Failed Git discovery uses this checkout's work cache. An unwritable cache
+    falls back to this session's basetemp.
 
     Args:
         fixture_manifest: The validated shared manifest.
@@ -298,16 +299,20 @@ def sample_provider(
     if pytestconfig.getoption("basetemp") is not None:
         cache = tmp_path_factory.getbasetemp() / "fixtures-generated"
     else:
-        result = subprocess.run(
-            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10,
-        )
-        main = Path(result.stdout.strip()).resolve().parent
-        cache = main / "work" / "fixtures" / "generated"
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError):
+            cache = REPO_ROOT / "work" / "fixtures" / "generated"
+        else:
+            main = Path(result.stdout.strip()).resolve().parent
+            cache = main / "work" / "fixtures" / "generated"
     if not writable_dir(cache):
         cache = tmp_path_factory.getbasetemp() / "fixtures-generated"
     return SampleProvider(

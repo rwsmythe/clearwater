@@ -1,10 +1,13 @@
 # WP-T8 tools, cache guard and suite-cost paydown
 
 Status: groups 1 and 2 are committed at `90fd9263` and `d558c48a`.
-The DR-116 archive analysis is complete. Reduction edits, Reviewer A,
-Reviewer B, the final three gate legs and acceptance remain pending.
-This report recommends re-scoping DR-116 around specific reductions;
-it does not claim that the serial leg has been made shorter by WP-T8.
+The DR-116 archive analysis and item (d)'s apply step are CLOSED with no
+reduction applied, by CHARC's generation-15 ruling at 11:17Z on 2026-11-04.
+DR-116 closes at acceptance on the attribution; its host-load-or-creep
+hypothesis is refuted. Reviewer A round 1 found no new critical/major;
+this revision addresses its minor findings. Reviewer B, the final three
+gate legs and acceptance await the dispatcher. WP-T8 does not claim a
+measured reduction in serial-leg time.
 
 ## Changes and regression coverage
 
@@ -20,9 +23,9 @@ The current seat result is the validation of record.
 | DR-119(d), V3 output | `tools/halo_part3.py::main` builds the V3 run in staging, publishes after JSON and table are complete, and abandons interrupted staging under a failed name. | `test_tools_halo_part3.py::test_v3_interrupt_publishes_no_final_folder`; `test_v3_publishes_the_record_and_table_together` covers success and the diagnostic STOP status. |
 | DR-119(d), overlap and documentation | `wholeset-run` refuses a resolved cache equal to or below `<out>/items` before processing. `build_sheet` documents `sheet-<stamp>/sheet.json`. | `test_tools_halo_part3.py::test_wholeset_refuses_a_cache_inside_the_items_folder` covers equality and a nested cache, with no processing or output creation; existing sheet tests cover the published record. |
 | DR-119(e) | `tools/n6.py` defines `N6_MIN_PER_MIN` and `FRAME_BUDGET_S_29_97`. `core_speed.py` and `export_bench.py` import the shared target. The module names D106, spec v0.5.8 and the owner's ruling date. | `test_core_speed.py::test_the_bar_is_d106_at_29_97_fps` extracts the current target from the spec's N6 line, checks both instruments and the frame conversion. |
-| DR-120 | `tests/fixture_plugin.py::sample_provider` uses `tmp_path_factory.getbasetemp()/fixtures-generated` when basetemp is explicit. Otherwise Git's common directory locates the main checkout's `work/fixtures/generated`; the unwritable-cache fallback remains under basetemp. | `test_fixtures.py::test_generated_cache_prefers_an_explicit_basetemp`, `test_generated_cache_without_basetemp_uses_the_main_checkout`, and `test_relocated_session_cache_keeps_the_manifest_content`. The last checks the real generated sample against the unchanged manifest. |
-| DR-118 | Only `DiskProxyCache._entry_for_write` changes in product code. It refuses a pre-existing symlink, junction or nondirectory, logs a WARNING naming the path and raises `OSError`, preserving the path and target. | `test_cache_store.py::test_a_write_refuses_a_preplanted_junction[proxy]` and `[statistics]` check refusal, warning, unchanged sentinel bytes and the surviving junction. Creation failures skip with an explicit platform/filesystem reason. |
-| DR-116 / DR-86 | Join the archived serial JUnits by `(classname, name)`, retain parameter suffixes, reconcile wall and node changes, update the banked candidate costs and identify possible reuse. No reductions are applied. | The stdlib analysis script checks unique keys, suite counts, skips, no errors/failures, the complete wall reconciliation, module sums and the fixed historical tail membership. Independent XML/CSV checks are recorded below. |
+| DR-120 | `tests/fixture_plugin.py::sample_provider` uses `tmp_path_factory.getbasetemp()/fixtures-generated` when basetemp is explicit, including xdist's worker basetemp. Only a non-xdist run without basetemp reaches Git discovery of the main checkout's `work/fixtures/generated`; failed Git discovery keeps the former checkout-local work cache. An unwritable cache falls back under basetemp. Each fresh root costs about 3.3 s generation + 0.7 s verification and 89,227,437 bytes; up to four parallel worker roots cost about 357 MB, plus serial/fullclip roots if used (Reviewer A measurement, F2, source below). | `test_fixtures.py::test_generated_cache_prefers_an_explicit_basetemp`, `test_generated_cache_without_basetemp_uses_the_main_checkout`, `test_generated_cache_without_git_uses_the_checkout`, and `test_relocated_session_cache_keeps_the_manifest_content`. The fallback test covers missing Git, a non-checkout and timeout; the content test checks the unchanged manifest. |
+| DR-118 | Only `DiskProxyCache._entry_for_write` changes in product code. It refuses a pre-existing symlink, junction or nondirectory, logs a WARNING naming the path and raises `OSError`, preserving the path and target. | `test_cache_store.py::test_a_write_refuses_a_preplanted_junction[proxy]` and `[statistics]` check refusal, warning, unchanged sentinel bytes and the surviving junction. Creation failures skip with an explicit platform/filesystem reason. Added `test_a_write_refuses_a_preplanted_file[proxy]` and `[statistics]` check the readable refusal, WARNING naming the file, and unchanged bytes, without platform privileges. |
+| DR-116 / DR-86 | Join the archived serial JUnits by `(classname, name)`, retain parameter suffixes, reconcile wall and node changes, and update banked candidate costs. Item (d)'s apply step is CLOSED with no reduction applied by CHARC's ruling; DR-86 candidates stay banked. | The stdlib analysis script checks unique keys, suite counts, skips, no errors/failures, the complete wall reconciliation, module sums and the fixed historical tail membership. Independent XML/CSV checks are recorded below. |
 
 The N6 label remains 12 minutes per minute and 0.4004 seconds per frame
 at `30000/1001` fps. Source: `tools/n6.py` and the N6 line of
@@ -37,15 +40,33 @@ fails earlier with the same readable refusal as a link. The scan silently
 skips links; the write path raises `OSError`, not a custom store error.
 This abnormal planted-path case fails the job; it does not continue
 uncached. These are the binding round-0 ruling and group-1 disposition,
-recorded in `work/wp-t8/seat-ruling.md`'s source dispatches and the supplied
-WP-T8 brief. No cache format or ordinary-path behavior changes.
+recorded in `docs/briefs/wp-t8-brief.md` (CHARC's round-0 ruling), its
+TURN-4 dispatch disposition, and DR-118's paydown text in
+`docs/debt-register.md` ("a link or not a directory"). The durable
+TURN-4 dispatch is
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/cell/dispatch-4.md`.
+No cache format or ordinary-path behavior changes.
+
+The DR-120 per-root cost is Reviewer A's F2 measurement in
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/A/r1/review.txt`.
+An xdist developer run without `--basetemp` still gets explicit
+`popen-gwN` worker basetemps under `%TEMP%`, so each worker generates
+there instead of reaching the main-checkout rule. This is additional
+generation and storage per fresh root, not changed fixture content.
+The non-xdist no-basetemp path falls back to
+`REPO_ROOT / "work" / "fixtures" / "generated"` if Git is missing,
+times out, or reports that the directory is not a checkout. The
+existing unwritable-cache fallback then still applies.
 
 ## Validation environment and the resolved STOP
 
-Sources: `work/wp-t8/seat-ruling.md` transcribes the binding generation-42
-dispatches, including the seat log paths. These seat results were supplied
-by the dispatcher; the cell did not read the main checkout's work folder.
-The cell's direct evidence is `work/wp-t8/turn4-rerun.log`.
+Sources: the binding generation-42 dispatches in
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/cell/dispatch-4.md`,
+`dispatch-5.md` and `dispatch-6.md`, and the durable seat logs below.
+These seat results were supplied by the dispatcher; the cell did not
+read the main checkout's work folder. The sandbox STOP is recorded in
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/cell/return-4.md` and
+the full cell transcript `cell/turn-4.txt` under the same evidence root.
 
 The worktree `.venv` was created empty at 10:08Z and remained empty until
 the seat ran `uv sync --frozen` at 10:58Z on 2026-11-04. Earlier
@@ -57,11 +78,11 @@ The earlier failure attribution is superseded by the seat checks below.
 
 | Check | Result | Evidence source |
 |---|---|---|
-| Three fixture audit tests on main | 3 passed | Dispatcher TURN-4 fact, transcribed in `work/wp-t8/seat-ruling.md` |
-| Same audit tests in the synced worktree at `d558c48a` | 3 passed | Same source |
-| Five-module set at the seat, outside the sandbox, no shim | 488 passed, 2 deselected in 138.86 s | `C:/Users/rwsmy/clearwater/work/orch-g42/wpt8-rerun-seat.log`, supplied in TURN 5 |
-| Three audit tests at the seat with `PYTHONPATH=scripts` and the mkdir shim | 3 passed | `C:/Users/rwsmy/clearwater/work/orch-g42/wpt8-rerun-shim.log`, supplied in TURN 5 |
-| Same five-module set inside the Codex sandbox, with the shim | 485 passed, 3 failed, 2 deselected in 144.53 s | `work/wp-t8/turn4-rerun.log` |
+| Three fixture audit tests on main | 3 passed | `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/seat/fixaudit-main.log` |
+| Same audit tests in the synced worktree at `d558c48a` | 3 passed | `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/seat/fixaudit-wpt8b.log` |
+| Five-module set at the seat, outside the sandbox, no shim | 488 passed, 2 deselected in 138.86 s | `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/seat/wpt8-rerun-seat.log` |
+| Three audit tests at the seat with `PYTHONPATH=scripts` and the mkdir shim | 3 passed | `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/seat/wpt8-rerun-shim.log` |
+| Same five-module set inside the Codex sandbox, with the shim | 485 passed, 3 failed, 2 deselected in 144.53 s | `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/cell/return-4.md`, `cell/turn-4.txt` |
 
 The five modules are `test_export_bench.py`, `test_tools_halo_part3.py`,
 `test_core_speed.py`, `test_cache_store.py` and `test_fixtures.py`.
@@ -84,16 +105,18 @@ without another test run.
 
 ## DR-116 sources and method
 
-The script is `work/wp-t8/dr116_table.py` (stdlib only, uncommitted).
-Run from the worktree root with
-`uv run --frozen python work/wp-t8/dr116_table.py`; output goes to
-`work/wp-t8/dr116/`. All timing tables below derive from these two
-input files unless a historical source is explicitly named:
+The archived stdlib script is
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116_table.py`.
+Its CSV/JSON/Markdown outputs are under
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/`.
+The cell ran the script on worktree copies; the durable original inputs
+are the sources of record below. All timing tables derive from them
+unless a historical source is explicitly named:
 
-| Label | Worktree copy | Archive source | MD5 |
-|---|---|---|---|
-| BEFORE | `work/wp-t8/junit/wp-t6-gate-g1-serial.xml` | `C:/Users/rwsmy/clearwater-review-evidence/wp-t6/work-copy/wp-t6/gate-g1/serial.xml` | `5b88c916589c843e09dd2815f0e58f17` |
-| AFTER | `work/wp-t8/junit/g40-p55-serial.xml` | `C:/Users/rwsmy/clearwater-review-evidence/release-1.0.0/g40-p55-serial.xml` | `93beab292d38c7c7b28dcfc22100f242` |
+| Label | Archive source | MD5 |
+|---|---|---|
+| BEFORE | `C:/Users/rwsmy/clearwater-review-evidence/wp-t6/work-copy/wp-t6/gate-g1/serial.xml` | `5b88c916589c843e09dd2815f0e58f17` |
+| AFTER | `C:/Users/rwsmy/clearwater-review-evidence/release-1.0.0/g40-p55-serial.xml` | `93beab292d38c7c7b28dcfc22100f242` |
 
 The copies were supplied as identical to the archives. The script computes
 the hashes above from the worktree copies; this turn does not re-open the
@@ -117,22 +140,24 @@ move when test ordering changes.
 
 Outputs retained for the dispatcher to archive:
 
-- `work/wp-t8/dr116/summary.json`: sources, hashes, totals, ratios, skip changes and DR-86 group sums.
-- `work/wp-t8/dr116/joined.csv`: every joined row, status, module, both times, delta and ratio.
-- `work/wp-t8/dr116/modules.csv`: all module aggregates, descending signed delta.
-- `work/wp-t8/dr116/top40-delta.csv`: shared nodes ranked by absolute delta.
-- `work/wp-t8/dr116/top40-new.csv`: new nodes ranked by AFTER cost.
-- `work/wp-t8/dr116/new.csv` and `removed.csv`: all additions/removals with their module.
-- `work/wp-t8/dr116/status-changes.csv`: shared nodes whose pass/skip status changed.
-- `work/wp-t8/dr116/dr86-nodes.csv`: exact membership and times for every banked group, including the frozen historical tail.
-- `work/wp-t8/dr116/tables.md`: complete module table and both top-40 tables.
+- `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/summary.json`: sources, hashes, totals, ratios, skip changes and DR-86 group sums.
+- `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/joined.csv`: every joined row, status, module, both times, delta and ratio.
+- `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/modules.csv`: all module aggregates, descending signed delta.
+- `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/top40-delta.csv`: shared nodes ranked by absolute delta.
+- `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/top40-new.csv`: new nodes ranked by AFTER cost.
+- `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/new.csv` and `removed.csv`: all additions/removals with their module.
+- `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/status-changes.csv`: shared nodes whose pass/skip status changed.
+- `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/dr86-nodes.csv`: exact membership and times for every banked group, including the frozen historical tail.
+- `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/tables.md`: complete module table and both top-40 tables.
 
-These files are gitignored, not deliverable Git blobs. The dispatcher
-copies the script and outputs into the evidence folder before pruning.
+The script and outputs are already copied to the durable analysis
+folder above, outside the releasable worktree. They are evidence, not
+deliverable Git blobs. Reproduction must copy them and the inputs to
+an authorized working folder before running the script.
 
 ### Totals and attribution
 
-Source: both copied JUnits and `work/wp-t8/dr116/summary.json`.
+Source: both copied JUnits and `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/summary.json`.
 Counts include skipped nodes; both XMLs have zero failures and errors.
 
 | Quantity | BEFORE | AFTER | AFTER minus BEFORE |
@@ -172,49 +197,49 @@ of each test's change or explain every earlier wall in DR-116's series.
 
 ### Module costs
 
-Source: `work/wp-t8/dr116/modules.csv`. The following are the largest
+Source: `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/modules.csv`. The following are the largest
 positive deltas and largest declines; the CSV and `tables.md` contain
 every module. Module labels below omit the common `tests.` prefix.
 
-| Module | BEFORE s | AFTER s | Delta s |
-|---|---:|---:|---:|
-| `test_photo_check` | 0.119 | 249.952 | +249.833 |
-| `test_v51_video_acceptance` | 0 | 201.060 | +201.060 |
-| `test_v51_shell_acceptance` | 0 | 74.445 | +74.445 |
-| `test_wp44_mov_input` | 0 | 58.575 | +58.575 |
-| `test_app_v7` | 0 | 57.528 | +57.528 |
-| `test_app_preview_fft` | 0 | 46.449 | +46.449 |
-| `test_app_wiring` | 0 | 42.842 | +42.842 |
-| `test_app_export_worker` | 0 | 35.645 | +35.645 |
-| `test_reviewpack` | 0 | 25.120 | +25.120 |
-| `test_app_v8_v18` | 0 | 13.343 | +13.343 |
-| `test_app_leftovers` | 0 | 11.410 | +11.410 |
-| `test_app_startup` | 0 | 10.181 | +10.181 |
-| `test_jobs_export_video` | 276.984 | 255.759 | -21.225 |
-| `test_io_video_encode` | 158.048 | 136.315 | -21.733 |
-| `test_prototype_clip` | 168.275 | 139.725 | -28.550 |
-| `test_methods_assembly_v8` | 47.192 | 1.027 | -46.165 |
-| `test_prototype_backend` | 74.491 | 25.775 | -48.716 |
+| Module | BEFORE s | AFTER s | Delta s | Status (BEFORE -> AFTER) |
+|---|---:|---:|---:|---|
+| `test_photo_check` | 0.119 | 249.952 | +249.833 | 1 skip -> 1 pass |
+| `test_v51_video_acceptance` | 0 | 201.060 | +201.060 | absent -> 20 pass |
+| `test_v51_shell_acceptance` | 0 | 74.445 | +74.445 | absent -> 2 pass |
+| `test_wp44_mov_input` | 0 | 58.575 | +58.575 | absent -> 1 pass |
+| `test_app_v7` | 0 | 57.528 | +57.528 | absent -> 6 pass |
+| `test_app_preview_fft` | 0 | 46.449 | +46.449 | absent -> 14 pass |
+| `test_app_wiring` | 0 | 42.842 | +42.842 | absent -> 29 pass |
+| `test_app_export_worker` | 0 | 35.645 | +35.645 | absent -> 23 pass |
+| `test_reviewpack` | 0 | 25.120 | +25.120 | absent -> 3 pass |
+| `test_app_v8_v18` | 0 | 13.343 | +13.343 | absent -> 6 pass, 1 skip |
+| `test_app_leftovers` | 0 | 11.410 | +11.410 | absent -> 3 pass |
+| `test_app_startup` | 0 | 10.181 | +10.181 | absent -> 10 pass |
+| `test_jobs_export_video` | 276.984 | 255.759 | -21.225 | 9 pass -> 9 pass |
+| `test_io_video_encode` | 158.048 | 136.315 | -21.733 | 18 pass -> 20 pass |
+| `test_prototype_clip` | 168.275 | 139.725 | -28.550 | 10 pass -> 10 pass |
+| `test_methods_assembly_v8` | 47.192 | 1.027 | -46.165 | 9 pass -> 9 skip |
+| `test_prototype_backend` | 74.491 | 25.775 | -48.716 | 18 pass -> 18 pass |
 
 ### Largest shared-node deltas
 
-Source: `work/wp-t8/dr116/top40-delta.csv`. This is the requested top
+Source: `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/top40-delta.csv`. This is the requested top
 ten by absolute delta, including improvements and status changes.
 Node IDs below use `tests/<module>.py::<name>` for readability;
 the CSV retains the exact classname and name join keys.
 
-| Node | BEFORE s | AFTER s | Delta s |
-|---|---:|---:|---:|
-| `test_photo_check.py::test_the_real_photo_leg_reads_and_round_trips_the_owners_photos` | 0.119 | 249.952 | +249.833 |
-| `test_prototype_backend.py::test_bench_gpu_records_graphics_memory` | 63.021 | 14.114 | -48.907 |
-| `test_prototype_clip.py::test_bench_whole_clip_modes_record_their_pass` | 67.228 | 43.231 | -23.997 |
-| `test_wp41_v8.py::test_v8c_k_above_1_on_real_sized_content` | 10.722 | 0.128 | -10.594 |
-| `test_jobs_export_video.py::test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item[trim]` | 88.511 | 78.964 | -9.547 |
-| `test_io_video_encode_bench.py::test_run_once_records_the_row_and_deletes_the_output` | 24.253 | 14.809 | -9.444 |
-| `test_methods_assembly_v8.py::test_v8_planted_range_error_fails` | 9.040 | 0.130 | -8.910 |
-| `test_methods_assembly_v8.py::test_v8_preview_against_the_downscaled_export[GX011625_0024.925-c3-cpu]` | 8.271 | 0.105 | -8.166 |
-| `test_methods_assembly_v8.py::test_v8_preview_against_the_downscaled_export[GX011625_0114.648-c3-cpu]` | 8.203 | 0.110 | -8.093 |
-| `test_methods_assembly_v8.py::test_v8_preview_against_the_downscaled_export[GX011625_0024.925-ancuti2018-cpu]` | 6.568 | 0.105 | -6.463 |
+| Node | BEFORE s | AFTER s | Delta s | Status (BEFORE -> AFTER) |
+|---|---:|---:|---:|---|
+| `test_photo_check.py::test_the_real_photo_leg_reads_and_round_trips_the_owners_photos` | 0.119 | 249.952 | +249.833 | skip -> pass |
+| `test_prototype_backend.py::test_bench_gpu_records_graphics_memory` | 63.021 | 14.114 | -48.907 | pass -> pass |
+| `test_prototype_clip.py::test_bench_whole_clip_modes_record_their_pass` | 67.228 | 43.231 | -23.997 | pass -> pass |
+| `test_wp41_v8.py::test_v8c_k_above_1_on_real_sized_content` | 10.722 | 0.128 | -10.594 | pass -> skip |
+| `test_jobs_export_video.py::test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item[trim]` | 88.511 | 78.964 | -9.547 | pass -> pass |
+| `test_io_video_encode_bench.py::test_run_once_records_the_row_and_deletes_the_output` | 24.253 | 14.809 | -9.444 | pass -> pass |
+| `test_methods_assembly_v8.py::test_v8_planted_range_error_fails` | 9.040 | 0.130 | -8.910 | pass -> skip |
+| `test_methods_assembly_v8.py::test_v8_preview_against_the_downscaled_export[GX011625_0024.925-c3-cpu]` | 8.271 | 0.105 | -8.166 | pass -> skip |
+| `test_methods_assembly_v8.py::test_v8_preview_against_the_downscaled_export[GX011625_0114.648-c3-cpu]` | 8.203 | 0.110 | -8.093 | pass -> skip |
+| `test_methods_assembly_v8.py::test_v8_preview_against_the_downscaled_export[GX011625_0024.925-ancuti2018-cpu]` | 6.568 | 0.105 | -6.463 | pass -> skip |
 
 Among shared nodes whose status stayed passed, the largest increases
 are `test_prototype_clip.py::test_footage_smoke_gx011628`
@@ -226,7 +251,7 @@ are `test_prototype_clip.py::test_footage_smoke_gx011628`
 
 ### Largest new-node costs
 
-Source: `work/wp-t8/dr116/top40-new.csv`. BEFORE is absent for every
+Source: `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/top40-new.csv`. BEFORE is absent for every
 row below. The full new-node roster, with module/package prefix, is
 `new.csv`. The six removed/renamed IDs in `removed.csv` are GUI routing,
 settings and stub-era status tests; their total BEFORE cost is 0.055 s.
@@ -247,7 +272,7 @@ The join does not assert that a removed node lost coverage.
 
 ## DR-86 banked candidates, updated
 
-Sources: copied BEFORE/AFTER JUnits, `work/wp-t8/dr116/dr86-nodes.csv`
+Sources: copied BEFORE/AFTER JUnits, `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/dr116/dr86-nodes.csv`
 and `summary.json`. The historical approximately 121/163/81/394 s
 labels are from `docs/reports/wp-t6-gate-sizing.md`, KEEP map and
 "For CHARC", and `docs/debt-register.md` DR-86. They describe an older
@@ -287,9 +312,13 @@ module fixtures in `test_prototype_clip.py`. The V3 clips and AD-14
 mask are already module fixtures in `test_wp42_v3_product.py`.
 Recommending those same fixture changes again would save no new work.
 
-## Candidate reductions for a later file grant
+## Candidate reductions: declined; apply step closed
 
-No edits are applied this turn. The source checks below establish
+CHARC DECLINED C1 and C2 (generation 15, 2026-11-04 11:17Z), closing
+item (d)'s apply step with no reduction applied. The V-suite acceptance
+checks retain their independent runs. Source:
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/cell/dispatch-6.md`.
+The source checks below establish
 opportunities to reuse identical setup while keeping every assertion.
 They do not establish measured savings: the archived JUnits provide
 whole-node totals, not the subcall costs or a before/after run of a
@@ -302,14 +331,17 @@ parameterization safe to drop was established.
 | C1: reuse one untagged CPU export through a module fixture | `test_v4_runner_preserves_fixture_fidelity[untagged]`; `test_v6_untagged_runner_warns_bt709_limited` | 6.313 s and 5.773 s, 12.086 s combined (`joined.csv`). Removes one duplicate `run_main` invocation. That invocation is inside the second node's 5.773 s total; its saved seconds are not separately measured. No measured saving is claimed. | Both currently use the identical source and `CPU` flags, with default correction. Keep the V4 comparison, frame count, CPU/libx265 checks, D54 warning checks and every mutation control. Consumers do not mutate the original result (V4 controls deep-copy). Give each consumer its own result copy, preserve source guards, and keep the export beneath the session basetemp. Selecting either node alone must still build the fixture. |
 | C2: reuse the immutable source timestamp set through a module fixture | `test_n10_video_cpu_render_digests_repeat`; `test_n10_video_gpu_render_digests_repeat_and_match_cpu` | 9.570 s and 13.016 s, 22.586 s combined (`joined.csv`). Removes one duplicate `_source_ticks` probe/gather of the same unchanged committed source. Subcall cost is not present in JUnit, so saved seconds are unmeasured. | Keep all independent exports and render recordings, repeated-run comparisons, CPU/GPU bounds, post-decode characterization and mutation controls. Only the expected source ticks are shared; return an immutable value or a copy. Preserve the per-test source guard and the GPU readiness behavior. |
 
-C1 and C2 need a grant for `tests/test_v51_video_acceptance.py`, which
-this turn does not own. Measure the reused operation in the later
-focused validation before promising a saving; retain only a change
-whose assertion map and independent-node selection checks pass.
-The two whole-node sums above are affected-cost figures, not a combined
-savings forecast. They must not be added to DR-86's banked group costs.
+C1 and C2 are retained here as declined proposals, not planned edits.
+CHARC judged their unmeasured benefit (at most about 35 s of the
+2,049 s leg) less valuable than independent acceptance checks of record.
+The whole-node sums above are affected-cost figures, not a savings
+forecast; they must not be added to DR-86's banked group costs.
+F8's additional candidate, sharing the CPU reference export in
+`test_n10_video_gpu_render_digests_repeat_and_match_cpu` with the CPU
+test's runs, is declined with the others.
 
-The following remain recommendations, not no-risk reductions:
+The following remain banked recommendations, not no-risk reductions or
+a commission for another suite-cost pass before the new trigger:
 
 - Keep the 5.3K CPU export in its ruled form. Source:
   `test_jobs_export_video.py::test_v4_synthetic_5k3_8_7_clip` asserts
@@ -340,23 +372,26 @@ bodies. No proposed change alters what a test asserts in this turn.
 
 ## Recommendation, verification and gate handoff
 
-Recommend **re-scope DR-116**: the requested archival attribution is
-complete, and it does not support treating the release's longer leg
-as uniform slow growth of the original tests. Keep specific reduction
-work separate, starting with C1 only after a file grant and a measured
-benefit. C2 is a smaller possible reuse whose cost needs measurement
-before it is worth an edit. Update DR-86 with the measured node/group
-costs above, retain its CPU/fixture/lead locks, and retain the serial
-leg's measured wall as the floor. The cell does not edit either debt row.
+CHARC RULED that **DR-116 closes at acceptance on the attribution**:
+the register's host-load-or-creep hypothesis is REFUTED. The roughly
+660 s increase is new coverage: about 617 s in new nodes plus 43 s
+net shared-node growth, dominated by the previously skipped photo leg
+becoming active. The approximately 250 s real-photo leg is owner-footage
+coverage live since the phone photos arrived on 2026-10-29 and stays.
+The p55 figure of record is restated as **1,273 tests / 2,049 s**
+(exact JUnit values above). Source: the binding ruling in
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/cell/dispatch-6.md`;
+the archived JUnits establish the arithmetic.
 
-A new serial leg was not run for DR-116. Use the already required final
-gate's quiet-host serial leg, with fresh basetemp and its normal duration
-log, to see whether the current suite repeats AFTER's costs. Record which
-look-check-dependent nodes execute or skip. That check would distinguish
-repeatable current cost from host/order variation on the current suite;
-it would not by itself prove the cause of this historical series or the
-saving of an unimplemented candidate. A separate profiling grant is
-needed only if the final evidence leaves a material question unresolved.
+DR-86's candidates stay banked, with the measured costs above and their
+existing CPU/fixture/lead locks. No new suite-cost pass for Phase 6 is
+commissioned unless the serial leg crosses about **40 minutes**. The
+cell does not edit either register row. No reduction is applied.
+
+A new serial leg was not run for DR-116. The already required final
+gate retains the quiet-host serial leg, fresh basetemp and its normal
+duration log. Its figures and pass/skip roster belong in the gate record;
+that gate is verification, not a newly commissioned suite-cost pass.
 
 | Final-candidate gate field | Result |
 |---|---|
@@ -366,9 +401,10 @@ needed only if the final evidence leaves a material question unresolved.
 | Serial leg (exclusive) | TO FILL AT THE GATE |
 | Fullclip leg | TO FILL AT THE GATE |
 | Owned-path diff and zero-CR check on final candidate | TO FILL AT THE GATE |
-| Reviewer A convergence / Reviewer B | TO FILL AT THE GATE |
+| Reviewer A | R1 `NO_NEW_CRITICAL_MAJOR`; terminating-round cleanup verified below |
+| Reviewer B | TO FILL AT THE GATE |
 
-The earlier groups' static/development summaries remain in the supplied
+The earlier groups' static/development summaries are in the supplied
 returns; they are not substituted for these final-candidate gates.
 The dispatcher runs the legs sequentially under its scheduling lock.
 No whole suite, gate leg, GPU exercise or footage read was performed
@@ -391,15 +427,76 @@ replaced the guess before generating the report. Its final run and the
 independent reconciliation passed. No product/test fix resulted from
 that scratch correction. Report scope/encoding checks pass; a full
 report pass found no further unresolved arithmetic or source mismatch.
-Evidence: `work/wp-t8/dr116-analysis.log`,
-`work/wp-t8/dr116-verification.log` (checker:
-`work/wp-t8/verify_dr116.py`), and `work/wp-t8/report-check.log`.
+Durable evidence: the archived script and tables under
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/dr116/`, the cell's
+verification results in `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/cell/turn-5.txt`
+and `cell/return-5.md`, and Reviewer A's independent re-derivation in
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/A/r1/review.txt`.
 
 Limits: archived timings are one pair of serial executions, rounded per
 node, with different code, inputs available and fixture/order state.
 They are costs, not controlled benchmarks or additive saving forecasts.
-The evidence copies and generated CSVs must be archived by the dispatcher.
+The evidence copies and generated CSVs are retained in the durable paths above.
 The sandbox audit residual has a seat ruling and no new DR. No reduction,
 interface, dependency, manifest, harness file or other product behavior
-was changed this turn. Only this report is a new tracked deliverable;
-the footage and main working-folder contents remain unread by the cell.
+was changed in the archive-analysis turn. This cleanup edits only the
+report, fixture plugin and two additive test files; the footage and main
+working-folder contents remain unread by the cell.
+
+F7 coverage limit (Reviewer A advisory): eleven V8 look-check nodes have
+skipped at every gate since the CP2 packs were archived on 2026-10-29
+to `D:/clearwater-archive/`; the frames formerly under the main checkout's
+`work/wp1.3/frames` are absent. This is a coverage loss outside WP-T8,
+routed by the orchestrator to CHARC. Source:
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/A/r1/review.txt` and
+the binding TURN-6 dispatch. This cell did not inspect those folders.
+
+## Reviewer A round 1 disposition and cumulative ledger
+
+Source: `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/A/r1/review.txt`,
+on `92bea573..6d0a249a`. Verdict `NO_NEW_CRITICAL_MAJOR`; the seat's
+five-module run passed, static checks were clean, and all DR-116 figures
+were independently re-derived. This is the terminating round's cleanup;
+the dispatcher owns Reviewer B and the final gates.
+
+| Finding | Classification | Disposition |
+|---|---|---|
+| F1 | MINOR, in envelope, NEW | Confirmed by removing only the nondirectory clause in memory; both new planted-file writer cases fail on the missing refusal message and pass on real code. Product source unchanged. |
+| F2 | MINOR, in envelope, NEW | Accepted: DR-120 row now states generation/verification time, bytes per root, worker multiplicity and the xdist exception. |
+| F3 | MINOR, in envelope, NEW | Confirmed by injected missing-Git, non-checkout and timeout failures. Catch the ruled exception families and keep the original checkout cache fallback; all three cases pass after the fix. |
+| F4 | MINOR, in envelope, NEW | Accepted: sources of record now name the durable archives, analysis, seat logs and ruling, rather than scratch paths. |
+| F5 | MINOR, in envelope, NEW | Accepted: module and top-delta tables now show BEFORE -> AFTER pass/skip status. |
+| F6 | MINOR, in envelope, NEW | Resolved by CHARC's ruling: apply step CLOSED, no reduction applied, DR-116 closes at accept on attribution. |
+| F7 | ADVISORY, in envelope, NEW | Disclosed as an out-of-package coverage loss routed to CHARC; no inline fix. |
+| F8 | ADVISORY, in envelope, NEW | Additional CPU-reference reuse noted and declined with C1/C2. |
+| F9 | ADVISORY, in envelope, NEW | No change: reviewer measured refusal overhead as negligible. |
+| F10 | ADVISORY, out of envelope, NEW | No change: alternative Git layouts remain outside the declared checkout envelope. |
+| F11 | ADVISORY, out of envelope, NEW | No change: broader POSIX symlink coverage is outside this Windows-junction package. |
+
+| Round | Critical / major / minor / advisory | In / out | NEW / REOPENED | Reverts | Product fixes / test and infrastructure fixes | Dispatcher-read depth at entry |
+|---|---|---|---|---|---|---|
+| A r1 cleanup | 0 / 0 / 6 / 5 | 9 / 2 | 11 / 0 | 0 | 0 / 2 (file regression; Git fallback and regression); remaining fixes are report-only | 160,961 of 475,000 |
+
+The cleanup's execution evidence is delivered in this cell's TURN-6
+return and transcript, recorded by the dispatcher under
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/cell/return-6.md` and
+`cell/turn-6.txt`. The source mutation was in memory only; a copy of the
+mutated method and its launcher remain scratch evidence for transfer.
+
+| Cleanup check | Observed result |
+|---|---|
+| F1 RED, only nondirectory clause removed in memory | Both planted-file writer cases fail: the `FileExistsError` message does not match `refusing cache entry path` |
+| F3 RED on the unchanged plugin at `6d0a249a` | All three injected errors escape: `FileNotFoundError`, `CalledProcessError`, `TimeoutExpired` |
+| F1 + F3 GREEN on real code | 5 passed in 0.15 s |
+| Requested `test_cache_store.py` + `test_fixtures.py` module run | 393 passed, 3 expected sandbox audit failures in 70.17 s; no other failure or skip |
+| Ruff / format on the three touched Python files | All checks passed; 3 files already formatted |
+| Scope, bytes and report consistency | Four owned files only; both test diffs additions-only; zero CR in all four files; 37 timing rows and 27 pass/skip status entries match the CSVs; diff whitespace check passes |
+
+The module run used the parallel-leg marker expression, explicit
+worktree basetemp `ct8-17`, `PYTHONPATH=scripts`, the sandbox mkdir shim,
+and `-p no:cacheprovider`. Its only failures were
+`test_generators_write_only_inside_their_output_folders`,
+`test_generators_read_only_their_own_code_and_libraries`, and
+`test_ffmpeg_is_told_to_write_only_into_the_output_folders` in
+`test_fixtures.py`: the ruled `nul` access and 55/56 launch residual.
+The seed tests gain lines only; no product source is changed in cleanup.

@@ -1640,6 +1640,35 @@ def test_generated_cache_without_basetemp_uses_the_main_checkout(
     assert provider.fixtures_dir == FIXTURES_DIR
 
 
+@pytest.mark.parametrize(
+    "error",
+    [
+        FileNotFoundError("git is not on PATH"),
+        subprocess.CalledProcessError(128, ["git", "rev-parse"], stderr="not a git repository"),
+        subprocess.TimeoutExpired(["git", "rev-parse"], 10),
+    ],
+    ids=["missing-git", "not-a-checkout", "git-timeout"],
+)
+def test_generated_cache_without_git_uses_the_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    """Failed Git discovery keeps the checkout cache usable without basetemp (DR-120)."""
+    checkout = tmp_path / "source-copy"
+    monkeypatch.setattr(fixture_plugin, "REPO_ROOT", checkout)
+
+    def unavailable_git(*args: Any, **kwargs: Any) -> Any:
+        raise error
+
+    monkeypatch.setattr(fixture_plugin.subprocess, "run", unavailable_git)
+    factory = SimpleNamespace(
+        getbasetemp=lambda: tmp_path / "fallback", mktemp=lambda name: tmp_path / name
+    )
+    provider = _location_provider(SimpleNamespace(getoption=lambda name: None), factory)
+    assert provider.generated_dir == checkout / "work" / "fixtures" / "generated"
+    assert provider.generated_dir.is_dir()
+    assert provider.path("vid-hlg") == FIXTURES_DIR / "video" / "hlg.mp4"
+
+
 @needs_ffmpeg
 def test_relocated_session_cache_keeps_the_manifest_content(
     tmp_path_factory: pytest.TempPathFactory,
