@@ -69,7 +69,33 @@ Standard Codex turns through `scripts/codex_cell.py`: round 0 (the design read-b
 
 ## Dispatch (orchestrator fills)
 
-- Base commit: (fill)
-- Lane paces at dispatch: (fill)
-- Worktree and session: (fill)
-- Depth at each yield: (fill)
+- **Base commit:** main at the commit that marks this brief FINAL. The worktree `.worktrees/wp-dr125` (branch `wp-dr125`) is created from that commit, and the cell reads the brief at that HEAD.
+- **Lane paces at dispatch** (read 2026-11-04 17:21Z): Codex 2 % / pace 0.464 (resets 2026-11-11 10:07Z); Claude 39 % / pace 1.183 (resets 2026-11-09 10:00Z). Codex is the lower pace and the package is eligible (no frozen interface), so the lane is **CODEX** as commissioned.
+- **Worktree and session:** `C:\Users\rwsmy\clearwater\.worktrees\wp-dr125`, branch `wp-dr125`.
+  - `implementer-codex-sol-high` runs through `scripts/codex_cell.py turn`, one FRESH session from turn 1. The session id is recorded from turn 1's driver footer and resumed for each later turn.
+  - Evidence goes in `C:\Users\rwsmy\clearwater-review-evidence\wp-dr125\` (`cell\` holds the dispatches, prompts, returns and transcripts; then `A\r<n>\`, `B\`, `frozen\`, `gate\`).
+  - Before turn 1, the seat checks that the worktree's `.venv` is populated (`uv sync --frozen` if it is empty; gen-42 lesson).
+- **Turns and yields.**
+  - **Turn 1 = round 0, read-only:** the design read-back against `export_worker.py`, `__main__.py` and the four shim tests at HEAD; Q1-Q3; any dispute, with evidence. A dispute goes to CHARC as a STOP; otherwise the build follows.
+  - **Turn 2 = the build:** the isolation, the raw-descriptor reader, the shim deletion, the tests, the README section and the static checks (including `mypy --platform darwin`).
+  - **Turn 3 = the before-records** and the report.
+  - **Then one resumed turn per Reviewer A round**, and one for Reviewer B's remediation if any.
+  - The seat runs the frozen check between A's convergence and B.
+- **Seat clarifications (binding on the cell; CHARC may strike any at FINAL):**
+  1. **The private reader is not an `io` object.** `run()` keeps its `stdin: BinaryIO` parameter for the tests (a `BytesIO` stays valid there). The object `main()` passes is a small class of the cell's own over the private fd:
+     - `readline()` is assembled from `os.read(fd, 65536)` with a remainder, per design item 4;
+     - `os.fdopen`, `open(fd, "rb")`, `io.FileIO` wrapped in a buffer, or anything else that builds a `BufferedReader` over the private fd is a design violation;
+     - the request line and the watcher's lines come through that one object.
+  2. **The fail-closed test never calls `dup2` on the pytest process's own fd 0** (an xdist worker's standard input). Run the isolation function's failure path in a CHILD: `sys.executable -I -c` or a stand-in script that imports the worker module with Qt blocked and the profile redirected, monkeypatches `os.dup2` there, and reports status, stderr and its descriptor bookkeeping through stdout. `psutil` is in the dev group (`pyproject.toml`) for a Windows handle count (`Process().num_handles()`); on POSIX use `/proc/self/fd` or the function's own bookkeeping.
+  3. **The before-records** (the child-inherits-NUL hang and the 20-run series on main) execute the OLD worker. Each runs ONCE, at the cell's seat in the Codex sandbox or at the orchestrator's seat if the sandbox refuses, from a copy of the NEW test or script pointed at the base revision. Before it runs, the cell greps that test or script for entry-point calls and confirms the ENTRY-POINT ISOLATION RULE holds there (APPDATA / LOCALAPPDATA / XDG redirected, Qt blocked, a bounded timeout); the hang case has a 10 s bound. Record the exact command beside its log in a `.record.txt`. A run that needs the network, a frozen build or a GUI is not done.
+  4. **The deterministic stand-in** (design item 4's witness) is product-free. If the "before" shape exits 0 on this interpreter in all 5 runs, report it as observed and do not force it; the 20-run series and the frozen check carry the claim. The cell reports what it saw.
+  5. **Codex sandbox residuals.** A test failure that occurs only in the sandbox (the restricted token, a `mkdtemp` listing, a `nul` open, as in `tests/test_fixtures.py`) is named as such, with its evidence. The seat run is of record. Preload `scripts/sandbox_mkdir_shim.py` (`-p sandbox_mkdir_shim` with `PYTHONPATH=scripts`) for pytest in the sandbox.
+- **Reviewers.**
+  - Reviewer A is a Claude pass at the orchestrator's seat (`codex_cell.py review`, read-only, the other model). It runs on each candidate head to convergence; this is the form used for every Codex cell, as in WP-T8 and WP6.2. Its first act is the stand-in witness; its prompt carries mutation probes against a copy (the raw reader swapped back for `readline()` on a `BufferedReader`; the isolation call moved after the imports; the `SetStdHandle` branch removed) and the isolation pre-read of every test that starts a worker.
+  - Reviewer B is a separate Claude pass at the seat on the final head.
+- **The gate:** static, collect, parallel, serial, harness. The serial leg is included because the new `slow` 20-run series is serial-leg; the start-up modules ride in the serial leg. Then the footprint (the owned paths only, 0 CR), the real `%LOCALAPPDATA%\Clearwater` absent, and `grep -n isolate_worker_stdin src tests tools docs` showing history only.
+- **Depth at each yield** (Codex input tokens from the driver footer, with the window and the moment): evaluate at about 200K, STOP near 250K.
+  - Turn 1 (round 0) end: (fill at yield)
+  - Turn 2 (build) end: (fill at yield)
+  - Turn 3 (before-records + report) end: (fill at yield)
+  - Each Reviewer A round's fold-in end: (fill at yield)
