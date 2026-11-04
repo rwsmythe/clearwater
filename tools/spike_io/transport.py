@@ -945,24 +945,28 @@ def idle_gate(script: Path, out: Path) -> dict[str, Any]:
 
     The record names the script and its md5, so the window record shows which gate ran.
     """
-    if sys.platform != "win32" or not script.is_file():
+    if sys.platform == "win32":  # AD-36 statement form: each platform in its own branch
+        if not script.is_file():
+            return {"ran": False, "reason": "not Windows or no gate script"}
+        md5 = hashlib.md5(script.read_bytes()).hexdigest()
+        identity = {"script": str(script), "script_md5": md5}
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-File", str(script), "-Out", str(out)],
+            capture_output=True,
+            text=True,
+            timeout=600,
+            check=False,
+        )
+        lines = [line for line in result.stdout.splitlines() if line.strip().startswith("{")]
+        return {
+            "ran": True,
+            **identity,
+            "status": result.returncode,
+            "record": json.loads(lines[-1]) if lines else None,
+            "stderr_tail": result.stderr.strip()[-300:],
+        }
+    else:
         return {"ran": False, "reason": "not Windows or no gate script"}
-    identity = {"script": str(script), "script_md5": hashlib.md5(script.read_bytes()).hexdigest()}
-    result = subprocess.run(
-        ["powershell", "-NoProfile", "-File", str(script), "-Out", str(out)],
-        capture_output=True,
-        text=True,
-        timeout=600,
-        check=False,
-    )
-    lines = [line for line in result.stdout.splitlines() if line.strip().startswith("{")]
-    return {
-        "ran": True,
-        **identity,
-        "status": result.returncode,
-        "record": json.loads(lines[-1]) if lines else None,
-        "stderr_tail": result.stderr.strip()[-300:],
-    }
 
 
 def run_window(

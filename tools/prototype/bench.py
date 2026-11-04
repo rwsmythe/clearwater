@@ -1154,24 +1154,25 @@ def _windows_power() -> dict[str, Any]:
         "power_overlay": None,
         "power_overlay_name": None,
     }
-    if sys.platform != "win32":
-        return record
-    import ctypes
-    import uuid
+    if sys.platform == "win32":  # AD-36 statement form: each platform in its own branch
+        import ctypes
+        import uuid
 
-    try:
-        powrprof = ctypes.WinDLL("powrprof")
-        scheme = ctypes.c_void_p()
-        if powrprof.PowerGetActiveScheme(None, ctypes.byref(scheme)) == 0 and scheme.value:
-            record["power_scheme"] = str(uuid.UUID(bytes_le=ctypes.string_at(scheme, 16)))
-            ctypes.windll.kernel32.LocalFree(scheme)
-        overlay = (ctypes.c_ubyte * 16)()
-        if powrprof.PowerGetEffectiveOverlayScheme(ctypes.byref(overlay)) == 0:
-            guid = str(uuid.UUID(bytes_le=bytes(overlay)))
-            record["power_overlay"] = guid
-            record["power_overlay_name"] = _OVERLAY_NAMES.get(guid, "unknown")
-    except (OSError, AttributeError):  # an older Windows without the overlay call
-        pass
+        try:
+            powrprof = ctypes.WinDLL("powrprof")
+            scheme = ctypes.c_void_p()
+            if powrprof.PowerGetActiveScheme(None, ctypes.byref(scheme)) == 0 and scheme.value:
+                record["power_scheme"] = str(uuid.UUID(bytes_le=ctypes.string_at(scheme, 16)))
+                ctypes.windll.kernel32.LocalFree(scheme)
+            overlay = (ctypes.c_ubyte * 16)()
+            if powrprof.PowerGetEffectiveOverlayScheme(ctypes.byref(overlay)) == 0:
+                guid = str(uuid.UUID(bytes_le=bytes(overlay)))
+                record["power_overlay"] = guid
+                record["power_overlay_name"] = _OVERLAY_NAMES.get(guid, "unknown")
+        except (OSError, AttributeError):  # an older Windows without the overlay call
+            pass
+    else:
+        pass  # no power-plan reading off Windows: the fields stay None
     return record
 
 
@@ -1464,22 +1465,24 @@ def _cpu_brand() -> str:
     ``PROCESSOR_IDENTIFIER`` environment variable there (WP1.2B ruling: no sampler or record
     of a timed window touches WMI). Elsewhere py-cpuinfo, or ``platform.processor()``.
     """
-    if os.name == "nt":  # (not sys.platform: mypy would drop the other branch)
+    if sys.platform == "win32":  # AD-36 statement form: both targets type-check each branch
         return os.environ.get("PROCESSOR_IDENTIFIER", "unknown")
-    try:
-        import cpuinfo
+    else:
+        try:
+            import cpuinfo
 
-        return str(cpuinfo.get_cpu_info().get("brand_raw", "")) or platform.processor()
-    except Exception:  # py-cpuinfo is best effort on an unusual system
-        return platform.processor()
+            return str(cpuinfo.get_cpu_info().get("brand_raw", "")) or platform.processor()
+        except Exception:  # py-cpuinfo is best effort on an unusual system
+            return platform.processor()
 
 
 def _platform_name() -> str:
     """The operating system, read without WMI (``sys.getwindowsversion`` on Windows)."""
-    if os.name == "nt":  # (not sys.platform: mypy would drop the other branch)
+    if sys.platform == "win32":  # AD-36 statement form: both targets type-check each branch
         version = sys.getwindowsversion()
         return f"Windows {version.major}.{version.minor}.{version.build}"
-    return platform.platform()
+    else:
+        return platform.platform()
 
 
 def _cuda_version(code: int) -> str:
