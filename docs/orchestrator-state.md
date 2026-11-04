@@ -21,35 +21,28 @@
 - **Backslash-bearing Python helpers are written with the Write tool**, never a heredoc. **`rm` takes literal absolute paths.** **Worktree release:** a released worktree's `work/` is pruned only on the owner's word; junits copied to `clearwater-review-evidence\<pkg>\gate\` first.
 - **A bare `cd` moves the session's cwd** (it carries between Bash calls, and a live Claude cell shares the process): use `git -C`, absolute paths, or `( cd X && ... )`.
 
-### Live board (RESUME HERE) -- gen 40, 2026-11-04 ~01:20Z
+### Live board (RESUME HERE) -- gen 40, 2026-11-04 ~02:25Z, NOTHING RUNNING (no cell live, no job)
 
-1. **OWNER RULED DEFER on DR-117** (CHARC `56d6a473`). Owner-pending: NONE except the word "tag 1.0.0" (to CHARC).
-2. **WP5.5 release preparation: BOTH NETS DONE; RELEASE GATE `p55` RUNNING** on the merge head `4742f69f` (main merged INTO `wp5.5` `--no-ff`).
-   - Run: `bash work/orch-g40/gate.sh wp5.5 p55 static collect parallel serial fullclip harness`; summary `work/orch-g40/gate-p55/summary.txt`. gate.sh now logs free space per leg and STOPs below 25 GB.
-   - Package commits:
-     - `e7876912`: build.
-     - `6135c496`: A r1 fixes (F1 cp1252 mojibake in 2 texts, F2 Tools > Settings).
-     - `51afce88`: A r2 minors and the report.
-     - `795a496c`: B remediation (B1 MSVC runtime + opengl32sw notices, CHARC concurred `df16a115aec924ca`; B3 CPU wording).
-     - `61b1fd58`: B re-run minors (4 upstream text hashes verified at the seat against the live URLs).
-   - Nets:
-     - A: r1 NEW_CRITICAL_MAJOR, r2 NO_NEW_CRITICAL_MAJOR (converged).
-     - B: first pass on `51afce88` 1 MAJOR (B1); re-run on `795a496c` NO_NEW_CRITICAL_MAJOR.
-     - All evidence under `clearwater-review-evidence\wp5.5\` (`cell\`, `A\r1`, `A\r2`, `B\`, `B\r2`).
-   - Rulings carried:
-     - CHARC R1-R4 (`ce6094d108b9546f`), with the `uv.lock` one-line grant;
-     - DR-119 (a)-(b) paid down here;
-     - B4 = DR-119 (e) on main `02aac236`.
-   - Codex sessions: `01a1a3b6` (turn 1), `01a1a3bf` (turns 2-3), `01a1a3eb` (turns 4-6; ended at 196,594 of 258,400). No cell live.
-   - **AT GATE GREEN:**
-     - fill the report's gate section with the figures;
-     - archive logs and junits to `clearwater-review-evidence\release-1.0.0\`;
-     - write the accept record `docs/proofs/wp5.5-accept.md`;
-     - ff main to the branch head, re-running the harness if main moved;
-     - post to CHARC (N13 / release record are CHARC's);
-     - the tag `git tag -a v1.0.0 <merge commit> -m "Clearwater 1.0.0"` ONLY on the owner's "tag 1.0.0" relayed by CHARC; no push.
-3. **WP-H1** HELD by CHARC until WP5.5's accept.
-- Kept worktrees: `wp5.3`, `wp5.7`, `wp5.8`, `wp-dr25`, `wp5.5`, `orch-state-g40`. Prunes of `work\wp5.7\` and `work\wp-dr25\` only on the owner's word.
+1. **WP5.5 ACCEPTED** (main `40d2ce04`, fast-forward; record `docs/proofs/wp5.5-accept.md`).
+   - **Release gate `p55` GREEN** on `4742f69f`: parallel 6,786 / serial 1,262 / fullclip 7.
+   - Harness 382 OK on `d6bed59d` and on the accept head, after `8e83fa76` registered the three release files.
+   - Figures of record: `clearwater-review-evidence\release-1.0.0\`.
+   - Return report posted to CHARC 02:24Z (`0c8da212`).
+2. **WAITING ON CHARC:** N13 SATISFIED; DR-119 (a)-(b) CLOSED; `docs/proofs/release-1.0.0.md`; the Phase 5 CLOSED pointer; and **the owner's word "tag 1.0.0"**.
+   - On that word: `git tag -a v1.0.0 <commit CHARC names: 40d2ce04 or main's head after the release record> -m "Clearwater 1.0.0"`.
+   - **NO push.** Confirm with `git show v1.0.0 --stat | head`.
+3. **WP-H1** was HELD by CHARC until WP5.5's accept: it awaits CHARC's commission.
+- Owner-pending: only the tag word.
+- Kept worktrees until the owner's word: `wp5.3`, `wp5.7`, `wp5.8`, `wp-dr25`, `wp5.5`; mine is `orch-state-g40`. Prunes of `work\wp5.7\` and `work\wp-dr25\` only on the owner's word.
+
+### Gen-40 lessons
+
+- **A new root-level or `docs/` file needs its harness registration** (`tests/harness/genericity_lists.py`, `INSTANCE_SURFACE_RELPATHS`). Only the harness leg catches it (the genericity guard + manifest accounting); gate `p55`'s harness leg failed on WP5.5's three release files after 70 minutes of green pytest legs. **Run the harness gate on the package head BEFORE Reviewer B**, and put the registration in the brief's owned files.
+- **A Codex cell's licence-text copy must decode as UTF-8 bytes explicitly**: the locale default (cp1252) garbled two texts, and the self-check hashed the garbled copy. Ask for hashes of the SOURCE bytes and a marker scan (`Â`, `Ã`, `â€`, U+FFFD).
+- **The Codex sandbox has no network**: anything needing an index (`uv run --with ...`, a lean sync with uncached packages) runs at the seat. Record the exact command in a `.record.txt` beside its log, or the reviewer cannot tell what ran.
+- **The review driver appends the whole diff**: for a package with a large generated file, exclude it through `codex_cell` (`DIFF_EXCLUDES` patched by a `python -c` wrapper) and tell the reviewer to read it with tools.
+- **A dispatcher's fill of a ruling into a cell's report can mis-scope it** (B re-run N-3: my fill made CHARC's concurrence cover a broader sentence): fill with a sentence of its own.
+- A bare `cd` in a Bash call moved the session cwd twice this generation (no cell live): use `git -C` or a subshell.
 
 ### Gen-39 lessons
 
