@@ -32,4 +32,4 @@ GATE_CHECKS (the brief's fill): `git diff --name-only main...wp6.2` = the report
 
 ## Merge
 
-`main` fast-forwarded to `wp6.2` (the merge `4380d156` plus this record's commit) by the orchestrator. The worktree `.worktrees/wp6.2` is released after the merge (its `work/` pruned only on the owner's word; it holds only a reviewer-created `.venv`).
+Harness gate on `6d80c835` (this record's first commit, the report unchanged since `2243da6b`): `uv run python -m unittest discover -s tests/harness` -> Ran 423 tests, OK (skipped=40); no registration needed for the two new files. `main` fast-forwarded to `wp6.2` (the merge `4380d156` plus this record's commits) by the orchestrator. The worktree `.worktrees/wp6.2` is released after the merge (its `work/` pruned only on the owner's word; it holds only a reviewer-created `.venv`).
