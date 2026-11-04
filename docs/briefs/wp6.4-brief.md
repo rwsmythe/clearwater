@@ -57,7 +57,42 @@ Claude opus-high cell, mid-package yield at the group boundary (item 14), evalua
 
 ## Dispatch (orchestrator fills)
 
-- Base commit: (fill)
-- Lane paces at dispatch: (fill)
-- Worktree and session: (fill)
-- Depth at each yield: (fill)
+Filled by orchestrator gen 45, 2026-11-04 ~20:30Z, for CHARC's FINAL.
+
+- **Base commit:** main at dispatch, at or after `b6ce8786` (the WP-DR125 accept), plus the commit that marks this brief FINAL.
+- **Lane paces at the fill** (read 20:26Z):
+  - Codex 4 % used, pace 0.652 (resets 2026-11-11 10:07Z);
+  - Claude 44 % used, pace 1.265 (resets 2026-11-09 10:00Z).
+  - **The lane is CLAUDE by task fit, not by pace.** The package edits a frozen-interface docstring (`interfaces/settings.py`, under CHARC's grant) and designs the VT branch and the rate helper. A package that touches a frozen interface is never Codex (`docs/codex-reviewer.md`). Both nets are therefore Codex.
+  - Claude's pace is above 1. This package is the main Claude spend of the week, so I keep the group sizes as the brief sets them and re-seat by the depth rule only.
+- **Worktree and session:** `.worktrees/wp6.4`, branch `wp6.4` from the FINAL head. The cell is `implementer-opus-high`, an Agent-tool subagent named `wp64-cell1`. It is fresh for group A. Group B goes to the same cell if its depth at the group-A yield is under about 250K, else to a fresh `wp64-cell2` from the ledger.
+- **Depth at each yield:** read with `scripts/cell_depth.py` at dispatch, at the group-A yield, at every round gate and at retirement; each figure is recorded with its moment in the ledger `docs/proofs/wp6.4-ledger.md`, which the cell keeps.
+
+### Seat clarifications (readings of the brief, offered for CHARC's FINAL)
+
+1. **Running beside WP6.3a.** WP6.3a's fold-in (Codex, `.worktrees/wp6.3a`) runs at the same time. Its files are `gpu_pack_install.py`, `__main__.py`, `gpu_pack.py`, `gui/gpu_pack_dialog.py`, `gui/shell.py`, its tests, `tools/package/README.md`, the user guide's section 2 and its report. WP6.4's owned set is disjoint from these.
+   - Design item 7's darwin AD-9 reason is a string in `core/backend.py`; the status bar shows it through the existing path, and `gui/shell.py` stays untouched by 6.4.
+   - Whichever package accepts second merges main and resolves.
+2. **Line references drift.** The brief's file:line references are from `ad0a87ef`. The cell locates each site by name at its base, and records the line at its base in the report. For example, DR-124's sites are now `tests/test_app_startup.py:180` (the `APPDATA=` env block) and `tests/test_gui_startup.py:206-209`, which already set HOME / USERPROFILE.
+   - DR-124's remaining work is therefore: the app start-up test gains the HOME redirection, and BOTH tests assert disposable-home-only writes.
+3. **The mid-package yield and Reviewer A in parallel.**
+   - At the group-A yield the cell commits and reports, with the Windows suite's affected modules green and the NVENC and x265 snapshot tests green.
+   - The seat starts Reviewer A r1, Codex on a detached copy at the group-A head, and dispatches group B AT THE SAME TIME, because group B changes no group-A product file.
+   - A r1's findings on group A are folded at the next cell turn.
+   - The five-round gate counts rounds across both groups.
+4. **`uv lock` needs the index.** A Claude cell has network at the seat, so the cell runs `uv lock` itself. It records the exact command and the lock diff summary in a `.record.txt`.
+   - A version that moves beyond the markers is a STOP to the seat.
+   - The `gpu_pack` table test is the proof that the eleven pack wheels are unchanged.
+5. **The `macos` marker and the legs.**
+   - M tests marked `macos` only land in the PARALLEL leg as skipped.
+   - Those marked `macos` + `gui` land in the serial leg as skipped.
+   - The gate's two expressions do not change. The collection identity counts both, and the report gives each leg's M count, collected and skipped.
+6. **The W-CODEC `slow` tests** spawn a real one-frame NVENC trial on this laptop. They are serial-leg, with no wall-clock bound. They obey AD-23's helper and set `stdin=` explicitly.
+7. **Reviewer form (the other model).**
+   - Reviewer A is Codex at the seat on `.worktrees/wp6.4-rA`, in the `codex exec` read-only review form (WP6.1's `A\r1`..`r5`).
+   - Reviewer B is the WSL script (form `wp5.7\B\run_review_B.sh`).
+   - Every Codex review prompt says: no frozen run, no Mac, no network, and no synthetic desktop input.
+8. **Hardware rules.** The DESKTOP INPUT RULE and the ENTRY-POINT ISOLATION RULE are pasted verbatim into every dispatch to this package.
+   - Design item 10's synthetic `QWheelEvent` is a Qt event sent to Clearwater's own OFFSCREEN widget, which the rule permits.
+   - No test sends input to the desktop.
+   - No test runs a frozen build.

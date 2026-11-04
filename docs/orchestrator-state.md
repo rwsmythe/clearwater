@@ -41,20 +41,12 @@
 
 ### Live board (RESUME HERE)
 
-1. **WP-DR125: AT THE GATE.** Branch `wp-dr125` at **`ee3877c1`**; the product is final at `96c364f0`; main is merged at `15ee158d`.
-   - Nets: A converged at r2; B r1 + r1b and the delta review are all NO_NEW_CRITICAL_MAJOR and folded in turns 7-9.
-   - The frozen re-check of `96c364f0` is GREEN (`wp-dr125\frozen2\`) and the report section is filled.
-   - Gate `pdr125` (static collect parallel serial harness) is running from 19:34Z; static and collect are green.
-   - The accept draft is `work/orch-g45/wp-dr125-accept.md`. Fill GATE_TABLE / GATE_SUMMARY / MERGE_TEXT, copy it to `docs/proofs/wp-dr125-accept.md` in the worktree, re-run the harness, commit by pathspec, `git merge --ff-only wp-dr125` on main, post to CHARC (CHARC closes DR-125 and amends AD-34 / AD-31), and archive the gate to `clearwater-review-evidence\wp-dr125\gate\`.
-   - Then release `.worktrees/wp-dr125-rA`.
-   - The cell session `01a1a7b0` is at 230,686 / 475,000 (turn-9 end). It is not to be resumed further: re-seat if anything more is needed.
-2. **WP6.3a: the fold-in dispatch is READY.** It is `wp6.3a\cell\dispatch-4.md`, with reading A confirmed by CHARC `6299db37` plus the three added lines.
-   - **AFTER the DR-125 accept:**
-     - merge main into `wp6.3a` (conflicts in `__main__.py`, `test_frozen_entry.py`, `tools/package/README.md` and `gpu_pack.py`: keep both packages; 6.3a's head `53748e82` still has the shim lines DR-125 deleted);
-     - set `HEAD_TBD` in dispatch-4;
-     - run a resumed turn of `01a1a7b8-97bb-7451-bb5a-adeb5a5c6387` (140,581 / 475,000 at turn-3 end).
-   - Then A r2 on `.worktrees/wp6.3a-rA`; the seat run (onedir build from the 6.3a head; 1.725 GB download into a redirected LOCALAPPDATA; expect **2,679 files**); B; the gate; the accept.
-3. **WP6.3b and WP6.4:** the briefs are DRAFT on main, for your fill. 6.3b goes after 6.3a's accept, with CHARC's additions (`--disable-windowed-traceback` + a product exception hook). 6.4 goes after DR-125's accept (Claude opus-high).
+1. **WP-DR125: ACCEPTED** at main `b6ce8786` (record `docs/proofs/wp-dr125-accept.md`); CHARC wrote the dispositions at `4dae7565` (DR-125 CLOSED, DR-130/131 opened, AD-34 amended, AD-31 note). `.worktrees/wp-dr125` is kept until the owner's prune word; `wp-dr125-rA` is released.
+2. **WP6.3a: fold-in TURN 4 RUNNING** (started ~20:25Z, a resumed `01a1a7b8-97bb-7451-bb5a-adeb5a5c6387`, 140,581 / 475,000 at turn-3 end). Main was merged into `wp6.3a` at `452ff088` with NO textual conflict: the shim is gone from `__main__.py`, and the four shared test modules gave 327 passed at the seat. Prompt `wp6.3a\cell\prompt-4.md` = `dispatch-4.md` (reading A plus CHARC's three lines).
+   - NEXT: QA the diff, then `codex_cell.py commit`, then A r2 on `.worktrees/wp6.3a-rA` (move it to the new head).
+   - Then the seat run: an onedir build from the 6.3a head; a 1.725 GB download into a redirected LOCALAPPDATA; expect **2,679 files** and `--verify` PASS.
+   - Then B (with no `run_in_background`), the gate and the accept.
+3. **WP6.4: the fill is POSTED for CHARC's FINAL** (brief section "Dispatch (orchestrator fills)", seat clarifications 1-8). On FINAL: `git worktree add .worktrees/wp6.4 -b wp6.4 main`, `uv sync --frozen`, `clearwater.local.toml`; dispatch `implementer-opus-high` as `wp64-cell1` (group A), with the two rules verbatim. **WP6.3b:** the brief is DRAFT on main, for your fill after 6.3a's accept, with CHARC's additions (`--disable-windowed-traceback` + a product exception hook).
 4. **Push:** main is ahead of `origin/main`. CHARC batches the owner's push.
 5. **Worktrees:** main; `orch-state-g45`; `wp-dr125` + `wp-dr125-rA`; `wp6.3a` + `wp6.3a-rA`; `wp6.1` (KEPT: the hand-filled pack at `work\wp6.1\t3c\appdata\Local\Clearwater\gpu-pack\14.2.0-cu12` serves the frozen checks); `wp6.2` (released).
 6. **Prunes owed (the owner's word only):** the wp6.1 builds and pack after 6.3a's seat run; `.worktrees/wp6.2`; the `wp-dr125` onedir build after the accept.
