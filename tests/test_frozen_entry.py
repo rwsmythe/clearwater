@@ -745,3 +745,152 @@ def test_the_real_pathfinder_canary_module_runs_through_the_frozen_dash_m(
     assert lines[-1] == "status 0 qt -"
     assert '"status": ' in lines[-2]
     assert '"abs_path": ' in lines[-2]
+
+
+# CHARC's widening of F-D (gen 15): every CPython spelling of -m / -c is a re-entry.
+
+
+@pytest.mark.parametrize(
+    ("argv", "expected"),
+    [
+        (["x", "-m", "a.b", "c"], ["-m", "a.b", "c"]),
+        (["x", "-mfoo", "c"], ["-m", "foo", "c"]),
+        (["x", "-I", "-m", "a"], ["-m", "a"]),
+        (["x", "-Im", "a"], ["-m", "a"]),
+        (["x", "-X", "utf8", "-m", "a"], ["-m", "a"]),
+        (["x", "-I", "-s", "-X", "utf8", "-W", "ignore", "-E", "-m", "a"], ["-m", "a"]),
+        (["x", "-c"], ["-c"]),
+        (["x", "-cCODE"], ["-c", "CODE"]),
+        (["x", "-I", "-c", "CODE"], ["-c", "CODE"]),
+        (["x", "-qmljsdebugger=port:1234"], ["-m", "ljsdebugger=port:1234"]),
+        (["x", "-m"], ["-m"]),
+        (["x"], None),
+        (["x", "-I"], None),
+        (["x", "-I", "photo.heic"], None),
+        (["x", "-X", "utf8"], None),
+        (["x", "-X"], None),
+        (["x", "-platform", "offscreen"], None),
+        (["x", "-style", "fusion"], None),
+        (["x", "-reverse"], None),
+        (["x", "-widgetcount"], None),
+        (["x", "photo.heic", "-m", "a"], None),
+        (["x", "--other"], None),
+    ],
+)
+def test_interpreter_reentry_follows_cpythons_grammar(
+    argv: list[str], expected: list[str] | None
+) -> None:
+    """Flags dropped, attached operands split; Qt's word options and files are not re-entries."""
+    import clearwater.__main__ as entry
+
+    assert entry.interpreter_reentry(argv) == expected
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        ["-mpackmod_run.probe"],
+        ["-I", "-m", "packmod_run.probe"],
+        ["-Im", "packmod_run.probe"],
+        ["-X", "utf8", "-m", "packmod_run.probe"],
+        ["-I", "-W", "ignore", "-sm", "packmod_run.probe"],
+    ],
+)
+def test_every_spelling_of_dash_m_runs_a_pack_module(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    pack: tuple[Path, list[tuple[str, Any]]],
+    prefix: list[str],
+) -> None:
+    """Attached, after flags, after ``-X`` / ``-W`` values: the pack module runs, no Qt."""
+    site, seen = pack
+    _package(site, "packmod_run")
+    record = tmp_path / "ran.txt"
+    entry, blocker = _fresh_entry(monkeypatch)
+    assert entry.main(["Clearwater.exe", *prefix, str(record), "a"]) == 0
+    name, args, _ = ast.literal_eval(record.read_text(encoding="utf-8"))
+    assert (name, args) == ("__main__", ["a"])
+    assert seen == [("activate", None)]
+    assert blocker.attempts == []
+
+
+@pytest.mark.parametrize(
+    ("args", "line"),
+    [
+        (["-cCODE"], "-c is not supported"),
+        (["-I", "-c", "CODE"], "-c is not supported"),
+        (["-Ic", "CODE"], "-c is not supported"),
+        (["-mhttp.server"], "-m 'http.server': not a GPU pack module"),
+        (["-I", "-m", "http.server"], "-m 'http.server': not a GPU pack module"),
+        (["-X", "utf8", "-m", "json.tool"], "-m 'json.tool': not a GPU pack module"),
+        (["-qmljsdebugger=port:1234"], "not a GPU pack module"),
+        (["-I", "-m"], "-m needs a module name"),
+    ],
+)
+def test_every_spelling_of_dash_c_and_of_a_foreign_dash_m_refuses(
+    pack: tuple[Path, list[tuple[str, Any]]],
+    capsys: pytest.CaptureFixture[str],
+    args: list[str],
+    line: str,
+) -> None:
+    """Refused: exit 2, one stderr line, no GUI (``-qmljsdebugger`` is the named collateral)."""
+    _, seen = pack
+    import clearwater.__main__ as entry
+
+    assert entry.main(["Clearwater.exe", *args]) == 2
+    out, err = capsys.readouterr()
+    assert out == ""
+    assert err.count("\n") == 1
+    assert line in err
+    assert not [call for call in seen if call[0] == "gui"]
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["-platform", "offscreen"],
+        ["-style", "fusion"],
+        ["-reverse"],
+        ["-widgetcount"],
+        ["-I"],
+        ["-X", "utf8"],
+        ["photo.heic", "-m", "x"],
+    ],
+)
+def test_qt_options_and_non_reentries_reach_the_gui_as_before_when_frozen(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]], args: list[str]
+) -> None:
+    """Frozen: anything that is not a re-entry still reaches the GUI with its argv unchanged."""
+    _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    _fake_gui(monkeypatch, calls)
+    import clearwater.__main__ as entry
+
+    argv = ["Clearwater.exe", *args]
+    assert entry.main(argv) == 3
+    assert calls == [("log", tmp_path / "cfg" / "logs"), ("activate", None), ("gui", argv)]
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["-mfoo"],
+        ["-I", "-m", "x"],
+        ["-Im", "x"],
+        ["-X", "utf8", "-m", "x"],
+        ["-cCODE"],
+        ["-I", "-c", "CODE"],
+        ["-qmljsdebugger=port:1"],
+    ],
+)
+def test_a_source_run_sends_every_spelling_to_the_gui_as_before(
+    monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]], args: list[str]
+) -> None:
+    """Not frozen: no re-entry branch on any form (1.0.0's behaviour)."""
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    _fake_gui(monkeypatch, calls)
+    import clearwater.__main__ as entry
+
+    argv = ["clearwater", *args]
+    assert entry.main(argv) == 3
+    assert calls == [("activate", None), ("gui", argv)]

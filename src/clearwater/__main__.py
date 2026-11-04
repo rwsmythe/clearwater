@@ -6,13 +6,15 @@ The branches of this entry (WP6.1, AD-34):
   remaining arguments. A packaged (frozen) build spawns its video export worker this way,
   because its executable cannot run ``-m clearwater.app.export_worker``. This branch imports
   no Qt-bearing module (AD-31).
-- Frozen only, a first argument of ``-m`` or ``-c`` (:func:`run_interpreter_option`): a
-  library inside the GPU pack re-enters ``sys.executable -m <its module>`` (``cuda.pathfinder``'s
+- Frozen only, an INTERPRETER RE-ENTRY (:func:`interpreter_reentry`: ``-m`` / ``-c`` in any
+  form CPython accepts, after interpreter flags; :func:`run_interpreter_option`): a library
+  inside the GPU pack re-enters ``sys.executable -m <its module>`` (``cuda.pathfinder``'s
   canary probe), which a frozen build would otherwise send to the GUI. ``-m <module> [args]``
   runs the module when its top-level package resolves from the loaded pack, and is refused
   otherwise; ``-c`` is always refused. A refusal is one line on stderr and a non-zero exit,
-  never a window: the executable is not a general Python interpreter (CHARC's F-D ruling).
-  This branch imports no Qt-bearing module either. A source run has no such branch.
+  never a window: the executable is not a general Python interpreter (CHARC's F-D ruling and
+  its widening at gen 15). This branch imports no Qt-bearing module either. A source run has
+  no such branch.
 - Anything else starts the GUI (:func:`clearwater.app.main.main`, WP4.3).
 
 On every branch the GPU pack loader (:func:`clearwater.gpu_pack.activate`) runs before
@@ -30,6 +32,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import re
 import sys
 from collections.abc import MutableMapping, Sequence
 
@@ -46,6 +49,20 @@ COMMAND_OPTION = "-c"
 
 REFUSED_STATUS = 2
 """The exit status of a refused ``-m`` / ``-c`` in a frozen build."""
+
+REENTRY_ARGUMENT = re.compile(r"-([BdEhiIOPqsSuvVWxX]*)([mc])(.*)", re.DOTALL)
+"""CPython's grammar for an argument that ends its options with ``-m`` or ``-c``.
+
+Flag letters, then ``m`` or ``c``, then the attached operand (``-mfoo``, ``-Im``, ``-cCODE``).
+Qt's word options (``-platform``, ``-style``, ``-reverse``, ``-widgetcount``) do not match;
+``-qmljsdebugger=...`` does (``-q`` then ``-m``) and is refused: Clearwater has no QML.
+"""
+
+LEADING_FLAGS = frozenset({"-I", "-E", "-s", "-S", "-B", "-u", "-O", "-q"})
+"""Interpreter flags that may come, alone, before a re-entry's ``-m`` / ``-c`` (dropped)."""
+
+VALUED_FLAGS = frozenset({"-X", "-W"})
+"""Interpreter flags that take the next argument as their value (both dropped)."""
 
 
 def prepend_executable_folder(environ: MutableMapping[str, str] | None = None) -> bool:
@@ -111,6 +128,38 @@ def _refuse(reason: str) -> int:
     return REFUSED_STATUS
 
 
+def interpreter_reentry(arguments: Sequence[str]) -> list[str] | None:
+    """Return a frozen interpreter re-entry's arguments normalised, or None when it is not one.
+
+    It is a re-entry when, after any :data:`LEADING_FLAGS` and :data:`VALUED_FLAGS` (with
+    their values), the next argument matches :data:`REENTRY_ARGUMENT`. The flags are dropped
+    (the bootloader configures the frozen interpreter); an attached operand is split off. Any
+    other command line (``-I`` alone, ``-platform offscreen``, a file) is not a re-entry and
+    goes to the GUI exactly as before.
+
+    Args:
+        arguments: The full command line, program name first.
+
+    Returns:
+        ``["-m" | "-c", <operand, when given>, *the rest]``, or None.
+    """
+    index = 1
+    while index < len(arguments):
+        if arguments[index] in LEADING_FLAGS:
+            index += 1
+        elif arguments[index] in VALUED_FLAGS and index + 1 < len(arguments):
+            index += 2
+        else:
+            break
+    if index >= len(arguments):
+        return None
+    match = REENTRY_ARGUMENT.fullmatch(arguments[index])
+    if match is None:
+        return None
+    attached = match.group(3)
+    return ["-" + match.group(2), *([attached] if attached else []), *arguments[index + 1 :]]
+
+
 def run_interpreter_option(arguments: Sequence[str]) -> int:
     """Frozen ``<exe> -m <module> [args]`` / ``<exe> -c ...``: run a pack module, or refuse.
 
@@ -123,8 +172,8 @@ def run_interpreter_option(arguments: Sequence[str]) -> int:
     so a windowed build shows no traceback dialog; ``SystemExit`` passes through.
 
     Args:
-        arguments: The full command line, program name first; ``arguments[1]`` is ``-m`` or
-            ``-c``.
+        arguments: The program name, then a re-entry as :func:`interpreter_reentry`
+            normalises it: ``arguments[1]`` is ``-m`` or ``-c``.
 
     Returns:
         The exit status: the module's (0 when it returns), 1 on an exception, or
@@ -157,7 +206,7 @@ def run_interpreter_option(arguments: Sequence[str]) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the export worker, a pack module (frozen ``-m``) or the GUI, as the arguments select.
+    """Run the export worker, a pack module (frozen re-entry) or the GUI, as arguments select.
 
     Args:
         argv: The full command line, program name first; ``sys.argv`` when None.
@@ -173,8 +222,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         return export_worker.main(arguments[2:])
     if getattr(sys, "frozen", False):
-        if arguments[1:2] in ([MODULE_OPTION], [COMMAND_OPTION]):
-            return run_interpreter_option(arguments)
+        reentry = interpreter_reentry(arguments)
+        if reentry is not None:
+            return run_interpreter_option([arguments[0], *reentry])
         _start_logging()
     gpu_pack.activate()
     from clearwater.app.main import main as gui_main
