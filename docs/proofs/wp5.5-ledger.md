@@ -440,3 +440,104 @@ remote action, footage/main-work/other-worktree read or write outside the
 worktree occurred. Only the four owned documentation files changed. Release
 gate/tag/acceptance remain with the orchestrator/CHARC/owner; the next action
 is the single B re-run. YIELD.
+
+## Reviewer B re-run
+
+Reviewer B re-run: Claude, read-only process at the orchestrator's seat on
+`795a496c`; findings `work/wp5.5/B2-review.txt`; verdict
+**NO_NEW_CRITICAL_MAJOR**. Baseline: **72 passed, 1 deselected in 76.37s**.
+B1, B2, B3, B5 and B6 are fixed; B4 is banked as DR-119 (e); B7 is partial
+(advisory). All ten claims-first items passed on substance, with the remaining
+findings below. Driver transport / CLI version is not supplied in the findings
+copy and is not inferred.
+
+| Review | Critical | Major | Minor | Advisory | In / out of envelope | NEW | REOPENED | Reverts | Product-code fixes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| B re-run | 0 | 0 | 3 | 4 | 7 / 0 | N-1..N-7 | B7 partial (N-7) | 0 | 0 |
+
+All seven findings are confirmed, in envelope and text-bearing; none is rejected.
+N-7 also closes the reopened B7 partial and is not counted as an eighth finding.
+This is the terminating non-blocking tidy; the orchestrator verifies it at its
+seat, with no further review round. The release gate remains pending.
+
+Depth at turn-6 start: 150,847 of 258,400 (dispatcher-read turn-5 end).
+
+Depth at turn-6 end: 196,594 of 258,400 (driver footer; session 01a1a3eb). Dispatcher verification: the four corrected upstream texts (36, 37, 41, 44) fetched at the seat 2026-11-04 equal their stated bytes and SHA-256 (7,651 da7eabb7; 18,120 d8afb1bc; 2,326 99a69660; 2,883 63263614).
+
+### Per-finding fixes
+
+| Finding | Severity | Confirmation and fix |
+| --- | --- | --- |
+| N-1 | MINOR | CONFIRMED. The re-run fetched upstream files and established that cached whole-file sources 36/37/41/44 each have exactly one extra LF. The strengthened source/declaration check first failed on exactly those four blocks. Removed their extra fenced-content LF and replaced all four declared hashes/counts with the upstream-byte values below. Checked all 44 declarations against source bytes or the stated selections; 35 installed texts and five selections remain unchanged. Corrected the report's former cached-source checks and current fidelity claims. No licence wording changed. |
+| N-2 | MINOR | CONFIRMED. Report now states four upstream whole-file texts (36/37/41/44) and five selections (38/39/40/42/43). It distinguishes the older reviewer counts from B's later source-boundary finding rather than claiming the padded copies matched upstream. |
+| N-3 | MINOR | CONFIRMED. Restored "No unresolved implementation question remains." as its own sentence, followed by the specific MSVC / Mesa licence concurrence and message/time. All three report concurrence passages now name that position explicitly. CHARC's concurrence does not endorse an implementation-completeness claim. |
+| N-4 | ADVISORY | CONFIRMED. Removed the blank line before the MSVC row so MSVC and Mesa are contiguous six-column rows in the runtime audit table, retaining their per-wheel RECORD evidence. |
+| N-5 | ADVISORY | CONFIRMED from CPython 3.12.13's `sys.base_prefix`. Added the eight bundled DLL names to both Python rows, the user-installed/not-redistributed position and the python-build-standalone component-licence URL. Actual locations: six library DLLs under DLLs/ and the two MSVC DLLs at the interpreter root. No extra text copied. |
+| N-6 | ADVISORY | CONFIRMED. Release checklist now repeats df -h /c before each heavy leg (serial/fullclip), as well as before the gate; 25 GB free is required at every check. No disk/gate job run by this cell. |
+| N-7 / B7 remainder | ADVISORY | CONFIRMED. Added the short turn-to-commit key near the report's top: round-0/no commit, e7876912, 6135c496, 51afce88, 795a496c with dispatcher ruling fill, and the closing commit. Report now records the converged B re-run and closing-seat verification instead of a pending B re-run. |
+
+CHARC's MSVC / Mesa licence concurrence is message `df16a115aec924ca`,
+2026-11-04 00:40Z. The per-wheel DLL inventory and wheel RECORD evidence remain
+in the audit. B4's stale core_speed label is banked as DR-119 (e), not changed.
+
+### Corrected upstream whole-file declarations
+
+| Text | UTF-8/LF bytes | SHA-256 |
+| --- | --- | --- |
+| 36 - LGPL-3.0 | 7,651 | `da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768` |
+| 37 - x265 COPYING | 18,120 | `d8afb1bcc7a2cfc603683b168d6987ef0a48e59e0da3693bf55c5d33b67e2b49` |
+| 41 - MinGW COPYING | 2,326 | `99a69660981156c21336fdb5661f89341b013c94e4bf9e1c7467b4745718397f` |
+| 44 - winpthreads COPYING | 2,883 | `63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177` |
+
+Each fenced whole-file copy now ends at the upstream file's own final newline,
+without the added blank LF. Text count is still 44; distinct source bytes total
+399,466; the notices file is 435,872 bytes after the Python-row addition.
+
+### Verification evidence
+
+The original `work/wp5.5/verify_notices_utf8.py` is executed in memory with two
+closing checks: recover the reviewer-established whole-file source bytes by
+removing exactly one LF from the four asserted padded cache copies, and read
+each hash/count from its committed notice declaration instead of the historical
+inventory. The original script, cached sources and inventory files are not
+edited, honoring the four-file ownership constraint. The source-path inventory
+is still useful; its four old hashes/counts are superseded by the committed
+notices/correction table and the 44 declarations in the closing verification
+log. No upstream fetch by this cell is claimed.
+
+- Before correction: `work/wp5.5/t6-notices-before.log`, verifier exit **1**:
+  **TEXTS: 44; MISMATCHES: 4**, exactly 36/37/41/44. (The PowerShell summary
+  reader itself exited 0; the failed verifier's exit is recorded in the log.)
+- After correction: `work/wp5.5/t6-notices-verify.log`, exit **0**:
+  **TEXTS: 44; MISMATCHES: 0**; **54 source records**; all stated hashes/counts
+  agree with LF-normalised source bytes or declared selections; ten duplicate
+  records also match; all four mojibake marker counts 0; complete EULA clause
+  matches; **NOTICES SIZE: 435872 bytes**. The log lists all 44 current
+  declarations for the closing record.
+- Python inventory: `work/wp5.5/t6-python-dlls.log`, exit **0**, all eight names
+  checked from `sys.base_prefix`: `DLLs/libcrypto-3-x64.dll`,
+  `DLLs/libssl-3-x64.dll`, `DLLs/libffi-8.dll`, `DLLs/sqlite3.dll`,
+  `DLLs/tcl86t.dll`, `DLLs/tk86t.dll`, `vcruntime140.dll` and
+  `vcruntime140_1.dll` (last two at interpreter root).
+- Targeted pytest, prescribed marker expression, sandbox_mkdir_shim,
+  no cacheprovider, basetemp `work/wp5.5/t6`, exit **0**:
+  **72 passed, 1 deselected in 70.95s (0:01:10)**; `work/wp5.5/t6.log`.
+- Ruff, exit **0**: **All checks passed!**; `work/wp5.5/t6-ruff.log`.
+- Format, exit **0**: **317 files already formatted**;
+  `work/wp5.5/t6-format.log`.
+
+`work/wp5.5/t6-scope-verify.log`, exit 0: four owned files UTF-8/LF-only;
+44 current declarations total 399,466 source bytes; each corrected whole-file
+block ends at its own final newline; 22 six-column audit rows are contiguous
+and retain the native RECORD evidence; all eight Python DLL names verified in
+both Python rows; no placeholders/home paths; report/checklist local links
+resolve. Git status names exactly the four authorized files; no source/tool/
+test/project/lock/guide/LICENSE diff. `t6-diff-check.log`: git diff --check
+exit 0.
+
+No code/test/dependency/lockfile edit, upstream copy, sync, whole-suite/xdist or
+heavy-gate run occurred. All output/log writes stay in this worktree; no
+footage/main-work/other-worktree read, git write, mailbox post or remote action
+occurred. Only the four authorized documentation files change. Closing
+verification, release gate, acceptance and tagging remain with the named
+orchestrator/CHARC/owner seats. YIELD.

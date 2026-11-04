@@ -9,9 +9,10 @@ signing or packaged executable is part of this release.
    Check the final candidate's version, notices, guide walkthrough, ownership and
    root-only lockfile diff. DR-119 (a)-(b) are paid down by this package;
    CHARC closes those parts at accept. DR-119 (c)-(d) remain Phase 6.
-2. Check disk space in Git Bash before the release gate. At least **25 GB free**
-   on C: is required; STOP below that floor. Do not prune without an explicit
-   owner grant.
+2. Check disk space in Git Bash before the release gate and repeat the check
+   before each heavy leg (serial and fullclip). At least **25 GB free** on C:
+   is required at each check; STOP below that floor. Do not prune without an
+   explicit owner grant.
 
    ```bash
    df -h /c

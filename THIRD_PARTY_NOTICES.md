@@ -23,7 +23,7 @@ The verdicts and any conditions are stated for each component below.
 
 | Component | Version | Licence | Verdict and required notice | Source / full text |
 | --- | --- | --- | --- | --- |
-| Python | 3.12.13 (outside lock) | PSF-2.0 and historical terms | COMPATIBLE: preserve Python copyright and historical notices. | [Source](https://github.com/python/cpython/tree/v3.12.13); [text](#text-01) |
+| Python | 3.12.13 (outside lock) | PSF-2.0 and historical terms | COMPATIBLE: preserve Python copyright and historical notices. The uv-managed CPython 3.12.13 build bundles OpenSSL (`DLLs/libcrypto-3-x64.dll`, `DLLs/libssl-3-x64.dll`), libffi (`DLLs/libffi-8.dll`), SQLite (`DLLs/sqlite3.dll`), Tcl/Tk (`DLLs/tcl86t.dll`, `DLLs/tk86t.dll`) and MSVC (`vcruntime140.dll`, `vcruntime140_1.dll` at the interpreter root), not all named in text 01; Python is user-installed by uv and not redistributed by this repository, as with FFmpeg; see [python-build-standalone](https://github.com/astral-sh/python-build-standalone) for the build component licences. | [Source](https://github.com/python/cpython/tree/v3.12.13); [text](#text-01) |
 | cuda-pathfinder | 1.8.3 | Apache-2.0 | **COMPATIBLE-WITH-CONDITION**: Retain NVIDIA copyright, Apache licence and notices below; GPLv3-compatible branch under Clearwater's or-later grant. | [Source](https://github.com/NVIDIA/cuda-python); [text](#text-02) |
 | cuda-toolkit | 12.9.2.0 | No licence declaration; metadata-only | **COMPATIBLE-WITH-CONDITION**: metadata-only meta-package: installs no code or data of its own; selects the nvidia-* component wheels, which are the NVIDIA rows under the NVIDIA EULA (optional component, not redistributed by this repository). | [Source](https://pypi.org/project/cuda-toolkit/12.9.2.0/); see notices below |
 | cupy-cuda12x | 14.2.0 | MIT; BSD/Apache-2.0/LLVM-exception component terms | **COMPATIBLE-WITH-CONDITION**: Optional gpu extra; retain complete CuPy aggregate and component texts; separately installed CUDA position below. | [Source](https://github.com/cupy/cupy); [text](#text-03), [text](#text-04), [text](#text-05), [text](#text-06), [text](#text-07), [text](#text-08) |
@@ -8195,7 +8195,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ### LGPL-3.0.txt
 
-Source: `https://raw.githubusercontent.com/qt/qtbase/v6.12.0/LICENSES/LGPL-3.0-only.txt`. SHA-256: `97628afebc60f026f5c2b25d7491c46a5c4ee61f693e7cfa07fbd2c03605979b`. UTF-8/LF bytes: 7652.
+Source: `https://raw.githubusercontent.com/qt/qtbase/v6.12.0/LICENSES/LGPL-3.0-only.txt`. SHA-256: `da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768`. UTF-8/LF bytes: 7651.
 
 Copied from this URL on 2026-11-03.
 
@@ -8365,14 +8365,13 @@ whether future versions of the GNU Lesser General Public License shall
 apply, that proxy's public statement of acceptance of any version is
 permanent authorization for you to choose that version for the
 Library.
-
 ````
 
 <a id="text-37"></a>
 
 ### x265-COPYING.txt
 
-Source: `https://raw.githubusercontent.com/Multicorewareinc/x265/4.3/COPYING`. SHA-256: `0daef7961f72671c6bbdf2afc64cb3001597bfb626a5f2882214f0736da9a532`. UTF-8/LF bytes: 18121.
+Source: `https://raw.githubusercontent.com/Multicorewareinc/x265/4.3/COPYING`. SHA-256: `d8afb1bcc7a2cfc603683b168d6987ef0a48e59e0da3693bf55c5d33b67e2b49`. UTF-8/LF bytes: 18120.
 
 Copied from this URL on 2026-11-03.
 
@@ -8720,7 +8719,6 @@ Public License instead of this License.
 
 This program is also available under a commercial proprietary license.
 For more information, contact us at license @ x265.com.
-
 ````
 
 <a id="text-38"></a>
@@ -8793,7 +8791,7 @@ License texts below and in the `COPYING` files of the corresponding subfolders.
 
 ### mingw-COPYING.txt
 
-Source: `https://raw.githubusercontent.com/mingw-w64/mingw-w64/master/COPYING`. SHA-256: `8f604966c08c3b8490f543a60b4952c42b951d466dce20a5ab81c3515d757d73`. UTF-8/LF bytes: 2327.
+Source: `https://raw.githubusercontent.com/mingw-w64/mingw-w64/master/COPYING`. SHA-256: `99a69660981156c21336fdb5661f89341b013c94e4bf9e1c7467b4745718397f`. UTF-8/LF bytes: 2326.
 
 Copied from this URL on 2026-11-03. The pillow-heif wheel manifest names no MinGW-w64 or winpthreads version, so no version-matched tagged copy can be identified; this unversioned source is disclosed rather than assigning an unverified tag.
 
@@ -8841,7 +8839,6 @@ OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
 LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 ````
 
 <a id="text-42"></a>
@@ -8908,7 +8905,7 @@ Copied from this URL on 2026-11-03. Selection: initial copyright/licence comment
 
 ### winpthreads-COPYING.txt
 
-Source: `https://raw.githubusercontent.com/mingw-w64/mingw-w64/master/mingw-w64-libraries/winpthreads/COPYING`. SHA-256: `7cc7c4b3acea31b22251b3610ec898d13d081e9860766d725754e6c18472a1e0`. UTF-8/LF bytes: 2884.
+Source: `https://raw.githubusercontent.com/mingw-w64/mingw-w64/master/mingw-w64-libraries/winpthreads/COPYING`. SHA-256: `63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177`. UTF-8/LF bytes: 2883.
 
 Copied from this URL on 2026-11-03. The pillow-heif wheel manifest names no MinGW-w64 or winpthreads version, so no version-matched tagged copy can be identified; this unversioned source is disclosed rather than assigning an unverified tag.
 
@@ -8970,5 +8967,4 @@ DEALINGS IN THE SOFTWARE.
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 ````

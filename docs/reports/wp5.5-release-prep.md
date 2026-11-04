@@ -1,14 +1,27 @@
 # WP5.5 release preparation - completion report
 
 Candidate: branch `wp5.5`, base `e2cf4752`; `e7876912` (build), `6135c496`
-(A r1 fixes), `51afce88` (A r2 fixes and this report), followed by the B
-remediation commit.
+(A r1 fixes), `51afce88` (A r2 fixes and this report), `795a496c` (B remediation
+and the dispatcher's ruling fill), followed by the closing commit.
 This report transfers the package to the orchestrator. Reviewer A returned
 **NO_NEW_CRITICAL_MAJOR** in round 2. Reviewer B on `51afce88` returned
-**NEW_CRITICAL_MAJOR_FOUND**; this is the single bounded B remediation.
-The B re-run, release gate and acceptance remain at the orchestrator's seat.
+**NEW_CRITICAL_MAJOR_FOUND**; its single bounded remediation is `795a496c`.
+The B re-run on that commit returned **NO_NEW_CRITICAL_MAJOR**. This closing
+commit tidies its non-blocking findings; no further review round follows.
+The release gate and acceptance remain at the orchestrator's seat.
 The cumulative execution and adjudication record is
 [the WP5.5 ledger](../proofs/wp5.5-ledger.md).
+
+Execution key for the evidence labels used below:
+
+| Turn | Commit / stage |
+| --- | --- |
+| 1 | Round 0, no commit |
+| 2 | `e7876912` |
+| 3 | `6135c496` |
+| 4 | `51afce88` |
+| 5 | `795a496c`, with the dispatcher's ruling fill |
+| 6 | The closing commit |
 
 ## What was built
 
@@ -18,16 +31,23 @@ The cumulative execution and adjudication record is
   runtime DLLs and Mesa's software OpenGL renderer. It preserves copyrights,
   licence terms, disclaimers, source pointers, LGPL replacement rights and the
   optional CUDA and platform-runtime positions. The final file is
-  **435,354 UTF-8/LF bytes**. Its **44 distinct
-  texts / 54 source records** represent **399,470 bytes** of distinct
+  **435,872 UTF-8/LF bytes**. Its **44 distinct
+  texts / 54 source records** represent **399,466 bytes** of distinct
   LF-normalised source text: 35 installed-source texts (including Python) and
-  nine upstream supplements. All 44 SHA-256 values and byte counts match their
-  source bytes; the ten duplicate records also match. LGPLv3 is reproduced
+  nine upstream supplements (four whole-file copies and five selections).
+  At closing validation, all 44 declared SHA-256 values and byte counts match
+  their CRLF-normalised source bytes or declared selections; the ten duplicate
+  records also match. Four upstream whole-file blocks previously included an
+  extra LF from cached copies; the closing commit removes that padding and
+  corrects their hashes/counts, as detailed below. LGPLv3 is reproduced
   once. NumPy, SciPy, Pillow and CuPy aggregate/component texts are complete.
   The full source/selection/hash/byte inventory is
-  `work/wp5.5/notices-inventory.json` and `notices-inventory.md`; the committed
-  notices also carry the per-text sources, hashes and counts. Turn-3's corrected
-  UTF-8 inventory supersedes the corrupted round-0/turn-2 text copies.
+  `work/wp5.5/notices-inventory.json` and `notices-inventory.md`; those historical
+  files retain four padded-cache hashes/counts, superseded by the closing
+  correction table and `work/wp5.5/t6-notices-verify.log`. The committed notices
+  carry every current source, hash and count. Turn-3's UTF-8 correction
+  superseded the corrupted round-0/turn-2 copies; the closing correction adds
+  strict source-boundary verification without changing licence wording.
 - [The user guide](../user-guide.md) has eight sections: purpose/inputs,
   installation, first run/panels, video, photos, troubleshooting,
   limitations/release notes, and licence. It describes the actual Basic and
@@ -72,9 +92,17 @@ For aggregate packages, the table gives the main licence path and links to the
 complete installed-source inventory in the notices. Verdict conditions and
 required notices are retained per row.
 
+The external Python row's eight bundled DLL names were verified against
+CPython 3.12.13's `sys.base_prefix` (`work/wp5.5/t6-python-dlls.log`): OpenSSL,
+libffi, SQLite and Tcl/Tk are under `DLLs/`; the two MSVC DLLs are at the
+interpreter root. Text 01 does not identify all these components. Python is
+installed by uv and not redistributed by this source repository; the
+python-build-standalone project supplies the build component licence pointers.
+No additional licence text was copied.
+
 | Component | Version | Licence | Installed evidence | Source / texts | Verdict and required notice |
 | --- | --- | --- | --- | --- | --- |
-| Python | 3.12.13 (outside lock) | PSF-2.0 and historical terms | `LICENSE.txt` beside the CPython 3.12.13 installation; text 01 | [Source](https://github.com/python/cpython/tree/v3.12.13); [text](../../THIRD_PARTY_NOTICES.md#text-01) | COMPATIBLE: preserve Python copyright and historical notices. |
+| Python | 3.12.13 (outside lock) | PSF-2.0 and historical terms | `LICENSE.txt` beside the CPython 3.12.13 installation; text 01 | [Source](https://github.com/python/cpython/tree/v3.12.13); [text](../../THIRD_PARTY_NOTICES.md#text-01) | COMPATIBLE: preserve Python copyright and historical notices. The uv-managed CPython 3.12.13 build bundles OpenSSL (`DLLs/libcrypto-3-x64.dll`, `DLLs/libssl-3-x64.dll`), libffi (`DLLs/libffi-8.dll`), SQLite (`DLLs/sqlite3.dll`), Tcl/Tk (`DLLs/tcl86t.dll`, `DLLs/tk86t.dll`) and MSVC (`vcruntime140.dll`, `vcruntime140_1.dll` at the interpreter root), not all named in text 01; Python is user-installed by uv and not redistributed by this repository, as with FFmpeg; see [python-build-standalone](https://github.com/astral-sh/python-build-standalone) for the build component licences. |
 | cuda-pathfinder | 1.8.3 | Apache-2.0 | `cuda_pathfinder-1.8.3.dist-info/licenses/LICENSE` | [Source](https://github.com/NVIDIA/cuda-python); [text](../../THIRD_PARTY_NOTICES.md#text-02) | **COMPATIBLE-WITH-CONDITION**: Retain NVIDIA copyright, Apache licence and notices in the notices; GPLv3-compatible branch under Clearwater's or-later grant. |
 | cuda-toolkit | 12.9.2.0 | No licence declaration; metadata-only | `cuda_toolkit-12.9.2.0.dist-info/METADATA` and `RECORD`; no licence file/code/data | [Source](https://pypi.org/project/cuda-toolkit/12.9.2.0/); [terms](../../THIRD_PARTY_NOTICES.md) | **COMPATIBLE-WITH-CONDITION**: metadata-only meta-package: installs no code or data of its own; selects the nvidia-* component wheels, which are the NVIDIA rows under the NVIDIA EULA (optional component, not redistributed by this repository). |
 | cupy-cuda12x | 14.2.0 | MIT; BSD/Apache-2.0/LLVM-exception component terms | `cupy/_core/include/cupy/_cccl/LICENSE`; all 6 installed licence files identified by the linked texts/inventory | [Source](https://github.com/cupy/cupy); [text](../../THIRD_PARTY_NOTICES.md#text-03), [text](../../THIRD_PARTY_NOTICES.md#text-04), [text](../../THIRD_PARTY_NOTICES.md#text-05), [text](../../THIRD_PARTY_NOTICES.md#text-06), [text](../../THIRD_PARTY_NOTICES.md#text-07), [text](../../THIRD_PARTY_NOTICES.md#text-08) | **COMPATIBLE-WITH-CONDITION**: Optional gpu extra; retain complete CuPy aggregate and component texts; separately installed CUDA position in the notices. |
@@ -94,7 +122,6 @@ required notices are retained per row.
 | shiboken6 | 6.12.0 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only (metadata) | `shiboken6-6.12.0.dist-info/METADATA`; `shiboken6-6.12.0.dist-info/licenses/LicenseRef-Qt-Commercial.txt` (commercial only; R2) | [Source](https://code.qt.io/cgit/pyside/pyside-setup.git/); [terms](../../THIRD_PARTY_NOTICES.md) | **COMPATIBLE-WITH-CONDITION**: LGPL-3.0 binding runtime, dynamically linked and replaceable; Qt notice in the notices. |
 | tifffile | 2026.10.15 | BSD-3-Clause | `tifffile-2026.10.15.dist-info/licenses/LICENSE` | [Source](https://github.com/cgohlke/tifffile); [text](../../THIRD_PARTY_NOTICES.md#text-35) | **COMPATIBLE**: Retain Christoph Gohlke/contributors' copyright, conditions and disclaimer in the notices. |
 | FFmpeg / ffprobe | 9.0.2-full_build-www.gyan.dev (outside lock) | GPL-3.0-or-later | Environment report `ffmpeg_version`; external executable build/licensing pages (not installed as a Python distribution) | [Tested build/source](https://www.gyan.dev/ffmpeg/builds/); [licensing](https://ffmpeg.org/legal.html) | COMPATIBLE-WITH-CONDITION: separate process, not redistributed, located on PATH. User obtains its licence and corresponding source from the build publisher. |
-
 | Microsoft Visual C++ runtime (native component) | DLL versions not established; present in NumPy 2.5.4, PySide6_Essentials 6.12.0 and shiboken6 6.12.0 | Microsoft Software License Terms for Visual C++ Redistributable | The wheels' `RECORD` files: `numpy-2.5.4.dist-info/RECORD` (one `numpy.libs/msvcp140-*.dll`), `pyside6_essentials-6.12.0.dist-info/RECORD` and `shiboken6-6.12.0.dist-info/RECORD` (ten MSVC DLLs each in `PySide6/` and `shiboken6/`); exact paths in native table below. No runtime licence file in the wheels. | [Microsoft terms](https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/) | COMPATIBLE-WITH-CONDITION: Clearwater's compiler/platform system-library position below; user-installed from PyPI, not redistributed by this repository. |
 | Mesa llvmpipe software OpenGL (native component) | Mesa version not identified; PySide6_Essentials 6.12.0 wheel | MIT | `pyside6_essentials-6.12.0.dist-info/RECORD` (`PySide6/opengl32sw.dll`); no separate installed Mesa licence text | [Qt attributions](https://doc.qt.io/qt-6/licenses-used-in-qt.html); [Mesa licence](https://docs.mesa3d.org/license.html) | COMPATIBLE-WITH-CONDITION: preserve applicable copyright, permission notice and disclaimer on redistribution; official source pointers supplied, no new text copied. |
 
@@ -128,7 +155,9 @@ them. GPLv2 section 3's exception for major OS/compiler components and GPLv3's
 remain applicable. This is a COMPATIBLE-WITH-CONDITION position, not a claim
 that the Microsoft licence is itself GPL-compatible. No MSVC or Mesa licence
 file was supplied by the audited wheels, so their official licence/attribution
-URLs are provided without adding a copied text. CHARC CONCURRED with this position (message `df16a115aec924ca`, 2026-11-04 00:40Z), adding that the
+URLs are provided without adding a copied text. CHARC concurred with the
+MSVC / Mesa licence position (message `df16a115aec924ca`, 2026-11-04 00:40Z),
+adding that the
 notices list the bundled DLL names per wheel and that the audit evidence for each
 is the wheel's `RECORD`.
 
@@ -303,13 +332,42 @@ RED preceded the turn-2 implementation. Logs are under `work/wp5.5/`.
 | Turn-4 ruff check | 0 | All checks passed!; `t4-ruff.log`. |
 | Turn-4 format check | 0 | 317 files already formatted; `t4-format.log`. |
 | Turn-4 mypy | 0 | Success: no issues found in 158 source files; `t4-mypy.log`. |
-| Turn-4 F1 source-byte verification | 0 | 44 texts, 0 mismatches; 54 source records; hashes/counts equal source bytes; all four mojibake markers 0; full EULA clause matches; `t4-notices-verify.log`. |
+| Turn-4 F1 cached-source verification | 0 | 44 texts, 0 mismatches against the then-used source copies; 54 source records; all four mojibake markers 0; full EULA clause matches. Four upstream whole-file copies contained an extra LF; their declarations were corrected at closing. `t4-notices-verify.log`. |
 | Reviewer B baseline | 0 | 72 passed, 1 deselected in 70.38s; `work/wp5.5/B-review.txt`. |
 | B remediation targeted | 0 | 72 passed, 1 deselected in 81.19s; `t5.log`. |
 | B remediation ruff check | 0 | All checks passed!; `t5-ruff.log`. |
 | B remediation format check | 0 | 317 files already formatted; `t5-format.log`. |
 | B remediation mypy | 0 | Success: no issues found in 158 source files; `t5-mypy.log`. |
-| B remediation F1 source-byte verification | 0 | 44 texts, 0 mismatches; 54 source records; hashes/counts equal source bytes; all four mojibake markers 0; full EULA clause matches; `t5-notices-verify.log`. |
+| B remediation F1 cached-source verification | 0 | 44 texts, 0 mismatches against the then-used source copies; 54 source records; all four mojibake markers 0; full EULA clause matches. The same four padded upstream copies were corrected at closing. `t5-notices-verify.log`. |
+| Reviewer B re-run baseline | 0 | 72 passed, 1 deselected in 76.37s; `work/wp5.5/B2-review.txt`. |
+| Closing targeted | 0 | 72 passed, 1 deselected in 70.95s; `t6.log`. |
+| Closing ruff check | 0 | All checks passed!; `t6-ruff.log`. |
+| Closing format check | 0 | 317 files already formatted; `t6-format.log`. |
+| Closing F1 source/declaration verification | 0 | 44 texts, 0 mismatches against source bytes/selections and committed hash/count declarations; 54 source records; 435,872 notice bytes; `t6-notices-verify.log`. |
+
+The closing check applies CRLF -> LF only to the source bytes and verifies the
+hash/count printed in each of all 44 committed blocks, rather than trusting
+the historical inventory's hashes. Reviewer B fetched the four upstream
+whole-file sources and confirmed that each cached copy had exactly one extra
+trailing LF; the cell removes only that confirmed padding in its in-memory
+source view. The original verifier, cached files and historical inventory are
+unchanged on disk, within this closing commit's ownership constraint. The
+original verifier is run with those source/declaration checks in memory;
+the complete current declaration inventory is retained in the closing log.
+No cell-side upstream fetch is claimed. All 35 installed texts and five
+declared selections were already consistent and remain unchanged.
+
+The strengthened check first reproduced **four mismatches**, exactly texts
+36, 37, 41 and 44 (`t6-notices-before.log`, verifier exit 1). The closing commit
+removes each extra trailing LF from its fenced content, preserving the source's
+own final newline, and replaces the padded hash/count with:
+
+| Text | Upstream whole-file UTF-8/LF bytes | SHA-256 |
+| --- | --- | --- |
+| 36 - LGPL-3.0 | 7,651 | `da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768` |
+| 37 - x265 COPYING | 18,120 | `d8afb1bcc7a2cfc603683b168d6987ef0a48e59e0da3693bf55c5d33b67e2b49` |
+| 41 - MinGW COPYING | 2,326 | `99a69660981156c21336fdb5661f89341b013c94e4bf9e1c7467b4745718397f` |
+| 44 - winpthreads COPYING | 2,883 | `63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177` |
 
 The cell's pytest runs always used the sandbox shim, disabled cacheprovider
 and a worktree basetemp. The existing slow halo test is the one deselection in
@@ -334,7 +392,8 @@ used this worktree's `.venv`, not the main tree's environment.
 | Turn 2 | Stale D106, CRLF listing and release literal confirmed by RED and fixed; missing/repeated notice conditions addressed during assembly. Suspected lock/dependency drift, README damage and lean install mutation rejected with diff/hash/distribution evidence. Network diagnostic prerequisite confirmed, subsequently resolved at the orchestrator seat. Its notice check compared corrupted evidence copies; F1 corrected that verification weakness in turn 3. |
 | A r1 | **0 critical / 2 major / 4 minor / 4 advisory**, all 10 NEW/in-envelope; 0 reverts, 0 product-code fixes. F1-F9 confirmed/fixed (including UTF-8 source recopy, actual Settings menu and complete EULA quote); F10 confirmed/no change, lean evidence supplied. F5's absent native version remained an explicit disclosure. No finding rejected. Verdict NEW_CRITICAL_MAJOR_FOUND. |
 | A r2 | **0 critical / 0 major / 2 minor / 1 reopened partial / 4 advisory**, all in envelope; NEW N1-N4, REOPENED F7, F8 regression; 0 reverts, 0 product-code fixes. Verdict **NO_NEW_CRITICAL_MAJOR**. All cleanup findings confirmed, none rejected; fixes listed below. F5's native-version disclosure remains accepted. |
-| Reviewer B | **0 critical / 1 major / 2 minor / 4 advisory**, all 7 NEW/in-envelope; 0 reverts, 0 product-code fixes. All confirmed, none rejected. B1 adds omitted MSVC/Mesa notices and native audit rows; B2 closes stale N4 pending statements; B3 corrects CPU fallback/forced-device wording; B4 is banked for the register outside this package's files; B5 discloses unexercised routes; B6 quotes the complete FFmpeg record; B7 identifies the commits. Verdict **NEW_CRITICAL_MAJOR_FOUND**; single bounded remediation, B re-run pending. |
+| Reviewer B | **0 critical / 1 major / 2 minor / 4 advisory**, all 7 NEW/in-envelope; 0 reverts, 0 product-code fixes. All confirmed, none rejected. B1 adds omitted MSVC/Mesa notices and native audit rows; B2 closes stale N4 pending statements; B3 corrects CPU fallback/forced-device wording; B4 is banked as DR-119 (e); B5 discloses unexercised routes; B6 quotes the complete FFmpeg record; B7 identifies the commits. Verdict **NEW_CRITICAL_MAJOR_FOUND**; single bounded remediation in `795a496c`. |
+| Reviewer B re-run | **0 critical / 0 major / 3 minor / 4 advisory**, all in envelope; NEW N-1..N-7, B7 partial reopened; 0 reverts, 0 product-code fixes. All confirmed/fixed in the closing commit, none rejected. Corrected four upstream byte boundaries/hashes, source-selection counts, concurrence wording and table rendering; identified external Python DLLs, repeated disk checks and added the execution key. Verdict **NO_NEW_CRITICAL_MAJOR**; closing verification at the orchestrator seat, no further review round. |
 
 Round-2 fixes in `51afce88`: F7 replaces turn vocabulary/stale re-fetch caveats
 with the 2026-11-03 copy date; F5's remaining dev link points to pydantic-core
@@ -343,9 +402,11 @@ export through File > Export and locates status/progress/Cancel in its panel;
 N2 links texts 37-44 from pillow-heif's row; N3 uses panel/button wording for
 Batch; N4 pins the two diagnostic ranges. The F1 script was rerun after all
 notices changes, against original source bytes. Reviewer A r2 also re-fetched
-all nine upstream supplements on 2026-11-03: five whole-file matches and four
-matches to the declared selections. The cell did not re-fetch them during that
-cleanup or the B remediation.
+all nine upstream supplements on 2026-11-03. Their correct classification is
+four whole-file texts (36, 37, 41, 44) and five selections (38, 39, 40, 42, 43).
+Reviewer B's re-run later established the four whole-file padding differences;
+the closing commit corrects them. The cell did not re-fetch them during that
+cleanup, the B remediation or closing.
 
 Reviewer A's loop converged on blocking findings under the fill's criterion;
 its non-blocking cleanup is in `51afce88`. Detailed
@@ -354,8 +415,10 @@ ledger and the review copies. Reviewer B was the orchestrator's independent
 Claude pass on `51afce88`; all ten claims-first items passed apart from its
 listed findings. It independently confirmed version/provenance mutations and
 the listing test's CRLF positive control. Its findings copy is
-`work/wp5.5/B-review.txt`. The orchestrator reruns B on the B remediation commit
-before the release gate; no clean B verdict is claimed here.
+`work/wp5.5/B-review.txt`. The re-run on `795a496c` is
+`work/wp5.5/B2-review.txt`, verdict **NO_NEW_CRITICAL_MAJOR**. Its remaining
+minor/advisory cleanup is verified at the orchestrator's seat before the release
+gate; it does not open another review round.
 
 ## Limits
 
@@ -381,7 +444,8 @@ before the release gate; no clean B verdict is claimed here.
 - MSVC/Mesa additions identify the installed DLLs and official licensing/source
   pointers; no network fetch or additional licence-text copy was performed in
   the B remediation. MSVC licence text and a Mesa version/separate licence text
-  are absent from the audited wheels. CHARC CONCURRED with this position (message `df16a115aec924ca`, 2026-11-04 00:40Z).
+  are absent from the audited wheels. CHARC concurred with the MSVC / Mesa
+  licence position (message `df16a115aec924ca`, 2026-11-04 00:40Z).
 
 ## Release gate
 
@@ -431,20 +495,23 @@ it exists. DR-117 is owner-deferred, not pending a decision.
 
 The interim D106 label in `tools/core_speed.py` / `tests/test_core_speed.py`
 was found by Reviewer B, banked for the register by the orchestrator with CHARC
-as a DR-119 extension; those files are outside this package's ownership.
+as DR-119 (e); those files are outside this package's ownership.
 
-No unresolved implementation question remains. CHARC CONCURRED with this position (message `df16a115aec924ca`, 2026-11-04 00:40Z). Pending actions have named
-owners: the orchestrator runs the B re-run and the release gate; CHARC records
+No unresolved implementation question remains.
+CHARC concurred with the MSVC / Mesa licence position (message
+`df16a115aec924ca`, 2026-11-04 00:40Z).
+Pending actions have named owners: the orchestrator verifies the closing tidy
+and runs the release gate; CHARC records
 N13 satisfaction, formal DR-119 (a)-(b)
 closure, acknowledged debt and Phase 5 closure at acceptance; tagging waits
 for the owner's word. DR-119 (c)-(d) are banked to Phase 6. These are not
 completed cell actions.
 
 The package preserves LICENSE, the spec, the local-config template, dependency
-lists and frozen interfaces. The B remediation changes only the four authorized
+lists and frozen interfaces. The closing commit changes only the four authorized
 documentation paths, with no code/test/dependency/lockfile change. No footage,
 main-tree work directory or other worktree was read; outputs/logs stay in this
-worktree. The B remediation performed no sync, whole-suite/xdist run, git write,
+worktree. The closing commit performed no sync, whole-suite/xdist run, git write,
 mailbox post, remote action, installer, packaged executable or unapproved heavy
 gate. The orchestrator commits the named files; this report and the final message are
 the acceptance-transfer handoff.
