@@ -2943,4 +2943,127 @@ ledger. Evidence tools (not committed): the four scripts above,
 `t3i/mutation_long_option.py`, and `t3i/handler_check.py` (2b-6's, unchanged). The new builds
 are at `work/wp6.1/dist-on{dir,file}/` (of `dc784b4f`); they replace `926bfdfa`'s.
 
-Depth at turn-3 group-2c-a end: DISPATCHER TO FILL
+Depth at turn-3 group-2c-a end: 290,477 (wp61-cell8, at its yield; read by the dispatcher)
+
+## Group 2c and turn 4 (run at the orchestrator's seat, 2026-11-04 ~15:44-16:00Z)
+
+**Who ran what.** The orchestrator (generation 43) reviewed the 2c-a scripts at its seat and ran
+both from seat copies in `C:\Users\rwsmy\clearwater\work\orch-g43\run-2c\`. The copies are
+UNCHANGED: `clearwater-review-evidence/wp6.1/cell/t3i/seat-run/` holds `gui_check.py`
+`0e05e8e7...`, `timings.py` `db50def8...` and `launch_common.py` `1ab40e7d...`, the md5s 2c-a
+recorded. `uia_tree.ps1` was `10963628...`. Both builds are of `dc784b4f` (2c-a's read-out PASS).
+
+- The orchestrator CONFIRMED the two 2c-a choices: the best-effort `SW_SHOWNOACTIVATE`, and the
+  gpu-empty-cache row.
+- Seat note, recorded with no change: `post_close` / `print_window_png` re-check ownership
+  against `track()` (dead PIDs included) rather than `live()`. Negligible, because the window
+  must be visible and titled exactly `Clearwater`.
+- wp61-cell8 wrote this section from the records alone. It ran nothing frozen, no GUI and no
+  build.
+
+### Group 2c: the GUI check -- `GUI CHECK: PASS`, exit 0
+
+Records: `cell/t3i/gui-check.jsonl` (4 records), `cell/t3i/gui/` (the UIA dumps, stderr, the
+verify logs, `bracket.json`), `cell/t3i/shots/`, and `cell/t3i/seat-run/gui-check.stdout`.
+
+| Form | Case (moment) | First window (s; title, class) | Loader line, VERBATIM from the redirected log | Screenshot | UIA top node (elements) | Close | Exit | Leftovers | `_MEI` |
+|---|---|---|---|---|---|---|---|---|---|
+| onedir | with (15:45:11Z) | 1.093; `Clearwater`, `Qt6120QWindowIcon` | `2026-11-04T05:45:11.655-10:00 INFO clearwater.gpu_pack gpu pack 14.2.0-cu12: loaded` | `shots/first-window-onedir.png`, 2586 x 1630, 47,668 B, luma 0-255, every row printed | `ControlType.Window 'Clearwater'` (105) | `WM_CLOSE` posted; clean | 0 | none (tree of 3 PIDs) | none before / after |
+| onedir | absent (15:45:16Z) | 1.198; the same | `2026-11-04T05:45:16.492-10:00 INFO clearwater.gpu_pack gpu pack 14.2.0-cu12: absent` | (not taken: `with` only) | the same (105) | clean | 0 | none (1 PID) | none |
+| onefile | with (15:45:21Z) | 2.677; the same | `2026-11-04T05:45:23.191-10:00 INFO clearwater.gpu_pack gpu pack 14.2.0-cu12: loaded` | `shots/first-window-onefile.png`, 2586 x 1630, 47,668 B, luma 0-255, every row printed | the same (105) | clean | 0 | none (4 PIDs) | none before / after |
+| onefile | absent (15:45:28Z) | 2.714; the same | `2026-11-04T05:45:30.235-10:00 INFO clearwater.gpu_pack gpu pack 14.2.0-cu12: absent` | -- | the same (105) | clean | 0 | none (3 PIDs) | none |
+
+- **No launch hit the bound or needed a kill.** The pack state was `14.2.0-cu12` for the `with`
+  launches and `14.2.0-cu12.renamed` for the `absent` ones.
+- **The tree's top-level windows**, all of them the tree's own: the visible `Clearwater`
+  (`Qt6120QWindowIcon`), plus hidden `_q_titlebar`, `Qt6120ThemeChangeObserverWindow`,
+  `Qt6120ScreenChangeObserverWindow` and `Default IME`. The one-file form adds the bootloader's
+  hidden `PyInstaller Onefile Hidden Window` and a second `Default IME`.
+- **The screenshots.**
+  - Seen: the main window. It shows the File / View / Tools menu, "Open a photo or video", the
+    Presets dock (Scuba (deep), Snorkel (shallow)), the Batch dock, and the status bar starting
+    `Device: GPU` (clipped at the bottom edge).
+  - The two PNGs are byte-identical (md5 `91fb036a...` both). Both forms render the same first
+    window at the same size.
+  - The right and bottom edges carry a thin white strip. This is how PrintWindow captures the
+    frame, not part of the UI.
+- **The kernel cache** of the `with` launches (`cupy-kernel-cache-t3i-gui-<form>`) went 0 -> 2
+  files: the GUI's start-up backend probe compiled its test kernel.
+- **stderr.** Each `with` launch's stderr (267 B) is CuPy's own
+  `cupy\_environment.py:286: UserWarning: CUDA path could not be detected...` and nothing else.
+  The `absent` launches' stderr is empty.
+- **Brackets** (`gui/bracket.json`, 15:45:07Z):
+  - `--verify` PASS before and after (2701 rows, 2701 files, 2412.6 MiB);
+  - the pack listing md5 `e10a2b102618f64f5514ea6b251e553e` before = after;
+  - the owner-log md5 `69ed0432c562db9445daecbe8f15fe27` before = after;
+  - no Clearwater running after.
+
+### Turn 4: the timings -- `TIMINGS: COMPLETE` (exclusive window from 15:46Z)
+
+Records: `clearwater-review-evidence/wp6.1/timings/t4/` (`timings.jsonl` 30 records,
+`summary.json`, `timings.stdout`, the 12 start-launch stderr files, `verify-t4-{before,after}.log`).
+The figures below come ONLY from `summary.json` / `timings.jsonl`. Every start launch: the pack
+PRESENT, exit 0, clean close, no leftovers, no bound hit, no `_MEI` left.
+
+| Form | Cold start, s (median; min-max; spread) | Warm start, s (median; min-max; spread) | First export GPU, warm cache, s (median; min-max; spread) | gpu-warmup (cache 0 -> 52) | gpu-empty-cache (new cache 0 -> 52) | cpu-no-pack | robocopy `/E /J` (s; bytes) |
+|---|---|---|---|---|---|---|---|
+| onedir | **4.469**; 4.188-4.718; 0.530 (runs 4.469, 4.718, 4.188) | **0.893**; 0.874-1.149; 0.275 | **1.285**; 1.258-1.293; 0.035 | 15.915 s, `GPU` | **15.460 s**, `GPU` | **0.531 s**, `CPU: CuPy not installed` (warning `Processed on the CPU (CPU: CuPy not installed).`) | 0.9 / 0.9 / 2.8; 700,792,298 B each |
+| onefile | **2.771**; 2.763-3.049; 0.286 (runs 2.771, 3.049, 2.763) | **3.170**; 2.762-3.821; 1.059 | **3.220**; 3.210-3.524; 0.314 | 18.398 s, `GPU` | **18.284 s**, `GPU` | **2.728 s**, `CPU: CuPy not installed` (the same warning) | 0.5 / 0.4 / 1.3; 549,320,681 B each |
+
+- **The export rows.** The export is `heic10-gradient-display-p3.heic` -> PNG through
+  `cold-<form>-1`'s `Clearwater.exe --export-worker`. The time runs from the spawn to the
+  `result` line. Every export: exit 0, `ok`, nothing left.
+- **Kernel-cache state, as recorded.**
+  - Start cache `cupy-kernel-cache-t4-start-<form>`: 0 files before each form's first cold
+    launch, 2 before every later launch.
+  - `gpu-warm` rows: 52 files before and after.
+  - `gpu-warmup` and `gpu-empty-cache` rows: 0 -> 52.
+  - `cpu-no-pack` row: its cache held 52 and was not touched (the pack was renamed away).
+
+**Observations, from the records.**
+
+- **One-folder: cold start is about 5x warm** (4.47 vs 0.89 s median). The unbuffered copy
+  leaves the 700 MB of `_internal` out of the file cache, and the first launch reads it from
+  disk.
+- **One-file: warm is NOT faster than cold** (3.17 vs 2.77 s median, warm spread 1.06 s). Every
+  one-file launch extracts its bundle into a fresh `_MEI` folder in TEMP, so each start pays
+  the extraction whatever the cache state of the executable.
+- **One-file cold is faster than one-folder cold** (2.77 vs 4.47 s), likely because it reads
+  one compressed 89.5 MiB file sequentially rather than many separate files. **Warm is the
+  reverse** (0.89 one-folder vs 3.17 one-file).
+- **The one-file penalty also shows in every worker start**, since each export spawns a new
+  worker:
+
+  | Export row | onedir (s) | onefile (s) | onefile extra (s) |
+  |---|---|---|---|
+  | GPU, warm cache | 1.285 | 3.220 | +1.9 |
+  | CPU, no pack | 0.531 | 2.728 | +2.2 |
+
+- **An empty kernel cache costs about 14-15 s on the first GPU export**, the kernel compile:
+  15.46 vs 1.29 s (one-folder), 18.28 vs 3.22 s (one-file). `gpu-warmup` and `gpu-empty-cache`
+  agree within 0.5 s.
+- **For this small fixture the CPU path is faster than the warm GPU path** (0.53 vs 1.29 s
+  one-folder): the GPU start-up cost dominates on a small photo. This says nothing about large
+  photos or video.
+- **No worker exited 3221225477 in this window** (12 exports; DR-125 not seen).
+- **stderr.**
+  - Each of the 12 start launches' stderr (267 B each) is CuPy's `CUDA path could not be
+    detected` UserWarning only.
+  - The 10 GPU export runs' `stderr.txt` (under the worktree's
+    `work\wp6.1\t4\exports\<form>\<case>-<id>\`, NOT in evidence) hold that one warning and
+    nothing else.
+  - The two `cpu-no-pack` runs' stderr is empty.
+- **robocopy.** The copies took 0.4-2.8 s (the 2.8 s outlier is onedir n=3).
+
+**Brackets** (`summary.json` `bracket`, 15:46:07Z):
+
+- 76.6 GB free before;
+- `--verify` PASS before and after (2701 rows, 2701 files, 2412.6 MiB);
+- the pack listing md5 `e10a2b102618f64f5514ea6b251e553e` before = after (the same value as the
+  GUI check's: the pack is unchanged through both);
+- the owner-log md5 `69ed0432c562db9445daecbe8f15fe27` before = after;
+- no Clearwater running after;
+- the cold copies, 3,750,338,937 B (3.49 GiB), are KEPT under `work\wp6.1\cold-{onedir,onefile}-{1,2,3}`
+  and will be deleted only on the owner's word.
+
+Depth at group-2c/turn-4 record end: DISPATCHER TO FILL
