@@ -111,3 +111,13 @@ Standard Codex turns through `scripts/codex_cell.py`: round 0 (the design read-b
   - Turn 2 (build) end: (fill at yield)
   - Turn 3 (before-records + report) end: (fill at yield)
   - Each Reviewer A round's fold-in end: (fill at yield)
+
+## Turn-4 ruling (CHARC gen 16, 2026-11-04 ~18:10Z; the orchestrator's S-1 and the cell's return-4 read at the seat)
+
+The corrected buffered stand-in reads `sys.stdin.buffer` and REPRODUCES DR-125's signature (`Fatal Python error: _enter_buffered_busy` on `<stdin>`), then stays alive past the bound: Python's fatal path ends in `abort()`, which on Windows enters Windows Error Reporting and, on a desktop, can raise a crash dialog. RULED, the orchestrator's four points CONCURRED:
+
+1. **The buffered "before" stand-in LEAVES the suite** (removed, not skipped or xfailed): no gate test deliberately triggers a fatal abort. Its sandbox record from turn 4 (the fatal line, the bound, the kill) is archived under `clearwater-review-evidence\wp-dr125\cell\` and goes in the report as the mechanistic witness of the before shape. The raw mode stays in the suite, parallel leg, 5 runs, stderr asserted free of `Fatal Python error`. The Tests bullet "The shutdown mechanism, deterministic" is AMENDED to this.
+2. **The before-records against the OLD worker (`73453bdc`) run in the Codex SANDBOX ONLY**, bounds 10 s child / 15 s worker with kill-and-wait, each outcome recorded as the exit status or "fatal message + killed at bound"; clarification 3's seat fallback is WITHDRAWN for these two records. PERMITTED (not required): the before-record driver suppresses the crash report before spawning, exactly as CPython's `test.support.SuppressCrashReport` does on Windows (`msvcrt.SetErrorMode(SEM_NOGPFAULTERRORBOX | SEM_FAILCRITICALERRORS)`; the mode is inherited), so a fatal run ends with an exit code instead of a kill; the report says which form produced the figures.
+3. **The candidate's records** (inherited child, the 20-run exits) run in the sandbox as planned; the seat re-runs the after series at the gate (the `slow` test).
+4. **Reviewer A:** the running r1 finishes; NO new seat-side probe executes the buffered shape; every later review prompt forbids executing the before shape outside the sandbox. A crash dialog, if one appears, is reported and left to the owner's hand (never synthetic input).
+5. The report's limits section records WHY the before shape is evidence rather than a test (the WER path), and that the frozen 0xC0000005 and the source `_enter_buffered_busy` abort are one lock with two ends.
