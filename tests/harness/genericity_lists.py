@@ -243,6 +243,12 @@ INSTANCE_SURFACE_RELPATHS: tuple[str, ...] = (
     "LICENSE",
     # the local-configuration template (footage + working folder paths).
     "clearwater.local.example.toml",
+    # the 1.0.0 release files (WP5.5, 2026-11-04): the application's third-party
+    # notices (N13; they quote the licences of the application's dependencies,
+    # toolchain names included), its user guide and its release checklist.
+    "THIRD_PARTY_NOTICES.md",
+    "docs/user-guide.md",
+    "docs/release-checklist.md",
 ) + INSTANCE_STUB_RELPATHS
 INSTANCE_SURFACE_PREFIXES: tuple[str, ...] = (
     "docs/briefs/",
