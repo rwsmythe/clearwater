@@ -2042,4 +2042,78 @@ For the one rebuild after F-F's ruling, read from both bundles before any with-p
 functions; `MULTIPROCESSING_FLAGS` present). `t3e/handler_check.py` needs `multiprocessing_reentry`
 added to its list.
 
-Depth at turn-3 group-2b-3 (A r3 fold-in) end: DISPATCHER TO FILL
+(This batch continues in the next section; its depth line is there.)
+
+## Turn 3 group 2b-3 (A r3 batch, continued): F-F and Q2 as CHARC ruled; the before-record on `54266f5e` -- FINAL for wp61-cell6
+
+Same cell (wp61-cell6). The dispatcher bounded the rest of my seat: the A r3 batch above, plus
+CHARC's F-F and Q2 rulings. NO build and NO pack-activating run; then retire. Commit `69d31929`.
+`tests/test_jobs_export_process.py` is untouched. The re-point of the cancel case inside
+`tests/test_frozen_entry.py` was ACCEPTED by CHARC.
+
+| Item | Fix (file) | Test(s) | On `54266f5e` |
+|---|---|---|---|
+| F-F (a) | `gpu_pack.add_site_prefix`, called by `activate()` (so frozen only) after a LOADED pack's `sys.path` insertion. It does `import site` (the bundled module) and puts the pack's `site-packages` FOLDER first in `site.PREFIXES`: moved to the front, never twice, never `<pack>`. The module docstring notes the `lib/python3.12/site-packages` spelling as a future-Linux-leg matter only. `CUDA_PATH` and a pathfinder patch are not used. | `test_a_frozen_activation_puts_the_pack_folder_first_in_site_prefixes`: `site.PREFIXES == [<pack>/site-packages, *before]`; `<pack>` not in it; on Windows `getsitepackages()[0] == <pack>/site-packages` exactly and `[1] == .../Lib/site-packages`; `ENABLE_USER_SITE` unchanged; `sys.path` gains only the one pack entry; a second activation adds nothing. `test_a_source_run_leaves_site_prefixes_untouched` (the 1.0.0 lock). `test_a_rejected_pack_adds_no_site_prefix`. The `isolated` fixture now also copies `site.PREFIXES`, so no test touches the pytest process's own. | `test_gpu_pack.py:1169` (no prefix); the source and rejected pins PASS by design |
+| Q2 | `_pack_problems(full=True)`, i.e. `--verify`, ends with `_unlisted_files`. It walks every file under `site-packages` (`os.walk`; a listing error is raised and the wrapper turns it into `pack unreadable`) and yields `unlisted file in site-packages: <path>` for each path no RECORD row names (normcase, `/`-joined). No exclusions: `__pycache__` included. A top-level entry already reported as unowned is not repeated. The start-up (cheap) check stays top-level. | `test_the_full_verify_lists_every_unlisted_nested_file`: a planted `cupy/__pycache__/__init__.cpython-312.pyc` and `cupy/planted.py`. `check_pack` still passes; `--verify` exits 1 listing both. | `test_gpu_pack.py:1223` (`--verify` passed) |
+
+The real pack under the full walk (`t3e/verify-7-q2-walk.log`): **PASS**, 2701 rows, 2701 files,
+2412.6 MiB. Every file on disk is named by a row, and there are 0 `.pyc` files.
+
+**Readers of `site.PREFIXES`, `site.getsitepackages()` and `site.getusersitepackages()`**
+(`t3e/site_readers.py` -> `t3e/site-readers.txt`). Both bundles were read by PyInstaller's
+readers (1,073 code objects each: every PYZ module, the stdlib and PySide6 included, and every
+CArchive script and module entry). The pack's `.py` files got a text search, nothing imported.
+
+- Bundle: **`site` itself** (its own `getsitepackages` / `getusersitepackages` /
+  `addsitepackages`; `main()` never runs under `no_site`).
+- Bundle: `PIL.TiffImagePlugin` matches only by name. Its `PREFIXES` is PIL's own TIFF
+  byte-order constant (`PIL/TiffImagePlugin.py:280`), not `site`'s.
+- Pack: **`cuda/pathfinder/_utils/find_sub_dirs.py:53`** `site.getsitepackages()` and **`:55`**
+  `site.getusersitepackages()`. That is `find_sub_dirs_all_sitepackages`, the reader F-F
+  targets.
+- Nothing else in the bundle or the pack (CuPy included) reads them.
+- Effect of the pack prefix: pathfinder's site-packages step now searches the pack first, then
+  `<pack>/site-packages/Lib/site-packages` (absent), then the bundle's own prefixes, as before.
+  `getusersitepackages()` does not read `PREFIXES` (it uses the user base) and is reached only
+  when `ENABLE_USER_SITE` is truthy, which it is not in the frozen process. No reader is
+  changed harmfully.
+- `sysconfig` reads `sys.prefix` / `sys.base_prefix` (`Lib/sysconfig.py:172-173`, `:650-651`),
+  never `site.PREFIXES`.
+
+**The before-record of the whole batch on `54266f5e`** (the F-E shim head; rule check first,
+`t3e/rule-check-ff.txt`): the three owned modules with `PYTHONPATH` / `WP61_BUILD_SCRIPT` on
+`git archive 54266f5e` give **41 failed, 225 passed** (`t3e/pytest-batch-before-on-54266f5e.log`).
+
+- Failing: every new A r3 test as listed in the fold-in table, the F-F frozen test (`:1169`) and
+  the Q2 test (`:1223`).
+- Lines in `test_frozen_entry.py` as in the fold-in table: `:174`, `:240`/`:241` x4, `:262`,
+  `:436`, `:1171` x10, `:1200`, `:1230` x4, F-E (iii) `:689`.
+- Lines in `test_gpu_pack.py`, now: `:826` x10, `:986`, `:1013`, `:1034`.
+- Lines in `test_tools_package_build.py`: `:757`, `:766`, `:792`.
+- The F-E (i) / (ii) tests and the frozen order test PASS there, as they should: the shim is in
+  `54266f5e`. The earlier fold-in before-record on `e0a90bc5` (42 failed) stands beside this one.
+
+| Command (worktree root, Git Bash, `PYTEST_ADDOPTS` unset) | Exit | Summary |
+|---|---|---|
+| the three owned modules on the final code (`c61f-11`, then `c61f-14` for `test_gpu_pack.py` after ruff's fix) | 0 | 266 passed; 98 passed |
+| the same on `54266f5e` (`c61f-12`) | 1 | 41 failed, 225 passed |
+| the wider set (the 7 modules, `-m "not gpu"`, `c61f-13`) | 0 | **417 passed, 41 deselected in 33.01 s** |
+| `ruff check .` / `ruff format --check .` | 0 / 0 | All checks passed (after `--fix` of 3 SIM300 in the new test) / 322 files already formatted |
+| `mypy` / `mypy --strict` on the 6 touched files, win32 and `--platform darwin` | 0 | 160 / 6 / 6 files, no issues |
+
+The harness rule for the pack (CHARC): no non-frozen helper imported from the pack in this part.
+`site_readers.py` only reads text, and ran with `-B`. The pack still has 0 `.pyc` files and
+`--verify` PASSES.
+
+Owner log md5 `69ed0432c562db9445daecbe8f15fe27` at every check (a check only).
+`%LOCALAPPDATA%\Clearwater` is absent. No build and no pack-activating run in this group.
+
+**For the fresh cell's one rebuild and proof.** The handler check reads, from BOTH bundles:
+`interpreter_reentry`, `run_interpreter_option`, `isolate_worker_stdin`,
+`multiprocessing_reentry` and `main`, plus `MULTIPROCESSING_FLAGS`. Add `multiprocessing_reentry`
+to `t3e/handler_check.py`'s list. The gpu_pack loader (`add_site_prefix`) is in the PYZ, not the
+entry script, so read it there too. Then the WITH-pack proof (onedir HEIC + video, then onefile),
+CHARC's amendment-4 evidence (the canary JSON, the device line, the site flags), the
+without-pack regression, `--verify` before and after.
+
+Depth at turn-3 group-2b-3 (A r3 batch) end: DISPATCHER TO FILL
