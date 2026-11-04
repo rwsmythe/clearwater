@@ -76,7 +76,10 @@ def pyc(name: str) -> bytes:
 
 
 def make_exe(
-    folder: Path, entries: list[tuple[str, bytes, str]], modules: Sequence[str] = ()
+    folder: Path,
+    entries: list[tuple[str, bytes, str]],
+    modules: Sequence[str] = (),
+    pyz_name: str = "PYZ.pyz",
 ) -> Path:
     """Write a real CArchive (and, with ``modules``, its PYZ) as ``folder/Clearwater.exe``.
 
@@ -84,6 +87,7 @@ def make_exe(
         folder: Where the archive and its source files go.
         entries: (archive name, data, CArchive typecode) for each entry.
         modules: Dotted module names for an embedded PYZ.
+        pyz_name: The PYZ's own entry name in the CArchive (PyInstaller writes ``PYZ.pyz``).
 
     Returns:
         The archive.
@@ -102,7 +106,7 @@ def make_exe(
         writers.ZlibArchiveWriter(
             str(pyz), [(m, str(sources / "m.py"), "PYMODULE") for m in modules], code_dict=code
         )
-        rows.append(("PYZ.pyz", str(pyz), False, "z"))
+        rows.append((pyz_name, str(pyz), False, "z"))
     executable = folder / "Clearwater.exe"
     writers.CArchiveWriter(str(executable), rows, "python312.dll")
     return executable
@@ -743,3 +747,50 @@ def test_the_real_pack_scan_finds_ctypes_wintypes() -> None:
     assert scan.unparsable == []
     assert any(p.startswith("cuda-pathfinder:") for p in scan.modules["ctypes.wintypes"])
     assert "graphlib" not in scan.modules  # the extension-only need the list carries
+
+
+# Reviewer A r3 #9, #11, #12.
+
+
+def test_the_dependency_allowlist_is_case_folded() -> None:
+    """#9: ``pyside6/QtCore.pyd`` and ``NUMPY/x.pyc`` are the allowed packages on Windows."""
+    assert build.name_violations(["pyside6", "QtCore.pyd"], module_root=True) == []
+    assert build.name_violations(["NUMPY", "x.pyc"], module_root=True) == []
+    assert build.name_violations(["JSON.pyc"], module_root=True) == []  # a stdlib name
+    assert build.name_violations(["AV", "x.pyd"], module_root=True) == ["unexpected-module"]
+
+
+def test_a_pyz_containers_own_name_is_checked(tmp_path: Path) -> None:
+    """#11: a PYZ entry named like a GPU binary is found, though its modules are clean."""
+    executable = make_exe(tmp_path, [], modules=["json"], pyz_name="cupy/runtime.pyd")
+    assert hits(build.forbidden_entries(executable), "pkg:cupy/runtime.pyd (gpu-module)")
+    clean = make_exe(tmp_path / "clean", [], modules=["json"])
+    assert build.forbidden_entries(clean) == []
+
+
+def test_a_pack_distribution_at_another_version_fails_the_scan_and_the_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """#12: the scan compares each installed distribution's version with the lock."""
+    try:
+        real = importlib.metadata.distribution("cupy-cuda12x")
+    except importlib.metadata.PackageNotFoundError:
+        pytest.skip("the GPU pack distributions are not installed (the gpu extra)")
+    real_distribution = importlib.metadata.distribution
+
+    class Stale:
+        version = "0.0"
+        files = real.files
+
+        def locate_file(self, path: Any) -> Any:
+            return real.locate_file(path)
+
+    def distribution(name: str) -> Any:
+        return Stale() if name == "cupy-cuda12x" else real_distribution(name)
+
+    monkeypatch.setattr(importlib.metadata, "distribution", distribution)
+    with pytest.raises(ValueError, match=r"cupy-cuda12x: installed 0.0, the lock has 14.2.0"):
+        build.pack_sources()
+    assert build.build("onedir", out=tmp_path / "out") == 1
+    out = capsys.readouterr().out
+    assert "FAILED: the pack sources cannot be scanned: cupy-cuda12x: installed 0.0" in out

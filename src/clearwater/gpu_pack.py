@@ -427,31 +427,80 @@ class RecordRow:
     size: int | None
 
 
+_RECORD_SIZE = re.compile(r"[0-9]{1,20}")
+"""A ``RECORD`` size: ASCII digits, at most 20 (any real file size; Reviewer A r3 #4)."""
+
+_RECORD_HASH = re.compile(r"[A-Za-z0-9]{1,16}=[A-Za-z0-9_-]{1,128}")
+"""A ``RECORD`` hash: ``<algorithm>=<urlsafe base64, no padding>``."""
+
+
+def _component_problem(component: str) -> str | None:
+    """Return why one ``RECORD`` path component is not allowed, or None (A r3 #4, #5).
+
+    Refused: an empty or ``.`` component, ``..``, an alternate data stream or drive (``:``),
+    and a component ending in ``.`` or a space (Windows resolves ``a.py.`` and ``a.py `` to
+    ``a.py``).
+    """
+    if component in ("", "."):
+        return "an empty or '.' part"
+    if component == "..":
+        return "a '..' part"
+    if ":" in component:
+        return "a ':' (a drive or an alternate data stream)"
+    if component.endswith((".", " ")):
+        return "a part ending in '.' or a space"
+    return None
+
+
 def parse_record(text: str) -> list[RecordRow] | str:
-    """Parse a ``RECORD`` file's text (CSV rows ``path,hash,size``).
+    """Parse a ``RECORD`` file's text (CSV rows ``path,hash,size``), validating each row first.
+
+    Every row is checked before it is used (Reviewer A r3 #4, #5): three fields, no NUL in
+    any, a non-empty path, a hash that is empty or ``<algorithm>=<base64>``, a size that is
+    empty or at most 20 ASCII digits; then the path's parts (split at ``/`` and the backslash): none
+    absolute, none with a drive, ``..``, ``:``, an empty or ``.`` part, or a trailing ``.`` or
+    space. So a malformed ``RECORD`` is a rejection reason, never an exception.
 
     Args:
         text: The file's text.
 
     Returns:
-        The rows, or the reason the text is malformed: a row without three fields, an empty
-        path, a size that is not a whole number, or a path that leaves ``site-packages``
-        (absolute, with a drive, or with a ``..`` part).
+        The rows, or the reason the text is malformed: ``RECORD malformed: row <n>: <what>``,
+        ``RECORD row outside site-packages: <path>`` (absolute, a drive, or ``..``) or
+        ``RECORD row path not allowed (<what>): <path>``.
     """
     rows: list[RecordRow] = []
-    for number, fields in enumerate(csv.reader(io.StringIO(text, newline="")), start=1):
+    reader = csv.reader(io.StringIO(text, newline=""))
+    number = 0
+    while True:
+        number += 1
+        try:
+            fields = next(reader)
+        except StopIteration:
+            return rows
+        except csv.Error:
+            return f"RECORD malformed: row {number}: not CSV"
         if not fields:
             continue
-        if len(fields) != 3 or not fields[0]:
-            return f"RECORD malformed: row {number}"
+        if len(fields) != 3:
+            return f"RECORD malformed: row {number}: not 3 fields"
+        if any("\x00" in field for field in fields):
+            return f"RECORD malformed: row {number}: a NUL character"
         path, digest, size = fields
-        if size and not size.isdecimal():
-            return f"RECORD malformed: row {number}"
+        if not path:
+            return f"RECORD malformed: row {number}: an empty path"
+        if digest and not _RECORD_HASH.fullmatch(digest):
+            return f"RECORD malformed: row {number}: a hash not of the form algorithm=base64"
+        if size and not _RECORD_SIZE.fullmatch(size):
+            return f"RECORD malformed: row {number}: a size not of 1-20 digits"
         posix, windows = PurePosixPath(path), PureWindowsPath(path)
         if posix.is_absolute() or windows.drive or windows.root or ".." in windows.parts:
             return f"RECORD row outside site-packages: {_safe(path)}"
+        for component in re.split(r"[/\\]", path):
+            problem = _component_problem(component)
+            if problem is not None:
+                return f"RECORD row path not allowed ({problem}): {_safe(path)}"
         rows.append(RecordRow(path, digest, int(size) if size else None))
-    return rows
 
 
 def platform_tags() -> tuple[str, str]:
@@ -595,11 +644,40 @@ def check_pack(folder: Path) -> str | None:
     """
     try:
         return next(pack_problems(folder), None)
-    except OSError as error:
-        return f"pack unreadable: {type(error).__name__}"
+    except Exception as error:  # start-up must never fail on a pack (A r3 #4)
+        return f"pack check failed: {_safe(type(error).__name__)}"
 
 
 def pack_problems(
+    folder: Path,
+    *,
+    full: bool = False,
+    tags: tuple[str, str] | None = None,
+) -> Iterator[str]:
+    """Yield every problem :func:`_pack_problems` finds; any exception ends it as one problem.
+
+    A file-system error becomes ``pack unreadable: <type>`` and any other exception (a
+    malformed ``RECORD`` that the row validation did not foresee, say)
+    ``pack check failed: <type>``, so neither start-up (:func:`check_pack`) nor ``--verify``
+    is ever stopped by an exception (Reviewer A r3 #4).
+
+    Args:
+        folder: The pack folder.
+        full: Also hash every listed file.
+        tags: The (interpreter, platform) tags to fit; :func:`platform_tags` when None.
+
+    Yields:
+        Each problem as a short ASCII reason, in check order.
+    """
+    try:
+        yield from _pack_problems(folder, full=full, tags=tags)
+    except OSError as error:
+        yield f"pack unreadable: {_safe(type(error).__name__)}"
+    except Exception as error:  # a rejection, never an escape (A r3 #4)
+        yield f"pack check failed: {_safe(type(error).__name__)}"
+
+
+def _pack_problems(
     folder: Path,
     *,
     full: bool = False,
@@ -836,8 +914,14 @@ def _add_dll_directories(site: Path) -> tuple[Path, ...] | str:
         The folders added (none on other platforms), or a rejection reason when they cannot
         be listed or one cannot be added (the ones already added are removed again).
     """
-    try:
-        folders = tuple(sorted(p for p in (site / "nvidia").glob("*/bin") if p.is_dir()))
+    nvidia = site / "nvidia"
+    try:  # os.scandir, not Path.glob: glob swallows an access error (Reviewer A r3 #7)
+        if nvidia.is_dir():
+            with os.scandir(nvidia) as listing:
+                names = sorted(item.name for item in listing)
+            folders = tuple(nvidia / n / "bin" for n in names if (nvidia / n / "bin").is_dir())
+        else:
+            folders = ()
     except OSError as error:
         return f"DLL folders unreadable: {type(error).__name__}"
     if sys.platform == "win32":
@@ -850,7 +934,7 @@ def _add_dll_directories(site: Path) -> tuple[Path, ...] | str:
                     close = getattr(handle, "close", None)
                     if callable(close):
                         close()
-                return f"DLL folder nvidia/{folder.parent.name}/bin: {type(error).__name__}"
+                return f"DLL folder nvidia/{_safe(folder.parent.name)}/bin: {type(error).__name__}"
         _DLL_HANDLES.extend(added)
         return folders
     else:

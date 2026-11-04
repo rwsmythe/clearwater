@@ -228,6 +228,11 @@ MAX_ZIP_DEPTH = 4
 MODULE_SUFFIXES: tuple[str, ...] = (".py", ".pyc", ".pyd", ".so")
 """Suffixes of loose Python modules and extension modules (the allowlist applies to them)."""
 
+_ALLOWED_FOLDED: frozenset[str] = frozenset(name.casefold() for name in ALLOWED_TOP_LEVEL)
+_STDLIB_FOLDED: frozenset[str] = frozenset(name.casefold() for name in sys.stdlib_module_names)
+"""The dependency allowlist and the stdlib names, case-folded as the GPU-name checks are
+(Reviewer A r3 #9: ``pyside6/QtCore.pyd`` is ``PySide6/QtCore.pyd`` on Windows)."""
+
 BOOT_MODULE_PREFIXES: tuple[str, ...] = ("pyimod", "pyiboot", "pyi_rth_")
 """PyInstaller's own boot modules, stored as CArchive module entries."""
 
@@ -408,7 +413,7 @@ def name_violations(parts: Sequence[str], *, module_root: bool) -> list[str]:
         top = parts[0] if len(parts) > 1 else parts[0].split(".", 1)[0]
         if top.lower() in SHADOW_NAMES or (top.lower() == "io" and len(parts) > 1):
             rules.add("shadow")
-        elif top not in ALLOWED_TOP_LEVEL and top not in sys.stdlib_module_names:
+        elif top.casefold() not in _ALLOWED_FOLDED and top.casefold() not in _STDLIB_FOLDED:
             rules.add("unexpected-module")
     return sorted(rules)
 
@@ -597,6 +602,8 @@ def forbidden_entries(executable: Path) -> list[str]:
         parts = split_name(name)
         label = f"pkg:{'/'.join(parts)}"
         if typecode == readers.PKG_ITEM_PYZ:
+            # the container's own name too (Reviewer A r3 #11), by name rules only
+            found += [f"{label} ({rule})" for rule in name_violations(parts, module_root=False)]
             for module in _pyz_modules(package, name):
                 found += [f"pyz:{module} ({rule})" for rule in module_violations(module)]
             continue
@@ -1169,7 +1176,8 @@ def pack_sources(names: Iterable[str] | None = None) -> list[tuple[str, Path]]:
 
     Raises:
         importlib.metadata.PackageNotFoundError: A distribution is not installed here.
-        ValueError: A distribution lists no files.
+        ValueError: A distribution lists no files, or (the pack's own set, ``names`` None)
+            its installed version is not the lock's.
     """
     import importlib.metadata
 
@@ -1178,9 +1186,16 @@ def pack_sources(names: Iterable[str] | None = None) -> list[tuple[str, Path]]:
         from clearwater import gpu_pack
 
         names = [locked.name for locked in gpu_pack.LOCKED_DISTRIBUTIONS]
+        versions = {locked.name: locked.version for locked in gpu_pack.LOCKED_DISTRIBUTIONS}
+    else:
+        versions = {}
     rows: list[tuple[str, Path]] = []
     for name in names:
         distribution = importlib.metadata.distribution(name)
+        expected = versions.get(name)
+        if expected is not None and distribution.version != expected:
+            # a stale build environment would describe other pack code (Reviewer A r3 #12)
+            raise ValueError(f"{name}: installed {distribution.version}, the lock has {expected}")
         files = distribution.files
         if files is None:
             raise ValueError(f"{name}: no RECORD")
@@ -1397,7 +1412,11 @@ def build(form: Form, *, out: Path, with_ffmpeg: bool = False) -> int:
         0 when the build succeeded and the bundle holds nothing forbidden, else 1.
     """
     version = app_version()
-    sources = pack_sources()
+    try:
+        sources = pack_sources()
+    except (ImportError, ValueError) as error:  # PackageNotFoundError is an ImportError
+        print(f"FAILED: the pack sources cannot be scanned: {error}")
+        return 1
     scan = scan_stdlib_imports(sources)
     wanted = hidden_imports(scan)
     report = write_hidden_import_report(

@@ -159,28 +159,122 @@ def test_an_injected_command_wins_when_frozen(
 # Q5 (b): the entry's dispatch.
 
 
-def test_the_worker_flag_runs_the_worker_without_qt(
+def test_a_source_run_sends_the_worker_flag_to_the_gui_as_1_0_0_did(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]]
 ) -> None:
-    """``--export-worker a b``: loader, then the worker with ``[a, b]``; no Qt, no log file."""
+    """Reviewer A r3 #1: not frozen, ``--export-worker a b`` reaches ``app.main`` (1.0.0).
+
+    The GUI is a stand-in (the real one is unimportable here) and the app data is under
+    ``tmp_path`` (the ``calls`` fixture): the 1.0.0 behaviour, pinned without a window.
+    """
     monkeypatch.delattr(sys, "frozen", raising=False)
     entry, blocker = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+    argv = ["python -m clearwater", "--export-worker", "a", "b"]
+    assert entry.main(argv) == 3
+    assert calls == [("activate", None), ("gui", argv)]
+    assert blocker.attempts == []
+
+
+def _stub_shim(monkeypatch: pytest.MonkeyPatch, entry: ModuleType, seen: list[Any]) -> None:
+    """Record the F-E shim's call instead of re-pointing THIS process's standard input."""
+    monkeypatch.setattr(
+        entry, "isolate_worker_stdin", lambda: seen.append(("shim", None)), raising=False
+    )
+
+
+def test_the_frozen_worker_flag_runs_the_shim_the_loader_then_the_worker_without_qt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]]
+) -> None:
+    """Frozen ``--export-worker a b``: the shim, the loader, the worker with ``[a, b]``; no Qt."""
+    _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))  # restored after the D1 prepend
+    entry, blocker = _fresh_entry(monkeypatch)
+    _stub_shim(monkeypatch, entry, calls)
     status = entry.main(["Clearwater.exe", "--export-worker", "a", "b"])
     assert status == 7
-    assert calls == [("activate", None), ("worker", ["a", "b"])]
+    assert calls == [("shim", None), ("activate", None), ("worker", ["a", "b"])]
     assert blocker.attempts == []
     assert not [m for m in sys.modules if m.startswith(BLOCKED)]
 
 
-def test_the_worker_flag_alone_passes_no_arguments(
-    monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]]
+def test_the_frozen_worker_flag_alone_passes_no_arguments(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]]
 ) -> None:
     """The real spawn (``[exe, "--export-worker"]``): the worker gets ``[]``, not its flag."""
-    monkeypatch.delattr(sys, "frozen", raising=False)
+    _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
     entry, _ = _fresh_entry(monkeypatch)
+    _stub_shim(monkeypatch, entry, calls)
     monkeypatch.setattr(sys, "argv", ["Clearwater.exe", "--export-worker"])
     assert entry.main() == 7
     assert calls[-1] == ("worker", [])
+
+
+# CHARC's ruling on Reviewer A r3 #3: a frozen multiprocessing re-entry is refused first.
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["X", "--multiprocessing-resource-tracker", "5"],
+        ["X", "--export-worker", "--multiprocessing-fork", "parent_pid=1"],
+        ["X", "-m", "cuda.pathfinder", "--multiprocessing-fork"],
+        ["X", "-c", "pass", "--multiprocessing-fork"],
+    ],
+    ids=["resource-tracker", "after-the-worker-flag", "after-dash-m", "after-dash-c"],
+)
+def test_a_frozen_multiprocessing_re_entry_is_refused_before_every_branch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    calls: list[tuple[str, Any]],
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+) -> None:
+    """Any argument naming a multiprocessing child: status 2, one line; nothing else runs."""
+    executable = _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    entry, blocker = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+    _stub_shim(monkeypatch, entry, calls)
+    assert entry.main([executable, *argv[1:]]) == 2
+    assert capsys.readouterr().err == "Clearwater: multiprocessing children are not supported\n"
+    assert calls == []  # no shim, no loader, no worker, no log file, no GUI
+    assert blocker.attempts == []
+
+
+def test_the_real_multiprocessing_spawn_command_line_is_refused_when_frozen(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    calls: list[tuple[str, Any]],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``multiprocessing.spawn.get_command_line()`` of a frozen process: refused, no GUI."""
+    import multiprocessing.spawn
+
+    executable = _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    command = multiprocessing.spawn.get_command_line(parent_pid=123, pipe_handle=456)
+    assert command[:2] == [executable, "--multiprocessing-fork"]
+    entry, blocker = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+    _stub_shim(monkeypatch, entry, calls)
+    assert entry.main(command) == 2
+    assert capsys.readouterr().err == "Clearwater: multiprocessing children are not supported\n"
+    assert calls == []
+    assert blocker.attempts == []
+
+
+def test_a_source_run_sends_a_multiprocessing_flag_to_the_gui_as_before(
+    monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]]
+) -> None:
+    """Not frozen: no refusal branch (1.0.0); the arguments reach ``app.main``."""
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    entry, _ = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+    argv = ["python -m clearwater", "--multiprocessing-fork"]
+    assert entry.main(argv) == 3
+    assert calls == [("activate", None), ("gui", argv)]
 
 
 @pytest.mark.parametrize(
@@ -327,6 +421,23 @@ def test_a_path_listing_the_folder_behind_another_ffmpeg_puts_it_first_once(
         expected = [folder, other_ffmpeg, "/a", "", "/b", folder.upper() + os.sep, "/c"]
     assert environ["PATH"].split(os.pathsep) == expected
     assert entry.prepend_executable_folder(environ) is False
+
+
+def test_a_quoted_spelling_of_the_folder_is_dropped_from_behind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reviewer A r3 #6: ``x;"<folder>"`` becomes ``<folder>;x`` (the quoted copy dropped)."""
+    executable = _frozen(monkeypatch, tmp_path)
+    folder = os.path.dirname(executable)
+    import clearwater.__main__ as entry
+
+    environ = {"PATH": os.pathsep.join(["/x", f'"{folder}"'])}
+    assert entry.prepend_executable_folder(environ) is True
+    assert environ["PATH"].split(os.pathsep) == [folder, "/x"]
+    quoted_first = {"PATH": os.pathsep.join([f'"{folder}"', "/x"])}
+    assert entry.prepend_executable_folder(quoted_first) is True  # shutil.which keeps quotes
+    assert quoted_first["PATH"].split(os.pathsep) == [folder, "/x"]
+    assert entry.prepend_executable_folder(quoted_first) is False
 
 
 def test_a_source_run_leaves_path_alone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -550,9 +661,14 @@ def test_the_frozen_worker_reads_its_request_and_the_cancel_line_through_the_pri
 def test_the_worker_branch_moves_no_standard_input_when_not_frozen(
     monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]]
 ) -> None:
-    """F-E (iii): the 1.0.0 lock. A source run duplicates nothing and calls no ``SetStdHandle``."""
+    """F-E (iii): the 1.0.0 lock. A source run duplicates nothing and calls no ``SetStdHandle``.
+
+    Since Reviewer A r3 #1 a source ``--export-worker`` reaches the GUI (a stand-in here), as
+    in 1.0.0; the shim is never reached on that path either.
+    """
     monkeypatch.delattr(sys, "frozen", raising=False)
     entry, _ = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
     dups: list[int] = []
     set_std_handle: list[object] = []
 
@@ -570,8 +686,9 @@ def test_the_worker_branch_moves_no_standard_input_when_not_frozen(
 
         monkeypatch.setattr(ctypes.windll.kernel32, "SetStdHandle", counting, raising=False)
     stdin = sys.stdin
-    assert entry.main(["python -m clearwater", "--export-worker"]) == 7
-    assert calls == [("activate", None), ("worker", [])]
+    assert entry.main(["python -m clearwater", "--export-worker"]) == 3
+    assert calls == [("activate", None), ("gui", ["python -m clearwater", "--export-worker"])]
+    assert entry.isolate_worker_stdin() is False  # called directly: still nothing when not frozen
     assert dups == []
     assert set_std_handle == []
     assert sys.stdin is stdin
@@ -593,6 +710,7 @@ class NoGui(importlib.abc.MetaPathFinder):
 
 sys.meta_path.insert(0, NoGui())  # no window can open, whatever the entry does
 sys.path.insert(0, sys.argv[1])
+sys.frozen = True  # the worker branch is frozen-only (Reviewer A r3 #1)
 import clearwater.__main__ as entry
 from clearwater.app import export_worker
 export_worker.main = lambda argv=None: 0
@@ -664,6 +782,16 @@ Path(sys.argv[1]).write_text(repr((__name__, sys.argv[2:], __file__)), encoding=
 """
 """A pack module that records its ``__name__``, its arguments and its file, then returns."""
 
+PROBE_SYS_BODY = """
+import sys
+from pathlib import Path
+main = getattr(sys.modules.get("__main__"), "__file__", None)
+Path(sys.argv[1]).write_text(
+    repr((__name__, sys.argv[2:], __file__, sys.argv[0], main)), encoding="utf-8"
+)
+"""
+""":data:`PROBE_BODY` that also records ``sys.argv[0]`` and ``sys.modules["__main__"]``'s file."""
+
 
 def _package(root: Path, name: str, *, init: bool = True, body: str = "") -> Path:
     """Write a package ``name`` under ``root`` (a regular one when ``init``) with ``probe.py``."""
@@ -734,14 +862,17 @@ def test_a_frozen_dash_m_runs_a_pack_module_after_the_loader_without_qt(
 ) -> None:
     """``<exe> -m <pack module> a b``: loader first, then the module as ``__main__``, no Qt."""
     site, seen = pack
-    _package(site, "packmod_run")
+    _package(site, "packmod_run", body=PROBE_SYS_BODY)
     record = tmp_path / "ran.txt"
     entry, blocker = _fresh_entry(monkeypatch)
     status = entry.main(["Clearwater.exe", "-m", "packmod_run.probe", str(record), "a", "b"])
     assert status == 0
-    name, args, file = ast.literal_eval(record.read_text(encoding="utf-8"))
+    name, args, file, argv0, main_file = ast.literal_eval(record.read_text(encoding="utf-8"))
     assert (name, args) == ("__main__", ["a", "b"])
     assert Path(file) == site / "packmod_run" / "probe.py"
+    # Reviewer A r3 #10: what alter_sys=True gives, as CPython's -m does
+    assert argv0 == file  # not "Clearwater.exe"
+    assert main_file == file  # sys.modules["__main__"] is the module while it runs
     assert seen == [("activate", None)]  # the loader ran; the GUI did not
     assert blocker.attempts == []
     assert not [m for m in sys.modules if m.startswith(BLOCKED)]
@@ -1002,6 +1133,33 @@ def test_the_real_pathfinder_canary_module_runs_through_the_frozen_dash_m(
         (["x", "-widgetcount"], None),
         (["x", "photo.heic", "-m", "a"], None),
         (["x", "--other"], None),
+        # Reviewer A r3 #2: clusters without m / c, and -X / -W values attached
+        (["x", "-Xutf8", "-m", "a"], ["-m", "a"]),
+        (["x", "-Wignore", "-m", "a"], ["-m", "a"]),
+        (["x", "-Wignore", "-cpass"], ["-c", "pass"]),
+        (["x", "-OO", "-m", "a"], ["-m", "a"]),
+        (["x", "-Es", "-m", "a"], ["-m", "a"]),
+        (["x", "-IIs", "-m", "a"], ["-m", "a"]),
+        (["x", "-bb", "-m", "a"], ["-m", "a"]),
+        (["x", "-IXutf8", "-m", "a"], ["-m", "a"]),
+        (["x", "-IW", "ignore", "-m", "a"], ["-m", "a"]),
+        (["x", "-IIm", "a"], ["-m", "a"]),
+        (["x", "-E", "-s", "-m", "a"], ["-m", "a"]),
+        (["x", "-movie.mp4"], ["-m", "ovie.mp4"]),
+        # still not re-entries: they go to the GUI as before
+        (["x", "-X"], None),
+        (["x", "-Xutf8"], None),
+        (["x", "-h"], None),
+        (["x", "-V"], None),
+        (["x", "-?"], None),
+        (["x", "-hm", "a"], None),
+        (["x", "--version"], None),
+        (["x", "-"], None),
+        (["x", "--"], None),
+        (["x", "--", "-m", "a"], None),
+        (["x", ""], None),
+        (["x", "é"], None),
+        (["x", "-style=fusion"], None),
     ],
 )
 def test_interpreter_reentry_follows_cpythons_grammar(
@@ -1013,6 +1171,37 @@ def test_interpreter_reentry_follows_cpythons_grammar(
     assert entry.interpreter_reentry(argv) == expected
 
 
+def test_cpythons_own_interpreter_flags_prefix_is_a_re_entry() -> None:
+    """Reviewer A r3 #2: ``subprocess._args_from_interpreter_flags()`` + ``-m x`` re-enters.
+
+    The flags come from a child started with ``-OO -Wignore -Xutf8`` (as CHARC asked) and from
+    this test process; either prefix before ``-m x`` must be judged a re-entry. The child runs
+    no product code.
+    """
+    import clearwater.__main__ as entry
+
+    done = subprocess.run(
+        [
+            sys.executable,
+            "-OO",
+            "-Wignore",
+            "-Xutf8",
+            "-c",
+            "import json, subprocess; print(json.dumps(subprocess._args_from_interpreter_flags()))",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=True,
+    )
+    flags = json.loads(done.stdout)
+    assert "-OO" in flags and "-Wignore" in flags  # a repeated cluster, an attached value
+    assert flags[flags.index("-X") + 1] == "utf8"  # -X comes as a separate value
+    assert entry.interpreter_reentry(["x", *flags, "-m", "x"]) == ["-m", "x"]
+    own = subprocess._args_from_interpreter_flags()  # type: ignore[attr-defined]
+    assert entry.interpreter_reentry(["x", *own, "-m", "x"]) == ["-m", "x"]
+
+
 @pytest.mark.parametrize(
     "prefix",
     [
@@ -1021,6 +1210,10 @@ def test_interpreter_reentry_follows_cpythons_grammar(
         ["-Im", "packmod_run.probe"],
         ["-X", "utf8", "-m", "packmod_run.probe"],
         ["-I", "-W", "ignore", "-sm", "packmod_run.probe"],
+        ["-Xutf8", "-m", "packmod_run.probe"],
+        ["-Wignore", "-m", "packmod_run.probe"],
+        ["-OO", "-m", "packmod_run.probe"],
+        ["-Es", "-m", "packmod_run.probe"],
     ],
 )
 def test_every_spelling_of_dash_m_runs_a_pack_module(

@@ -2,11 +2,16 @@
 
 The branches of this entry (WP6.1, AD-34):
 
-- ``<entry> --export-worker [args]`` runs :func:`clearwater.app.export_worker.main` with the
-  remaining arguments. A packaged (frozen) build spawns its video export worker this way,
+- Frozen only, a MULTIPROCESSING re-entry (:func:`multiprocessing_reentry`: any argument in
+  :data:`MULTIPROCESSING_FLAGS`) is refused first, before every other branch: one stderr line,
+  status 2, no GUI (CHARC's ruling on Reviewer A r3 #3; ``freeze_support()`` is declined).
+- Frozen only, ``<exe> --export-worker [args]`` runs :func:`clearwater.app.export_worker.main`
+  with the remaining arguments. A packaged build spawns its video export worker this way,
   because its executable cannot run ``-m clearwater.app.export_worker``. This branch imports
-  no Qt-bearing module (AD-31). Frozen only, it first moves the request pipe off the
-  standard-input slot (:func:`isolate_worker_stdin`, CHARC's F-E ruling; TEMPORARY, see there).
+  no Qt-bearing module (AD-31). It first moves the request pipe off the standard-input slot
+  (:func:`isolate_worker_stdin`, CHARC's F-E ruling; TEMPORARY, see there). A source run
+  sends ``--export-worker`` to the GUI, as 1.0.0 did (Reviewer A r3 #1); the source worker is
+  ``python -m clearwater.app.export_worker``.
 - Frozen only, an INTERPRETER RE-ENTRY (:func:`interpreter_reentry`: ``-m`` / ``-c`` in any
   form CPython accepts, after interpreter flags; :func:`run_interpreter_option`): a library
   inside the GPU pack re-enters ``sys.executable -m <its module>`` (``cuda.pathfinder``'s
@@ -34,7 +39,6 @@ from __future__ import annotations
 import contextlib
 import io
 import os
-import re
 import sys
 from collections.abc import MutableMapping, Sequence
 
@@ -52,19 +56,30 @@ COMMAND_OPTION = "-c"
 REFUSED_STATUS = 2
 """The exit status of a refused ``-m`` / ``-c`` in a frozen build."""
 
-REENTRY_ARGUMENT = re.compile(r"-([BdEhiIOPqsSuvVWxX]*)([mc])(.*)", re.DOTALL)
-"""CPython's grammar for an argument that ends its options with ``-m`` or ``-c``.
+FLAG_LETTERS = frozenset("bBdEiIOPqsSuvx")
+"""CPython 3.12's option letters that take no value (``python -h``); they may be clustered
+(``-OO``, ``-Es``, ``-IIs``). ``-h``, ``-V`` and ``-?`` are not among them: a cluster holding one
+is not a re-entry (it goes to the GUI)."""
 
-Flag letters, then ``m`` or ``c``, then the attached operand (``-mfoo``, ``-Im``, ``-cCODE``).
-Qt's word options (``-platform``, ``-style``, ``-reverse``, ``-widgetcount``) do not match;
-``-qmljsdebugger=...`` does (``-q`` then ``-m``) and is refused: Clearwater has no QML.
+VALUE_LETTERS = frozenset("WX")
+"""CPython's option letters that take a value: the rest of the cluster (``-Xutf8``,
+``-Wignore``) or, when nothing is attached, the next argument (``-X utf8``)."""
+
+REENTRY_LETTERS = frozenset("mc")
+"""The letters that end CPython's options: ``-m <module>`` and ``-c <code>``, the operand
+attached (``-mfoo``, ``-cCODE``) or the next argument."""
+
+MULTIPROCESSING_FLAGS = ("--multiprocessing-fork", "--multiprocessing-resource-tracker")
+"""Arguments with which ``multiprocessing`` re-enters a frozen ``sys.executable`` for a child.
+
+``--multiprocessing-fork`` is the one the bundled 3.12 standard library names
+(``multiprocessing/spawn.py``'s ``get_command_line``, frozen form; a read of both bundles' frozen
+code found no other ``--multiprocessing-`` string). ``--multiprocessing-resource-tracker`` is
+refused too by CHARC's ruling on Reviewer A r3 #3.
 """
 
-LEADING_FLAGS = frozenset({"-I", "-E", "-s", "-S", "-B", "-u", "-O", "-q"})
-"""Interpreter flags that may come, alone, before a re-entry's ``-m`` / ``-c`` (dropped)."""
-
-VALUED_FLAGS = frozenset({"-X", "-W"})
-"""Interpreter flags that take the next argument as their value (both dropped)."""
+MULTIPROCESSING_REFUSAL = "multiprocessing children are not supported"
+"""The one stderr line (after ``Clearwater: ``) of a refused multiprocessing re-entry."""
 
 STD_INPUT_HANDLE = -10
 """Win32's ``STD_INPUT_HANDLE`` (``(DWORD)-10``), the slot ``SetStdHandle`` re-points."""
@@ -154,14 +169,21 @@ def prepend_executable_folder(environ: MutableMapping[str, str] | None = None) -
     wanted = _path_key(folder)
     entries = current.split(os.pathsep) if current else []
     others = [entry for entry in entries if not entry or _path_key(entry) != wanted]
-    if len(others) == len(entries) - 1 and entries and _path_key(entries[0]) == wanted:
+    first_plain = bool(entries) and not entries[0].startswith('"')  # which() cannot use quotes
+    if len(others) == len(entries) - 1 and first_plain and _path_key(entries[0]) == wanted:
         return False
     env["PATH"] = os.pathsep.join([folder, *others])
     return True
 
 
 def _path_key(entry: str) -> str:
-    """Return a ``PATH`` entry in the form two entries naming one folder share."""
+    """Return a ``PATH`` entry in the form two entries naming one folder share.
+
+    Surrounding double quotes (a quoted folder, as Windows allows in ``PATH``) are dropped first,
+    so a quoted spelling of the executable's folder counts as the folder (Reviewer A r3 #6).
+    """
+    if len(entry) >= 2 and entry[0] == entry[-1] == '"':
+        entry = entry[1:-1]
     return os.path.normcase(os.path.normpath(entry))
 
 
@@ -191,33 +213,57 @@ def _refuse(reason: str) -> int:
 def interpreter_reentry(arguments: Sequence[str]) -> list[str] | None:
     """Return a frozen interpreter re-entry's arguments normalised, or None when it is not one.
 
-    It is a re-entry when, after any :data:`LEADING_FLAGS` and :data:`VALUED_FLAGS` (with
-    their values), the next argument matches :data:`REENTRY_ARGUMENT`. The flags are dropped
-    (the bootloader configures the frozen interpreter); an attached operand is split off. Any
-    other command line (``-I`` alone, ``-platform offscreen``, a file) is not a re-entry and
-    goes to the GUI exactly as before.
+    CPython's option grammar (Reviewer A r3 #2 as CHARC ruled it): zero or more option
+    arguments, each a cluster of :data:`FLAG_LETTERS` that may end with a
+    :data:`VALUE_LETTERS` letter (its value attached, or the next argument), then the
+    ``-m`` / ``-c`` letter (:data:`REENTRY_LETTERS`, possibly at the end of a cluster, its
+    operand attached or the next argument). The options are dropped (the bootloader configures
+    the frozen interpreter); an attached operand is split off. Anything else (``-I`` alone,
+    ``-X`` without a value, ``-h``, ``--version``, ``-``, ``--``, ``-platform offscreen``, a
+    file) is not a re-entry and goes to the GUI exactly as before.
 
     Args:
         arguments: The full command line, program name first.
 
     Returns:
-        ``["-m" | "-c", <operand, when given>, *the rest]``, or None.
+        ``["-m" | "-c", <operand, when attached>, *the rest]``, or None.
     """
     index = 1
     while index < len(arguments):
-        if arguments[index] in LEADING_FLAGS:
-            index += 1
-        elif arguments[index] in VALUED_FLAGS and index + 1 < len(arguments):
-            index += 2
-        else:
-            break
-    if index >= len(arguments):
-        return None
-    match = REENTRY_ARGUMENT.fullmatch(arguments[index])
-    if match is None:
-        return None
-    attached = match.group(3)
-    return ["-" + match.group(2), *([attached] if attached else []), *arguments[index + 1 :]]
+        token = arguments[index]
+        if len(token) < 2 or token[0] != "-" or token[1] == "-":
+            return None
+        index += 1
+        for position in range(1, len(token)):
+            letter = token[position]
+            if letter in FLAG_LETTERS:
+                continue
+            rest = token[position + 1 :]
+            if letter in REENTRY_LETTERS:
+                return ["-" + letter, *([rest] if rest else []), *arguments[index:]]
+            if letter in VALUE_LETTERS:
+                if not rest:
+                    if index >= len(arguments):
+                        return None  # a value option with no value
+                    index += 1  # its value is the next argument
+                break
+            return None  # not an interpreter option letter
+    return None
+
+
+def multiprocessing_reentry(arguments: Sequence[str]) -> bool:
+    """Return whether a command line is ``multiprocessing`` re-entering the executable.
+
+    Any argument after the program name that is one of :data:`MULTIPROCESSING_FLAGS` counts,
+    wherever it stands, so no argument order routes around the refusal.
+
+    Args:
+        arguments: The full command line, program name first.
+
+    Returns:
+        True for a multiprocessing child's command line.
+    """
+    return any(argument in MULTIPROCESSING_FLAGS for argument in arguments[1:])
 
 
 def run_interpreter_option(arguments: Sequence[str]) -> int:
@@ -276,15 +322,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     arguments = list(sys.argv if argv is None else argv)
     prepend_executable_folder()
-    if arguments[1:2] == [WORKER_FLAG]:
-        # F-E: before the worker's first read and before anything that can spawn a child
-        # (the loader, the worker import, its backend probe, any CuPy import).
-        isolate_worker_stdin()
-        gpu_pack.activate()
-        from clearwater.app import export_worker
-
-        return export_worker.main(arguments[2:])
     if getattr(sys, "frozen", False):
+        if multiprocessing_reentry(arguments):  # before every other dispatch (A r3 #3)
+            return _refuse(MULTIPROCESSING_REFUSAL)
+        if arguments[1:2] == [WORKER_FLAG]:  # frozen only: a source run is 1.0.0 (A r3 #1)
+            # F-E: before the worker's first read and before anything that can spawn a child
+            # (the loader, the worker import, its backend probe, any CuPy import).
+            isolate_worker_stdin()
+            gpu_pack.activate()
+            from clearwater.app import export_worker
+
+            return export_worker.main(arguments[2:])
         reentry = interpreter_reentry(arguments)
         if reentry is not None:
             return run_interpreter_option([arguments[0], *reentry])

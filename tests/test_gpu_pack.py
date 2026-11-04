@@ -772,16 +772,48 @@ def test_the_cheap_check_hashes_no_listed_file(
     assert gpu_pack.check_pack(folder) is None
 
 
+MALFORMED_8 = "RECORD malformed: row 8:"
+NOT_ALLOWED = "RECORD row path not allowed ("
+TRAILING = "a part ending in '.' or a space"
+
+
 @pytest.mark.parametrize(
     ("row", "reason"),
     [
         ("../escape.py,,", "RECORD row outside site-packages: ../escape.py"),
         ("/abs/olute.py,,", "RECORD row outside site-packages: /abs/olute.py"),
         ("C:/drive.py,,", "RECORD row outside site-packages: C:/drive.py"),
-        ("cupy/a.py,sha256=x", "RECORD malformed: row 8"),
-        ("cupy/a.py,sha256=x,big", "RECORD malformed: row 8"),
+        ("cupy/a.py,sha256=x", "RECORD malformed: row 8: not 3 fields"),
+        ("cupy/a.py,sha256=x,big", "RECORD malformed: row 8: a size not of 1-20 digits"),
+        # Reviewer A r3 #4: one row per probe, each a rejection with its reason
+        (".,,1", "RECORD row path not allowed (an empty or '.' part): ."),
+        ("cupy/a.py\x00,,1", "RECORD malformed: row 8: a NUL character"),
+        ("cupy/a.py,," + "9" * 5000, "RECORD malformed: row 8: a size not of 1-20 digits"),
+        ("cupy/a.py,not-a-hash,1", f"{MALFORMED_8} a hash not of the form algorithm=base64"),
+        # Reviewer A r3 #5: Windows spellings that resolve to another name
+        (
+            "file:stream,,1",
+            f"{NOT_ALLOWED}a ':' (a drive or an alternate data stream)): file:stream",
+        ),
+        ("cupy/__init__.py.,,7", f"{NOT_ALLOWED}{TRAILING}): cupy/__init__.py."),
+        ("cupy/__init__.py ,,7", f"{NOT_ALLOWED}{TRAILING}): cupy/__init__.py "),
+        ("cupy//__init__.py,,7", f"{NOT_ALLOWED}an empty or '.' part): cupy//__init__.py"),
     ],
-    ids=["dotdot", "absolute", "drive", "two-fields", "bad-size"],
+    ids=[
+        "dotdot",
+        "absolute",
+        "drive",
+        "two-fields",
+        "bad-size",
+        "dot-row",
+        "nul",
+        "5000-digit-size",
+        "hash-form",
+        "ads",
+        "trailing-dot",
+        "trailing-space",
+        "empty-part",
+    ],
 )
 def test_a_malformed_or_escaping_record_row_is_rejected(
     tmp_path: Path, isolated: list[str], caplog: pytest.LogCaptureFixture, row: str, reason: str
@@ -936,6 +968,69 @@ def test_an_os_error_during_the_walk_is_a_rejection(
 
     monkeypatch.setattr(os, "scandir", scandir)
     _rejected(tmp_path, folder, "pack unreadable: PermissionError", caplog)
+
+
+def test_any_exception_in_the_walk_is_a_rejection_at_start_up_and_in_verify(
+    tmp_path: Path,
+    isolated: list[str],
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reviewer A r3 #4: an exception no row check foresaw ends the walk as ONE reason."""
+    folder = make_pack(tmp_path)
+
+    def broken(*_: Any, **__: Any) -> Any:
+        raise IndexError("an input no validation foresaw")
+
+    monkeypatch.setattr(gpu_pack, "_row_problems", broken)
+    _rejected(tmp_path, folder, "pack check failed: IndexError", caplog)
+    status, lines = _verify(folder, capsys)
+    assert status == 1
+    assert "pack check failed: IndexError" in "\n".join(lines)
+
+
+def test_an_unlistable_nvidia_folder_rejects_the_pack(
+    tmp_path: Path,
+    isolated: list[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reviewer A r3 #7: listing ``nvidia`` refused is a rejection, not "no DLL folders"."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    folder = make_pack(tmp_path)
+    nvidia = os.fspath(_site(folder) / "nvidia")
+    real_scandir = os.scandir
+
+    def scandir(path: Any = ".") -> Any:
+        if os.fspath(path) == nvidia:
+            raise PermissionError(13, "Access is denied")
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", scandir)
+    _rejected(tmp_path, folder, "DLL folders unreadable: PermissionError", caplog)
+    assert isolated == []
+
+
+def test_a_failing_non_ascii_dll_folder_is_named_in_ascii(
+    tmp_path: Path, isolated: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reviewer A r3 #8: the DLL-folder failure reason escapes the folder name."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    folder = make_pack(tmp_path)
+    (_site(folder) / "nvidia" / "é" / "bin").mkdir(parents=True)  # a tool-made folder
+    real = vars(os)["add_dll_directory"]
+
+    def refuse_it(path: str) -> Any:
+        if "é" in path:
+            raise OSError("refused")
+        return real(path)
+
+    monkeypatch.setattr(os, "add_dll_directory", refuse_it)
+    status = gpu_pack.load(tmp_path)
+    assert status.outcome == "rejected"
+    assert status.reason == "DLL folder nvidia/\\xe9/bin: OSError"
+    assert status.line.isascii()
 
 
 # build.py --verify: the full check for a hand-filled pack.
