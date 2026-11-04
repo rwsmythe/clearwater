@@ -48,6 +48,7 @@ dev = [
     "av>=15,<17",
     # WP3.16 ruling 3 (CHARC grant; MIT, AD-18): Qt test fixtures for the headless GUI tests.
     "pytest-qt>=4.5,<5",
+    "pyinstaller>=6.22,<7",
 ]
 # The harness's optional mail UI (scripts/comms_ui.py). The comms CORE
 # (role_mail.py, the hooks, cell_depth.py) is stdlib-only and never imports it.
