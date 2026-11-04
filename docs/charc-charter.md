@@ -105,10 +105,13 @@ never before it (operator-directed 2026-09-25: a roll is not considered until th
 then it happens at the next available opportunity; a seat does not roll early because its next
 unit would cross the cap). **The ONE exception, operator-ruled 2026-11-02 (it resolves the
 2026-10-20 director ruling against the 2026-09-25 direction):** a seat about to start a unit it
-cannot see finish before the cap -- a dispatch of cells whose expected life exceeds the seat's
-remaining depth, or a long job spawned from its pane -- rolls BEFORE that unit, at that boundary,
-with the arithmetic stated in its rollover post. Pre-dispatch only, never mid-round, never
-mid-job. The same text binds `docs/model-prompting-standard.md`. -- and
+cannot see finish inside the WINDOW -- a dispatch whose cells' expected life plus their QA exceeds
+the seat's remaining 1M, or a long job spawned from its pane that would still be running at
+exhaustion -- rolls BEFORE that unit, at that boundary, with the arithmetic stated in its rollover
+post. Pre-dispatch only, never mid-round, never mid-job. "It would cross 400K" is NOT that
+arithmetic and never licenses a roll; "it would not fit in the window" is (operator wording ruling,
+relayed 2026-11-04: the cap is a floor, a unit that crosses it is taken, not rolled before). The
+same text binds `docs/model-prompting-standard.md`. -- and
 it rolls at a BOUNDARY -- after an accept, before a dispatch -- because the per-turn cost of a
 session scales with its depth while the handoff a compact state pointer enables costs a fixed
 few tens of thousands of tokens. The prompt hook reports the depth every turn; rolling is the

@@ -100,11 +100,14 @@ on this harness's record 68% of all read tokens landed on turns above 400K. Rule
   (first a director ruling of 2026-10-20, after an orchestrator generation rolled at ~300K rather
   than fan out four parallel cells that would have died with it mid-round; the operator's
   2026-11-02 direction "start no long job you cannot see finish" made it the rule):** a seat about
-  to start a unit it cannot see finish before the cap -- a DISPATCH of cells whose expected life
-  exceeds the seat's remaining depth, or a long job spawned from its pane -- rolls BEFORE that
-  unit, at that boundary, with the arithmetic stated in its rollover post; the cost of one early
-  spin-up is below the cost of re-dispatching every cell from its ledger or re-running the job.
-  Pre-dispatch only, never mid-round, never mid-job. The charter (5.1) carries the same text. At or past the cap no new dispatch happens at all: that
+  to start a unit it cannot see finish inside the WINDOW -- a DISPATCH whose cells' expected life
+  plus their QA exceeds the seat's remaining 1M, or a long job spawned from its pane that would
+  still be running at exhaustion -- rolls BEFORE that unit, at that boundary, with the arithmetic
+  stated in its rollover post; the cost of one early spin-up is below the cost of re-dispatching
+  every cell from its ledger or re-running the job. Pre-dispatch only, never mid-round, never
+  mid-job. "It would cross 400K" is NOT that arithmetic and never licenses a roll; "it would not
+  fit in the window" is (operator wording ruling, relayed 2026-11-04: the cap is a floor, a unit
+  that crosses it is taken, not rolled before). The charter (5.1) carries the same text. At or past the cap no new dispatch happens at all: that
   dispatch is the successor's. The prompt hook prints the session's depth
   every turn (`[ctx] NNNK of 1000K (NN%)`) and names the cap when it is reached; the rollover
   procedure is the state-pointer convention (charter 5.1).
