@@ -401,12 +401,12 @@ that gate is verification, not a newly commissioned suite-cost pass.
 
 | Final-candidate gate field | Result |
 |---|---|
-| Ruff / format / mypy | TO FILL AT THE GATE |
-| Collection identity: parallel + serial + fullclip = all | TO FILL AT THE GATE |
-| Parallel leg | TO FILL AT THE GATE |
-| Serial leg (exclusive) | TO FILL AT THE GATE |
-| Fullclip leg | TO FILL AT THE GATE |
-| Owned-path diff and zero-CR check on final candidate | TO FILL AT THE GATE |
+| Ruff / format / mypy | gate `t8a` on `ad385cbb` (13:11Z): ruff exit 0; format exit 0, 318 files already formatted; mypy exit 0, no issues in 159 source files |
+| Collection identity: parallel + serial + fullclip = all | 6,806 + 1,273 + 7 = 8,086 = all; 0 duplicates; 0 differences |
+| Parallel leg | exit 0, 591 s: 6,805 passed, 1 skipped (the by-design swscale yuvj case), 5 warnings (CuPy CUDA path, PIL truncated read; none from this package) |
+| Serial leg (exclusive) | exit 0, 2,163 s: 1,273 passed, 0 skipped (the eleven V8 look-check nodes ran on the restored frames), 1 warning |
+| Fullclip leg | exit 0, 1,601 s: 7 passed, 1 warning |
+| Owned-path diff and zero-CR check on final candidate | `git diff --name-only main...wp-t8` = the 12 owned paths; 0 CR in every changed blob |
 | Reviewer A | R1 `NO_NEW_CRITICAL_MAJOR`; terminating-round cleanup verified below |
 | Reviewer B | `NO_NEW_CRITICAL_MAJOR`; this revision addresses its minor and granted advisories |
 
@@ -456,7 +456,7 @@ to `D:/clearwater-archive/`; the frames formerly under the main checkout's
 `work/wp1.3/frames` are absent. This is a coverage loss outside WP-T8,
 routed by the orchestrator to CHARC. Source:
 `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/A/r1/review.txt` and
-the binding TURN-6 dispatch. CHARC ruled at 11:34Z that the two frames be restored from the archive; they have been restored, so the gate of record runs these eleven nodes again (TURN-7 dispatch). Gate figures remain TO FILL AT THE GATE. This cell did not inspect those folders.
+the binding TURN-6 dispatch. CHARC ruled at 11:34Z that the two frames be restored from the archive; they have been restored, so the gate of record runs these eleven nodes again (TURN-7 dispatch). The gate of record (`t8a`) ran them: the serial leg skipped none. This cell did not inspect those folders.
 
 ## Reviewer A round 1 disposition and cumulative ledger
 
@@ -514,7 +514,7 @@ Source: Findings section of
 `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/B/review.txt`, on
 `a844a37f`; binding rulings are in the TURN-7 dispatch. Verdict:
 `NO_NEW_CRITICAL_MAJOR`. This section records the small follow-up;
-the final gate figures above remain TO FILL AT THE GATE.
+the final gate figures are in the gate table above.
 
 | Finding | Classification | Disposition |
 |---|---|---|
@@ -551,4 +551,4 @@ basetemp, the sandbox mkdir shim and no cacheprovider. Ruff passes;
 format reports 5 files already formatted. Scope/encoding checks pass:
 six owned files, zero CR, fixture-test changes confined to the turn-6
 F3 addition, export-bench regression additions only, and clean diff
-whitespace. Final three-leg gate figures remain TO FILL AT THE GATE.
+whitespace. The three-leg gate figures are in the gate table above.
