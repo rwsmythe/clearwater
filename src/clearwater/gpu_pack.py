@@ -1047,8 +1047,8 @@ def activate() -> PackStatus | None:
     Call it before anything imports ``cupy`` (``clearwater.__main__`` does, on its worker,
     ``-m`` and GUI branches). A named ``-m`` target activates the pack BEFORE it is judged (an
     absent or rejected pack, or a module not from the pack, is refused after this call); ``-c``,
-    the multiprocessing flags, ``-m`` without a module name and a failed worker stdin isolation
-    are refused before it.
+    the multiprocessing flags and ``-m`` without a module name are refused before it. The
+    export worker isolates its own stdin after activation, before any backend probe or job.
 
     Returns:
         The status in a frozen build; None in a source run (nothing checked, nothing logged).
