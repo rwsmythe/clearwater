@@ -151,6 +151,10 @@ These are outside the runtime closure on the audited platform. A default
 developer sync installs both groups, but the lean application install does not.
 Licences are recorded for audit; these development tools need no notice in the
 installed program. MPL-2.0 development packages are not linked into Clearwater.
+Exception (2026-11-04, WP6.1, spec N13 second pass): PyInstaller's bootloader and the
+run-time hooks it embeds DO reach the user inside a packaged 1.1.0 artifact; their
+licence and exception are rowed below and the artifact's own notices (WP6.3) carry
+the full text. The source install (this file's subject) carries none of that code.
 
 | Component | Locked / installed version | Group | Licence | Source / metadata |
 | --- | --- | --- | --- | --- |
@@ -173,6 +177,11 @@ installed program. MPL-2.0 development packages are not linked into Clearwater.
 | librt | 0.16.0 | dev | MIT | [Source](https://github.com/mypyc/librt); installed METADATA / licence file |
 | markupsafe | 3.0.4 | comms | BSD-3-Clause | [Source](https://github.com/pallets/markupsafe/); installed METADATA / licence file |
 | mypy | 1.20.2 | dev | MIT | [Source](https://github.com/python/mypy); installed METADATA / licence file |
+| altgraph | 0.17.5 | dev (PyInstaller dependency) | MIT | [Source](https://github.com/ronaldoussoren/altgraph); installed METADATA / licence file |
+| pefile | 2024.8.26 | dev (PyInstaller dependency) | MIT | [Source](https://github.com/erocarrera/pefile); installed METADATA / licence file |
+| pyinstaller | 6.22.3 | dev (`pyinstaller>=6.22,<7`, WP6.1) | GPL-2.0-or-later WITH the PyInstaller Bootloader Exception (the exception permits a built executable to be distributed under the application's own licence; the bootloader and run-time hooks it embeds in a Clearwater 1.1.0 artifact are the only PyInstaller code a user receives) | [Source](https://github.com/pyinstaller/pyinstaller/tree/v6.22.3) (COPYING.txt carries the exception); installed METADATA / licence file. **Artifact notice (N13, 1.1.0):** the packaged artifact's own notices (WP6.3) name the bootloader version and reproduce PyInstaller's licence and exception text; the developer install carries none of its code. |
+| pyinstaller-hooks-contrib | 2026.9 | dev (PyInstaller dependency) | GPL-2.0-or-later WITH the same Bootloader Exception; its run-time hooks that a build embeds are covered the same way (named in the artifact notices, WP6.3) | [Source](https://github.com/pyinstaller/pyinstaller-hooks-contrib); installed METADATA / licence file |
+| pywin32-ctypes | 0.2.3 | dev (PyInstaller dependency, Windows) | BSD-3-Clause | [Source](https://github.com/enthought/pywin32-ctypes); installed METADATA / licence file |
 | mypy-extensions | 1.1.0 | dev | MIT | [Source](https://github.com/python/mypy_extensions); installed METADATA / licence file |
 | opentelemetry-api | 1.45.1 | comms | Apache-2.0 | [Source](https://github.com/open-telemetry/opentelemetry-python); installed METADATA / licence file |
 | packaging | 26.3 | dev | Apache-2.0 OR BSD-2-Clause | [Source](https://github.com/pypa/packaging); installed METADATA / licence file |
