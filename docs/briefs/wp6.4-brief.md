@@ -1,6 +1,6 @@
-# WP6.4 — macOS adaptation: the audit's list implemented on Windows, Mac legs marked (dispatch brief, DRAFT)
+# WP6.4 — macOS adaptation: the audit's list implemented on Windows, Mac legs marked (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-11-04 by CHARC (generation 15, session `clearwater-charc-20261104-0027`) after the WP6.2 accept `ad0a87ef` (the portability audit, `docs/reports/wp6.2-portability-audit.md`), the WP6.1 accept `b2eb4f74` and CP6a. The orchestrator fills the dispatch section; CHARC marks it FINAL. Spec v0.6.2 (G12 "auto" already platform-neutral in v0.6.1; N1 names macOS arm64 from v0.6.0); no spec clause changes. Owner decisions inside the package: none (the Mac itself is asked for at WP6.5 only; WP6.4 runs no Mac). Dispatch after WP-DR125's accept (both touch `io/video/pipes.py`'s neighbourhood and the worker's spawn path is validated here); may run beside WP6.3a / 6.3b (Codex lane, different files).
+**Status:** FINAL 2026-11-04 ~20:45Z by CHARC gen 16 (session `clearwater-charc-20261104-0738`) on orchestrator gen 45's fill `c56f6272`, seat clarifications 1-8 CONFIRMED (see the FINAL tail). DRAFT 2026-11-04 by CHARC (generation 15, session `clearwater-charc-20261104-0027`) after the WP6.2 accept `ad0a87ef` (the portability audit, `docs/reports/wp6.2-portability-audit.md`), the WP6.1 accept `b2eb4f74` and CP6a. The orchestrator fills the dispatch section; CHARC marks it FINAL. Spec v0.6.2 (G12 "auto" already platform-neutral in v0.6.1; N1 names macOS arm64 from v0.6.0); no spec clause changes. Owner decisions inside the package: none (the Mac itself is asked for at WP6.5 only; WP6.4 runs no Mac). Dispatch after WP-DR125's accept (both touch `io/video/pipes.py`'s neighbourhood and the worker's spawn path is validated here); may run beside WP6.3a / 6.3b (Codex lane, different files).
 
 | Field | Content |
 |---|---|
@@ -16,7 +16,7 @@
 | Markers | W tests parallel-leg, no marker (stubs, injected platforms, fake identities; each under 5 s); the few that spawn a real FFmpeg trial (W-CODEC availability on this laptop) are `slow` with the reason, serial leg. M tests `macos` (+ `gui` for native UI) and skipped on Windows by the explicit skip; they are collected (strict markers) and their count is in the report. No `gpu` test added; the `gpu` marker stays CUDA-specific. |
 | Hardware flags | None. No EXCLUSIVE window; no Mac. The NVENC snapshot test uses the laptop's FFmpeg listing (present) and a VT listing FIXTURE (a captured `ffmpeg -encoders` and `-h encoder=hevc_videotoolbox` text from an arm64 FFmpeg build, placed under `tests/fixtures/ffmpeg-text/` with its provenance; if the cell cannot obtain one offline, a hand-written minimal listing marked SYNTHETIC and the real one is WP6.5's). |
 | Out of scope | Running anything on a Mac (WP6.5: M tests natively, VT measurement Q1, V4 on VT output, the CPU N6 figure, CP6b, the app bundle, notices DR-123); Metal; the decoder pipe size on macOS (Q2: OS default, AD-23); an XDG -> Library migration (AD-25(a): none); Linux (markers may mention it; nothing is proved for it); the GPU pack on macOS (None by design); a universal2 / Intel build. |
-| Debt and decided items | At the accept CHARC writes: DR-121 CLOSED, DR-122 CLOSED (the helper and the five sites), DR-124 CLOSED, DR-34(a) note (P73's no-replace rename; the APFS corpus runs at WP6.5), AD-35 / AD-36 / AD-37 marked BUILT with file:line, AD-25(a) built, AD-12 note (the rate helper), the gate fill gains the W-STATIC darwin line, the WP6.1 fold-in POSIX-portability advisory (A r5 #4) CLOSED (the test runs on macOS at WP6.5), DR-130 opened for any P-row the cell could only partially implement without a Mac (named per row). |
+| Debt and decided items | At the accept CHARC writes: DR-121 CLOSED, DR-122 CLOSED (the helper and the five sites), DR-124 CLOSED, DR-34(a) note (P73's no-replace rename; the APFS corpus runs at WP6.5), AD-35 / AD-36 / AD-37 marked BUILT with file:line, AD-25(a) built, AD-12 note (the rate helper), the gate fill gains the W-STATIC darwin line, the WP6.1 fold-in POSIX-portability advisory (A r5 #4) CLOSED (the test runs on macOS at WP6.5), a NEW register row (the next free number; DR-130 and DR-131 were taken at WP-DR125's accept) opened for any P-row the cell could only partially implement without a Mac (named per row). |
 | Done | Plan 4.5. ruff / format clean; `uv run mypy` AND `uv run mypy --platform darwin` clean on the full `files` set; every existing test green and unchanged except the two start-up tests' redirection and the interface docstring assertion; the W tests green in the parallel leg (the `slow` ones serial); the M tests collected and skipped with the explicit reason on Windows; the NVENC and x265 snapshot tests green; `uv lock` diff limited to the markers (the eleven pack wheels unchanged, the `gpu_pack` table test green); the package gate per GATE_CHECKS (static both targets, collect, parallel, serial, harness; fullclip not needed: no decode / encode path change on Windows); the report; Reviewer A converged; Reviewer B clean or its single remediation done. |
 
 ## Why
@@ -57,7 +57,52 @@ Claude opus-high cell, mid-package yield at the group boundary (item 14), evalua
 
 ## Dispatch (orchestrator fills)
 
-- Base commit: (fill)
-- Lane paces at dispatch: (fill)
-- Worktree and session: (fill)
-- Depth at each yield: (fill)
+Filled by orchestrator gen 45, 2026-11-04 ~20:30Z, for CHARC's FINAL.
+
+- **Base commit:** main at dispatch, at or after `b6ce8786` (the WP-DR125 accept), plus the commit that marks this brief FINAL.
+- **Lane paces at the fill** (read 20:26Z):
+  - Codex 4 % used, pace 0.652 (resets 2026-11-11 10:07Z);
+  - Claude 44 % used, pace 1.265 (resets 2026-11-09 10:00Z).
+  - **The lane is CLAUDE by task fit, not by pace.** The package edits a frozen-interface docstring (`interfaces/settings.py`, under CHARC's grant) and designs the VT branch and the rate helper. A package that touches a frozen interface is never Codex (`docs/codex-reviewer.md`). Both nets are therefore Codex.
+  - Claude's pace is above 1. This package is the main Claude spend of the week, so I keep the group sizes as the brief sets them and re-seat by the depth rule only.
+- **Worktree and session:** `.worktrees/wp6.4`, branch `wp6.4` from the FINAL head. The cell is `implementer-opus-high`, an Agent-tool subagent named `wp64-cell1`. It is fresh for group A. Group B goes to the same cell if its depth at the group-A yield is under about 250K, else to a fresh `wp64-cell2` from the ledger.
+- **Depth at each yield:** read with `scripts/cell_depth.py` at dispatch, at the group-A yield, at every round gate and at retirement; each figure is recorded with its moment in the ledger `docs/proofs/wp6.4-ledger.md`, which the cell keeps.
+
+### Seat clarifications (readings of the brief, offered for CHARC's FINAL)
+
+1. **Running beside WP6.3a.** WP6.3a's fold-in (Codex, `.worktrees/wp6.3a`) runs at the same time. Its files are `gpu_pack_install.py`, `__main__.py`, `gpu_pack.py`, `gui/gpu_pack_dialog.py`, `gui/shell.py`, its tests, `tools/package/README.md`, the user guide's section 2 and its report. WP6.4's owned set is disjoint from these.
+   - Design item 7's darwin AD-9 reason is a string in `core/backend.py`; the status bar shows it through the existing path, and `gui/shell.py` stays untouched by 6.4.
+   - Whichever package accepts second merges main and resolves.
+2. **Line references drift.** The brief's file:line references are from `ad0a87ef`. The cell locates each site by name at its base, and records the line at its base in the report. For example, DR-124's sites are now `tests/test_app_startup.py:180` (the `APPDATA=` env block) and `tests/test_gui_startup.py:206-209`, which already set HOME / USERPROFILE.
+   - DR-124's remaining work is therefore: the app start-up test gains the HOME redirection, and BOTH tests assert disposable-home-only writes.
+3. **The mid-package yield and Reviewer A in parallel.**
+   - At the group-A yield the cell commits and reports, with the Windows suite's affected modules green and the NVENC and x265 snapshot tests green.
+   - The seat starts Reviewer A r1, Codex on a detached copy at the group-A head, and dispatches group B AT THE SAME TIME, because group B changes no group-A product file.
+   - A r1's findings on group A are folded at the next cell turn.
+   - The five-round gate counts rounds across both groups.
+4. **`uv lock` needs the index.** A Claude cell has network at the seat, so the cell runs `uv lock` itself. It records the exact command and the lock diff summary in a `.record.txt`.
+   - A version that moves beyond the markers is a STOP to the seat.
+   - The `gpu_pack` table test is the proof that the eleven pack wheels are unchanged.
+5. **The `macos` marker and the legs.**
+   - M tests marked `macos` only land in the PARALLEL leg as skipped.
+   - Those marked `macos` + `gui` land in the serial leg as skipped.
+   - The gate's two expressions do not change. The collection identity counts both, and the report gives each leg's M count, collected and skipped.
+6. **The W-CODEC `slow` tests** spawn a real one-frame NVENC trial on this laptop. They are serial-leg, with no wall-clock bound. They obey AD-23's helper and set `stdin=` explicitly.
+7. **Reviewer form (the other model).**
+   - Reviewer A is Codex at the seat on `.worktrees/wp6.4-rA`, in the `codex exec` read-only review form (WP6.1's `A\r1`..`r5`).
+   - Reviewer B is the WSL script (form `wp5.7\B\run_review_B.sh`).
+   - Every Codex review prompt says: no frozen run, no Mac, no network, and no synthetic desktop input.
+8. **Hardware rules.** The DESKTOP INPUT RULE and the ENTRY-POINT ISOLATION RULE are pasted verbatim into every dispatch to this package.
+   - Design item 10's synthetic `QWheelEvent` is a Qt event sent to Clearwater's own OFFSCREEN widget, which the rule permits.
+   - No test sends input to the desktop.
+   - No test runs a frozen build.
+
+## FINAL (CHARC gen 16, 2026-11-04 ~20:45Z, on the fill `c56f6272`)
+
+FINAL as filled. The lane is CLAUDE `implementer-opus-high` by the frozen-interface rule (the `interfaces/settings.py` docstring grant makes this a package Codex never takes), accepted with Claude's pace at 1.265 against Codex's 0.652: the owner's lane-balance direction yields to the rule, and the Codex lane carries WP6.3a / 6.3b at the same time. Both nets Codex. Clarifications 1-8 are each the brief's intended reading; three notes:
+
+- **Clarification 3 (A r1 on group A beside group B's dispatch):** confirmed, with the order inside the cell fixed: the group-B turn runs to its own yield, THEN the A r1 fold-in turn (findings on group-A files only); a group-A finding that touches a file group B is editing waits for B's yield, never a concurrent edit. The five-round gate counts every A round across both groups, as filled.
+- **Clarification 5 (the legs):** confirmed. The gate's two expressions do not change; an M test marked `macos` alone is collected in the parallel leg and skipped by its `skipif`, `macos` + `gui` in the serial leg and skipped. The report gives, per leg, the M count collected and skipped, and the collection identity still sums to all.
+- **The group-A yield's static step:** before the yield the cell runs `uv run mypy` AND `uv run mypy --platform darwin` over the full `files` set and reports both; on the darwin target the group-A yield may still show exactly the two group-B tool errors (`prototype/bench.py:1159` / `:1480`, `spike_io/transport.py:950` = three sites), listed by file:line, and nothing else; `pipes.py:56` is group A's and must be clean at the yield. Reviewer A r1 reads the yield with that expectation.
+
+Register numbering: the "Debt and decided items" row is corrected above (DR-130 / DR-131 exist since `4dae7565`); the orchestrator's accept post names the next free number. The `uv lock` record (`.record.txt`, clarification 4) goes under the evidence folder `wp6.4\cell\` beside the turn's return. Dispatch `wp64-cell1`.
