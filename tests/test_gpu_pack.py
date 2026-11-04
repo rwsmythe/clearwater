@@ -9,13 +9,17 @@ DLL search path.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import importlib.metadata
 import importlib.util
 import json
 import logging
 import os
 import sys
+import sysconfig
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -56,8 +60,13 @@ NVIDIA_LIBS = (
 
 
 def _load_build_script() -> ModuleType:
-    """Import ``tools/package/build.py`` by its path (it is not a package)."""
-    path = REPO_ROOT / "tools" / "package" / "build.py"
+    """Import ``tools/package/build.py`` by its path (it is not a package).
+
+    ``WP61_BUILD_SCRIPT`` may name another copy (an earlier commit's, for the ledger's
+    before / after record), as in ``tests/test_tools_package_build.py``.
+    """
+    default = REPO_ROOT / "tools" / "package" / "build.py"
+    path = Path(os.environ.get("WP61_BUILD_SCRIPT", default))
     spec = importlib.util.spec_from_file_location("wp61_package_build", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -84,30 +93,104 @@ def _windows_wheel(locked: gpu_pack.LockedDistribution) -> str:
     return pure
 
 
-def make_pack(root: Path) -> Path:
+WINDOWS_TAGS = ("cp312", "win_amd64")
+"""The (interpreter, platform) tags the synthetic Windows packs are checked against."""
+
+
+def _payload(locked: gpu_pack.LockedDistribution) -> dict[str, bytes]:
+    """Return the files (relative to ``site-packages``) a synthetic install of one wheel holds.
+
+    The shapes follow the real wheels: CuPy's three packages, ``cuda/pathfinder``, nothing
+    but metadata for ``cuda-toolkit``, and ``nvidia/<lib>/bin/<dll>`` for each NVIDIA wheel
+    (cuBLAS also has an ``include`` folder, which is never a DLL folder).
+    """
+    if locked.name == "cupy-cuda12x":
+        return {
+            "cupy/__init__.py": b"# cupy\n",
+            "cupyx/__init__.py": b"# cupyx\n",
+            "cupy_backends/__init__.py": b"# cupy_backends\n",
+        }
+    if locked.name == "cuda-pathfinder":
+        return {"cuda/pathfinder/__init__.py": b"# pathfinder\n"}
+    if locked.name == "cuda-toolkit":
+        return {}
+    lib = locked.name.removeprefix("nvidia-").removesuffix("-cu12").replace("-", "_")
+    files = {f"nvidia/{lib}/bin/{lib}64.dll": b"MZ" + lib.encode()}
+    if lib == "cublas":
+        files["nvidia/cublas/include/cublas.h"] = b"/* cublas */\n"
+    return files
+
+
+def record_hash(data: bytes) -> str:
+    """Return ``data``'s hash in ``RECORD``'s form, computed here (not by the product)."""
+    digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=")
+    return "sha256=" + digest.decode("ascii")
+
+
+def record_text(rows: list[tuple[str, bytes]], own: str) -> str:
+    """Return a ``RECORD`` file's text for ``(path, content)`` rows plus its own row."""
+    lines = [f"{path},{record_hash(data)},{len(data)}" for path, data in rows]
+    return "\n".join([*lines, f"{own},,"]) + "\n"
+
+
+def install(
+    site: Path, locked: gpu_pack.LockedDistribution, wheel: str, files: dict[str, bytes]
+) -> None:
+    """Install one synthetic wheel into ``site`` the way an installer does (with ``RECORD``)."""
+    dist_info = locked.dist_info_name
+    tags = sorted(build.wheel_file_tags(wheel))
+    metadata = {
+        f"{dist_info}/METADATA": f"Name: {locked.name}\nVersion: {locked.version}\n".encode(),
+        f"{dist_info}/WHEEL": (
+            "Wheel-Version: 1.0\n" + "".join(f"Tag: {t}\n" for t in tags)
+        ).encode(),
+        f"{dist_info}/INSTALLER": b"uv\n",
+    }
+    everything = {**files, **metadata}
+    for name, data in everything.items():
+        path = site / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    record = record_text(sorted(everything.items()), f"{dist_info}/RECORD")
+    (site / dist_info / "RECORD").write_text(record, encoding="utf-8", newline="\n")
+
+
+def make_pack(
+    root: Path, choose: Callable[[gpu_pack.LockedDistribution], str] | None = None
+) -> Path:
     """Fill ``root/<STAMP>`` like a hand-filled Windows pack and write its manifest.
 
     Args:
         root: The pack root.
+        choose: Picks each distribution's locked wheel; the Windows one when None.
 
     Returns:
         The pack folder.
     """
     folder = root / gpu_pack.STAMP
     site = folder / gpu_pack.SITE_PACKAGES_NAME
+    site.mkdir(parents=True)
     for locked in gpu_pack.LOCKED_DISTRIBUTIONS:
-        dist_info = site / locked.dist_info_name
-        dist_info.mkdir(parents=True)
-        (dist_info / "RECORD").write_text(f"{locked.name}/__init__.py,,\n", encoding="utf-8")
-        wheel = _windows_wheel(locked)
-        tags = sorted(build.wheel_file_tags(wheel))
-        lines = ["Wheel-Version: 1.0"] + [f"Tag: {tag}" for tag in tags]
-        (dist_info / "WHEEL").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    for lib in NVIDIA_LIBS:
-        (site / "nvidia" / lib / "bin").mkdir(parents=True)
-    (site / "nvidia" / "cublas" / "include").mkdir()  # not a bin folder: never added
+        install(site, locked, (choose or _windows_wheel)(locked), _payload(locked))
     build.write_manifest(folder)
     return folder
+
+
+def locked_named(name: str) -> gpu_pack.LockedDistribution:
+    """Return the locked distribution called ``name``."""
+    return {d.name: d for d in gpu_pack.LOCKED_DISTRIBUTIONS}[name]
+
+
+def add_record_rows(folder: Path, name: str, rows: list[str]) -> None:
+    """Append raw rows to one distribution's ``RECORD`` and rewrite the manifest to match.
+
+    So a test plants a ``RECORD`` an installer could have written: only the planted rows,
+    not a stale manifest, can make the check fail.
+    """
+    record = folder / gpu_pack.SITE_PACKAGES_NAME / locked_named(name).dist_info_name / "RECORD"
+    text = record.read_text(encoding="utf-8") + "".join(f"{row}\n" for row in rows)
+    record.write_text(text, encoding="utf-8", newline="\n")
+    build.write_manifest(folder)
 
 
 def edit_manifest(folder: Path, change: Any) -> None:
@@ -156,6 +239,8 @@ def isolated(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
     monkeypatch.setattr(os, "add_dll_directory", record, raising=False)
     monkeypatch.setattr(gpu_pack, "_DLL_HANDLES", [])
+    # The synthetic packs hold Windows wheels: check them as Windows does, on any host.
+    monkeypatch.setattr(gpu_pack, "platform_tags", lambda: WINDOWS_TAGS, raising=False)
     return added
 
 
@@ -608,15 +693,331 @@ def test_an_unreadable_record_is_rejected(
 ) -> None:
     """A RECORD that exists but cannot be read is not reported as missing."""
     folder = make_pack(tmp_path)
-    real = gpu_pack.file_sha256
-
-    def refuse(path: Path) -> str:
-        if path.parent.name.startswith("nvidia_cufft"):
-            raise PermissionError("locked")
-        return real(path)
-
-    monkeypatch.setattr(gpu_pack, "file_sha256", refuse)
+    record = folder / "site-packages" / locked_named("nvidia-cufft-cu12").dist_info_name / "RECORD"
+    for method in ("read_bytes", "open"):  # however the loader reads it
+        _refusing(monkeypatch, method, record, PermissionError(13, "locked"))
     _rejected(tmp_path, folder, "nvidia-cufft-cu12 RECORD unreadable: PermissionError", caplog)
+
+
+# The cheap check at every start-up (CHARC's ruling 2 on Reviewer A r2, with #7).
+
+
+def _site(folder: Path) -> Path:
+    """Return a pack folder's ``site-packages``."""
+    return folder / gpu_pack.SITE_PACKAGES_NAME
+
+
+def test_a_clean_pack_passes_the_cheap_and_the_full_check(
+    tmp_path: Path, isolated: list[str]
+) -> None:
+    """The synthetic pack is clean: no problem with or without hashing."""
+    folder = make_pack(tmp_path)
+    assert gpu_pack.check_pack(folder) is None
+    assert list(gpu_pack.pack_problems(folder, full=True, tags=WINDOWS_TAGS)) == []
+
+
+def test_a_listed_file_that_is_missing_is_rejected(
+    tmp_path: Path, isolated: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """(a) A file that a RECORD lists is gone (a partial install or a clean-up tool)."""
+    folder = make_pack(tmp_path)
+    (_site(folder) / "cupyx" / "__init__.py").unlink()
+    _rejected(tmp_path, folder, "cupy-cuda12x file cupyx/__init__.py missing", caplog)
+
+
+def test_a_listed_file_of_another_size_is_rejected(
+    tmp_path: Path, isolated: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """(a) A listed file whose size is not RECORD's (a truncated download)."""
+    folder = make_pack(tmp_path)
+    dll = _site(folder) / "nvidia" / "cufft" / "bin" / "cufft64.dll"
+    dll.write_bytes(dll.read_bytes()[:-1])
+    reason = "nvidia-cufft-cu12 file nvidia/cufft/bin/cufft64.dll size 6, RECORD says 7"
+    _rejected(tmp_path, folder, reason, caplog)
+
+
+def test_a_listed_folder_where_a_file_should_be_is_rejected(
+    tmp_path: Path, isolated: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """(a) The listed name exists but is a folder."""
+    folder = make_pack(tmp_path)
+    path = _site(folder) / "cuda" / "pathfinder" / "__init__.py"
+    path.unlink()
+    path.mkdir()
+    reason = "cuda-pathfinder file cuda/pathfinder/__init__.py is not a file"
+    _rejected(tmp_path, folder, reason, caplog)
+
+
+def test_a_row_without_a_size_is_checked_for_existence_only(
+    tmp_path: Path, isolated: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """(a) A size-less row (RECORD's own) needs only its file: present passes, absent fails."""
+    folder = make_pack(tmp_path)
+    (_site(folder) / "cupy" / "extra.py").write_bytes(b"any size at all")
+    add_record_rows(folder, "cupy-cuda12x", ["cupy/extra.py,,", "cupy/gone.py,,"])
+    _rejected(tmp_path, folder, "cupy-cuda12x file cupy/gone.py missing", caplog)
+
+
+def test_the_cheap_check_hashes_no_listed_file(
+    tmp_path: Path, isolated: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No hashing at start-up: a same-size content change passes the cheap check only."""
+    folder = make_pack(tmp_path)
+    (_site(folder) / "cupy" / "__init__.py").write_bytes(b"# CUPY\n")  # the same 7 bytes
+
+    def forbidden(path: object) -> bytes:
+        raise AssertionError(f"the cheap check hashed {path}")
+
+    monkeypatch.setattr(gpu_pack, "_file_digest", forbidden, raising=False)
+    assert gpu_pack.check_pack(folder) is None
+
+
+@pytest.mark.parametrize(
+    ("row", "reason"),
+    [
+        ("../escape.py,,", "RECORD row outside site-packages: ../escape.py"),
+        ("/abs/olute.py,,", "RECORD row outside site-packages: /abs/olute.py"),
+        ("C:/drive.py,,", "RECORD row outside site-packages: C:/drive.py"),
+        ("cupy/a.py,sha256=x", "RECORD malformed: row 8"),
+        ("cupy/a.py,sha256=x,big", "RECORD malformed: row 8"),
+    ],
+    ids=["dotdot", "absolute", "drive", "two-fields", "bad-size"],
+)
+def test_a_malformed_or_escaping_record_row_is_rejected(
+    tmp_path: Path, isolated: list[str], caplog: pytest.LogCaptureFixture, row: str, reason: str
+) -> None:
+    """(a) A row that is not ``path,hash,size`` or names a file outside ``site-packages``."""
+    folder = make_pack(tmp_path)
+    add_record_rows(folder, "cupy-cuda12x", [row])
+    _rejected(tmp_path, folder, f"cupy-cuda12x {reason}", caplog)
+
+
+@pytest.mark.parametrize(
+    ("planted", "name"),
+    [
+        ("numpy/__init__.py", "numpy"),
+        ("shadow.py", "shadow.py"),
+        ("zz-startup.pth", "zz-startup.pth"),
+        ("stray.dist-info/RECORD", "stray.dist-info"),
+    ],
+    ids=["package", "module", "pth", "dist-info"],
+)
+def test_an_unlisted_top_level_entry_is_rejected(
+    tmp_path: Path,
+    isolated: list[str],
+    caplog: pytest.LogCaptureFixture,
+    planted: str,
+    name: str,
+) -> None:
+    """(b) Nothing that no RECORD owns may sit in ``site-packages`` (it could shadow numpy)."""
+    folder = make_pack(tmp_path)
+    path = _site(folder) / planted
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"")
+    _rejected(tmp_path, folder, f"unlisted entry in site-packages: {name}", caplog)
+
+
+def test_ownership_is_the_first_component_of_any_record_row(
+    tmp_path: Path, isolated: list[str]
+) -> None:
+    """(b) ``nvidia`` is owned by eight RECORDs; an unlisted file INSIDE an owned folder passes.
+
+    The cheap check looks at the top level only; a nested extra file cannot shadow a
+    top-level module, and the full check does not list it either (it walks RECORD rows).
+    """
+    folder = make_pack(tmp_path)
+    (_site(folder) / "cupy" / "__pycache__").mkdir()
+    (_site(folder) / "cupy" / "__pycache__" / "x.pyc").write_bytes(b"")
+    assert gpu_pack.check_pack(folder) is None
+
+
+def test_ownership_ignores_case_where_the_platform_does(
+    tmp_path: Path, isolated: list[str]
+) -> None:
+    """(b) On Windows ``CUPY`` and ``cupy`` are one folder; elsewhere they are two."""
+    folder = make_pack(tmp_path)
+    (_site(folder) / "cupy").rename(_site(folder) / "CuPy")
+    reason = gpu_pack.check_pack(folder)
+    if os.path.normcase("A") == "a":
+        assert reason is None
+    else:
+        assert reason == "cupy-cuda12x file cupy/__init__.py missing"
+
+
+def _linux_cupy(locked: gpu_pack.LockedDistribution) -> str:
+    """Pick the Linux x86-64 CuPy wheel, the Windows wheel for everything else."""
+    if locked.name == "cupy-cuda12x":
+        return "cupy_cuda12x-14.2.0-cp312-cp312-manylinux2014_x86_64.whl"
+    return _windows_wheel(locked)
+
+
+def test_a_locked_wheel_for_another_platform_is_rejected(
+    tmp_path: Path, isolated: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """(c) #7: the Linux CuPy wheel, installed whole and with a true manifest, on Windows."""
+    folder = make_pack(tmp_path, choose=_linux_cupy)
+    reason = "cupy-cuda12x wheel tag cp312-cp312-manylinux2014_x86_64 is not for win_amd64"
+    _rejected(tmp_path, folder, reason, caplog)
+
+
+def test_a_wheel_file_without_a_usable_tag_is_rejected(
+    tmp_path: Path, isolated: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """(c) The WHEEL file gone, then present with no ``Tag:`` line."""
+    folder = make_pack(tmp_path)
+    wheel = _site(folder) / locked_named("nvidia-curand-cu12").dist_info_name / "WHEEL"
+    wheel.unlink()
+    _rejected(tmp_path, folder, "nvidia-curand-cu12 WHEEL missing", caplog)
+    caplog.clear()
+    wheel.write_text("Wheel-Version: 1.0\n", encoding="utf-8")
+    _rejected(tmp_path, folder, "nvidia-curand-cu12 WHEEL has no Tag line", caplog)
+
+
+@pytest.mark.parametrize(
+    ("tag", "interpreter", "platform", "fits"),
+    [
+        ("cp312-cp312-win_amd64", "cp312", "win_amd64", True),
+        ("py3-none-win_amd64", "cp312", "win_amd64", True),
+        ("py3-none-any", "cp312", "linux_x86_64", True),
+        ("py2.py3-none-any", "cp312", "win_amd64", True),
+        ("cp312-abi3-win_amd64", "cp312", "win_amd64", True),
+        ("cp312-cp312-manylinux2014_x86_64", "cp312", "linux_x86_64", True),
+        ("py3-none-manylinux_2_27_x86_64", "cp312", "linux_x86_64", True),
+        ("cp312-cp312-manylinux2014_x86_64", "cp312", "win_amd64", False),
+        ("py3-none-manylinux_2_27_aarch64", "cp312", "linux_x86_64", False),
+        ("cp312-cp312-win_amd64", "cp312", "win_arm64", False),
+        ("cp311-cp311-win_amd64", "cp312", "win_amd64", False),
+        ("py2-none-any", "cp312", "win_amd64", False),
+        ("not-a-tag", "cp312", "win_amd64", False),
+    ],
+)
+def test_tag_fits(tag: str, interpreter: str, platform: str, fits: bool) -> None:
+    """The platform rule, by injection, for Windows and Linux machines."""
+    assert gpu_pack.tag_fits(tag, interpreter, platform) is fits
+
+
+def test_platform_tags_name_the_running_interpreter_and_platform() -> None:
+    """``cp312`` and, on 64-bit Windows, ``win_amd64`` (the pack's locked wheel)."""
+    interpreter, platform = gpu_pack.platform_tags()
+    assert interpreter == f"cp{sys.version_info.major}{sys.version_info.minor}"
+    assert platform == sysconfig.get_platform().replace("-", "_").replace(".", "_").lower()
+    if sysconfig.get_platform() == "win-amd64":
+        assert platform == "win_amd64"
+
+
+def test_an_os_error_during_the_walk_is_a_rejection(
+    tmp_path: Path,
+    isolated: list[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A listed file that cannot be examined, then a ``site-packages`` that cannot be listed."""
+    folder = make_pack(tmp_path)
+    target = os.path.join(_site(folder), "cupy", "__init__.py")
+    real_stat = os.stat
+
+    def stat(path: Any, *args: Any, **kwargs: Any) -> os.stat_result:
+        if os.fspath(path) == target:
+            raise PermissionError(13, "Access is denied")
+        return real_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "stat", stat)
+    reason = "cupy-cuda12x file cupy/__init__.py unreadable: PermissionError"
+    _rejected(tmp_path, folder, reason, caplog)
+    monkeypatch.setattr(os, "stat", real_stat)
+    caplog.clear()
+    real_scandir = os.scandir
+    site = os.fspath(_site(folder))
+
+    def scandir(path: Any = ".") -> Any:
+        if os.fspath(path) == site:
+            raise PermissionError(13, "Access is denied")
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", scandir)
+    _rejected(tmp_path, folder, "pack unreadable: PermissionError", caplog)
+
+
+# build.py --verify: the full check for a hand-filled pack.
+
+
+def _verify(folder: Path, capsys: pytest.CaptureFixture[str]) -> tuple[int, list[str]]:
+    """Run ``build.py --verify <folder>`` in this process; return its status and lines."""
+    status = build.main(["--verify", str(folder)])
+    return status, capsys.readouterr().out.splitlines()
+
+
+def test_verify_passes_a_clean_pack_with_one_line(
+    tmp_path: Path, isolated: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Exit 0 and one summary line naming the rows and files checked."""
+    folder = make_pack(tmp_path)
+    status, lines = _verify(folder, capsys)
+    assert status == 0
+    (line,) = lines
+    assert line.startswith(f"verify {folder}: PASS (11 distributions; ")
+    rows = sum(1 + len(_payload(d)) + 3 for d in gpu_pack.LOCKED_DISTRIBUTIONS)
+    assert f"{rows} RECORD rows" in line
+
+
+def test_verify_lists_every_mismatch(
+    tmp_path: Path, isolated: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Content changed (same size), size changed, a file missing, an unlisted entry: all four."""
+    folder = make_pack(tmp_path)
+    site = _site(folder)
+    (site / "cupy" / "__init__.py").write_bytes(b"# CUPY\n")  # same size, other content
+    (site / "nvidia" / "curand" / "bin" / "curand64.dll").write_bytes(b"MZcurand+")
+    (site / "cuda" / "pathfinder" / "__init__.py").unlink()
+    (site / "numpy").mkdir()
+    status, lines = _verify(folder, capsys)
+    assert status == 1
+    assert lines[0] == f"verify {folder}: FAIL (5 problems)"
+    assert lines[1:] == [
+        "  cupy-cuda12x file cupy/__init__.py sha256 mismatch",
+        "  cuda-pathfinder file cuda/pathfinder/__init__.py missing",
+        "  nvidia-curand-cu12 file nvidia/curand/bin/curand64.dll size 9, RECORD says 8",
+        "  nvidia-curand-cu12 file nvidia/curand/bin/curand64.dll sha256 mismatch",
+        "  unlisted entry in site-packages: numpy",
+    ]
+
+
+def test_verify_also_runs_the_start_up_checks(
+    tmp_path: Path, isolated: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The manifest against the lock (d) and the platform tags (c) are part of the full check."""
+    folder = make_pack(tmp_path, choose=_linux_cupy)
+    edit_manifest(folder, lambda d: entry(d, "nvidia-cufft-cu12").update(version="0"))
+    status, lines = _verify(folder, capsys)
+    assert status == 1
+    assert lines[1:] == [
+        "  cupy-cuda12x wheel tag cp312-cp312-manylinux2014_x86_64 is not for win_amd64",
+        "  nvidia-cufft-cu12 version 0, expected 11.4.1.4",
+    ]
+
+
+def test_verify_flags_a_listed_file_without_a_hash(
+    tmp_path: Path, isolated: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Only RECORD's own row may lack a hash in the full check (the cheap one allows it)."""
+    folder = make_pack(tmp_path)
+    (_site(folder) / "cupy" / "extra.py").write_bytes(b"x")
+    add_record_rows(folder, "cupy-cuda12x", ["cupy/extra.py,,1"])
+    assert gpu_pack.check_pack(folder) is None
+    status, lines = _verify(folder, capsys)
+    assert status == 1
+    assert lines[1:] == ["  cupy-cuda12x file cupy/extra.py has no hash in RECORD"]
+
+
+@pytest.mark.parametrize("other", [["--form", "onedir"], ["--write-manifest", "x"]])
+def test_verify_is_exclusive_with_the_other_actions(
+    tmp_path: Path, other: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``--verify`` with ``--form`` or ``--write-manifest`` is a usage error (exit 2)."""
+    with pytest.raises(SystemExit) as raised:
+        build.parse_args(["--verify", str(tmp_path), *other])
+    assert raised.value.code == 2
+    assert "not allowed with argument" in capsys.readouterr().err
 
 
 # activate() (D4).

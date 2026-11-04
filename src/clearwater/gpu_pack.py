@@ -22,23 +22,34 @@ The loader only acts in a frozen build (``sys.frozen``); a source install takes 
 own environment (the ``gpu`` extra). It never writes, creates or deletes anything: the pack
 folder is read-only to it. It imports only the standard library, so it can run first.
 
-The manifest check guards against a partial, corrupt or wrong-version install, not against a
-local attacker who can already write the user's own folder. It checks the manifest and each
-distribution's ``RECORD`` file, not every file the ``RECORD`` lists (that is the installer's
-job at install time).
+The check guards against a partial, corrupt, wrong-version or wrong-platform install, not
+against a local attacker who can already write the user's own folder. At every start-up it
+runs the CHEAP check (:func:`check_pack`, CHARC's ruling at Reviewer A r2): the manifest
+matches the lock; each distribution's ``RECORD`` file has the manifest's sha256; each
+distribution's ``WHEEL`` tags fit the running platform; every file a ``RECORD`` lists exists
+with the size that ``RECORD`` gives; and ``site-packages`` holds no top-level entry that no
+``RECORD`` owns (so nothing unlisted, a ``.pth`` file or a second ``numpy`` say, can shadow
+the bundle). It hashes no file but the ``RECORD`` files. Hashing every file is the
+installer's job, once, at install time (:func:`pack_problems` with ``full=True``, which the
+build script's ``--verify`` runs on a pack filled by hand).
 """
 
 from __future__ import annotations
 
+import base64
+import csv
 import hashlib
+import io
 import json
 import logging
 import os
 import re
+import stat
 import sys
-from collections.abc import Mapping
+import sysconfig
+from collections.abc import Generator, Iterator, Mapping
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Literal
 
 _LOG = logging.getLogger(__name__)
@@ -355,6 +366,25 @@ def pack_root(
     return data / POSIX_APP_FOLDER / PACK_FOLDER_NAME
 
 
+def _file_digest(path: Path | str) -> bytes:
+    """Return a file's raw sha256 digest, reading it in 1 MiB blocks.
+
+    Args:
+        path: The file.
+
+    Returns:
+        The 32-byte digest.
+
+    Raises:
+        OSError: The file cannot be read.
+    """
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.digest()
+
+
 def file_sha256(path: Path) -> str:
     """Return a file's sha256 as lower-case hex.
 
@@ -367,11 +397,115 @@ def file_sha256(path: Path) -> str:
     Raises:
         OSError: The file cannot be read.
     """
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(block)
-    return digest.hexdigest()
+    return _file_digest(path).hex()
+
+
+def record_hash(digest: bytes) -> str:
+    """Return a sha256 digest in ``RECORD``'s form: ``sha256=`` + urlsafe base64, no padding.
+
+    Args:
+        digest: The raw digest.
+
+    Returns:
+        For example ``sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU`` (an empty file).
+    """
+    return "sha256=" + base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+@dataclass(frozen=True)
+class RecordRow:
+    """One row of a distribution's ``RECORD`` file.
+
+    Attributes:
+        path: The file, relative to ``site-packages``, with ``/`` separators.
+        hash: ``<algorithm>=<urlsafe base64>``, or ``""`` (the ``RECORD`` file's own row).
+        size: The size in bytes, or None when the row gives none.
+    """
+
+    path: str
+    hash: str
+    size: int | None
+
+
+def parse_record(text: str) -> list[RecordRow] | str:
+    """Parse a ``RECORD`` file's text (CSV rows ``path,hash,size``).
+
+    Args:
+        text: The file's text.
+
+    Returns:
+        The rows, or the reason the text is malformed: a row without three fields, an empty
+        path, a size that is not a whole number, or a path that leaves ``site-packages``
+        (absolute, with a drive, or with a ``..`` part).
+    """
+    rows: list[RecordRow] = []
+    for number, fields in enumerate(csv.reader(io.StringIO(text, newline="")), start=1):
+        if not fields:
+            continue
+        if len(fields) != 3 or not fields[0]:
+            return f"RECORD malformed: row {number}"
+        path, digest, size = fields
+        if size and not size.isdecimal():
+            return f"RECORD malformed: row {number}"
+        posix, windows = PurePosixPath(path), PureWindowsPath(path)
+        if posix.is_absolute() or windows.drive or windows.root or ".." in windows.parts:
+            return f"RECORD row outside site-packages: {_safe(path)}"
+        rows.append(RecordRow(path, digest, int(size) if size else None))
+    return rows
+
+
+def platform_tags() -> tuple[str, str]:
+    """Return the running interpreter's tag and platform tag, as wheel tags spell them.
+
+    Returns:
+        For example ``("cp312", "win_amd64")`` or ``("cp312", "linux_x86_64")``.
+    """
+    version = f"{sys.version_info.major}{sys.version_info.minor}"
+    prefix = "cp" if sys.implementation.name == "cpython" else sys.implementation.name[:2]
+    platform = re.sub(r"[-.]", "_", sysconfig.get_platform()).lower()
+    return f"{prefix}{version}", platform
+
+
+_MANYLINUX = re.compile(r"manylinux(?:1|2010|2014|_\d+_\d+)_(?P<arch>\w+)")
+"""A ``manylinux`` platform tag; the glibc version it names is not compared."""
+
+
+def tag_fits(tag: str, interpreter: str, platform: str) -> bool:
+    """Return whether one wheel tag (``python-abi-platform``) can run here.
+
+    The python part fits when it is the interpreter's tag (``cp312``), ``py3`` or ``py312``
+    (the same major and minor); the ABI part when it is ``none``, the interpreter's tag or
+    ``abi3``; the platform part when it is ``any``, the running platform tag, or, on Linux, a
+    ``manylinux`` tag for the same machine (its glibc version is not compared). A compressed
+    tag set (``py2.py3``) fits when any of its tags does.
+
+    Args:
+        tag: The tag, for example ``cp312-cp312-win_amd64``.
+        interpreter: The interpreter's tag (:func:`platform_tags`).
+        platform: The running platform tag (:func:`platform_tags`).
+
+    Returns:
+        True when the tag fits.
+    """
+    parts = tag.split("-")
+    if len(parts) != 3:
+        return False
+    major = interpreter[2:3]
+    pythons = {interpreter, f"py{major}", f"py{interpreter[2:]}"}
+    abis = {"none", interpreter} | ({"abi3"} if interpreter.startswith("cp") else set())
+    pys, abi_set, plats = (part.split(".") for part in parts)
+
+    def platform_fits(plat: str) -> bool:
+        if plat in ("any", platform):
+            return True
+        match = _MANYLINUX.fullmatch(plat)
+        return match is not None and platform == f"linux_{match.group('arch')}"
+
+    return (
+        any(p in pythons for p in pys)
+        and any(a in abis for a in abi_set)
+        and any(platform_fits(p) for p in plats)
+    )
 
 
 @dataclass(frozen=True)
@@ -447,14 +581,11 @@ def _manifest_entries(document: object) -> list[dict[str, str]] | str:
 
 
 def check_pack(folder: Path) -> str | None:
-    """Check one pack folder (``<pack root>/<stamp>``) against the lock. Reads only.
+    """Run the cheap check on one pack folder (``<pack root>/<stamp>``). Reads only.
 
-    The checks, in order: the manifest parses, its format is :data:`MANIFEST_FORMAT` and its
-    stamp is :data:`STAMP`; ``site-packages`` exists; the distributions are exactly
-    :data:`LOCKED_DISTRIBUTIONS`, each at its locked version and naming one of its locked
-    wheels with that wheel's sha256; and each distribution's installed ``RECORD`` file exists
-    with the sha256 the manifest records. A file-system error on any check (an existence or
-    type check included) is a rejection, never an exception out of start-up.
+    This is :func:`pack_problems` without file hashing, stopped at its first problem: the
+    check every start-up runs. A file-system error on any check (an existence or type check
+    included) is a rejection, never an exception out of start-up.
 
     Args:
         folder: The pack folder.
@@ -463,62 +594,232 @@ def check_pack(folder: Path) -> str | None:
         None when the pack passes, else the first failed check as a short ASCII reason.
     """
     try:
-        return _check_pack(folder)
+        return next(pack_problems(folder), None)
     except OSError as error:
         return f"pack unreadable: {type(error).__name__}"
 
 
-def _check_pack(folder: Path) -> str | None:
-    """Run :func:`check_pack`'s checks; an ``OSError`` from a path check propagates to it.
+def pack_problems(
+    folder: Path,
+    *,
+    full: bool = False,
+    tags: tuple[str, str] | None = None,
+) -> Iterator[str]:
+    """Yield every way one pack folder differs from the lock and from its ``RECORD`` files.
+
+    The checks, in order:
+
+    1. ``manifest.json`` parses, its format is :data:`MANIFEST_FORMAT` and its stamp is
+       :data:`STAMP`; ``site-packages`` exists; the distributions are exactly
+       :data:`LOCKED_DISTRIBUTIONS` (each failure here ends the walk).
+    2. For each distribution (ruling (d), then (c), then (a)): its locked version, one of its
+       locked wheels with that wheel's sha256, the installed ``RECORD`` file with the
+       manifest's sha256; its ``WHEEL`` file's ``Tag:`` lines, of which at least one must fit
+       the running platform (:func:`tag_fits`); and each ``RECORD`` row (:func:`parse_record`)
+       naming a regular file that exists with the row's size. A row without a size (the
+       ``RECORD`` file's own) is checked for existence only.
+    3. Ruling (b): every top-level entry of ``site-packages`` is owned, that is, it is the
+       first path component of some row of the eleven ``RECORD`` files (compared as the
+       platform compares file names, so case-insensitively on Windows). Skipped when a
+       ``RECORD`` could not be read, since ownership is then unknown.
+
+    With ``full`` each row's file is also hashed and compared with the row's ``sha256``, and a
+    row without a hash (other than the ``RECORD`` file's own) is a problem: the install-time
+    check (``tools/package/build.py --verify``). Without it no file but the ``RECORD`` files is
+    read.
 
     Args:
         folder: The pack folder.
+        full: Also hash every listed file.
+        tags: The (interpreter, platform) tags to fit; :func:`platform_tags` when None.
 
-    Returns:
-        None when the pack passes, else the first failed check.
+    Yields:
+        Each problem as a short ASCII reason, in check order.
+
+    Raises:
+        OSError: A file-system error on a structural check (the manifest, ``site-packages``,
+            a ``RECORD`` existence check, the ``site-packages`` listing). A listed file that
+            cannot be examined is yielded as a problem instead.
     """
     manifest = folder / MANIFEST_NAME
     if not manifest.is_file():
-        return f"no {MANIFEST_NAME}"
+        yield f"no {MANIFEST_NAME}"
+        return
     try:
         document = json.loads(manifest.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, ValueError) as error:
-        return f"{MANIFEST_NAME} unreadable: {type(error).__name__}"
+        yield f"{MANIFEST_NAME} unreadable: {type(error).__name__}"
+        return
     entries = _manifest_entries(document)
     if isinstance(entries, str):
-        return entries
+        yield entries
+        return
     site = folder / SITE_PACKAGES_NAME
     if not site.is_dir():
-        return f"no {SITE_PACKAGES_NAME} folder"
+        yield f"no {SITE_PACKAGES_NAME} folder"
+        return
     expected = {locked.name: locked for locked in LOCKED_DISTRIBUTIONS}
     seen: set[str] = set()
     for entry in entries:
         name = entry["name"]
         if name not in expected:
-            return f"unexpected distribution {_safe(name)}"
+            yield f"unexpected distribution {_safe(name)}"
+            return
         if name in seen:
-            return f"duplicate distribution {name}"
+            yield f"duplicate distribution {name}"
+            return
         seen.add(name)
     missing = sorted(set(expected) - seen)
     if missing:
-        return f"missing distribution {missing[0]}"
+        yield f"missing distribution {missing[0]}"
+        return
+    interpreter, platform = platform_tags() if tags is None else tags
+    owned: set[str] = set()
+    every_record_read = True
     for entry in entries:
         locked = expected[entry["name"]]
         if entry["version"] != locked.version:
-            return f"{locked.name} version {_safe(entry['version'])}, expected {locked.version}"
+            yield f"{locked.name} version {_safe(entry['version'])}, expected {locked.version}"
         if (entry["wheel"], entry["wheel_sha256"].lower()) not in locked.wheels:
             wheel = _safe(entry["wheel"])
-            return f"{locked.name} wheel {wheel} with that sha256 is not in the lock"
-        record = site / locked.dist_info_name / "RECORD"
-        if not record.is_file():
-            return f"{locked.name} RECORD missing"
-        try:
-            actual = file_sha256(record)
-        except OSError as error:
-            return f"{locked.name} RECORD unreadable: {type(error).__name__}"
-        if actual != entry["record_sha256"].lower():
-            return f"{locked.name} RECORD sha256 mismatch"
-    return None
+            yield f"{locked.name} wheel {wheel} with that sha256 is not in the lock"
+        rows = yield from _record_problems(site, locked, entry["record_sha256"])
+        if rows is None:
+            every_record_read = False
+            continue
+        yield from _wheel_tag_problems(site, locked, interpreter, platform)
+        for row in rows:
+            owned.add(os.path.normcase(PurePosixPath(row.path).parts[0]))
+            yield from _row_problems(site, locked, row, full=full)
+    if every_record_read:
+        with os.scandir(site) as listing:
+            names = sorted(item.name for item in listing)
+        for name in names:
+            if os.path.normcase(name) not in owned:
+                yield f"unlisted entry in site-packages: {_safe(name)}"
+
+
+def _record_problems(
+    site: Path, locked: LockedDistribution, record_sha256: str
+) -> Generator[str, None, list[RecordRow] | None]:
+    """Check one distribution's ``RECORD`` file and return its rows.
+
+    Args:
+        site: The pack's ``site-packages``.
+        locked: The distribution.
+        record_sha256: The sha256 hex the manifest records for the file.
+
+    Yields:
+        A missing, unreadable, mismatched or malformed ``RECORD``.
+
+    Returns:
+        The rows, or None when the file is missing, unreadable or malformed.
+
+    Raises:
+        OSError: The existence check itself fails.
+    """
+    record = site / locked.dist_info_name / "RECORD"
+    if not record.is_file():
+        yield f"{locked.name} RECORD missing"
+        return None
+    try:
+        data = record.read_bytes()
+    except OSError as error:
+        yield f"{locked.name} RECORD unreadable: {type(error).__name__}"
+        return None
+    if hashlib.sha256(data).hexdigest() != record_sha256.lower():
+        yield f"{locked.name} RECORD sha256 mismatch"
+    try:
+        rows = parse_record(data.decode("utf-8"))
+    except UnicodeDecodeError:
+        rows = "RECORD malformed: not UTF-8"
+    if isinstance(rows, str):
+        yield f"{locked.name} {rows}"
+        return None
+    return rows
+
+
+def _wheel_tag_problems(
+    site: Path, locked: LockedDistribution, interpreter: str, platform: str
+) -> Iterator[str]:
+    """Check that one distribution's ``WHEEL`` file names a tag for this platform (ruling (c)).
+
+    Args:
+        site: The pack's ``site-packages``.
+        locked: The distribution.
+        interpreter: The interpreter's tag.
+        platform: The running platform tag.
+
+    Yields:
+        A missing or unreadable ``WHEEL`` file, one with no ``Tag:`` line, or one whose tags
+        do not fit.
+    """
+    wheel = site / locked.dist_info_name / "WHEEL"
+    try:
+        text = wheel.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        yield f"{locked.name} WHEEL missing"
+        return
+    except (OSError, UnicodeDecodeError) as error:
+        yield f"{locked.name} WHEEL unreadable: {type(error).__name__}"
+        return
+    tags = sorted(
+        line.split(":", 1)[1].strip() for line in text.splitlines() if line.startswith("Tag:")
+    )
+    if not tags:
+        yield f"{locked.name} WHEEL has no Tag line"
+    elif not any(tag_fits(tag, interpreter, platform) for tag in tags):
+        yield f"{locked.name} wheel tag {_safe(','.join(tags))} is not for {platform}"
+
+
+def _row_problems(
+    site: Path, locked: LockedDistribution, row: RecordRow, *, full: bool
+) -> Iterator[str]:
+    """Check one ``RECORD`` row against the file it names (ruling (a); with ``full``, its hash).
+
+    Args:
+        site: The pack's ``site-packages``.
+        locked: The distribution the row belongs to.
+        row: The row.
+        full: Also hash the file and compare it with the row's ``sha256``.
+
+    Yields:
+        A missing, unreadable or non-regular file, a size mismatch and, with ``full``, a
+        missing, non-sha256 or mismatched hash.
+    """
+    name = f"{locked.name} file {_safe(row.path)}"
+    path = os.path.join(site, *PurePosixPath(row.path).parts)
+    try:
+        info = os.stat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        yield f"{name} missing"
+        return
+    except OSError as error:
+        yield f"{name} unreadable: {type(error).__name__}"
+        return
+    if not stat.S_ISREG(info.st_mode):
+        yield f"{name} is not a file"
+        return
+    if row.size is not None and info.st_size != row.size:
+        yield f"{name} size {info.st_size}, RECORD says {row.size}"
+    if not full:
+        return
+    own_record = os.path.normcase(row.path) == os.path.normcase(f"{locked.dist_info_name}/RECORD")
+    if not row.hash:
+        if not own_record:
+            yield f"{name} has no hash in RECORD"
+        return
+    algorithm, _, _value = row.hash.partition("=")
+    if algorithm != "sha256":
+        yield f"{name} hash {_safe(algorithm)}, expected sha256"
+        return
+    try:
+        actual = record_hash(_file_digest(path))
+    except OSError as error:
+        yield f"{name} unreadable: {type(error).__name__}"
+        return
+    if actual != row.hash:
+        yield f"{name} sha256 mismatch"
 
 
 _DLL_HANDLES: list[object] = []

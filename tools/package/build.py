@@ -20,9 +20,12 @@ Usage::
     uv run --no-sync python tools/package/build.py --form onedir
     uv run --no-sync python tools/package/build.py --form onefile --with-ffmpeg
     uv run --no-sync python tools/package/build.py --write-manifest <pack root>/<stamp>
+    uv run --no-sync python tools/package/build.py --verify <pack root>/<stamp>
 
 ``--write-manifest`` writes ``manifest.json`` for a GPU pack filled by hand (the loader's
 layout, :mod:`clearwater.gpu_pack`); the WP6.3 downloader will write the same file.
+``--verify`` runs the FULL check on such a pack (every listed file's sha256 and size, plus the
+loader's start-up checks) and lists each problem.
 
 This is spike tooling (evidence, not product): see ``tools/package/README.md``.
 """
@@ -844,6 +847,86 @@ def write_manifest(folder: Path) -> Path:
     return path
 
 
+def verify_pack(folder: Path) -> list[str]:
+    """Return every problem the FULL pack check finds in a pack folder filled by hand.
+
+    The full check is :func:`clearwater.gpu_pack.pack_problems` with ``full=True``: the cheap
+    start-up check (the manifest against the lock, each ``RECORD``'s sha256, the ``WHEEL``
+    platform tags, every listed file's existence and size, no unlisted top-level entry) plus
+    each listed file's sha256 against its ``RECORD`` row. Reads only.
+
+    Args:
+        folder: The pack folder, ``<pack root>/<stamp>``.
+
+    Returns:
+        The problems, in check order; empty when the pack is clean.
+    """
+    from clearwater import gpu_pack
+
+    problems: list[str] = []
+    try:
+        problems.extend(gpu_pack.pack_problems(folder, full=True))
+    except OSError as error:
+        problems.append(f"pack unreadable: {type(error).__name__}")
+    return problems
+
+
+def pack_census(folder: Path) -> tuple[int, int, int]:
+    """Count a pack's ``RECORD`` rows, and the files and bytes under its ``site-packages``.
+
+    Args:
+        folder: The pack folder.
+
+    Returns:
+        (rows in the eleven ``RECORD`` files that parse, files on disk, bytes on disk).
+
+    Raises:
+        OSError: A ``RECORD`` file cannot be read.
+    """
+    from clearwater import gpu_pack
+
+    site = folder / gpu_pack.SITE_PACKAGES_NAME
+    rows = 0
+    for locked in gpu_pack.LOCKED_DISTRIBUTIONS:
+        record = site / locked.dist_info_name / "RECORD"
+        if record.is_file():
+            parsed = gpu_pack.parse_record(record.read_text(encoding="utf-8"))
+            rows += 0 if isinstance(parsed, str) else len(parsed)
+    files = 0
+    size = 0
+    for parent, _dirs, names in os.walk(site):
+        for name in names:
+            files += 1
+            size += os.stat(os.path.join(parent, name)).st_size
+    return rows, files, size
+
+
+def verify(folder: Path) -> int:
+    """Run the full check on a hand-filled pack and print the result (``--verify``).
+
+    Args:
+        folder: The pack folder.
+
+    Returns:
+        0 with a one-line summary when the pack is clean; 1 with each problem listed.
+    """
+    from clearwater import gpu_pack
+
+    problems = verify_pack(folder)
+    if problems:
+        print(f"verify {folder}: FAIL ({len(problems)} problems)")
+        for problem in problems:
+            print(f"  {problem}")
+        return 1
+    rows, files, size = pack_census(folder)
+    print(
+        f"verify {folder}: PASS ({len(gpu_pack.LOCKED_DISTRIBUTIONS)} distributions;"
+        f" {rows} RECORD rows, each file's sha256 and size; {files} files,"
+        f" {size / 2**20:.1f} MiB)"
+    )
+    return 0
+
+
 def run_pyinstaller(args: Sequence[str]) -> None:
     """Run PyInstaller in this process: ``PyInstaller.__main__.run(args)``.
 
@@ -946,12 +1029,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         argv: The arguments; ``sys.argv[1:]`` when None.
 
     Returns:
-        The parsed namespace (``form``, ``out``, ``with_ffmpeg``, ``write_manifest``).
+        The parsed namespace (``form``, ``out``, ``with_ffmpeg``, ``write_manifest``,
+        ``verify``).
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--form", choices=FORMS)
     action.add_argument("--write-manifest", type=Path, metavar="PACK_FOLDER")
+    action.add_argument("--verify", type=Path, metavar="PACK_FOLDER")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--with-ffmpeg", action="store_true")
     return parser.parse_args(argv)
@@ -972,6 +1057,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         path = write_manifest(Path(os.path.abspath(options.write_manifest)))
         print(f"wrote {path}")
         return 0
+    if options.verify is not None:
+        sys.dont_write_bytecode = True
+        return verify(Path(os.path.abspath(options.verify)))
     out = Path(os.path.abspath(options.out))
     return build(cast(Form, options.form), out=out, with_ffmpeg=options.with_ffmpeg)
 

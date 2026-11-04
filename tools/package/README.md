@@ -117,3 +117,30 @@ match the installed `WHEEL` file, that wheel's sha256 from `uv.lock`, and the sh
 installed `RECORD` file. The loader rejects the pack when any of these disagrees with the lock
 or with the folder. Point `LOCALAPPDATA` at a folder under `work/` for a proof run; never fill
 the real `%LOCALAPPDATA%\Clearwater` from the harness.
+
+### What the loader checks at every start-up, and `--verify`
+
+The CHEAP check (`gpu_pack.check_pack`, every start-up, no file hashed but the `RECORD`
+files) rejects the pack, with a one-line reason and the CPU path, when:
+
+- (d) the manifest disagrees with the lock (above), or a `RECORD` file with the manifest;
+- (c) no `Tag:` line of a distribution's `WHEEL` file fits the running interpreter and
+  platform (`gpu_pack.tag_fits`: `win_amd64` here; on Linux a `manylinux` tag of the same
+  machine, its glibc version not compared);
+- (a) a `RECORD` row is malformed or leaves `site-packages`, or the file it names is missing,
+  not a regular file, or not the row's size (a row without a size, the `RECORD` file's own,
+  is checked for existence only);
+- (b) `site-packages` holds a top-level entry that is not the first path component of any
+  row of the eleven `RECORD` files (an unlisted package, module, `.pth` file or
+  `.dist-info`), so nothing outside the pack can shadow the bundle's `numpy`.
+
+Hashing every file is the installer's job, once. For a pack filled by hand:
+
+```
+uv run --no-sync python tools/package/build.py --verify <pack root>/<stamp>
+```
+
+runs the FULL check: all of the above plus each listed file's sha256 (`RECORD`'s urlsafe
+base64 form) against the file, and any listed file without a hash. It exits 0 with one
+summary line (rows, files, size) when the pack is clean, and 1 with every problem listed.
+`--verify` excludes `--form` and `--write-manifest`.
