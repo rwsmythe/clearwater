@@ -355,7 +355,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             return run_interpreter_option([arguments[0], *reentry])
         _start_logging()
     marker = gpu_pack.pending_removal_path()
-    if marker is not None and marker.exists():
+    root = gpu_pack.pack_root()
+    if (marker is not None and marker.exists()) or (
+        root is not None
+        and root.is_dir()
+        and next(root.glob(f"{gpu_pack.STAMP}.partial-*"), None) is not None
+    ):
         from clearwater import gpu_pack_install
 
         gpu_pack_install.apply_pending_removal()

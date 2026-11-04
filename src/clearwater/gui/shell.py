@@ -510,7 +510,9 @@ class MainWindow(ShellWindow):
         marker = gpu_pack.pending_removal_path()
         if self._gpu_removal_pending and (marker is None or not marker.exists()):
             self._gpu_removal_pending = False
-            self.set_idle_device("CPU: GPU support changes take effect at the next start")
+            self._idle_device = "CPU: GPU support changes take effect at the next start"
+            if hasattr(self, "device_label"):
+                self._update_status()
         supported = root is not None
         self._gpu_install.setVisible(supported)
         self._gpu_remove.setVisible(supported)

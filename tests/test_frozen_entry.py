@@ -186,6 +186,45 @@ def test_gui_start_applies_pending_removal_only_before_activation(
 
 
 @pytest.mark.timeout(10)
+@pytest.mark.parametrize("frozen", [False, True])
+def test_gui_start_sweeps_markerless_partial_without_creating_absent_root(
+    monkeypatch, tmp_path, calls, frozen
+):
+    """A real GUI-branch cleanup sweeps leftovers but creates no root for a first start."""
+    if frozen:
+        _frozen(monkeypatch, tmp_path)
+        monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    else:
+        monkeypatch.delattr(sys, "frozen", raising=False)
+    root = tmp_path / "packs"
+    partial = root / (gpu_pack.STAMP + ".partial-interrupted")
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: root)
+    entry, blocker = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+
+    def activate():
+        assert not partial.exists(), "partial must be swept before activation"
+        calls.append(("activate", None))
+
+    monkeypatch.setattr(gpu_pack, "activate", activate)
+    assert entry.main(["Clearwater"]) == 3
+    assert not root.exists(), "no-pack startup must not create the pack root or lock"
+    expected = ([("log", tmp_path / "cfg" / "logs")] if frozen else []) + [
+        ("activate", None),
+        ("gui", ["Clearwater"]),
+    ]
+    assert calls == expected
+    calls.clear()
+    partial.mkdir(parents=True)
+    (partial / "leftover.dll").write_bytes(b"unmapped remainder")
+    assert not gpu_pack.pending_removal_path().exists()
+    assert entry.main(["Clearwater"]) == 3
+    assert list(root.iterdir()) == []
+    assert calls == expected
+    assert blocker.attempts == []
+
+
+@pytest.mark.timeout(10)
 def test_gui_start_locked_pack_keeps_marker_and_skips_activation(
     monkeypatch,
     tmp_path,

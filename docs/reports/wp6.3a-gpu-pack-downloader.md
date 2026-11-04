@@ -7,7 +7,10 @@ Dispatch 6 folds Reviewer A r2 into `196d2380`, revising removal for mapped
 images under CHARC's three-layer ruling. Reviewer A converged at r3 on
 `ffb8896e` (NO_NEW_CRITICAL_MAJOR). Dispatch 7 folds all five remaining r3
 findings into merged HEAD `852fcee8`; the short delta review, real-download
-seat proof, Reviewer B and release gate remain with the orchestrator.
+seat proof, Reviewer B and release gate were next at that handoff. The delta
+review of `9c2bdded` also returned NO_NEW_CRITICAL_MAJOR, with two new MINOR
+findings. Dispatch 8 folds both into merged HEAD `c606a895`; the seat proof,
+Reviewer B (including this delta) and release gate remain with the orchestrator.
 
 ## Design as built
 
@@ -63,7 +66,8 @@ pack to a partial folder before deleting any file. A blocked probe or rename
 leaves the pack intact and writes the empty `<stamp>.remove` marker. A delete
 PermissionError after rename also returns pending, keeping the remainder for
 a future partial sweep. Other filesystem failures are reported. Matching plain partial folders are cleaned
-under the operation lock on every GUI startup, install and remove; files,
+under the operation lock on GUI startup when a marker or matching partial
+entry exists, and on install/remove; files,
 symlinks and reparse points with partial names are skipped and logged without
 being followed. The image probe uses a recursive `os.scandir` walk that skips
 symlinks and all Windows reparse points, for both files and directories.
@@ -302,7 +306,8 @@ and a passing `--verify`, rather than equality with uv's extra files. These are
 expectations, not cell results. Real download, frozen build, two GPU worker runs, mapped-file
 proof, product removal and real-profile absence checks belong to the seat.
 The cell wrote no seat/download script and ran no frozen executable. Reviewer
-A converged at r3; its short cleanup delta review, Reviewer B and the final
+A converged at r3 and its cleanup delta review found no new critical or major
+issue. Both delta MINOR findings are folded in below; Reviewer B and the final
 gate are pending.
 
 ## Reviewer A r1 fold-in (dispatch 5)
@@ -447,7 +452,8 @@ cell's footprint. Depth is supplied by the dispatcher's driver, not estimated.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | A r1, initial fold-in; #2 reopened at r2 | 1 / 1 / 4 / 5 | 10 / 1 | 11 / 0 | 0 | 6 initial / 1 / 1 finding groups; #2 corrected below | 7, 10, 11 per CHARC | Turn-5 end: 160,597 / 475,000, supplied at dispatch 6 |
 | A r2, adjudicated and folded in | 0 / 1 / 2 / 2 | 5 / 0 | 4 / 1 (#2) | 0 | 3 / 2 / 0 finding groups | No new banked finding | Turn-6 end: 229,611, supplied at dispatch 7 |
-| A r3, CONVERGED; all five cleanup findings folded in | 0 / 0 / 2 / 3 | 4 / 1 (R3-5, expressly granted) | 5 / 0 | 0 | 4 / 1 / 0 finding groups | None of r3's five left open | DISPATCHER TO FILL |
+| A r3, CONVERGED; all five cleanup findings folded in | 0 / 0 / 2 / 3 | 4 / 1 (R3-5, expressly granted) | 5 / 0 | 0 | 4 / 1 / 0 finding groups; R3-3 integration corrected by delta F1 | None of r3's five left open after delta F1 | Turn-7 end: 109,576 / 475,000, supplied at dispatch 8 |
+| A delta, NO_NEW_CRITICAL_MAJOR; two MINORs folded in | 0 / 0 / 2 / 1 | 3 / 0 | 3 / 0 | 0 | 2 / 0 / 0 finding groups; A1 equivalent, no change | None | DISPATCHER TO FILL |
 
 The r1 turn bundled its ruled remediation groups in one logical review
 fold-in. At that handoff Reviewer A r2 and the real-download seat proof were
@@ -590,18 +596,21 @@ half-done. This turn bundles the five commissioned cleanup findings.
 | --- | --- | --- |
 | R3-1 MINOR | Before a Windows image write-open, clear FILE_ATTRIBUTE_READONLY using `os.chmod`; any OSError clearing it returns in-use/pending before a rename | `test_read_only_unmapped_image_removes_cleanly`; `test_read_only_image_attribute_failure_defers_intact` for PermissionError and OSError. Actual read-only image removal failed before the fix; generic attribute OSError initially returned failure, then passed after widening the clear-failure handling |
 | R3-2 MINOR, test-only | Child-mapped DLL is under `site-packages/nvidia/x/bin/`; child-loaded `.pyd` and the observed uppercase extension are under `site-packages/pkg/`. Byte/mtime snapshots cover nested files | `test_child_mapped_image_keeps_pack_intact_until_exit[dll/pyd]` and `test_probe_opens_both_image_extensions_without_writing`; all three fail the top-level-only mutant and pass the restored implementation |
-| R3-3 ADVISORY | `apply_pending_removal()` sweeps partials on every GUI start under the operation lock, even without a marker. Busy lock refuses immediately; per-partial PermissionError stays logged/tolerated | `test_startup_sweeps_leftover_partial_without_marker` and `test_startup_busy_lock_skips_partial_sweep`; both failed before the fix. Existing four-way delete-race and unreadable-partial tests remain green |
+| R3-3 ADVISORY | `apply_pending_removal()` sweeps partials whenever called, under the operation lock, even without a marker. Busy lock refuses immediately; per-partial PermissionError stays logged/tolerated. The missing GUI-entry call is corrected by delta F1 below | `test_startup_sweeps_leftover_partial_without_marker` and `test_startup_busy_lock_skips_partial_sweep` test the helper, not entry-point integration; delta F1 adds the real GUI-branch test |
 | R3-4 ADVISORY | Menu-action refresh clears `_gpu_removal_pending` when the marker is gone, including successful install and removal completions. The label then says `CPU: GPU support changes take effect at the next start`; later ordinary device reasons work again | Offscreen `test_pending_reason_clears_after_marker_is_gone[install/remove]`; both failed before the fix. Existing startup-marker precedence test remains green |
 | R3-5 ADVISORY, originally out of envelope, granted | Replace `rglob` with an iterative `os.scandir` walk; inspect entries without following links, skip symlinks/all reparse points, and recurse only into plain directories | `test_probe_never_enters_linked_images[junction/directory-symlink/file-symlink]`; actual junction and file-symlink cases failed against the old walk. All three pass here, with a guard that rejects any outside image write-open and an unchanged outside payload |
 
-The startup call in `__main__` is unchanged. The partial sweep moved out of
-the marker-only helper to the already-called GUI-start wrapper. Install and
-remove retain their own lock-held sweeps. A partial still locked after a
-mapping race can remain when the absent stamp's marker is cleared; every
-later GUI start now retries that partial without needing the marker. This
-supersedes the r2 historical gap described above. Child entry branches remain
-read-only. The shell does not activate GPU support after any operation; a
-restart still applies the change.
+Turn 7 left the startup call in `__main__` unchanged, incorrectly assuming
+that the wrapper was called on every GUI start. The delta review confirmed
+that the call was marker-only, so the direct-helper tests did not prove the
+product path and turn 7's every-start report claim was incorrect. Under the
+dispatch-8 grant, the GUI branch now checks for a marker OR an existing root
+directory with a `<STAMP>.partial-*` entry, using one glob of the root only.
+It then calls the lock-held sweep; no marker is needed for a leftover partial
+to be retried at a later start. A missing root causes no installer call and
+no root/lock creation. Install/remove retain their own lock-held sweeps.
+Child entry branches remain read-only. The shell does not activate GPU
+support after any operation; a restart still applies the change.
 
 ### R3 validation
 
@@ -650,7 +659,7 @@ script was written.
 | Read-only image can be pending forever | Actual attribute test failed against the pre-change implementation (`r3-red.log`) | Confirmed and fixed; clean removal plus two attribute-failure pending controls pass |
 | Attribute-clear failure may escape as a raw failure | Explicit generic OSError control failed (`r3-attribute-red.log`: 1 failed / 1 passed) | Confirmed and fixed; clear-failure OSError is in-use, not a failed removal |
 | Probe recursion remains unprotected | Equivalent in-memory M12 mutant fails three named tests | Rejected as a remaining gap; restored code passes three |
-| A markerless race remainder never gets another startup sweep | New markerless and busy-lock cases both failed against old code | Confirmed and fixed; sweep occurs under lock and retries at the next unlocked startup |
+| A markerless race remainder never gets another startup sweep | New markerless and busy-lock helper cases both failed against old code, but did not cover the GUI entry call | Helper fixed at r3; real-start integration confirmed missing and corrected by delta F1 |
 | Pending status remains after the marker disappears | Both install/remove GUI cases failed (`r3-gui-red.log`) | Confirmed and fixed; ordinary later device reason and tooltip work again |
 | Probe can write-open outside the pack via a link | Actual junction and file-symlink regressions failed against `rglob` (`r3-red.log`) | Confirmed and fixed; all three linked-entry controls pass |
 | Final in-envelope pass | 434 required non-GUI tests, 91 module-alone tests, 21 offscreen tests, restored mutant controls, static checks and owned-file audit | No further in-envelope finding |
@@ -667,3 +676,91 @@ interface change, real network fetch, GPU activation, frozen run/build,
 desktop input, git write, footage/profile write or edit outside the owned
 files occurred. All five rulings are implemented; no deviation or open
 question needs a ruling in this turn.
+
+## Delta-review fold-in (dispatch 8)
+
+The delta review of turn 7 (`9c2bdded` against `ffb8896e`) returned
+NO_NEW_CRITICAL_MAJOR, with two new MINOR findings and one equivalent-mutant
+advisory. It executed R3-1, R3-2, R3-4 and R3-5 successfully, killing 9 of 10
+mutants. CHARC's complete delta ruling grants the GUI-entry condition edit
+and the constructor-safe reset. Both findings are confirmed and fixed here.
+
+| Finding | Change | Discriminating test |
+| --- | --- | --- |
+| F1 MINOR, missing real-start integration | One hunk in the GUI branch of `__main__.main` adds the existing-root/partial alternative to the marker condition. It uses `root.is_dir()` and one root glob; the installer is not called when the root is absent. Worker and frozen `-m` branches are unchanged | `test_gui_start_sweeps_markerless_partial_without_creating_absent_root[False/True]` in `tests/test_frozen_entry.py` covers source/frozen. Each first starts with an absent root and proves it stays absent, then plants a markerless partial and proves actual cleanup completes before the stub activation/GUI |
+| F2 MINOR, constructor race | Smaller guarded-refresh option: `_update_gpu_actions()` always resets the flag and `_idle_device`, and calls `_update_status()` only when `device_label` exists. During construction the ordinary later status refresh renders that value; subsequent operation/menu refreshes still update the label immediately | Offscreen `test_marker_vanishing_during_construction_resets_without_a_status_bar` returns an existing marker on the first lookup and a missing one thereafter; window construction succeeds with the correct non-pending label and later ordinary device reasons work |
+| A1 ADVISORY, equivalent mutant | No change, as ruled: ignoring a failed chmod still leaves READONLY set, so real write-open fails and returns in-use | Delta reviewer classified the surviving mutant as equivalent; no new assertion or product change added |
+
+F1's test uses the existing `calls`, `_fresh_entry` and `_fake_gui` helpers in
+`test_frozen_entry.py`. APPDATA, LOCALAPPDATA and all four XDG variables are
+redirected under `tmp_path`; PySide6/shiboken6/GUI imports are blocked;
+`app.main`, activation, logging and worker entry are stubbed. Both cases have
+a ten-second timeout. They execute the real installer cleanup, without a
+network request or pack activation. F2 uses the existing offscreen shell
+fixture with disposable profiles and stubbed real install/remove operations.
+
+The true GUI-start order is now: marker-or-root-partial check, optional
+`apply_pending_removal()` under its operation lock, activation unless a marker
+remains, then the GUI. A first start without a pack creates neither its root
+nor `.install.lock`. No recursive scan inside the installed pack was added.
+This corrects the turn-7 report's every-start claim, which its direct-helper
+tests did not establish. The installer implementation itself is unchanged.
+
+### Delta validation and turn-7 discrimination
+
+All logs are under `work/wp6.3a/`. Every pytest run set
+`PYTHONPATH=scripts` and `QT_QPA_PLATFORM=offscreen`, loaded
+`-p sandbox_mkdir_shim -p no:cacheprovider`, and used the indicated bounded
+timeout and disposable worktree basetemp. As in prior turns, the GUI command
+includes the binding sandbox shim in addition to the dispatch's command.
+
+| Command | Result / evidence |
+| --- | --- |
+| `uv run --no-sync ruff check .` | All checks passed, exit 0; `delta-ruff.log` |
+| `uv run --no-sync ruff format --check .` | 327 files already formatted, exit 0; `delta-format-check.log` |
+| `uv run --no-sync mypy` | No issues in 163 source files, exit 0; `delta-mypy.log` |
+| `uv run --no-sync mypy --platform darwin` | Exactly 4 accepted baseline errors in 3 files / 163 checked, exit 1; `delta-darwin.log` |
+| `uv run --no-sync python work/wp6.3a/delta-turn7.py entry` | Exact turn-7 entry module loaded in memory; **2 expected failures in 0.71 s**, exit 1, at `partial must be swept before activation`; `delta-turn7-entry.log` |
+| `uv run --no-sync python work/wp6.3a/delta-turn7.py gui` | Exact turn-7 `_update_gpu_actions` patched in memory; **1 expected failure in 0.21 s**, exit 1, with `AttributeError: 'MainWindow' object has no attribute 'device_label'`; `delta-turn7-gui.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 600 tests/test_frozen_entry.py::test_gui_start_sweeps_markerless_partial_without_creating_absent_root tests/test_gui_gpu_pack_dialog.py::test_marker_vanishing_during_construction_resets_without_a_status_bar --basetemp=work/c63a-8green` | Fixed normal code: **3 passed in 0.75 s**, exit 0; `delta-green.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_gpu_pack.py tests/test_gpu_pack_install.py tests/test_tools_package_build.py tests/test_frozen_entry.py --basetemp=work/c63a-8 --junitxml=work/wp6.3a/delta-tests.xml` | **436 passed in 23.19 s**, exit 0; `delta-tests.log` / XML |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 600 tests/test_gui_gpu_pack_dialog.py --basetemp=work/c63a-8gui --junitxml=work/wp6.3a/delta-gui.xml` | **22 passed in 0.99 s**, exit 0; `delta-gui.log` / XML |
+| `uv run --no-sync python work/wp6.3a/delta-audit.py` (includes `git diff --name-only` and `git diff --check`) | Exactly 5 owned files, 0 CR bytes, clean diff check, one granted `__main__` hunk, unchanged seat section, XML counts 436 / 22 with 0 failures/errors/skips; `delta-audit.log` |
+
+The old-code probes read source at `9c2bdded` using read-only `git show` and
+compile it in memory in separate processes; no product file is reverted or
+committed. The entry import hook supplies the turn-7 module only to the
+isolated tests, and the GUI probe replaces only the old action-refresh
+method. Both still use the current test fixtures and their isolation rules.
+The initial test-first runs also reproduced the same two entry failures
+(`delta-entry-red.log`, 2 failed / 0.80 s) and the constructor AttributeError
+(`delta-gui-red.log`, 1 failed / 0.83 s). The final full normal runs above
+confirm the fixed code after the old-code probe processes exit.
+
+Darwin's only errors are `src/clearwater/io/video/pipes.py:56`,
+`tools/prototype/bench.py:1159`, `tools/prototype/bench.py:1480` and
+`tools/spike_io/transport.py:950`. There is no new error, test skip or sandbox
+residual. Timings describe test runs only.
+
+| Verification-loop suspicion | Confirmation / rejection | Final disposition |
+| --- | --- | --- |
+| Markerless partial cleanup is unreachable from real GUI entry | Source and frozen entry tests fail against exact turn-7 code before the activation stub | Confirmed; one condition hunk fixes integration; both pass |
+| Making cleanup unconditional would create a root for CPU-only users | Each new entry case first asserts the root remains absent after a no-pack start | Rejected as a remaining defect; condition guards the installer call |
+| Marker disappearance can refresh a status bar that does not yet exist | Exact turn-7 action-refresh method raises the reported AttributeError | Confirmed; guarded refresh constructs and renders the correct label |
+| Guarded constructor refresh could break later pending resets | Existing install/remove completion tests and the new later-device-reason check pass in the 22-case GUI run | Rejected as a remaining defect |
+| Final in-envelope pass | Required static checks, 436 non-GUI tests, 22 offscreen tests and footprint/hunk/CR audit | No further in-envelope finding |
+
+The cumulative delta ledger above records 0 critical / 0 major / 2 minor /
+1 advisory, all NEW, no reverts, two product-code finding groups and A1
+equivalent/no change. Turn-7 depth was 109,576 / 475,000 as supplied in
+dispatch 8; this turn's depth is DISPATCHER TO FILL. No item is stopped and
+no deviation or open question needs a ruling. The seat-run section remains
+**SEAT TO FILL**; the seat, full Reviewer B (covering these two edits), gate
+and accept remain with the orchestrator under the delta ruling.
+
+This turn changes only the five dispatch-8 owned files, with the isolated
+entry tests in `tests/test_frozen_entry.py` and no change to
+`tests/test_gpu_pack_install.py`. No dependency, frozen interface, worker or
+`-m` branch changed. No real fetch, GPU activation, frozen executable/build,
+desktop input, git write, footage/profile write or seat/download script was
+performed or created.

@@ -334,6 +334,31 @@ def test_pending_reason_clears_after_marker_is_gone(
     assert window.device_label.toolTip() == "Tools > Install GPU support..."
 
 
+def test_marker_vanishing_during_construction_resets_without_a_status_bar(
+    make_window, monkeypatch, isolated_pack
+):
+    isolated_pack.mkdir()
+    present = isolated_pack / (gpu_pack.STAMP + ".remove")
+    present.touch()
+    missing = isolated_pack / "already-removed"
+    calls = 0
+
+    def changing_marker():
+        nonlocal calls
+        calls += 1
+        return present if calls == 1 else missing
+
+    monkeypatch.setattr(gpu_pack, "pending_removal_path", changing_marker)
+    window = make_window()
+    assert calls >= 2
+    assert window.device_label.text() == (
+        "Device: CPU: GPU support changes take effect at the next start"
+    )
+    assert window.device_label.toolTip() == ""
+    window.set_idle_device("CPU: CuPy not installed")
+    assert window.device_label.text() == "Device: CPU: CuPy not installed"
+
+
 def test_this_process_loaded_remove_only_writes_marker(make_window, monkeypatch, isolated_pack):
     folder = isolated_pack / gpu_pack.STAMP
     folder.mkdir(parents=True)
