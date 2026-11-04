@@ -17,6 +17,23 @@ reader folds those back into ONE request before summing three of its usage
 fields into a depth-in-tokens figure, read straight through the file, never
 writing to it.
 
+Selectors: --all (the default) reads every discovered cell; --live HOURS
+reads fresh cells plus older cells whose parent main transcript is fresh
+(flagged parked); repeatable --agent ID reads agent-a<ID>*.jsonl at any age.
+These three selectors are mutually exclusive. --sessions switches to direct
+<project>/<session-id>.jsonl main transcripts, named by session id; it works
+with --all or --live, but not --agent. --session restricts discovery literally
+in either mode, and the positional substring filters the reported names.
+
+Every row appends age=<hours to one decimal>h and flag=ok, OVER, parked, or
+OVER,parked. The PEAK cap applies to all selected rows, including parked ones.
+Exit codes: 0 clean (also a nonempty discovery with an empty live window);
+1 no transcripts discovered, loudly reported as NO CELLS FOUND; 2 PEAK over
+cap; 3 incomplete measurement; 4 usage/configuration error, including unknown
+agent IDs. Exit 2 wins over 3. An empty live window prints one stdout line:
+no cells written in the last <H>h (cap <N>); nothing to check
+(sessions instead of cells in --sessions mode).
+
 STDLIB ONLY. Read-only: this script never creates, deletes, or modifies a
 transcript.
 """
@@ -27,8 +44,10 @@ import argparse
 import math
 import os
 import sys
+import time
 import json
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 # A NAMED cell: agent-a<name>-<16 hex char hash>.jsonl. An ANONYMOUS cell (no
@@ -387,6 +406,127 @@ def discover_cells(project: Path, session: str | None,
             yield name, session_id, Path(entry.path)
 
 
+_Transcript = tuple[str, str, Path]
+
+
+def discover_sessions(project: Path, session: str | None,
+                      errors: list[DiscoveryError] | None = None) -> Iterator[_Transcript]:
+    """Yield main transcripts directly under a project, named by session id.
+
+    Match an optional session literally, with the same single-segment guard
+    as cell discovery. Scandir/stat failures raise DiscoveryError in strict
+    mode or accumulate in errors while healthy entries remain discoverable.
+    A main transcript does not require a corresponding session directory.
+    """
+    if session is not None and not _is_single_segment(session):
+        raise BadSession(f"--session must be a single directory name, not {session!r}")
+    try:
+        entries = _scan_dir_entries(project)
+    except OSError as exc:
+        error = DiscoveryError(f"cannot list sessions under {project}: {exc}")
+        if errors is not None:
+            errors.append(error)
+            return
+        raise error from exc
+    for entry in entries:
+        if not entry.name.endswith(".jsonl"):
+            continue
+        name = entry.name[:-6]
+        if session is not None and name != session:
+            continue
+        try:
+            is_file = entry.is_file()
+        except OSError as exc:
+            error = DiscoveryError(f"cannot stat {entry.path}: {exc}")
+            if errors is not None:
+                errors.append(error)
+                continue
+            raise error from exc
+        if is_file:
+            yield name, name, Path(entry.path)
+
+
+def find_agents(cells: list[_Transcript], project: Path, session: str | None,
+                agent_ids: list[str]) -> tuple[list[_Transcript], list[str]]:
+    """Select requested filename prefixes at any age and report missing patterns.
+
+    Reuse already discovered cells so named/anonymous parsing and scandir
+    failures retain the cell reader's contract. Each path is returned once,
+    even when requested IDs repeat or overlap. IDs are literal prefixes of
+    the filename portion following agent-a, not additional filesystem globs.
+    """
+    selected: set[Path] = set()
+    missing: list[str] = []
+    for agent_id in agent_ids:
+        matches = [path for _, _, path in cells
+                   if path.name.startswith(f"agent-a{agent_id}")]
+        if not matches:
+            missing.append(str(project / (session if session is not None else "*")
+                               / "subagents" / f"agent-a{agent_id}*.jsonl"))
+        selected.update(matches)
+    return [cell for cell in cells if cell[2] in selected], missing
+
+
+def session_transcript_path(cell_path: Path) -> Path:
+    """Return the parent main transcript derived only from the cell's own path.
+
+    A cell at project/session/subagents/agent-a*.jsonl has its parent main
+    transcript at project/session.jsonl, always within that same project.
+    """
+    session_dir = cell_path.parent.parent
+    return session_dir.parent / f"{session_dir.name}.jsonl"
+
+
+def _transcript_age_hours(path: Path, *, now: float) -> float:
+    """Measure transcript age with one stat, clamping future mtimes to zero."""
+    return max(0.0, (now - path.stat().st_mtime) / 3600.0)
+
+
+def session_transcript_age_hours(cell_path: Path, *, now: float | None = None) -> float | None:
+    """Return the parent transcript's age, or None if it has disappeared.
+
+    One guarded stat avoids an existence-check/stat race. Other filesystem
+    failures propagate so a failed parent lookup cannot look like a clean
+    exclusion from a live census.
+    """
+    stamp = time.time() if now is None else now
+    try:
+        return _transcript_age_hours(session_transcript_path(cell_path), now=stamp)
+    except FileNotFoundError:
+        return None
+
+
+def select_live(cells: list[_Transcript], live_hours: float, *,
+                ages: dict[Path, float], now: float | None = None,
+                errors: list[DiscoveryError] | None = None) -> tuple[list[_Transcript], set[Path]]:
+    """Select fresh cells and older cells parked under a fresh parent session.
+
+    Return selected cells and the parked subset's paths. Missing parents do
+    not retain old cells. Other parent stat failures raise DiscoveryError,
+    or accumulate in errors while selection continues for healthy cells.
+    """
+    stamp = time.time() if now is None else now
+    kept: list[_Transcript] = []
+    parked: set[Path] = set()
+    for cell in cells:
+        _, _, path = cell
+        if ages[path] <= live_hours:
+            kept.append(cell)
+            continue
+        try:
+            parent_age = session_transcript_age_hours(path, now=stamp)
+        except OSError as exc:
+            error = DiscoveryError(f"cannot stat parent transcript for {path}: {exc}")
+            if errors is not None:
+                errors.append(error)
+                continue
+            raise error from exc
+        if parent_age is not None and parent_age <= live_hours:
+            kept.append(cell)
+            parked.add(path)
+    return kept, parked
+
+
 class _ConfigError(Exception):
     """Raised in place of `ArgumentParser`'s default `sys.exit(2)` on a usage
     error (bad `--cap`, an unknown argument, a missing option value) so
@@ -409,7 +549,7 @@ def _build_parser() -> argparse.ArgumentParser:
                      "this, so a dispatcher reads it here.")
     parser.add_argument(
         "cell", nargs="?", default=None,
-        help="only report cells whose name contains this substring")
+        help="only report cells or sessions whose name contains this substring")
     parser.add_argument(
         "--project", type=Path, default=None,
         help="project transcript directory (default: this clone's own "
@@ -425,13 +565,30 @@ def _build_parser() -> argparse.ArgumentParser:
              "because the binding rule requires re-dispatch from a FRESH "
              "context, and a compacted cell's current depth looks cheap "
              "again while carrying the same degraded context")
+    selectors = parser.add_mutually_exclusive_group()
+    selectors.add_argument(
+        "--live", type=float, metavar="HOURS",
+        help="report transcripts written within HOURS; cell mode also includes "
+             "older cells with fresh parent transcripts, flagged parked")
+    selectors.add_argument(
+        "--all", action="store_true", help="report every discovered transcript (the default)")
+    selectors.add_argument(
+        "--agent", action="append", metavar="ID",
+        help="read agent-a<ID>*.jsonl at any age; repeatable; incompatible with --sessions")
+    parser.add_argument(
+        "--sessions", action="store_true",
+        help="read main <project>/<session-id>.jsonl transcripts instead of cells; "
+             "--live uses only their own mtime")
     parser.epilog = (
-        "Exit codes: 0 clean; 1 no cells found; 2 a cell's PEAK depth exceeds "
+        "Exit codes: 0 clean (including a nonempty discovery with an empty "
+        "--live window, reported as 'nothing to check'); 1 no transcripts "
+        "found (NO CELLS FOUND on stderr); 2 a transcript's PEAK depth exceeds "
         "--cap; 3 the sweep ran but is INCOMPLETE (an unreadable transcript, "
         "an unparsed filename, a directory-listing error, skipped malformed "
         "lines, or a cell with zero usage-bearing requests yet -- 2 always "
         "wins over 3 when both apply); 4 usage/configuration error (bad "
-        "--project, bad --session, an invalid --cap, or any other argument "
+        "--project, bad --session, an invalid --cap, an unknown --agent ID, "
+        "--agent with --sessions, or any other argument "
         "error -- the measurement never ran).")
     return parser
 
@@ -439,6 +596,8 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     try:
         args = _build_parser().parse_args(argv)
+        if args.agent and args.sessions:
+            raise _ConfigError("--agent reads cells; it cannot be combined with --sessions")
     except _ConfigError as exc:
         print(f"USAGE ERROR: {exc}", file=sys.stderr)
         return 4
@@ -462,22 +621,56 @@ def main(argv: list[str] | None = None) -> int:
     unreadable = []
     discovery_errors: list[DiscoveryError] = []
     try:
-        for name, session_id, path in discover_cells(
-                project, args.session, errors=discovery_errors):
-            if args.cell and args.cell not in name:
-                continue
-            try:
-                stats = read_transcript(path)
-            except (OSError, UnicodeDecodeError) as exc:
-                # One unreadable transcript (permissions, a mid-write
-                # truncation, a stray non-UTF-8 file) must not take down the
-                # report for every OTHER cell in the same sweep.
-                unreadable.append((name, path, exc))
-                continue
-            rows.append((name, session_id, path, stats))
+        discover = discover_sessions if args.sessions else discover_cells
+        cells = list(discover(project, args.session, errors=discovery_errors))
     except BadSession as exc:
         print(f"BAD --session: {exc}", file=sys.stderr)
         return 4
+
+    if args.agent:
+        cells, missing = find_agents(cells, project, args.session, args.agent)
+        if missing:
+            for error in discovery_errors:
+                print(f"DISCOVERY ERROR: {error}", file=sys.stderr)
+            for pattern in missing:
+                print(f"USAGE ERROR: no cell transcript found; searched: {pattern}",
+                      file=sys.stderr)
+            return 4
+    if args.cell:
+        cells = [cell for cell in cells if args.cell in cell[0]]
+    discovered = bool(cells)
+    ages: dict[Path, float] = {}
+    stamp = time.time()
+    measurable: list[_Transcript] = []
+    for cell in cells:
+        name, _, path = cell
+        try:
+            ages[path] = _transcript_age_hours(path, now=stamp)
+        except OSError as exc:
+            unreadable.append((name, path, exc))
+            continue
+        measurable.append(cell)
+    cells = measurable
+    parked: set[Path] = set()
+    if args.live is not None:
+        if args.sessions:
+            cells = [cell for cell in cells if ages[cell[2]] <= args.live]
+        else:
+            cells, parked = select_live(cells, args.live, ages=ages, now=stamp,
+                                       errors=discovery_errors)
+        if not cells and discovered and not unreadable and not discovery_errors:
+            kind = "sessions" if args.sessions else "cells"
+            print(f"no {kind} written in the last {args.live:g}h (cap {args.cap:,}); "
+                  "nothing to check")
+            return 0
+    for name, session_id, path in cells:
+        try:
+            stats = read_transcript(path)
+        except (OSError, UnicodeDecodeError) as exc:
+            # One unreadable transcript must not blind the rest of the sweep.
+            unreadable.append((name, path, exc))
+            continue
+        rows.append((name, session_id, path, stats))
 
     for error in discovery_errors:
         print(f"DISCOVERY ERROR: {error}", file=sys.stderr)
@@ -490,10 +683,14 @@ def main(argv: list[str] | None = None) -> int:
         # is the exact defect this script exists to prevent -- a naive glob
         # that misses subagents/ once undercounted a real arc's spend by 42.9%
         # while reporting "no cells" as if that were a clean negative result.
-        print(f"NO CELLS FOUND under {project} "
-              f"(glob: {session_desc}/subagents/agent-a*.jsonl) -- "
-              "verify the project directory and session id; a directory "
-              "without a subagents/ subdirectory will always report this",
+        if args.sessions:
+            pattern = f"{args.session}.jsonl" if args.session is not None else "*.jsonl"
+        else:
+            pattern = f"{session_desc}/subagents/agent-a*.jsonl"
+        advice = ("verify the project directory and session id" if args.sessions else
+                  "verify the project directory and session id; a directory "
+                  "without a subagents/ subdirectory will always report this")
+        print(f"NO CELLS FOUND under {project} (glob: {pattern}) -- {advice}",
               file=sys.stderr)
         return 1
 
@@ -509,6 +706,9 @@ def main(argv: list[str] | None = None) -> int:
         if stats.malformed or stats.turns == 0:
             any_incomplete_row = True
         marker = "  PAST-CAP" if past_cap else ""
+        flag = "OVER" if past_cap else "ok"
+        if path in parked:
+            flag = "OVER,parked" if past_cap else "parked"
         # rung-a item (d): the CLI version SET, on the row itself. Sorted so the
         # line is stable, and SPAN is called out by name -- a set of size > 1 IS a
         # span, and the reader says so rather than leaving a comma to be noticed.
@@ -520,7 +720,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             cli = f"  cli=SPAN[{','.join(versions)}]"
         print(f"{name}  current={stats.current}  peak={stats.peak}  "
-              f"turns={stats.turns}  session={session_id[:8]}{cli}{marker}")
+              f"turns={stats.turns}  session={session_id[:8]}{cli}{marker}  "
+              f"age={ages[path]:.1f}h  flag={flag}")
         if stats.malformed:
             print(f"  ({stats.malformed} malformed line(s) skipped in "
                   f"{path.name})", file=sys.stderr)

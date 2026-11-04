@@ -15,8 +15,10 @@ import contextlib
 import io
 import itertools
 import json
+import os
 import shutil
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -333,7 +335,7 @@ class MainCliTest(unittest.TestCase, TmpDirMixin):
             # session and the marker. These fixture records carry no `version` key,
             # so it reads `none-recorded` -- an explicit absence, never a blank.
             r"^fixture-cell {2}current=450002 {2}peak=450002 {2}turns=3 {2}"
-            r"session=session- {2}cli=none-recorded {2}PAST-CAP\s*$",
+            r"session=session- {2}cli=none-recorded {2}PAST-CAP {2}age=\d+\.\dh {2}flag=OVER\s*$",
             "the exact one-line output format, pinned end to end")
 
     def test_compacted_cell_trips_past_cap_on_peak_not_current(self) -> None:
@@ -844,6 +846,269 @@ class CliVersionSetTest(unittest.TestCase, TmpDirMixin):
         stats = cd.read_transcript(path)
         self.assertEqual(stats.cli_versions, {"2.1.265", "2.1.266"})
         self.assertEqual(stats.turns, 3)          # unchanged by the new collection
+
+
+class SelectorCliTest(unittest.TestCase, TmpDirMixin):
+    """Port the sibling reader's selectors onto strict transcript discovery."""
+
+    def setUp(self) -> None:
+        TmpDirMixin.setUp(self)
+        self.now = time.time()
+
+    def _cell(self, name: str | None, depth: int, *, age: float = 0,
+              session: str = "sess-1", identity: str = "0123456789abcdef") -> Path:
+        filename = (f"agent-a{name}-{identity}.jsonl" if name is not None
+                    else f"agent-a{identity}.jsonl")
+        path = self.tmp / session / "subagents" / filename
+        _write_transcript(path, [_usage_record(0, depth, 0)])
+        self._age(path, age)
+        return path
+
+    def _session(self, depth: int = 0, *, age: float = 0,
+                 session: str = "sess-1") -> Path:
+        path = self.tmp / f"{session}.jsonl"
+        _write_transcript(path, [_usage_record(0, depth, 0)])
+        self._age(path, age)
+        return path
+
+    def _age(self, path: Path, hours: float) -> None:
+        stamp = self.now - hours * 3600
+        os.utime(path, (stamp, stamp))
+
+    def _run(self, *extra: str) -> tuple[int, str, str]:
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = cd.main(["--project", str(self.tmp), *extra])
+        return rc, out.getvalue(), err.getvalue()
+
+    def test_live_filter_selects_by_transcript_age(self) -> None:
+        self._cell("old", 900_000, age=48)
+        self._cell(None, 100_000, age=1 / 60)
+        rc, out, _ = self._run("--live", "6")
+        self.assertEqual(rc, 0)
+        self.assertIn("0123456789abcdef  current=100000", out)
+        self.assertNotIn("old  current", out)
+        self.assertRegex(out, r"age=0\.0h {2}flag=ok\s*$")
+
+    def test_sessions_mode_reads_main_transcripts_and_excludes_cells(self) -> None:
+        self._cell("cell", 700_000)
+        main = self._session(396_000)
+        # Main-session mode must retain request folding and PEAK/current semantics.
+        _write_transcript(main, [
+            _usage_record(1000, 390_000, 5000, message_id="first"),
+            {"type": "user"},
+            _usage_record(1000, 390_000, 5000, message_id="first"),
+            _usage_record(0, 10, 0, message_id="second"),
+        ])
+        rc, out, _ = self._run("--sessions")
+        self.assertEqual(rc, 0)
+        self.assertIn("sess-1  current=10  peak=396000  turns=2", out)
+        self.assertNotIn("cell  current", out)
+        rc, out, _ = self._run()
+        self.assertEqual(rc, 2)
+        self.assertIn("cell  current=700000", out)
+        self.assertNotIn("sess-1  current", out)
+        # A main transcript can exist without its session directory.
+        self._session(25, session="sess-2")
+        rc, out, _ = self._run("--sessions", "--session", "sess-2", "sess-2")
+        self.assertEqual(rc, 0)
+        self.assertIn("sess-2  current=25", out)
+        self.assertNotIn("sess-1  current", out)
+
+    def test_agent_reads_a_parked_cell_older_than_the_live_window(self) -> None:
+        self._cell("parked", 350_000, age=3)
+        self._cell(None, 50_000, age=1 / 60)
+        rc, out, _ = self._run("--live", "1")
+        self.assertEqual(rc, 0)
+        self.assertIn("0123456789abcdef  current", out)
+        self.assertNotIn("parked  current", out)
+        rc, out, _ = self._run("--agent", "parked")
+        self.assertEqual(rc, 0)
+        self.assertIn("parked  current=350000", out)
+        self.assertNotIn("0123456789abcdef  current", out)
+        self.assertIn("flag=ok", out)
+        out.encode("ascii")
+
+    def test_agent_is_repeatable_and_applies_the_cap(self) -> None:
+        self._cell("one", 450_000)
+        self._cell(None, 100_000)
+        self._cell("three", 200_000)
+        rc, out, _ = self._run("--agent", "one", "--agent", "0123456789abcdef")
+        self.assertEqual(rc, 2)
+        self.assertIn("one  current=450000", out)
+        self.assertIn("0123456789abcdef  current=100000", out)
+        self.assertNotIn("three  current", out)
+
+    def test_agent_unknown_id_exits_4_naming_the_searched_glob(self) -> None:
+        self._cell("present", 100_000)
+        rc, out, err = self._run("--agent", "missing")
+        self.assertEqual(rc, 4)
+        self.assertIn("subagents", err)
+        self.assertIn("agent-amissing*.jsonl", err)
+        self.assertEqual(out, "")
+        err.encode("ascii")
+
+    def test_agent_with_live_is_a_usage_error(self) -> None:
+        self._cell("x", 100_000)
+        rc, out, err = self._run("--agent", "x", "--live", "1")
+        self.assertEqual(rc, 4)
+        self.assertEqual(out, "")
+        self.assertIn("USAGE ERROR", err)
+
+    def test_r3_a_old_cell_with_a_fresh_parent_is_listed_and_flagged_parked(self) -> None:
+        self._cell(None, 50_000, age=5)
+        self._session(age=1 / 60)
+        rc, out, _ = self._run("--live", "1")
+        self.assertEqual(rc, 0)
+        self.assertIn("0123456789abcdef  current=50000", out)
+        self.assertRegex(out, r"age=5\.0h {2}flag=parked\s*$")
+
+    def test_r3_b_old_cell_with_an_old_parent_is_not_listed(self) -> None:
+        self._cell("gone", 50_000, age=5)
+        self._session(age=5)
+        rc, out, _ = self._run("--live", "1")
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, "no cells written in the last 1h (cap 400,000); nothing to check\n")
+
+    def test_r3_c_a_fresh_cell_is_listed_not_flagged_parked(self) -> None:
+        self._cell("fresh", 50_000, age=1 / 60)
+        self._session(age=1 / 60)
+        rc, out, _ = self._run("--live", "1")
+        self.assertEqual(rc, 0)
+        self.assertIn("fresh  current=50000", out)
+        self.assertIn("flag=ok", out)
+        self.assertNotIn("parked", out)
+
+    def test_r3_d_a_parked_cell_over_the_cap_exits_2(self) -> None:
+        self._cell("deep", 500_000, age=5)
+        self._session(age=1 / 60)
+        rc, out, _ = self._run("--live", "1", "--cap", "400000")
+        self.assertEqual(rc, 2)
+        self.assertIn("PAST-CAP", out)
+        self.assertIn("flag=OVER,parked", out)
+
+    def test_r3_a_missing_parent_transcript_does_not_crash(self) -> None:
+        self._cell("orphan", 50_000, age=5)
+        rc, out, _ = self._run("--live", "1")
+        self.assertEqual(rc, 0)
+        self.assertNotIn("orphan  current", out)
+        self.assertIn("nothing to check", out)
+
+    def test_r3_toctou_deletion_between_check_and_stat_does_not_crash(self) -> None:
+        cell = self._cell("raced", 50_000, age=5)
+        session = self._session(age=1 / 60)
+        real_stat = Path.stat
+
+        def _stat_raises_for_session(path: Path, *args, **kwargs):
+            if path == session:
+                raise FileNotFoundError(path)
+            return real_stat(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "stat", _stat_raises_for_session):
+            self.assertIsNone(cd.session_transcript_age_hours(cell, now=self.now))
+
+    def test_r3_session_transcript_path_never_crosses_project_dirs(self) -> None:
+        path = self.tmp / "projects" / "some-slug" / "sess-9" / "subagents" / "agent-ax.jsonl"
+        self.assertEqual(cd.session_transcript_path(path),
+                         self.tmp / "projects" / "some-slug" / "sess-9.jsonl")
+
+    def test_r3_sessions_mode_with_live_is_unaffected_by_parked_logic(self) -> None:
+        project = self.tmp / "projects" / "some-slug"
+        main = project / "sess-1.jsonl"
+        _write_transcript(main, [_usage_record(0, 100_000, 0)])
+        self._age(main, 5)
+        # This would be the parent if the cell-only path derivation were misapplied.
+        _write_transcript(self.tmp / "projects.jsonl", [_usage_record(0, 1, 0)])
+        rc, out, _ = self._run("--project", str(project), "--sessions", "--live", "1")
+        self.assertEqual(rc, 0)
+        self.assertEqual(out, "no sessions written in the last 1h (cap 400,000); nothing to check\n")
+
+    def test_r3_over_cap_and_parked_flag_form_is_OVER_comma_parked(self) -> None:
+        self._cell("deep", 500_000, age=5)
+        self._session(age=1 / 60)
+        rc, out, _ = self._run("--live", "1", "--cap", "400000")
+        self.assertEqual(rc, 2)
+        self.assertRegex(out, r"PAST-CAP {2}age=5\.0h {2}flag=OVER,parked\s*$")
+        out.encode("ascii")
+
+    def test_exit_map_over_cap_exits_2(self) -> None:
+        cell = self._cell("deep", 1)
+        _write_transcript(cell, [_usage_record(0, 500_000, 0), _usage_record(0, 10, 0)])
+        rc, out, _ = self._run("--all")
+        self.assertEqual(rc, 2)
+        self.assertIn("current=10  peak=500000", out)
+        self.assertIn("flag=OVER", out)
+        # The cap is strict: equality is clean, and the positional filter composes.
+        rc, out, _ = self._run("deep", "--agent", "deep", "--cap", "500000")
+        self.assertEqual(rc, 0)
+        self.assertIn("flag=ok", out)
+
+    def test_exit_map_no_transcripts_exits_1_loud(self) -> None:
+        for extra in (("--live", "1"), ("--sessions", "--live", "1")):
+            with self.subTest(extra=extra):
+                rc, out, err = self._run(*extra)
+                self.assertEqual(rc, 1)
+                self.assertEqual(out, "")
+                self.assertIn("NO CELLS FOUND", err)
+        # A listing failure must remain incomplete, never become empty-window success.
+        with mock.patch.object(cd, "_scan_dir_entries", side_effect=PermissionError("simulated")):
+            rc, _, err = self._run("--sessions", "--live", "1")
+        self.assertEqual(rc, 3)
+        self.assertIn("DISCOVERY ERROR", err)
+
+    def test_exit_map_unknown_agent_exits_4(self) -> None:
+        self._cell("present", 100_000, session="sess-1")
+        self._cell("elsewhere", 100_000, session="sess-2")
+        for extra, pattern in (
+            (("--agent", "present", "--agent", "missing"), "agent-amissing*.jsonl"),
+            (("--session", "sess-1", "--agent", "elsewhere"), "agent-aelsewhere*.jsonl"),
+        ):
+            with self.subTest(extra=extra):
+                rc, out, err = self._run(*extra)
+                self.assertEqual(rc, 4)
+                self.assertEqual(out, "")
+                self.assertIn(pattern, err)
+
+    def test_exit_map_argparse_usage_exits_4(self) -> None:
+        for extra in (
+            ("--agent", "x", "--sessions"),
+            ("--agent", "x", "--live", "1"),
+            ("--all", "--live", "1"),
+            ("--all", "--agent", "x"),
+            ("--live", "not-a-number"),
+            ("--agent",),
+        ):
+            with self.subTest(extra=extra):
+                rc, out, err = self._run(*extra)
+                self.assertEqual(rc, 4)
+                self.assertEqual(out, "")
+                self.assertIn("USAGE ERROR", err)
+        for session in ("", "..", "../other", "D:foo"):
+            with self.subTest(session=session):
+                rc, _, err = self._run("--sessions", "--session", session)
+                self.assertEqual(rc, 4)
+                self.assertIn("BAD --session", err)
+
+    def test_exit_map_empty_live_window_exits_0(self) -> None:
+        cell = self._cell("old", 900_000, age=48, session="sess-1")
+        self._session(900_000, age=48)
+        self._cell("fresh", 100_000, session="sess-2")
+        self._session(100_000, session="sess-2")
+        for mode, kind in (((), "cells"), (("--sessions",), "sessions")):
+            with self.subTest(mode=mode):
+                # The excluded old transcript must not even be read.
+                real_read = cd.read_transcript
+
+                def _read(path: Path):
+                    if path in (cell, self.tmp / "sess-1.jsonl"):
+                        raise OSError("old transcript should not be read")
+                    return real_read(path)
+
+                with mock.patch.object(cd, "read_transcript", side_effect=_read):
+                    rc, out, err = self._run(*mode, "--session", "sess-1", "--live", "6")
+                self.assertEqual(rc, 0)
+                self.assertNotIn("UNREADABLE", err)
+                self.assertEqual(out, f"no {kind} written in the last 6h (cap 400,000); nothing to check\n")
 
 
 if __name__ == "__main__":
