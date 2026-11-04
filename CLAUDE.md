@@ -71,4 +71,6 @@ The repository doubles as a multi-agent harness instance (template: `rwsmythe/ha
 
 ## Hardware rule (plan §4.3)
 
+**Desktop input rule (2026-11-04, after a WP6.1 incident):** no cell or seat sends synthetic keyboard or mouse input to the desktop (SendKeys, SendInput, keybd_event, AppActivate, mouse_event or equivalents). A GUI check uses UI Automation on Clearwater's own window elements, Qt's offscreen platform and test hooks, PrintWindow for a screenshot of Clearwater's own window, or the owner by hand. A stray keystroke lands in whatever the owner has in front.
+
 Agents run on the owner's laptop with direct access to the graphics card. Packages that record timing or memory figures are exclusive: one at a time, nothing else heavy running, timed on a full clip rather than one frame.
