@@ -276,17 +276,44 @@ turn. The seat must still perform its required before/after checks.
 
 ## The seat run
 
-SEAT TO FILL
+Run by orchestrator generation 46 on 2026-11-04, 23:19:03Z-23:25:46Z, on the package head
+`a76a7723` (turn 8; `git status` clean). The kit was `clearwater-review-evidence\wp6.3a\seat\`:
+`seat63a.sh` with its helpers, all seven md5-checked against `md5-copies.txt` just before the run.
+The record is `seat.summary.txt` in that folder, with one log per leg beside it. Free space on C:
+was 78 GB before and 77 GB after.
 
-Additional r2 leg, SEAT TO FILL: a bounded SOURCE Python child uses the seat's
-redirected LOCALAPPDATA/APPDATA/XDG roots, blocks Qt imports, activates the
-real downloaded pack and imports CuPy. From a second process, headless
-`--remove-gpu-pack` must exit 0 with pending text, leave an empty marker and
-keep the complete pack at its original path (`--verify` PASS). The child then
-exits. A second headless removal must exit 0, delete the pack and clear the
-marker. Record both headless exit codes, the child's exit code, the intact-pack
-verification, and the marker's creation/clearance moments. This is an
-orchestrator leg; the cell supplies no seat or download script.
+All app data was redirected to `.worktrees\wp6.3a\work\wp6.3a\appdata` (LOCALAPPDATA, APPDATA,
+the XDG roots). No GUI was launched and no desktop input was sent.
+
+| Leg | Result |
+| --- | --- |
+| Profile before | real `%LOCALAPPDATA%\Clearwater` ABSENT; the owner log's md5 `69ed0432...` (unchanged since the WP6.1 incident) |
+| 1. onedir build (`build.py --form onedir --with-ffmpeg`) | exit 0, 96 s; both PASS lines (no ZIP, no CUDA library, every module's top-level name allowed) |
+| 2. Real install (`--install-gpu-pack`, frozen, through `proof4.py`) | exit 0, 248.1 s wall, no window; last line "GPU support is installed. Restart Clearwater to use it."; the eleven locked wheels, 1.725 GB, fetched from `files.pythonhosted.org` |
+| 3. `build.py --verify` on the installed pack | PASS: 11 distributions; 2,679 RECORD rows, each file's sha256 and size; 2,679 files, 2,412.6 MiB |
+| 4. Census | 2,679 new files, 2,412.3 MiB of RECORD; `SET_EQUAL_RECORD` true; `SET_EQUAL_HANDFILLED_MINUS_UV` true (WP6.1's hand-filled pack minus uv's 22 INSTALLER / REQUESTED files); `EXPECTED_2679` true |
+| 5. Two frozen workers on the installed pack | heic: exit 0, 21.3 s, `ok` true, device GPU, 67 CUDA files mapped; video: exit 0, 12.6 s, `ok` true, device GPU, 67 CUDA files mapped; no window in either |
+| 6. Remove while loaded (CHARC's A r2 leg) | A bounded SOURCE child (`python -I`, redirected roots, Qt blocked, 900 s bound) activated the pack: outcome `loaded`, CuPy imported from the pack, a GPU sum of 45, 56 pack images mapped. A frozen headless `--remove-gpu-pack` from a second process then gave exit 0 in 0.42 s with "GPU support will be removed at the next start". After it: the marker `14.2.0-cu12.remove` PRESENT, the pack PRESENT at its original path (not renamed), 0 partials |
+| 6a. `--verify` after the loaded remove | exit 1, with 143 problems, ALL `__pycache__/*.pyc` files written into the pack by the seat's SOURCE child (see the note below). No listed file had a hash or size problem, and none was missing; every RECORD file was intact |
+| 6b. Child exit; final remove | child exit 0. A second frozen `--remove-gpu-pack`: exit 0 in 1.22 s, "GPU support is removed; takes effect at the next start"; marker ABSENT, pack ABSENT, 0 partials, the pack root empty |
+| Profile after | the owner log's md5 unchanged; real `%LOCALAPPDATA%\Clearwater` ABSENT; no Clearwater process running |
+
+**Note on 6a (a seat-kit gap, not a product defect).** The seat's source child ran
+`python.exe -I` without `-B`. CPython therefore wrote bytecode caches for every pack module it
+imported, and the full check rejects those as unlisted files, as it should. The product does not
+do this:
+- the source product never loads the pack (`activate()` returns early when not frozen);
+- the frozen interpreter does not write bytecode;
+- WP6.1's hand-filled pack, used by the WP6.1 and WP-DR125 frozen GPU runs, holds 0 `.pyc`
+  files today.
+
+The leg's own claims hold:
+- the frozen headless remove deferred (pending, marker written, no rename, no partial);
+- every RECORD file stayed intact;
+- the marker was cleared and the pack removed only after the mapping process exited.
+
+A later seat kit that maps a pack from a source child adds `-B` (or sets
+`PYTHONDONTWRITEBYTECODE`).
 
 ## Limits and remaining handoff
 
@@ -319,7 +346,7 @@ At the r1 handoff, Reviewer A r2 was still pending (historical).
 | --- | --- | --- |
 | 1 | CRITICAL, confirmed, fixed: `.data` refusal applies only to the first path component | `test_nested_package_data_installs`, the existing top-level hostile-member case, and eleven `test_real_locked_record_member_names_are_allowed` cases reading actual installed RECORDs without importing their packages |
 | 2 | MAJOR, initial r1 remediation; REOPENED by r2 F1: rename-first protects an ordinary open handle, but its premise was false for mapped images. The r2 three-layer correction below supersedes the initial loaded-pack claim | Initial open-handle/rename tests remain as non-mapped controls; r2 adds actual child-mapped DLL and `.pyd` cases |
-| 3 | MINOR, confirmed, corrected: expected downloader census 2,679, excluding uv's 22 added files | Corrected census and file-set acceptance criterion above; real census is SEAT TO FILL |
+| 3 | MINOR, confirmed, corrected: expected downloader census 2,679, excluding uv's 22 added files | Corrected census and file-set acceptance criterion above; real census 2,679, SET_EQUAL both true (the seat run) |
 | 4 | MINOR, confirmed, fixed: rejected-pack notice in the dialog before the request and on stderr before headless installation | `test_rejected_pack_plan_warns_before_request`, `test_headless_replacement_notice` |
 | 5 | MINOR, confirmed coverage gap, fixed: oversized body test observes each actual `.part` write, no retry and full cleanup | `test_oversized_body_never_writes_past_locked_size_or_retries`; executed m2b mutation fails on 2,955 written bytes versus the 128-byte locked limit |
 | 6 | MINOR, confirmed, fixed: one held-open root lock covers install, removal, pending-removal application and every partial sweep, including failure cleanup | Three `test_operation_lock_refuses_second_operation` cases, `test_stale_operation_lock_is_broken`, two isolated headless lock-refusal/exit-1 cases |
@@ -453,7 +480,7 @@ cell's footprint. Depth is supplied by the dispatcher's driver, not estimated.
 | A r1, initial fold-in; #2 reopened at r2 | 1 / 1 / 4 / 5 | 10 / 1 | 11 / 0 | 0 | 6 initial / 1 / 1 finding groups; #2 corrected below | 7, 10, 11 per CHARC | Turn-5 end: 160,597 / 475,000, supplied at dispatch 6 |
 | A r2, adjudicated and folded in | 0 / 1 / 2 / 2 | 5 / 0 | 4 / 1 (#2) | 0 | 3 / 2 / 0 finding groups | No new banked finding | Turn-6 end: 229,611, supplied at dispatch 7 |
 | A r3, CONVERGED; all five cleanup findings folded in | 0 / 0 / 2 / 3 | 4 / 1 (R3-5, expressly granted) | 5 / 0 | 0 | 4 / 1 / 0 finding groups; R3-3 integration corrected by delta F1 | None of r3's five left open after delta F1 | Turn-7 end: 109,576 / 475,000, supplied at dispatch 8 |
-| A delta, NO_NEW_CRITICAL_MAJOR; two MINORs folded in | 0 / 0 / 2 / 1 | 3 / 0 | 3 / 0 | 0 | 2 / 0 / 0 finding groups; A1 equivalent, no change | None | DISPATCHER TO FILL |
+| A delta, NO_NEW_CRITICAL_MAJOR; two MINORs folded in | 0 / 0 / 2 / 1 | 3 / 0 | 3 / 0 | 0 | 2 / 0 / 0 finding groups; A1 equivalent, no change | None | Turn-8 end 137,204 / 475,000 |
 
 The r1 turn bundled its ruled remediation groups in one logical review
 fold-in. At that handoff Reviewer A r2 and the real-download seat proof were
@@ -525,7 +552,7 @@ The probe's separate test observes both image extensions (including uppercase
 are unchanged. The off-win32 control forbids `os.open` entirely. The delete-race
 tests force a post-rename PermissionError, then a locked-partial sweep: pending
 success, marker lifecycle, one log line and eventual sweep cleanup all hold.
-The real-pack mapped-CuPy proof remains **SEAT TO FILL**, in the seat section.
+The real-pack mapped-CuPy proof is in the seat section (leg 6).
 
 ### R2 validation and verification record
 
@@ -666,9 +693,9 @@ script was written.
 
 The cumulative r3 ledger row above records 0 critical / 0 major / 2 minor /
 3 advisory, 5 NEW / 0 REOPENED, 0 reverts, four product-code finding groups
-and one test-only group. Depth is DISPATCHER TO FILL. Reviewer A remains
+and one test-only group. Depth was 109,576 / 475,000 at the end of turn 7. Reviewer A remains
 converged; this handoff is for its short delta review, then the staged seat
-run, Reviewer B and gate. The seat section remains **SEAT TO FILL**.
+run, Reviewer B and gate. The seat section is now filled (the seat run, 2026-11-04).
 
 Exactly the five dispatch-7 owned files changed, with zero CR bytes and a
 passing `git diff --check` (`r3-audit.log`). No new dependency, frozen
@@ -753,9 +780,9 @@ residual. Timings describe test runs only.
 The cumulative delta ledger above records 0 critical / 0 major / 2 minor /
 1 advisory, all NEW, no reverts, two product-code finding groups and A1
 equivalent/no change. Turn-7 depth was 109,576 / 475,000 as supplied in
-dispatch 8; this turn's depth is DISPATCHER TO FILL. No item is stopped and
-no deviation or open question needs a ruling. The seat-run section remains
-**SEAT TO FILL**; the seat, full Reviewer B (covering these two edits), gate
+dispatch 8; this turn's depth was 137,204 / 475,000 at its end. No item is stopped and
+no deviation or open question needs a ruling. The seat-run section is
+filled; full Reviewer B (covering these two edits), gate
 and accept remain with the orchestrator under the delta ruling.
 
 This turn changes only the five dispatch-8 owned files, with the isolated
