@@ -9,7 +9,7 @@ dispatcher fills the depth figures.
 | Round | Reviewer | Blocking (crit/major) | Minor/nit | In-envelope / out | NEW / REOPENED | Reverts | Fixes: product / tests-only | Transport, CLI | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|---|
 | 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | - | 247,937 (cell1, at return) |
-| A r2 (group B; folded turn 5) | Reviewer A, Codex | 0 / 6 | 2 minor, 3 advisory | 11 / 0 | 11 NEW / 0 REOPENED | 0 | tool 1 (item 1, `tools/footage_guard.py`) / tests-only 8 (items 2-6, 9-11); item 7 REJECTED, item 8 a report sentence | Codex review; cell5 fold | DISPATCHER TO FILL (cell5) |
+| A r2 (group B; folded turn 5) | Reviewer A, Codex | 0 / 6 | 2 minor, 3 advisory | 11 / 0 | 11 NEW / 0 REOPENED | 0 | tool 1 (item 1, `tools/footage_guard.py`) / tests-only 8 (items 2-6, 9-11); item 7 REJECTED, item 8 a report sentence | Codex review; cell5 fold | 314,460 at the turn-5 yield (cell5) |
 
 ## Round 0
 
@@ -990,7 +990,7 @@ replace `subprocess.run` and `Popen` with a raising stub), every test run offscr
 `PYTEST_ADDOPTS` unset. One slip: the first edit script was written to `/tmp` instead of the session
 scratchpad; nothing else was written there.
 
-Depth at point 1 (`36651814`): DISPATCHER TO FILL
-Depth at point 2 (`f1175b92`): DISPATCHER TO FILL
-Depth at point 3 (`a9dc9adb`): DISPATCHER TO FILL
-Depth at turn-5 yield: DISPATCHER TO FILL
+Depth at point 1 (`36651814`): not read at the seat
+Depth at point 2 (`f1175b92`): 243,632 (the seat read it at ~23:29Z, after this commit, before `a9dc9adb`)
+Depth at point 3 (`a9dc9adb`): not read at the seat
+Depth at turn-5 yield: 314,460 (cell_depth.py --live, read at the seat ~23:46Z after the return; 126 turns). DEVIATION: dispatch-5 said to yield at about 250K with what remained; the cell was at 243,632 after point 2 and built point 3 and the report past it. It stayed under the 400K cap. Recorded; no rework. cell5 retired.
