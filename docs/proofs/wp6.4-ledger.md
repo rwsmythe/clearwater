@@ -697,3 +697,125 @@ cases are group A's, in `test_interfaces`. W-GUI has 14 cases, not 13, because g
 | M-DEVICE AD-11 | none on Windows | the Mac CPU output against the Windows references within AD-11's tolerances; not yet written, WP6.5 |
 
 Depth at group-B yield: 416,156 (wp64-cell3, read by the dispatcher with cell_depth.py after its final return incl. the export grant; PAST its cap, retired; the A r1 fold-in goes to a fresh cell)
+
+## Group B fold-in (turn 4)
+
+Cell `wp64-cell4` (implementer-opus-high, FRESH), dispatch-4, base `107e6c77`. Four items: S-B1,
+S-B2, the A r1 P30 advisory, this section. Evidence scripts and logs: `work\wp6.4\` in the
+worktree (`p30_mutant.py`, `sb1_spy.py`, `mtool_leak.py`, `t4-*.log`).
+
+### T4.1 Commits
+
+| Commit | What |
+|---|---|
+| `b0c0d5fd` | test: W-FS[P30] gains the `Stra\u00dfe.MP4` (folder `a`) / `STRASSE.mp4` (folder `b`) pair, asserting the bare labels |
+| `b08e9f43` | test: the same pair in ASCII source (`\u00df` escape); the file tool had written the literal character |
+| (this commit) | docs: NEW `docs/reports/wp6.4-macos-adaptation.md`; this section |
+
+All by pathspec with `-c core.autocrlf=false`, the Co-Authored-By line, blob check 0 CR.
+
+### T4.2 Item 3: W-FS[P30] (A r1 ADVISORY) -- DONE
+
+- The mutant, in memory (`work\wp6.4\p30_mutant.py`, a pytest plugin replacing
+  `batch_panel.item_labels` with a copy that compares `item.path.name.casefold()` instead of
+  `os.path.normcase(item.path.name)`; no committed edit):
+  - `mutant`: `1 failed`, at `assert batch_panel.item_labels(unicode_pair) == ["Stra\u00dfe.MP4",
+    "STRASSE.mp4"]` (the mutant added `(...\a)` / `(...\b)`); exit 1.
+  - `clean`: `1 passed`; exit 0.
+  - Both re-run at `b08e9f43` with the same result.
+- The case count is unchanged (180): the pair is inside the existing `_fs_p30`.
+
+### T4.3 Item 1: S-B1 (GRANTED) -- STOPPED, no edit made
+
+- **The conflict.** The grant allows ONE edit to `tests/test_environment_report.py` (the key
+  order at `:13-33`), and the dispatch requires that every test calling `collect()` / `main()`
+  stubs the trial seam. The module's tests call `main()` and stub only `subprocess.run` and
+  `cpuinfo`. With the facts on by default they would reach `_correction_backend` (the product's
+  `select_backend`: a real CuPy import, CUDA device count and test kernel) and `_encoder_rows`
+  (the product's `detect_capabilities`: the real `find_tool("ffmpeg")` and its trials). The stub
+  they need (an autouse fixture beside `stub_cpuinfo`) is a second edit to that file.
+- **Reproduction (cheap, no trial, no CuPy):** `work\wp6.4\sb1_spy.py` sets `collect`'s keyword
+  default to `platform_facts=True` in memory, simulates the granted key order, and replaces the
+  two seams with RECORDERS returning stub values. Result: `19 passed`; `SPY: 16 tests reached the
+  trial seam (unstubbed in the module)` -- every test except `test_missing_config_without_out_fails`,
+  `test_run_decodes_undecodable_output_with_replacement` and
+  `test_same_second_reports_never_overwrite`.
+- **Found while there (M-TOOL, MAJOR for WP6.5, test-only):** `test_macos_tool_reporting` runs the
+  W case `_w().TOOL_CASES[site](monkeypatch, tmp_path)` and then `_tool_native` on the SAME
+  monkeypatch, so the native half reads the W stubs. `work\wp6.4\mtool_leak.py` replays it with
+  stubs only: T01's native `collect` sees encoders `['libx265']` (it asserts `[VT, X265]`); after
+  T02's W case `sys.platform` is `win32` and the gpu reason is `nvidia-smi not found` (it asserts
+  "not applicable on this platform"). So M-TOOL[T01] and [T02] fail on a Mac as written. The fix
+  (the W case under its own `pytest.MonkeyPatch.context()`) makes the native T01 half run real
+  VT / x265 trials, which the dispatch's rule asks to be `slow` / `gpu`-marked "for that reason":
+  that marker choice moves cases between gate legs, so it waits for the ruling too.
+- **Recommended:** grant a second edit to `tests/test_environment_report.py`: an autouse fixture
+  stubbing `environment_report._correction_backend` and `environment_report._encoder_rows` (as
+  `_tool_report` in `test_portability.py` does); then the tool change, the key order, the two
+  W-TOOL callers and the M-TOOL context fix as dispatched, with M-TOOL's native T01 / T02 left on
+  the `macos` marker only (they exist to run natively; they are skipped off darwin).
+- **The callers at this head** (`grep` of `environment_report.collect(` / `.main(` in `tests` and
+  `tools`; no other module imports `environment_report`): `test_environment_report.py:76, 182,
+  189, 199, 216, 230` (`main`); `test_portability.py:3327, 3329, 3345, 3351` (`collect`, all under
+  `_tool_report`'s stubs); `test_macos_portability.py:1032` (`collect(platform_facts=True)`,
+  `macos`, skipped here).
+
+### T4.4 Item 2: S-B2 (ACCEPTED) -- DONE
+
+- `docs/reports/wp6.4-macos-adaptation.md` written with the Write tool; the tool did NOT refuse
+  this time. Content: return-3 section 7, plus the export grant (section 1), P71's line (sections
+  1 and 10), ledger B.6's partial-row table (section 10), the turn-4 changes, and the counts
+  re-taken at `b08e9f43`. S-B1 is described as granted and NOT built at this head.
+- **File-tool note:** the Write / Edit tools decoded a typed `\u00df` escape into the literal
+  character (in the test source and in the report). Both were turned back into the ASCII escape by
+  a byte-level replace; the report and the test file are now pure ASCII. The 172-row table was
+  checked line by line against return-3 section 7: identical except the P30 and T01 cells, which
+  were changed on purpose.
+- 0 CR in the file.
+
+### T4.5 Static and counts at `b08e9f43` (run from the worktree root)
+
+    uv run --no-sync ruff check .                  All checks passed!
+    uv run --no-sync ruff format --check .         326 files already formatted
+    uv run --no-sync mypy                          Success: no issues found in 162 source files
+    uv run --no-sync mypy --platform darwin        Success: no issues found in 162 source files
+
+(mypy at `b0c0d5fd`; `b08e9f43` changes one test file's escapes only, outside mypy's `files`.)
+
+Tests (`-p no:cacheprovider --timeout 600`, `QT_QPA_PLATFORM=offscreen`, `PYTEST_ADDOPTS` unset,
+basetemp `work\wp6.4\t4-*`):
+
+| Module | Parallel leg, `-n 4` (collected / passed / skipped) | Serial leg (collected / passed / skipped) | Fullclip |
+|---|---|---|---|
+| `test_environment_report` | 19 / 19 / 0 | 0 | 0 |
+| `test_portability` | 163 / 163 / 0 | 17 / 17 / 0 | 0 |
+| `test_macos_portability` | 159 / 0 / 159 | 19 / 0 / 19 | 0 |
+| the three together | 341 / 182 / 159 | 36 / 17 / 19 | 0 |
+
+Every skip reads "macOS native leg (WP6.5)".
+
+### T4.6 Verification loop (suspected / confirmed / rejected / fixed)
+
+- Suspected: W-FS[P30] lets a casefold label mutant through (A r1). Confirmed by the in-memory
+  mutant after the fix (fails); fixed by the pair.
+- Suspected: the default-on facts would reach the real trial seam in `test_environment_report`.
+  Confirmed (16 / 19 by the spy). Not fixed: STOP (T4.3).
+- Suspected: M-TOOL's native half reads the W stubs. Confirmed (replay). Not fixed: held with
+  S-B1 (T4.3).
+- Suspected: the file tool wrote non-ASCII into the test source. Confirmed (`grep`); fixed
+  (`b08e9f43`).
+- Suspected: the report's row table drifted from return-3 while being retyped. Rejected: the
+  line-by-line comparison shows only the two intended cells.
+- A second pass over the three edited files found nothing new.
+
+### T4.7 Discipline record
+
+- **`wp64-cell3` returned at 416,156, PAST the cap; recorded here as a discipline breach** (CHARC,
+  brief tail: "the rule is STOP near 400K, a return is not a licence to run on"); the successor's
+  dispatches to a cell name its mid-build yield points (the 2026-10-29 rule).
+- This cell: no bare `cd` (subshells only), no stash, no mailbox post, no edit outside the owned
+  files, no real FFmpeg / `nvidia-smi` / CuPy run from a test or probe, every test run offscreen.
+
+Depth at the mid-turn yield point (items 1 and 3 committed): DISPATCHER TO FILL
+
+Depth at turn-4 yield: DISPATCHER TO FILL
