@@ -1322,4 +1322,143 @@ warm 4 s: that cost belongs to install time, not start-up.
 both builds and the experimental onedir build stay under `work/wp6.1/` (pack 2.4 GB at
 `work/wp6.1/t3c/appdata/Local/Clearwater/gpu-pack/14.2.0-cu12`, kept for item 7's resumption).
 
-Depth at turn-3 group-2b-2 end: DISPATCHER TO FILL
+Depth at turn-3 group-2b-2 end: 300,127 (wp61-cell4, at its yield; read by the dispatcher)
+
+## Turn 3 group 2b-3 (2026-11-04 ~11:50Z-): F-C2 hidden imports, the F-D `-m` handler; the with-pack GPU proof
+
+Fresh cell (implementer-opus-high, wp61-cell5), dispatch
+`clearwater-review-evidence/wp6.1/cell/dispatch-7.md`, head at start `97eff4e6`. Evidence:
+`clearwater-review-evidence/wp6.1/cell/t3d/`. No desktop input was sent. `t2b/gui_check.py` and
+the `t3c/exp/` builds were not run (the exp build was only READ, by the bundle check).
+
+### INCIDENT (this cell): a before-record test started the real GUI branch
+
+- **What happened (11:55:31Z).** I ran the new `tests/test_frozen_entry.py` against
+  `97eff4e6`'s `src` (`git archive` to `work/wp6.1/t3d-base`, `PYTHONPATH`). One new test,
+  `test_the_real_pathfinder_canary_module_runs_through_the_frozen_dash_m`, starts a fresh
+  `python -I -c` child with `sys.frozen` faked and calls
+  `entry.main(["Clearwater.exe", "-m", <pathfinder probe>, ...])`.
+- **Why it reached the GUI.** On `97eff4e6` that argument list goes to the GUI branch. The child
+  ran the real `_start_logging` and then the real `clearwater.app.main` with the owner's real
+  app-data variables. The test's 120 s subprocess timeout killed it.
+- **Consequences.**
+  - A window was possible for up to 120 s.
+  - One line was appended to the owner's `%APPDATA%\Clearwater\logs\clearwater.log`:
+    `2026-11-04T01:55:31.566-10:00 INFO clearwater.app.startup device: GPU`. The file is now
+    479 B, md5 `69ed0432...`. It was left untouched on the dispatcher's word.
+  - `settings.json` and `presets/` are unchanged. `%LOCALAPPDATA%\Clearwater` is absent.
+  - No process was left.
+- **Logs.** `t3d/pytest-2-on-97eff4e6-INCIDENT.log`, `applog-after-incident.txt`,
+  `applog-tail.txt`.
+- **Cause.** The test was safe on the new code, but not on the old revision it was run
+  against.
+- **Fix** (`584d711d`, then `e27fa134` under the dispatcher's two new rules):
+  - every test that calls an entry point redirects APPDATA, LOCALAPPDATA and XDG_* under
+    `tmp_path`;
+  - it blocks or stubs the GUI BEFORE it runs, on any revision;
+  - before any before-record run, the test file is grepped for entry-point calls.
+- **What each test does now.**
+  - The pathfinder child blocks PySide6 and shiboken6 and stubs `clearwater.app.main`.
+  - The worker-import child blocks `clearwater.app.main` and `clearwater.gui`.
+  - The `calls`, `pack` and absent-pack tests redirect the variables and stub the log set-up.
+- **Checks since.** Every later run, the before-records included: the owner's log md5 is
+  unchanged, and `%LOCALAPPDATA%\Clearwater` is absent.
+- **Two other slips (mine).**
+  - An empty heredoc started a stray `python3` REPL (PID 46648, its own command line). I killed
+    it by PID with `taskkill /PID 46648 /T /F`.
+  - One command carried a bare `cd`. A subagent's shell cwd resets per call.
+
+### Rulings applied (CHARC gen 15, on group 2b-2)
+
+1. F-C2 (iii) with (a) and (b): built (item 1).
+2. F-D (i), frozen only and narrowed: built (item 2). The attached and combined forms
+   (`-mfoo`, `-cCODE`, `-I -m x`, `-Im x`) still go to the GUI, per the literal text. The
+   question is with CHARC through the dispatcher.
+3. F-C: no allowlist.
+4. The 2b-1 deviation is concurred.
+5. Noted: the frozen loader line is moved to 2c; the CuPy kernel cache goes to WP6.3; 3221225477
+   = DR-125; the report's limits get the incident line.
+
+### Items 1-2: the table
+
+"On `97eff4e6`" = the same test files with `PYTHONPATH` / `WP61_BUILD_SCRIPT` on the
+`git archive 97eff4e6` copy (`t3d/pytest-8.log`): **31 failed, 44 passed**.
+
+| Item | What (file) | Tests | On `97eff4e6` |
+|---|---|---|---|
+| 2 F-D | `__main__.run_interpreter_option`, frozen only, when `argv[1]` is exactly `-m` or `-c`. `-c` is refused before the loader. For `-m`: `prepend_executable_folder()`, `gpu_pack.activate()`, then the check, then `runpy.run_module(module, run_name="__main__", alter_sys=True)` with `sys.argv = [<file>, *args]`. A refusal is `Clearwater: <reason>`, one stderr line (skipped when the windowed process has no stderr), exit 2, no GUI. An exception from the module prints its traceback and gives status 1, so a windowed build shows no traceback dialog. `SystemExit` passes through. Qt-free (only `runpy` / `traceback` are imported on the branch). | `test_a_frozen_dash_m_runs_a_pack_module_after_the_loader_without_qt` (planted pack module; `__name__ == "__main__"`, argv, file, loader first, no Qt via the import blocker); `..._of_anything_else_and_dash_c_refuse_with_one_line[9]` (`http.server`, `json.tool`, `clearwater`, a missing name, `.relative`, `-m` alone, `-m ""`, `-c print(1)`, `-c` alone); `..._refuses_when_no_pack_is_loaded[absent, rejected]`; `test_a_pack_modules_exit_passes_and_its_exception_is_printed_not_raised[2]`; `test_the_real_pathfinder_canary_module_runs_through_the_frozen_dash_m` (the real `cuda.pathfinder._dynamic_libs.dynamic_lib_subprocess canary nvrtc` from the venv's site-packages as the "pack", fresh `-I` child: JSON payload printed, status 0, no PySide6) | `test_frozen_entry.py:547` / `:581` `assert 3 == 2` (the GUI stand-in ran); `:659` `assert 3 == 5` / `3 == 1`; `:745` `'status 9 qt -'` (the GUI stand-in, safely); `:48` the GUI import blocked |
+| 2 resolution | `gpu_pack.module_from_pack(module, site_packages)`: `importlib.util.find_spec(<top-level name>)` on the LIVE `sys.path` and hooks (after activation the pack is `sys.path[0]`). EVERY location (the `origin` when `has_location`, plus each `submodule_search_locations` portion) must lie under `site_packages`, compared with `realpath` and `normcase` (`os.path.commonpath`). A built-in, frozen, unresolvable, empty, relative or non-identifier name is not from the pack. Finding a top-level spec runs none of its code. | `test_a_name_in_the_bundle_and_the_pack_is_judged_by_the_first_on_sys_path` (bundle first: refused; pack first: accepted, and the pack copy runs); `test_a_namespace_package_is_from_the_pack_only_when_every_portion_is` (`cuda` is a namespace package in the pack); `test_built_in_stdlib_and_bundle_modules_are_not_from_the_pack` | `:600`, `:624`, `:636` `AttributeError` (no `module_from_pack`) |
+| 2 source run | no new branch when not frozen | `test_a_source_run_sends_dash_m_and_dash_c_to_the_gui_as_before[3]` | PASSES (by design: it pins the 1.0.0 behaviour; it would catch a dropped `sys.frozen` guard) |
+| 1 F-C2 scan | `build.scan_stdlib_imports` / `import_candidates` / `_resolve` / `stdlib_kind` / `stdlib_search_path`. `ast` over each `.py` file that `pack_sources()` lists: the RECORD of the eleven `LOCKED_DISTRIBUTIONS`, from the build venv via `importlib.metadata`. An import anywhere counts, including conditional / `try` / function-level ones and `from __future__` (a real `IMPORT_NAME` at run time). A literal `importlib.import_module("x")` or `__import__("x")` counts. Skipped: relative imports, third-party names (a top level not in `sys.stdlib_module_names`), non-literal dynamic imports. `from a import b` adds `a.b` only when `a` is a package with a submodule `b`. `import os.path` gives `os`. Existence is decided WITHOUT importing: built-ins, then `PathFinder` over the stdlib folders. A name absent on this platform goes to `unavailable` (recorded, not imported). | `test_the_scan_of_a_fixture_package_returns_exactly_its_stdlib_imports` (an exact set of 15, plus `winreg` here / `fcntl` unavailable); `test_a_file_that_cannot_be_parsed_is_reported`; `test_the_real_pack_scan_finds_ctypes_wintypes` | `:581`-`:613` `AttributeError` |
+| 1 set + report (a) | `hidden_imports(scan, committed=PACK_EXTENSION_STDLIB_NEEDS)`: sorted `HiddenImport(name, sources, named_by, named)`, each marked `committed` and / or `scan`. `build()` writes `work/wp6.1/hidden-imports-<form>.json` (with the unavailable and unparsable lists) and one log line per member, and passes each member as `--hidden-import`. An unparsable pack file fails the build BEFORE PyInstaller. | `test_the_hidden_import_set_marks_each_member_by_its_source`; `test_the_committed_list_is_graphlib`; `test_every_hidden_import_is_passed_to_pyinstaller`; `test_an_unparsable_pack_file_fails_the_build_before_pyinstaller` | `:619` `TypeError` (no `hidden=`), the rest `AttributeError` |
+| 1 bundle check (b) | `bundled_modules(exe)` looks in the PYZ, the CArchive module entries (`struct`), `base_library.zip` (an `_internal/` file in onedir, a CArchive entry in onefile), the extension modules (`.pyd` / `.so` under `_internal/` and `lib-dynload/`, or CArchive binaries) and `sys.builtin_module_names`. `missing_hidden_imports` lists `hidden-import missing from the bundle: <name> (<sources>)`. `build()` then returns 1: a FAILURE, never a warning. | `test_a_planted_removal_from_the_committed_list_fails_the_bundle_check_by_name` (a build from the list WITHOUT `graphlib`: its args lack it, and its real CArchive + PYZ fails BY NAME, `graphlib (committed)`; with it, `[]`); `test_the_bundle_check_looks_in_every_place_pyinstaller_puts_a_module`; `test_a_missing_member_fails_the_build_and_the_set_is_written_to_the_report[pass, fail]` (`build()` end to end with PyInstaller replaced) | `AttributeError` / `TypeError` |
+
+- The two existing build tests (`_stopping_build`, `:318`) now stub `pack_sources`. On
+  `97eff4e6` they fail at that `setattr` only (no `pack_sources` there). That is a helper
+  change, not a behaviour change.
+- **`ctypes.wintypes` comes from the SCAN**, named 3 times:
+  `cuda-pathfinder:cuda/pathfinder/_dynamic_libs/load_dl_windows.py:7`,
+  `cuda/pathfinder/_utils/windows_arch.py:58` and
+  `cupy-cuda12x:cupy/_environment.py:735`. Only `graphlib` is on the committed list.
+
+### The resolved hidden-import set (the scan over this venv's eleven distributions)
+
+The scan covers 376 `.py` files in 2.5 s. Nothing was unparsable and nothing was unavailable
+here. There are **61 members**: 60 from the scan and `graphlib` from the committed list.
+
+`__future__ abc argparse ast atexit binascii cmath collections collections.abc contextlib
+contextvars copy ctypes ctypes.util ctypes.wintypes dataclasses enum functools glob
+graphlib[committed] hashlib importlib importlib.metadata importlib.util inspect io itertools
+json linecache math multiprocessing ntpath numbers operator os pathlib platform random re
+shlex shutil site socket string struct subprocess sys sysconfig tempfile textwrap threading
+time traceback types typing unittest unittest.mock urllib.request warnings weakref winreg`
+
+**The check run READ-ONLY on the existing builds** (`t3d/scan-probe-on-2b2-builds.txt`):
+
+- The 2b-2 onedir and onefile builds each lack 5:
+  - `ctypes.util` (`load_dl_linux.py:8`);
+  - `ctypes.wintypes`;
+  - `graphlib (committed)`;
+  - `site` (`cuda/pathfinder/_utils/find_sub_dirs.py:6`, a module-level import);
+  - `unittest.mock` (`cupy/testing`).
+- The `t3c/exp/` onedir build (2b-2's experiment) lacks 3: `ctypes.util`, `site` and
+  `unittest.mock`.
+- So the check distinguishes, on real artifacts.
+- **Note on `site`.** 2b-2's import-gap measurement set `site` aside as a venv start-up
+  module. The scan shows that `cuda-pathfinder` imports it at module level, and the frozen
+  bundle does not hold it. With `--hidden-import site` it is bundled (frozen
+  `sys.flags.no_site` stops it running `site.main()` on import). The with-pack proof shows
+  whether that path is reached.
+
+### Item 3: tests and static checks (worktree root, Git Bash, `PYTEST_ADDOPTS` unset; logs in `t3d/`)
+
+| Command | Exit | Summary |
+|---|---|---|
+| `pytest -q -rs -p no:cacheprovider --durations=5 --basetemp=<wt>/work/c61e-7 tests/test_gpu_pack.py tests/test_frozen_entry.py tests/test_tools_package_build.py tests/test_jobs_export_process.py tests/test_app_composition.py tests/test_wp42_composition.py tests/test_core_backend.py -m "not gpu"` | 0 | **309 passed, 41 deselected in 39.49 s** (slowest 2.38 s, `test_jobs_export_process`) |
+| the two touched test modules against `97eff4e6` (`c61e-8`) | 1 | 31 failed, 44 passed (the before record) |
+| `ruff check .` / `ruff format --check .` | 0 / 0 | All checks passed / 322 files already formatted |
+| `mypy` (strict, configured set) | 0 | no issues in 160 source files |
+| `mypy --strict` on the 5 touched files, win32 and `--platform darwin` | 0 / 0 | no issues in 5 source files |
+
+Self-review (suspected / confirmed / fixed):
+
+1. CArchive module entries (`struct`) were not counted as bundled. This was confirmed by the
+   first read-only check, which listed `struct` as missing. Fixed.
+2. A `@dataclass` in `build.py` breaks loading by path (`sys.modules` lookup) in the tests.
+   Confirmed. Fixed with a `NamedTuple` and a plain class.
+
+A second pass found nothing new.
+
+Commits:
+
+- `584d711d` feat(wp6.1): frozen -m runs a GPU pack module only; -c and every other -m
+  refused (F-D);
+- `4409077f` feat(wp6.1): bundle the GPU pack's stdlib needs as hidden imports; fail the build
+  when one is missing (F-C2);
+- `e27fa134` test(wp6.1): every entry-point test redirects app data and blocks the GUI on any
+  revision.
+
+0 CR in every blob.
+
+MID-BUILD YIELD here. The builds and the with-pack proof (items 4-5) follow on the
+dispatcher's word.
