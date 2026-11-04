@@ -12,10 +12,11 @@ suffix. Only portable standard-library and third-party calls are used.
 
 On macOS the NVIDIA fields are ``null`` with "not applicable on this platform" (``nvidia-smi``
 is not run); elsewhere a missing ``nvidia-smi`` gives "nvidia-smi not found". No GPU figure is
-ever invented (WP6.4, T02). ``--platform-facts`` adds the machine, the interpreter's build
+ever invented (WP6.4, T02). The report also holds the machine, the interpreter's build
 architecture, the correction backend the product would choose for a 4K frame, and each encoder
 of the platform's roster with its availability and bit depths, read through the PRODUCT's own
-one-frame trial model (``clearwater.io.video.capability.detect_capabilities``; T01).
+one-frame trial model (``clearwater.io.video.capability.detect_capabilities``; T01), so
+writing a report runs the product's encoder trials.
 """
 
 from __future__ import annotations
@@ -47,7 +48,7 @@ _PLATFORM_KEYS = (
     "correction_backend_reason",
     "encoders",
 )
-"""The ``--platform-facts`` keys, in report order (before ``unavailable``)."""
+"""The platform-fact keys, in report order (last, before ``unavailable``)."""
 _NOT_APPLICABLE = "not applicable on this platform (no NVIDIA graphics on macOS; not run)"
 _NVIDIA_SMI = [
     "nvidia-smi",
@@ -181,11 +182,10 @@ def _encoder_rows() -> list[dict[str, object]]:
     ]
 
 
-def collect(*, platform_facts: bool = False) -> dict[str, object]:
+def collect() -> dict[str, object]:
     """Probe the machine and return the report as a JSON-ready dictionary.
 
-    Args:
-        platform_facts: Add :data:`_PLATFORM_KEYS` (runs the product's encoder trials).
+    The report ends with :data:`_PLATFORM_KEYS` (this runs the product's encoder trials).
 
     Returns:
         The report; failed probes hold ``None`` and are explained in ``unavailable``.
@@ -234,11 +234,10 @@ def collect(*, platform_facts: bool = False) -> dict[str, object]:
     probe(("uv_version",), lambda: (_first_line(["uv", "--version"]),))
     probe(("ffmpeg_version",), lambda: (_first_line(["ffmpeg", "-version"]),))
     probe(("clearwater_commit",), lambda: (_first_line(["git", "rev-parse", "HEAD"], REPO_ROOT),))
-    if platform_facts:
-        report["machine"] = platform.machine() or None
-        report["process_architecture"] = sysconfig.get_platform()
-        probe(_PLATFORM_KEYS[2:4], _correction_backend)
-        probe(_PLATFORM_KEYS[4:], lambda: (_encoder_rows(),))
+    report["machine"] = platform.machine() or None
+    report["process_architecture"] = sysconfig.get_platform()
+    probe(_PLATFORM_KEYS[2:4], _correction_backend)
+    probe(_PLATFORM_KEYS[4:], lambda: (_encoder_rows(),))
     report["unavailable"] = unavailable
     return report
 
@@ -258,11 +257,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--out", type=Path, help="working folder to use instead of the configured one"
     )
-    parser.add_argument(
-        "--platform-facts",
-        action="store_true",
-        help="add the machine, architecture, correction backend and encoder roster",
-    )
     args = parser.parse_args(argv)
 
     if args.out is not None:
@@ -274,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: {exc}", file=sys.stderr)
             return 2
 
-    report = collect(platform_facts=True) if args.platform_facts else collect()
+    report = collect()
     stamp = str(report["timestamp_utc"]).replace("-", "").replace(":", "")
     try:
         target = _write_report(working / "reports", stamp, report)

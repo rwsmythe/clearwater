@@ -3319,14 +3319,12 @@ def _tool_report(monkeypatch: pytest.MonkeyPatch, platform: str, smi: str | None
 
 
 def _tool_t01(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """T01: the OS facts stay; --platform-facts adds machine, architecture, backend, roster."""
+    """T01: the OS facts stay; the default report adds machine, architecture, backend, roster."""
     import platform
     import sysconfig
 
     environment_report, _ran = _tool_report(monkeypatch, sys.platform, "GPU, 8188, 560.94")
-    plain = environment_report.collect()
-    assert not set(environment_report._PLATFORM_KEYS) & set(plain)
-    report = environment_report.collect(platform_facts=True)
+    report = environment_report.collect()
     keys = list(report)
     assert keys[-6:] == [*environment_report._PLATFORM_KEYS, "unavailable"]
     assert report["machine"] == (platform.machine() or None)

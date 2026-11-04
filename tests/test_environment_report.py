@@ -28,6 +28,11 @@ EXPECTED_KEY_ORDER = [
     "uv_version",
     "ffmpeg_version",
     "clearwater_commit",
+    "machine",
+    "process_architecture",
+    "correction_backend",
+    "correction_backend_reason",
+    "encoders",
     "unavailable",
 ]
 EXPECTED_KEYS = set(EXPECTED_KEY_ORDER)
@@ -59,6 +64,13 @@ def stub_cpuinfo(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         environment_report.cpuinfo, "get_cpu_info", lambda: {"brand_raw": "Test CPU @ 1.0GHz"}
     )
+
+
+@pytest.fixture(autouse=True)
+def stub_trial_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test here runs the product's CuPy probe or its FFmpeg encoder trials."""
+    monkeypatch.setattr(environment_report, "_correction_backend", lambda: ("numpy", "CPU: stub"))
+    monkeypatch.setattr(environment_report, "_encoder_rows", lambda: [])
 
 
 def _healthy() -> dict[str, Any]:

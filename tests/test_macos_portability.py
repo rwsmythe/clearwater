@@ -1029,7 +1029,7 @@ def _tool_native(site: str, tmp_path: Path) -> None:
 
     environment_report = importlib.import_module("environment_report")
     if site in ("T01", "T02"):
-        report = environment_report.collect(platform_facts=True)
+        report = environment_report.collect()
         assert report["os_name"] == "Darwin" and report["machine"] == platform.machine()
         assert str(report["process_architecture"]).startswith("macosx-")
         assert report["gpu_model"] is None
@@ -1057,7 +1057,8 @@ def test_macos_tool_reporting(site: str, monkeypatch: pytest.MonkeyPatch, tmp_pa
         licences = importlib.import_module("spike_io.licences")
         if not {".so", ".dylib"} <= set(licences._CODE_SUFFIXES):
             pytest.xfail("candidate DR 3: the licence scan lacks the Mach-O library forms")
-    _w().TOOL_CASES[site](monkeypatch, tmp_path)
+    with pytest.MonkeyPatch.context() as w_patch:  # the W stubs end before the native half
+        _w().TOOL_CASES[site](w_patch, tmp_path)
     _tool_native(site, tmp_path)
 
 
