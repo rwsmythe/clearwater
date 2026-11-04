@@ -115,8 +115,8 @@ def find_tool(name: str) -> Path:
     if found is None:
         raise VideoProbeError(
             "missing_tool",
-            f"{name} was not found on the PATH. Install FFmpeg and make sure {name} can be run "
-            "from a command prompt.",
+            f"{name} was not found on the PATH. Install FFmpeg as the user guide describes and "
+            f"make sure its folder is on the PATH, so {name} can be run from a terminal.",
         )
     return Path(found)
 

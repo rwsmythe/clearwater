@@ -4,12 +4,15 @@ FFmpeg writes raw frames to an anonymous pipe. On Windows the pipe's buffer is e
 :data:`BIG_PIPE_BYTES` (AD-2, AD-23: an approved exception to N1); when the large pipe
 cannot be created, or on any other operating system, :func:`open_frame_pipe` returns None and the
 caller uses the default pipe (``subprocess.PIPE``), which carries the same bytes more slowly.
-The reason for the fallback is logged once per process.
+The reason for the fallback is logged once per process: a WARNING on Windows, where it means
+the enlarged pipe failed, and INFO elsewhere, where the default pipe is the design (AD-37, Q2).
 
 Every product FFmpeg, ffprobe and Python worker launch uses :func:`tool_spawn_kwargs` (the
-Python worker since WP4.6): no inherited FFREPORT log file, and no console window on Windows
-(AD-23's approved extension), with a zero creation flag on every other platform. This module
-imports nothing from the package.
+Python worker since WP4.6): no inherited FFREPORT log file; on Windows no console window
+(AD-23's approved extension); on every other platform a zero creation flag and a new session,
+so a Terminal Ctrl+C reaches the parent only and the product's own cancel ends the children in
+order (AD-37). Each platform's values are set in its own branch (AD-36). This module imports
+nothing from the package.
 """
 
 from __future__ import annotations
@@ -39,6 +42,7 @@ class _ToolSpawnKwargs(TypedDict):
     """The subprocess keyword arguments shared by all product tool launches."""
 
     creationflags: int
+    start_new_session: bool
     env: dict[str, str]
 
 
@@ -48,12 +52,21 @@ def tool_spawn_kwargs() -> _ToolSpawnKwargs:
     Every product FFmpeg, ffprobe and Python worker launch takes these (AD-23; WP4.6).
 
     Returns:
-        Subprocess keyword arguments: CREATE_NO_WINDOW on Windows, zero creation flags
-        elsewhere, and a fresh copy of the parent environment without any case spelling of
-        FFREPORT, which would make FFmpeg or ffprobe write an unsolicited log file.
+        Subprocess keyword arguments: on Windows CREATE_NO_WINDOW and ``start_new_session``
+        False (Popen's default there); elsewhere zero creation flags and ``start_new_session``
+        True (AD-37); on every platform a fresh copy of the parent environment without any
+        case spelling of FFREPORT, which would make FFmpeg or ffprobe write an unsolicited log
+        file.
     """
+    if sys.platform == "win32":
+        flags = subprocess.CREATE_NO_WINDOW
+        new_session = False
+    else:
+        flags = 0
+        new_session = True
     return {
-        "creationflags": subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        "creationflags": flags,
+        "start_new_session": new_session,
         "env": {key: value for key, value in os.environ.items() if key.upper() != "FFREPORT"},
     }
 
@@ -82,17 +95,26 @@ def _create_pipe(size: int) -> tuple[int, int]:
             _winapi.CloseHandle(write_handle)
             raise
         return read_fd, write_fd
-    raise OSError(f"the pipe buffer cannot be enlarged on {sys.platform}")
+    else:
+        raise OSError(f"the pipe buffer cannot be enlarged on {sys.platform}")
 
 
 def _log_fallback(reason: str) -> None:
-    """Log the reason for using the default pipe, the first time only."""
+    """Log the reason for using the default pipe, the first time only.
+
+    A WARNING on Windows (the enlarged pipe failed); INFO elsewhere, where the default pipe is
+    the designed path (AD-37).
+    """
     global _fallback_logged
     with _fallback_lock:
         if _fallback_logged:
             return
         _fallback_logged = True
-    _log.warning("using the default frame pipe: %s", reason)
+    if sys.platform == "win32":
+        level = logging.WARNING
+    else:
+        level = logging.INFO
+    _log.log(level, "using the default frame pipe: %s", reason)
 
 
 def open_frame_pipe(size: int = BIG_PIPE_BYTES) -> tuple[int, int] | None:
