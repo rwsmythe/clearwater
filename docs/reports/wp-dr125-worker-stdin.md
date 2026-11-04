@@ -6,8 +6,8 @@ does not itself close DR-125.
 
 ## Design as built
 
-Product build: `6ef67a19`. Turn-5 checkout: `48915f42`, after the ruling merge.
-Before-record base: `73453bdc`. Turns 4 and 5 change no product file.
+Product build: `6ef67a19`. Turn-6 checkout: `fd798923`, after the ruling merge.
+Before-record base: `73453bdc`. Turns 4, 5 and 6 change no product file.
 
 - `src/clearwater/app/export_worker.py:95`, `_RawStdinReader`: one remainder
   assembler uses `os.read(fd, 65536)` for request and cancel lines. No IO object
@@ -29,6 +29,14 @@ Before-record base: `73453bdc`. Turns 4 and 5 change no product file.
   loader, imports the worker and calls it. The entry shim is deleted.
 - `tools/package/README.md:120`: worker-side isolation replaces the temporary
   shim description. `gpu_pack.py` has the authorized docstring-only correction.
+- `tests/test_app_export_worker.py:254`: the windowed-interpreter test starts
+  `pythonw.exe` with a pipe on fd 0 and checks the Win32 input slot against the
+  CRT handle after isolation. It also checks that the slot changed from the
+  original pipe handle. It reports through a file, with Qt blocked, a disposable
+  profile, a bounded wait and process cleanup. It skips if pythonw is absent.
+
+A non-`OSError` from `_isolate_stdin()` escapes `main` as an uncaught traceback
+before any request read or job, so it is fail-closed in effect (r1 ruling a6).
 
 ## Rulings
 
@@ -75,6 +83,28 @@ Its raw-reader loop, bounded waits, result assertion and daemon setup remain.
 It now asserts both status 0 and stderr free of `Fatal Python error`.
 No seat execution of the buffered shape was requested or performed by this cell.
 
+Reviewer A r1's recorded seat claim-1 probe observed:
+
+| Seat stand-in mode | Outcome |
+|---|---|
+| `sys.stdin.buffer.readline()` daemon | 10/10 `0xC0000005`, `_enter_buffered_busy <stdin>`, no hang |
+| Raw `os.read(os.dup(0))`, fd 0 NUL, `SetStdHandle` | 10/10 exit 0 |
+| Private `io.open(os.dup(0), 'rb').readline()` daemon | 10/10 exit 0 |
+| No thread | 10/10 exit 0 |
+
+Source: `C:/Users/rwsmy/clearwater-review-evidence/wp-dr125/A/r1/review.txt`,
+claim 1. No crash dialog was seen at that seat. This report carries the seat's
+natural exits and the unsuppressed sandbox hang as separate observations. The
+turn-4 ruling stands; this cell has not rerun the buffered shape in turn 6.
+
+Regression guards for a BufferedReader swapped back into the worker are
+`test_a_worker_child_inherits_null_instead_of_the_request_pipe`,
+`test_twenty_workers_exit_zero_after_their_result_with_stdin_held_open` and
+`test_private_reader_has_no_io_buffer_or_instance_readline`. The structural
+test checks the exact reader class, forbids an instance `readline` override,
+and rejects `io.BufferedIOBase` or `io.RawIOBase` attributes. It catches the
+private-buffer shell mutant that a private-buffer shutdown series alone missed.
+
 ## Matched before/after records
 
 All four records ran once in the Codex sandbox. None was refused. The same
@@ -106,6 +136,8 @@ Each adjacent `.record.txt` records the exact command, revision, source hash,
 resolved worker path, suppression form, isolation pre-read and result summary.
 Per-run protocol/stderr files are under the matching `*-runs/run-NN/` folders.
 Runner summaries are `work/wp-dr125/{before,after}-{child,exits}-runner.log`.
+The seat archived the turn-5 records under
+`C:/Users/rwsmy/clearwater-review-evidence/wp-dr125/cell/t5-records/`.
 
 Before EACH run, `run_record.py` ran and quoted this pre-read in its record:
 
@@ -140,36 +172,88 @@ became `test_the_frozen_worker_flag_runs_the_loader_then_the_worker_without_qt`.
 The source-to-GUI assertion is retained. `_stub_shim` and its callers are gone.
 Evidence: `git diff 73453bdc 6ef67a19 -- tests/test_frozen_entry.py`.
 
+Under the widened r1 ownership, turn 6 also deletes
+`_SPAWN_BEFORE_THE_PROBE`, `_within`, `_CANCEL_THROUGH_THE_SHIM`,
+`_EOF_THROUGH_THE_SHIM`, `_PARENT_THAT_DIES`, `_SHIM_FAILURE` (all modes), and
+`test_a_process_without_a_standard_input_runs_the_worker_branch_on`.
+The worker-side missing-stdin test retains EBADF coverage. All seven deleted
+names have zero remaining references in the frozen-entry test, as checked by
+`rg -n` and the AST audit: `work/wp-dr125/deleted-name-search-6.log` and
+`work/wp-dr125/audit-6.log`. The retained `_NO_GUI_PRELUDE` was not named in
+the deletion grant. The module, section comment and source-to-GUI docstring
+now describe the tested behavior. Unused imports were removed as a consequence.
+
+## Reviewer A r1 adjudication
+
+Review source: `C:/Users/rwsmy/clearwater-review-evidence/wp-dr125/A/r1/review.txt`.
+It reviewed `6ef67a19` and returned NEW_CRITICAL_MAJOR_FOUND. Product code met
+the contract. The brief's r1 ruling grants these test/doc-only fixes.
+
+| Finding | Disposition and evidence |
+|---|---|
+| M1 MAJOR, in envelope, REASONED | Confirmed: `/proc/self/fd` is not portable to macOS. POSIX count now uses `psutil.Process().num_fds()`. No Mac execution is claimed. |
+| M2 MAJOR, in envelope, EXECUTED | Confirmed: console CRT behavior masks a missing/wrong Win32 slot update. New pythonw witness passes on the candidate and fails both slot mutants. |
+| m3 MINOR, in envelope, EXECUTED | Confirmed: add a one-write request-plus-cancel witness. It passes on the candidate and fails guarded pre-read. |
+| m4 MINOR, in envelope, EXECUTED | Confirmed: add exact-type and no-buffer/no-instance-method assertions. The buffered-shell mutant fails. |
+| m5 MINOR, in envelope, EXECUTED | Confirmed: remove the authorized dead helpers and vacuous shim test; correct stale text. |
+| a6 ADVISORY, REASONED | No code change. The ruling rejects the non-OSError characterization: the uncaught exception is fail-closed before reads/jobs. Request-read OSError behavior predates this package. |
+| a7 ADVISORY, in envelope | Fixed: README stdin paragraph wrapped to the surrounding width. |
+| a8 ADVISORY, in envelope | Resolved by the report added in turn 5, after the reviewed head. |
+| a9 ADVISORY, EXECUTED | No defect established; no change. The process-global os.read monkeypatch is restored by pytest. The reviewer observed a clean parallel run. |
+
+Four mutation runs used disposable `src` copies, with the existing isolated
+child bootstrap, bounded waits and cleanup. No product checkout was edited.
+
+| Mutant | Dedicated witness | Result |
+|---|---|---|
+| M2: SetStdHandle slot -11 | `test_windowed_worker_updates_the_win32_stdin_slot` | Failed: Win32 slot differs from CRT fd 0 |
+| M2: SetStdHandle call removed | Same | Failed: Win32 slot differs from CRT fd 0 |
+| m3: guarded buffered request pre-read, request retained in raw remainder | `test_a_coalesced_request_and_cancel_reach_the_private_reader` | Failed: no complete protocol result within the bound |
+| m4: BufferedReader.readline stored in the raw-reader shell | `test_private_reader_has_no_io_buffer_or_instance_readline` | Failed: instance readline override |
+
+Each mutation returned pytest status 1 with one failed dedicated test. The
+candidate's same three tests passed together. Logs:
+`work/wp-dr125/new-6.log`, `work/wp-dr125/mutations-6.log`, and
+`work/wp-dr125/mutations-6/<mutant>/{pytest.log,record.txt}`.
+
+The cumulative round row, also staged in `work/wp-dr125/review-ledger.md` for
+the dispatcher's after-B ledger commit, is:
+
+| Round | Counts | Envelope | NEW / REOPENED | Reverts | Fix surface | Transport / depth |
+|---|---|---|---|---|---|---|
+| A r1 | 0 critical, 2 major, 3 minor, 4 advisory | All 5 formal findings in; a6 unchanged read-error case outside; 3 other advisories in | 9 / 0 | 0 | Tests and docs only; 0 product changes | Seat Claude process, read-only; CLI version and depth dispatcher-supplied, not available to cell |
+
+All r1 findings are dispositioned. This fold-in does not claim convergence;
+the next independent reviewer pass remains with the dispatcher.
+
 ## Validation and collection
 
-| Turn-5 check | Result | Log under `work/wp-dr125/` |
+| Turn-6 check | Result | Log under `work/wp-dr125/` |
 |---|---|---|
-| `uv run --no-sync ruff check .` | Passed | `ruff-5.log` |
-| `uv run --no-sync ruff format --check .` | 323 files already formatted | `format-5.log` |
-| `uv run --no-sync mypy` | Clean, 161 source files | `mypy-5.log` |
-| Short worker tests, R1 deselected | 17 passed, 25 deselected | `short-5.log` |
-| Full worker module, R1 deselected | 41 passed, 1 deselected | `modules-5.log` |
-| Parallel collection | 18/42 nodes | `collect-parallel-5.log` |
-| Serial collection | 24/42 nodes | `collect-serial-5.log` |
+| `uv run --no-sync ruff check .` | Passed | `ruff-6.log` |
+| `uv run --no-sync ruff format --check .` | 323 files already formatted | `format-6.log` |
+| `uv run --no-sync mypy` | Clean, 161 source files | `mypy-6.log` |
+| Darwin-target mypy on worker and entry | Clean, 2 source files | `mypy-darwin-6.log` |
+| Three new dedicated witnesses | 3 passed, 42 deselected | `new-6.log` |
+| All three requested modules, R1 deselected | 284 passed, 1 deselected; no skips | `modules-6.log` |
+| Parallel collection | 21/45 nodes | `collect-parallel-6.log` |
+| Serial collection | 24/45 nodes | `collect-serial-6.log` |
 
-Both execution runs used `PYTHONPATH=scripts`, `-p sandbox_mkdir_shim`,
-`-p no:cacheprovider`, `--timeout 300` and
-`--deselect tests/test_app_export_worker.py::test_eager_imports_and_isolation_spawn_nothing_and_import_no_cupy`.
-Their basetemps were `work/cdr-5-short` and `work/cdr-5`. The short run added
-`-m 'not slow'`. The raw stand-in's full-module record shows five exits 0 with
-empty stderr; the full-module worker series shows 20 successful results and
-20 exits 0 with empty stderr. Evidence: `work/wp-dr125/series-5-summary.log`.
+Execution used `PYTHONPATH=scripts`, `-p sandbox_mkdir_shim`,
+`-p no:cacheprovider`, `--timeout 300` and `--basetemp=work/cdr-6`:
 
-The earlier three-module run passed 283 nodes with R1 deselected once:
-`work/wp-dr125/modules-3.log`. The Win32 mypy result in turn 3 was clean on
-161 source files: `work/wp-dr125/mypy-3.log`.
-`uv run --no-sync mypy --platform darwin src/clearwater/app/export_worker.py src/clearwater/__main__.py`
-was clean on two source files: `work/wp-dr125/mypy-darwin-3.log`.
-This test/doc-only turn does not change the Darwin product surface.
+`uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_app_export_worker.py tests/test_frozen_entry.py tests/test_jobs_export_process.py --deselect tests/test_app_export_worker.py::test_eager_imports_and_isolation_spawn_nothing_and_import_no_cupy --basetemp=work/cdr-6`
 
-Turn-3 collection was 19 parallel and 24 serial nodes. Removing buffered mode
-subtracts one parallel node; all 23 pre-existing nodes and the 20-run slow
-series stay in the serial leg. Turn-5 collect logs below confirm the new split.
+The exact Darwin command was:
+`uv run --no-sync mypy --platform darwin src/clearwater/app/export_worker.py src/clearwater/__main__.py`.
+The windowed test ran successfully in the sandbox; no seat fallback is needed
+for that test. macOS execution remains WP6.4's work.
+
+The final three-module raw stand-in record shows five exits 0 with empty
+stderr. Its worker series shows 20 successful results and 20 exits 0 with
+empty stderr. Evidence: `work/wp-dr125/series-6-summary.log`.
+All 23 pre-existing worker nodes and the 20-run slow series remain serial.
+The new pythonw, coalesced-cancel and structural witnesses are parallel nodes.
 
 R1 remains unchanged and deselected in the sandbox. The stdlib WMI fallback
 caused its sandbox failure: `work/wp-dr125/import.log`. The dispatcher reports
@@ -200,8 +284,11 @@ revision before any old-worker execution. No product workaround was added.
 
 Final footprint and ASCII/LF checks are in `work/wp-dr125/footprint-5.log`;
 diff whitespace checking is in `work/wp-dr125/diff-check-5.log`.
-No further in-scope issue was found in the final verification pass. Reviewer A
-and B verdicts remain separate seat work; none is claimed here.
+Turn-6 final footprint, preserved-AST and evidence audits are in
+`work/wp-dr125/footprint-6.log` and `work/wp-dr125/audit-6.log`; whitespace
+checking is in `work/wp-dr125/diff-check-6.log`. The final verification pass
+found no further in-scope issue. Reviewer A r1 is dispositioned above;
+convergence and Reviewer B remain separate seat work.
 
 ## Limits
 
@@ -211,17 +298,20 @@ The frozen `0xC0000005` and source `_enter_buffered_busy` abort are one
 buffered-reader lock with two ends, as ruled by CHARC.
 
 The unsuppressed turn-4 record shows the fatal message plus a kill at the
-bound; it does not supply a natural crash status. The suppressed base records
-show natural `0xC0000005` exits after the same fatal message. The raw stand-in
+bound; it does not supply a natural crash status. CHARC rules that hang
+sandbox-specific; the prior Reviewer A seat probe exited without hanging.
+The suppressed base records show natural `0xC0000005` exits after the same
+fatal message. The raw stand-in
 and source series do not prove absence of an intermittent frozen failure.
 These tiny CPU-stub jobs are shutdown/protocol witnesses, not full export or
 performance measurements. The seat repeats the candidate series at the gate.
-The frozen check and both review verdicts still must be supplied by the seat.
+The frozen check, Reviewer A convergence and Reviewer B remain with the seat.
 
 The footage folder and owner profile were untouched. No frozen build/run,
 GPU-pack activation, GUI launch, network fetch, synthetic desktop input or git
-write occurred. Every old-worker execution in this turn was inside the sandbox.
-Only the owned stand-in, this report and ignored `work/wp-dr125/` scratch changed.
+write occurred. Every old-worker execution in turn 5 was inside the sandbox;
+none ran in turn 6. Turn 6 changes only the two owned test files, README, this
+report and ignored `work/wp-dr125/` scratch. No product file changed.
 
 ## Frozen check (seat)
 

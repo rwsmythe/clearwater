@@ -98,14 +98,14 @@ def _isolated_profile_and_children(tmp_path, monkeypatch):
                 child.wait(timeout=10)
 
 
-def _child(code, tmp_path, *arguments):
+def _child(code, tmp_path, *arguments, executable=None):
     """Start an isolated child; the fixture always kills and waits on unfinished children."""
     import clearwater
 
     source = Path(clearwater.__file__).resolve().parents[1]
     bootstrap = _NO_GUI + "\nsys.path.insert(0, sys.argv.pop(1))\n" + code
     return subprocess.Popen(
-        [sys.executable, "-I", "-c", bootstrap, str(source), *map(str, arguments)],
+        [executable or sys.executable, "-I", "-c", bootstrap, str(source), *map(str, arguments)],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -229,6 +229,78 @@ def test_a_worker_child_inherits_null_instead_of_the_request_pipe(tmp_path):
     assert any(m.get("log", {}).get("message") == "child_read=0" for m in messages)
 
 
+_WINDOWED_STDIN_SLOT = """
+import ctypes
+import json
+import msvcrt
+from pathlib import Path
+from clearwater.app import export_worker as worker
+
+get_handle = ctypes.windll.kernel32.GetStdHandle
+get_handle.argtypes = [ctypes.c_ulong]
+get_handle.restype = ctypes.c_void_p
+slot = ctypes.c_ulong(-10 & 0xFFFFFFFF)
+before = get_handle(slot)
+original_fd = msvcrt.get_osfhandle(0)
+reader = worker._isolate_stdin()
+record = {'before': before, 'original_fd': original_fd,
+          'after': get_handle(slot), 'fd0': msvcrt.get_osfhandle(0)}
+reader.close()  # no watcher has started in this child
+Path(sys.argv[1]).write_text(json.dumps(record), encoding='utf-8')
+"""
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Win32 standard-input handle")
+def test_windowed_worker_updates_the_win32_stdin_slot(tmp_path):
+    executable = Path(sys.executable).with_name("pythonw.exe")
+    if not executable.is_file():
+        pytest.skip("the interpreter environment has no pythonw.exe")
+    record_path = tmp_path / "stdin-slot.json"
+    child = _child(_WINDOWED_STDIN_SLOT, tmp_path, record_path, executable=str(executable))
+    assert child.wait(timeout=10) == 0
+    out, err = child.communicate(timeout=10)
+    assert out == b"" and err == b""
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    assert record["before"] == record["original_fd"]
+    assert record["after"] == record["fd0"]
+    assert record["after"] != record["before"]
+
+
+def test_a_coalesced_request_and_cancel_reach_the_private_reader(tmp_path):
+    child = _child(_STUB_JOB, tmp_path, "cancel")
+    out = tmp_path / "out"
+    out.mkdir()
+    request = json.dumps(_document(out, tmp_path / "scratch")).encode() + b"\n"
+    child.stdin.write(request + b'{"cancel": true}\n')  # one write, before the first read
+    child.stdin.flush()
+    assert _result(child)[-1]["result"]["failure"] == "cancelled"
+    assert child.wait(timeout=10) == 0, child.stderr.read()
+    assert list(out.iterdir()) == []
+
+
+_RAW_READER_WITNESS = """
+import io
+from clearwater.app import export_worker as worker
+
+reader = worker._isolate_stdin()
+try:
+    assert type(reader) is worker._RawStdinReader, type(reader)
+    assert 'readline' not in vars(reader), vars(reader)
+    assert not any(isinstance(value, (io.BufferedIOBase, io.RawIOBase))
+                   for value in vars(reader).values()), vars(reader)
+finally:
+    reader.close()  # this child has no watcher
+print('raw reader only')
+"""
+
+
+def test_private_reader_has_no_io_buffer_or_instance_readline(tmp_path):
+    child = _child(_RAW_READER_WITNESS, tmp_path)
+    out, err = child.communicate(timeout=10)
+    assert child.returncode == 0, err.decode("utf-8", "replace")
+    assert out.splitlines() == [b"raw reader only"]
+
+
 @pytest.mark.parametrize("ending", ["cancel", "eof"])
 def test_cancel_and_eof_reach_the_private_reader_and_remove_the_partial(tmp_path, ending):
     child = _child(_STUB_JOB, tmp_path, ending)
@@ -306,17 +378,17 @@ import errno
 import json
 import os
 from pathlib import Path
+import psutil
 from clearwater.app import export_worker as worker
+process = psutil.Process()
 if sys.platform == 'win32':
     import ctypes
     import msvcrt
-    import psutil
-    process = psutil.Process()
     def count():
         return process.num_handles()
 else:
     def count():
-        return len(os.listdir('/proc/self/fd'))
+        return process.num_fds()
 
 fd = os.open(sys.argv[2], os.O_RDONLY)
 os.dup2(fd, 0)

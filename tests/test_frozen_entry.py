@@ -1,11 +1,9 @@
-"""The frozen-build entry: the worker re-entry and the bundled-tool PATH (WP6.1, AD-34, D1).
+"""The frozen-build entry: worker dispatch, interpreter re-entry and bundled-tool PATH.
 
-Synthetic (parallel except the marked wall-clock check): ``sys.frozen`` and
-``sys.executable`` are monkeypatched, the export
-worker's ``main``, the GPU pack loader, the log set-up and the GUI's ``main`` are stubbed, so no
-window opens and no real app-data folder is touched. One check runs in a fresh interpreter
-(``python -I -c``), because only a fresh import graph shows what the worker branch imports. The
-frozen build itself is checked by hand (the WP6.1 report).
+Most checks stub the worker, GPU pack loader, logging and GUI entry, with a disposable
+profile and blocked GUI imports. Fresh-interpreter checks cover the worker import graph
+and pack-module dispatch. Worker stdin isolation is tested in ``test_app_export_worker``.
+The packaged executable is checked separately at the seat.
 """
 
 from __future__ import annotations
@@ -20,8 +18,7 @@ import os
 import shutil
 import subprocess
 import sys
-import threading
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -475,8 +472,7 @@ def test_the_entry_sets_path_before_either_branch(
     assert first == os.path.dirname(executable)
 
 
-# CHARC's F-E ruling: the frozen worker reads its request pipe privately; children get NUL.
-# TEMPORARY with the shim itself (DR-125's package moves the isolation into the worker).
+# Historical entry-shim prelude; worker stdin isolation is tested in the worker module.
 
 _NO_GUI_PRELUDE = """
 import importlib.abc
@@ -503,56 +499,6 @@ from clearwater import gpu_pack
 """
 """What each F-E child runs first: the GUI unimportable, the entry imported as frozen."""
 
-_SPAWN_BEFORE_THE_PROBE = (
-    _NO_GUI_PRELUDE
-    + """
-set_std_handle = []
-if sys.platform == "win32":
-    import ctypes
-
-    kernel32 = ctypes.windll.kernel32
-    real = kernel32.SetStdHandle
-
-    def counting(*args):
-        set_std_handle.append(1)
-        return real(*args)
-
-    kernel32.SetStdHandle = counting
-
-
-def spawn_first():
-    early = sorted(
-        m for m in sys.modules if m.split(".")[0] == "cupy" or m == "clearwater.app.export_worker"
-    )
-    try:
-        done = subprocess.run(
-            [sys.executable, "-I", "-c", "import sys; print(len(sys.stdin.buffer.read()))"],
-            capture_output=True,
-            text=True,
-            timeout=float(sys.argv[2]),
-        )
-        child = done.stdout.strip()
-    except subprocess.TimeoutExpired:
-        child = "timeout"
-    import os
-
-    print(json.dumps({
-        "child_read": child,
-        "early": early,
-        "set_std_handle": len(set_std_handle),
-        "stdin_fd": sys.stdin.fileno(),
-        "stdin_inheritable": os.get_inheritable(sys.stdin.fileno()),
-    }), flush=True)
-    raise SystemExit(0)
-
-
-gpu_pack.activate = spawn_first  # the branch's first call after the shim: before any probe
-entry.main(["Clearwater.exe", "--export-worker"])
-"""
-)
-"""The frozen worker branch, whose loader call is replaced by a spawn: a child with
-``stdin=None`` reads its standard input to the end and prints how many bytes it got."""
-
 
 def _app_data_environ(root: Path) -> dict[str, str]:
     """This environment with every app-data variable under ``root`` (never the user's)."""
@@ -569,246 +515,12 @@ def _app_data_environ(root: Path) -> dict[str, str]:
     return environ
 
 
-def _within[T](read: Callable[[], T], timeout: float, what: str) -> T:
-    """Run a blocking child operation on a daemon thread; fail the test at the deadline.
-
-    Reviewer A r5 #1: no raw ``read`` / ``readline`` on a child pipe without a deadline. The
-    thread is a daemon, so a read still blocked at the deadline cannot hold pytest open; the
-    caller's ``finally`` ends the child it started.
-
-    Args:
-        read: A blocking call (a pipe read or a complete worker job).
-        timeout: Seconds to wait for it.
-        what: What is read, for the failure message.
-
-    Returns:
-        The blocking call's result.
-    """
-    got: list[T] = []
-    failed: list[BaseException] = []
-
-    def target() -> None:
-        try:
-            got.append(read())
-        except BaseException as error:  # handed to the test thread below
-            failed.append(error)
-
-    reader = threading.Thread(target=target, daemon=True)
-    reader.start()
-    reader.join(timeout)
-    if reader.is_alive():
-        pytest.fail(f"no {what} within {timeout} s")
-    if failed:
-        raise failed[0]
-    return got[0]
-
-
-_CANCEL_THROUGH_THE_SHIM = (
-    _NO_GUI_PRELUDE
-    + """
-from clearwater.app import export_worker
-
-gpu_pack.activate = lambda: None
-
-
-def run(stdin, protocol):
-    def send(obj):
-        protocol.write(json.dumps(obj).encode("ascii") + b"\\n")
-        protocol.flush()
-
-    request = json.loads(stdin.readline())
-    send({"progress": [1, 100, "working"]})
-    cancel = stdin.readline()
-    import os
-
-    Path(sys.argv[2]).write_text(json.dumps({
-        "fd": stdin.fileno(),
-        "inheritable": os.get_inheritable(stdin.fileno()),
-        "request_keys": sorted(request),
-        "cancel": cancel.decode("ascii"),
-    }), encoding="utf-8")
-    send({"result": {"ok": False, "outputs": [], "warnings": [], "failure": "cancelled",
-                     "device": "cpu", "elapsed_s": 1.0}})
-    return 0
-
-
-export_worker.run = run  # the real main: stdout taken over, then run(sys.stdin.buffer, ...)
-raise SystemExit(entry.main(["Clearwater.exe", "--export-worker"]))
-"""
-)
-"""The frozen worker branch with the real ``export_worker.main`` and a stand-in ``run`` that
-reads the request, reports once, reads the parent's cancel line, records both, and ends."""
-
-
-_EOF_THROUGH_THE_SHIM = (
-    _NO_GUI_PRELUDE
-    + """
-import os
-import threading
-import time
-
-from clearwater.app import export_worker
-
-gpu_pack.activate = lambda: None
-
-
-def run(stdin, protocol):
-    request = stdin.readline()
-    eof = threading.Event()
-    threading.Thread(target=export_worker._watch_stdin, args=(stdin, eof), daemon=True).start()
-    start = time.monotonic()
-    seen = eof.wait(float(sys.argv[3]))
-    Path(sys.argv[2]).write_text(json.dumps({
-        "fd": stdin.fileno(),
-        "inheritable": os.get_inheritable(stdin.fileno()),
-        "request": request.decode("ascii"),
-        "eof": seen,
-        "waited_s": round(time.monotonic() - start, 3),
-    }), encoding="utf-8")
-    return 0
-
-
-export_worker.run = run  # the real main, then the real _watch_stdin on the private reader
-raise SystemExit(entry.main(["Clearwater.exe", "--export-worker"]))
-"""
-)
-"""The frozen worker branch with the real ``export_worker.main``; a stand-in ``run`` reads the
-request line, then runs the REAL cancel watcher (``_watch_stdin``) on the private reader and
-records whether the end of the stream reached it (no cancel line is ever sent)."""
-
-_PARENT_THAT_DIES = """
-import subprocess
-import sys
-import time
-
-worker = subprocess.Popen(
-    [sys.executable, "-I", "-c", sys.argv[1], sys.argv[2], sys.argv[3], "30"],
-    stdin=subprocess.PIPE,
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,
-)
-worker.stdin.write(b'{"request": 1}\\n')
-worker.stdin.flush()
-print(worker.pid, flush=True)
-time.sleep(120)  # killed by the test long before this ends
-"""
-"""A parent that spawns the worker, writes its request, reports the worker's PID and is then
-killed by the test while still holding the request pipe's write end."""
-
-
-_SHIM_FAILURE = (
-    _NO_GUI_PRELUDE
-    + """
-import errno
-import io
-import os
-
-
-class NoWorker(importlib.abc.MetaPathFinder):
-    attempts = []
-
-    def find_spec(self, name, path, target=None):
-        if name == "clearwater.app.export_worker":
-            NoWorker.attempts.append(name)
-            raise ImportError("blocked by the test: " + name)
-        return None
-
-
-sys.meta_path.insert(0, NoWorker())  # the worker module is never imported for real
-ran = []
-gpu_pack.activate = lambda: ran.append("activate")
-entry._start_logging = lambda: ran.append("log")
-
-
-def open_fds():
-    found = []
-    for fd in range(256):
-        try:
-            os.fstat(fd)
-        except OSError:
-            continue
-        found.append(fd)
-    return found
-
-
-def raiser(error):
-    def fail(*args, **kwargs):
-        raise error
-
-    return fail
-
-
-mode = sys.argv[2]
-if mode == "open-null":
-    os.open = raiser(OSError(errno.EACCES, "injected by the test"))
-elif mode == "dup2":
-    os.dup2 = raiser(OSError(errno.EBADF, "injected by the test"))
-elif mode == "set-std-handle":
-    import ctypes
-
-    ctypes.windll.kernel32.SetStdHandle = lambda *args: 0
-elif mode == "reader-open":
-    entry.open = raiser(ValueError("injected by the test"))
-elif mode == "reader-wrap":
-    io.TextIOWrapper = raiser(TypeError("injected by the test"))
-elif mode == "dup-emfile":
-    os.dup = raiser(OSError(errno.EMFILE, "injected by the test"))
-elif mode == "dup-ebadf":
-    os.dup = raiser(OSError(errno.EBADF, "injected by the test"))
-before = open_fds()
-try:
-    status, escaped = entry.main(["Clearwater.exe", "--export-worker"]), None
-except ImportError as error:
-    status, escaped = None, type(error).__name__
-print(json.dumps({
-    "status": status,
-    "escaped": escaped,
-    "ran": ran,
-    "worker_imports": NoWorker.attempts,
-    "fds_before": before,
-    "fds_after": open_fds(),
-}), flush=True)
-"""
-)
-"""The frozen worker branch with one step of the shim made to fail (``sys.argv[2]``); the
-loader, the log set-up and the worker import are recorded, never run for real."""
-
-
-def test_a_process_without_a_standard_input_runs_the_worker_branch_on(tmp_path: Path) -> None:
-    """Reviewer A r4 #4: only ``os.dup(0)`` failing with ``EBADF`` is "nothing to move".
-
-    The branch goes on: the loader runs and the worker import is attempted (the test's blocker
-    refuses it), no refusal line is written, and no descriptor is opened.
-    """
-    import clearwater
-
-    src_root = Path(clearwater.__file__).resolve().parents[1]
-    done = subprocess.run(
-        [sys.executable, "-I", "-c", _SHIM_FAILURE, str(src_root), "dup-ebadf"],
-        stdin=subprocess.PIPE,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-        env=_app_data_environ(tmp_path),
-    )
-    assert done.returncode == 0, done.stderr
-    seen = json.loads(done.stdout.strip().splitlines()[-1])
-    assert seen["status"] is None
-    assert seen["escaped"] == "ImportError"
-    assert seen["ran"] == ["activate"]
-    assert seen["worker_imports"] == ["clearwater.app.export_worker"]
-    assert "isolation failed" not in done.stderr
-    assert seen["fds_after"] == seen["fds_before"]
-
-
 def test_the_worker_branch_moves_no_standard_input_when_not_frozen(
     monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]]
 ) -> None:
-    """F-E (iii): the 1.0.0 lock. A source run duplicates nothing and calls no ``SetStdHandle``.
+    """A source ``--export-worker`` reaches the GUI stand-in with stdin unchanged.
 
-    Since Reviewer A r3 #1 a source ``--export-worker`` reaches the GUI (a stand-in here), as
-    in 1.0.0; the shim is never reached on that path either.
+    The source invocation keeps the 1.0.0 dispatch behavior.
     """
     monkeypatch.delattr(sys, "frozen", raising=False)
     entry, _ = _fresh_entry(monkeypatch)

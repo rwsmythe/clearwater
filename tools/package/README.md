@@ -119,7 +119,17 @@ bundles the module; it never reaches a user's GPU as an import error.
 
 ## The export worker's standard input
 
-The export worker isolates its own standard input in source and frozen runs, after its argument check and before reading the request or running any backend probe or job. It duplicates the request pipe to a private, non-inheritable descriptor and points descriptor 0 (and the Win32 standard-input handle on Windows) at the null device, so every child it spawns with inherited stdin gets EOF, including CuPy's pathfinder canary. One raw `os.read` reader serves the request and the daemon cancel watcher without a buffered-reader lock at interpreter shutdown. The original `sys.stdin` object stays bound to descriptor 0; the watcher is neither joined nor closed at exit. Isolation fails closed with status 2 and one stderr line (`export worker: stdin isolation failed: <exception type>`); absent stdin follows the normal empty-request refusal. The frozen entry branch runs the GPU pack loader and then the worker; it has no stdin shim.
+The export worker isolates its own standard input in source and frozen runs, after its
+argument check and before reading the request or running any backend probe or job. It
+duplicates the request pipe to a private, non-inheritable descriptor and points descriptor 0
+(and the Win32 standard-input handle on Windows) at the null device, so every child it spawns
+with inherited stdin gets EOF, including CuPy's pathfinder canary. One raw `os.read` reader
+serves the request and the daemon cancel watcher without a buffered-reader lock at interpreter
+shutdown. The original `sys.stdin` object stays bound to descriptor 0; the watcher is neither
+joined nor closed at exit. Isolation fails closed with status 2 and one stderr line
+(`export worker: stdin isolation failed: <exception type>`); absent stdin follows the normal
+empty-request refusal. The frozen entry branch runs the GPU pack loader and then the worker;
+it has no stdin shim.
 
 ## The GPU pack manifest
 
