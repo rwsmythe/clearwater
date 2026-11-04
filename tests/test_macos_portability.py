@@ -36,6 +36,7 @@ import textwrap
 import time
 import unicodedata
 from collections.abc import Iterator, Sequence
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -475,17 +476,84 @@ def test_macos_tool_and_worker_spawn(
 
 # --- M-PIPE ----------------------------------------------------------------------------------
 
+PIPE_FRAMES = 30
+"""Frames in M-PIPE's one-second 30000/1001 clip."""
+
+PIPE_STEP = Fraction(1001, 30000)
+"""Seconds between two frames of that clip (it starts at 0, constant rate)."""
+
 
 def _open_fds() -> int:
     return len(os.listdir("/dev/fd"))
+
+
+def _file_decode(probe: Any, path: Path) -> bytes:
+    """The product's own decode command with its raw output sent to a FILE instead of the pipe.
+
+    The bytes the default pipe must carry, without a pipe in between (the reference of P04).
+    """
+    from clearwater.io.video import decode
+
+    command = decode.decode_command(probe, ffmpeg=_ffmpeg(), cuda=False)
+    assert command[-1] == "pipe:1", command
+    done = _run([*command[:-1], "-y", f"file:{path}"])
+    assert done.returncode == 0, done.stderr[-1000:]
+    return path.read_bytes()
+
+
+def _probe_pts(clip: Path) -> list[int]:
+    """Each decoded frame's pts in stream ticks, read by ffprobe (no product code)."""
+    data = _ffprobe_json(clip, "-select_streams", "v:0", "-show_entries", "frame=pts")
+    return [int(frame["pts"]) for frame in data["frames"]]
+
+
+def pipe_fidelity_failures(
+    frames: Sequence[Any], reference: bytes, reference_pts: Sequence[int], video: Any
+) -> list[str]:
+    """Return what the frames read through the default pipe get wrong (empty when none).
+
+    Args:
+        frames: The product's frames, read through the pipe.
+        reference: The same decode written to a file (:func:`_file_decode`).
+        reference_pts: ffprobe's pts of each frame, in stream ticks.
+        video: The probe's video stream (geometry and bit depth of the raw frames).
+
+    Returns:
+        One line per wrong count, frame payload or presentation time.
+    """
+    import numpy as np
+
+    from clearwater.color import planes_to_rgb
+
+    failures = []
+    if len(frames) != PIPE_FRAMES or len(reference_pts) != PIPE_FRAMES:
+        failures.append(f"count: {len(frames)} frames, {len(reference_pts)} pts, not 30")
+    if not frames or len(reference) % len(frames):
+        return [*failures, f"reference: {len(reference)} bytes for {len(frames)} frames"]
+    size = len(reference) // len(frames)
+    for i, frame in enumerate(frames):
+        expected = planes_to_rgb(
+            reference[i * size : (i + 1) * size],
+            width=video.width,
+            height=video.height,
+            bit_depth=video.bit_depth,
+        )
+        if not np.array_equal(np.asarray(frame.pixels), expected):
+            failures.append(f"frame {i}: the pixels differ from the file decode")
+        if i < len(reference_pts) and frame.pts_ticks != reference_pts[i]:
+            failures.append(f"frame {i}: pts_ticks {frame.pts_ticks} != {reference_pts[i]}")
+        if frame.pts != i * PIPE_STEP:
+            failures.append(f"frame {i}: pts {frame.pts} != {i * PIPE_STEP}")
+    return failures
 
 
 @pytest.mark.parametrize("site", ["P03", "P04", "T07", "T08", "X23", "X24"])
 def test_macos_default_pipe_fidelity(
     site: str, caplog: pytest.LogCaptureFixture, tmp_path: Path
 ) -> None:
-    """M-PIPE: the OS default pipe (Q2): no enlarged pipe, an INFO fallback, every frame and pts
-    of a real decode, and no descriptor or child left after a cancelled one."""
+    """M-PIPE: the OS default pipe (Q2): no enlarged pipe, an INFO fallback; every frame of a
+    real decode byte-identical to the same decode written to a file, at ffprobe's exact pts
+    and the clip's exact constant step; no descriptor or child left after a cancelled one."""
     import fcntl
     import logging
 
@@ -501,10 +569,8 @@ def test_macos_default_pipe_fidelity(
     probe = reader.probe(clip)
     if site in ("P04", "T07"):
         frames = list(reader.frames(probe, hw_decode=False))
-        assert len(frames) == 30
-        ticks = [f.pts_ticks for f in frames]
-        assert ticks == sorted(ticks) and len(set(ticks)) == 30
-        assert frames[0].pts == 0
+        reference = _file_decode(probe, tmp_path / "reference.raw")
+        assert pipe_fidelity_failures(frames, reference, _probe_pts(clip), probe.video) == []
     if site == "X24":
         before = _open_fds()
         stream = reader.frames(probe, hw_decode=False)
@@ -954,13 +1020,19 @@ def test_macos_videotoolbox_v4(
 # --- M-SPACE ---------------------------------------------------------------------------------
 
 
+SPACE_QUALITIES = ("high", "standard", "draft")
+"""The D75 quality levels M-SPACE encodes at."""
+
+
 @pytest.mark.parametrize("site", ["P64", "P69"])
 def test_macos_videotoolbox_space_estimate(
-    site: str, tmp_path: Path, volumes: dict[str, Path]
+    site: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, volumes: dict[str, Path]
 ) -> None:
-    """M-SPACE: a VT output's size against the D87 estimate; ENOSPC on a full disk image is
-    disk-full; free bytes from the APFS volume (purgeable space not counted)."""
+    """M-SPACE: VT outputs under both Q1 rate candidates, at every ADVERTISED depth and every
+    quality, each within the D87 estimate; ENOSPC on a full disk image is disk-full; free
+    bytes from the APFS volume (purgeable space not counted)."""
     from clearwater.interfaces import Settings
+    from clearwater.io.video import encode
     from clearwater.jobs import disk_space
     from clearwater.jobs.safe_write import is_disk_full
 
@@ -975,20 +1047,29 @@ def test_macos_videotoolbox_space_estimate(
         check = disk_space.check_free_space(volumes["insensitive"], 1)
         assert check.ok and check.free == shutil.disk_usage(volumes["insensitive"]).free
         return
-    _vt_or_skip()
+    vt = _vt_or_skip()
+    assert_unadvertised_refused(vt)
     clip = _clip(tmp_path / "in.mp4", seconds=2.0)
-    for quality in ("high", "standard", "draft"):
-        out = tmp_path / f"{quality}.mp4"
-        probe, _report = _encode(clip, out, encoder=VT, quality=quality, bit_depth=8)
-        estimate = disk_space.estimate_video_bytes(
-            clip.stat().st_size,
-            Settings(quality_level=quality),  # type: ignore[arg-type]
-            width=probe.video.width,
-            height=probe.video.height,
-            frame_rate=probe.video.frame_rate,
-            duration_s=probe.duration_s,
-        )
-        assert out.stat().st_size <= estimate, (quality, out.stat().st_size, estimate)
+    measured = {}
+    for candidate in ("A", "B"):
+        monkeypatch.setattr(encode, "VT_RATE_CONTROL", candidate)
+        for depth in vt.bit_depths:
+            for quality in SPACE_QUALITIES:
+                out = tmp_path / f"{candidate}-{depth}-{quality}.mp4"
+                probe, _report = _encode(clip, out, encoder=VT, quality=quality, bit_depth=depth)
+                estimate = disk_space.estimate_video_bytes(
+                    clip.stat().st_size,
+                    Settings(quality_level=quality),  # type: ignore[arg-type]
+                    width=probe.video.width,
+                    height=probe.video.height,
+                    frame_rate=probe.video.frame_rate,
+                    duration_s=probe.duration_s,
+                )
+                measured[candidate, depth, quality] = (out.stat().st_size, estimate)
+    over = {key: sizes for key, sizes in measured.items() if sizes[0] > sizes[1]}
+    assert over == {}, over
+    expected = {(c, d, q) for c in ("A", "B") for d in vt.bit_depths for q in SPACE_QUALITIES}
+    assert set(measured) == expected
 
 
 # --- M-FS ------------------------------------------------------------------------------------
@@ -1023,25 +1104,36 @@ def _fold(name: str) -> str:
 
 
 def _fs_presets(volumes: dict[str, Path]) -> None:
-    """P40 / P41 / P49 / P73: overwrite=False and rename into each folding name on APFS never
-    replace another preset; its bytes stay unchanged."""
+    """P40 / P41 / P49 / P73: on both APFS modes, ``overwrite=False`` saves and renames INTO
+    each folding-corpus name (U+0131, U+00DF, NFC / NFD, case) never replace the occupant; its
+    bytes and the renamed preset's stay unchanged, and a free name takes the bytes it held."""
+    from dataclasses import replace
+
     from clearwater.config.presets import PresetError, PresetStore
 
     w_presets = importlib.import_module("test_config_presets")
+    occupant_set = w_presets._set()
+    mover_set = replace(occupant_set, parameters={"strength": 0.75, "steps": 2, "enabled": True})
     for label in ("insensitive", "sensitive"):
-        folder = volumes[label] / "presets"
         for name in FOLDING_CORPUS:
+            folder = volumes[label] / "presets"
             store = PresetStore(folder)
-            other = store.save("Other", w_presets._set())
-            before = other.read_bytes()
-            store.save(name, w_presets._set())
-            for twin in FOLDING_CORPUS:
-                if twin != name and _fold(twin) == _fold(name):
+            occupant = store.save(name, occupant_set)
+            mover = store.save("Mover", mover_set)
+            held, moving = occupant.read_bytes(), mover.read_bytes()
+            assert held != moving  # the two files are told apart by their bytes
+            twins = [t for t in FOLDING_CORPUS if _fold(t) == _fold(name)]
+            for twin in twins:  # the occupied name itself and each name that folds onto it
+                if twin != name:
                     with pytest.raises(PresetError):
                         store.save(twin, w_presets._set(), overwrite=False)
-            with pytest.raises(PresetError):
-                store.rename(name, "Other")
-            assert other.read_bytes() == before
+                with pytest.raises(PresetError):
+                    store.rename("Mover", twin)
+                assert occupant.read_bytes() == held, (label, name, twin)
+                assert mover.read_bytes() == moving, (label, name, twin)
+            moved = store.rename("Mover", "Fresh")  # the control: a free name is taken
+            assert moved.read_bytes() == moving and not mover.exists()
+            assert occupant.read_bytes() == held
             shutil.rmtree(folder)
 
 

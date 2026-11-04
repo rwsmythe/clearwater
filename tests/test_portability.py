@@ -3106,32 +3106,53 @@ def test_portability_tool_text_and_redaction(
 # --- W-SPACE: the disk estimate and the disk-full classifier (D87, DR-48) ------------------
 
 
+D87_CONTRACT: dict[str, Any] = {
+    "bits_per_pixel": Fraction(24, 100),
+    "rate_share": {"high": 1, "standard": 2, "draft": 4},
+    "quality_ratio": {
+        "high": Fraction(11, 10),
+        "standard": Fraction(1, 2),
+        "draft": Fraction(1, 4),
+    },
+    "margin": Fraction(5, 4),
+}
+"""The D87 estimate's constants of record, pinned HERE (AD-12 as amended: 0.24 bit per pixel at
+High, Standard half, Draft a quarter; the size ratios and the 1.25 margin of the accepted
+estimate), so a change in the production module cannot also change the expected value."""
+
+SPACE_INPUTS = {
+    "size binds": (10**12, 1280, 720, Fraction(30), Fraction(10)),
+    "ceiling binds": (10**6, 3840, 2160, Fraction(60), Fraction(60)),
+}
+"""(source bytes, width, height, frame rate, duration): one input where each term of the max
+binds (A r2 item 10)."""
+
+
 def _space_p64(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """P64: the D87 arithmetic, recomputed; injected free bytes; no purgeable bytes counted."""
+    """P64: the D87 arithmetic from the PINNED constants, on inputs where each term binds;
+    injected free bytes; no purgeable bytes counted."""
     import collections
 
     from clearwater.interfaces import Settings
     from clearwater.jobs import disk_space
 
-    for quality in ("high", "standard", "draft"):
-        settings = Settings(quality_level=quality)  # type: ignore[arg-type]
-        got = disk_space.estimate_video_bytes(
-            10**9,
-            settings,
-            width=3840,
-            height=2160,
-            frame_rate=Fraction(60),
-            duration_s=Fraction(60),
-        )
-        ceiling = (
-            Fraction(encode.NVENC_BITS_PER_PIXEL)
-            / encode.NVENC_RATE_SHARE[quality]
-            * 3840
-            * 2160
-            * Fraction(60)
-        )
-        bound = max(disk_space.QUALITY_RATIO[quality] * 10**9, ceiling * 60 / 8)
-        assert abs(got - bound * disk_space.MARGIN) <= 1, quality
+    pins = D87_CONTRACT
+    assert pins["bits_per_pixel"] == encode.NVENC_BITS_PER_PIXEL
+    assert pins["rate_share"] == encode.NVENC_RATE_SHARE
+    assert pins["quality_ratio"] == disk_space.QUALITY_RATIO
+    assert pins["margin"] == disk_space.MARGIN
+    for label, (size, width, height, rate, seconds) in SPACE_INPUTS.items():
+        for quality in ("high", "standard", "draft"):
+            settings = Settings(quality_level=quality)  # type: ignore[arg-type]
+            got = disk_space.estimate_video_bytes(
+                size, settings, width=width, height=height, frame_rate=rate, duration_s=seconds
+            )
+            per_second = (
+                pins["bits_per_pixel"] / pins["rate_share"][quality] * width * height * rate
+            )
+            by_size, by_ceiling = pins["quality_ratio"][quality] * size, per_second * seconds / 8
+            assert (by_size > by_ceiling) is (label == "size binds"), (label, quality)
+            assert abs(got - max(by_size, by_ceiling) * pins["margin"]) <= 1, (label, quality)
     usage = collections.namedtuple("usage", "total used free")
     monkeypatch.setattr(disk_space.shutil, "disk_usage", lambda path: usage(100, 90, 10))
     check = disk_space.check_free_space(tmp_path, 11)
@@ -3168,53 +3189,247 @@ def test_portability_disk_space_estimate(
 
 # --- W-GUARD: the footage guard and the test helpers' platform guards ----------------------
 
-PLATFORM_TEXTS = ("os.name", "sys.platform", "WINDOWS")
-"""What a platform guard mentions (``WINDOWS`` is a module constant built on sys.platform)."""
+HOSTS = (("win32", "nt"), ("darwin", "posix"), ("linux", "posix"))
+"""The hosts a platform test is evaluated on: Windows first, then the two others."""
+
+OFF_WINDOWS, ON_WINDOWS = "off-windows", "on-windows"
+"""The two polarities a pure platform test can have (true only off / only on Windows)."""
+
+
+def platform_polarity(test: ast.expr) -> str | None:
+    """Return the polarity of a platform test, or None when it is not a pure one.
+
+    The expression is EVALUATED once per host in :data:`HOSTS` with ``sys.platform``,
+    ``os.name`` and the ``WINDOWS`` constant bound (nothing else): true only off Windows is
+    :data:`OFF_WINDOWS`, true only on Windows :data:`ON_WINDOWS`. An ``and`` with an
+    on-Windows operand is on Windows (its other operands never run elsewhere).
+    """
+    code = compile(ast.Expression(test), "<platform test>", "eval")
+    values = []
+    for platform, os_name in HOSTS:
+        names = {
+            "sys": SimpleNamespace(platform=platform),
+            "os": SimpleNamespace(name=os_name),
+            "WINDOWS": platform == "win32",
+        }
+        try:
+            values.append(bool(eval(code, {"__builtins__": {}}, names)))
+        except Exception:  # not a pure platform test (another name, a call that fails)
+            if (
+                isinstance(test, ast.BoolOp)
+                and isinstance(test.op, ast.And)
+                and any(platform_polarity(v) == ON_WINDOWS for v in test.values)
+            ):
+                return ON_WINDOWS
+            return None
+    windows, *others = values
+    if not windows and all(others):
+        return OFF_WINDOWS
+    if windows and not any(others):
+        return ON_WINDOWS
+    return None
 
 
 def platform_guard_offenders(source: str, markers: Sequence[str], name: str) -> list[str]:
-    """Return ``name:line`` for each line holding a marker outside any platform guard.
+    """Return ``name:line`` for each marker that a Windows-only path does not control.
 
-    A line is guarded when it mentions a platform test itself, or when its innermost enclosing
-    function (decorators included) does, calls a helper that does (a skip off Windows), or is
-    only called from functions that are guarded.
+    The source is parsed (comments never count) and each marker's smallest node is walked up
+    to the module. It is controlled when an enclosing branch is taken only on Windows (an
+    ``if`` body, an ``else`` of an off-Windows test, a later ``and`` operand), when its function
+    carries ``skipif`` with an off-Windows condition, or when an earlier statement of an
+    enclosing block skips, raises or returns off Windows (itself, inside a helper it calls, or
+    a ``monkeypatch.setattr(subprocess, ...)`` stub). Each test's POLARITY is evaluated
+    (:func:`platform_polarity`): an inverted guard controls nothing. A marker in the skip of
+    an off-Windows guard is that guard's own text; a constant assigned to a name is
+    controlled when every later use is; a function without its own control is controlled
+    when every call of it is.
     """
     tree = ast.parse(source)
-    lines = source.splitlines()
-    functions = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
+    parents: dict[ast.AST, ast.AST] = {}
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+    functions = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
 
-    def span(node: ast.FunctionDef) -> tuple[int, int]:
-        first = min([node.lineno, *(d.lineno for d in node.decorator_list)])
-        return first, node.end_lineno or node.lineno
+    def is_skip(node: ast.AST) -> bool:
+        return isinstance(node, ast.Call) and ast.unparse(node.func) in ("pytest.skip", "skip")
 
-    def text(node: ast.FunctionDef) -> str:
-        first, last = span(node)
-        return "\n".join(lines[first - 1 : last])
+    def exits(body: Sequence[ast.stmt]) -> bool:
+        return any(
+            isinstance(n, ast.Raise | ast.Return) or is_skip(n) for s in body for n in ast.walk(s)
+        )
 
-    def direct(node: ast.FunctionDef) -> bool:
-        body = text(node)
-        return any(t in body for t in PLATFORM_TEXTS) or "monkeypatch.setattr(subprocess" in body
+    def exits_off_windows(statement: ast.AST) -> bool:
+        return any(
+            isinstance(n, ast.If) and platform_polarity(n.test) == OFF_WINDOWS and exits(n.body)
+            for n in ast.walk(statement)
+        )
 
-    skipping = {f.name for f in functions if direct(f)}  # helpers that skip off Windows
+    def skipper(function: ast.FunctionDef) -> bool:
+        return any(
+            isinstance(s, ast.If) and platform_polarity(s.test) == OFF_WINDOWS and exits(s.body)
+            for s in function.body
+        )
 
-    def guarded(node: ast.FunctionDef, depth: int = 0) -> bool:
-        body = text(node)
-        if direct(node) or any(f"{name}(" in body for name in skipping - {node.name}):
+    def stops_off_windows(statement: ast.stmt) -> bool:
+        if exits_off_windows(statement):
             return True
-        callers = [f for f in functions if f is not node and f"{node.name}(" in text(f)]
-        return depth < 3 and bool(callers) and all(guarded(f, depth + 1) for f in callers)
+        for call in (n for n in ast.walk(statement) if isinstance(n, ast.Call)):
+            text = ast.unparse(call.func)
+            if (
+                text == "monkeypatch.setattr"
+                and call.args
+                and ast.unparse(call.args[0]) == "subprocess"
+            ):
+                return True
+            if text in functions and skipper(functions[text]):
+                return True
+        return False
+
+    def skipif_off_windows(function: ast.FunctionDef) -> bool:
+        for decorator in function.decorator_list:
+            if isinstance(decorator, ast.Call) and ast.unparse(decorator.func).endswith(
+                "mark.skipif"
+            ):
+                condition = decorator.args[0] if decorator.args else None
+                condition = condition or next(
+                    (k.value for k in decorator.keywords if k.arg == "condition"), None
+                )
+                if condition is not None and platform_polarity(condition) == OFF_WINDOWS:
+                    return True
+        return False
+
+    def in_skip(node: ast.AST, stop: ast.AST) -> bool:
+        while node is not stop:
+            if is_skip(node):
+                return True
+            node = parents[node]
+        return False
+
+    def controlled(node: ast.AST, depth: int = 0) -> bool:
+        statement = node
+        while not isinstance(statement, ast.stmt):
+            statement = parents[statement]
+        if (
+            isinstance(statement, ast.Assign)
+            and len(statement.targets) == 1
+            and isinstance(statement.targets[0], ast.Name)
+            and not any(isinstance(n, ast.Call) for n in ast.walk(statement.value))
+            and depth < 3
+        ):  # a constant: controlled where it is used
+            scope = parents[statement]
+            uses = [
+                n
+                for n in ast.walk(scope)
+                if isinstance(n, ast.Name)
+                and n.id == statement.targets[0].id
+                and isinstance(n.ctx, ast.Load)
+                and n.lineno > statement.lineno
+            ]
+            return bool(uses) and all(controlled(u, depth + 1) for u in uses)
+        innermost: ast.FunctionDef | None = None
+        child, current = node, parents.get(node)
+        while current is not None:
+            if isinstance(current, ast.If):
+                polarity = platform_polarity(current.test)
+                if child in current.body and polarity == ON_WINDOWS:
+                    return True
+                if child in current.orelse and polarity == OFF_WINDOWS:
+                    return True
+                if child in current.body and polarity == OFF_WINDOWS and in_skip(node, current):
+                    return True  # the guard's own skip text
+            if isinstance(current, ast.IfExp):
+                polarity = platform_polarity(current.test)
+                if (child is current.body and polarity == ON_WINDOWS) or (
+                    child is current.orelse and polarity == OFF_WINDOWS
+                ):
+                    return True
+            if isinstance(current, ast.BoolOp) and isinstance(current.op, ast.And):
+                earlier = current.values[: current.values.index(child)]  # type: ignore[arg-type]
+                if any(platform_polarity(v) == ON_WINDOWS for v in earlier):
+                    return True
+            for field in ("body", "orelse", "finalbody"):
+                block = getattr(current, field, None)
+                if (
+                    isinstance(block, list)
+                    and child in block
+                    and any(stops_off_windows(s) for s in block[: block.index(child)])
+                ):
+                    return True
+            if isinstance(current, ast.FunctionDef):
+                if skipif_off_windows(current):
+                    return True
+                innermost = innermost or current
+            child, current = current, parents.get(current)
+        if innermost is None or depth >= 3:
+            return False
+        calls = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == innermost.name
+        ]
+        return bool(calls) and all(controlled(c, depth + 1) for c in calls)
 
     offenders = []
-    for number, line in enumerate(lines, start=1):
-        if not any(m in line for m in markers) or any(t in line for t in PLATFORM_TEXTS):
+    for number, line in enumerate(source.splitlines(), start=1):
+        if not any(m in line for m in markers):
             continue
-        around = [f for f in functions if span(f)[0] <= number <= span(f)[1]]
-        inner = max(around, key=lambda f: span(f)[0], default=None)
-        if inner is None or not guarded(inner):
+        spanning = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.expr | ast.stmt)
+            and n.lineno <= number <= (n.end_lineno or n.lineno)
+            and any(m in (ast.get_source_segment(source, n) or "") for m in markers)
+        ]
+        if not spanning:  # a comment or a docstring line: no code to control
+            continue
+        smallest = min(spanning, key=lambda n: len(ast.get_source_segment(source, n) or ""))
+        if not controlled(smallest):
             offenders.append(f"{name}:{number}")
     return offenders
 
 
+GUARD_PROBES = {
+    "unguarded": ("def helper(p):\n    subprocess.run(['cmd', '/c', 'mklink', '/J', p, p])\n", 1),
+    "a comment": (
+        "def helper(p):  # sys.platform == 'win32' only\n"
+        "    subprocess.run(['cmd', '/c', 'mklink', '/J', p, p])  # os.name\n",
+        1,
+    ),
+    "inverted if": (
+        "def helper(p):\n    if sys.platform != 'win32':\n"
+        "        subprocess.run(['cmd', '/c', 'mklink', '/J', p, p])\n",
+        1,
+    ),
+    "inverted skip": (
+        "def helper(p):\n    if sys.platform == 'win32':\n        pytest.skip('x')\n"
+        "    subprocess.run(['cmd', '/c', 'mklink', '/J', p, p])\n",
+        1,
+    ),
+    "inverted skipif": (
+        "@pytest.mark.skipif(os.name == 'nt', reason='x')\n"
+        "def test_x(p):\n    subprocess.run(['cmd', '/c', 'mklink', '/J', p, p])\n",
+        1,
+    ),
+    "guarded if": (
+        "def helper(p):\n    if sys.platform == 'win32':\n"
+        "        subprocess.run(['cmd', '/c', 'mklink', '/J', p, p])\n",
+        0,
+    ),
+    "guarded skip": (
+        "def helper(p):\n    if not WINDOWS:\n        pytest.skip('x')\n"
+        "    subprocess.run(['cmd', '/c', 'mklink', '/J', p, p])\n",
+        0,
+    ),
+    "guarded skipif": (
+        "@pytest.mark.skipif(os.name != 'nt', reason='x')\n"
+        "def test_x(p):\n    subprocess.run(['cmd', '/c', 'mklink', '/J', p, p])\n",
+        0,
+    ),
+}
+"""Planted sources for the instrument and how many offenders each must give (A r2 item 9)."""
 GUARD_SITES = {
     "X05": ("test_conftest_guard.py", ('"\\\\\\\\?\\\\"',)),
     "X06": ("test_conftest_guard.py", ("letter case matters only",)),
@@ -3247,8 +3462,8 @@ def _guard_helpers(site: str) -> Any:
         source = (Path(__file__).parent / module).read_text(encoding="utf-8")
         assert any(m in source for m in markers), (site, markers)  # the construct is there
         assert platform_guard_offenders(source, markers, module) == []
-        planted = "def helper(p):\n    subprocess.run(['cmd', '/c', 'mklink', '/J', p, p])\n"
-        assert platform_guard_offenders(planted, ("mklink",), "planted") == ["planted:2"]
+        for label, (planted, count) in GUARD_PROBES.items():  # comments and polarity
+            assert len(platform_guard_offenders(planted, ("mklink",), "planted")) == count, label
 
     return case
 
