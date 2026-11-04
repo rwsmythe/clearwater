@@ -86,6 +86,28 @@ Both replied within the hour. Dispositions were returned to each by SendMessage.
    first on the Clearwater instance, then upstreamed by the re-port method below. Dispatch gate: Phase
    5 CLOSED (the gate report accepted). Harness-side package, CHARC-briefed; runs the harness suite,
    not the product gate.
+   **DONE 2026-11-04 (WP-H1 accepted, Clearwater main `5dc227dd`, record `docs/proofs/wp-h1-accept.md`,
+   report `docs/reports/wp-h1-cell-depth.md`):** the reader gained `--sessions`, `--live HOURS` with the
+   parked-cell rule and `--agent ID` (exact match on the cell name or the full `agent-a<ID>` stem, CHARC's
+   F3 ruling); the row gained `age=` and `flag=`; swing's 15 selector tests ported plus the exit-map,
+   guard and boundary pins (reader module 47 -> 88 tests; harness suite 382 -> 423 OK). Codex lane, both
+   nets Claude: A converged at r2, B clean with one remediation. See the re-port section below.
+
+## Re-port 2026-11-04 (WP-H1)
+
+Done by the orchestrator (generation 40) at the WP-H1 accept, by the method below:
+
+- Template clone `C:\Users\rwsmy\harness-template`: `master` = `origin/master` = Clearwater's
+  `refs/remotes/template/main` = `4335ff6` (PR #1's merge) checked first; `core.autocrlf` false.
+- Delta `git diff template/main 5dc227dd -- scripts/cell_depth.py tests/harness/test_cell_depth.py
+  docs/dispatch-recipe.md`: 3 files, +810 / -27, 0 CR, 0 instance-vocabulary hits; applied with
+  `git apply --index`; all three blobs byte-identical to Clearwater's.
+- Reviewer B's B1 caught a pre-package docstring hunk that would have returned a private lineage
+  identifier the template removed in `80316172`; Clearwater took the template's wording (`3dba892b`)
+  before the delta was cut.
+- Branch **`clearwater-upstream-2026-11-04`**, commit **`911e783`**, local only; the template's own suite
+  `python -m unittest discover -s tests/harness` 423 OK (1 skipped). The clone is back on `master`, clean.
+- **NOT PUSHED.** As with item 1: the push, the PR and the merge are the owner's word and click.
 
 ## Re-port method for later
 
