@@ -226,6 +226,8 @@ def test_nothing_is_written_outside_the_injected_locations(
 ) -> None:
     sentinel = tmp_path / "real-app-data"
     _sentinel_environment(monkeypatch, sentinel)
+    for resolved in (app_locations().config_dir, app_locations().cache_dir):
+        assert resolved.is_relative_to(sentinel)  # every platform's branch, Library included
     _session(make_window, qtbot)
     assert _written_under(sentinel) == []
     assert (tmp_path / "config" / "settings.json").is_file()

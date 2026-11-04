@@ -28,6 +28,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from clearwater.config.paths import Locations, app_locations
 from clearwater.interfaces.image import ColorDescription
 from clearwater.interfaces.video import (
     AudioStreamInfo,
@@ -1356,3 +1357,142 @@ def test_portability_default_pipe(
 ) -> None:
     """W-PIPE: the enlarged pipe and its fallback, per platform, without a Windows call off it."""
     PIPE_CASES[site](monkeypatch, tmp_path)
+
+
+# --- W-PATH: the app-data locations per platform (AD-25(a) as amended 2026-11-04) -----------
+
+XDG = {"XDG_CONFIG_HOME": "", "XDG_CACHE_HOME": ""}
+
+
+def _xdg(root: Path) -> dict[str, str]:
+    return {"XDG_CONFIG_HOME": str(root / "cfg"), "XDG_CACHE_HOME": str(root / "cch")}
+
+
+def _path_p01(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P01: win32 unchanged, darwin under ~/Library, Linux XDG; nothing is created."""
+    home = tmp_path / "home"
+    roaming = {"APPDATA": str(tmp_path / "R"), "LOCALAPPDATA": str(tmp_path / "L")}
+    windows = app_locations(environ={**roaming, **_xdg(tmp_path)}, platform="win32", home=home)
+    assert windows == Locations(
+        tmp_path / "R" / "Clearwater", tmp_path / "L" / "Clearwater" / "cache"
+    )
+    for env in ({}, roaming, _xdg(tmp_path), XDG):
+        darwin = app_locations(environ=env, platform="darwin", home=home)
+        assert darwin.config_dir == home / "Library" / "Application Support" / "Clearwater"
+        assert darwin.cache_dir == home / "Library" / "Caches" / "Clearwater"
+    assert darwin.settings_file == darwin.config_dir / "settings.json"
+    assert darwin.presets_dir == darwin.config_dir / "presets"
+    assert darwin.log_file == darwin.config_dir / "logs" / "clearwater.log"
+    linux = app_locations(environ=_xdg(tmp_path), platform="linux", home=home)
+    assert linux == Locations(tmp_path / "cfg" / "clearwater", tmp_path / "cch" / "clearwater")
+    fallback = app_locations(environ={}, platform="linux", home=home)
+    assert fallback == Locations(home / ".config" / "clearwater", home / ".cache" / "clearwater")
+    assert not home.exists() and sorted(tmp_path.iterdir()) == []
+
+
+def _path_p25(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P25 / P26: the journal sits in config_dir (Application Support), never in the cache."""
+    from clearwater.app.startup import JOURNAL_FILE_NAME, WriteJournal
+
+    main = ast.parse((SRC / "app" / "main.py").read_text(encoding="utf-8"))
+    calls = [
+        ast.unparse(n)
+        for n in ast.walk(main)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "WriteJournal"
+    ]
+    assert calls == ["WriteJournal(locations.config_dir)"]
+    darwin = app_locations(environ={}, platform="darwin", home=tmp_path / "home")
+    journal = WriteJournal(darwin.config_dir)
+    assert journal.path == darwin.config_dir / JOURNAL_FILE_NAME
+    assert JOURNAL_FILE_NAME == "write-journal.json"
+    assert not journal.path.is_relative_to(darwin.cache_dir)
+    assert not (tmp_path / "home").exists()
+
+
+def _path_p56(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P56: the GPU pack root: Windows and Linux kept, None on macOS (no lookup)."""
+    from clearwater import gpu_pack
+
+    home = tmp_path / "home"
+    local = {"LOCALAPPDATA": str(tmp_path / "L"), "XDG_DATA_HOME": str(tmp_path / "D")}
+    assert gpu_pack.pack_root(environ=local, platform="win32", home=home) == (
+        tmp_path / "L" / "Clearwater" / "gpu-pack"
+    )
+    assert gpu_pack.pack_root(environ=local, platform="linux", home=home) == (
+        tmp_path / "D" / "clearwater" / "gpu-pack"
+    )
+
+    def poisoned(*_args: object) -> Path:
+        raise AssertionError("macOS looked a pack folder up")
+
+    monkeypatch.setattr(Path, "home", poisoned)
+    assert gpu_pack.pack_root(environ=local, platform="darwin") is None
+
+
+def _path_x13(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """X13: darwin ignores the XDG variables (moved from test_config_paths, CHARC S2)."""
+    found = app_locations(environ=_xdg(tmp_path), platform="darwin", home=tmp_path / "h")
+    assert found.config_dir == tmp_path / "h" / "Library" / "Application Support" / "Clearwater"
+    assert found.cache_dir == tmp_path / "h" / "Library" / "Caches" / "Clearwater"
+    assert not found.config_dir.is_relative_to(tmp_path / "cfg")
+
+
+def _path_x14(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """X14: darwin's only real root is Path.home(), which the isolation test poisons."""
+
+    def poisoned(*_args: object) -> Path:
+        raise AssertionError("the real home folder was resolved")
+
+    monkeypatch.setattr(Path, "home", poisoned)
+    assert app_locations(environ={}, platform="darwin", home=tmp_path).cache_dir.is_relative_to(
+        tmp_path
+    )
+    with pytest.raises(AssertionError, match="real home folder"):
+        app_locations(environ={}, platform="darwin")
+    isolation = (Path(__file__).parent / "test_config_isolation.py").read_text(encoding="utf-8")
+    assert 'monkeypatch.setattr(Path, "home", poisoned)' in isolation
+
+
+def _string_keys(node: ast.AST) -> set[str]:
+    """Return the environment names a test sets: keywords and literal first arguments."""
+    names = {k.arg for n in ast.walk(node) if isinstance(n, ast.Call) for k in n.keywords if k.arg}
+    for n in ast.walk(node):
+        if isinstance(n, ast.Call) and n.args and isinstance(n.args[0], ast.Constant):
+            names.add(str(n.args[0].value))
+        if isinstance(n, ast.Tuple):
+            names |= {str(e.value) for e in n.elts if isinstance(e, ast.Constant)}
+    return names
+
+
+def _path_x15(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """X15 / X16: both start-up tests redirect HOME and USERPROFILE too (DR-124)."""
+    wanted = {"APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "HOME", "USERPROFILE"}
+    for module, function in (
+        ("test_app_startup.py", "test_python_m_clearwater_starts_the_shell_and_exits_0"),
+        ("test_gui_startup.py", "_sentinel_environment"),
+    ):
+        tree = ast.parse((Path(__file__).parent / module).read_text(encoding="utf-8"))
+        node = next(
+            n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == function
+        )
+        assert wanted <= _string_keys(node), module
+
+
+PATH_CASES = {
+    "P01": _path_p01,
+    "P25": _path_p25,
+    "P26": _path_p25,
+    "P56": _path_p56,
+    "X13": _path_x13,
+    "X14": _path_x14,
+    "X15": _path_x15,
+    "X16": _path_x15,
+}
+
+
+@pytest.mark.parametrize("site", sorted(PATH_CASES))
+def test_portability_app_locations(
+    site: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """W-PATH: settings, presets, log, journal and cache roots per platform; no migration."""
+    PATH_CASES[site](monkeypatch, tmp_path)

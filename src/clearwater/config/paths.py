@@ -2,20 +2,23 @@ r"""Per-OS app-data locations: the one place that reads the environment for a fo
 
 D37 (presets), D71 (proxy cache), D88 and N9 (log) and D89 (settings) all store under "app
 data". The convention for each OS is required portability behaviour, not an N1 exception
-(AD-25(a)):
+(AD-25(a), amended 2026-11-04 for macOS):
 
-==========  ==================================  ================================================
-Platform    Settings, presets, log              Proxy cache (not roamed)
-==========  ==================================  ================================================
-Windows     ``%APPDATA%\Clearwater``             ``%LOCALAPPDATA%\Clearwater\cache``
-Elsewhere   ``$XDG_CONFIG_HOME/clearwater``     ``$XDG_CACHE_HOME/clearwater``
-==========  ==================================  ================================================
+==========  ==========================================  ========================================
+Platform    Settings, presets, log, write journal       Proxy cache, worker scratch (not roamed)
+==========  ==========================================  ========================================
+Windows     ``%APPDATA%\Clearwater``                     ``%LOCALAPPDATA%\Clearwater\cache``
+macOS       ``~/Library/Application Support/Clearwater``  ``~/Library/Caches/Clearwater``
+Elsewhere   ``$XDG_CONFIG_HOME/clearwater``             ``$XDG_CACHE_HOME/clearwater``
+==========  ==========================================  ========================================
 
 A variable that is unset, empty or not an absolute path is ignored (XDG: relative values are
 invalid) and the home-folder fallback applies: ``~/AppData/Roaming`` and ``~/AppData/Local`` on
-Windows, ``~/.config`` and ``~/.cache`` elsewhere. Nothing here creates a folder unless
-:func:`ensure_directory` is called; every store and the log take their folder as an argument, so
-tests pass ``tmp_path`` and never resolve the real locations.
+Windows, ``~/.config`` and ``~/.cache`` elsewhere. macOS reads no variable: its folders are under
+the home folder, and the XDG variables do not apply there (no migration from ``~/.config``:
+AD-25(a)). Nothing here creates a folder unless :func:`ensure_directory` is called; every store
+and the log take their folder as an argument, so tests pass ``tmp_path`` and never resolve the
+real locations.
 """
 
 from __future__ import annotations
@@ -31,6 +34,10 @@ WINDOWS_FOLDER_NAME = "Clearwater"
 
 POSIX_FOLDER_NAME = "clearwater"
 """The application folder name under the XDG roots (lower-case, the XDG convention)."""
+
+MACOS_FOLDER_NAME = "Clearwater"
+"""The application folder name under ``~/Library/Application Support`` and
+``~/Library/Caches`` on macOS (AD-25(a) as amended)."""
 
 SETTINGS_FILE_NAME = "settings.json"
 """The settings document inside the config folder (D89)."""
@@ -105,8 +112,9 @@ def app_locations(
     Args:
         environ: The environment to read; ``os.environ`` when None.
         platform: A ``sys.platform`` value; the running one when None. ``"win32"`` selects the
-            Windows convention, anything else the XDG one.
-        home: The home folder used by the fallbacks; ``Path.home()`` when None.
+            Windows convention, ``"darwin"`` the macOS Library folders, anything else the XDG
+            one.
+        home: The home folder used by the fallbacks and by macOS; ``Path.home()`` when None.
 
     Returns:
         The config and cache folders.
@@ -120,20 +128,28 @@ def app_locations(
             base = Path.home() if home is None else home
             roaming = roaming or base / "AppData" / "Roaming"
             local = local or base / "AppData" / "Local"
-        return Locations(
+        found = Locations(
             config_dir=roaming / WINDOWS_FOLDER_NAME,
             cache_dir=local / WINDOWS_FOLDER_NAME / CACHE_FOLDER_NAME,
         )
-    config_root = _absolute_from_environment(env, "XDG_CONFIG_HOME")
-    cache_root = _absolute_from_environment(env, "XDG_CACHE_HOME")
-    if config_root is None or cache_root is None:
-        base = Path.home() if home is None else home
-        config_root = config_root or base / ".config"
-        cache_root = cache_root or base / ".cache"
-    return Locations(
-        config_dir=config_root / POSIX_FOLDER_NAME,
-        cache_dir=cache_root / POSIX_FOLDER_NAME,
-    )
+    elif kind == "darwin":
+        library = (Path.home() if home is None else home) / "Library"
+        found = Locations(
+            config_dir=library / "Application Support" / MACOS_FOLDER_NAME,
+            cache_dir=library / "Caches" / MACOS_FOLDER_NAME,
+        )
+    else:
+        config_root = _absolute_from_environment(env, "XDG_CONFIG_HOME")
+        cache_root = _absolute_from_environment(env, "XDG_CACHE_HOME")
+        if config_root is None or cache_root is None:
+            base = Path.home() if home is None else home
+            config_root = config_root or base / ".config"
+            cache_root = cache_root or base / ".cache"
+        found = Locations(
+            config_dir=config_root / POSIX_FOLDER_NAME,
+            cache_dir=cache_root / POSIX_FOLDER_NAME,
+        )
+    return found
 
 
 def ensure_directory(path: Path) -> Path:

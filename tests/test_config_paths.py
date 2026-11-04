@@ -41,7 +41,7 @@ def test_windows_mixed_one_variable_set(tmp_path: Path) -> None:
     assert found.cache_dir == home / "AppData" / "Local" / "Clearwater" / "cache"
 
 
-@pytest.mark.parametrize("platform", ["linux", "darwin"])
+@pytest.mark.parametrize("platform", ["linux"])
 def test_xdg_variables_win_elsewhere(tmp_path: Path, platform: str) -> None:
     env = {"XDG_CONFIG_HOME": str(tmp_path / "cfg"), "XDG_CACHE_HOME": str(tmp_path / "cch")}
     found = app_locations(environ=env, platform=platform, home=tmp_path / "h")

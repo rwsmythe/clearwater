@@ -173,7 +173,11 @@ runpy.run_module("clearwater", run_name="__main__", alter_sys=True)
 
 
 def test_python_m_clearwater_starts_the_shell_and_exits_0(tmp_path: Path) -> None:
-    """The real entry point under offscreen QPA, app data redirected under ``tmp_path``."""
+    """The real entry point under offscreen QPA; app data and the home redirected to tmp_path.
+
+    The home (HOME, and USERPROFILE on Windows) is redirected too: macOS resolves its Library
+    folders from it (AD-25(a) as amended; DR-124).
+    """
     env = dict(os.environ)
     env.update(
         QT_QPA_PLATFORM="offscreen",
@@ -181,6 +185,8 @@ def test_python_m_clearwater_starts_the_shell_and_exits_0(tmp_path: Path) -> Non
         LOCALAPPDATA=str(tmp_path / "local"),
         XDG_CONFIG_HOME=str(tmp_path / "xdg-config"),
         XDG_CACHE_HOME=str(tmp_path / "xdg-cache"),
+        HOME=str(tmp_path / "home"),
+        USERPROFILE=str(tmp_path / "home"),
     )
     env.pop("PYTEST_ADDOPTS", None)
     done = subprocess.run(
@@ -194,7 +200,13 @@ def test_python_m_clearwater_starts_the_shell_and_exits_0(tmp_path: Path) -> Non
     assert done.returncode == 0, done.stderr[-2000:]
     assert "event loop reached" in done.stdout
     written = sorted(p.relative_to(tmp_path).parts[0] for p in tmp_path.rglob("settings.json"))
-    assert written in (["roaming"], ["xdg-config"])  # the close saved the settings in app data
+    if sys.platform == "win32":
+        expected = ["roaming"]
+    elif sys.platform == "darwin":
+        expected = ["home"]  # ~/Library/Application Support/Clearwater
+    else:
+        expected = ["xdg-config"]
+    assert written == expected  # the close saved the settings in the disposable app data only
 
 
 # The engines and the order (Q11, Q17, S-order, DR-35 (c)).
