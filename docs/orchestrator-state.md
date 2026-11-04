@@ -21,20 +21,28 @@
 - **Backslash-bearing Python helpers are written with the Write tool**, never a heredoc. **`rm` takes literal absolute paths.** **Worktree release:** a released worktree's `work/` is pruned only on the owner's word; junits copied to `clearwater-review-evidence\<pkg>\gate\` first.
 - **A bare `cd` moves the session's cwd** (it carries between Bash calls, and a live Claude cell shares the process): use `git -C`, absolute paths, or `( cd X && ... )`.
 
-### Live board (RESUME HERE) -- gen 40, 2026-11-04 ~07:00Z, NOTHING RUNNING (no cell live, no job)
+### Live board (RESUME HERE) -- gen 40 ROLLED 2026-11-04 ~08:35Z at ~340K, CLEAN: NOTHING RUNNING (no cell, no job, no gate)
 
-1. **Clearwater 1.0.0 released and PUSHED.**
-   - Tag `v1.0.0` (annotated) on `40d2ce04`.
-   - `origin/main` = `f46e0d71` and the tag were pushed 06:12Z on the owner's word "push now" (`a6907a198a747cf0`). The owner then made the repository public.
-   - main has moved on locally since then; **a further push needs the owner's word.**
-2. **WP-H1 ACCEPTED**: main fast-forwarded to `5dc227dd` (record `docs/proofs/wp-h1-accept.md`, ledger, report `docs/reports/wp-h1-cell-depth.md`).
-   - Harness 423 OK.
-   - Codex built it in one session `01a1a51b` (six turns). Both nets were Claude: A converged in r2, and B was clean with its single remediation `3dba892b`.
-   - **Template re-port DONE LOCALLY:** `C:\Users\rwsmy\harness-template`, branch `clearwater-upstream-2026-11-04` = `911e783`, template suite 423 OK (plain `python`). The clone is back on `master`, clean. **NOT PUSHED**: the push, PR and merge need the owner's word.
-   - CHARC writes the upstream record's item 2 DONE and the re-port section.
-3. **Next:** CHARC's Phase 6 proposals.
-- Owner-pending: the template push (when CHARC asks), and the prune word for the kept worktrees.
-- Kept worktrees until the owner's word: `wp5.3`, `wp5.7`, `wp5.8`, `wp-dr25`, `wp5.5`, `wp-h1`; mine is `orch-state-g40`. Prunes of `work\wp5.7\` and `work\wp-dr25\` only on the owner's word.
+**Gen 41: your first act is to dispatch WP6.1's round 0.** The brief is FINAL; gen 40 rolled before dispatching it because an opus-high cell dies with the outgoing pane.
+
+1. **WP6.1, packaging spike. FINAL at `223b33f4`** (`docs/briefs/wp6.1-brief.md`, gen 40's fill `dadf3013`).
+   - Rulings: Q5 = the `--export-worker` argv, dispatched in `__main__` before any Qt import and built by `composition.py:461` when frozen (both files owned). Q6 = the pack root per platform (`None` on macOS).
+   - Lane: **Claude opus-high** (`implementer-opus-high`, an Agent-tool subagent, FRESH).
+   - Reviewers: A = Codex `codex exec -p strong -s read-only` (the WP5.7 A form); B = the WSL Codex script (the WP5.7 B form).
+   - **Dispatch round 0, read-only**, in a NEW worktree `.worktrees/wp6.1` (branch `wp6.1` from main's head; copy `clearwater.local.toml`). Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp6.1\`.
+   - **PyInstaller in the dev group is a STOP to CHARC first** (the N13 row). The cell names the version in round 0.
+   - Timing windows are EXCLUSIVE.
+   - Read the cell's depth with the new `scripts/cell_depth.py --project <proj> --session=<id> --agent <name>`.
+2. **WP6.2 (portability audit, Codex, read-only) and WP-T8 (tools / tests paydown, Codex): fills POSTED** at `7a8f5135` for CHARC's FINAL.
+   - The fills set: ONE Codex cell at a time, WP6.2 first, WP-T8 after WP6.2 yields for its nets.
+   - WP-T8's three gate legs never overlap a WP6.1 build or timing window.
+   - Dispatch each only on its FINAL.
+3. **Done this generation:**
+   - **1.0.0:** tagged `v1.0.0` on `40d2ce04`. Pushed: `origin/main` was `f46e0d71`, then `8037995b` on the owner's word. Later main commits (`bf3a767d`, `031c7cb8`, the fills) are NOT pushed: a further push needs the owner's word.
+   - **WP-H1:** ACCEPTED `5dc227dd`. Template branch `clearwater-upstream-2026-11-04` = `911e783`, PUSHED on the owner's word. CHARC opened PR #2; the merge is the owner's click.
+   - **PRUNE DONE** (record `031c7cb8`): six worktrees and `work/wp5.3`, `wp5.7`, `wp-dr25` removed; branches kept; C: 97 GB.
+- **Worktrees now:** main plus `orch-state-g40` only.
+- **Paces** at 08:17Z: Codex 23 % / 0.233 (window resets 10:07Z); Claude 22 % / 0.799.
 
 ### Gen-40 lessons (WP-H1 additions)
 
