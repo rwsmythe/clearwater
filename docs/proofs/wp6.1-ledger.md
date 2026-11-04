@@ -618,3 +618,136 @@ Commands that worked:
   `--window-only` skips the keystroke part. Its `shot()` still calls the unsafe `keys(pid, "")`
   (an AppActivate plus an empty SendKeys), so replace `shot()` with PrintWindow before reuse.
 - **Without `--exe`**, the same script runs the dev baseline (`python -m clearwater`).
+
+## Turn 3 group 1 (2026-11-04): the loader, the frozen entry, their tests
+
+Fresh cell (implementer-opus-high), dispatch `clearwater-review-evidence/wp6.1/cell/dispatch-3.md`.
+No GUI launch, no synthetic input, nothing under the real `%LOCALAPPDATA%\Clearwater` (checked
+after the runs: the folder does not exist). Evidence `clearwater-review-evidence/wp6.1/cell/t3/`.
+
+Built:
+
+- `src/clearwater/gpu_pack.py` (stdlib only).
+  - `pack_root()` per Q6.
+  - `STAMP` = `stamp_for("cupy-cuda12x", <locked version>)` = `14.2.0-cu12`.
+  - `LOCKED_DISTRIBUTIONS` = the eleven pack distributions with every locked wheel (29 file
+    name / sha256 pairs, generated from `uv.lock` by `t3/gen_locked.py`; a test keeps them
+    equal to the lock).
+  - `check_pack(folder)` checks, in order: `manifest.json` present and parseable; `format` is
+    the int 1; `stamp` matches; `site-packages` exists; the name set is exactly the eleven (no
+    extra, no duplicate, none missing); each version is the lock's; each (wheel,
+    wheel_sha256) is a locked pair; each installed `<name>-<version>.dist-info/RECORD` exists
+    and has the manifest's sha256.
+  - `load(root)`: absent when `root` is None or `root/<STAMP>` is not a folder; rejected on
+    the first failed check; else, on win32 only, `os.add_dll_directory` for each
+    `site-packages/nvidia/*/bin` (handles kept for the process; a failure closes those already
+    added and rejects), then `site-packages` inserted at `sys.path[0]` once.
+  - One INFO line `gpu pack 14.2.0-cu12: loaded` / `absent` / `rejected: <reason>`. Reasons
+    are ASCII-safe: manifest text is escaped and cut at 80 characters.
+  - `activate()` returns None and logs nothing unless `sys.frozen` (D4). Nothing is written.
+- `src/clearwater/__main__.py`.
+  - Module level: the stdlib and `clearwater.gpu_pack` only.
+  - `main(argv)` first calls `prepend_executable_folder()` (D1: frozen only; not again when
+    the folder is already first, as in a spawned worker).
+  - `argv[1:2] == ["--export-worker"]`: `gpu_pack.activate()`, then
+    `export_worker.main(argv[2:])` (Q5(b)).
+  - Otherwise: `configure_logging(app_locations().log_dir)` with OSError suppressed (D3),
+    `gpu_pack.activate()`, then `clearwater.app.main.main(argv)`, imported on that branch only.
+- `src/clearwater/app/composition.py` `process_export_jobs`: `command` if given; else
+  `[sys.executable, "--export-worker"]` when `sys.frozen`; else the unchanged
+  `-m clearwater.app.export_worker` (Q5(a)). The one-line conditional became an if / elif /
+  else on the same statement; the docstring states both. `jobs/export_process.py`,
+  `io/video/pipes.py` and `app/export_worker.py` are untouched.
+- `tools/package/build.py --write-manifest <pack root>/<stamp>` (`manifest_document`,
+  `write_manifest`, `wheel_file_tags`, `installed_wheel_tags`): refuses a folder not named
+  `STAMP`; picks the one locked wheel whose tags match the installed `WHEEL` file; records the
+  lock's sha256 and the installed RECORD's sha256. `--form` and `--write-manifest` are mutually
+  exclusive. README section added.
+
+Commands (worktree root, Git Bash, `PYTEST_ADDOPTS` unset, outputs in `t3/`):
+
+| Command | Exit | Summary |
+|---|---|---|
+| `uv run --no-sync pytest -q -rs -p no:cacheprovider --basetemp=<wt>/work/c61b-4 tests/test_gpu_pack.py tests/test_frozen_entry.py` | 0 | 49 passed in 1.82 s (slowest call 0.06 s) |
+| `uv run --no-sync pytest -q -rs -p no:cacheprovider --basetemp=<wt>/work/c61b-5 tests/test_gpu_pack.py tests/test_frozen_entry.py tests/test_jobs_export_process.py tests/test_app_composition.py tests/test_wp42_composition.py tests/test_core_backend.py -m "not gpu"` | 0 | 200 passed, 41 deselected in 27.15 s |
+| `uv run --no-sync ruff check .` | 0 | All checks passed |
+| `uv run --no-sync ruff format --check .` | 0 | 321 files already formatted |
+| `uv run --no-sync mypy` | 0 | no issues in 160 source files |
+| `uv run --no-sync python <ev>/t3/mutate.py <wt>` | 0 | 21 / 21 mutations KILLED; the three product files restored byte-exact (sha256 checked) |
+
+Not run (the gate is the orchestrator's): the gui / slow / serial modules, among them
+`tests/test_app_startup.py` (which runs the real entry through `runpy`) and
+`tests/test_app_export_worker.py`.
+
+Mutations and the tests that catch them (each run by `t3/mutate.py`; the first failing test
+is named):
+
+| # | Mutation | Caught by |
+|---|---|---|
+| M1 | `activate()` ignores `sys.frozen` | `test_activate_does_nothing_in_a_source_run` |
+| M2 | `sys.path.append` instead of `insert(0)` | `test_a_valid_pack_is_loaded` |
+| M3 | RECORD sha256 not compared | `test_a_tampered_manifest_is_rejected[record]`, `test_a_changed_record_file_is_rejected` |
+| M4 | wheel / sha256 not checked against the lock | `test_a_tampered_manifest_is_rejected[wheel-hash]`, `[wheel-name]` |
+| M5 | missing distributions not checked | `test_a_missing_distribution_is_rejected` |
+| M6 | DLL folders added off Windows | `test_no_dll_folder_is_added_on_linux` |
+| M7 | macOS given an XDG root | `test_pack_root_on_macos_is_none` |
+| M8 | stamp without the CUDA major | `test_the_stamp_is_the_cupy_version_and_the_cuda_major` |
+| M9 | version not checked | `test_a_tampered_manifest_is_rejected[version]` |
+| M10 | `clearwater.app.main` imported at the entry's top level | `test_the_worker_flag_runs_the_worker_without_qt` (import blocker) |
+| M11 | worker given `argv[1:]` (its own flag: exit 2 in the real worker) | `test_the_worker_flag_runs_the_worker_without_qt`, `test_the_worker_flag_alone_passes_no_arguments` |
+| M12 | no loader on the worker branch | `test_the_worker_flag_runs_the_worker_without_qt` (call order) |
+| M13 | loader before the log on the GUI branch | `test_anything_else_starts_the_gui_after_logging_and_the_loader` |
+| M14 | PATH prepend not guarded by `sys.frozen` | `test_a_source_run_leaves_path_alone` |
+| M15 | PATH prepended again when already first | `test_frozen_puts_the_executable_folder_first_on_path` |
+| M16 | `main()` never prepends PATH | `test_the_entry_sets_path_before_either_branch` |
+| M17 | frozen build keeps the `-m` command | `test_a_frozen_build_re_enters_its_executable_as_the_worker` |
+| M18 | worker branch opens the log file | `test_the_worker_flag_runs_the_worker_without_qt` (call list) |
+| M19 | `format: true` accepted (`True == 1`) | `test_a_tampered_manifest_is_rejected[format-bool]` |
+| M20 | non-ASCII manifest text in a reason | `test_an_extra_or_duplicated_distribution_is_rejected` |
+| M21 | unreadable RECORD reported as missing | `test_an_unreadable_record_is_rejected` |
+
+Other tests and what they pin:
+
+- `test_locked_distributions_equal_the_lock`: the constant against `uv.lock`. The closure of
+  `cupy-cuda12x[ctk]` minus numpy is the eleven, and the versions and wheel pairs are equal.
+  It catches a lock bump without a loader update.
+- `test_the_bundle_numpy_satisfies_cupys_requirement`: the locked numpy lies inside CuPy's
+  installed `numpy` bound (skips if CuPy is not installed).
+- `test_pack_root_on_windows`, `_on_linux`, `_reads_the_running_platform_and_environment`:
+  the environment and home fallbacks, by injection and by monkeypatch of `sys.platform` and
+  the environment. `test_the_app_folder_names_match_config_paths`.
+- `test_no_pack_is_absent_and_changes_nothing` (missing / empty / None root: nothing created,
+  `sys.path` unchanged, one `absent` line); `test_a_pack_under_another_stamp_is_absent`;
+  `test_a_manifest_naming_another_stamp_is_rejected`.
+- `test_the_dll_folders_are_added_on_windows` (exactly the eight `nvidia/*/bin`, not
+  `include`); `test_a_failing_dll_folder_rejects_the_pack`.
+- `test_an_injected_command_wins_when_frozen`; `test_a_log_folder_failure_does_not_stop_the_gui`;
+  the build helper's three tests.
+
+Self-review (suspected / confirmed / fixed):
+
+1. A RECORD that exists but cannot be read was reported as `missing`: confirmed, fixed
+   (`unreadable: <type>`); M21.
+2. `format: true` passed the `== 1` check: confirmed, fixed (int type check); M19.
+3. A manifest name with non-ASCII text reached the log line unescaped: confirmed, fixed
+   (`_safe`); M20.
+4. The DLL-failure reason named only `bin`: fixed to `nvidia/<lib>/bin`.
+
+A second pass found nothing new.
+
+Notes for group 2 and the report:
+
+- The pack's `site-packages` is put on `sys.path`, not processed by `site.addsitedir`, so a
+  `.pth` file in it is ignored. None of the eleven wheels is expected to ship one; group 2
+  confirms on the real install.
+- The worker logs no pack line (D3). Its `clearwater` logger has no handler when `activate()`
+  runs, and the line is INFO, below the last-resort handler's WARNING, so nothing reaches the
+  worker's stderr either.
+- In a source run the loader logs nothing (D4), so the gate machine is a no-op by
+  construction, whatever folders exist.
+
+Commits: `3ed5c409` feat(wp6.1): GPU pack loader from a per-user folder, its tests, the
+manifest helper; `01cdd6ca` feat(wp6.1): frozen entry -- --export-worker re-entry, PATH
+prepend, frozen worker command.
+
+Depth at turn-3 group-1 end: DISPATCHER TO FILL
