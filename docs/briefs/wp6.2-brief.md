@@ -49,3 +49,33 @@ Turn 1 = round 0 (the grep record and the table's skeleton; any site that is a p
 
 - Lane paces at dispatch; base commit; worktree; evidence folder.
 - GATE_CHECKS: `git diff --name-only main` = the report only; 0 CR; no pytest leg (no code change); the harness suite if any harness file is touched (it must not be).
+
+## Dispatch fill (orchestrator gen 40, 2026-11-04 ~08:25Z)
+
+This section fills the one above. Where it differs, it governs once CHARC marks it FINAL. Corrections are marked **[corr]**.
+
+- **Base, worktree and evidence.**
+  - Base = main at dispatch (`dadf3013` or later, with CHARC's FINAL).
+  - Worktree `.worktrees/wp6.2`, branch `wp6.2`. No `clearwater.local.toml`: the package reads no footage.
+  - Evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp6.2\` (`cell\`, `A\`, `B\`).
+- **Lane paces at 08:17Z.** Codex 23 % / 0.233 (resets 10:07Z); Claude 22 % / 0.799.
+  - CODEX lane as briefed (`implementer-codex-sol-high`, a FRESH session).
+  - Reviewer A = a Claude pass at my seat (`scripts/codex_cell.py review`); Reviewer B = a Claude pass at my seat.
+- **[corr] Scheduling: one Codex cell at a time** (CLAUDE.md: "ONE Codex cell"). WP6.2 and WP-T8 are both on the Codex lane, so they run in sequence, not beside each other.
+  - **WP6.2 goes first:** it is read-only and short, and it runs beside WP6.1's round 0 and build turns.
+  - WP-T8 follows when WP6.2 has yielded for its nets.
+  - WP6.2 may run during a WP6.1 timing window, since it reads only. Its cell runs no pytest and no build, and I hold its turns if a window needs the CPU quiet.
+- **[corr] The "9 known conditional sites" were checked at the seat** (`grep -rnE "sys\.platform|os\.name|platform\.system\(|CREATE_NO_WINDOW|msvcrt|windll|LOCALAPPDATA|APPDATA" src/clearwater`): 13 lines, in TWO files, `config/paths.py` and `io/video/pipes.py`.
+  - `core/memory.py`, `io/video/capability.py` and `encode.py` hold Windows / NVIDIA ASSUMPTIONS (device memory, the `hevc_nvenc` / `libx265` pair, stderr wording) rather than platform conditionals.
+  - The audit covers both classes and counts them separately. In `tools/` and `tests/` the wider pattern (with `powershell`, `where`) matches 109 files at a first pass; round 0 refines the pattern and states the exact command and count.
+- **Read-only, enforced.** `git status --porcelain` is empty except the report, at every yield.
+- **Turns.**
+  - Turn 1 = round 0: the grep record with exact commands and counts, the table's skeleton, and Q1-Q3. Any site that is a product defect TODAY on Windows = STOP. YIELD.
+  - Turn 2 = the full report. I commit it. YIELD for Reviewer A.
+  - Then the nets.
+  - Depth: evaluate at about 200K, STOP near 250K.
+- **GATE_CHECKS:**
+  - `git diff --name-only main...wp6.2` = `docs/reports/wp6.2-portability-audit.md` only;
+  - 0 CR;
+  - the harness suite, once, because a new `docs/` file sits under `docs/reports/`, which is already instance surface: confirm no registration is needed;
+  - no pytest leg.

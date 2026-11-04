@@ -37,3 +37,42 @@ Turn 1 = round 0 (read every row and site; the DR-116 junit inventory; Q1-Q3) an
 
 - Lane paces at dispatch; base commit; worktree; evidence folder.
 - GATE_CHECKS: static; collection identity; the three legs (the store and the fixture plugin are on every path); `git diff --name-only main` = the owned paths; 0 CR.
+
+## Dispatch fill (orchestrator gen 40, 2026-11-04 ~08:25Z)
+
+This section fills the one above. Where it differs, it governs once CHARC marks it FINAL. Corrections are marked **[corr]**.
+
+- **Base, worktree and evidence.**
+  - Base = main at dispatch.
+  - Worktree `.worktrees/wp-t8`, branch `wp-t8`, with `clearwater.local.toml` copied in. The gate legs need the footage guard and FFmpeg.
+  - Evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp-t8\` (`cell\`, `A\`, `B\`, `gate\`).
+- **Lane paces at 08:17Z.** Codex 23 % / 0.233 (resets 10:07Z); Claude 22 % / 0.799.
+  - CODEX lane as briefed, a FRESH session.
+  - Reviewer A and Reviewer B = Claude passes at my seat.
+- **[corr] Scheduling.**
+  - **One Codex cell at a time:** WP-T8 starts when WP6.2 has yielded for its nets, not beside it.
+  - **One heavy job at a time:** WP-T8's three gate legs (about 70 minutes, the serial leg EXCLUSIVE) never overlap a WP6.1 build or timing window, and vice versa. I sequence them.
+  - The DR-116 table is from archived junits, so it is not heavy.
+- **Sources verified at the seat (08:20Z).**
+  - `cache/store.py`: the scan's refusal is at `:573` (`item.is_symlink() or item.is_junction() or not item.is_dir(follow_symlinks=False)`); `_entry_for_write` is at `:652`.
+  - `tools/export_bench.py` already carries `D106_MIN_PER_MIN = 12.0` (WP5.5 paid DR-119 (a)). Q1's shared constant replaces it with an import and does not duplicate it.
+  - **Archived serial junits for DR-116:**
+    - `clearwater-review-evidence\release-1.0.0\g40-p55-serial.xml` (the 1.0.0 gate of record);
+    - `wp-dr25\gate\g38-pdr25-serial.xml`, `wp-dr113\gate\g35-dr113-serial.xml`, `wp-d112\gate\g34-d112-serial.xml`, `wp-t7\gate\g31-t7-serial.xml`, `wp-d54\gate\g30-wpd54-serial2.xml`;
+    - WP-T6's run under `wp-t6\work-copy\` (`wp-t6\gate-g1\serial.xml`, `mc\serial.xml`, `w3\...`).
+  - Round 0 names which WP-T6 file matches `docs/reports/wp-t6-gate-sizing.md`'s 1,389 s figure of record, and uses it as the baseline.
+- **The DR-118 edit is the one product change.** It goes in `_entry_for_write` only. The store's on-disk format is unchanged, and so is its behaviour without a junction (the 1.0.0 cache tests stay green). Any wider change = STOP.
+- **Turns.**
+  - Turn 1 = round 0, read-only: every row and site; the junit inventory; Q1-Q3. YIELD.
+  - Turn 2 = (a)-(c) RED then GREEN. I commit.
+  - Turn 3 = (d) the table and the report. YIELD for Reviewer A.
+  - Depth: evaluate at about 200K, STOP near 250K. The DR-116 turn re-seats fresh if needed.
+- **GATE_CHECKS** (my seat, after Reviewer B, alone on the machine):
+  - `df -h /c` (25 GB floor);
+  - static (ruff, format, mypy);
+  - collection identity;
+  - parallel, serial and fullclip legs, one at a time with the stall watch;
+  - the harness suite only if a harness file changes (it must not);
+  - `git diff --name-only main...wp-t8` = the owned paths;
+  - 0 CR.
+  - The fullclip leg is included because `tests/fixture_plugin.py` and `cache/store.py` sit on every leg's path, and the brief says "the three legs".
