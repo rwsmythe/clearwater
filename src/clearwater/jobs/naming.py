@@ -306,8 +306,15 @@ def _base_plan(source: Path, settings: Settings, kind: MediaKind) -> OutputPlan:
         or Path(name).name != name
         or os.path.splitdrive(name)[0] != ""
     ):
+        bad = next((char for char in "/\\:" if char in name), None)
+        if bad is None:
+            detail = ""
+        elif bad in source.stem:
+            detail = f": the name {source.stem!r} contains {bad!r}"
+        else:
+            detail = f": {name!r} contains {bad!r}"
         raise OutputNameError(
-            f"output name for {source.name!r} must be a single portable name component"
+            f"output name for {source.name!r} must be a single portable name component{detail}"
         )
     return OutputPlan(
         source=source,
