@@ -30,17 +30,20 @@ This is spike tooling (evidence, not product): see ``tools/package/README.md``.
 from __future__ import annotations
 
 import argparse
+import ast
 import importlib
+import io
 import json
 import os
+import re
 import shutil
+import subprocess
 import sys
 import time
-from collections.abc import Iterable, Sequence
+import zipfile
+from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
-from typing import Literal, cast
-
-from clearwater import gpu_pack
+from typing import Literal, Protocol, cast
 
 Form = Literal["onedir", "onefile"]
 """The two PyInstaller forms the spike measures."""
@@ -179,18 +182,69 @@ ALLOWED_TOP_LEVEL: frozenset[str] = frozenset(
 FFMPEG_TOOLS: tuple[str, ...] = ("ffmpeg", "ffprobe")
 """The FFmpeg command-line tools copied beside the executable by ``--with-ffmpeg``."""
 
+GPU_MODULE_NAMES: frozenset[str] = frozenset(n for n in FORBIDDEN_TOP_LEVEL if n != "tests")
+"""Names (compared lower-case) that must not be ANY component of a bundled path or module."""
 
-def app_version() -> str:
-    """Return ``clearwater.__version__`` read from this tree's ``src``.
+GPU_NAME_EXCEPTIONS: tuple[tuple[str, ...], ...] = (
+    ("scipy", "_external", "array_api_compat", "cupy"),
+)
+"""Component prefixes whose LAST component may be a :data:`GPU_MODULE_NAMES` name.
+
+SciPy's vendored ``array_api_compat`` ships its own ``cupy`` adapter subpackage inside the
+scipy wheel. It is SciPy's code, not CuPy's (it imports ``cupy`` only when handed CuPy
+arrays), so it is not GPU-pack content. Any other component of such a path is still checked.
+"""
+
+CUDA_LIBRARY = re.compile(
+    r"(?:lib)?(?:" + "|".join(FORBIDDEN_LIBRARY_PREFIXES) + r")[^/\\]*\.(?:dll|so(?:\.\d+)*)"
+)
+"""A CUDA library file name, lower case: ``nvrtc64_120_0.dll``, ``libcudart.so.12`` (F11)."""
+
+ZIP_SUFFIXES: tuple[str, ...] = (".zip", ".egg", ".whl")
+"""File-name suffixes always opened as ZIP archives (other files are opened on their magic)."""
+
+ZIP_MAGIC = b"PK\x03\x04"
+"""The first bytes of a ZIP archive (a local file header)."""
+
+MAX_ZIP_DEPTH = 4
+"""How deep ZIP archives nested inside ZIP archives are opened."""
+
+MODULE_SUFFIXES: tuple[str, ...] = (".py", ".pyc", ".pyd", ".so")
+"""Suffixes of loose Python modules and extension modules (the allowlist applies to them)."""
+
+BOOT_MODULE_PREFIXES: tuple[str, ...] = ("pyimod", "pyiboot", "pyi_rth_")
+"""PyInstaller's own boot modules, stored as CArchive module entries."""
+
+PYINSTALLER_CONFIG_FOLDER = "pyinstaller-config"
+"""The folder under the output folder for PyInstaller's cache (``PYINSTALLER_CONFIG_DIR``)."""
+
+
+def app_version(init_file: Path | None = None) -> str:
+    """Return ``clearwater.__version__`` as written in this tree's ``src``, without importing it.
+
+    Parsing the file (rather than importing the package) writes no bytecode into ``src`` and
+    cannot return an already-imported package's version (Reviewer A F8, F10).
+
+    Args:
+        init_file: The package's ``__init__.py``; this tree's when None.
 
     Returns:
         The version string, for example ``"1.0.0"``.
+
+    Raises:
+        ValueError: The file assigns no string ``__version__``.
     """
-    source = str(REPO_ROOT / "src")
-    if source not in sys.path:
-        sys.path.insert(0, source)
-    module = importlib.import_module("clearwater")
-    return str(module.__version__)
+    path = REPO_ROOT / "src" / "clearwater" / "__init__.py" if init_file is None else init_file
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id == "__version__" for t in node.targets)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            return node.value.value
+    raise ValueError(f"no string __version__ in {path}")
 
 
 def platform_tag(platform: str | None = None) -> str:
@@ -272,109 +326,265 @@ def pyinstaller_args(form: Form, *, out: Path, version: str) -> list[str]:
     return args
 
 
-def _is_forbidden_name(name: str) -> bool:
-    """Return True when a dotted module name or a top-level bundle entry is forbidden.
+def split_name(name: str) -> list[str]:
+    """Split a bundled path or archive entry name on either separator.
 
     Args:
-        name: A dotted module name, or the first part of a bundled path (a package folder, a
-            ``.dist-info`` folder or a DLL).
+        name: A relative path, a CArchive entry name (back slashes on Windows) or a ZIP
+            member name.
 
     Returns:
-        True for a :data:`FORBIDDEN_TOP_LEVEL` module, GPU-pack metadata or a CUDA library.
+        Its non-empty components.
     """
-    top = name.split(".", 1)[0]
-    if top in FORBIDDEN_TOP_LEVEL:
-        return True
-    lowered = name.lower()
-    if lowered.endswith(".dist-info") and lowered.startswith(FORBIDDEN_DIST_INFO_PREFIXES):
-        return True
-    return lowered.endswith((".dll", ".so")) and lowered.startswith(FORBIDDEN_LIBRARY_PREFIXES)
+    return [part for part in re.split(r"[\\/]+", name) if part not in ("", ".")]
 
 
-def _bundle_top(parts: Sequence[str]) -> str | None:
-    """Return the first part of a bundled path below the executable's folder and ``_internal``.
+def name_violations(parts: Sequence[str], *, module_root: bool) -> list[str]:
+    """Return the rules a bundled name breaks; every comparison is on lower-cased names.
+
+    The rules:
+
+    - ``gpu-module``: ANY component is (or starts with ``<name>.``) one of
+      :data:`GPU_MODULE_NAMES` (Reviewer A F1, F2), except as :data:`GPU_NAME_EXCEPTIONS`
+      allows;
+    - ``gpu-metadata``: any component is GPU-pack distribution metadata;
+    - ``tests``: the first component is the test suite;
+    - ``cuda-library``: the last component is a CUDA library (:data:`CUDA_LIBRARY`);
+    - when ``module_root`` (the name is relative to a folder on the frozen ``sys.path``) and
+      the name is a loose module or an extension module (:data:`MODULE_SUFFIXES`):
+      ``shadow`` for a ``clearwater`` subpackage (or a package ``io``) at the top level, and
+      ``unexpected-module`` for a top-level name outside :data:`ALLOWED_TOP_LEVEL` and the
+      standard library (Reviewer A F5).
 
     Args:
-        parts: The path's parts relative to the release folder (or a package-archive name's).
+        parts: The name's components, relative to the bundle's root (the executable's
+            ``_internal`` folder, the one-file archive, or a ZIP archive's root).
+        module_root: Whether ``parts`` are relative to a folder on the frozen ``sys.path``.
 
     Returns:
-        That first part, or None for the executable's folder or ``_internal`` itself.
+        The broken rules, sorted; empty when the name is allowed.
+    """
+    lowered = [part.lower() for part in parts]
+    if not lowered:
+        return []
+    rules: set[str] = set()
+    stems = tuple(part.split(".", 1)[0] for part in lowered)
+    excepted = {len(e) - 1 for e in GPU_NAME_EXCEPTIONS if stems[: len(e)] == e}
+    for index, stem in enumerate(stems):
+        if stem in GPU_MODULE_NAMES and index not in excepted:
+            rules.add("gpu-module")
+    for part in lowered:
+        if part.endswith((".dist-info", ".egg-info")) and part.startswith(
+            FORBIDDEN_DIST_INFO_PREFIXES
+        ):
+            rules.add("gpu-metadata")
+    if lowered[0].split(".", 1)[0] == "tests":
+        rules.add("tests")
+    if CUDA_LIBRARY.fullmatch(lowered[-1]):
+        rules.add("cuda-library")
+    if module_root and lowered[-1].endswith(MODULE_SUFFIXES):
+        top = parts[0] if len(parts) > 1 else parts[0].split(".", 1)[0]
+        if top.lower() in SHADOW_NAMES or (top.lower() == "io" and len(parts) > 1):
+            rules.add("shadow")
+        elif top not in ALLOWED_TOP_LEVEL and top not in sys.stdlib_module_names:
+            rules.add("unexpected-module")
+    return sorted(rules)
+
+
+def module_violations(module: str, *, allow_boot: bool = False) -> list[str]:
+    """Return the rules a frozen module name (``a.b.c``) breaks: :func:`name_violations`.
+
+    Args:
+        module: A dotted module name from the PYZ or a CArchive module entry.
+        allow_boot: Accept PyInstaller's boot modules (:data:`BOOT_MODULE_PREFIXES`).
+
+    Returns:
+        The broken rules, sorted.
+    """
+    if allow_boot and module.startswith(BOOT_MODULE_PREFIXES):
+        return []
+    parts = module.split(".")
+    return name_violations([*parts[:-1], parts[-1] + ".pyc"], module_root=True)
+
+
+def _is_zip_name(name: str) -> bool:
+    """Return True when a name has a ZIP suffix (:data:`ZIP_SUFFIXES`)."""
+    return name.lower().endswith(ZIP_SUFFIXES)
+
+
+def zip_violations(
+    source: Path | bytes, label: str, *, module_root: bool, depth: int = 0
+) -> list[str]:
+    """Return every rule broken by a ZIP archive's members, recursively, in memory.
+
+    Nothing is extracted to disk: member names are read from the archive's directory, and a
+    nested archive (a ZIP suffix, or a member starting with the ZIP magic) is read into
+    memory and opened in turn, down to :data:`MAX_ZIP_DEPTH` (Reviewer A F3).
+
+    Args:
+        source: The archive: a file, or its bytes.
+        label: How the archive is named in a violation (its bundle path).
+        module_root: Whether the archive is itself on the frozen ``sys.path`` (a ZIP at the
+            bundle's root, as ``base_library.zip``); nested archives never are.
+        depth: The nesting depth of this archive.
+
+    Returns:
+        Violations as ``<label>!<member> (<rule>)``; an archive that cannot be read is a
+        violation itself (``unreadable-zip``).
+    """
+    found: list[str] = []
+    try:
+        handle = zipfile.ZipFile(source if isinstance(source, Path) else io.BytesIO(source))
+    except (zipfile.BadZipFile, OSError):
+        return [f"{label} (unreadable-zip)"]
+    with handle:
+        for member in handle.namelist():
+            parts = split_name(member)
+            shown = f"{label}!{'/'.join(parts)}"
+            found += [
+                f"{shown} ({rule})" for rule in name_violations(parts, module_root=module_root)
+            ]
+            if member.endswith("/"):
+                continue
+            with handle.open(member) as data:
+                nested = _is_zip_name(member) or data.read(len(ZIP_MAGIC)) == ZIP_MAGIC
+            if nested:
+                if depth + 1 > MAX_ZIP_DEPTH:
+                    found.append(f"{shown} (zip-too-deep)")
+                else:
+                    found += zip_violations(
+                        handle.read(member), shown, module_root=False, depth=depth + 1
+                    )
+    return found
+
+
+def _starts_with_zip_magic(path: Path) -> bool:
+    """Return True when a file begins with the ZIP magic."""
+    with path.open("rb") as handle:
+        return handle.read(len(ZIP_MAGIC)) == ZIP_MAGIC
+
+
+def _bundle_parts(parts: Sequence[str]) -> tuple[list[str], bool]:
+    """Strip the release folder's ``Clearwater/`` and ``_internal/`` from a dist path.
+
+    Args:
+        parts: The path's components relative to the release folder.
+
+    Returns:
+        (the components relative to the bundle's root, whether they are under ``_internal``
+        or the one-file release root, i.e. relative to a folder on the frozen ``sys.path``).
     """
     rest = list(parts)
-    if rest and rest[0] == APP_NAME:
+    if len(rest) > 1 and rest[0] == APP_NAME:
         rest = rest[1:]
-    if rest and rest[0] == "_internal":
-        rest = rest[1:]
-    return rest[0] if rest else None
+    if len(rest) > 1 and rest[0].lower() == "_internal":
+        return rest[1:], True
+    return rest, False
 
 
 def forbidden_paths(root: Path) -> list[str]:
-    """Return every bundled file or folder whose top-level entry is forbidden.
+    """Return every bundled file or folder, or ZIP member, that breaks a bundle rule.
+
+    Every path under ``root`` is checked by :func:`name_violations` on all its components;
+    every ZIP archive (by suffix or magic) is opened in memory by :func:`zip_violations`.
 
     Args:
         root: The release folder.
 
     Returns:
-        The offending paths relative to ``root`` (POSIX form), sorted; empty when clean.
+        Violations as ``dist:<path> (<rule>)``, sorted; empty when clean.
     """
     found: list[str] = []
-    for path in root.rglob("*"):
-        top = _bundle_top(path.relative_to(root).parts)
-        if top is not None and _is_forbidden_name(top):
-            found.append(path.relative_to(root).as_posix())
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root)
+        parts, under_internal = _bundle_parts(relative.parts)
+        is_file = path.is_file()
+        rooted = under_internal and is_file
+        label = f"dist:{relative.as_posix()}"
+        found += [f"{label} ({rule})" for rule in name_violations(parts, module_root=rooted)]
+        if is_file and (_is_zip_name(path.name) or _starts_with_zip_magic(path)):
+            found += zip_violations(path, label, module_root=under_internal and len(parts) == 1)
     return sorted(found)
 
 
-def archive_names(executable: Path) -> tuple[list[str], list[str]]:
-    """Return the executable's embedded package entries and its frozen-module names.
+class _Listing(Protocol):
+    """The part of PyInstaller's ``ZlibArchiveReader`` the checks use."""
 
-    The executable carries PyInstaller's package archive (the CArchive). Its entries are the
-    bundled binaries and data in the one-file form, and the scripts in both forms. Among them,
-    the ``PYZ`` holds every frozen module.
+    toc: dict[str, object]
+
+
+class _Package(Protocol):
+    """The part of PyInstaller's ``CArchiveReader`` the checks use."""
+
+    toc: dict[str, tuple[int, int, int, int, str]]
+
+    def extract(self, name: str) -> bytes:
+        """Return one entry's data, decompressed."""
+
+    def open_embedded_archive(self, name: str) -> _Listing:
+        """Return a reader of an embedded PYZ archive (its ``toc`` lists the modules)."""
+
+
+def read_package(executable: Path) -> _Package:
+    """Open the executable's package archive (PyInstaller's CArchive) for reading.
 
     Args:
         executable: The built executable.
 
     Returns:
-        (package entry names, PYZ module names).
+        The reader.
     """
     readers = importlib.import_module("PyInstaller.archive.readers")
-    package = readers.CArchiveReader(str(executable))
-    entries = [str(name) for name in package.toc]
-    modules: list[str] = []
-    for name, entry in package.toc.items():
-        if entry[-1] == readers.PKG_ITEM_PYZ:
-            modules += [str(module) for module in package.open_embedded_archive(name).toc]
-    return entries, modules
+    return cast(_Package, readers.CArchiveReader(str(executable)))
+
+
+def _pyz_modules(package: _Package, name: str) -> Iterator[str]:
+    """Yield every module name in an embedded PYZ archive."""
+    archive = package.open_embedded_archive(name)
+    yield from (str(module) for module in archive.toc)
 
 
 def forbidden_entries(executable: Path) -> list[str]:
-    """Return every archive entry or frozen module that must not be in the bundle.
+    """Return every package-archive entry, frozen module or ZIP member that breaks a rule.
 
-    The checks:
+    The package archive (CArchive) is the executable's: the scripts and the PYZ in both
+    forms, and every bundled binary and data file in the one-file form. Checked:
 
-    - a forbidden top-level name (:data:`FORBIDDEN_TOP_LEVEL`) or GPU-pack metadata;
-    - a ``clearwater`` subpackage frozen at the top level (:data:`SHADOW_NAMES`);
-    - an ``io`` with submodules (as ``clearwater.io`` has), not the stdlib's flat module;
-    - a non-standard-library top-level module outside :data:`ALLOWED_TOP_LEVEL` (a package
-      that leaked in from the development environment).
+    - each entry's name, all components (:func:`name_violations`);
+    - each PYZ module, all components, against the allowlist (:func:`module_violations`);
+    - each module entry (PyInstaller's boot modules allowed);
+    - each data or binary entry that is a ZIP archive (by suffix or magic), recursively and in
+      memory (:func:`zip_violations`).
 
     Args:
         executable: The built executable.
 
     Returns:
-        The offending names, each prefixed ``pkg:``, ``pyz:`` or ``pyz-unexpected:``; empty
-        when clean.
+        Violations as ``pkg:<entry> (<rule>)`` or ``pyz:<module> (<rule>)``, sorted.
     """
-    entries, modules = archive_names(executable)
-    bad = [f"pkg:{e}" for e in entries if _is_forbidden_name(_bundle_top(Path(e).parts) or "")]
-    bad += [f"pyz:{m}" for m in modules if _is_forbidden_name(m)]
-    bad += [f"pyz:{m}" for m in modules if m.split(".", 1)[0] in SHADOW_NAMES]
-    bad += [f"pyz:{m}" for m in modules if m.startswith("io.")]
-    tops = {m.split(".", 1)[0] for m in modules}
-    unexpected = tops - ALLOWED_TOP_LEVEL - sys.stdlib_module_names
-    bad += [f"pyz-unexpected:{t}" for t in unexpected]
-    return sorted(bad)
+    readers = importlib.import_module("PyInstaller.archive.readers")
+    package = read_package(executable)
+    found: list[str] = []
+    for name, entry in package.toc.items():
+        typecode = entry[-1]
+        parts = split_name(name)
+        label = f"pkg:{'/'.join(parts)}"
+        if typecode == readers.PKG_ITEM_PYZ:
+            for module in _pyz_modules(package, name):
+                found += [f"pyz:{module} ({rule})" for rule in module_violations(module)]
+            continue
+        if typecode in (readers.PKG_ITEM_PYMODULE, readers.PKG_ITEM_PYPACKAGE):
+            module = name.replace("\\", ".").replace("/", ".")
+            found += [f"{label} ({r})" for r in module_violations(module, allow_boot=True)]
+            continue
+        if typecode in (readers.PKG_ITEM_PYSOURCE, readers.PKG_ITEM_RUNTIME_OPTION):
+            continue  # the entry script and run-time hooks; options are not files
+        found += [f"{label} ({rule})" for rule in name_violations(parts, module_root=True)]
+        if typecode in (readers.PKG_ITEM_BINARY, readers.PKG_ITEM_DATA, readers.PKG_ITEM_ZIPFILE):
+            data = package.extract(name)
+            if _is_zip_name(name) or data[: len(ZIP_MAGIC)] == ZIP_MAGIC:
+                found += zip_violations(data, label, module_root=len(parts) == 1)
+    return sorted(found)
 
 
 def find_executable(root: Path) -> Path:
@@ -433,30 +643,78 @@ def size_by_top_level(executable: Path) -> list[tuple[str, int]]:
     return sorted(rows, key=lambda row: (-row[1], row[0]))
 
 
-def copy_ffmpeg(destination: Path, tools: Iterable[str] = FFMPEG_TOOLS) -> list[Path]:
-    """Copy the FFmpeg tools found on this machine's PATH beside the executable.
+def tool_file_name(tool: str, platform: str | None = None) -> str:
+    """Return a tool's canonical file name: ``ffmpeg.exe`` on Windows, ``ffmpeg`` elsewhere.
 
-    Spike only: it proves the PATH-less run. The real bundle rule is WP6.3's.
+    Args:
+        tool: The tool's name.
+        platform: A ``sys.platform`` value; the running one when None.
+
+    Returns:
+        The file name ``find_tool`` looks for beside the executable.
+    """
+    kind = sys.platform if platform is None else platform
+    return f"{tool}.exe" if kind == "win32" else tool
+
+
+def tool_version(path: Path) -> str:
+    """Run a copied tool's ``-version`` from its own folder, with only that folder on PATH.
+
+    Args:
+        path: The copied tool.
+
+    Returns:
+        The first line of its output, for example ``ffmpeg version 9.0.2-full_build-...``.
+
+    Raises:
+        RuntimeError: The tool did not run, exited non-zero, or printed no ``version`` line.
+    """
+    env = {key: value for key, value in os.environ.items() if key.upper() != "PATH"}
+    env["PATH"] = str(path.parent)
+    try:
+        done = subprocess.run(
+            [str(path), "-version"],
+            cwd=path.parent,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError(f"{path.name} -version did not run: {error}") from error
+    first = done.stdout.splitlines()[0] if done.stdout else ""
+    if done.returncode != 0 or " version " not in f" {first} ":
+        raise RuntimeError(f"{path.name} -version failed (exit {done.returncode}): {first!r}")
+    return first
+
+
+def copy_ffmpeg(destination: Path, tools: Iterable[str] = FFMPEG_TOOLS) -> list[tuple[Path, str]]:
+    """Copy the FFmpeg tools found on this machine's PATH beside the executable, and check them.
+
+    Spike only: it proves the PATH-less run. The real bundle rule is WP6.3's. Each tool is
+    copied under its canonical name (:func:`tool_file_name`), whatever the PATH entry's target
+    is called, and must then run on its own (:func:`tool_version`; Reviewer A F7).
 
     Args:
         destination: The executable's folder.
         tools: The tool names to copy.
 
     Returns:
-        The copied files.
+        (the copied file, its version line) for each tool.
 
     Raises:
         FileNotFoundError: A tool is not on the PATH.
+        RuntimeError: A copied tool does not run from the destination folder.
     """
-    copied: list[Path] = []
+    copied: list[tuple[Path, str]] = []
     for tool in tools:
         found = shutil.which(tool)
         if found is None:
             raise FileNotFoundError(f"{tool} is not on the PATH")
-        source = Path(found).resolve()
-        target = destination / source.name
-        shutil.copy2(source, target)
-        copied.append(target)
+        target = destination / tool_file_name(tool)
+        shutil.copy2(Path(found).resolve(), target)
+        copied.append((target, tool_version(target)))
     return copied
 
 
@@ -519,6 +777,8 @@ def manifest_document(folder: Path) -> dict[str, object]:
         FileNotFoundError: A distribution's metadata folder or ``RECORD`` is missing.
         ValueError: No locked wheel, or more than one, matches an installed distribution.
     """
+    from clearwater import gpu_pack
+
     site = folder / gpu_pack.SITE_PACKAGES_NAME
     rows: list[dict[str, str]] = []
     for locked in gpu_pack.LOCKED_DISTRIBUTIONS:
@@ -556,6 +816,8 @@ def write_manifest(folder: Path) -> Path:
         ValueError: The folder is not named for this build's stamp, or a wheel does not match.
         FileNotFoundError: A distribution is not installed.
     """
+    from clearwater import gpu_pack
+
     if folder.name != gpu_pack.STAMP:
         raise ValueError(f"the pack folder must be named {gpu_pack.STAMP!r}, not {folder.name!r}")
     document = manifest_document(folder)
@@ -577,8 +839,48 @@ def run_pyinstaller(args: Sequence[str]) -> None:
     main.run(list(args))
 
 
+def pyinstaller_config_dir(out: Path) -> Path:
+    """Return the folder PyInstaller's cache goes to: under the output folder (F4).
+
+    Args:
+        out: The output folder.
+
+    Returns:
+        ``out / "pyinstaller-config"``.
+    """
+    return out / PYINSTALLER_CONFIG_FOLDER
+
+
+def clean_release_dir(out: Path, form: Form, version: str) -> Path:
+    """Delete the release folder of one form before it is built again (Reviewer A F6).
+
+    Only the release folder under ``out`` is deleted, so nothing from an earlier build (such
+    as FFmpeg copied by ``--with-ffmpeg``) survives into the new one.
+
+    Args:
+        out: The output folder.
+        form: The PyInstaller form.
+        version: The application version.
+
+    Returns:
+        The (now absent) release folder.
+
+    Raises:
+        ValueError: The release folder does not lie inside ``out``.
+    """
+    root = release_dir(out, form, version)
+    if not root.resolve().is_relative_to(out.resolve()):
+        raise ValueError(f"{root} is not inside {out}")
+    if root.exists():
+        shutil.rmtree(root)
+    return root
+
+
 def build(form: Form, *, out: Path, with_ffmpeg: bool = False) -> int:
     """Build one form, check it, and print its summary.
+
+    PyInstaller's cache is kept under ``out`` (``PYINSTALLER_CONFIG_DIR``), so ``--clean``
+    touches nothing outside the output folder, and the release folder is emptied first.
 
     Args:
         form: The PyInstaller form.
@@ -589,28 +891,33 @@ def build(form: Form, *, out: Path, with_ffmpeg: bool = False) -> int:
         0 when the build succeeded and the bundle holds nothing forbidden, else 1.
     """
     version = app_version()
+    os.environ["PYINSTALLER_CONFIG_DIR"] = str(pyinstaller_config_dir(out))
+    root = clean_release_dir(out, form, version)
     args = pyinstaller_args(form, out=out, version=version)
+    print(f"build {form}: PYINSTALLER_CONFIG_DIR={os.environ['PYINSTALLER_CONFIG_DIR']}")
     print(f"build {form}: PyInstaller {' '.join(args)}", flush=True)
     start = time.monotonic()
     run_pyinstaller(args)
     wall = time.monotonic() - start
-    root = release_dir(out, form, version)
     executable = find_executable(root)
     if with_ffmpeg:
-        for path in copy_ffmpeg(executable.parent):
-            print(f"copied {path}")
+        for path, line in copy_ffmpeg(executable.parent):
+            print(f"copied {path}: {line}")
+    check_start = time.monotonic()
     bad = forbidden_paths(root) + forbidden_entries(executable)
+    check_wall = time.monotonic() - check_start
     print(f"build {form}: wall {wall:.1f} s; executable {executable}")
     for name, size in size_by_top_level(executable):
         print(f"  size {size / 2**20:10.1f} MiB  {name}")
     print(f"  total {tree_size(root) / 2**20:.1f} MiB under {root}")
+    print(f"  bundle checks took {check_wall:.1f} s")
     if bad:
         print(f"FORBIDDEN in the bundle ({len(bad)}):")
         for name in bad[:50]:
             print(f"  {name}")
         return 1
-    print("forbidden-module check: PASS (none of " + ", ".join(FORBIDDEN_TOP_LEVEL) + ";")
-    print("  non-stdlib top-level modules all in ALLOWED_TOP_LEVEL)")
+    print("bundle check: PASS (no " + ", ".join(FORBIDDEN_TOP_LEVEL) + " at any depth or in")
+    print("  any ZIP; no CUDA library; every module's top-level name allowed)")
     return 0
 
 
@@ -643,8 +950,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     options = parse_args(argv)
     if options.write_manifest is not None:
+        sys.dont_write_bytecode = True  # importing clearwater must not write into src (F8)
         path = write_manifest(Path(os.path.abspath(options.write_manifest)))
-        print(f"wrote {path} (stamp {gpu_pack.STAMP})")
+        print(f"wrote {path}")
         return 0
     out = Path(os.path.abspath(options.out))
     return build(cast(Form, options.form), out=out, with_ffmpeg=options.with_ffmpeg)

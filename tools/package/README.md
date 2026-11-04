@@ -27,6 +27,13 @@ uv run --no-sync python tools/package/build.py --form onefile --with-ffmpeg
 Check at least 25 GB free on the drive before a build (the brief's floor). Route the build's
 output to a file; it is long.
 
+Each build first deletes its own release folder (`dist-<form>/Clearwater-<version>-...`), so
+nothing from an earlier build survives into it. PyInstaller's cache goes to
+`<out>/pyinstaller-config` (`PYINSTALLER_CONFIG_DIR`), so `--clean` cleans nothing outside the
+output folder. FFmpeg is copied under the names `ffmpeg.exe` / `ffprobe.exe` and each copy
+must run `-version` from the release folder, with only that folder on PATH; the build prints
+the version line.
+
 ## Outputs
 
 ```
@@ -34,9 +41,11 @@ work/wp6.1/
   dist-<form>/Clearwater-<version>-<platform>-<form>/   the release folder
   build-<form>/                                         PyInstaller's work folder (warn-Clearwater.txt, xref)
   spec-<form>/Clearwater.spec                           the generated spec
+  pyinstaller-config/                                   PyInstaller's cache (bincache)
 ```
 
-`<version>` is `clearwater.__version__` read from this tree's `src/`.
+`<version>` is `clearwater.__version__`, parsed from this tree's `src/clearwater/__init__.py`
+(not imported, so nothing is written into `src/`).
 
 ## What is left out, and checked
 
@@ -48,17 +57,32 @@ The excluded modules are `EXCLUDED_MODULES` in `build.py`:
 - the `dev` and `comms` dependency groups;
 - `tkinter`.
 
-After the build, `forbidden_paths` and `forbidden_entries` fail the run (exit 1) if any of the
-following appears in the release folder, in the executable's package archive, or in its
-frozen-module archive (PYZ):
+After the build, `forbidden_paths` and `forbidden_entries` fail the run (exit 1) on any
+violation in what they inspect: every file and folder of the release folder; every entry of
+the executable's package archive (CArchive); every module of its frozen-module archive (PYZ);
+and every member of every ZIP archive found in any of these (by a ZIP suffix or the ZIP
+magic), opened recursively in memory, never extracted. Names are compared lower-case. The
+violations:
 
-- `cupy`, `cupyx`, `cupy_backends`, `cuda`, `nvidia`, `fastrlock` or `tests`;
-- a GPU-pack `.dist-info`;
-- a CUDA library;
-- a `clearwater` subpackage frozen at the top level;
-- a non-standard-library top-level module outside `ALLOWED_TOP_LEVEL`, which is the product's
-  dependency closure from `uv.lock` (this catches a package that leaked in from the dev
-  environment).
+- `cupy`, `cupyx`, `cupy_backends`, `cuda`, `nvidia` or `fastrlock` as ANY component of a
+  path, entry or dotted module name (one exception: SciPy's own vendored adapter
+  `scipy/_external/array_api_compat/cupy`, which is SciPy's code, `GPU_NAME_EXCEPTIONS`);
+- `tests` as the first component;
+- a GPU-pack `.dist-info` / `.egg-info` folder at any depth;
+- a CUDA library file name (`cublas*`, `cudart*`, `cufft*`, `curand*`, `cusolver*`,
+  `cusparse*`, `nvjitlink*`, `nvrtc*`, with or without `lib`, ending `.dll`, `.so` or
+  `.so.<n>`);
+- a `clearwater` subpackage (or a package `io`) at the top level;
+- a module outside `ALLOWED_TOP_LEVEL` and the standard library: PYZ modules, CArchive module
+  entries (PyInstaller's own boot modules allowed), and loose `.py` / `.pyc` / `.pyd` / `.so`
+  files relative to a folder on the frozen `sys.path` (`_internal`, the one-file root, a ZIP at
+  the bundle's root). `ALLOWED_TOP_LEVEL` is the product's dependency closure from `uv.lock`.
+- a ZIP that cannot be read, or nested deeper than four levels.
+
+Scope: the allowlist names top-level packages, not distributions, so a module of a different
+distribution under an allowed name (for example `PySide6.QtCharts` from PySide6-Addons) would
+pass; the locked environment holds no such distribution. The checks were validated on Windows
+builds; the Linux library names are covered by the pattern but not by a real Linux build.
 
 ## The GPU pack manifest
 
