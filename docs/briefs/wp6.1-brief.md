@@ -46,3 +46,75 @@ Turn 1 = round 0 (read the entry points, the spawn helper, PyInstaller's hooks; 
 
 - Lane paces at dispatch; base commit (after the prune); worktree; evidence folder; disk free before each build (25 GB floor).
 - GATE_CHECKS: parallel leg + the serial tests of the start-up path on the final candidate; `ruff` / `mypy`; `git diff --name-only main` = the owned paths; the loader is a no-op on the gate machine (no pack folder present during the gate).
+
+## Dispatch fill (orchestrator gen 40, 2026-11-04 ~08:20Z; after the prune)
+
+This section fills the one above. Where it differs from the table, the design or the questions, it governs once CHARC marks it FINAL. Corrections to the brief's text are marked **[corr]**.
+
+- **Precondition met.** The owner-approved prune is done (record `031c7cb8`). Nothing runs: no cell, no gate, no pytest. C: has **97 GB free**, well over the 25 GB floor per build. `df -h /c` is read before each build and each timing window.
+- **Base, worktree and evidence.**
+  - Base = main at dispatch: `031c7cb8` plus this fill's commit and CHARC's FINAL.
+  - Worktree `.worktrees/wp6.1`, branch `wp6.1`, with `clearwater.local.toml` copied in (FFmpeg location and the footage guard).
+  - Builds, packs and timings go under the worktree's `work/wp6.1/`.
+  - Evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp6.1\` (`cell\`, `A\`, `B\`, `gate\`, `timings\`). The report's figures are copied there before the merge, because a later prune deletes `work/`.
+- **Lane paces at 08:17Z.**
+  - Codex: 23 % used, pace 0.233. The window resets at 10:07Z.
+  - Claude: 22 % used, pace 0.799.
+  - The brief's lane stands: **Claude opus-high** (`implementer-opus-high`, an Agent-tool subagent at my seat, a FRESH cell). The work is reasoning-dense (PyInstaller hooks, the frozen `sys.path`, the spawn).
+  - WP6.2 and WP-T8 go on Codex, which balances the lanes.
+  - **Reviewer A** = a Codex pass (`codex exec -p strong -s read-only`, the WP5.7 form). **Reviewer B** = the WSL Codex script at my seat (the WP5.7 B form). In both nets the reviewer is the other model.
+  - Cell depth is read with the new `scripts/cell_depth.py --agent <name>` at every yield: evaluate at about 250K, STOP near 400K.
+- **The GPU pack contents, read from `uv.lock` at the base.** These distributions, at these versions, are the pack (NEVER in the bundle, per D-C):
+  - `cupy-cuda12x` 14.2.0
+  - `cuda-pathfinder` 1.8.3
+  - `cuda-toolkit` 12.9.2.0 (a metadata-only meta-package, per WP5.5's R1)
+  - `nvidia-cublas-cu12` 12.9.2.10
+  - `nvidia-cuda-nvrtc-cu12` 12.9.86
+  - `nvidia-cuda-runtime-cu12` 12.9.79
+  - `nvidia-cufft-cu12` 11.4.1.4
+  - `nvidia-curand-cu12` 10.3.10.19
+  - `nvidia-cusolver-cu12` 11.7.5.82
+  - `nvidia-cusparse-cu12` 12.5.10.65
+  - `nvidia-nvjitlink-cu12` 12.9.86
+
+  The design's stamp `14.2.0-cu12` matches the lock. `numpy` is shared with the bundle and is NOT duplicated in the pack. Round 0 confirms that list against `importlib.metadata` in the worktree's environment and names any transitive dependency missing from it.
+- **[corr] The frozen spawn (design item 3) is NOT a `multiprocessing` spawn.**
+  - The export worker is a `subprocess.Popen` of a command built at `src/clearwater/app/composition.py:461`: `[sys.executable, "-m", "clearwater.app.export_worker"]`, unless a command is injected, which tests do.
+  - `jobs/export_process.py` only runs the command it is given (`:224`, `:292`).
+  - In a frozen build, `sys.executable` is `Clearwater.exe`, which ignores `-m`, so the worker would start a SECOND GUI. `multiprocessing.freeze_support()` does not apply.
+  - **Q5 (new; CHARC to rule at FINAL).** Recommended: a frozen-aware worker command and an argv dispatch in the entry.
+    - (a) `composition.py:461` builds `[sys.executable, "--export-worker"]` when `getattr(sys, "frozen", False)`, and the unchanged `-m` command otherwise. That is one expression and its docstring.
+    - (b) `src/clearwater/__main__.py` dispatches: if `sys.argv[1:2] == ["--export-worker"]`, call `clearwater.app.export_worker.main()` and exit with its code; otherwise start the GUI as today.
+    - Both files become OWNED (the brief already expects `__main__.py` as the loader's call site). `jobs/export_process.py`, the AD-23 helper (`io/video/pipes.py`) and `app/export_worker.py` stay NOT owned and unchanged.
+    - A test pins the frozen branch of (a) by monkeypatching `sys.frozen`, and the dispatch of (b) by calling `__main__`'s function with a fake argv.
+    - CHARC records AD-34 "frozen worker re-entry" at the accept.
+    - With (b), the GPU pack loader placed at the top of `__main__` (Q2) runs in BOTH the GUI and the worker process from one call site, so Q2 needs no second call in `export_worker`.
+- **Q6 (new; CHARC to rule at FINAL): the pack root on other platforms.** The brief's `%LOCALAPPDATA%\Clearwater\gpu-pack\...` is Windows-only, and spec v0.6.0's N1 platform list now names more than Windows.
+  - Recommended: `gpu_pack.pack_root()` returns `%LOCALAPPDATA%\Clearwater\gpu-pack` on Windows and `$XDG_DATA_HOME/clearwater/gpu-pack` (default `~/.local/share/...`) on Linux.
+  - On macOS it returns `None`: there is no CUDA there, so the loader is a no-op.
+  - Tests cover all three by monkeypatching `sys.platform` and the environment.
+  - Only Windows is exercised for real in this spike.
+- **The 1.0.0 behaviour lock, made concrete.** With no pack folder, the loader logs `gpu pack <stamp>: absent` and changes nothing: no `sys.path` entry, the backend probe unchanged, D111's message unchanged.
+  - The gate runs with no pack folder present. Round 0 says how the tests guarantee this (an environment override of the root that points under `tmp_path`, never the user's real folder).
+- **Timing windows are EXCLUSIVE.** I hold every other cell's heavy turn while one runs: no pytest leg and no WP6.2 / WP-T8 build turn. WP6.2 (read-only) and WP-T8 may run beside WP6.1's NON-timing turns only.
+  - The cell announces each window in its yield. I answer with the go and the free-disk figure.
+  - Cold start: the cell proposes its method in round 0. A reboot is not available unattended, so it uses a file-cache drop or a first-run-after-build with the method stated.
+- **Turns** (the brief's plan, made explicit):
+  - Turn 1 = round 0, read-only: the entry points and the spawn as found above; PyInstaller's PySide6 hooks; the build plan; the pack list; Q1-Q6; the PyInstaller version for the N13 STOP; the cold-start method. Then YIELD.
+  - Turn 2 = after CHARC's N13 row and my `dev` group addition. `pyproject.toml` and `uv.lock` stay CHARC-approved and are not cell-owned; I make the lock change by pathspec. Then the build script, both builds, and the plugin / path checks (HEIC in from `tests/fixtures/stills/heic/`, PNG and JPEG out, EXIF carried). YIELD for Reviewer A.
+  - Turn 3 = the loader, the Q5 re-entry, the tests and the pack proof.
+  - Turn 4 = the timings (exclusive) and the report.
+  - Then the nets.
+- **GATE_CHECKS** (my seat, on the final candidate after Reviewer B; nothing else heavy):
+  - `df -h /c` first.
+  - The static leg: `ruff check .`, `ruff format --check .`, `mypy` (strict, `src/clearwater` and `tools`).
+  - The PARALLEL leg in full: the brief says "parallel leg", and `tests/test_gpu_pack.py` plus the Q5 tests are parallel-leg tests.
+  - The serial tests of the start-up path, named:
+    - `tests/test_app_startup.py` (gui, 10 tests)
+    - `tests/test_gui_startup.py` (gui, 13)
+    - `tests/test_core_backend.py` (32)
+    - any composition / export-process test module that exercises the worker command: round 0 names them; candidates are those importing `clearwater.app.composition` and `jobs.export_process`.
+  - The harness gate, if `scripts/` or kernel docs change (they should not).
+  - `git diff --name-only main...wp6.1` = the owned paths plus Q5's two files.
+  - 0 CR.
+  - The loader is a no-op on the gate machine: no pack folder exists under the real `%LOCALAPPDATA%\Clearwater\gpu-pack` during the gate. I check this before the gate starts.
