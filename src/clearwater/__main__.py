@@ -33,14 +33,19 @@ WORKER_FLAG = "--export-worker"
 
 
 def prepend_executable_folder(environ: MutableMapping[str, str] | None = None) -> bool:
-    """In a frozen build, put the executable's folder at the front of ``PATH`` (D1).
+    """In a frozen build, make the executable's folder the first ``PATH`` entry, once (D1).
 
     Tools are found with ``shutil.which`` (``PATH``), so a bundled ``ffmpeg`` beside the
-    executable is found first. Nothing changes in a source run, or when the folder is already
-    ANY entry of ``PATH`` (Reviewer A r2 #10): a spawned worker inherits its parent's
-    ``PATH``, and before the entry runs PyInstaller's PySide6 run-time hook puts the bundle
-    folder, and PySide6's own start-up its package folder, in front of it, so a first-entry
-    test would add it a second time.
+    executable is found before any other. Every entry naming that folder (in any spelling:
+    case, separators, a trailing separator) is removed and the folder is put first; the other
+    entries keep their order (CHARC's ruling 4 on Reviewer A r2 #10: a ``PATH`` that already
+    lists the folder BEHIND another FFmpeg folder must not let that FFmpeg win). Only this
+    process's environment changes (``os.environ``, which the spawned export worker and its
+    FFmpeg inherit); the user's persistent ``PATH`` is never written. Nothing changes in a
+    source run, or when the folder is already the first entry and appears once. A spawned
+    worker inherits its parent's ``PATH`` after PyInstaller's PySide6 run-time hook has put
+    the bundle folders in front of it, so the worker moves the folder back to the front
+    without adding it a second time.
 
     Args:
         environ: The environment to change; ``os.environ`` when None.
@@ -54,9 +59,11 @@ def prepend_executable_folder(environ: MutableMapping[str, str] | None = None) -
     folder = os.path.dirname(sys.executable)
     current = env.get("PATH", "")
     wanted = _path_key(folder)
-    if any(_path_key(entry) == wanted for entry in current.split(os.pathsep) if entry):
+    entries = current.split(os.pathsep) if current else []
+    others = [entry for entry in entries if not entry or _path_key(entry) != wanted]
+    if len(others) == len(entries) - 1 and entries and _path_key(entries[0]) == wanted:
         return False
-    env["PATH"] = folder + os.pathsep + current if current else folder
+    env["PATH"] = os.pathsep.join([folder, *others])
     return True
 
 

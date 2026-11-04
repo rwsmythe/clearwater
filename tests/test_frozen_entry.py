@@ -270,11 +270,13 @@ def test_frozen_puts_the_executable_folder_first_on_path(
 def test_a_worker_whose_path_was_changed_by_pyside6_does_not_add_the_folder_again(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Reviewer A r2 #10: membership, not position, decides (no duplicate entry).
+    """Reviewer A r2 #10: the PySide6 hook's prepends never make a duplicate entry.
 
     The parent prepends the folder; the frozen child inherits that ``PATH``, and before its
     entry runs, PyInstaller's PySide6 run-time hook prepends the bundle folder and PySide6's
-    start-up its package folder. The child's entry must then leave ``PATH`` as it is.
+    start-up its package folder. The child's entry then moves the folder back to the front
+    (ruling 4: move-to-front with dedupe) and it still appears once; the hook's entries keep
+    their order. A trailing-separator spelling of the folder counts as the folder.
     """
     executable = _frozen(monkeypatch, tmp_path)
     folder = os.path.dirname(executable)
@@ -285,12 +287,41 @@ def test_a_worker_whose_path_was_changed_by_pyside6_does_not_add_the_folder_agai
     bundle = os.path.join(folder, "_internal")
     pyside = os.path.join(bundle, "PySide6")
     environ["PATH"] = pyside + os.pathsep + bundle + os.pathsep + environ["PATH"]
-    inherited = environ["PATH"]
-    assert entry.prepend_executable_folder(environ) is False  # the worker process
-    assert environ["PATH"] == inherited
+    assert entry.prepend_executable_folder(environ) is True  # the worker process
+    assert environ["PATH"] == os.pathsep.join([folder, pyside, bundle, "/a", "/b"])
     assert environ["PATH"].split(os.pathsep).count(folder) == 1
+    assert entry.prepend_executable_folder(environ) is False  # first and once: unchanged
     trailing = {"PATH": os.pathsep.join(["/a", folder + os.sep])}
-    assert entry.prepend_executable_folder(trailing) is False  # the same folder, spelt with /
+    assert entry.prepend_executable_folder(trailing) is True  # the same folder, spelt with /
+    assert trailing["PATH"] == os.pathsep.join([folder, "/a"])
+    first_spelt_so = {"PATH": os.pathsep.join([folder + os.sep, "/a"])}
+    assert entry.prepend_executable_folder(first_spelt_so) is False
+
+
+def test_a_path_listing_the_folder_behind_another_ffmpeg_puts_it_first_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ruling 4 on #10: the folder behind another FFmpeg folder comes out first, once.
+
+    The other entries keep their original order (an empty entry included); every spelling
+    of the folder is dropped from behind; only the given environment changes.
+    """
+    executable = _frozen(monkeypatch, tmp_path)
+    folder = os.path.dirname(executable)
+    import clearwater.__main__ as entry
+
+    other_ffmpeg = str(tmp_path / "other-ffmpeg" / "bin")
+    environ = {
+        "PATH": os.pathsep.join(
+            [other_ffmpeg, "/a", folder, "", "/b", folder.upper() + os.sep, "/c"]
+        )
+    }
+    assert entry.prepend_executable_folder(environ) is True
+    expected = [folder, other_ffmpeg, "/a", "", "/b", "/c"]
+    if os.path.normcase("A") != "a":  # a case-sensitive platform: the upper-case one is another
+        expected = [folder, other_ffmpeg, "/a", "", "/b", folder.upper() + os.sep, "/c"]
+    assert environ["PATH"].split(os.pathsep) == expected
+    assert entry.prepend_executable_folder(environ) is False
 
 
 def test_a_source_run_leaves_path_alone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
