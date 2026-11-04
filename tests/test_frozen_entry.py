@@ -472,9 +472,6 @@ def test_the_entry_sets_path_before_either_branch(
     assert first == os.path.dirname(executable)
 
 
-# Historical entry-shim prelude; worker stdin isolation is tested in the worker module.
-
-
 def _app_data_environ(root: Path) -> dict[str, str]:
     """This environment with every app-data variable under ``root`` (never the user's)."""
     environ = dict(os.environ)

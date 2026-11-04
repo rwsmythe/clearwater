@@ -471,12 +471,14 @@ _ISOLATION_FACTS = """
 import json
 import os
 import stat
-from clearwater.app import export_worker as worker
+from pathlib import Path
 
 if sys.argv[1] == 'frozen':
     sys.frozen = True
 elif hasattr(sys, 'frozen'):
     del sys.frozen
+from clearwater.app import export_worker as worker
+
 reader = worker._isolate_stdin()
 try:
     null = os.open(os.devnull, os.O_RDONLY)
@@ -499,19 +501,32 @@ try:
         )
 finally:
     reader.close()  # neither child starts a watcher
-print(json.dumps(facts))
+Path(sys.argv[2]).write_text(json.dumps(facts), encoding='utf-8')
 """
 
 
-def test_source_and_frozen_use_the_same_isolation_function(tmp_path):
+@pytest.mark.parametrize("compare_slot", [False, True], ids=["descriptor", "win32-slot"])
+def test_source_and_frozen_use_the_same_isolation_function(tmp_path, compare_slot):
+    windowed = Path(sys.executable).with_name("pythonw.exe")
+    use_windowed = sys.platform == "win32" and windowed.is_file()
+    if compare_slot and sys.platform != "win32":
+        pytest.skip("Win32 input-slot comparison is not applicable on this platform")
+    if compare_slot and not use_windowed:
+        pytest.skip("no pythonw.exe; descriptor/type facts still checked under console Python")
+    executable = str(windowed) if use_windowed else sys.executable
     facts = []
     for mode in ("source", "frozen"):
-        child = _child(_ISOLATION_FACTS, tmp_path, mode)
+        record_path = tmp_path / f"{mode}.json"
+        child = _child(_ISOLATION_FACTS, tmp_path, mode, record_path, executable=executable)
         out, err = child.communicate(timeout=10)
         assert child.returncode == 0, err.decode(errors="replace")
-        facts.append(json.loads(out))
+        assert out == b"" and err == b""
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        if not compare_slot:
+            record.pop("win32_input_matches_fd0", None)
+        facts.append(record)
     expected = {"fd0_null": True, "private_reader_type": "_RawStdinReader"}
-    if sys.platform == "win32":
+    if compare_slot:
         expected["win32_input_matches_fd0"] = True
     assert facts == [expected, expected]
 

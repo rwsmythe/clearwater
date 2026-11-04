@@ -182,7 +182,7 @@ Under the widened r1 ownership, turn 6 also deletes
 The worker-side missing-stdin test retains EBADF coverage. All seven deleted
 names have zero remaining references in the frozen-entry test, as checked by
 `rg -n` and the AST audit: `work/wp-dr125/deleted-name-search-6.log` and
-`work/wp-dr125/audit-6.log`. The retained `_NO_GUI_PRELUDE` was not named in
+`work/wp-dr125/audit-6.log`. The retained `_NO_GUI_PRELUDE` (removed in turn 7) was not named in
 the deletion grant. The module, section comment and source-to-GUI docstring
 now describe the tested behavior. Unused imports were removed as a consequence.
 
@@ -227,6 +227,7 @@ the dispatcher's after-B ledger commit, is:
 | A r1 | 0 critical, 2 major, 3 minor, 4 advisory | All 5 formal findings in; a6 no change (ruling: fail-closed in effect); 3 other advisories in | 9 / 0 | 0 | Tests and docs only; 0 product changes | Seat Claude process, read-only; CLI version and depth dispatcher-supplied, not available to cell |
 | B r1 | 0 critical, 0 major, 1 minor | Exit-comment finding in envelope | 1 / 0 | 0 | Folded in turn 7: comment only, no executable product change | Seat Claude process; CLI version and depth dispatcher-supplied |
 | B r1b | 0 critical, 0 major, 4 minor, 7 advisory | 4 minor and 5 advisory folded; A-2 out of envelope and A-7 legacy deadline banked | 11 / 0 | 0 | Folded in turn 8: product handler/assembler, tests and docs | Seat Claude process on 5da7aad7; CLI version and depth dispatcher-supplied |
+| Delta review (Claude, seat) `5da7aad7..96c364f0` | 0 critical, 0 major, 1 minor, 3 advisory | All in envelope | 4 / 0 | 0 | Folded in turn 9, tests and docs only | Seat Claude process; depth at dispatch 213,220 / 475,000 |
 
 All r1 findings are dispositioned. This fold-in does not claim convergence;
 the next independent reviewer pass remains with the dispatcher.
