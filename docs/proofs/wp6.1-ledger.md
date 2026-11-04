@@ -858,3 +858,178 @@ Commit: `51ae68f6` fix(wp6.1): bundle checks at every depth, case and ZIP member
 hygiene (Reviewer A r1).
 
 Depth at turn-3 group-2a end: DISPATCHER TO FILL
+
+## Turn 3 group 2b-1 (2026-11-04 ~10:15-10:50Z): Reviewer A round 2 fixes, rebuilds, the headless frozen worker
+
+Fresh cell (implementer-opus-high), dispatch `clearwater-review-evidence/wp6.1/cell/dispatch-5.md`.
+No GUI launch, no synthetic input, `t2b/gui_check.py` not run. Nothing under the real
+`%LOCALAPPDATA%\Clearwater` (checked at the end: the folder does not exist). Evidence
+`clearwater-review-evidence/wp6.1/cell/t3b/`.
+
+### Reviewer A round 2 (Codex at the dispatcher's seat, on `16e03c0f`)
+
+Full text `clearwater-review-evidence/wp6.1/A/r2/review.txt`: 6 MAJOR, 6 minor, 2 advisory, all
+in envelope except #14. Held for CHARC (not fixed here): #1 + #2 (what the pack check proves)
+and #3 (the PySide6 runtime hook loads Qt in the worker; measured below). #7 is held with
+#1 / #2. #14 is banked.
+
+The "on `16e03c0f`" column is the same test files run against `16e03c0f`'s `src` and `build.py`
+(`git archive 16e03c0f`, `PYTHONPATH` and `WP61_BUILD_SCRIPT` pointing at the copy):
+`t3b/pytest-4-on-16e03c0f.log`, **12 failed, 73 passed**. Line numbers are the current files'.
+
+| # | Sev | Verdict | Fix | Test(s) | On `16e03c0f` |
+|---|---|---|---|---|---|
+| 1, 2 | MAJOR | HELD (CHARC) | none | none | n/a |
+| 3 | MAJOR | HELD (CHARC); measured | none (see the #3 table) | none | n/a |
+| 4 | MAJOR | FIXED | `FORBIDDEN_LIBRARY_PREFIXES` gains `nvblas`, `cudnn`, `cutensor`, `nccl`, `nvtx` (`tools/package/build.py`) | `test_every_dll_the_locked_pack_wheels_install_is_flagged` (every DLL basename the eleven locked wheels' RECORD files list, 14, plus `cudnn64_9.dll`, planted nested, beside the exe, in a ZIP and as a CArchive entry); `test_every_extension_module_the_locked_pack_wheels_install_is_flagged` (all 63 `.pyd` at their RECORD paths, at `_internal/` and at the release root) | `test_tools_package_build.py:430` `nvblas64_12.dll` not flagged; `:449` the release-root `.pyd` not flagged (that one is #8) |
+| 5 | MAJOR | FIXED | script and option entries are named-checked (`module_root=False`); the boot-prefix exemption now drops only the allowlist rules (`module_violations`) | `test_script_and_boot_module_entries_are_checked_for_gpu_names` (`cupy/__init__.py` and `tests/accidental.py` as `s` entries, `pyimod_accidental.cupy` as `m`; the real boot names, `__main__` and an `o` option pass) | `:469` `pkg:cupy/__init__.py (gpu-module)` absent |
+| 6 | MAJOR | FIXED | `__main__.main` calls `_start_logging()` only when `sys.frozen` | `test_a_source_run_starts_the_gui_as_1_0_0_did` (real `app_locations` + `configure_logging`, app data under `tmp_path`, a stand-in GUI: no log folder, no new handler); the two GUI-branch log tests now run frozen | `test_frozen_entry.py:217` `assert not log_dir.exists()` |
+| 7 | minor | HELD with #1 / #2 | none | none | n/a |
+| 8 | minor | FIXED | every loose file in the release folder meets the allowlist (`forbidden_paths`: `module_root=is_file`); `_bundle_parts`' docstring corrected | `test_an_extension_module_beside_the_executable_is_found` (`av.pyd` at the root and beside the exe, `Clearwater/yaml/__init__.pyc`) | `:479` `dist:av.pyd` not flagged |
+| 9 | minor | FIXED | `check_pack` turns any `OSError` into `pack unreadable: <type>`; `load` (`_find_and_load`) the same for the stamp folder's `is_dir`; `_add_dll_directories` returns `DLL folders unreadable: <type>` | `test_a_file_system_error_is_a_rejection_not_an_exception[5 cases]` (`PermissionError` from the stamp folder, `manifest.json`, `site-packages`, a RECORD, an `nvidia/*/bin`) | all 5: `PermissionError` escaped `gpu_pack.load` (`test_gpu_pack.py:383`) |
+| 10 | minor | FIXED | `prepend_executable_folder` is membership-based (`normcase(normpath)` of every entry): no change when the folder is ANY entry | `test_a_worker_whose_path_was_changed_by_pyside6_does_not_add_the_folder_again` (parent prepend, then the PySide6 hook's two prepends, then the child: unchanged, the folder once; a trailing-separator spelling counts) | `:283` the child prepended again (`True is False`) |
+| 11 | minor | FIXED (test) | none in product code | `test_the_worker_branch_imports_no_qt_in_a_fresh_interpreter` (`python -I -c`: imports the entry and `export_worker` afresh, stubs `export_worker.main`, runs the `--export-worker` branch, lists `PySide6` / `shiboken6` / `clearwater.gui` / `clearwater.app.main` in `sys.modules`); `test_the_fresh_interpreter_probe_sees_a_top_level_qt_import` (the reviewer's mutation on a copy of the package under `tmp_path`: caught) | passes (the product was right); the self-check is the distinguishing run |
+| 12 | minor | FIXED | `_safe` escapes ASCII control characters as `\x..` after the non-ASCII escape | `test_a_reason_is_always_one_line` (`\n`, `\t`, `\r`, `\x7f` in a name) | `test_gpu_pack.py:385` raw newline in the reason |
+| 13 | advisory | FIXED (test) | none | `test_each_copied_tool_is_run_from_the_destination` (`tool_version` called on each copy, its line returned) | passes (the code was right); fails on the reviewer's mutation (`tool_version(target)` -> `""`): `t3b/pytest-5-mut13.log`, 1 failed |
+| 14 | advisory | BANKED (out of envelope) | none | none | n/a |
+
+Residual on #10 (for the dispatcher): membership means a user `PATH` that already lists the
+executable's folder BEHIND another FFmpeg folder is left as it is, so that FFmpeg would win.
+Moving the folder to the front (deduplicated) would close it; the literal ruling was kept.
+
+Self-review (suspected / confirmed / fixed): (1) the first #4 `.pyd` assertion expected
+`unexpected-module` for every root `.pyd`: `core.cp312-win_amd64.pyd` is `shadow` (a
+clearwater subpackage name), confirmed correct behaviour, the test now accepts any rule;
+(2) the strict mypy run over the touched TEST files found 7 errors from group 1 (`object()` as
+`photo_exports`, `_command` on `ExportJobs`, an `Any` return, `os.add_dll_directory` on darwin):
+confirmed, fixed in `16aceca9`. A second pass found nothing new.
+
+Commands (worktree root, Git Bash, `PYTEST_ADDOPTS` unset; outputs in `t3b/`):
+
+| Command | Exit | Summary |
+|---|---|---|
+| `pytest -q -rs -p no:cacheprovider --basetemp=<wt>/work/c61c-8 tests/test_gpu_pack.py tests/test_frozen_entry.py tests/test_tools_package_build.py tests/test_jobs_export_process.py tests/test_app_composition.py tests/test_wp42_composition.py tests/test_core_backend.py -m "not gpu"` | 0 | 236 passed, 41 deselected in 26.83 s (head `16aceca9`) |
+| the three owned modules alone (`c61c-3`) | 0 | 85 passed in 5.13 s; slowest the two fresh-interpreter tests, 1.54 s and 0.79 s |
+| the same three against `16e03c0f` (`c61c-4`) | 1 | 12 failed, 73 passed (the before record) |
+| `ruff check .` / `ruff format --check .` | 0 / 0 | All checks passed / 322 files already formatted |
+| `mypy` (strict, configured set) | 0 | no issues in 160 source files |
+| `mypy --platform darwin tools/package/build.py src/clearwater/gpu_pack.py src/clearwater/__main__.py` | 0 | no issues in 3 source files |
+| `mypy --strict` (win32 and `--platform darwin`) on the three touched test modules | 0 / 0 | no issues in 3 source files (after `16aceca9`) |
+
+Commits: `5e437c46` fix(wp6.1): source-run logging as 1.0.0, PATH membership, pack errors as
+rejections, one-line reasons; `240a62e0` fix(wp6.1): bundle checks name every entry type,
+every locked CUDA DLL, modules beside the exe; `16aceca9` test(wp6.1): strict mypy on the tests.
+
+### The rebuilds (from `240a62e0`; the product code is unchanged by `16aceca9`)
+
+| # | Command (worktree root) | `df -h /c` before | Exit | Wall (shell / PyInstaller) | Result |
+|---|---|---|---|---|---|
+| 5 | `uv run --no-sync python tools/package/build.py --form onedir --with-ffmpeg > work/wp6.1/build-onedir-t3b.log 2>&1` | 85 GB free (10:26:25Z) | 0 | 196 s / 173.0 s | `_internal` 223.8 MiB + `Clearwater.exe` 10.1 MiB; 668.2 MiB release with FFmpeg; bundle checks 16.7 s: **PASS** |
+| 6 | `... --form onefile --with-ffmpeg > work/wp6.1/build-onefile-t3b.log 2>&1` | 82 GB free | 0 | 214 s / 206.3 s | `Clearwater.exe` 89.4 MiB; 523.8 MiB release; bundle checks 1.4 s: **PASS** |
+
+Sizes are unchanged from builds 3 / 4. The walls are about twice group 2a's: a Codex cell
+(WP-T8) was running tests beside them (not timed, as the dispatch allows). The same two
+build-log warnings as before (`scipy.special._cdflib`; the build-time CuPy `CUDA path`
+warning). FFmpeg copies: `ffmpeg version 9.0.2-full_build-www.gyan.dev`, `ffprobe version
+9.0.2-full_build-www.gyan.dev`. The stricter #5 / #8 checks found nothing in either real build.
+
+### The frozen worker, headless (D6)
+
+Tool: `t3b/headless.py` (evidence tooling, run from the dev environment). Each request line is
+built by the product's `ProcessExportJobs._request_line`; each worker is spawned as
+`jobs/export_process.py` spawns it (`Popen(command, stdin/stdout/stderr=PIPE,
+**tool_spawn_kwargs())`, the request written first, stdin closed on the result). The child's
+`APPDATA` / `LOCALAPPDATA` / `TEMP` / `TMP` are under `work/wp6.1/t3b/<form>/`, `PATH` is
+`C:\Windows\System32;C:\Windows`, no `PYTHON*` variable, and the working directory is that
+work folder (never the dist folder). Command: `uv run --no-sync python
+<ev>/t3b/headless.py run --form <form> --req <heic|jpeg|video>`; worker command
+`<dist>\Clearwater.exe --export-worker`. Requests: `heic-ad24-both.heic` -> PNG,
+`jpeg-gradient-display-p3.jpg` -> PNG (D22), `tests/fixtures/video/vfr.mp4` (the shortest
+fixture video: 1.33 s, 30 frames, 320x180) -> MP4; c3 defaults, `force_cpu` off, encoder
+`auto`. Every record is in `t3b/runs.jsonl`.
+
+| Form | Request | Exit | Output | Final protocol message | EXIF check | Left over |
+|---|---|---|---|---|---|---|
+| onedir | HEIC | 0 | `heic-ad24-both_corrected.png` 37,104 B (96x64 16-bit RGB) | `result` ok, device `CPU: CuPy not installed`, warning `Processed on the CPU (CPU: CuPy not installed).` | eXIf 178 B == `exif.edit(source 112 B, 96, 64)`: **PASS**; differs from the source only in D63's four fields (Orientation 6 -> 1, Software, PixelX / YDimension) | none |
+| onedir | JPEG | 0 | `jpeg-gradient-display-p3_corrected.png` 1,921 B | the same | the source has no EXIF; eXIf 92 B == `exif.edit(None, 96, 64)`: **PASS** | none |
+| onedir | video | 0 | `vfr_corrected.mp4` 55,165 B | `result` ok, the same device | n/a | none |
+| onefile | HEIC | **3221225477** | the same PNG, 37,104 B | the same `result` ok | **PASS** (as onedir) | none |
+| onefile | JPEG | **3221225477** | 1,921 B | the same | **PASS** | none |
+| onefile | video | **3221225477** | 55,165 B | the same | n/a | none |
+
+- **FFmpeg (D1).** Both video runs spawned the BUNDLED `<dist>\ffmpeg.exe` and `ffprobe.exe`
+  (the worker's process tree, from psutil), with `PATH` = Windows only and the working
+  directory outside the dist. The protocol log has no `shutil.which` line. The worker's own
+  `PATH`, read from the frozen child (psutil `environ()`, the `path-check` runs): onedir
+  `<dist>;<dist>\_internal\PySide6;<dist>\_internal;C:\Windows\System32;C:\Windows`, onefile
+  `<dist>;<TEMP>\_MEI...\PySide6;<TEMP>\_MEI...;...`: the executable's folder once, first,
+  after PyInstaller's PySide6 hook added its two entries (D1 and #10 as built).
+- **Left over.** No process of any run's own tree was alive after it (psutil, by PID).
+  `tasklist` twice showed one `ffmpeg.exe` that was not in the run's tree (PIDs 35044, 25248;
+  another session's); at the end `tasklist` shows no `Clearwater.exe` and no `ffmpeg.exe`. No
+  `_MEI` folder was left by a run that ended by itself.
+- **The non-zero exits: a 1.0.0 export-worker defect, not a packaging one (a DR row
+  candidate; `app/export_worker.py` is not owned).** Every non-zero exit is the worker
+  crashing AFTER its result line: stderr `Fatal Python error: _enter_buffered_busy: could not
+  acquire lock for <_io.BufferedReader name='<stdin>'> at interpreter shutdown, possibly due
+  to daemon threads`, then exit `0xC0000005`. The worker's daemon `_watch_stdin` thread is
+  blocked in `stdin.readline()` when the main thread finalises; it is a race with the
+  parent's close of stdin on the result. Reproduced with the SOURCE worker (`python -m
+  clearwater.app.export_worker`) and with the product's own parent (`ProcessExportJobs`,
+  unchanged, `t3b/repro_exit.py`, no sampling): the parent logs `export worker sent its
+  result, then exit status 3221225477`; source 5 / 5 and 2 / 2 runs, onedir 2 / 5, onefile
+  1 / 5 (`t3b/repro-exit-*.log`), and 9 / 9 of the #3 runs below (all three forms). The job's
+  result is still used (the export is OK), and the crash adds about 1 s before the process
+  ends. (The source runs in `repro_exit.py` failed their export for the expected reason, no
+  `ffprobe` on the Windows-only `PATH`, and crashed the same way after that result.)
+
+### The write journal (D85)
+
+Tool: `headless.py journal --form <form> --target <worker|spawned>`, records in
+`t3b/journal.jsonl`. The GUI's own guarded path runs in the dev process: `GuardedExports(
+ProcessExportJobs(..., command=[<exe>, "--export-worker"]), cache=DeferredProxyCache(<redirected
+cache>), locks=ClipLocks(), journal=WriteJournal(<redirected config>))` on `vfr.mp4`. The kill
+is `taskkill /PID <pid> /F` once the temporary output exists in the output folder (the encode
+has begun). Then the product's start-up clean-up `clean_leftovers(settings,
+WriteJournal(<redirected config>))`.
+
+| Form | Killed PID | During the export | After the kill | `clean_leftovers` | After it |
+|---|---|---|---|---|---|
+| onedir | the worker (the spawned `Clearwater.exe`) | journal: one entry, the output folder; folder: `vfr_corrected.clearwater-partial-66938c574ef6.mp4` | job failed `The export worker ended without a result (exit status 1)`; the entry KEPT (its folder holds a temporary); the partial file still there; no process left | `removed=(...partial-66938c574ef6.mp4,)`, `failed=()` | journal `entries: []`; folder empty: **PASS** |
+| onefile | the worker = the bootloader's CHILD (PID 17620; spawned PID 32928) | the same, `...partial-60765307cc75.mp4` | the same failure; entry kept; partial there; the bootloader exited too and removed its `_MEI`; no process left | `removed=(...partial-60765307cc75.mp4,)` | journal empty; folder empty: **PASS** |
+| onefile | the SPAWNED PID (the bootloader, 41044) | the same, `...partial-3aec56619800.mp4` | the child worker (PID 39048) was still alive 1 s later and FINISHED the export: job `ok=True`, `vfr_corrected.mp4` written, the entry removed; an orphaned `_MEI0000a0542` left in `TEMP` | nothing to remove | `vfr_corrected.mp4` only |
+
+- **Finding for WP6.3 / CP6a (packaging): in the one-file form the PID the parent holds is the
+  bootloader, not the worker.** `export_process`'s `process.kill()` (its hung-worker path,
+  `KILL_AFTER_CANCEL_S` after a cancel or a result) would end only the bootloader; the Python
+  worker runs on to its own end, and the bootloader's `_MEI` extraction is left in `%TEMP%`.
+  The first, too-early journal attempt (killed during analysis, before any temporary existed)
+  showed the same orphan and leak (`_MEI0000ab1c2`). The one-folder form has no such layer.
+  The leaked `_MEI` folders are kept under `work/wp6.1/t3b/onefile/temp/` as evidence.
+
+### #3 measurement (for CHARC's ruling; a guide, not of record, nothing exclusive)
+
+HEIC -> PNG, `force_cpu` on (so the source worker does not load CuPy), three runs per form,
+interleaved; `t3b/runs.jsonl` labels `m3-1..3`. "First message" = from `Popen` to the first
+protocol line (`progress 0/4 Reading ...`). "Private" = the peak of psutil's
+`memory_info().private` over 50 ms samples (the worker process; the one-file tree adds its
+bootloader). DLLs = psutil `memory_maps()` of the worker, sampled at the first message and
+throughout. The sampling itself costs some time, the same for every form.
+
+| Form | First message, s (median; range) | Private, MiB (median; range) | Qt-family DLLs mapped (at the first message, and at any time) | DLLs mapped |
+|---|---|---|---|---|
+| onedir `Clearwater.exe --export-worker` | 0.543 (0.528-0.558) | 1,047.8 (1,047.5-1,048.2) | `Qt6Core.dll`, `pyside6.abi3.dll`, `shiboken6.abi3.dll` (3 / 3 runs) | 122-126 |
+| onefile `Clearwater.exe --export-worker` | 2.375 (2.340-3.380) | 1,047.9 worker (1,049.3 with the bootloader) | the same three, from `_MEI...\PySide6` (3 / 3) | 125-129 |
+| source `python -m clearwater.app.export_worker` | 0.720 (0.717-0.736) | 1,044.0 (1,043.3-1,044.0) | none | 108-112 |
+
+- So #3 is confirmed on the real builds: every frozen worker maps `Qt6Core`, PySide6's and
+  shiboken6's runtime libraries before its first message (no `Qt6Gui` / `Qt6Widgets`), which
+  the source worker never does. The cost seen here is small: about +4 MiB private and no
+  start-up penalty against the source worker (onedir is faster than the source run; onefile's
+  extra ~1.8 s is its extraction).
+- The first onedir HEIC run after the build took 5.87 s to its first message (a cold file
+  cache); later runs 0.5-0.7 s.
+- About 1 GiB of private memory in all three forms, the source worker included, is the
+  worker's own (not a packaging effect); recorded only.
+
+Depth at turn-3 group-2b-1 end: DISPATCHER TO FILL
