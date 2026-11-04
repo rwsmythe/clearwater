@@ -11,6 +11,7 @@ from __future__ import annotations
 import ast
 import copy
 import hashlib
+import inspect
 import io
 import json
 import os
@@ -22,6 +23,7 @@ import tempfile
 import zlib
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -29,6 +31,7 @@ import pillow_heif
 import pytest
 from PIL import ExifTags, Image, ImageCms, ImageOps
 
+import fixture_plugin
 from fixture_plugin import (
     FIXTURES_DIR,
     REPO_ROOT,
@@ -1584,6 +1587,72 @@ def test_ffmpeg_is_told_to_write_only_into_the_output_folders(audited_run: dict[
 
 
 # --- The plugin ---------------------------------------------------------------------------
+
+
+def _location_provider(config: Any, factory: Any) -> SampleProvider:
+    """Call the fixture body with the context supported before or after DR-120."""
+    body = fixture_plugin.sample_provider.__wrapped__
+    context = {"fixture_manifest": MANIFEST, "tmp_path_factory": factory, "pytestconfig": config}
+    return body(**{name: context[name] for name in inspect.signature(body).parameters})
+
+
+def test_generated_cache_prefers_an_explicit_basetemp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An explicit worker root wins over a writable checkout cache (DR-120)."""
+    base = tmp_path / "worker-root"
+    factory = SimpleNamespace(getbasetemp=lambda: base, mktemp=lambda name: base / name)
+    config = SimpleNamespace(getoption=lambda name: str(base))
+    monkeypatch.setattr(fixture_plugin, "REPO_ROOT", tmp_path / "not-a-git-checkout")
+    monkeypatch.setattr(fixture_plugin, "writable_dir", lambda path: True)
+    provider = _location_provider(config, factory)
+    assert provider.generated_dir == base / "fixtures-generated"
+    assert provider.manifest == MANIFEST
+    assert provider.fixtures_dir == FIXTURES_DIR
+
+
+def test_generated_cache_without_basetemp_uses_the_main_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Discover the common Git directory from a simulated linked worktree (DR-120)."""
+    main = tmp_path / "main"
+    common = main / ".git"
+    metadata = common / "worktrees" / "cell"
+    metadata.mkdir(parents=True)
+    (common / "objects").mkdir()
+    (common / "refs" / "heads").mkdir(parents=True)
+    (common / "HEAD").write_text("ref: refs/heads/main\n", encoding="ascii")
+    (metadata / "HEAD").write_text("ref: refs/heads/main\n", encoding="ascii")
+    (metadata / "commondir").write_text("../..\n", encoding="ascii")
+    worktree = main / ".worktrees" / "cell"
+    worktree.mkdir(parents=True)
+    (worktree / ".git").write_text(f"gitdir: {metadata.as_posix()}\n", encoding="utf-8")
+    monkeypatch.setattr(fixture_plugin, "REPO_ROOT", worktree)
+    # Avoid any cache writes while exercising both the old and new location rule.
+    monkeypatch.setattr(fixture_plugin, "writable_dir", lambda path: True)
+    factory = SimpleNamespace(
+        getbasetemp=lambda: tmp_path / "fallback", mktemp=lambda name: tmp_path / name
+    )
+    provider = _location_provider(SimpleNamespace(getoption=lambda name: None), factory)
+    assert provider.generated_dir == main / "work" / "fixtures" / "generated"
+    assert not (worktree / "work").exists()
+    assert provider.manifest == MANIFEST
+    assert provider.fixtures_dir == FIXTURES_DIR
+
+
+@needs_ffmpeg
+def test_relocated_session_cache_keeps_the_manifest_content(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """The relocated real sample retains its stream identity and decoded frame hash."""
+    base = tmp_path_factory.getbasetemp()
+    sample_provider = _location_provider(
+        SimpleNamespace(getoption=lambda name: str(base)), tmp_path_factory
+    )
+    assert sample_provider.generated_dir == base / "fixtures-generated"
+    generated = sample_provider.path("ad14-flicker")
+    assert generated.is_relative_to(base)
+    assert verify_generated(ENTRIES["ad14-flicker"], generated) is None
 
 
 def _provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, tools: bool) -> SampleProvider:
