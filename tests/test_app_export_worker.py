@@ -257,8 +257,14 @@ def test_windowed_worker_updates_the_win32_stdin_slot(tmp_path):
         pytest.skip("the interpreter environment has no pythonw.exe")
     record_path = tmp_path / "stdin-slot.json"
     child = _child(_WINDOWED_STDIN_SLOT, tmp_path, record_path, executable=str(executable))
-    assert child.wait(timeout=10) == 0
-    out, err = child.communicate(timeout=10)
+    try:
+        out, err = child.communicate(timeout=10)
+    except subprocess.TimeoutExpired:
+        if child.poll() is None:
+            child.kill()
+        child.wait(timeout=10)
+        raise
+    assert child.returncode == 0, err.decode(errors="replace")
     assert out == b"" and err == b""
     record = json.loads(record_path.read_text(encoding="utf-8"))
     assert record["before"] == record["original_fd"]

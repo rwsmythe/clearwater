@@ -196,7 +196,7 @@ the contract. The brief's r1 ruling grants these test/doc-only fixes.
 | m3 MINOR, in envelope, EXECUTED | Confirmed: add a one-write request-plus-cancel witness. It passes on the candidate and fails guarded pre-read. |
 | m4 MINOR, in envelope, EXECUTED | Confirmed: add exact-type and no-buffer/no-instance-method assertions. The buffered-shell mutant fails. |
 | m5 MINOR, in envelope, EXECUTED | Confirmed: remove the authorized dead helpers and vacuous shim test; correct stale text. |
-| a6 ADVISORY, REASONED | No code change. The ruling rejects the non-OSError characterization: the uncaught exception is fail-closed before reads/jobs. Request-read OSError behavior predates this package. |
+| a6 ADVISORY, REASONED | No code change (ruling a6, concur): fail-closed in effect; the request-read OSError behaviour predates this package. |
 | a7 ADVISORY, in envelope | Fixed: README stdin paragraph wrapped to the surrounding width. |
 | a8 ADVISORY, in envelope | Resolved by the report added in turn 5, after the reviewed head. |
 | a9 ADVISORY, EXECUTED | No defect established; no change. The process-global os.read monkeypatch is restored by pytest. The reviewer observed a clean parallel run. |
@@ -221,10 +221,17 @@ the dispatcher's after-B ledger commit, is:
 
 | Round | Counts | Envelope | NEW / REOPENED | Reverts | Fix surface | Transport / depth |
 |---|---|---|---|---|---|---|
-| A r1 | 0 critical, 2 major, 3 minor, 4 advisory | All 5 formal findings in; a6 unchanged read-error case outside; 3 other advisories in | 9 / 0 | 0 | Tests and docs only; 0 product changes | Seat Claude process, read-only; CLI version and depth dispatcher-supplied, not available to cell |
+| A r1 | 0 critical, 2 major, 3 minor, 4 advisory | All 5 formal findings in; a6 no change (ruling: fail-closed in effect); 3 other advisories in | 9 / 0 | 0 | Tests and docs only; 0 product changes | Seat Claude process, read-only; CLI version and depth dispatcher-supplied, not available to cell |
 
 All r1 findings are dispositioned. This fold-in does not claim convergence;
 the next independent reviewer pass remains with the dispatcher.
+
+Reviewer A r2 / Reviewer B: A r2 returned NO_NEW_CRITICAL_MAJOR with three
+advisories, all folded in turn 7: remove the dead prelude, collect windowed
+stderr before checking status, and correct the a6 wording. Reviewer B returned
+NO_NEW_CRITICAL_MAJOR; its MINOR exit-comment finding is folded in turn 7.
+The comment now names the Windows close-under-pending-read hang. No product
+code changed. B's remaining advisory list is being re-collected at the seat.
 
 ## Validation and collection
 

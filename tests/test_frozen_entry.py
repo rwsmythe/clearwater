@@ -474,31 +474,6 @@ def test_the_entry_sets_path_before_either_branch(
 
 # Historical entry-shim prelude; worker stdin isolation is tested in the worker module.
 
-_NO_GUI_PRELUDE = """
-import importlib.abc
-import json
-import subprocess
-import sys
-from pathlib import Path
-
-
-class NoGui(importlib.abc.MetaPathFinder):
-    def find_spec(self, name, path, target=None):
-        if name.split(".")[0] in ("PySide6", "shiboken6") or name == "clearwater.app.main" or (
-            name == "clearwater.gui" or name.startswith("clearwater.gui.")
-        ):
-            raise ImportError("blocked by the test: " + name)
-        return None
-
-
-sys.meta_path.insert(0, NoGui())  # no window can open, whatever branch runs, on any revision
-sys.path.insert(0, sys.argv[1])
-sys.frozen = True
-import clearwater.__main__ as entry
-from clearwater import gpu_pack
-"""
-"""What each F-E child runs first: the GUI unimportable, the entry imported as frozen."""
-
 
 def _app_data_environ(root: Path) -> dict[str, str]:
     """This environment with every app-data variable under ``root`` (never the user's)."""

@@ -429,8 +429,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run(stdin, protocol)
     finally:
         protocol.close()
-        # The daemon may still be in os.read. Neither close its descriptor nor join it;
-        # the OS releases the descriptor on process exit, with no IO buffer to finalize.
+        # Never close or join here: closing while the daemon blocks in os.read can block
+        # the close on Windows and hang the worker after its result. Process exit releases
+        # the descriptor; no IO buffer remains for finalization to contend for (DR-125).
 
 
 if __name__ == "__main__":
