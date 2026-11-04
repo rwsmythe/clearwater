@@ -710,7 +710,9 @@ worktree (`p30_mutant.py`, `sb1_spy.py`, `mtool_leak.py`, `t4-*.log`).
 |---|---|
 | `b0c0d5fd` | test: W-FS[P30] gains the `Stra\u00dfe.MP4` (folder `a`) / `STRASSE.mp4` (folder `b`) pair, asserting the bare labels |
 | `b08e9f43` | test: the same pair in ASCII source (`\u00df` escape); the file tool had written the literal character |
-| (this commit) | docs: NEW `docs/reports/wp6.4-macos-adaptation.md`; this section |
+| `3ec3f7cf` | docs: NEW `docs/reports/wp6.4-macos-adaptation.md`; this section (first return) |
+| `a6294d43` | feat: S-B1 on by default, the flag removed; the two `test_environment_report` edits; the W-TOOL / M-TOOL callers; the M-TOOL context fix (T4.8) |
+| (this commit) | docs: the report and this section after the ruling (T4.8) |
 
 All by pathspec with `-c core.autocrlf=false`, the Co-Authored-By line, blob check 0 CR.
 
@@ -725,7 +727,7 @@ All by pathspec with `-c core.autocrlf=false`, the Co-Authored-By line, blob che
   - Both re-run at `b08e9f43` with the same result.
 - The case count is unchanged (180): the pair is inside the existing `_fs_p30`.
 
-### T4.3 Item 1: S-B1 (GRANTED) -- STOPPED, no edit made
+### T4.3 Item 1: S-B1 (GRANTED) -- STOPPED at the first return, no edit made; built after the ruling (T4.8)
 
 - **The conflict.** The grant allows ONE edit to `tests/test_environment_report.py` (the key
   order at `:13-33`), and the dispatch requires that every test calling `collect()` / `main()`
@@ -816,6 +818,66 @@ Every skip reads "macOS native leg (WP6.5)".
 - This cell: no bare `cd` (subshells only), no stash, no mailbox post, no edit outside the owned
   files, no real FFmpeg / `nvidia-smi` / CuPy run from a test or probe, every test run offscreen.
 
-Depth at the mid-turn yield point (items 1 and 3 committed): DISPATCHER TO FILL
+Depth at the first turn-4 return (the S-B1 STOP): 148,769 (the dispatcher's figure at the ruling relay)
+
+### T4.8 After the turn-4 STOP ruling (CHARC `a5ca96e5`, relayed by the dispatcher)
+
+The ruling: (1) a second `tests/test_environment_report.py` edit GRANTED, ONE autouse fixture
+stubbing `_correction_backend` and `_encoder_rows` (that module's grant is exactly two edits),
+then S-B1 as ruled; (2) the M-TOOL leak fixed in scope, the W case in its own
+`pytest.MonkeyPatch.context()`, native T01 / T02 on `macos` ONLY (no `slow`; the "no real trial
+unless slow / gpu" rule binds the Windows legs), no case moving between legs.
+
+- **Built (`a6294d43`):**
+  - `tools/environment_report.py`: the facts ON BY DEFAULT; `--platform-facts` and the
+    `platform_facts` parameter removed; the module and `collect` docstrings and the
+    `_PLATFORM_KEYS` note say the report runs the product's encoder trials.
+  - `tests/test_environment_report.py`, the two edits only: `machine`, `process_architecture`,
+    `correction_backend`, `correction_backend_reason`, `encoders` appended to `EXPECTED_KEY_ORDER`
+    before `unavailable`; the autouse fixture `stub_trial_seam`. (The working copy had CRLF from
+    the checkout; it was normalised to LF before the commit; blob 0 CR.)
+  - `tests/test_portability.py` W-TOOL T01: the facts read from the default `collect()`; the
+    `plain` / `platform_facts=True` pair is gone (the tail assertion `keys[-6:] ==
+    [*_PLATFORM_KEYS, "unavailable"]` stays).
+  - `tests/test_macos_portability.py` M-TOOL: `collect()`; the W case under
+    `with pytest.MonkeyPatch.context() as w_patch`.
+- **No real trial on the Windows legs:** `work\wp6.4\sb1_check.py` installs RECORDERS (stub
+  values) over the real seams at session start; a test's own stub replaces them. Over the three
+  modules: parallel expression `182 passed, 159 skipped`, `CHECK: 0 unstubbed seam calls`; serial
+  expression `17 passed, 19 skipped`, `CHECK: 0 unstubbed seam calls`. (The first return's spy saw
+  16 of 19 reach it before the fixture.)
+- **M-TOOL fix shown:** `work\wp6.4\mtool_fixed.py` replays the fixed sequence (stubs only):
+  `T01: stubbed inside=True, originals restored after=True`; the same for T02.
+- **The callers** (`grep` of `environment_report.collect(` / `.main(` / `platform_facts` in `tests`
+  and `tools`; no other module imports `environment_report`): `test_environment_report.py:88, 194,
+  201, 211, 228, 242` (`main`, all under `stub_trial_seam`; `:201` fails on the config before
+  `collect`); `test_portability.py:3327, 3343, 3349` (`collect()`, under `_tool_report`'s stubs);
+  `test_macos_portability.py:1032` (`collect()`, the native half, `macos` only, skipped here). No
+  `platform_facts` remains.
+- **Report:** `docs/reports/wp6.4-macos-adaptation.md` updated (S-B1 default in sections 1 and 2,
+  the M-TOOL fix and the default trials in section 10, counts and mypy at `a6294d43`).
+
+Static at `a6294d43`:
+
+    uv run --no-sync ruff check .                  All checks passed!
+    uv run --no-sync ruff format --check .         326 files already formatted
+    uv run --no-sync mypy                          Success: no issues found in 162 source files
+    uv run --no-sync mypy --platform darwin        Success: no issues found in 162 source files
+
+Counts at `a6294d43` (same options as T4.5):
+
+| Module | Parallel leg, `-n 4` (collected / passed / skipped) | Serial leg (collected / passed / skipped) | Fullclip |
+|---|---|---|---|
+| `test_environment_report` | 19 / 19 / 0 | 0 | 0 |
+| `test_portability` | 163 / 163 / 0 | 17 / 17 / 0 | 0 |
+| `test_macos_portability` | 159 / 0 / 159 | 19 / 0 / 19 | 0 |
+| the three together | 341 / 182 / 159 | 36 / 17 / 19 | 0 |
+
+Every skip reads "macOS native leg (WP6.5)". No case moved between legs.
+
+Verification loop, second pass: suspected that a W-TOOL or M-TOOL caller still passed
+`platform_facts` (rejected: grep, none); that the fixture missed a `main()` caller (rejected: the
+recorder saw 0); that the M-TOOL context leaves a stub live (rejected: the replay); that the test
+file would commit CR (confirmed in the working copy; fixed before the commit). Nothing new.
 
 Depth at turn-4 yield: DISPATCHER TO FILL

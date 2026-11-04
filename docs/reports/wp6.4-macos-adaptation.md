@@ -10,12 +10,12 @@ group-B yield rulings).
   CHARC's export grant `1a003fe4`). Its file tool refused this report (S-B2); its return carried
   the text.
 - `wp64-cell4` ran the A r1 fold-in turn: the W-FS[P30] pair, this report and the ledger's turn-4
-  section. S-B1 (the environment facts on by default) is NOT built at this head: the turn-4 cell
-  stopped it (section 10).
+  section; then, on CHARC's turn-4 STOP ruling (`a5ca96e5`), S-B1 (the environment facts on by
+  default) and the M-TOOL monkeypatch fix (section 10).
 
 The ledger is `docs/proofs/wp6.4-ledger.md`, branch `wp6.4`. **No Mac was run.** Every M test is
 written to run natively and is UNEXECUTED until WP6.5. The counts below are the turn-4 cell's own
-runs at `b08e9f43`. Reviewer A (Codex) round 2 on groups A + B and the package gate follow.
+runs at `a6294d43`. Reviewer A (Codex) round 2 on groups A + B and the package gate follow.
 
 ## 1. What was built
 
@@ -94,12 +94,12 @@ The per-item build cycles are recorded in ledger A.1.
   - Item 13: the inventory counts AppleDouble `._` names on their own summary line, "AppleDouble
     files (._ names, macOS metadata; not rows)", and never probes or lists them (T14).
   - Item 13: on darwin, `environment_report`'s NVIDIA fields are null with "not applicable on this
-    platform", and `nvidia-smi` is not run there. `--platform-facts` adds the machine, the process
-    architecture, the correction backend and its reason, and the roster's capability rows from the
-    product's trial model (T01, T02). It is opt-in at this head: CHARC granted S-B1 (the facts on
-    by default, the flag removed, one edit to `EXPECTED_KEY_ORDER`), and the turn-4 cell stopped
-    that item because 16 of the 19 `tests/test_environment_report.py` tests would then reach the
-    real trial seam with no stub, and the stub is a second edit to that file (section 10).
+    platform", and `nvidia-smi` is not run there. The default report also holds the machine, the
+    process architecture, the correction backend and its reason, and the roster's capability rows
+    from the product's trial model (T01, T02), as its last keys before `unavailable`. Group B
+    built these behind an opt-in `--platform-facts` flag (STOP S-B1: an unowned test pinned the
+    key set); turn 4 made them the default and removed the flag and the `platform_facts`
+    parameter (CHARC's S-B1 grant and turn-4 ruling; section 1, "Turn 4").
 - **The export grant (CHARC, `63ff45f3`; commit `1a003fe4`).** In `jobs/export.py`, the video job's
   encoder check (the `capability is None or not capability.available` branch after
   `resolve_encoder`): a saved known encoder that the platform's capability report does not list
@@ -125,7 +125,24 @@ The per-item build cycles are recorded in ledger A.1.
   mutant of `batch_panel.item_labels` comparing by `casefold` instead of `normcase` now FAILS the
   case (it adds the parent folders); the unmutated code passes. The case count is unchanged (the
   pair is inside the existing case).
-- **S-B1 (GRANTED, STOPPED this turn):** see section 10.
+- **S-B1 (GRANTED; built after the turn-4 STOP ruling).**
+  - `tools/environment_report.py`: the platform facts are ON BY DEFAULT; the `--platform-facts`
+    flag and `collect`'s `platform_facts` parameter are removed. Writing a report now runs the
+    product's encoder trials.
+  - `tests/test_environment_report.py`, exactly two edits: the five keys appended to
+    `EXPECTED_KEY_ORDER` before `unavailable` (existing keys keep their order), and one autouse
+    fixture `stub_trial_seam` stubbing `_correction_backend` and `_encoder_rows`.
+  - The callers: W-TOOL T01 (`test_portability.py`) reads the facts from the default `collect()`;
+    M-TOOL (`test_macos_portability.py`) calls the default `collect()`.
+  - No test on the Windows legs reaches the real trial seam: a session-start recorder over the
+    three modules (both leg expressions) saw 0 unstubbed calls, where the stub-less simulation
+    before the fixture saw 16 of `test_environment_report`'s 19 tests reach it.
+- **M-TOOL monkeypatch fix (found in turn 4; CHARC's turn-4 ruling).** `test_macos_tool_reporting`
+  ran its W case and its native half on one monkeypatch, so on a Mac the native half read the W
+  stubs (encoders `['libx265']`; `sys.platform` left at `win32` after T02's W case) and would have
+  failed. The W case now runs in its own `pytest.MonkeyPatch.context()`; a replay shows the stubs
+  live inside it and every original restored after it. Native T01 / T02 stay on `macos` only (no
+  `slow`): a real VT / x265 trial is the native leg's point, and no case moves between legs.
 
 ### Notable tests
 
@@ -250,7 +267,7 @@ shortened; the full site is the WP6.2 audit's row.
 | P72 | io/video/probe.py:67,504 | validated (W) | `tool_text_and_redaction` | M-TEXT[P72] |
 | P73 | config/presets.py:395-402; docs/debt-register.... | implemented (A) | `filesystem_semantics` | M-FS[P73] |
 | P74 | io/video/pipes.py:45-58; tools/headless_export.... | implemented (A) | `spawn_policy` | M-SPAWN[P74] |
-| T01 | environment_report.py:172 | implemented (B): --platform-facts (opt-in; S-B1 granted, not built at this head: turn-4 STOP) | `tool_reporting` | M-TOOL[T01] |
+| T01 | environment_report.py:172 | implemented (B): platform facts in the default report (S-B1, turn 4) | `tool_reporting` | M-TOOL[T01] |
 | T02 | environment_report.py:171 | implemented (B): darwin NVIDIA fields null, not run | `tool_reporting` | M-TOOL[T02] |
 | T03 | prototype/bench.py:1157-1159 | implemented (B): bench._windows_power statement form | `tool_reporting`, W-STATIC (mypy both targets) | M-TOOL[T03]; M-STATIC[T03] |
 | T04 | prototype/bench.py:1467 | implemented (B): bench._cpu_brand statement form, comment fixed (D4 (d)) | `tool_reporting` | M-TOOL[T04] |
@@ -389,8 +406,7 @@ It passed on the unchanged code before any edit, and on every later commit.
 
 ## 5. The dual-target mypy output
 
-At `b0c0d5fd` (turn 4; `b08e9f43` after it changes only a test file's escapes, outside mypy's
-`files`), run from the worktree root:
+At `a6294d43` (turn 4), run from the worktree root:
 
     uv run --no-sync mypy                    Success: no issues found in 162 source files
     uv run --no-sync mypy --platform darwin  Success: no issues found in 162 source files
@@ -414,7 +430,7 @@ Source: ledger A.4 and `uv-lock.record.txt`.
 
 ## 7. The W and M test counts per gate leg
 
-Re-taken by the turn-4 cell at `b08e9f43` (`-p no:cacheprovider --timeout 600`,
+Re-taken by the turn-4 cell at `a6294d43` (`-p no:cacheprovider --timeout 600`,
 `QT_QPA_PLATFORM=offscreen`; the parallel expression with `-n 4`, the serial expression without):
 
 | Module | Parallel leg (collected / passed / skipped) | Serial leg (collected / passed / skipped) | Fullclip |
@@ -491,16 +507,14 @@ A Mac `uv sync` installs no CuPy, and the product runs CPU-only (P22).
   - Not checked on real hardware.
 - **The jobs/export.py empty-reason gap** (ledger A.7, item 3) is closed by CHARC's grant
   (`1a003fe4`; section 1).
-- **S-B1 is open at this head.** CHARC granted the environment facts on by default (the
-  `--platform-facts` flag and the `platform_facts` parameter removed; one edit to
-  `tests/test_environment_report.py`'s `EXPECTED_KEY_ORDER`). The turn-4 cell stopped the item
-  before any edit: an in-memory simulation of the default-on change showed 16 of the module's 19
-  tests reaching `_correction_backend` (the product's CuPy probe) and `_encoder_rows` (the
-  product's FFmpeg trials) with no stub, and adding the stub is a second edit to that file. The
-  same turn found that M-TOOL[T01] / [T02] run their W case and their native half on ONE
-  monkeypatch, so on a Mac the native half would read the W stubs (encoders `['libx265']`, and
-  `sys.platform` left at `win32` for T02) and fail. Both wait for the dispatcher's ruling (ledger
-  turn-4 section).
+- **M-TOOL[T01] / [T02] run real trials natively, by design.** Their W case now runs in its own
+  `pytest.MonkeyPatch.context()` (turn 4), so the native half calls the unstubbed default
+  `collect()`: on a Mac that runs the product's real VT / x265 trials. They stay on the `macos`
+  marker only, not `slow`; the "no real trial unless `slow` / `gpu`" rule binds the Windows legs
+  (CHARC's turn-4 ruling). Before the fix both would have failed on a Mac, reading the W stubs;
+  the fix is shown on Windows by a replay only, and its native run is WP6.5's.
+- **The environment report now runs the product's encoder trials by default** (S-B1). A report
+  run on a machine without FFmpeg still writes, with every encoder unavailable and its reason.
 - **The rows built only in part without a Mac.** For ONE register row at the accept; each row with
   its Windows proof and the WP6.5 native check that closes it (ledger B.6):
 
@@ -515,7 +529,7 @@ A Mac `uv sync` installs no CuPy, and the product runs CPU-only (P22).
 | P71 | synthetic offscreen `QWheelEvent`s (W-GUI) | M-GUI[P71]: Cocoa wheel phases including momentum; the owner's trackpad by hand |
 | T14 | a synthetic `._` tree (W-FS) | M-FS[T14]: exFAT AppleDouble files made by `xattr` |
 | T17 T26-T29 | the planted case alias reproduced through footage_guard's text and link-resolution seams on NTFS (W-FS) | M-FS[T17, T26-T29]: a native symlink alias and a native case alias |
-| T01 T02 | the environment facts with stubs (W-TOOL); opt-in, S-B1 | M-TOOL[T01, T02]: the native report (arm64, macosx-*, NVIDIA not applicable, the VT / x265 rows) |
+| T01 T02 | the environment facts with stubs (W-TOOL); on by default (S-B1) | M-TOOL[T01, T02]: the native report (arm64, macosx-*, NVIDIA not applicable, the VT / x265 rows) |
 | T11 T12 | the Windows licence-scan forms are pinned (W-TOOL) | M-TOOL[T11, T12]: xfail until candidate DR 3 adds the Mach-O forms |
 | P16 P24 P57 X28 | source / frozen command construction (W-SPAWN) | M-BUNDLE with `CLEARWATER_MAC_BUNDLE`, plus the owner's Finder, Dock-Quit and Cmd-Q checks |
 | (no row ID) M-DEVICE AD-11 | none on Windows | the Mac CPU output against the Windows references within AD-11's tolerances; not yet written, WP6.5 |
