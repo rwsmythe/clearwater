@@ -658,4 +658,42 @@ cases are group A's, in `test_interfaces`. W-GUI has 14 cases, not 13, because g
     session cwd.
   - Every new commit is LF.
 
+### B.6 Addendum: CHARC's group-A yield rulings (`63ff45f3`), relayed mid-turn
+
+- **The export grant.** `jobs/export.py`, in the video job's encoder check (by name: the
+  `capability is None or not capability.available` branch after `resolve_encoder`). When the
+  capability is None, the failure now ends ": not offered on this platform". When a reason exists,
+  it is unchanged. Commit `1a003fe4`. The one test is
+  `test_portability_export_names_an_encoder_outside_the_roster`. It drives the
+  `test_jobs_export_support.Rig` with `hevc_videotoolbox`, which is absent from the rig's report on
+  every platform, and failed red before the edit. Its control is `hevc_nvenc`, listed as
+  unavailable, which keeps its reason. This closes open item 3 of A.7.
+  Runs after the edit:
+  - `test_portability`, `test_jobs_export`, `test_jobs_export_video`, `test_jobs_export_process`
+    and `test_wp42_runner_video`, parallel expression: 372 passed;
+  - the serial expression over the export modules plus `test_gui_export_panel`: 46 passed;
+  - static: ruff, format and both mypy targets clean.
+- **Counts, updated.** `test_portability` has 180 cases: parallel 163 / 163, serial 17 / 17.
+  `test_macos_portability` is unchanged.
+- **P71.** It is the fix of a pre-existing Windows defect: the old `wheelEvent` zoomed a full step on
+  any non-zero delta, so a precision touchpad over-zoomed.
+- **Partial rows, for ONE register row at the accept.** Each row is listed with its Windows proof and
+  the WP6.5 native check that closes it:
+
+| Row(s) | Windows proof (W) | WP6.5 native check (M) that closes it |
+|---|---|---|
+| P09 P10 P12 P14 P59 | the VT argument lists, reasons and branch, from snapshot / argv and the SYNTHETIC `tests/ffmpeg_text/` listings (W-CODEC, W-RATE, W-TEXT) | M-CODEC[P09, P14]: real VT 8 / 10-bit trials and a sink encode. M-RATE: both Q1 candidates under R. M-TEXT[P08, P10]: the real listing and reasons. Plus replacing the synthetic listings with a capture |
+| P01 P25 P26 | injected-home Library paths (W-PATH) | M-PATH: a child with HOME redirected resolves the Library roots natively |
+| P03 P74 | INFO fallback and `start_new_session` built with stubs (W-PIPE, W-SPAWN) | M-PIPE[P03]: the native INFO fallback. M-SPAWN[P74]: `os.killpg` leaves the child in its own session, and it exits on its parent's death |
+| P22 | the darwin reason through a patched platform (W-DEVICE, W-GUI) | M-DEVICE: the reason with no CuPy installed. M-GUI[P22]: the Cocoa status text |
+| P29 | identity on a fake stat and on NTFS (W-FS) | M-FS[P29]: case-insensitive and case-sensitive APFS images |
+| P73 | the link / unlink / fallback branches stubbed (W-FS) | M-FS[P40, P41, P49, P73]: the DR-34(a) folding corpus on both APFS modes. M-FS[P48]: exFAT link refusal |
+| P71 | synthetic offscreen `QWheelEvent`s (W-GUI) | M-GUI[P71]: Cocoa wheel phases including momentum; the owner's trackpad by hand |
+| T14 | a synthetic `._` tree (W-FS) | M-FS[T14]: exFAT AppleDouble files made by `xattr` |
+| T17 T26-T29 | the planted case alias reproduced through footage_guard's text and link-resolution seams on NTFS (W-FS) | M-FS[T17, T26-T29]: a native symlink alias and a native case alias |
+| T01 T02 | the environment facts with stubs (W-TOOL); opt-in, S-B1 | M-TOOL[T01, T02]: the native report (arm64, macosx-*, NVIDIA not applicable, the VT / x265 rows) |
+| T11 T12 | the Windows licence-scan forms are pinned (W-TOOL) | M-TOOL[T11, T12]: xfail until candidate DR 3 adds the Mach-O forms |
+| P16 P24 P57 X28 | source / frozen command construction (W-SPAWN) | M-BUNDLE with `CLEARWATER_MAC_BUNDLE`, plus the owner's Finder, Dock-Quit and Cmd-Q checks |
+| M-DEVICE AD-11 | none on Windows | the Mac CPU output against the Windows references within AD-11's tolerances; not yet written, WP6.5 |
+
 Depth at group-B yield: DISPATCHER TO FILL
