@@ -9,6 +9,13 @@ that cannot run (tool absent, non-zero exit, unparsable output, timeout) yields
 ``null`` for its fields and a one-line reason under ``unavailable``; the report is
 still written. An existing report is never overwritten: a name collision gets a numeric
 suffix. Only portable standard-library and third-party calls are used.
+
+On macOS the NVIDIA fields are ``null`` with "not applicable on this platform" (``nvidia-smi``
+is not run); elsewhere a missing ``nvidia-smi`` gives "nvidia-smi not found". No GPU figure is
+ever invented (WP6.4, T02). ``--platform-facts`` adds the machine, the interpreter's build
+architecture, the correction backend the product would choose for a 4K frame, and each encoder
+of the platform's roster with its availability and bit depths, read through the PRODUCT's own
+one-frame trial model (``clearwater.io.video.capability.detect_capabilities``; T01).
 """
 
 from __future__ import annotations
@@ -18,6 +25,7 @@ import json
 import platform
 import subprocess
 import sys
+import sysconfig
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,6 +40,15 @@ PROBE_TIMEOUT_SECONDS = 20.0
 REPORT_VERSION = 1
 _MIB = 1024 * 1024
 _GPU_KEYS = ("gpu_model", "gpu_memory_bytes", "gpu_driver_version")
+_PLATFORM_KEYS = (
+    "machine",
+    "process_architecture",
+    "correction_backend",
+    "correction_backend_reason",
+    "encoders",
+)
+"""The ``--platform-facts`` keys, in report order (before ``unavailable``)."""
+_NOT_APPLICABLE = "not applicable on this platform (no NVIDIA graphics on macOS; not run)"
 _NVIDIA_SMI = [
     "nvidia-smi",
     "--query-gpu=name,memory.total,driver_version",
@@ -132,8 +149,43 @@ def _psutil_value(what: str, read: Callable[[], int | None]) -> int:
     return value
 
 
-def collect() -> dict[str, object]:
+def _correction_backend() -> tuple[str, str]:
+    """Return the product's backend choice for a 4K c3 frame: its name and its AD-9 reason."""
+    from clearwater.core import select_backend
+    from clearwater.interfaces import Settings
+
+    try:
+        chosen, reason = select_backend(Settings(), 2160, 3840, "c3")
+    except Exception as exc:  # the product's probe is best effort here
+        raise ProbeError(f"backend selection failed: {type(exc).__name__}") from None
+    return chosen.name, reason
+
+
+def _encoder_rows() -> list[dict[str, object]]:
+    """Return the platform roster's capability rows from the product's own trial model."""
+    from clearwater.io.video.capability import detect_capabilities
+
+    try:
+        rows = detect_capabilities()
+    except Exception as exc:  # the detection reports its own reasons; this is a backstop
+        raise ProbeError(f"encoder detection failed: {type(exc).__name__}") from None
+    return [
+        {
+            "name": row.name,
+            "available": row.available,
+            "hardware": row.hw,
+            "bit_depths": list(row.bit_depths),
+            "reason": row.reason,
+        }
+        for row in rows
+    ]
+
+
+def collect(*, platform_facts: bool = False) -> dict[str, object]:
     """Probe the machine and return the report as a JSON-ready dictionary.
+
+    Args:
+        platform_facts: Add :data:`_PLATFORM_KEYS` (runs the product's encoder trials).
 
     Returns:
         The report; failed probes hold ``None`` and are explained in ``unavailable``.
@@ -168,7 +220,12 @@ def collect() -> dict[str, object]:
         ("ram_total_bytes",),
         lambda: (_psutil_value("total memory", lambda: psutil.virtual_memory().total),),
     )
-    probe(_GPU_KEYS, lambda: parse_nvidia_smi(_run(_NVIDIA_SMI)))
+    if sys.platform == "darwin":  # AD-36 statement form: macOS never runs nvidia-smi
+        for key in _GPU_KEYS:
+            report[key] = None
+            unavailable[key] = _NOT_APPLICABLE
+    else:
+        probe(_GPU_KEYS, lambda: parse_nvidia_smi(_run(_NVIDIA_SMI)))
     report["os_name"] = platform.system()
     report["os_release"] = platform.release()
     report["os_version"] = platform.version()
@@ -177,6 +234,11 @@ def collect() -> dict[str, object]:
     probe(("uv_version",), lambda: (_first_line(["uv", "--version"]),))
     probe(("ffmpeg_version",), lambda: (_first_line(["ffmpeg", "-version"]),))
     probe(("clearwater_commit",), lambda: (_first_line(["git", "rev-parse", "HEAD"], REPO_ROOT),))
+    if platform_facts:
+        report["machine"] = platform.machine() or None
+        report["process_architecture"] = sysconfig.get_platform()
+        probe(_PLATFORM_KEYS[2:4], _correction_backend)
+        probe(_PLATFORM_KEYS[4:], lambda: (_encoder_rows(),))
     report["unavailable"] = unavailable
     return report
 
@@ -196,6 +258,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--out", type=Path, help="working folder to use instead of the configured one"
     )
+    parser.add_argument(
+        "--platform-facts",
+        action="store_true",
+        help="add the machine, architecture, correction backend and encoder roster",
+    )
     args = parser.parse_args(argv)
 
     if args.out is not None:
@@ -207,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: {exc}", file=sys.stderr)
             return 2
 
-    report = collect()
+    report = collect(platform_facts=True) if args.platform_facts else collect()
     stamp = str(report["timestamp_utc"]).replace("-", "").replace(":", "")
     try:
         target = _write_report(working / "reports", stamp, report)
