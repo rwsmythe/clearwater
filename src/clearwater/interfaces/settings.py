@@ -31,7 +31,8 @@ DEFAULT_PNG_BIT_DEPTH = 16
 """The default PNG bit depth (D22, D53): keeps the corrected precision; 8 is selectable."""
 
 DEFAULT_VIDEO_ENCODER = "auto"
-"""The default video encoder: NVENC HEVC when available (D74), else libx265."""
+"""The default video encoder: the platform's hardware HEVC encoder when available (D74), else
+libx265."""
 
 DEFAULT_QUALITY_LEVEL = "standard"
 """The default named quality level (D75, AD-12), stored lower-case."""
@@ -63,10 +64,10 @@ class Settings:
         output_folder: Where outputs go; None means the source folder (D34).
         output_suffix: The output name suffix (D36).
         png_bit_depth: The PNG bit depth, 8 or 16 (D22).
-        video_encoder: The video encoder name (D26): ``"auto"`` (the default: NVENC HEVC when
-            the D74 capability report says available, else libx265) or an
-            :class:`~clearwater.interfaces.video.EncoderCapability` name. Provenance records the
-            resolved encoder, never ``"auto"``.
+        video_encoder: The video encoder name (D26): ``"auto"`` (the default: the platform's
+            hardware HEVC encoder when the D74 capability report says available, else
+            libx265) or an :class:`~clearwater.interfaces.video.EncoderCapability` name.
+            Provenance records the resolved encoder, never ``"auto"``.
         quality_level: The named video quality level (D75, AD-12): ``"high"``, ``"standard"``
             or ``"draft"``, lower-case.
         ten_bit_for_eight_bit: Write 10-bit video from 8-bit sources (D76); off by default.

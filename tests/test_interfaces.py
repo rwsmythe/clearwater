@@ -524,3 +524,26 @@ def test_select_backend_signature_and_interface_level_behaviour() -> None:
         interfaces.select_backend(
             Settings(png_bit_depth=16, video_encoder="e", quality_level="q"), 1, 1, "c3"
         )
+
+
+def test_settings_auto_encoder_docs_are_platform_neutral_and_the_fields_unchanged() -> None:
+    """WP6.4 P55: only the two docstrings changed (G12 v0.6.1); fields and defaults did not."""
+    import clearwater.interfaces.settings as settings_module
+
+    text = " ".join(Path(settings_module.__file__).read_text(encoding="utf-8").split())
+    assert "NVENC" not in text
+    assert text.count("the platform's hardware HEVC encoder when") == 2
+    assert settings_module.DEFAULT_VIDEO_ENCODER == "auto"
+    fields = [(f.name, f.default) for f in dataclasses.fields(Settings)]
+    assert fields == [  # read from the base c1458747
+        ("output_folder", None),
+        ("output_suffix", "_corrected"),
+        ("png_bit_depth", 16),
+        ("video_encoder", "auto"),
+        ("quality_level", "standard"),
+        ("ten_bit_for_eight_bit", False),
+        ("provenance", True),
+        ("cache_limit_bytes", 20_000_000_000),
+        ("force_cpu", False),
+        ("last_parameters", None),
+    ]
