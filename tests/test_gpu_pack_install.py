@@ -7,14 +7,17 @@ import csv
 import errno
 import hashlib
 import importlib.metadata
+import importlib.util
 import io
 import json
 import os
 import shutil
 import socket
 import stat
+import subprocess
 import sys
 import threading
+import time
 import zipfile
 from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -35,7 +38,10 @@ def _installer():
 
 @pytest.fixture
 def headless_entry(monkeypatch, tmp_path):
-    # Reuse the fresh-import blocker without importing or constructing a GUI.
+    # Resolve the native class before removing PySide6 from sys.modules. pytest-qt
+    # processes events after fixture setup even in a module-alone headless run.
+    from PySide6.QtWidgets import QApplication
+
     from test_frozen_entry import _fresh_entry
 
     for variable in (
@@ -47,6 +53,7 @@ def headless_entry(monkeypatch, tmp_path):
         "XDG_STATE_HOME",
     ):
         monkeypatch.setenv(variable, str(tmp_path / variable))
+    QApplication.instance()  # No application or window is constructed.
     entry, blocker = _fresh_entry(monkeypatch)
     monkeypatch.setattr(entry.gpu_pack, "activate", lambda: pytest.fail("pack activated"))
     yield entry
@@ -629,6 +636,9 @@ def test_real_locked_record_member_names_are_allowed(tmp_path, name):
         distribution = importlib.metadata.distribution(name)
     except importlib.metadata.PackageNotFoundError:
         pytest.skip(f"{name} is not installed in this environment")
+    locked = next(d for d in gpu_pack.LOCKED_DISTRIBUTIONS if d.name == name)
+    if distribution.version != locked.version:
+        pytest.skip(f"{name}: installed {distribution.version}, locked {locked.version}")
     text = distribution.read_text("RECORD")
     assert text is not None
     for row in csv.reader(io.StringIO(text)):
@@ -769,6 +779,7 @@ def test_remove_in_use_defers_intact_and_is_idempotent(empty_plan, monkeypatch):
     installer, root = empty_plan
     folder = _fake_pack(root)
     _deny_pack_rename(monkeypatch, folder)
+    monkeypatch.setattr(installer, "_pack_in_use", lambda _: True, raising=False)
     result = installer.remove()
     assert result.ok and result.message == "GPU support will be removed at the next start"
     assert (folder / "a_first.py").read_bytes() == b"keep first"
@@ -779,7 +790,7 @@ def test_remove_in_use_defers_intact_and_is_idempotent(empty_plan, monkeypatch):
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="POSIX permits renaming open files")
-def test_real_open_file_defers_remove_and_pending_install(empty_plan):
+def test_real_nonmapped_open_file_defers_remove_and_pending_install(empty_plan):
     installer, root = empty_plan
     folder = _fake_pack(root)
     with (folder / "z_locked.dll").open("rb"):
@@ -897,3 +908,229 @@ def test_headless_lock_refusal_exits_one(empty_plan, headless_entry, operation, 
     with installer._operation_lock(root):
         assert headless_entry.main(["clearwater", f"--{operation}-gpu-pack"]) == 1
     assert capsys.readouterr().err.strip() == "another GPU pack operation is in progress"
+
+
+@pytest.mark.parametrize("operation", ["remove", "pending", "install-marker", "replace"])
+def test_write_open_probe_defers_before_any_rename(fake_index, monkeypatch, operation):
+    installer = _installer()
+    folder = _fake_pack(fake_index.root)
+    marker = fake_index.root / (gpu_pack.STAMP + ".remove")
+    if operation in ("pending", "install-marker"):
+        marker.touch()
+    original_open = os.open
+    probes = []
+
+    def in_use(path, flags, *args, **kwargs):
+        if Path(path).suffix.lower() in (".dll", ".pyd"):
+            probes.append((Path(path), flags))
+            raise PermissionError("mapped image denies write-open")
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", in_use)
+    monkeypatch.setattr(os, "replace", lambda *args: pytest.fail("pack was renamed"))
+    if operation == "remove":
+        result = installer.remove()
+        assert result.ok and result.message == "GPU support will be removed at the next start"
+    elif operation == "pending":
+        assert not installer.apply_pending_removal().ok
+    else:
+        result = installer.install(Progress())
+        assert not result.ok and "close it and try again" in result.message
+    assert probes == [(folder / "z_locked.dll", os.O_RDWR)]
+    assert marker.read_bytes() == b""
+    assert (folder / "a_first.py").read_bytes() == b"keep first"
+    assert (folder / "z_locked.dll").read_bytes() == b"keep locked"
+    assert fake_index.requests == []
+    assert not list(fake_index.root.glob("*.partial-*"))
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="The write-open probe is Windows only")
+def test_probe_opens_both_image_extensions_without_writing(empty_plan, monkeypatch):
+    installer, root = empty_plan
+    folder = _fake_pack(root)
+    (folder / "extension.PYD").write_bytes(b"extension")
+    before = {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in folder.iterdir()}
+    original_open = os.open
+    probes = []
+
+    def observed(path, flags, *args, **kwargs):
+        fd = original_open(path, flags, *args, **kwargs)
+        probes.append((Path(path).name, flags, fd))
+        return fd
+
+    monkeypatch.setattr(os, "open", observed)
+    assert not installer._pack_in_use(folder)
+    assert {name for name, _, _ in probes} == {"z_locked.dll", "extension.PYD"}
+    assert all(flags == os.O_RDWR for _, flags, _ in probes)
+    for _, _, fd in probes:
+        with pytest.raises(OSError):
+            os.fstat(fd)
+    assert before == {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in folder.iterdir()}
+
+
+def test_no_image_probe_off_win32(empty_plan, monkeypatch):
+    installer, root = empty_plan
+    folder = _fake_pack(root)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(os, "open", lambda *args, **kwargs: pytest.fail("write-open off win32"))
+    assert not installer._pack_in_use(folder)
+
+
+@pytest.mark.parametrize("operation", ["remove", "pending", "install-marker", "replace"])
+def test_delete_race_defers_and_locked_partial_does_not_block_start(
+    empty_plan, monkeypatch, caplog, operation
+):
+    installer, root = empty_plan
+    folder = _fake_pack(root)
+    cleanup = installer._remove_tree
+    marker = root / (gpu_pack.STAMP + ".remove")
+    if operation in ("pending", "install-marker"):
+        marker.touch()
+
+    def mapped_after_probe(parent, target):
+        if ".partial-" in target.name:
+            assert not folder.exists()
+            raise PermissionError("image mapped after write-open probe")
+        return cleanup(parent, target)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(installer, "_remove_tree", mapped_after_probe)
+        if operation == "remove":
+            result = installer.remove()
+            assert result.ok and result.message == "GPU support will be removed at the next start"
+        elif operation == "pending":
+            assert not installer.apply_pending_removal().ok
+        else:
+            result = installer.install(Progress())
+            assert not result.ok and "close it and try again" in result.message
+        assert marker.exists() and not folder.exists()
+        assert len(list(root.glob("*.partial-*"))) == 1
+        caplog.clear()
+        assert installer.apply_pending_removal().ok
+        assert not marker.exists()
+        assert len(list(root.glob("*.partial-*"))) == 1
+        assert len(caplog.records) == 1 and "partial" in caplog.text
+    assert installer.remove().ok
+    assert list(root.iterdir()) == []
+
+
+def test_remove_retries_existing_marker_after_holder_exits(empty_plan):
+    installer, root = empty_plan
+    _fake_pack(root)
+    (root / (gpu_pack.STAMP + ".remove")).touch()
+    assert installer.remove().ok
+    assert list(root.iterdir()) == []
+
+
+def test_unreadable_partial_does_not_keep_absent_pack_marker(empty_plan, monkeypatch, caplog):
+    installer, root = empty_plan
+    root.mkdir()
+    partial = root / (gpu_pack.STAMP + ".partial-unreadable")
+    partial.mkdir()
+    marker = root / (gpu_pack.STAMP + ".remove")
+    marker.touch()
+    original_lstat = Path.lstat
+
+    def denied(path, *args, **kwargs):
+        if path == partial:
+            raise PermissionError("partial metadata unavailable")
+        return original_lstat(path, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "lstat", denied)
+        assert installer.apply_pending_removal().ok
+        assert not marker.exists() and partial.exists()
+        assert len(caplog.records) == 1 and "partial" in caplog.text
+    assert installer.remove().ok
+    assert list(root.iterdir()) == []
+
+
+def test_real_record_validator_skips_mismatched_environment(tmp_path, monkeypatch):
+    name = gpu_pack.LOCKED_DISTRIBUTIONS[0].name
+    stale = SimpleNamespace(version="0.0", read_text=lambda _: pytest.fail("stale RECORD read"))
+    monkeypatch.setattr(importlib.metadata, "distribution", lambda _: stale)
+    with pytest.raises(pytest.skip.Exception, match=r"installed 0\.0, locked"):
+        test_real_locked_record_member_names_are_allowed(tmp_path, name)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows mapped-image sharing semantics")
+@pytest.mark.parametrize("kind", ["dll", "pyd"])
+def test_child_mapped_image_keeps_pack_intact_until_exit(empty_plan, tmp_path, kind):
+    installer, root = empty_plan
+    folder = _fake_pack(root)
+    if kind == "dll":
+        source = Path(sys.base_prefix) / "python3.dll"
+        target = folder / "mapped.dll"
+    else:
+        source = Path(importlib.util.find_spec("_queue").origin)
+        target = folder / "_queue.pyd"
+    shutil.copy2(source, target)
+    ready, release = tmp_path / "ready", tmp_path / "release"
+    environment = os.environ.copy()
+    for key in (
+        "APPDATA",
+        "LOCALAPPDATA",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+    ):
+        environment[key] = str(tmp_path / key)
+    environment["QT_QPA_PLATFORM"] = "offscreen"
+    code = r"""
+import importlib.abc, importlib.util, sys, time
+from pathlib import Path
+class NoQt(importlib.abc.MetaPathFinder):
+    def find_spec(self, name, path=None, target=None):
+        if name.split('.')[0] in ('PySide6', 'shiboken6') or name == 'clearwater.app.main':
+            raise ImportError('Qt blocked in mapped-image child')
+sys.meta_path.insert(0, NoQt())
+kind, image, ready, release = sys.argv[1:]
+if kind == 'dll':
+    import ctypes
+    mapped = ctypes.WinDLL(image)
+else:
+    spec = importlib.util.spec_from_file_location('_queue', image)
+    mapped = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mapped)
+Path(ready).touch()
+deadline = time.monotonic() + 8
+while not Path(release).exists():
+    if time.monotonic() > deadline:
+        raise SystemExit('mapped-image child timed out')
+    time.sleep(0.02)
+"""
+    before = {p.name: p.read_bytes() for p in folder.iterdir()}
+    with (tmp_path / "mapped-child.log").open("wb") as log:
+        child = subprocess.Popen(
+            [sys.executable, "-c", code, kind, str(target), str(ready), str(release)],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=log,
+        )
+        try:
+            deadline = time.monotonic() + 5
+            while not ready.exists() and child.poll() is None and time.monotonic() < deadline:
+                time.sleep(0.02)
+            assert ready.exists(), "mapped-image child failed to become ready; see mapped-child.log"
+            result = installer.remove()
+            assert result.ok and result.message == "GPU support will be removed at the next start"
+            marker = root / (gpu_pack.STAMP + ".remove")
+            assert marker.read_bytes() == b""
+            assert folder.is_dir() and not list(root.glob("*.partial-*"))
+            assert {p.name: p.read_bytes() for p in folder.iterdir()} == before
+            assert not installer.apply_pending_removal().ok
+            assert {p.name: p.read_bytes() for p in folder.iterdir()} == before
+            assert not installer.install(Progress()).ok
+            assert {p.name: p.read_bytes() for p in folder.iterdir()} == before
+        finally:
+            release.touch()
+            try:
+                child.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                child.kill()
+                child.wait(timeout=2)
+        assert child.returncode == 0
+    assert installer.apply_pending_removal().ok
+    assert list(root.iterdir()) == []

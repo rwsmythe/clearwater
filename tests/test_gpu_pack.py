@@ -1181,6 +1181,19 @@ def test_activate_does_nothing_in_a_source_run(monkeypatch: pytest.MonkeyPatch) 
     assert gpu_pack.activate() is None
 
 
+@pytest.mark.parametrize("outcome", ["loaded", "absent", "rejected"])
+def test_activation_status_exposes_last_outcome_without_io(monkeypatch, outcome):
+    """Removal can consult the immutable process outcome without rechecking any pack."""
+    monkeypatch.setattr(gpu_pack, "_ACTIVATION_STATUS", None, raising=False)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: None)
+    status = gpu_pack.PackStatus(gpu_pack.STAMP, outcome)
+    monkeypatch.setattr(gpu_pack, "load", lambda _: status)
+    assert gpu_pack.activate() is status
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: pytest.fail("status getter performed I/O"))
+    assert gpu_pack.activation_status() is status
+
+
 def test_activate_loads_from_the_pack_root_when_frozen(
     tmp_path: Path, isolated: list[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

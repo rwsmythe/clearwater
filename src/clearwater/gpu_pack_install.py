@@ -438,14 +438,17 @@ def _retry_read_only(function: Callable[..., object], path: str, error: BaseExce
 def _partials(root: Path, stamp: str) -> None:
     """Under the operation lock, remove plain staging folders left by a dead process."""
     for folder in root.glob(f"{stamp}.partial-*"):
-        info = folder.lstat()
-        reparse = False
-        if sys.platform == "win32":
-            reparse = bool(info.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
-        if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode) or reparse:
-            _LOG.warning("skipping non-directory or linked partial: %s", _ascii(folder))
-            continue
-        _remove_tree(root, folder)
+        try:
+            info = folder.lstat()
+            reparse = False
+            if sys.platform == "win32":
+                reparse = bool(info.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+            if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode) or reparse:
+                _LOG.warning("skipping non-directory or linked partial: %s", _ascii(folder))
+                continue
+            _remove_tree(root, folder)
+        except PermissionError as error:
+            _LOG.warning("GPU pack partial still in use: %s: %s", _ascii(folder), _ascii(error))
 
 
 @contextmanager
@@ -515,14 +518,61 @@ def _operation_lock(root: Path) -> Iterator[None]:
                 handle.close()
 
 
-def _rename_remove(root: Path) -> None:
-    """Hide the pack atomically before deleting any file, with the operation lock held."""
+def _mark_pending() -> None:
+    """Write the empty removal marker while the pack-root operation lock is held."""
+    marker = gpu_pack.pending_removal_path()
+    assert marker is not None
+    marker.touch()
+
+
+def _pack_in_use(folder: Path) -> bool:
+    """On Windows, probe mapped images by write-open, never by renaming their folder."""
+    if sys.platform == "win32":
+        for path in folder.rglob("*"):
+            if path.suffix.lower() in (".pyd", ".dll") and path.is_file():
+                try:
+                    descriptor = os.open(path, os.O_RDWR)
+                except PermissionError:
+                    return True
+                os.close(descriptor)
+    return False
+
+
+def _rename_remove(root: Path) -> bool:
+    """Probe then hide and delete under the operation lock; False means deferred removal."""
     destination = root / gpu_pack.STAMP
     _contained(root, destination)
     if destination.exists():
+        if _pack_in_use(destination):
+            _mark_pending()
+            return False
         renamed = root / f"{gpu_pack.STAMP}.partial-{uuid.uuid4().hex}"
-        os.replace(destination, renamed)
-        _remove_tree(root, renamed)
+        try:
+            os.replace(destination, renamed)
+            _remove_tree(root, renamed)
+        except PermissionError:
+            # A mapped image may appear after the probe. Keep the remainder hidden;
+            # a future partial sweep can finish it without breaking GUI startup.
+            _mark_pending()
+            return False
+    return True
+
+
+def defer_removal() -> PackResult:
+    """Record the GUI's removal request for a pack already activated in this process.
+
+    Returns:
+        Pending success without probing or renaming, or an operation-lock/write failure.
+    """
+    root = gpu_pack.pack_root()
+    if root is None:
+        return PackResult(False, "GPU support is not available on this platform")
+    try:
+        with _operation_lock(root):
+            _mark_pending()
+            return PackResult(True, _PENDING)
+    except Exception as error:
+        return PackResult(False, _ascii(error))
 
 
 def _apply_pending_locked(root: Path) -> PackResult:
@@ -532,7 +582,9 @@ def _apply_pending_locked(root: Path) -> PackResult:
     if not marker.exists():
         return PackResult(True, "no GPU pack removal is pending")
     try:
-        _rename_remove(root)
+        if not _rename_remove(root):
+            _LOG.warning("GPU pack removal pending")
+            return PackResult(False, "GPU pack removal pending")
         _partials(root, gpu_pack.STAMP)
         marker.unlink()
         return PackResult(True, "GPU support is removed; takes effect at the next start")
@@ -605,7 +657,10 @@ def _install_locked(root: Path, progress: Progress) -> PackResult:
                 f"only {free:,} bytes free"
             )
         _cancel(progress)
-        _remove_tree(root, destination)
+        if not _rename_remove(root):
+            raise _InstallError(
+                "GPU support is loaded by a running Clearwater; close it and try again"
+            )
         staging = root / f"{wanted.stamp}.partial-{uuid.uuid4().hex}"
         staging.mkdir()
         site = staging / gpu_pack.SITE_PACKAGES_NAME
@@ -676,18 +731,11 @@ def remove(folder: Path | None = None) -> PackResult:
         with _operation_lock(root):
             marker = gpu_pack.pending_removal_path()
             assert marker is not None
-            if marker.exists():
-                return PackResult(True, _PENDING)
             present = destination.exists()
-            try:
-                _rename_remove(root)
-            except PermissionError:
-                # Rename failure leaves every pack file intact; defer the whole request.
-                if not destination.exists():
-                    raise
-                marker.touch()
+            if not _rename_remove(root):
                 return PackResult(True, _PENDING)
             _partials(root, gpu_pack.STAMP)
+            marker.unlink(missing_ok=True)
             message = (
                 "GPU support is removed; takes effect at the next start"
                 if present

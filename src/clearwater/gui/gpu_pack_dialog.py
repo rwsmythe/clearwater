@@ -63,6 +63,11 @@ def _remove_job(progress: Progress) -> JobResult:
     return _pack_job(gpu_pack_install.remove)
 
 
+def _defer_remove_job(progress: Progress) -> JobResult:
+    """Only mark removal of this process's loaded pack, without probing or renaming it."""
+    return _pack_job(gpu_pack_install.defer_removal)
+
+
 class GpuPackDialog(QDialog):
     """Window-modal install request and job status; opening it starts no download.
 

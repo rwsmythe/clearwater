@@ -67,7 +67,7 @@ from .contract import (
     ShellWindow,
 )
 from .engines import default_engines
-from .gpu_pack_dialog import GpuPackDialog, _remove_job
+from .gpu_pack_dialog import GpuPackDialog, _defer_remove_job, _remove_job
 from .jobs import QtJobRunner
 from .messages import BannerWidget, DialogPresenter
 from .preview import PreviewController, PreviewWidget
@@ -307,7 +307,9 @@ class MainWindow(ShellWindow):
         self._save_at_close = startup.save_at_close
         self._choose = choose_file or _choose_file
         self._closed = False
-        self._idle_device = "-"
+        marker = gpu_pack.pending_removal_path()
+        self._gpu_removal_pending = marker is not None and marker.exists()
+        self._idle_device = "CPU: GPU pack removal pending" if self._gpu_removal_pending else "-"
         self.session = ShellSession(
             engines,
             startup.settings,
@@ -549,7 +551,13 @@ class MainWindow(ShellWindow):
             return
         self._gpu_busy_changed(True)
         try:
-            self.jobs.run(_remove_job, on_done=self._gpu_removed)
+            activation = gpu_pack.activation_status()
+            job = (
+                _defer_remove_job
+                if activation is not None and activation.outcome == "loaded"
+                else _remove_job
+            )
+            self.jobs.run(job, on_done=self._gpu_removed)
         except RuntimeError as error:
             self._gpu_removed(JobResult(False, (), (), str(error), "unknown", 0))
 
@@ -560,6 +568,7 @@ class MainWindow(ShellWindow):
             text = result.warnings[0] if result.warnings else "GPU support is removed"
             marker = gpu_pack.pending_removal_path()
             if marker is not None and marker.exists():
+                self._gpu_removal_pending = True
                 self._idle_device = "CPU: GPU pack removal pending"
                 self.device_label.setText(f"Device: {self._idle_device}")
                 self.device_label.setToolTip("")
@@ -612,12 +621,13 @@ class MainWindow(ShellWindow):
         """Show the start-up's AD-9 reason while no file is open (WP4.3, ruling S3).
 
         Until it is called the status bar shows ``Device: -`` before a file is open; once a file
-        is open it shows the full-resolution selection's reason, as before.
+        is open it shows the full-resolution selection's reason, as before. A pending-removal
+        reason takes precedence over a startup probe that completes later.
 
         Args:
             reason: The reason of the application's graphics-card detection.
         """
-        self._idle_device = reason
+        self._idle_device = "CPU: GPU pack removal pending" if self._gpu_removal_pending else reason
         self._update_status()
 
     def _update_status(self, *_: object) -> None:

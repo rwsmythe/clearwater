@@ -1159,6 +1159,19 @@ def load(root: Path | None) -> PackStatus:
     return status
 
 
+_ACTIVATION_STATUS: PackStatus | None = None
+"""The last completed frozen activation; consulted without filesystem access."""
+
+
+def activation_status() -> PackStatus | None:
+    """Return this process's immutable last activation outcome, without checking the disk.
+
+    Returns:
+        The most recent frozen activation status, or None before any activation.
+    """
+    return _ACTIVATION_STATUS
+
+
 def activate() -> PackStatus | None:
     """Load the pack from :func:`pack_root` in a frozen build; do nothing otherwise (D4).
 
@@ -1171,6 +1184,7 @@ def activate() -> PackStatus | None:
     Returns:
         The status in a frozen build; None in a source run (nothing checked, nothing logged).
     """
+    global _ACTIVATION_STATUS
     if not getattr(sys, "frozen", False):
         return None
     warnings.filterwarnings(
@@ -1179,6 +1193,7 @@ def activate() -> PackStatus | None:
     status = load(pack_root())
     if status.outcome == "loaded" and status.site_packages is not None:
         add_site_prefix(status.site_packages)
+    _ACTIVATION_STATUS = status
     return status
 
 

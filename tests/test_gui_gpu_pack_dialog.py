@@ -45,6 +45,7 @@ def isolated_pack(monkeypatch, tmp_path):
         monkeypatch.setenv(variable, str(tmp_path / variable))
     root = tmp_path / "packs"
     monkeypatch.setattr(gpu_pack, "pack_root", lambda: root)
+    monkeypatch.setattr(gpu_pack, "activation_status", lambda: None, raising=False)
     monkeypatch.setattr(gpu_pack_install, "install", lambda _: pytest.fail("real install"))
     monkeypatch.setattr(gpu_pack_install, "remove", lambda: pytest.fail("real remove"))
     return root
@@ -289,3 +290,69 @@ def test_deferred_remove_updates_cpu_reason(
     script.finish(_result(True, "GPU support will be removed at the next start"))
     assert window.statusBar().currentMessage() == "GPU support will be removed at the next start"
     assert window.device_label.text() == "Device: CPU: GPU pack removal pending"
+
+
+def test_startup_marker_shows_pending_reason_without_install_hint(make_window, isolated_pack):
+    isolated_pack.mkdir()
+    (isolated_pack / (gpu_pack.STAMP + ".remove")).touch()
+    window = make_window()
+    assert window.device_label.text() == "Device: CPU: GPU pack removal pending"
+    assert window.device_label.toolTip() == ""
+    # The asynchronous startup probe's ordinary missing-CuPy reason cannot hide the marker.
+    window.set_idle_device("CPU: CuPy not installed")
+    assert window.device_label.text() == "Device: CPU: GPU pack removal pending"
+    assert window.device_label.toolTip() == ""
+
+
+def test_this_process_loaded_remove_only_writes_marker(make_window, monkeypatch, isolated_pack):
+    folder = isolated_pack / gpu_pack.STAMP
+    folder.mkdir(parents=True)
+    (folder / "keep").write_bytes(b"intact")
+    monkeypatch.setattr(
+        gpu_pack, "activation_status", lambda: gpu_pack.PackStatus(gpu_pack.STAMP, "loaded")
+    )
+    monkeypatch.setattr(
+        gpu_pack_install, "_pack_in_use", lambda _: pytest.fail("this-process probe"), raising=False
+    )
+    window = make_window()
+    original_replace = os.replace
+
+    def checked_replace(source, target):
+        if Path(source) == folder:
+            pytest.fail("loaded pack renamed")
+        return original_replace(source, target)
+
+    monkeypatch.setattr(os, "replace", checked_replace)
+    script = ScriptedRunner()
+    monkeypatch.setattr(window.jobs, "run", script.run)
+    _, actions = _actions(window)
+    actions["Remove GPU support"].trigger()
+    window._gpu_remove_prompt.button(QMessageBox.StandardButton.Yes).click()
+    job, _, _, handle = script.calls[-1]
+    script.finish(job(handle.progress))
+    assert (isolated_pack / (gpu_pack.STAMP + ".remove")).read_bytes() == b""
+    assert (folder / "keep").read_bytes() == b"intact"
+    assert not list(isolated_pack.glob("*.partial-*"))
+    assert window.statusBar().currentMessage() == "GPU support will be removed at the next start"
+
+
+@pytest.mark.parametrize("outcome", [None, "absent", "rejected"])
+def test_without_loaded_status_gui_uses_normal_remove(
+    make_window, monkeypatch, isolated_pack, outcome
+):
+    (isolated_pack / gpu_pack.STAMP).mkdir(parents=True)
+    activation = None if outcome is None else gpu_pack.PackStatus(gpu_pack.STAMP, outcome)
+    monkeypatch.setattr(gpu_pack, "activation_status", lambda: activation)
+    monkeypatch.setattr(
+        gpu_pack_install, "remove", lambda: gpu_pack_install.PackResult(True, "normal removal")
+    )
+    window = make_window()
+    script = ScriptedRunner()
+    monkeypatch.setattr(window.jobs, "run", script.run)
+    _, actions = _actions(window)
+    actions["Remove GPU support"].trigger()
+    window._gpu_remove_prompt.button(QMessageBox.StandardButton.Yes).click()
+    job, _, _, handle = script.calls[-1]
+    script.finish(job(handle.progress))
+    assert window.statusBar().currentMessage() == "normal removal"
+    assert not (isolated_pack / (gpu_pack.STAMP + ".remove")).exists()

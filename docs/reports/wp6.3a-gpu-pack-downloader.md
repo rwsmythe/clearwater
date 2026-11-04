@@ -3,7 +3,8 @@
 Candidate report, 2026-11-04. Parts 1 and 2 added the installer and request
 surfaces. Dispatch 5 folds Reviewer A r1 into the merged candidate at
 `f00172a6`, following CHARC's rulings including the checker-cancellation grant.
-Reviewer A r2, Reviewer B, the release gate and the real-download seat proof
+Dispatch 6 folds Reviewer A r2 into `196d2380`, revising removal for mapped
+images under CHARC's three-layer ruling. Reviewer A r3, Reviewer B, the release gate and the real-download seat proof
 remain with the orchestrator.
 
 ## Design as built
@@ -53,10 +54,13 @@ Publication order is:
 Failure or cancellation removes staging; a cleanup failure is logged and
 disclosed in the result. The product result carries success/failure text,
 installed path and cancellation state. Removal only accepts the current stamp
-under the calculated root. It renames the pack to a partial folder before
-deleting any file. A rename blocked by an open file leaves the pack intact and
-writes the empty `<stamp>.remove` marker for the next GUI start. Other
-filesystem failures are reported. Matching plain partial folders are cleaned
+under the calculated root. A GUI removal of this process's activated pack only
+writes the marker. Other removals first write-open every DLL and `.pyd` on
+Windows to detect mapped images without writing any bytes, then rename the
+pack to a partial folder before deleting any file. A blocked probe or rename
+leaves the pack intact and writes the empty `<stamp>.remove` marker. A delete
+PermissionError after rename also returns pending, keeping the remainder for
+a future partial sweep. Other filesystem failures are reported. Matching plain partial folders are cleaned
 under the operation lock; files, symlinks and reparse points with partial names
 are skipped and logged without being followed.
 
@@ -128,7 +132,10 @@ when it exists; they never call the installer or delete anything. A skipped
 starts apply pending removal under the operation lock. Install applies pending
 removal under its already-held lock before staging or network work and refuses
 an in-use pack with "GPU support is loaded by a running Clearwater; close it
-and try again". Remove with an existing marker is an idempotent success.
+and try again". Under the r2 revision, Remove with an existing marker retries
+the same probe: pending remains success while in use, and removal completes
+after the holder exits. This enables the second headless removal in the new
+seat leg.
 
 The headless install prints one stderr line per wheel and then the product
 message. Success, already-installed and remove-with-none exit 0; failure and
@@ -261,6 +268,16 @@ turn. The seat must still perform its required before/after checks.
 
 SEAT TO FILL
 
+Additional r2 leg, SEAT TO FILL: a bounded SOURCE Python child uses the seat's
+redirected LOCALAPPDATA/APPDATA/XDG roots, blocks Qt imports, activates the
+real downloaded pack and imports CuPy. From a second process, headless
+`--remove-gpu-pack` must exit 0 with pending text, leave an empty marker and
+keep the complete pack at its original path (`--verify` PASS). The child then
+exits. A second headless removal must exit 0, delete the pack and clear the
+marker. Record both headless exit codes, the child's exit code, the intact-pack
+verification, and the marker's creation/clearance moments. This is an
+orchestrator leg; the cell supplies no seat or download script.
+
 ## Limits and remaining handoff
 
 There is no resume across sessions; retry means a fresh transaction. Proxy
@@ -289,7 +306,7 @@ The candidate does not claim Reviewer A convergence until the seat runs r2.
 | Finding | Classification and change | Discriminating coverage |
 | --- | --- | --- |
 | 1 | CRITICAL, confirmed, fixed: `.data` refusal applies only to the first path component | `test_nested_package_data_installs`, the existing top-level hostile-member case, and eleven `test_real_locked_record_member_names_are_allowed` cases reading actual installed RECORDs without importing their packages |
-| 2 | MAJOR, confirmed, fixed: rename before deleting; a blocked rename writes the empty marker and preserves every pack file; pending removal is retried only at GUI startup or an explicit install | `test_remove_renames_before_deleting`, `test_remove_in_use_defers_intact_and_is_idempotent`, the real Windows held-open-file test, `test_pending_removal_retries_and_clears_marker`, both install-with-marker cases, all three entry sites and the deferred-removal status test with and without an open source |
+| 2 | MAJOR, initial r1 remediation; REOPENED by r2 F1: rename-first protects an ordinary open handle, but its premise was false for mapped images. The r2 three-layer correction below supersedes the initial loaded-pack claim | Initial open-handle/rename tests remain as non-mapped controls; r2 adds actual child-mapped DLL and `.pyd` cases |
 | 3 | MINOR, confirmed, corrected: expected downloader census 2,679, excluding uv's 22 added files | Corrected census and file-set acceptance criterion above; real census is SEAT TO FILL |
 | 4 | MINOR, confirmed, fixed: rejected-pack notice in the dialog before the request and on stderr before headless installation | `test_rejected_pack_plan_warns_before_request`, `test_headless_replacement_notice` |
 | 5 | MINOR, confirmed coverage gap, fixed: oversized body test observes each actual `.part` write, no retry and full cleanup | `test_oversized_body_never_writes_past_locked_size_or_retries`; executed m2b mutation fails on 2,955 written bytes versus the 128-byte locked limit |
@@ -331,7 +348,7 @@ identical ASTs to HEAD before this fold-in (`r1-footprint.log`). A cheap check
 with a predicate that would fail if called never consults it; default full
 results and explicit-None results match.
 
-### Current validation
+### R1 validation (historical)
 
 All runner outputs are worktree files under `work/wp6.3a/`. Pytest commands
 used `PYTHONPATH=scripts`, `-p sandbox_mkdir_shim -p no:cacheprovider`, bounded
@@ -405,7 +422,7 @@ the latter read installed metadata only. Every installer case was below the
 | Suspected issue | Independent confirmation / rejection | Disposition |
 | --- | --- | --- |
 | Nested package data is rejected | New synthetic install and actual CuPy RECORD names failed before the change (`r1-red.log`) | Confirmed, fixed, all eleven real RECORD validators pass |
-| Removal can partially delete a loaded pack | Before-change rename-first and held-open-file regressions fail; after-change real Windows handle preserves both payloads | Confirmed, fixed by rename and pending marker |
+| Removal can partially delete a loaded pack | R1 checked only a non-mapped open handle; r2 independently mapped DLL/`.pyd` images and disproved the rename premise | REOPENED by r2 F1; corrected by the three layers below |
 | Lock, pending startup and cancel contracts are missing | Initial group: 19 expected failures / 11 passes; entry/dialog group: 8 expected failures / 1 pass (`r1-redentry.log`) | Confirmed, implemented and green |
 | Size test might miss m2b | In-memory mutation writes 2,955 bytes against 128 and fails the named assertion | Rejected as a remaining coverage gap |
 | Full-check cancellation test might cancel too early | First combined run: 351 passed / 1 failed; traced four hashes to manifest RECORD construction | Test corrected to cancel on the first payload hash; final install has exactly one such hash, no manifest, no pack or staging |
@@ -419,12 +436,135 @@ list does not grant a separate `docs/proofs/wp6.3a-ledger.md` edit. The
 dispatcher can transfer this row to its proof ledger without widening this
 cell's footprint. Depth is supplied by the dispatcher's driver, not estimated.
 
-| Round | New C / M / minor / advisory | In / out | NEW / REOPENED | Reverts | Product-code / test-only / documentation fixes | Banked | Depth |
+| Round | C / M / minor / advisory | In / out | NEW / REOPENED | Reverts | Product-code / test-only / documentation fixes | Banked | Depth |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| A r1, adjudicated and folded in | 1 / 1 / 4 / 5 | 10 / 1 | 11 / 0 | 0 | 6 / 1 / 1 finding groups | 7, 10, 11 per CHARC | DISPATCHER TO FILL |
+| A r1, initial fold-in; #2 reopened at r2 | 1 / 1 / 4 / 5 | 10 / 1 | 11 / 0 | 0 | 6 initial / 1 / 1 finding groups; #2 corrected below | 7, 10, 11 per CHARC | Turn-5 end: 160,597 / 475,000, supplied at dispatch 6 |
+| A r2, adjudicated and folded in | 0 / 1 / 2 / 2 | 5 / 0 | 4 / 1 (#2) | 0 | 3 / 2 / 0 finding groups | No new banked finding | DISPATCHER TO FILL |
 
-This turn bundles the ruled r1 remediation groups in one logical review
-fold-in, as commissioned. No further scope ruling is requested. Reviewer A r2
-and the real-download seat proof are the next orchestrator actions. No
+The r1 turn bundled its ruled remediation groups in one logical review
+fold-in. At that handoff Reviewer A r2 and the real-download seat proof were
+the next orchestrator actions. No
 unowned file, interface, dependency, release workflow or worker isolation code
 was changed; no git write, real download, build or desktop input occurred.
+
+## Reviewer A r2 fold-in (dispatch 6)
+
+The r1 removal claim was wrong for mapped images. An ordinary `open()` handle
+can block renaming its parent folder, but a mapped DLL or `.pyd` does not.
+Reviewer A and CHARC independently demonstrated that rename succeeds while
+write-open and deletion fail. The previous held-open test therefore covered
+only the non-mapped case. It remains, explicitly named
+`test_real_nonmapped_open_file_defers_remove_and_pending_install`.
+
+The revised implementation uses all three ruled layers:
+
+1. `gpu_pack.activation_status()` returns the frozen loader's last immutable
+   status from module state, with no filesystem access. For `loaded`, the GUI
+   submits `_defer_remove_job`, which writes the pending marker under the
+   operation lock without a probe, rename or deletion. Absent, rejected and
+   never-activated states retain the normal removal job. Headless removal
+   does not activate the loader or use this GUI shortcut.
+2. `_pack_in_use()` runs under the operation lock before any pack rename. On
+   win32 it opens each DLL and `.pyd` with `os.O_RDWR` and immediately closes
+   the descriptor, writing no bytes. PermissionError means pending removal
+   with the original folder untouched. Off win32 it performs no probe. The
+   same `_rename_remove` path serves remove, pending-removal application,
+   install-with-marker and rejected-pack replacement.
+3. If a PermissionError occurs after the rename, the remainder stays under
+   `.partial-*`, the marker is written and removal returns pending success.
+   Pending application/installation retain their refusal outcome while a
+   removal request is still pending. When the stamp folder is absent,
+   pending application clears the marker after sweeping partials. A
+   PermissionError on an individual partial logs one line and leaves it for
+   a future sweep; it does not prevent startup or show an error dialog.
+
+A repeated explicit remove now retries the probe even when a marker exists.
+It remains pending while the holder is alive and removes the pack/marker
+after the holder exits. This revises r1's marker-only early return to meet
+the new seat leg's second headless-remove requirement. A race remainder still
+mapped at the first sweep can remain after the absent-stamp marker is cleared;
+subsequent install/remove partial sweeps retry it, as the ruled fail-safe
+allows. No unowned startup cleanup path was added.
+
+| Finding | Classification / change | Coverage |
+| --- | --- | --- |
+| F1 | MAJOR, REOPENED r1 #2, confirmed and corrected by all three layers | `test_activation_status_exposes_last_outcome_without_io` (loaded/absent/rejected); offscreen `test_this_process_loaded_remove_only_writes_marker` and three negative status controls; `test_write_open_probe_defers_before_any_rename` for remove, pending, install-marker and rejected replacement; actual child-mapped DLL and `.pyd`; four `test_delete_race_defers_and_locked_partial_does_not_block_start` cases |
+| F2 | MINOR, confirmed pre-existing fixture defect; resolve `QApplication` and its native `instance()` call before the fresh-entry blocker removes PySide6 modules | Installer module alone: 83 passed, exit 0; no application/window constructed; entry's Qt-import blocker and disposable profile remain active |
+| F3 | MINOR, confirmed and fixed in shell only; startup marker sets the pending CPU reason, which takes precedence over a later asynchronous device-probe callback | `test_startup_marker_shows_pending_reason_without_install_hint`; existing status/hint and open-source removal cases remain green |
+| F4 | ADVISORY, confirmed and fixed; real RECORD validation skips with an explicit installed/locked-version reason on mismatch | `test_real_record_validator_skips_mismatched_environment` forbids reading the stale RECORD; all eleven actual locked-version RECORD validators pass here |
+| F5 | ADVISORY, confirmed and fixed; rejected pack deletion uses the same write-open probe, marker and delete-race fail-safe | The `replace` cases in both four-way probe/race tests; rejected-pack happy path remains green |
+
+The child-mapping tests copy the host interpreter's `python3.dll` and `_queue`
+extension into separate synthetic packs, then use `ctypes.WinDLL` or Python's
+extension loader in a child. They do not import CuPy or activate a GPU pack.
+Each child has redirected APPDATA/LOCALAPPDATA/XDG roots, Qt imports blocked,
+no inherited stdin, an eight-second lifetime limit and bounded parent waits.
+While mapped, remove returns pending; the original folder and all file bytes
+remain intact; no partial folder appears. Applying pending removal and
+installing with the marker also preserve every byte. After the child exits
+with status 0, applying pending removal deletes the pack and marker. The final
+four-module run records **DLL 0.121 s / `.pyd` 0.155 s**, including fixtures
+(`r2-tests-final.xml`, `r2-child-summary-final.log`); both passed in this sandbox.
+
+The probe's separate test observes both image extensions (including uppercase
+`.PYD`), checks every descriptor is closed, and verifies payloads and mtimes
+are unchanged. The off-win32 control forbids `os.open` entirely. The delete-race
+tests force a post-rename PermissionError, then a locked-partial sweep: pending
+success, marker lifecycle, one log line and eventual sweep cleanup all hold.
+The real-pack mapped-CuPy proof remains **SEAT TO FILL**, in the seat section.
+
+### R2 validation and verification record
+
+Runner files are under `work/wp6.3a/`. All pytest runs used
+`PYTHONPATH=scripts`, `-p sandbox_mkdir_shim -p no:cacheprovider`, bounded
+timeouts and worktree basetemps. GUI runs used `QT_QPA_PLATFORM=offscreen`;
+the required sandbox shim was added to the GUI command. F3's shell test is
+in the owned dialog module, so that module covers both requested GUI surfaces.
+
+| Command | Result / log |
+| --- | --- |
+| `uv run --no-sync ruff check .` | All checks passed, exit 0; `r2-ruff.log` |
+| `uv run --no-sync ruff format --check .` | 327 files already formatted, exit 0; `r2-format-check.log` |
+| `uv run --no-sync mypy` | Clean, 163 source files, exit 0; `r2-mypy.log` |
+| Full `uv run --no-sync mypy --platform darwin` | Exactly the four accepted baseline errors, exit 1; `r2-darwin.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_gpu_pack.py tests/test_gpu_pack_install.py tests/test_tools_package_build.py tests/test_frozen_entry.py --basetemp=work/c63a-6 --junitxml=work/wp6.3a/r2-tests.xml --durations=0` | 425 passed in 25.01 s before the final metadata-permission regression, exit 0; `r2-tests.log` |
+| Same four-module command with `--basetemp=work/c63a-6final --junitxml=work/wp6.3a/r2-tests-final.xml --durations=0` | **426 passed in 21.96 s**, exit 0; `r2-tests-final.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_gpu_pack_install.py --basetemp=work/c63a-6mfinal` | **83 passed in 10.38 s**, exit 0; `r2-module-alone-final.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 600 tests/test_gui_gpu_pack_dialog.py --basetemp=work/c63a-6gui-verified` | **19 passed in 1.14 s**, exit 0; `r2-gui-final.log` |
+| Five-module collection with the fill's parallel / serial expressions | **426 parallel + 19 serial = 445**; installer parallel, dialog serial; `r2-collect-parallel.log`, `r2-collect-serial.log` |
+
+The full Darwin errors are exactly `src/clearwater/io/video/pipes.py:56`,
+`tools/prototype/bench.py:1159`, `tools/prototype/bench.py:1480` and
+`tools/spike_io/transport.py:950`. There is no new Darwin error or new skip.
+No sandbox residual was encountered in the required tests or child-image
+tests. The initial module-alone check passed 79 cases before the delete-race
+matrix was expanded; the final 83-case run includes that expansion and the
+partial-metadata PermissionError regression.
+`r2-audit-final.log` confirms exactly eight changed owned files, zero CR
+bytes, a passing `git diff --check`, and a disjoint 426/19 collection split.
+The existing cheap/full checker and hash functions have identical ASTs to
+the pre-fold-in HEAD; only the granted activation-state exposure changes the
+loader outside those checks. `__main__`, worker isolation, core/backend and
+app wiring have no diff this turn.
+
+| Suspected issue | Evidence | Disposition |
+| --- | --- | --- |
+| Mapped images evade the r1 rename assumption | Pre-change regressions failed for actual DLL and `.pyd` children; r2 reviewer and CHARC reproduced independently | Confirmed; write-open, own-process marker and race fail-safe added |
+| A replacement or pending install might delete another instance's loaded pack | Probe-denied tests prohibit any rename, record zero fake-index requests and preserve both payloads in all four entry paths | Fixed; shared removal path, no download on in-use refusal |
+| A post-probe mapping race might surface as a raw removal failure or block startup | Four forced-delete-failure tests retain the partial, return pending and tolerate its locked sweep with one log line | Fixed under the ruled residual behavior |
+| The GUI might always defer even without a loaded status | Three negative controls execute the captured worker job and receive normal-removal text without a marker | Rejected as a remaining defect |
+| Startup's asynchronous CPU probe might hide the pending reason | New offscreen marker test exercises construction and a later `set_idle_device` call | Confirmed, fixed entirely in shell; no backend/app-wiring edit |
+| The module-alone run might still crash pytest-qt | Final module-alone exit 0, 83 passes, with entry Qt blockers intact | Fixed fixture; no window or application created |
+| A stale venv might validate a different RECORD | Mismatched-version control raises the explicit skip before its forbidden RECORD read | Fixed; actual eleven distributions pass |
+| New GUI rename guard might catch unrelated preset/settings saves | Initial guard caught test setup/teardown, rather than pack removal | Test guard narrowed to the pack folder; 19 GUI tests pass |
+| Metadata PermissionError on a partial might keep an absent pack's marker set | The late regression failed before the final fix (`r2-partial-red.log`); the per-partial handler covered deletion but not lstat | Confirmed and fixed; `test_unreadable_partial_does_not_keep_absent_pack_marker` clears the marker, leaves the inaccessible partial and logs one line |
+| Final in-envelope pass | Required tests/static checks, actual child mappings, scope/default-check audit and collection partition | No further in-envelope finding |
+
+Reviewer A r2 reported **21/21 mutants caught**, but reopened r1 #2 based on
+the missing mapped-image case. That review is not convergence. The cumulative
+ledger above now records r2 as **4 NEW / 1 REOPENED**, no reverts, three
+product-code finding groups and two test-only groups. R1 advisories 7, 10 and
+11 remain banked by CHARC. Reviewer A r3, the expanded seat run, Reviewer B and
+the gate remain with the orchestrator. This turn bundles F1-F5 as commissioned;
+no new dependency, real download, frozen/build run, desktop input, git write,
+footage/profile write or edit to DR-125/core backend/app wiring occurred.
