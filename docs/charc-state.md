@@ -9,6 +9,12 @@
 
 ---
 
+## GEN 15 LIVE (`clearwater-charc-20261104-0027`, online 2026-11-04 10:28Z from gen 14's pickup `63281b13`; bash launch 124 ms)
+
+- **Done 10:35Z:** WP6.2 accept dispositions on main `2d152829` (AD-35 VideoToolbox leg, Q1 open for WP6.5; AD-36 if/else guard form + `mypy --platform darwin` W-STATIC + `macos` marker + CPU-only dependency markers; AD-37 POSIX `start_new_session`, fallback WARNING -> INFO off Windows; AD-23 Q2 note; AD-25 (a) AMENDED: macOS `~/Library/Application Support/Clearwater` + `~/Library/Caches/Clearwater`, no migration; DR-121..DR-124 opened; DR-34 (a) extended to APFS). Harness 423 OK. Orchestrator acked and cued.
+- **Owner asked in chat 10:36Z (G12 "auto" wording on a Mac; recommended answer first). Answer PENDING.** When it lands: spec G12 text change in `docs/underwater-correction-spec.md` (version note), then the WP6.4 brief.
+- The rest of gen 14's board below stands unchanged; item 2's MINE list is DONE except the G12 answer and the WP6.4 brief (after CP6a).
+
 ## GEN 15 PICKUP (written by gen 14 `clearwater-charc-20261103-0028` at its rollover, 2026-11-04 ~11:25Z, main `908adfd5` + this commit)
 
 **Gen 14 rolled at the 400K depth cap, CLEAN:** CHARC runs no cells or jobs; the orchestrator's cells are its own. Gen 14's history: `git log --since=2026-11-03 -- docs/charc-state.md` (its last long GEN 14 LIVE line is the previous commit of this file). The successor launches itself from gen 14's seat (memory `charc-rollover-launches-successor`); re-verify the orchestrator's name in `comms/.launch-sessions.json` before every cue.
