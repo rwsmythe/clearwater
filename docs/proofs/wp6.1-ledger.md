@@ -1723,6 +1723,71 @@ watch. Outputs are in `t3e/repro-*.out`.
 Recommended: (a), with a test that a child spawned by the frozen worker branch inherits no
 pipe stdin. Then both rebuilds, the handler check, and this proof from its start.
 
+### Item 4 addition (CHARC, via the dispatcher): the frozen process and the user's site-packages
+
+The question: since `site` is now a hidden import, does a frozen process put the user's
+site-packages on `sys.path`? CHARC asked for `sys.flags.no_site`, `sys.flags.no_user_site`,
+`site.ENABLE_USER_SITE`, and any `...\Python\Python312\site-packages` entry on `sys.path`.
+
+**Route.** No pack module prints these values. `-m` refusals carry the same text whether a name
+is unresolvable or resolved outside the pack. So I used two behaviours of existing pack code,
+in pack-activating `-m` runs on the two NEW builds only, under the isolation redirect and the
+window watch. Nothing was planted in the pack.
+
+- **Plant (disposable tree only).** I created two EMPTY directories in the REDIRECTED user site,
+  `t3c\appdata\Roaming\Python\Python312\site-packages\`: `cuda\` and `nvidia\nvjpeg\bin\`.
+  There are no files and no code (`t3e/usersite-plant.txt`). Both were removed afterwards.
+- **Probe 1 (`sys.path`, before `site` is imported).** The `-m` handler accepts a module only
+  when EVERY namespace portion of `cuda` lies under the pack (`gpu_pack.module_from_pack`).
+  - If the user site were on `sys.path`, the empty `cuda\` would be a second portion and the
+    run would be refused.
+  - The check runs before the module, so before pathfinder's `import site`.
+- **Probe 2 (`site.ENABLE_USER_SITE`, after `import site`).** Mode `load nvjpeg` (a library not
+  in the pack) runs pathfinder's `find_sub_dirs_all_sitepackages`
+  (`cuda/pathfinder/_utils/find_sub_dirs.py`). That function adds `site.getusersitepackages()`
+  only `if site.ENABLE_USER_SITE`. Its not-found message lists `listdir("<dir>")` for each
+  existing searched directory.
+
+| Process | `-m` accepted? | `load nvjpeg` message lists the user-site `nvidia\nvjpeg\bin`? | Exit; windows; left |
+|---|---|---|---|
+| NEW onedir `Clearwater.exe -m cuda.pathfinder._dynamic_libs.dynamic_lib_subprocess load nvjpeg` | **yes** (ran; payload `not-found`) | **no**: `Failure finding "known nvjpeg DLL": No such file: known nvjpeg DLL, No such file: known nvjpeg DLL` | 0; 0 UIA / 0 visible; none (`t3e/usersite-probe-onedir.out`) |
+| NEW onefile, the same | **yes** | **no** (the same message) | 0; 0 / 0; none; no `_MEI` (`t3e/usersite-probe-onefile.out`) |
+| CONTROL: base CPython 3.12 (non-frozen), `PYTHONPATH` = the pack, the same redirect (`t3e/usersite_control.py`, `t3e/usersite-control.out`) | `module_from_pack` = **False** (it would be refused); the redirected user site IS on `sys.path`; `no_site 0`, `no_user_site 0`, `ENABLE_USER_SITE True` | **yes**: `... \n  listdir("...\t3c\appdata\Roaming\Python\Python312\site-packages\nvidia\nvjpeg\bin"):` | 0 |
+
+**What is OBSERVED inside each frozen process (both forms):**
+
+- the user site, as that process would compute it, is NOT on `sys.path` at the `-m` check;
+- after pathfinder's module-level `import site`, `site.ENABLE_USER_SITE` is FALSY, so pathfinder
+  searches no user site either.
+
+The control shows that both probes change outcome when the user site is enabled.
+
+**What is REASONED, not observed (the exact flag values):**
+
+- The windowed bootloader sets CPython's `site_import` config by name. `runw.exe` (PyInstaller
+  6.22.3, `.venv\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe`) holds
+  the strings `site_import` at byte offset 215856 and `Failed to set 'site_import': %s` at
+  215872. Both built `Clearwater.exe` files hold the latter at the same offset, 215872.
+  `site_import = 0` is `sys.flags.no_site == 1`. The probes fit it: with `no_site 0`, CPython
+  would run `site.main()` at start-up, and in a non-venv process that adds the user site to
+  `sys.path` unless `no_user_site` is set.
+- `sys.flags.no_user_site`: NOT determined. The bootloader has no `user_site` string, and the
+  venv has no C source to cite.
+- `site.ENABLE_USER_SITE`: falsy, observed. `None` when `site.main()` never ran, which the
+  `no_site` reading implies. A value of `False` cannot be told apart from `None` by this route.
+- The PyInstaller Python-side loader (`PyInstaller/loader/pyimod0*.py`, `pyiboot01_bootstrap.py`)
+  has no site-flag handling (grep: no `no_site`, `site_import`, `ENABLE_USER_SITE` or
+  `user_site`).
+- I found no route to print the four values verbatim from inside the frozen process without a
+  code change or a planted module. I did not make one.
+
+**The real profile.** `C:\Users\rwsmy\AppData\Roaming\Python\Python312\` holds only
+`comtypes_cache`. There is no `site-packages` there, so nothing of the owner's could be on a
+frozen `sys.path` today in any case. I only listed it.
+
+Owner log md5 after this addition: `69ed0432c562db9445daecbe8f15fe27` (a check only).
+`%LOCALAPPDATA%\Clearwater` is absent. No `Clearwater.exe` is left (tasklist).
+
 ### Item 5 (partial)
 
 - `--verify` after the runs: exit 0, the same PASS line and figures (`t3e/verify-2-after.log`).
@@ -1739,7 +1804,7 @@ pipe stdin. Then both rebuilds, the handler check, and this proof from its start
 `docs/proofs/wp6.1-ledger.md` only.
 
 - Evidence tools (not product, not committed): `t3e/handler_check.py`, `t3e/proof3.py`,
-  `t3e/uia_watch.ps1`, `t3e/repro_stdin.py`, `t3e/stdin_parent.py`.
+  `t3e/uia_watch.ps1`, `t3e/repro_stdin.py`, `t3e/stdin_parent.py`, `t3e/usersite_control.py`.
 - The new builds are at `work/wp6.1/dist-on{dir,file}/`; they replace the 2b-2 builds.
 - The pack is unchanged at `work/wp6.1/t3c/appdata/Local/Clearwater/gpu-pack/14.2.0-cu12`.
 
