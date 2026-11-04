@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 from collections import Counter
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -224,8 +226,22 @@ def test_proxy_is_the_s3_block_mean() -> None:
 
 
 def test_the_bar_is_d106_at_29_97_fps() -> None:
-    assert abs(core_speed.D106_SECONDS_PER_FRAME - 0.834) < 0.001
-    assert core_speed.minutes_per_minute(core_speed.D106_SECONDS_PER_FRAME) == pytest.approx(25.0)
+    """Both instruments label their figures with the spec's current N6 target (DR-119 e)."""
+    spec = Path(__file__).resolve().parents[1] / "docs" / "underwater-correction-spec.md"
+    line = next(
+        line
+        for line in spec.read_text(encoding="utf-8").splitlines()
+        if line.startswith("- **N6 Performance target (D106):**")
+    )
+    match = re.search(r"at most about ([0-9.]+) minutes", line)
+    assert match is not None
+    target = float(match.group(1))
+    assert target == core_speed.D106_MINUTES_PER_MINUTE
+    import export_bench
+
+    assert target == export_bench.D106_MIN_PER_MIN
+    assert pytest.approx(target / (30000 / 1001)) == core_speed.D106_SECONDS_PER_FRAME
+    assert core_speed.minutes_per_minute(core_speed.D106_SECONDS_PER_FRAME) == pytest.approx(target)
     assert core_speed.minutes_per_minute(1.0) == pytest.approx(30000 / 1001)
 
 

@@ -7,6 +7,7 @@ here the plan, the record's shape and arithmetic, the cleanup and the command li
 
 from __future__ import annotations
 
+import io
 import json
 from fractions import Fraction
 from pathlib import Path
@@ -34,6 +35,58 @@ def test_d106_is_0_4004_seconds_per_frame_at_29_97() -> None:
 def test_d106_matches_spec_n6_12_minutes_per_minute() -> None:
     """Prevent the bench label drifting from the owner's spec v0.5.8 N6 figure."""
     assert bench.D106_MIN_PER_MIN == 12.0
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_record_interrupt_preserves_the_previous_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, existing: bool
+) -> None:
+    """A partial write must never truncate or create the published record (DR-119 c)."""
+    final = tmp_path / "export-bench-clip.json"
+    previous = b'{"runs": [{"ok": true}]}\n'
+    if existing:
+        final.write_bytes(previous)
+    real_open = io.open
+
+    class InterruptedText:
+        """Write a prefix to the real file before simulating an interrupt."""
+
+        def __init__(self, handle: Any) -> None:
+            self.handle = handle
+
+        def __enter__(self) -> InterruptedText:
+            return self
+
+        def __exit__(self, *exc: Any) -> None:
+            self.handle.close()
+
+        def write(self, text: str) -> int:
+            self.handle.write(text[:8])
+            self.handle.flush()
+            raise KeyboardInterrupt("interrupted record write")
+
+    def interrupted_open(*args: Any, **kwargs: Any) -> Any:
+        return InterruptedText(real_open(*args, **kwargs))
+
+    with monkeypatch.context() as patch:
+        patch.setattr(io, "open", interrupted_open)
+        with pytest.raises(KeyboardInterrupt, match="interrupted record write"):
+            bench._write(final, {"runs": [{"ok": True}, {"ok": False}]})
+    if existing:
+        assert final.read_bytes() == previous
+    else:
+        assert not final.exists()
+    assert list(tmp_path.iterdir()) == ([final] if existing else [])
+
+
+def test_record_updates_replace_the_complete_json(tmp_path: Path) -> None:
+    """Each completed run replaces the earlier complete record and removes its temporary."""
+    final = tmp_path / "export-bench-clip.json"
+    bench._write(final, {"runs": [{"ok": True}]})
+    latest = {"runs": [{"ok": True}, {"ok": False}]}
+    bench._write(final, latest)
+    assert json.loads(final.read_text(encoding="utf-8")) == latest
+    assert list(tmp_path.iterdir()) == [final]
 
 
 def test_v16_plan_is_ruling_q12() -> None:

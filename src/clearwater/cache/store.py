@@ -650,14 +650,28 @@ class DiskProxyCache:
         return True
 
     def _entry_for_write(self, key: CacheKey) -> _Entry:
-        """Return the entry of ``key`` ready for appending, creating it if there is none."""
+        """Return an appendable entry, refusing a linked or nondirectory entry path.
+
+        Raises:
+            OSError: The entry path is a symlink, junction or existing nondirectory,
+                or the entry cannot be made ready for writing. A refused path and
+                its target are left untouched.
+        """
+        folder = self._folder / entry_name(key)
+        if (
+            folder.is_symlink()
+            or folder.is_junction()
+            or (os.path.lexists(folder) and not folder.is_dir())
+        ):
+            reason = f"refusing cache entry path {folder}: it is a link or not a directory"
+            _LOG.warning("%s", reason)
+            raise OSError(reason)
         entry = self._entries.get(key)
         if entry is not None and entry.closing and not self._remove_entry(entry):
             raise OSError(f"the cache entry of {key} is marked for removal and cannot be replaced")
         entry = self._entries.get(key)
         if entry is not None and self._ensure_scanned(entry):
             return entry
-        folder = self._folder / entry_name(key)
         folder.mkdir(parents=True, exist_ok=True)
         entry = _Entry(key, folder, PACK_HEADER_SIZE, scanned=True)
         self._void_stale_marks(entry)

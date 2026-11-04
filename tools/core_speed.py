@@ -48,7 +48,7 @@ under ``wp3.4/`` in the working folder:
   the block-mean proxy (960 x 540 at 4K, the S3 rule of ``clearwater.gui.imaging``; built
   untimed), each stage given the frame's own raw earlier records; ``render`` at full size with
   that record; their sum, the core's share of a frame; and the prototype ``correct()`` on the
-  same device frame (the gate's figure). The core's share is set against D106's interim figure
+  same device frame (the gate's figure). The core's share is set against D106 / N6's target
   (:data:`D106_SECONDS_PER_FRAME`) as minutes of processing per minute of footage. The render's
   per-call uploads (DR-40 b) are counted once per method and a three-value upload is timed.
 - ``--memory``: on the GPU, a counting allocator in front of CuPy's default pool (the WP1.2A
@@ -94,6 +94,7 @@ from clearwater.interfaces.image import ColorDescription, Image
 from clearwater.interfaces.method import CorrectionMethod, Statistics
 from clearwater.methods import available_methods
 from local_config import find_footage_file, load_local_config
+from n6 import FRAME_BUDGET_S_29_97, N6_MIN_PER_MIN
 from prototype import pipeline as proto
 from prototype.backend import of as prototype_backend_of
 from prototype.params import Params
@@ -105,10 +106,10 @@ WHOLE_SUBDIR = Path("wp3.4")
 _GPU_QUERY = "clocks.sm,clocks.mem,temperature.gpu,utilization.gpu,memory.used,power.draw"
 FPS = 30000 / 1001
 """The frame rate of the bar (the owner's GoPro footage, 29.97 fps)."""
-D106_MINUTES_PER_MINUTE = 25.0
-"""D106's interim figure: about 25 minutes of processing per minute of 4K footage."""
-D106_SECONDS_PER_FRAME = D106_MINUTES_PER_MINUTE * 60.0 / (60.0 * FPS)
-"""D106 as seconds per frame for the whole export at :data:`FPS` (about 0.834 s)."""
+D106_MINUTES_PER_MINUTE = N6_MIN_PER_MIN
+"""The shared D106 / N6 target in minutes of processing per minute of 4K footage."""
+D106_SECONDS_PER_FRAME = FRAME_BUDGET_S_29_97
+"""The shared D106 / N6 frame budget for the whole export at :data:`FPS`."""
 STATISTICS_SHORT_SIDE = 540
 """The analysis proxy's short side (the S3 rule; ``clearwater.gui.imaging``)."""
 MEMORY_SIZES = ((2160, 3840), (2988, 5312))
