@@ -5,38 +5,80 @@
 
 ### Generation
 
-- **Generation 43** (session `clearwater-orchestrator-20261104-0421`) LIVE 2026-11-04 14:21Z -> ROLLED at the 400K cap 2026-11-04 ~16:55Z, clean: nothing it started still running (see the board). CHARC = **gen 15 `clearwater-charc-20261104-0027`**; re-verify both names in `comms/.launch-sessions.json` before every cue. Seat folder `work/orch-g43/` (gate.sh WITH a `startup` leg, watch2.sh, run-2c/ the seat-run script copies, drains 1-5, posts). Bash gauge at bring-up: 37 ms. State worktree `.worktrees/orch-state-g43` (`git merge --ff-only main` before each edit; ff main to it after the commit; the successor removes it and adds its own).
-- **Disk:** C: 77 GB free at 15:45Z. `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB before any window or gate.
-- **Paces at 14:22Z:** Codex 2 % / 0.792 (resets 2026-11-11 10:07Z); Claude 37 % / 1.187 (resets 2026-11-09 10:00Z). Re-read at the first dispatch.
+- **Generation 44** (session `clearwater-orchestrator-20261104-0652`) LIVE from 2026-11-04 16:53Z. CHARC = **gen 15 `clearwater-charc-20261104-0027`**. Re-verify both names in `comms/.launch-sessions.json` before every cue.
+- Seat folder `work/orch-g44/`:
+  - `gate.sh` (legs `static collect parallel serial startup fullclip harness`; basetemps still named `g43-<run>-*`);
+  - `watch2.sh`;
+  - the drains;
+  - the posts;
+  - `fill_accept.py`.
+- Bash gauge at bring-up: 44 ms.
+- State worktree `.worktrees/orch-state-g44`. Run `git merge --ff-only main` before each edit, and ff main to it after the commit. The successor removes it and adds its own.
+- **Disk:** C: 84 GB free at 17:12Z. Run `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB is needed before any window or gate.
+- **Paces at 16:53Z:**
+  - Codex 2 % / 0.497 (resets 2026-11-11 10:07Z);
+  - Claude 39 % / 1.194 (resets 2026-11-09 10:00Z).
+
+  Re-read at the next dispatch.
 - **CHARC subjects: under 100 characters.**
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
 
-- **DESKTOP INPUT RULE and ENTRY-POINT ISOLATION RULE (CLAUDE.md hardware section).** Paste BOTH VERBATIM into EVERY dispatch (CHARC's order; the text is in `clearwater-review-evidence\wp6.1\cell\dispatch-14.md`). A cell-written GUI script is YIELDED to the seat UNRUN, reviewed (grep for SendKeys / AppActivate / SendInput / keybd_event / mouse_event / pyautogui / SetForegroundWindow; PID-tree filter; redirect; bounds) and RUN AT THE SEAT FROM md5-CHECKED COPIES.
-- **ROLLOVER TIMING (OWNER-RULED, CHARC FYI `08c0b43b`).** Below the 400K cap a seat starts the next unit WHATEVER ITS SIZE; it rolls at the first clean boundary AFTER 400K with nothing it started still running. At or past the cap, dispatch nothing new. Owner (2026-11-03): "I do not want rollovers to happen until after 400k is hit. Once it is hit, rollovers should happen as soon as practicable."
-- **NO ROLLOVER WHILE A JOB RUNS (OWNER, 2026-11-02, verbatim: "the generations should not have handed over if the previous generation was still working").** An Agent-tool cell and every background process die with the pane.
-- **NO PYTEST DURING A SERIAL OR FULLCLIP LEG** or a window; one heavy job at a time. A light Codex / Claude turn beside an IMAGE batch is fine; nothing beside a serial leg, a fullclip leg or a timing window.
-- **ONE CODEX CELL AT A TIME** (CLAUDE.md); a Codex REVIEWER pass (`codex exec -s read-only`) is not a cell and may run beside one.
-- **Gates carry WP-T7's flags** and the STALL WATCH: `bash work/orch-g43/gate.sh <worktree> <run-id> <legs...>` (legs `static collect parallel serial startup fullclip harness`; `startup` = WP6.1's GATE_CHECKS serial start-up modules + its 3 owned modules; summary `work/orch-g43/gate-<run>/summary.txt`) + Monitor `bash work/orch-g43/watch2.sh <run-id> <summary line count before the start>` (30 min cap; re-arm).
-- **Codex turns:** `uv run python scripts/codex_cell.py turn --worktree <ABS> --prompt <p> --evidence <dir> --turn N [--session <id>] > <dir>\turn-N.driver.stdout 2>&1` with **run_in_background**; commit with `codex_cell.py commit --worktree <ABS> --return-file <return-N.md>` (it stages new files itself); depth = the footer's `depth_input_tokens`; FRESH prompt = `.claude/agents/implementer-codex-sol-high.md` + the brief at HEAD + `dispatch-N.md`, joined, `tr -d '\r'`; a RESUMED session's prompt = `dispatch-N.md` alone.
-- **Reviewer passes (Claude, for a Codex cell):** `uv run python scripts/codex_cell.py review --worktree <abs> --base <sha> --prompt <p> --out <dir> > <dir>\review.seat.log 2>&1` (background). Forms: A `clearwater-review-evidence\wp6.2\A\r1\review-prompt-r1.md` (text package); B `...\wp6.2\B\review-prompt-B.md`. Assert from the seat log's JSON line: model_ok, is_error false, the verdict line, worktree_clean_after.
-- **Codex review of a Claude cell:** Reviewer A = a DETACHED review worktree `.worktrees/wp6.1-rA` at the head under review; from it (IN A SUBSHELL): `cat prompt diff | codex exec -p strong -s read-only --skip-git-repo-check -c 'windows.sandbox="unelevated"' - > review.out 2>&1`; the final answer = the lines after the LAST `^codex$` line up to `^hook: Stop$`. Forms `clearwater-review-evidence\wp6.1\A\r4\` / `r5\`. Reviewer B = the WSL script `clearwater-review-evidence\wp6.1\B\run_review_B.sh probe|review` (`MSYS_NO_PATHCONV=1 wsl.exe bash -ilc 'bash /mnt/c/.../run_review_B.sh review'`; assert `review.done` exit=0, 0 `^ERROR`, model gpt-6.1-sol / high, the VERDICT line).
-- **Backslash-bearing Python helpers are written with the Write tool**, never a heredoc. **`rm` takes literal absolute paths.** A NEW file in a worktree must be `git -C <wt> add`ed before a pathspec commit. **Worktree release:** a released worktree's `work/` is pruned only on the owner's word.
-- **A bare `cd` moves the session's cwd** (it carries between Bash calls, and a live Claude cell shares the process). ONLY `( cd X && ... )`, `git -C`, absolute paths. Gen 43 slipped THREE times (twice with a cell live).
+- **DESKTOP INPUT RULE and ENTRY-POINT ISOLATION RULE (CLAUDE.md hardware section).** Paste BOTH VERBATIM into EVERY dispatch (CHARC's order; the text is in `clearwater-review-evidence\wp6.1\cell\dispatch-15.md`). A cell-written GUI script is YIELDED to the seat UNRUN and reviewed before it runs:
+  - grep it for SendKeys / AppActivate / SendInput / keybd_event / mouse_event / pyautogui / SetForegroundWindow;
+  - check the PID-tree filter, the redirect and the bounds.
 
-### Live board (RESUME HERE) -- gen 43 ROLLED at the 400K cap: NOTHING RUNNING (no cell, no Codex turn, no reviewer, no gate, no GUI)
+  It is then RUN AT THE SEAT FROM md5-CHECKED COPIES.
+- **ROLLOVER TIMING (OWNER-RULED, CHARC FYI `08c0b43b`).** Below the 400K cap a seat starts the next unit WHATEVER ITS SIZE. It rolls at the first clean boundary AFTER 400K, with nothing it started still running. At or past the cap, dispatch nothing new.
+- **NO ROLLOVER WHILE A JOB RUNS (OWNER, 2026-11-02).** An Agent-tool cell and every background process die with the pane.
+- **NO PYTEST DURING A SERIAL OR FULLCLIP LEG** or a window; one heavy job at a time.
+- **ONE CODEX CELL AT A TIME**; a Codex REVIEWER pass is not a cell.
+- **Gates:** `bash work/orch-g44/gate.sh <worktree> <run-id> <legs...>` (background), plus a Monitor on `bash work/orch-g44/watch2.sh <run-id> <summary line count before the start>` (30 min cap; re-arm).
+- **Codex turns:**
+  - Run a turn with `uv run python scripts/codex_cell.py turn --worktree <ABS> --prompt <p> --evidence <dir> --turn N [--session <id>] > <dir>\turn-N.driver.stdout 2>&1`, with **run_in_background**.
+  - Commit with `codex_cell.py commit --worktree <ABS> --return-file <return-N.md>`.
+  - Depth = the footer's `depth_input_tokens`.
+  - FRESH prompt = `.claude/agents/implementer-codex-sol-high.md` + the brief at HEAD + `dispatch-N.md`, joined, with `tr -d '\r'`.
+  - A RESUMED session's prompt = `dispatch-N.md` alone.
+- **Claude reviewer pass for a Codex cell:** `uv run python scripts/codex_cell.py review --worktree <abs> --base <sha> --prompt <p> --out <dir> > <dir>\review.seat.log 2>&1` (background).
+  - Latest form: `clearwater-review-evidence\wp6.1\cell\codex-b\review-1\review-prompt-1.md` (a code delta, with mutation probes and the isolation pre-read).
+  - Text-package form: `...\wp6.2\A\r1\review-prompt-r1.md`.
+  - Assert from the seat log's JSON line: `model_ok`, `is_error` false, the verdict line, `worktree_clean_after`. Read `permission_denials` from `review.json`.
+- **Codex review of a Claude cell:**
+  - Reviewer A runs in a DETACHED review worktree, from a subshell: `cat prompt diff | codex exec -p strong -s read-only --skip-git-repo-check -c 'windows.sandbox="unelevated"' -`. Forms: `wp6.1\A\r4\` / `r5\`.
+  - Reviewer B = the WSL script `clearwater-review-evidence\wp6.1\B\run_review_B.sh probe|review`.
+- **Backslash-bearing Python helpers are written with the Write tool**, never a heredoc.
+- **`rm` takes literal absolute paths.**
+- A NEW file in a worktree must be `git -C <wt> add`ed before a pathspec commit.
+- **A bare `cd` moves the session's cwd.** This includes `cd X && ...` at the START of a Bash command: the harness carries it whenever X is inside the working directories. Use ONLY `( cd X && ... )`, `git -C` and absolute paths. Gen 44 slipped twice at pickup, with no cell live.
 
-**Gen 44: first acts, in order.** (1) Read `comms/orchestrator/inbox`. (2) Re-read the paces. (3) **WP6.1's Reviewer B fold-in** (Codex turn 1, fresh session, `clearwater-review-evidence\wp6.1\cell\dispatch-15.md`, evidence `cell\codex-b\`): DONE and COMMITTED `7316b3ce` on `wp6.1` (fresh session `01a1a74f-bfb3-7880-a926-1c1927bcdd64`; depth 117,846 / 475,000 at turn-1 end; 330 passed in the sandbox with the mkdir shim; marker collection parallel 328 / serial 2; `src/` UNTOUCHED; 0 CR). Fill the ledger's `Depth at the B fold-in end: DISPATCHER TO FILL` with 117,846 (Codex input tokens, turn-1 end). **ALSO DONE before the roll:** the OWNER RULED (CHARC `c4b790e9`, verbatim "onedir; go; prune"): **CP6a = ONEDIR** for 1.1.0 (record it in the accept: on CHARC's recommendation; N14 figures are onedir's). **D6 hand check RAN** (onedir only, 16:11-16:51Z, the seat-run script md5 `0e05e8e7`): HEIC->PNG (6 EXIF entries), JPEG->PNG (3), `vfr.mp4`->MP4 all `ok; device GPU`, clean close exit 0, nothing left, owner-log md5 unchanged; record + outputs in `clearwater-review-evidence\wp6.1\d6\`. **The owner's WORDS on D6 come via CHARC**: put them in the accept record (only a D6 FAILURE reopens). **THE PRUNE IS YOURS (owner "prune")**: delete `.worktrees/wp6.1/work/wp6.1/cold-onedir-1..3` and `cold-onefile-1..3` (3.49 GiB) and `.worktrees/wp-t8`'s `work/`, then `git worktree remove .worktrees/wp-t8` (the branch stays); record `docs/proofs/prune-2026-11-04.md` (what, size, free before / after) or a section of the accept record; nothing else is pruned on this word (the `dist-on{dir,file}` builds stay until the accept). If the auto-mode classifier refuses the deletion, stage a guarded script and give the owner its `! bash` line. Post + cue CHARC when recorded.  (4) **The Claude review pass on that delta** at the seat: `codex_cell.py review --worktree C:\Users\rwsmy\clearwater\.worktrees\wp6.1 --base 68cc1f33 --prompt <p> --out clearwater-review-evidence\wp6.1\cell\codex-b\review-1` (write `<p>` from `wp6.2\A\r1\review-prompt-r1.md`'s form: the six B findings `B\review-B.txt` as the checklist, each fix + its test + mutation claim; `src/` must be untouched; tests isolated per CLAUDE.md; the `slow` marker on the wall-clock test). A finding = one more resumed Codex turn (`--session <id>` from turn-1's driver footer). (5) If `build.py` has a read-only bundle-check entry point, re-run it on both existing builds (`work\wp6.1\dist-on{dir,file}`, of `dc784b4f`) with the new checker; else say so (CHARC: the gate's test of the checker then stands). (6) **THE GATE** on the package head: `df -h /c`; `bash work/orch-g43/gate.sh wp6.1 p61 static collect parallel startup harness` (background) + the watch2 Monitor. Then `git diff --name-only main...wp6.1` = the owned paths (`src/clearwater/__main__.py`, `gpu_pack.py`, `app/composition.py`, the 3 test modules, `tools/package/build.py` + `README.md`, the ledger, the report, `pyproject.toml` + `uv.lock` (N13 pin)); 0 CR on every changed blob; the real `%LOCALAPPDATA%\Clearwater` ABSENT during the gate (checked 16:0xZ: absent). (7) **THE ACCEPT** (CHARC PRE-RULED `c85d332f`: proceed with D6 and CP6a recorded as "PENDING owner"; do NOT hold or ask again; only a D6 FAILURE reopens): fill the ledger's open `DISPATCHER TO FILL` depth lines (turn-4 report: wp61-cell9 at its final report 277,694 + the B fold-in Codex depth); if main moved, `git -C .worktrees/wp6.1 merge --no-ff main` and re-run the harness leg; write `docs/proofs/wp6.1-accept.md` (form `docs/proofs/wp-t8-accept.md`: nets A r1-r5 + B with verdicts and evidence paths, the gate summary, the GUI check + timings, D6 + CP6a PENDING owner with the step list (ledger "The owner's hand check (D6)") and the CP6a table (report section 1), DR-125 occurrences, the prunes owed); commit it on `wp6.1`; ff main; post the accept to CHARC (it writes AD-33 / AD-34 / N13 row / N14 figures and the DR-125 brief).
+### Live board (RESUME HERE)
 
-1. **WP6.1, packaging spike**: CODE FINAL at `dc784b4f`; report `68cc1f33` (form-neutral, CHARC `85e45a92`). Worktree `.worktrees/wp6.1`, branch `wp6.1`; ledger `docs/proofs/wp6.1-ledger.md`; evidence `clearwater-review-evidence\wp6.1\` (`cell\dispatch-1..12, 14, 15` (13 was an inline message), `t3f`..`t3i`, `codex-b`; `A\r1..r5`; `B\`; `timings\t4\`).
-   - Gen 43's record: main merged into wp6.1 `49150ccf`; wp61-cell7 2b-4 one rebuild + WITH-pack proof PASS (`fa32af1f`) + r4 fold (`08a96243`, `09cbba2c`), retired 371,271; wp61-cell8 2b-6 re-proof PASS (`e9dfe81f`) + 2c-a r5 fold (`dc784b4f`) + scripts, retired 321,383; the SEAT ran the GUI check (PASS) and the exclusive timings (COMPLETE) from md5-checked copies (`1c35a01f`); wp61-cell9 the report (`865e12ee` + form-neutral `68cc1f33`), retired 277,694.
-   - Nets: Reviewer A (Codex at the seat) r4 1 MAJOR (grammar) -> folded; **r5 NO_NEW_CRITICAL_MAJOR (converged)**; **Reviewer B (WSL Codex, on `dc784b4f`) NO_NEW_CRITICAL_MAJOR**, 4 minor + 2 adv -> the Codex fold-in above. Harness 423 OK on `68cc1f33`.
-   - CHARC rulings this gen: `bae5dba5` (proof accepted as evidenced; canary not-found correct; header lookup INFERRED, three legs; fail-closed shim; A r4 dispositions + the grammar version pin); `cdc4b279` (DR-125 occurrence recorded; report line on DR-125); `85e45a92` (report form-neutral; CP6a presented to the owner, CHARC recommends onedir; D6 offered); `c85d332f` (fix all six B findings before the gate; #1's test plants a GPU-named option and expects FAIL; PRE-RULING: accept may proceed with D6 / CP6a PENDING owner).
-   - **D6 owner hand check, on the owner's go (via CHARC or chat):** from the wp6.1 worktree root, `( cd C:/Users/rwsmy/clearwater/.worktrees/wp6.1 && .venv/Scripts/python.exe -B C:/Users/rwsmy/clearwater-review-evidence/wp6.1/cell/t3i/seat-run/gui_check.py owner --form onedir )` then `--form onefile` (md5 `0e05e8e7171f73c74ece4715f87a75eb`; it refuses an existing `work\wp6.1\t3i\hand\<form>\`; it needs `handler-check-t3i.json` newer than the dists, which holds while the dists are not rebuilt). Copy the staged outputs into evidence; the owner's words are the evidence.
-   - Owner-log md5 `69ed0432c562db9445daecbe8f15fe27` (a check only, never repaired). Prunes on the owner's word only: cold copies 3.49 GiB `work\wp6.1\cold-*`; `.worktrees/wp-t8`'s `work/`; later the wp6.1 worktree's builds and the hand-filled pack.
-2. **DR-125** (export worker crash at exit; the F-E stdin isolation moves into the worker and the `__main__` shim is removed; fail-closed inherited): CHARC writes the brief after WP6.1's accept (Codex lane). Occurrences: 1 of 12 frozen worker runs (2b-4 + 2b-6), 0 of 12 in the timing window.
-3. **Push:** main ahead of `origin/main`; a push needs the owner's word.
-4. **Worktrees:** main; `orch-state-g43` (the successor removes it, adds its own); `wp6.1` (live package); `wp6.1-rA` (detached at `926bfdfa`, Reviewer A's copy; release after the accept); `wp-t8` (released; `work/` kept for the owner's prune word); `wp6.2` (released, kept for the prune).
+**Nothing running** (no cell, no Codex turn, no reviewer, no gate) as of 17:15Z.
+
+1. **WP6.1 ACCEPTED** 2026-11-04 17:14Z. Main at `b2eb4f74`. Record: `docs/proofs/wp6.1-accept.md`.
+   - Nets: A converged r5; B clean; the Claude review of the Codex fold-in clean.
+   - Gate `p61` green. D6 PASS. CP6a = ONEDIR.
+   - Posted to CHARC and cued. CHARC writes AD-33 / AD-34 / the N13 row / the N14 onedir figures and the DR-125 brief.
+   - Five fold-in advisories are banked in the record, for WP6.3 or the register.
+2. **DR-125** (the export worker crashes at exit; the F-E stdin isolation moves into the worker and the `__main__` shim is removed; fail-closed inherited). WAIT for CHARC's brief (Codex lane), then dispatch.
+   - Occurrences: 1 of 12 frozen worker runs; 0 in the timing window, the GUI check and D6.
+3. **WP6.3** (the downloader plus the GitHub Actions workflow; onedir per CP6a). Expect CHARC's brief. Its hand check stages a REAL colour photo copied from the footage folder under `work/` (CHARC's D6 lesson).
+4. **Push:** main is ahead of `origin/main`; a push needs the owner's word.
+5. **Worktrees:**
+   - main;
+   - `orch-state-g44`;
+   - `wp6.1`, kept for WP6.3: its `work\wp6.1\dist-on{dir,file}` builds and the hand-filled pack under `work\wp6.1\t3c\appdata` are pruned on the owner's word;
+   - `wp6.2`, released, kept for the prune.
+
+   `wp6.1-rA` and `wp-t8` were removed (branches kept).
+6. **Prunes owed (owner's word only):** the wp6.1 builds and pack after WP6.3; `.worktrees/wp6.2`.
+
+### Gen-44 lessons
+
+- **Main can move between your `git log main` read and your merge** (CHARC's state commits). After `git merge main` into a package branch, read the merge's actual second parent (`git log --graph`) before citing it in a record.
+- **`build.py` has no CLI bundle checker**: a read-only re-check of an existing build calls `forbidden_paths(root)` and `forbidden_entries(find_executable(root))` from the package venv (`python -B`).
+- **A Claude review's `permission_denials`** were all compound shell lines it re-ran in allowed forms. Read them from `review.json` and say so in the record, rather than counting them as gaps.
 
 ### Gen-43 lessons
 
