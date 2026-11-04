@@ -377,3 +377,118 @@ NOT cold either: the build's own writes sit in the file cache.
   records that line.
 
 Depth at round-0 end: DISPATCHER TO FILL
+
+Depth at round-0 yield (dispatcher): 178,334.
+
+## Turn 2 group A (2026-11-04 08:45-09:05Z): the build script and the onedir build
+
+Built (owned paths):
+
+- `tools/package/build.py`. One argument list (`pyinstaller_args(form, out=, version=)`)
+  serves both forms. It is run in-process through `PyInstaller.__main__.run(args)`.
+  - Entry `src/clearwater/__main__.py`, with `--paths src`. PyInstaller adds the script's
+    TOP-LEVEL package folder (`src`), not `src/clearwater`, to the analysis path
+    (`get_path_to_toplevel_modules`, `building/build_main.py:614-636`).
+  - Flags: `--windowed --noconfirm --clean --name Clearwater`.
+  - Outputs go to `work/wp6.1/dist-<form>/Clearwater-<__version__>-windows-<form>/`,
+    `build-<form>/` and `spec-<form>/`.
+  - Excludes `EXCLUDED_MODULES`.
+  - The post-build checks are `forbidden_paths` (the release folder) and `forbidden_entries`
+    (the executable's CArchive TOC and its PYZ module list). They fail the run on any of:
+    - `cupy`, `cupyx`, `cupy_backends`, `cuda`, `nvidia`, `fastrlock` or `tests`;
+    - a GPU-pack `.dist-info`;
+    - a CUDA DLL;
+    - a `clearwater` subpackage frozen at the top level, or an `io.*` submodule;
+    - a non-stdlib top-level module outside `ALLOWED_TOP_LEVEL` (the product's dependency
+      closure computed from `uv.lock`: numpy, scipy, PIL, pillow_heif, tifffile, PySide6,
+      shiboken6, plus clearwater and `_pyi_rth_utils`).
+  - `--with-ffmpeg` copies `ffmpeg` / `ffprobe` from PATH beside the executable. It is for
+    group B; it was not run this turn.
+  - The `measure` and `manifest` parts wait for turns 3-4.
+- `tools/package/README.md`.
+- Static checks on both: `uv run --no-sync ruff check tools/package` passed;
+  `ruff format --check` reported 1 file already formatted; `mypy tools/package/build.py`
+  passed. The whole configured `uv run --no-sync mypy` passed on 159 source files.
+  `PyInstaller` has no `py.typed`, so `build.py` reaches it through
+  `importlib.import_module`. This needs no `pyproject.toml` override.
+
+Builds (`df -h /c` before each: 73 GB free at 08:48Z, 70 GB at 08:56Z; floor 25 GB):
+
+| # | Command (from the worktree root) | Exit | Wall | Result |
+|---|---|---|---|---|
+| 1 | `uv run --no-sync python tools/package/build.py --form onedir > work/wp6.1/build-onedir.log 2>&1` | 0 | 287 s (PyInstaller 284.3 s) | 234.2 MiB; old check PASS |
+| 2 | same, after the exclude list gained `yaml`, `_yaml`, `typing_extensions` and the allowlist check (`> work/wp6.1/build-onedir-2.log`) | 0 | 154 s (PyInstaller 152.7 s) | **233.8 MiB; every check PASS** |
+
+- **Why build 2.** Build 1's PYZ held two packages outside the product's closure: `yaml`
+  (imported by `numpy.__config__` / `scipy.__config__`; PyYAML is in the env through the
+  comms group's `uvicorn[standard]`) and `typing_extensions` (imported only under
+  `TYPE_CHECKING` or optionally by numpy / scipy; it comes from the dev tools).
+- **The new check distinguishes.** Run on build 1's executable, it reports
+  `['pyz-unexpected:typing_extensions', 'pyz-unexpected:yaml']`; on build 2 it reports none.
+  Build 2's PYZ has 1,050 modules (build 1 had 1,068), 103 of them `clearwater.*`. Its
+  package archive has 12 entries, all PyInstaller boot / run-time hooks (`pyi_rth_inspect`,
+  `pyi_rth_pkgutil`, `pyi_rth_multiprocessing`, `pyi_rth_pyside6`) plus `__main__` and
+  `PYZ.pyz`.
+
+Size of build 2 by top-level entry (MiB; the 233.8 MiB total includes many small `.pyd` and
+DLL files under 0.1 MiB each):
+
+| Entry | MiB | Entry | MiB |
+|---|---|---|---|
+| `_internal/PySide6` | 73.7 | `_internal/libcrypto-3-x64.dll` | 5.5 |
+| `_internal/scipy` | 46.1 | `_internal/libstdc++-6-*.dll` (pillow-heif) | 2.5 |
+| `_internal/libx265-217-*.dll` (pillow-heif) | 21.6 | `_internal/libheif-*.dll` | 2.1 |
+| `_internal/numpy.libs` | 20.2 | `_internal/base_library.zip` | 1.3 |
+| `_internal/scipy.libs` | 19.3 | `_internal/shiboken6` | 1.1 |
+| `_internal/PIL` | 10.7 | `_internal/unicodedata.pyd` | 1.1 |
+| `Clearwater.exe` | 10.0 | `_internal/ucrtbase.dll` | 1.1 |
+| `_internal/python312.dll` | 6.6 | `_internal/libssl-3-x64.dll` | 1.0 |
+| `_internal/numpy` | 6.1 | `_internal/libde265-*.dll` | 0.9 |
+
+- **Inside `PySide6` (73.7):**
+  - `opengl32sw.dll` 20 (the Qt hook's software-OpenGL fallback);
+  - `Qt6Core` 10, `Qt6Gui` 9.3, `Qt6Widgets` 6.3, `Qt6Network` 1.7, `Qt6Svg` 0.6;
+  - `translations/` 6.9;
+  - `plugins/` 5.7: `imageformats` 2.4, `platforms` 2.2, `tls` 0.66, `styles` 0.24,
+    `generic` 0.10, `networkinformation` 0.08, `iconengines` 0.07.
+- `libcrypto` / `libssl` / `_ssl` come with the stdlib `ssl`, which `urllib.request`,
+  `http.client` and `logging.handlers` import. Qt's `tls` / `networkinformation` plugins and
+  `Qt6Network` come from the PySide6 hooks. Trimming either is out of scope (the brief
+  excludes the Qt plugin set beyond what the application loads). Group B measures what
+  actually loads.
+
+**warn-*.txt triage** (build 2, `work/wp6.1/build-onedir/Clearwater/warn-Clearwater.txt`,
+277 `missing module` lines; classifier `warn_triage.py` and both outputs in
+`clearwater-review-evidence/wp6.1/cell/t2a/`). All are ACCEPTED, none needs a hidden import:
+
+- **A, excluded by design (1):** `cupy.cuda`, from `scipy._external.array_api_compat.cupy`.
+  This is the analysis following SciPy's function-level CuPy imports, which the exclude
+  stops.
+- **B, non-Windows platform modules (18 names):** `posix`, `pwd`, `grp`, `fcntl`, `termios`,
+  `resource`, `_posixsubprocess`, `_posixshmem`, `_scproxy`, `readline`, `vms_lib`, `java`,
+  `_winreg` and the like. All are imported under platform guards.
+- **C, names re-exported from compiled or dynamic modules (212):** `from pkg import name`
+  where the name is defined inside a `.pyd` or by `globals()` updates: `scipy.special.*`
+  (from `_ufuncs`), `scipy.sparse.*`, `scipy.linalg.*`, `numpy.*`, `multiprocessing.*`.
+  These are attributes at run time, not modules.
+- **D, optional third-party packages not installed in the dev env either (41 lines,
+  28 top-level names):** Cython, cffi, dask, defusedxml, imagecodecs, jax, lxml,
+  matplotlib, sparse, sphinx, threadpoolctl, torch, uarray, xarray, zarr, win32evtlog / pdh,
+  and others. Every one is reached only through conditional, optional or delayed imports.
+- **E, inspected by hand (5):**
+  - `_typeshed`: a type-checker-only stub;
+  - `dask.array` and `torch`: SciPy's array-API adapters, reached only for dask or torch
+    arrays;
+  - `olefile`: PIL's FlashPix / MIC plugins, formats Clearwater does not accept (spec 5.1:
+    HEIC, JPEG, PNG, TIFF);
+  - `zarr`: `tifffile.zarr`, the zarr store interface, unused.
+
+  None is installed in the dev env, so the frozen run behaves as the source run.
+- **The one build-log warning:** `Hidden import "scipy.special._cdflib" not found!` comes
+  from PyInstaller's `hook-scipy.special._ufuncs.py:20-21`, which adds it for scipy >= 1.13.
+  scipy 1.18.1 ships no `_cdflib` (no such file in `scipy/special/`), so this is benign.
+  Group B's frozen start confirms SciPy imports.
+
+No STOP. Group B (the onefile build and the plugin / path checks) is next.
+
+Depth at turn-2 group-A end: DISPATCHER TO FILL
