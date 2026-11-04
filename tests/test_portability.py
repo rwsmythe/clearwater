@@ -1656,10 +1656,10 @@ def _fs_p30(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         f"clip.MP4 ({tmp_path / 'b'})",
     ]
     assert batch_panel.item_labels([item(tmp_path / "solo.mp4")]) == ["solo.mp4"]
-    # D5 keeps normcase: "Straße" and "STRASSE" differ under it (str.lower on Windows, no
+    # D5 keeps normcase: "Stra\u00dfe" and "STRASSE" differ under it (str.lower on Windows, no
     # fold elsewhere) and share only a casefold, so a casefold comparison would add folders.
-    unicode_pair = [item(tmp_path / "a" / "Straße.MP4"), item(tmp_path / "b" / "STRASSE.mp4")]
-    assert batch_panel.item_labels(unicode_pair) == ["Straße.MP4", "STRASSE.mp4"]
+    unicode_pair = [item(tmp_path / "a" / "Stra\u00dfe.MP4"), item(tmp_path / "b" / "STRASSE.mp4")]
+    assert batch_panel.item_labels(unicode_pair) == ["Stra\u00dfe.MP4", "STRASSE.mp4"]
 
 
 class _Named:
