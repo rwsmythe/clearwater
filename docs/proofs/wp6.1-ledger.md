@@ -2116,4 +2116,286 @@ entry script, so read it there too. Then the WITH-pack proof (onedir HEIC + vide
 CHARC's amendment-4 evidence (the canary JSON, the device line, the site flags), the
 without-pack regression, `--verify` before and after.
 
-Depth at turn-3 group-2b-3 (A r3 batch) end: DISPATCHER TO FILL
+Depth at turn-3 group-2b-3 (A r3 batch) end: 468,982 (wp61-cell6, at its final report; past the 400K stop, the F-F batch landed before the stop message; read by the dispatcher)
+
+## Turn 3 group 2b-4 (the one rebuild and the WITH-pack proof) (2026-11-04 ~14:25-14:41Z)
+
+Fresh cell (implementer-opus-high, wp61-cell7), dispatch
+`clearwater-review-evidence/wp6.1/cell/dispatch-9.md`, head at start `49150ccf` (the merge of
+main `c7ea0004`). Evidence: `clearwater-review-evidence/wp6.1/cell/t3f/`. This group changed
+ONLY this ledger. No STOP condition was met.
+
+- No desktop input was sent and there was no GUI launch. `t2b/gui_check.py` was not run.
+  Nothing under `t3c/exp/` was run; its onedir executable was only READ, as the handler
+  check's control.
+- No network. Nothing under the real `%APPDATA%\Clearwater` or `%LOCALAPPDATA%\Clearwater`
+  (the latter absent before and after).
+- Every frozen run had APPDATA, LOCALAPPDATA, TEMP / TMP and the five XDG_* variables under
+  `work\wp6.1\t3c\appdata\`, every `CUDA_PATH*` removed, and `PATH = C:\Windows\System32;C:\Windows`.
+  The read-only window watch ran beside every frozen run (UI Automation per PID of the run's
+  tree plus `EnumWindows`, every 0.25 s).
+- The two NON-frozen helpers (`t3f/handler_check.py`, `t3f/proof4.py`) import nothing from the
+  pack. Both ran with `-B`. The full `--verify` bracketed the group.
+
+**Owner log** `%APPDATA%\Clearwater\logs\clearwater.log`: md5 `69ed0432c562db9445daecbe8f15fe27`
+before (14:26:05Z) and after (14:40:07Z) (`t3f/owner-log-md5-{before,after}.txt`; a check only).
+
+### Item 1: the wider run on `49150ccf`
+
+| Command (worktree root, Git Bash, `PYTEST_ADDOPTS` unset) | Exit | Summary |
+|---|---|---|
+| `uv run --no-sync pytest -q -rs -p no:cacheprovider --timeout 120 --durations=5 --basetemp=<wt>/work/c61g-1 tests/test_gpu_pack.py tests/test_frozen_entry.py tests/test_tools_package_build.py tests/test_jobs_export_process.py tests/test_app_composition.py tests/test_wp42_composition.py tests/test_core_backend.py tests/test_cache_store.py -m "not gpu"` | 0 | **459 passed, 41 deselected in 35.52 s** (slowest 1.03 s, `test_jobs_export_process`) (`t3f/pytest-wider-c61g-1.log`) |
+| `ruff check .` / `ruff format --check .` | 0 / 0 | All checks passed / 323 files already formatted |
+| `mypy` (strict, configured set) | 0 | no issues in 161 source files |
+
+The merge added `tests/test_cache_store.py` (WP-T8): 459 = 417 (2b-3's last wider run) plus that
+module's 42.
+
+### Item 2: both rebuilds (from `49150ccf`; `src` and `tools` clean, only this ledger modified)
+
+| Form | Command (worktree root) | `df -h /c` before | Exit | Wall (shell / PyInstaller) | Result |
+|---|---|---|---|---|---|
+| onedir | `uv run --no-sync python tools/package/build.py --form onedir --with-ffmpeg > work/wp6.1/build-onedir-t3f.log 2>&1` | 77 GB free (14:27Z) | 0 | 74 s / 65.0 s | `_internal` 234,668,819 B + `Clearwater.exe` 10,677,212 B; 668.3 MiB release with FFmpeg; bundle checks 7.6 s |
+| onefile | `... --form onefile --with-ffmpeg > work/wp6.1/build-onefile-t3f.log 2>&1` | 77 GB free (14:28Z) | 0 | 82 s / 79.6 s | `Clearwater.exe` 93,874,026 B (89.5 MiB); 523.9 MiB release; bundle checks 0.7 s |
+
+- `PYINSTALLER_CONFIG_DIR` was set by `build.py` itself, under the output folder.
+- Both logs show:
+  - `61 hidden imports from 376 pack files`;
+  - `hidden-import site (scan; named 1x)`;
+  - `hidden-import check: PASS (61 modules, each in the bundle)`;
+  - `bundle check: PASS (no cupy, cupyx, cupy_backends, cuda, nvidia, fastrlock, tests ...; no CUDA library; every module's top-level name allowed)`.
+- The single warning is the usual `scipy.special._cdflib` (benign). FFmpeg and ffprobe
+  9.0.2-full_build-www.gyan.dev were copied beside each executable.
+- **The resolved set** is the 61 members of group 2b-3: 60 from the scan, `graphlib` from the
+  committed list. Every one of them is passed as `--hidden-import` on the PyInstaller command
+  line in both logs. `site` was bundled without complaint.
+- Copies: `t3f/build-on{dir,file}-t3f.log`, `t3f/hidden-imports-on{dir,file}-t3f.json`.
+
+**The handler read-out, before any run of the new builds** (`t3f/handler_check.py` ->
+`t3f/handler-check-t3f.json`). Method:
+
+- `t3e/handler_check.py` was copied and extended: `multiprocessing_reentry` added, plus
+  `MULTIPROCESSING_FLAGS` and the PYZ's `clearwater.gpu_pack`.
+- PyInstaller's own `CArchiveReader` read each new `Clearwater.exe`. The entry script
+  `__main__` (typecode `s`) and the PYZ entry `clearwater.gpu_pack` were unmarshalled.
+  Nothing was executed.
+- The comparison is with a compile of `src/clearwater/__main__.py` and
+  `src/clearwater/gpu_pack.py` at `49150ccf`, the build's commit.
+
+| Read in each `Clearwater.exe` (onedir and onefile alike) | Result |
+|---|---|
+| entry script: `interpreter_reentry`, `run_interpreter_option`, `isolate_worker_stdin`, `multiprocessing_reentry`, `main` | present; bytecode AND non-code constants equal the source, each |
+| entry script, whole module | 10 of 10 functions equal; module-level bytecode and constants equal |
+| `main` names `isolate_worker_stdin` and `multiprocessing_reentry` | yes, both |
+| `MULTIPROCESSING_FLAGS` | in the module's names; the constant `("--multiprocessing-fork", "--multiprocessing-resource-tracker")` in its constants |
+| `clearwater.__main__` in the PYZ | no (the entry script is the only copy) |
+| PYZ `clearwater.gpu_pack.add_site_prefix` | present; bytecode and constants equal the source |
+| PYZ `clearwater.gpu_pack.activate` | bytecode equal; its names include `add_site_prefix` (it calls it) |
+| PYZ `clearwater.gpu_pack`, whole module | 38 of 38 functions equal; module-level bytecode and constants equal |
+
+**HANDLER CHECK: PASS on both.**
+
+Control: the same check on the `t3c/exp` onedir build, read only
+(`t3f/handler-check-t3f-control-t3c-exp.json`), gives `HANDLER CHECK: FAIL`, with 5 `present:
+false` entries. So the check distinguishes.
+
+**The second check, executed** (pack folder renamed `14.2.0-cu12.renamed`, window watch
+running; `t3f/argv-<form>-<case>.out`, records in `t3f/proof4.jsonl`). A positive control of the
+watch came first (`t3f/control.out`): explorer.exe showed 2 UIA elements and 9 visible / 46
+hidden windows; this Python showed 0.
+
+| Form | Arguments | Exit | stderr (one line) | Windows (UIA / visible) | Tree | Left |
+|---|---|---|---|---|---|---|
+| onedir | `-c pass` | 2 | `Clearwater: -c is not supported` | 0 / 0 (1 sample) | 1 PID | none |
+| onedir | `-m http.server` | 2 | `Clearwater: -m 'http.server': no GPU pack is loaded` | 0 / 0 (1) | 1 PID | none |
+| onedir | `--multiprocessing-fork` | 2 | `Clearwater: multiprocessing children are not supported` | 0 / 0 (1) | 1 PID | none |
+| onedir | `--multiprocessing-resource-tracker` | 2 | `Clearwater: multiprocessing children are not supported` | 0 / 0 (1) | 1 PID | none |
+| onefile | `-c pass` | 2 | `Clearwater: -c is not supported` | 0 / 0 (9) | bootloader + child, both exit 2 | none; no `_MEI` |
+| onefile | `-m http.server` | 2 | `Clearwater: -m 'http.server': no GPU pack is loaded` | 0 / 0 (9) | the same | none; no `_MEI` |
+| onefile | `--multiprocessing-fork` | 2 | `Clearwater: multiprocessing children are not supported` | 0 / 0 (8) | the same | none; no `_MEI` |
+| onefile | `--multiprocessing-resource-tracker` | 2 | `Clearwater: multiprocessing children are not supported` | 0 / 0 (8) | the same | none; no `_MEI` |
+
+`tasklist` after the eight runs showed no `Clearwater.exe` and no `ffmpeg.exe`.
+
+### Item 3: `--verify` (the pack renamed back; the full walk, Q2)
+
+`build.py --verify <t3c pack>`: exit 0, `PASS (11 distributions; 2701 RECORD rows, each file's
+sha256 and size; 2701 files, 2412.6 MiB)` in 4 s (`t3f/verify-1-before.log`). `find` gives 2,701
+files under `site-packages` and 0 `.pyc`. The sorted file list's md5 is `27f33db1...`
+(`t3f/pack-filelist-before.md5`).
+
+### Item 4: the WITH-pack GPU proof, headless -- PASS on both forms
+
+- **Tool.** `t3f/proof4.py` is `t3e/proof3.py` copied, with the evidence paths moved to `t3f`
+  and a fresh per-form kernel cache `appdata\cupy-kernel-cache-t3f-<form>`. The spawn, the
+  environment, the tree tracker and the watch are unchanged.
+- **Command.** The child command is `<new dist>\Clearwater.exe --export-worker`, built from
+  `t3b/headless.EXES`, which points at the `dist-on{dir,file}` paths rebuilt above.
+- **Requests.** `heic-ad24-both.heic` -> PNG and `vfr.mp4` -> MP4, c3 defaults, `force_cpu` off,
+  encoder `auto`.
+- **Working directory.** `work\wp6.1\t3c\runs\<form>`.
+- **Order.** onedir HEIC, onedir video, onefile HEIC, onefile video.
+
+| Form | Request (moment) | Exit | Device | Output | Kernels compiled (cache `.cubin` count) | CUDA / CuPy files mapped | Canary children | Windows (UIA / visible) | Left over |
+|---|---|---|---|---|---|---|---|---|---|
+| onedir | HEIC -> PNG (14:36:18Z, 17.4 s) | **0** | **`GPU`**; log `export heic-ad24-both.heic: ok; device GPU`; no warning | `heic-ad24-both_corrected.png` 37,080 B, ok | 0 -> 52 (first file 14:36:01Z, inside the run) | 67: 59 pack + 8 driver, **0 elsewhere** | **none** | 0 / 0 (62 samples) | none; pack +0 / -0 files |
+| onedir | `vfr.mp4` -> MP4 (14:36:52Z, 11.1 s) | **0** | **`GPU`**; `export vfr.mp4: ok; device GPU` | `vfr_corrected.mp4` 55,168 B, ok | 52 -> 62 | 67: 59 pack + 8 driver, 0 elsewhere | none | 0 / 0 (33) | none; +0 / -0 |
+| onefile | HEIC -> PNG (14:37:30Z, 21.3 s) | **0** | **`GPU`** | 37,080 B, ok | 0 -> 52 (first file 14:37:11Z) | 67: 59 pack + 8 driver, 0 elsewhere | none | 0 / 0 (70) | none; `_MEI` before [] after []; +0 / -0 |
+| onefile | `vfr.mp4` -> MP4 (14:37:47Z, 14.5 s) | **0** | **`GPU`** | 55,168 B, ok | 52 -> 62 | 67: 59 pack + 8 driver, 0 elsewhere | none | 0 / 0 (39) | none; `_MEI` [] / []; +0 / -0 |
+
+- **The process trees.**
+  - Each onefile tree is the bootloader plus one `Clearwater.exe --export-worker` child
+    (both exit 0).
+  - The video trees hold the ffprobe / ffmpeg children of 1.0.0's video path: the probes, the
+    encoder detection, the decode, the encode, and their `conhost.exe`.
+  - Three short-lived PIDs (one in onedir video, two in onefile video) ended before psutil
+    could read them (`NoSuchProcess`; no command line). Each had an ffprobe / ffmpeg / worker
+    parent and was gone at the end.
+  - The onefile bootloader's two top-level windows are HIDDEN (`PyInstaller Onefile Hidden
+    Window` and `Default IME`, `IsWindowVisible` false). There was no UIA element. Neither
+    window is a Clearwater window.
+- **stderr of every with-pack worker run (one warning, CuPy's own).**
+  `...\gpu-pack\14.2.0-cu12\site-packages\cupy\_environment.py:286: UserWarning: CUDA path
+  could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.`
+  - Reason: `_get_cuda_path` returns `None` for a CUDA 12 wheel layout found through
+    site-packages (`cupy/_environment.py:172-179`, "no single root").
+  - It is harmless here: the kernels compiled.
+  - It goes to the worker's stderr, not to the user.
+  - For WP6.3: whether to silence it.
+- **DR-125 did not appear.** Every worker run in this group exited 0, with the pack and without
+  it. Every frozen worker run before the F-E shim exited `3221225477`. This fits F-E's side
+  observation, but this group did not test the cause.
+
+**The canary, the kernel, pathfinder, the site flags.**
+
+1. **CuPy's canary child: NONE in any of the four runs.**
+   - The tracker saw no `-m` child and no `dynamic_lib_subprocess` command line.
+   - So pathfinder's search steps that run before its CTK-root canary found what CuPy asked
+     for. The canary had nothing to do.
+   - The dispatch expected a canary child with `status: found`. That premise does not hold on
+     the new builds, and it is not one of the STOP conditions. Also, pathfinder's success
+     status is spelled `"ok"`, not `"found"` (`cuda/pathfinder/_dynamic_libs/subprocess_protocol.py:16-17`:
+     `STATUS_OK = "ok"`, `STATUS_NOT_FOUND = "not-found"`).
+   - To record the canary's own behaviour, I ran its exact command standalone through the
+     frozen `-m` handler, both forms, the pack present, under the watch:
+     `Clearwater.exe -m cuda.pathfinder._dynamic_libs.dynamic_lib_subprocess canary cudart`
+     (and `... canary nvrtc`).
+   - Result: exit 0 in 0.27-0.28 s (onedir) and 2.4-2.7 s (onefile, bootloader included), no
+     window, nothing left, payload `{"status": "not-found", "abs_path": null}` for both.
+   - The canary uses SYSTEM search only (`dynamic_lib_subprocess.py:31-42`,
+     `LOADER.load_with_system_search`). With `PATH` = Windows only and no toolkit, it finds no
+     CUDA runtime, and that is correct.
+   - It was not needed: see 3.
+   - Records: `t3f/probe-<form>-canary-{cudart,nvrtc}.out`.
+2. **The kernels compiled with the pack's NVRTC.**
+   - `nvrtc64_120_0.dll` and `nvrtc-builtins64_129.dll` were mapped from the pack's
+     `nvidia\cuda_nvrtc\bin` in all four runs.
+   - Each form's kernel cache started EMPTY:
+     - the HEIC run wrote 52 `.cubin` files, timestamped inside the run;
+     - the video run wrote 10 more (62).
+   - The device stayed `GPU` with no warning. The device test kernel's failure (F-E's timeout,
+     F-F's `Failed to find CUDA headers`) is gone.
+3. **`cuda.pathfinder` and the pack (the route: frozen `-m` runs of the pack's own
+   `dynamic_lib_subprocess` module under the pack rules; NOT the run's log, which names no
+   path).**
+   - Frozen `-m ... load cudart` gives `{"status": "ok", "abs_path": "<pack>\site-packages\nvidia\cuda_runtime\bin\cudart64_12.dll"}`.
+   - Frozen `-m ... load nvrtc` gives `{"status": "ok", "abs_path": "<pack>\site-packages\nvidia\cuda_nvrtc\bin\nvrtc64_120_0.dll"}`.
+   - Both forms give the same result, exit 0, no window (`t3f/probe-<form>-load-{cudart,nvrtc}.out`).
+   - The canary above shows that system search does NOT reach the pack. So these PACK paths
+     came from pathfinder's site-packages step: `search_platform.py:30/54/95` ->
+     `find_sub_dirs_all_sitepackages` -> `site.getsitepackages()`.
+   - `find_nvidia_header_directory`'s step 1 calls the SAME function
+     (`_headers/find_nvidia_headers.py:86`) with `nvidia/cuda_runtime/include` and
+     `nvidia/cuda_nvrtc/include`, and the pack has both folders.
+   - **`find_nvidia_header_directory("cudart")` / `("nvrtc")` themselves were NOT printed
+     from a frozen process.** No pack module has a `__main__` that calls them. The only `-m`
+     runnable pack modules are `dynamic_lib_subprocess` (modes `canary` / `load`, no header
+     mode) and three `cupyx/tools` scripts. Nothing may be planted in the pack.
+   - **The pack paths for the headers are therefore INFERRED, from four facts:**
+     - the same reader returns the pack in the frozen process;
+     - the kernels compiled in an environment identical to F-F's failing one except for
+       `add_site_prefix`;
+     - 2b-3's base-CPython reproduction printed exactly `<pack>\nvidia\cuda_runtime\include` /
+       `<pack>\nvidia\cuda_nvrtc\include` once the pack was in `site.PREFIXES`
+       (`t3e/headers-repro-prefixes.out`);
+     - F-F's run showed that no other header source is reachable here (CUDA_PATH unset, no
+       conda, no toolkit headers found by any other step).
+4. **The site flags of the frozen process.**
+   - **`site.PREFIXES` holds the pack's `site-packages`: OBSERVED in effect** (item 3:
+     `site.getsitepackages()` yields it in the frozen process).
+   - **That it is at index 0: NOT observed directly.** It comes from:
+     - the bundled `add_site_prefix` being byte-identical to the source (the read-out above);
+     - `test_a_frozen_activation_puts_the_pack_folder_first_in_site_prefixes`;
+     - the bundle's other prefixes (`_internal`) holding no `nvidia` folder, so the order
+       cannot change a lookup today.
+   - **`ENABLE_USER_SITE` falsy, and no user site on `sys.path`: OBSERVED again on the new
+     builds**, by 2b-3's plant probe:
+     - two EMPTY folders, `cuda\` and `nvidia\nvjpeg\bin\`, in the REDIRECTED user site
+       `t3c\appdata\Roaming\Python\Python312\site-packages\` (`t3f/usersite-plant.txt`;
+       removed afterwards);
+     - frozen `-m ... load nvjpeg`, both forms.
+   - **The plant probe's result.**
+     - The `-m` was ACCEPTED. An empty `cuda\` on `sys.path` would be a second namespace
+       portion outside the pack and would be refused.
+     - The not-found message does not list the user-site `nvidia\nvjpeg\bin`:
+       `Failure finding "known nvjpeg DLL": No such file: known nvjpeg DLL, No such file: known nvjpeg DLL`.
+       Pathfinder adds the user site only `if site.ENABLE_USER_SITE`.
+     - Exit 0, no window, nothing left (`t3f/usersite-probe-{onedir,onefile}.out`).
+     - 2b-3's base-CPython control (`t3e/usersite-control.out`) showed that both probes flip
+       when the user site is enabled.
+   - The exact `sys.flags.no_site` / `no_user_site` values remain as 2b-3 reported them
+     (reasoned, not printed).
+
+**Every mapped CUDA / CuPy / NVRTC file over the four runs' trees** (`t3f/mapped-cuda-files.tsv`;
+the same 67 paths in each of the four runs; psutil `memory_maps()` sampled every 0.05 s over
+every live PID except ffmpeg / ffprobe):
+
+- **Pack, 59 (88.1 %)**, under `<wt>\work\wp6.1\t3c\appdata\Local\Clearwater\gpu-pack\14.2.0-cu12\site-packages\`:
+  - `nvidia\cublas\bin\cublas64_12.dll`
+  - `nvidia\cublas\bin\cublasLt64_12.dll`
+  - `nvidia\cuda_nvrtc\bin\nvrtc64_120_0.dll`
+  - `nvidia\cuda_nvrtc\bin\nvrtc-builtins64_129.dll`
+  - 55 extension modules: 45 under `cupy\`, 9 under `cupy_backends\`, 1 under `cupyx\`.
+- **NVIDIA driver, 8 (11.9 %):**
+  - `C:\Windows\System32\nvcuda.dll`
+  - under `C:\Windows\System32\DriverStore\FileRepository\nvami.inf_amd64_00e5dc1fb00a1261\`:
+    `nvcuda64.dll`, `nvapi64.dll`, `nvapi64_impl.dll`, `nvdiagclt64.dll`, `nvdxgdmal64.dll`,
+    `nvobjectloader64.dll`, `Display.NvContainer\NvMessageBus.dll`.
+- **Elsewhere: 0.** The share is 100 % pack + driver, as expected.
+- The filter: any file under the pack root, or a DLL whose name starts `cu` / `nv` or contains
+  `cuda`. No CUDA toolkit, `CUDA_PATH` or bundle `_internal` copy appears.
+
+**Leftovers.** After every run: no live PID of the run's tree; `tasklist` shows no
+`Clearwater.exe`, `ffmpeg.exe` or `ffprobe.exe`; the redirected `TEMP\_MEI*` is empty before and
+after every onefile run. The pack gained and lost 0 files in every run.
+
+**For WP6.3 (observed, not acted on).** The NVIDIA driver keeps its JIT cache under
+`%APPDATA%\NVIDIA\ComputeCache`. Here that is the redirected tree's (created in 2b-2, used
+again now). On a user's machine it is the user's real APPDATA; it is the driver's, not
+Clearwater's.
+
+### Item 5: the WITHOUT-pack regression (pack renamed `14.2.0-cu12.renamed`), then `--verify`
+
+| Form | Request (moment) | Exit | Device and warning (AD-9's text) | Log | Output | CUDA files | Windows | Left |
+|---|---|---|---|---|---|---|---|---|
+| onedir | HEIC -> PNG (14:39:49Z, 0.6 s) | 0 | **`CPU: CuPy not installed`**; warning `Processed on the CPU (CPU: CuPy not installed).` | `CuPy not installed: No module named 'cupy'` | `heic-ad24-both_corrected.png` 37,104 B, ok | 0 | 0 / 0 (2) | none |
+| onefile | HEIC -> PNG (14:39:54Z, 2.8 s) | 0 | the same | the same | 37,104 B, ok | 0 | 0 / 0 (10) | none; no `_MEI` |
+
+- The device, the warning, the log line and the output size equal 2b-2's without-pack rows.
+  The exit is now 0, where it was `3221225477` there (DR-125, above).
+- The GPU PNG (37,080 B) and the CPU PNG (37,104 B) differ in size, as the two backends' float
+  paths do.
+- **`--verify` after the runs (pack renamed back): PASS**, with the same line and figures:
+  2701 rows, 2701 files, 2412.6 MiB (`t3f/verify-2-after.log`).
+- 0 `.pyc` files.
+- The sorted file list's md5 is `27f33db1...` again (`t3f/pack-filelist-after.md5`).
+- **No run wrote into the pack.**
+
+### Files changed this group
+
+`docs/proofs/wp6.1-ledger.md` only. Evidence tools (not product, not committed):
+`t3f/handler_check.py`, `t3f/proof4.py`, `t3f/uia_watch.ps1` (copied unchanged). The new builds
+are at `work/wp6.1/dist-on{dir,file}/` (of `49150ccf`); they replace `62198baf`'s. The pack is
+unchanged at `work/wp6.1/t3c/appdata/Local/Clearwater/gpu-pack/14.2.0-cu12`.
+
+Depth at turn-3 group-2b-4 end: DISPATCHER TO FILL
