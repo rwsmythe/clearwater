@@ -3066,4 +3066,40 @@ PRESENT, exit 0, clean close, no leftovers, no bound hit, no `_MEI` left.
 - the cold copies, 3,750,338,937 B (3.49 GiB), are KEPT under `work\wp6.1\cold-{onedir,onefile}-{1,2,3}`
   and will be deleted only on the owner's word.
 
-Depth at group-2c/turn-4 record end: DISPATCHER TO FILL
+Depth at group-2c/turn-4 record end: 321,383 (wp61-cell8, at its final report; read by the dispatcher)
+
+## Turn 4 (the report)
+
+Fresh cell (implementer-opus-high, wp61-cell9), dispatch
+`clearwater-review-evidence/wp6.1/cell/dispatch-14.md`, head at start `1c35a01f`. Nothing was run
+frozen; no GUI, no build, no timing. The report was written from the brief, this ledger and the
+evidence only.
+
+Written: `docs/reports/wp6.1-packaging-spike.md`, nine sections as dispatch-14 lists them. Its
+recommendation for CP6a: the one-folder form (warm start 0.893 s against 3.170 s, a worker start
+without the per-launch unpacking, no bootloader layer between the parent and the worker (F-B), no
+`_MEI` left by a kill), against one-file's smaller release (523.9 against 668.3 MiB) and faster
+cold start (2.771 against 4.469 s); the owner decides.
+
+Fact check (every figure re-read from its source; sources named in the report):
+
+- Sizes, walls, the exclude list, the 61 hidden imports, the per-entry bundle sizes: the final
+  build logs `cell/t3i/build-on{dir,file}-t3i.log` and "Turn 3 group 2c-a". The `PySide6`
+  breakdown is from turn 2's build 2 (the final log does not split it); the report says so.
+- Every timing: `timings/t4/summary.json`, checked against `timings.jsonl` (30 records; the 12
+  export exits all 0).
+- The loader lines and first-window times: `cell/t3i/gui-check.jsonl` (4 records, all
+  `pass: true`); `GUI CHECK: PASS` in `cell/t3i/seat-run/gui-check.stdout`.
+- The screenshots: viewed; both md5 `91fb036aa7076de0c23c656b56d2d6f2` (re-computed).
+- The read-out: `cell/t3i/handler-check-t3i.json` ends `HANDLER CHECK: PASS`.
+- Reviewer A rounds: each `A/r<n>/review.txt` verdict line and finding headers (r1 4/4/3,
+  r2 6/6/2, r3 4/6/2, r4 1/4/2, r5 0 MAJOR, 1 MINOR, 3 ADVISORY, `NO_NEW_CRITICAL_MAJOR`).
+- NOT in the records, so stated as not measured / not recorded and not estimated: the zipped size
+  of either form; the size and disk need of the one-file `_MEI` extraction; whether a worker
+  started by the one-file GUI reuses the GUI's `_MEI`; the FFmpeg build's licence; the dev-run Qt
+  plugin baseline; a frozen TIFF input.
+- Corrected in drafting: the `_MEI` line (round 0 expected a crashed one-file process to leave
+  its folder; the records show only a killed BOOTLOADER leaving it, the bootloader removing it
+  after a worker kill or crash).
+
+Depth at turn-4 report end: DISPATCHER TO FILL
