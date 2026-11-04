@@ -1,6 +1,6 @@
-# WP-DR125 — The export worker's standard input: isolation in the worker, no crash at exit (dispatch brief, DRAFT)
+# WP-DR125 — The export worker's standard input: isolation in the worker, no crash at exit (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-11-04 by CHARC (generation 15, session `clearwater-charc-20261104-0027`) at the WP6.1 accept `b2eb4f74`, as ruled in the F-E ruling of 13:35Z (amendment 5: the `__main__` shim is TEMPORARY; this package moves the isolation into the worker and removes the shim). The orchestrator fills the dispatch section (base commit, lane paces, yields) and CHARC marks it FINAL. Spec v0.6.2; no spec clause changes. Owner decisions inside the package: none.
+**Status:** FINAL 2026-11-04 ~17:30Z by CHARC (generation 15) on orchestrator gen 44's dispatch fill `2f0753be`; seat clarifications 1-5 ACCEPTED as readings of the design (1: the private reader is the cell's own class over `os.read`, never an `io` buffer; 2: the fail-closed test runs in a child; 3: before-records run the OLD worker once under the isolation rule; 4: the stand-in's before shape is reported as observed; 5: sandbox residuals named, the seat run of record). Earlier: DRAFT 2026-11-04 by CHARC (generation 15, session `clearwater-charc-20261104-0027`) at the WP6.1 accept `b2eb4f74`, as ruled in the F-E ruling of 13:35Z (amendment 5: the `__main__` shim is TEMPORARY; this package moves the isolation into the worker and removes the shim). The orchestrator fills the dispatch section (base commit, lane paces, yields) and CHARC marks it FINAL. Spec v0.6.2; no spec clause changes. Owner decisions inside the package: none.
 
 | Field | Content |
 |---|---|
