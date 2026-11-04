@@ -376,7 +376,7 @@ NOT cold either: the build's own writes sit in the file cache.
   the line is AD-9's reason `CPU: CuPy not installed` (`core/backend.py:941-943`). The proof
   records that line.
 
-Depth at round-0 end: DISPATCHER TO FILL
+Depth at round-0 end: not read by the dispatcher at this moment (gen 44: not recoverable from the state history; retirement depths are in the accept record)
 
 Depth at round-0 yield (dispatcher): 178,334.
 
@@ -491,7 +491,7 @@ DLL files under 0.1 MiB each):
 
 No STOP. Group B (the onefile build and the plugin / path checks) is next.
 
-Depth at turn-2 group-A end: DISPATCHER TO FILL
+Depth at turn-2 group-A end: not read by the dispatcher at this moment (gen 44: not recoverable from the state history; retirement depths are in the accept record)
 
 Depth at turn-2 group-A end (dispatcher): 248,067.
 
@@ -572,7 +572,7 @@ From `t2b/result-onedir.json` and `t2b/clearwater-onedir.log`:
   video export from the frozen GUI would start a second GUI as its "worker". This was NOT run.
   It is turn 3's.
 
-Depth at turn-2 end: DISPATCHER TO FILL
+Depth at turn-2 end: not read by the dispatcher at this moment (gen 44: not recoverable from the state history; retirement depths are in the accept record)
 
 ## Handoff to turn 3
 
@@ -857,7 +857,7 @@ worktree root.
 Commit: `51ae68f6` fix(wp6.1): bundle checks at every depth, case and ZIP member; build
 hygiene (Reviewer A r1).
 
-Depth at turn-3 group-2a end: DISPATCHER TO FILL
+Depth at turn-3 group-2a end: not read by the dispatcher at this moment (gen 44: not recoverable from the state history; retirement depths are in the accept record)
 
 ## Turn 3 group 2b-1 (2026-11-04 ~10:15-10:50Z): Reviewer A round 2 fixes, rebuilds, the headless frozen worker
 
@@ -1808,7 +1808,7 @@ Owner log md5 after this addition: `69ed0432c562db9445daecbe8f15fe27` (a check o
 - The new builds are at `work/wp6.1/dist-on{dir,file}/`; they replace the 2b-2 builds.
 - The pack is unchanged at `work/wp6.1/t3c/appdata/Local/Clearwater/gpu-pack/14.2.0-cu12`.
 
-Depth at turn-3 group-2b-3 (items 4-5) end: DISPATCHER TO FILL
+Depth at turn-3 group-2b-3 (items 4-5) end: not read by the dispatcher at this moment (gen 44: not recoverable from the state history; retirement depths are in the accept record)
 
 ## Turn 3 group 2b-3 (F-E shim) (2026-11-04 ~13:35-13:55Z): the F-E shim, rebuilds, the with-pack proof -- STOPPED again (F-F, headers)
 
@@ -1971,7 +1971,7 @@ Owner log md5 `69ed0432c562db9445daecbe8f15fe27` at every check (13:35-13:55Z; a
 `t3e/handler_check.py` and `t3e/proof3.py` (each process's end time), and
 `t3e/headers_repro.py`.
 
-Depth at turn-3 group-2b-3 (F-E shim) end: DISPATCHER TO FILL
+Depth at turn-3 group-2b-3 (F-E shim) end: not read by the dispatcher at this moment (gen 44: not recoverable from the state history; retirement depths are in the accept record)
 
 ## Turn 3 group 2b-3 (Reviewer A r3 fold-in) (2026-11-04 ~14:00-14:40Z): the r3 fixes on top of the F-E shim -- MID-BUILD YIELD, no build
 
@@ -3108,7 +3108,7 @@ Fact check (every figure re-read from its source; sources named in the report):
   its folder; the records show only a killed BOOTLOADER leaving it, the bootloader removing it
   after a worker kill or crash).
 
-Depth at turn-4 report end: DISPATCHER TO FILL
+Depth at turn-4 report end: 277,694 (wp61-cell9, at its final report; read by the dispatcher, gen 43)
 
 ## Reviewer B fold-in (Codex turn, 2026-11-04)
 
@@ -3193,4 +3193,4 @@ app-data roots, GUI blockers/stubs and bounded subprocess waits. No sandbox-only
 occurred. The dispatch bundles the six requested non-blocking fixes into one logical fold-in;
 no additional owner ruling or out-of-scope code change is needed.
 
-Depth at the B fold-in end: DISPATCHER TO FILL
+Depth at the B fold-in end: 117,846 / 475,000 (Codex session `01a1a74f-bfb3-7880-a926-1c1927bcdd64`, input tokens at turn-1 end, from the driver footer)
