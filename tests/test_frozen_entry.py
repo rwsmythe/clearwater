@@ -27,6 +27,8 @@ from clearwater import gpu_pack
 from clearwater.app import composition, export_worker
 from clearwater.config import log as config_log
 from clearwater.config import paths as config_paths
+from clearwater.jobs.export_process import ProcessExportJobs
+from clearwater.jobs.export_seam import unavailable_exports
 
 BLOCKED = ("PySide6", "shiboken6", "clearwater.gui", "clearwater.app.main")
 """Modules the worker branch must never import (AD-31: the worker is Qt-free)."""
@@ -115,13 +117,21 @@ def _frozen(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> str:
     return executable
 
 
+def _worker_command(tmp_path: Path, command: Sequence[str] | None = None) -> tuple[str, ...]:
+    """Return the worker command line ``process_export_jobs`` builds."""
+    built = composition.process_export_jobs(
+        photo_exports=unavailable_exports(), cache_dir=tmp_path, command=command
+    )
+    assert isinstance(built, ProcessExportJobs)
+    return built._command
+
+
 def test_a_frozen_build_re_enters_its_executable_as_the_worker(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Frozen: ``[sys.executable, "--export-worker"]`` (no ``-m``, which the exe ignores)."""
     executable = _frozen(monkeypatch, tmp_path)
-    built = composition.process_export_jobs(photo_exports=object(), cache_dir=tmp_path)
-    assert built._command == (executable, "--export-worker")
+    assert _worker_command(tmp_path) == (executable, "--export-worker")
 
 
 def test_a_source_run_spawns_the_worker_module(
@@ -129,8 +139,7 @@ def test_a_source_run_spawns_the_worker_module(
 ) -> None:
     """Not frozen: the unchanged ``python -m clearwater.app.export_worker``."""
     monkeypatch.delattr(sys, "frozen", raising=False)
-    built = composition.process_export_jobs(photo_exports=object(), cache_dir=tmp_path)
-    assert built._command == (sys.executable, "-m", "clearwater.app.export_worker")
+    assert _worker_command(tmp_path) == (sys.executable, "-m", "clearwater.app.export_worker")
 
 
 def test_an_injected_command_wins_when_frozen(
@@ -139,10 +148,7 @@ def test_an_injected_command_wins_when_frozen(
     """Tests' own worker commands are kept as given, frozen or not."""
     _frozen(monkeypatch, tmp_path)
     fake = ("python", "-c", "pass")
-    built = composition.process_export_jobs(
-        photo_exports=object(), cache_dir=tmp_path, command=fake
-    )
-    assert built._command == fake
+    assert _worker_command(tmp_path, fake) == fake
 
 
 # Q5 (b): the entry's dispatch.

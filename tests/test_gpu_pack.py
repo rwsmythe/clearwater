@@ -120,7 +120,8 @@ def edit_manifest(folder: Path, change: Any) -> None:
 
 def entry(document: dict[str, Any], name: str) -> dict[str, Any]:
     """Return the manifest's entry for one distribution."""
-    (found,) = [row for row in document["distributions"] if row["name"] == name]
+    rows: list[dict[str, Any]] = document["distributions"]
+    (found,) = [row for row in rows if row["name"] == name]
     return found
 
 
@@ -326,7 +327,7 @@ def test_a_failing_dll_folder_rejects_the_pack(
 ) -> None:
     """An ``os.add_dll_directory`` failure: rejected, the folders already added removed."""
     monkeypatch.setattr(sys, "platform", "win32")
-    real = os.add_dll_directory
+    real = vars(os)["add_dll_directory"]  # the isolated fixture's recorder, on any platform
     calls = {"n": 0}
 
     def flaky(folder: str) -> Any:
