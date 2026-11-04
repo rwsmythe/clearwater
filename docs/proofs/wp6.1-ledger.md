@@ -2459,10 +2459,9 @@ go to the GUI, as CPython refuses them or prints and exits.
 | 6 ADVISORY | FIX | The `__main__` module docstring: the branches in `main`'s order; multiprocessing before `PATH`; the shim's fail-closed refusal; "Every branch that can import CuPy ... runs the loader before it; a refusal ... ends before the loader" replaces "On every branch". `REFUSED_STATUS` now names every refusal. `gpu_pack.activate`: "its worker, `-m` and GUI branches; its refusals end before it". `test_gpu_pack.py` ownership test docstring: the FULL check does list a nested extra (Q2). `tools/package/README.md` (the `--verify` paragraph: the unlisted-file walk; the shim paragraph: fails closed) and `build.py` `verify_pack` docstring (the walk). | docs only | n/a |
 | 7 ADVISORY (OUT of envelope) | BANK | none | none | n/a |
 
-**Banked (r4 #7), for the report's limits and for WP6.3.** The full `--verify` walk uses
-`os.walk` with `followlinks=False`, so it does not follow directory symlinks or junctions. A file
-behind a link planted inside an owned package escapes Q2's accounting. WP6.3's installer
-verification should reject any link (symlink, junction, other reparse point) under the pack.
+**Banked (r4 #7), for the report's limits and for WP6.3 (CHARC bae5dba5 (4), verbatim):** the
+full --verify does not follow directory links; WP6.3: the full --verify rejects any reparse
+point / symlink under the pack, and the downloader never creates one.
 
 ### Commands (worktree root, Git Bash, `PYTEST_ADDOPTS` unset; logs in `t3g/`)
 
@@ -2500,5 +2499,26 @@ and again at the end).
    REJECTED: `--` is not a key of `LONG_VALUE_OPTIONS`, and the table's `--` rows pass.
 
 A second pass found nothing new.
+
+### CHARC's amendment to dispatch-10 (ruling `bae5dba5`, relayed by the dispatcher), folded in
+
+**Timing:** the amendment asked for this BEFORE the code commit. It reached me after
+`08a96243` was committed, so it is a follow-up commit (below). Nothing was rebuilt.
+
+| Item | Fold-in (file) | Test | Result on the old code |
+|---|---|---|---|
+| (1) the grammar records its CPython | `__main__`: `GRAMMAR_PYTHON_VERSION` = `"3.12.13 (main, Mar  3 2026, 15:01:35) [MSC v.1944 64 bit (AMD64)]"` and `GRAMMAR_PYTHON_VERSION_INFO` = `(3, 12, 13, "final", 0)`. Both were read from the deriving interpreter: `sys.version` and `tuple(sys.version_info)`. `t3g/grammar-letters.txt` also carries the `version_info` line now. The rule is unchanged: run-modifier long options are consumed like `-W` / `-X`; `--help*`, `--version` and unknown `--x` reach the GUI. | NEW `test_the_grammar_table_was_derived_from_this_python_minor_version`: the version string matches the tuple, and `sys.version_info[:2]` must EQUAL the recorded `[:2]`; otherwise it FAILS with "re-derive it". | `49150ccf`: FAILS (no constant). Mutation `(3, 13, 0, "final", 0)` on a copy of the final `src` (`t3g/pytest-amend-mutation-version.log`): FAILS, with the re-derive message. |
+| (2) #4 fail closed | CONFIRMED as built in `08a96243`; no change | -- | -- |
+| (3) #5: the refusal is the FIRST statement after the arguments are read | `main`: `if getattr(sys, "frozen", False) and multiprocessing_reentry(arguments): return _refuse(...)` follows `arguments = ...` directly. The `frozen = ...` local now comes after it. | the two multiprocessing tests, unchanged (PATH observed) | `49150ccf`: 5 FAIL (`t3g/pytest-amend-before-on-49150ccf.log`) |
+| (4) #7's ledger line | the "Banked (r4 #7)" line above now reads as CHARC worded it | -- | -- |
+
+| Command | Exit | Summary |
+|---|---|---|
+| the three owned modules (`c61g-10`) | 0 | **307 passed in 30.48 s** (+1) |
+| the WIDER run (`c61g-11`) | 0 | **500 passed, 41 deselected in 45.35 s** |
+| the amendment's tests on `49150ccf` (`c61g-12`; no entry point in the new test, rule unchanged for the other two) | 1 | 6 failed (the version test + the 5 multiprocessing cases) |
+| `ruff check .` / `ruff format --check .` / `mypy` / `mypy --strict` (2 touched files, win32 and `--platform darwin`) | 0 | clean; 323 files formatted; 161 files no issues; 2 / 2 files no issues |
+
+The owner-log md5 was `69ed0432c562db9445daecbe8f15fe27` after these runs.
 
 Depth at turn-3 group-2b-5 end: DISPATCHER TO FILL
