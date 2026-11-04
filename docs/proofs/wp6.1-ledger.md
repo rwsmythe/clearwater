@@ -1972,3 +1972,74 @@ Owner log md5 `69ed0432c562db9445daecbe8f15fe27` at every check (13:35-13:55Z; a
 `t3e/headers_repro.py`.
 
 Depth at turn-3 group-2b-3 (F-E shim) end: DISPATCHER TO FILL
+
+## Turn 3 group 2b-3 (Reviewer A r3 fold-in) (2026-11-04 ~14:00-14:40Z): the r3 fixes on top of the F-E shim -- MID-BUILD YIELD, no build
+
+Same cell (wp61-cell6). The work: the dispatcher's amendment (fold Reviewer A round 3,
+`clearwater-review-evidence/wp6.1/A/r3/review.txt`, into the pending change) and CHARC's rulings
+on #3 and its precisions.
+
+- **Timing note.** The amendment ("DO NOT REBUILD YET") reached me after the F-E-shim builds of
+  `62198baf`; those builds are superseded by this change. Nothing was built in this group.
+- No pack-activating run was made. F-F (the CUDA headers) is still with CHARC and NOT in this
+  change.
+
+Commit `48c0891f`. The before-record (its line numbers are those of the test files as run then; `test_gpu_pack.py` was reformatted afterwards) is the three owned test modules with `PYTHONPATH` /
+`WP61_BUILD_SCRIPT` on `git archive e0a90bc5` src and tools (`t3e/pytest-r3-before-on-e0a90bc5.log`):
+**42 failed, 220 passed**. The rule check came first (`t3e/rule-check-r3.txt`, 25 call sites).
+The owner log md5 was unchanged before and after.
+
+| # | Fix (file) | Test(s) | On `e0a90bc5` |
+|---|---|---|---|
+| 1 MAJOR | `__main__.main`: the `--export-worker` dispatch is inside `if sys.frozen`. A source `python -m clearwater --export-worker` reaches `app.main` as in 1.0.0. | `:161` re-pointed: `test_a_source_run_sends_the_worker_flag_to_the_gui_as_1_0_0_did` (GUI stand-in, `calls` redirect). The worker tests became frozen-simulated, with the shim stubbed: `test_the_frozen_worker_flag_runs_the_shim_the_loader_then_the_worker_without_qt` pins the order shim -> loader -> worker. `test_the_worker_flag_alone...` is now frozen. The fresh-interpreter worker-import probe sets `sys.frozen`. | `:174` (the worker ran: 7, not 3); the frozen order test `:196` (no shim); F-E (iii) `:689` |
+| 2 MAJOR | `interpreter_reentry`: a character scanner over CPython 3.12's option grammar. `FLAG_LETTERS` `bBdEiIOPqsSuvx` (from `python -h`) may be clustered. `VALUE_LETTERS` `WX` take the rest of the cluster or the next argument. `REENTRY_LETTERS` `mc` take an attached or the next operand. Any other letter (`h`, `V`, `?`, `p`, `t`, `w`, ...), `-`, `--`, or a non-option = not a re-entry (GUI). `REENTRY_ARGUMENT` / `LEADING_FLAGS` / `VALUED_FLAGS` are removed. | grammar table +27 rows: `-Xutf8 -m`, `-Wignore -m`, `-Wignore -cpass`, `-OO`, `-Es`, `-IIs`, `-bb`, `-IXutf8`, `-IW ignore`, `-IIm`, `-E -s -m`, `-movie.mp4`; and the GUI ones: `-X`, `-Xutf8` alone, `-h`, `-V`, `-?`, `-hm a`, `--version`, `-`, `--`, `-- -m a`, empty, non-ASCII, `-style=fusion`. `test_every_spelling_of_dash_m_runs_a_pack_module` +4 (`-Xutf8`, `-Wignore`, `-OO`, `-Es`). `test_cpythons_own_interpreter_flags_prefix_is_a_re_entry`: a child started `-OO -Wignore -Xutf8` prints `_args_from_interpreter_flags()` (it emits `-OO`, `-Wignore`, `-X utf8`); that prefix and this process's own, each before `-m x`, give `["-m", "x"]`. | `:1171` x10 (9 new forms, plus `-hm a`, which the old regex took as a re-entry: CPython would print its help); `:1230` x4 (`:49`, the GUI blocked); `:1200` |
+| 3 MAJOR (CHARC: REFUSE) | `MULTIPROCESSING_FLAGS` = `--multiprocessing-fork`, `--multiprocessing-resource-tracker`; `multiprocessing_reentry` matches ANY argument after the program name. Frozen only, it is checked FIRST, before the worker flag and the `-m` / `-c` grammar: `Clearwater: multiprocessing children are not supported`, status 2, nothing else consulted (no shim, loader, log or GUI). The list was read from BOTH bundles' frozen code (`t3e/mp_flags.py` -> `t3e/mp-flags.txt`: the 23 PYZ `multiprocessing*` modules and every CArchive script / module entry). The only `--multiprocessing-` string is `--multiprocessing-fork` (`multiprocessing.spawn`). `--multiprocessing-resource-tracker` is CHARC's name; no bundled code emits it. `freeze_support()` is not called. | `test_a_frozen_multiprocessing_re_entry_is_refused_before_every_branch[4]` (`resource-tracker`; after `--export-worker`, after `-m`, after `-c`); `test_the_real_multiprocessing_spawn_command_line_is_refused_when_frozen` (`multiprocessing.spawn.get_command_line(parent_pid=123, pipe_handle=456)` with `sys.frozen` set: `[exe, "--multiprocessing-fork", ...]`); `test_a_source_run_sends_a_multiprocessing_flag_to_the_gui_as_before` (1.0.0) | `:240` / `:241` x4 (the GUI stand-in ran, or `-c`'s line); `:262`; the source pin PASSES by design |
+| 4 MAJOR | `gpu_pack.parse_record` validates each row up front. CSV errors; exactly 3 fields; no NUL; a non-empty path; a hash empty or `<alg>=<base64>` (`_RECORD_HASH`); a size empty or 1-20 ASCII digits (`_RECORD_SIZE`); then each path part (split at `/` and backslash) through `_component_problem`. `pack_problems` is now a wrapper over `_pack_problems`: an `OSError` gives `pack unreadable: <type>`, any other exception `pack check failed: <type>`. `check_pack` catches any exception too. `--verify` uses the same wrapper. | `test_a_malformed_or_escaping_record_row_is_rejected`, one row per probe with its REASON: `.,,1` -> `RECORD row path not allowed (an empty or '.' part): .`; an embedded NUL -> `RECORD malformed: row 8: a NUL character`; a 5,000-digit size -> `... a size not of 1-20 digits`; `not-a-hash` -> `... a hash not of the form algorithm=base64`. The two old rows' reasons gain their `: <what>` suffix. `test_any_exception_in_the_walk_is_a_rejection_at_start_up_and_in_verify` (`_row_problems` raising `IndexError`: `pack check failed: IndexError`, and `--verify` lists it, exit 1). | `test_gpu_pack.py:816` x10 (the old reasons, or an exception); `:976` (the `IndexError` escaped) |
+| 5 MINOR | `_component_problem`: `:` (ADS or a drive), a trailing `.` or space, an empty part (`a//b`). | rows `ads`, `trailing-dot` (`cupy/__init__.py.`), `trailing-space`, `empty-part` | in `:816` above (the old code accepted the trailing-dot and trailing-space rows: the file resolved) |
+| 6 MINOR | `__main__._path_key` drops surrounding double quotes. `prepend_executable_folder` treats a quoted first entry as not yet first, because `shutil.which` does not strip quotes (`Lib/shutil.py:1523-1526` only splits). | `test_a_quoted_spelling_of_the_folder_is_dropped_from_behind`: `x;"<folder>"` -> `<folder>;x`; `"<folder>";x` -> `<folder>;x`, then unchanged | `:436` |
+| 7 MINOR | `_add_dll_directories` lists `nvidia` with `os.scandir` (an access error becomes `DLL folders unreadable: <type>`). | `test_an_unlistable_nvidia_folder_rejects_the_pack` | `test_gpu_pack.py:1003` (via `_rejected` `:469-471`: loaded, with no DLL folders) |
+| 8 MINOR | `_safe()` on the folder name in `DLL folder nvidia/<name>/bin: <type>`. | `test_a_failing_non_ascii_dll_folder_is_named_in_ascii` (`nvidia/\xe9/bin`) | `:1024` |
+| 9 MINOR | `build.name_violations`: allowlist and stdlib membership case-folded (`_ALLOWED_FOLDED`, `_STDLIB_FOLDED`). | `test_the_dependency_allowlist_is_case_folded` (`pyside6/QtCore.pyd`, `NUMPY/x.pyc`, `JSON.pyc` pass; `AV/x.pyd` is still `unexpected-module`) | `test_tools_package_build.py:757` |
+| 10 MINOR | test only | `test_a_frozen_dash_m_runs_a_pack_module_after_the_loader_without_qt` now records, through `PROBE_SYS_BODY`, `sys.argv[0]` and `sys.modules["__main__"].__file__` (each must be the module's file). Mutation run (`t3e/pytest-r3-mutation-alter-sys.log`, `alter_sys=False` on a copy of the new src): **1 failed**, `assert 'Clearwater.exe' == '...probe.py'`. | passes (the old code is correct; the test now catches the mutation) |
+| 11 ADVISORY | `build.forbidden_entries` also checks a PYZ entry's own name, by the name rules. | `test_a_pyz_containers_own_name_is_checked` (a PYZ named `cupy/runtime.pyd` holding only `json`: `gpu-module`; a canonical `PYZ.pyz`: clean). The test helper `make_exe` gained `pyz_name`. | `:766` |
+| 12 ADVISORY | `build.pack_sources()` (the pack's own set) raises `ValueError` when an installed version is not the lock's. `build()` turns that, and a missing distribution, into `FAILED: the pack sources cannot be scanned: ...`, exit 1 (it raised before). | `test_a_pack_distribution_at_another_version_fails_the_scan_and_the_build` (a stale `cupy-cuda12x` 0.0) | `:792` (DID NOT RAISE) |
+
+The rest of the 42: the F-E tests (i) `:592` and (ii) `:658`, as in the F-E group ((iii) `:689` is
+counted under #1). The frozen worker-flag-alone test PASSES on the old code by design (the old worker branch
+gives `[]` too).
+
+Commands (worktree root, Git Bash, `PYTEST_ADDOPTS` unset; logs in `t3e/`):
+
+| Command | Exit | Summary |
+|---|---|---|
+| the three owned modules (`c61f-6`) | 0 | 262 passed in 10.57 s |
+| the same on `e0a90bc5` (`c61f-7`) | 1 | 42 failed, 220 passed |
+| the wider set (the 7 modules, `-m "not gpu"`, `c61f-10`) | 0 | **413 passed, 41 deselected in 32.72 s** |
+| `ruff check .` / `ruff format --check .` | 0 / 0 | All checks passed / 322 files already formatted |
+| `mypy` / `mypy --strict` on the 6 touched files, win32 and `--platform darwin` | 0 / 0 / 0 | 160 files / 6 / 6, no issues |
+| `build.py --verify` on the real pack with the new row validation (`t3e/verify-6-new-validation.log`) | 0 | PASS, 2701 rows / files, 2412.6 MiB (every real row passes the new checks) |
+
+Self-review (suspected / confirmed / fixed):
+
+1. A heredoc collapsed `\\x00` into a literal NUL byte and `[/\\]` into `[/\]` in `gpu_pack.py`.
+   Confirmed by a byte count. Fixed with a byte-level replacement from a written script; the
+   file now holds 0 NUL bytes.
+2. The F-E (iii) test, the fresh-interpreter worker probe and its mutation twin assumed a source
+   `--export-worker` reaches the worker. Confirmed by 2 failures. Re-pointed (above).
+3. A quoted first `PATH` entry was "already first". Confirmed by reading `shutil.which`. Fixed:
+   it is rewritten unquoted.
+
+A second pass found nothing new.
+
+Slip (mine): one tool call carried a stray `cd /dev/null` (it failed; no effect). Not repeated.
+
+Owner log md5 `69ed0432c562db9445daecbe8f15fe27` at every check (a check only).
+`%LOCALAPPDATA%\Clearwater` is absent. The pack is unchanged (0 `.pyc`, `--verify` PASS).
+
+For the one rebuild after F-F's ruling, read from both bundles before any with-pack run:
+`interpreter_reentry`, `run_interpreter_option`, `isolate_worker_stdin`,
+`multiprocessing_reentry` and `main` (bytecode equal to the source; `main` names both new
+functions; `MULTIPROCESSING_FLAGS` present). `t3e/handler_check.py` needs `multiprocessing_reentry`
+added to its list.
+
+Depth at turn-3 group-2b-3 (A r3 fold-in) end: DISPATCHER TO FILL
