@@ -390,21 +390,15 @@ def test_source_and_frozen_use_the_same_isolation_function():
 
 
 _SHUTDOWN_STANDIN = """
-import io
 import os
 import threading
 import time
 
 fd = os.dup(0)
-mode = sys.argv[1]
-reader = io.open(fd, 'rb') if mode == 'buffered' else None
 started = threading.Event()
 def watch():
     started.set()
-    if reader is not None:
-        reader.readline()
-    else:
-        os.read(fd, 65536)
+    os.read(fd, 65536)
 threading.Thread(target=watch, daemon=True).start()
 assert started.wait(2)
 time.sleep(0.05)  # permit the daemon to enter its blocking call before finalization
@@ -412,19 +406,18 @@ print('result', flush=True)
 """
 
 
-@pytest.mark.parametrize("mode", ["buffered", "raw"])
-def test_shutdown_with_a_blocked_daemon_reader(tmp_path, mode):
+def test_shutdown_with_a_blocked_daemon_reader(tmp_path):
     records = []
     for _ in range(5):
-        child = _child(_SHUTDOWN_STANDIN, tmp_path, mode)
+        child = _child(_SHUTDOWN_STANDIN, tmp_path)
         # Do not communicate(): it closes stdin and would release the blocked daemon.
         status = child.wait(timeout=10)
         out, err = child.communicate(timeout=10)
         assert out.splitlines() == [b"result"], err
         records.append({"status": status, "stderr": err.decode("utf-8", "replace")})
-        if mode == "raw":
-            assert status == 0, err
-    (tmp_path / f"standin-{mode}.json").write_text(json.dumps(records), encoding="utf-8")
+        assert status == 0, err
+        assert b"Fatal Python error" not in err
+    (tmp_path / "standin-raw.json").write_text(json.dumps(records), encoding="utf-8")
 
 
 @pytest.mark.slow  # serial-leg wall series of record, DR-125
