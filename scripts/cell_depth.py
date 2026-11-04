@@ -163,7 +163,7 @@ class TranscriptStats:
     version that wrote it (the top-level ``version`` key). A cell whose
     transcript carries two of them ran across a binary change -- a REGIME
     VARIABLE, not noise, and the same class of event that went unrecorded
-    inside v17's seed 8 attempt 2. Reported rather than judged: this reader
+    inside one long run. Reported rather than judged: this reader
     says WHAT it read; the `[ctx]` consumer decides what to do about it."""
 
     __slots__ = ("current", "peak", "turns", "malformed", "cli_versions")
@@ -466,6 +466,7 @@ def find_agents(cells: list[_Transcript], project: Path, session: str | None,
     selected: set[Path] = set()
     missing: list[str] = []
     noted: set[tuple[str, str]] = set()
+    cross_session_noted: set[str] = set()
     for agent_id in agent_ids:
         matches = [(session_id, path) for name, session_id, path in cells
                    if name == agent_id or path.stem == f"agent-a{agent_id}"]
@@ -484,6 +485,10 @@ def find_agents(cells: list[_Transcript], project: Path, session: str | None,
                       f"{session_id[:8]}; use the full name-hash stem to read one",
                       file=sys.stderr)
                 noted.add((agent_id, session_id))
+        if session is None and len(session_counts) > 1 and agent_id not in cross_session_noted:
+            print(f"NOTE: --agent {agent_id} matched transcripts in {len(session_counts)} "
+                  "sessions; pass --session=<session-id> to read one", file=sys.stderr)
+            cross_session_noted.add(agent_id)
     return [cell for cell in cells if cell[2] in selected], missing
 
 
@@ -668,8 +673,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{prefix}: no cell transcript found; searched: {pattern}",
                       file=sys.stderr)
             return 3 if discovery_errors else 4
+    positional_miss = False
     if args.cell:
+        had_cells = bool(cells)
         cells = [cell for cell in cells if args.cell in cell[0]]
+        positional_miss = had_cells and not cells
     discovered = bool(cells)
     ages: dict[Path, float] = {}
     stamp = time.time()
@@ -722,7 +730,9 @@ def main(argv: list[str] | None = None) -> int:
         advice = ("verify the project directory and session id" if args.sessions else
                   "verify the project directory and session id; a directory "
                   "without a subagents/ subdirectory will always report this")
-        print(f"NO CELLS FOUND under {project} (glob: {pattern}) -- {advice}",
+        filter_desc = (f" (positional filter {args.cell!r} matched none)"
+                       if positional_miss else "")
+        print(f"NO CELLS FOUND under {project} (glob: {pattern}){filter_desc} -- {advice}",
               file=sys.stderr)
         return 1
 

@@ -850,7 +850,7 @@ class CliVersionSetTest(unittest.TestCase, TmpDirMixin):
 
 
 class SelectorCliTest(unittest.TestCase, TmpDirMixin):
-    """Port the sibling reader's selectors onto strict transcript discovery."""
+    """Selector tests: --live / --sessions / --agent with strict discovery."""
 
     def setUp(self) -> None:
         TmpDirMixin.setUp(self)
@@ -878,7 +878,8 @@ class SelectorCliTest(unittest.TestCase, TmpDirMixin):
 
     def _run(self, *extra: str) -> tuple[int, str, str]:
         out, err = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), \
+                mock.patch.object(cd.time, "time", return_value=self.now):
             rc = cd.main(["--project", str(self.tmp), *extra])
         return rc, out.getvalue(), err.getvalue()
 
@@ -1266,10 +1267,15 @@ class SelectorCliTest(unittest.TestCase, TmpDirMixin):
                 self.assertEqual(rc, 2)
                 self.assertEqual(len(out.splitlines()), rows)
                 notes = [line for line in err.splitlines() if line.startswith("NOTE:")]
-                self.assertEqual(notes, [
+                expected = [
                     "NOTE: --agent reused matched 2 transcripts in session sess-1; "
                     "use the full name-hash stem to read one",
-                ])
+                ]
+                if rows == 3:
+                    expected.append(
+                        "NOTE: --agent reused matched transcripts in 2 sessions; "
+                        "pass --session=<session-id> to read one")
+                self.assertEqual(notes, expected)
         rc, out, err = self._run("--session", "sess-1", "--agent", "reused-fedcba9876543210")
         self.assertEqual(rc, 0)
         self.assertEqual(len(out.splitlines()), 1)
@@ -1321,6 +1327,54 @@ class SelectorCliTest(unittest.TestCase, TmpDirMixin):
         self.assertIn("agent-ahidden.jsonl", err)
         self.assertIn("agent-amissing.jsonl", err)
         self.assertNotIn("USAGE ERROR", err)
+
+    def test_agent_cross_session_note_preserves_rows_and_status(self) -> None:
+        self._cell("shared", 450_000, age=30, session="sess-a")
+        self._cell("shared", 100_000, session="sess-b")
+        rc, out, err = self._run("--agent", "shared", "--agent", "shared")
+        self.assertEqual(rc, 2)
+        self.assertEqual(len(out.splitlines()), 2)
+        self.assertIn("session=sess-a", out)
+        self.assertIn("session=sess-b", out)
+        self.assertEqual([line for line in err.splitlines() if line.startswith("NOTE:")], [
+            "NOTE: --agent shared matched transcripts in 2 sessions; "
+            "pass --session=<session-id> to read one",
+        ])
+        rc, out, err = self._run("--session", "sess-b", "--agent", "shared")
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(out.splitlines()), 1)
+        self.assertIn("session=sess-b", out)
+        self.assertNotIn("NOTE:", err)
+
+    def test_sessions_is_file_failure_is_incomplete_or_strict_error(self) -> None:
+        entry = mock.Mock()
+        entry.name = "blocked.jsonl"
+        entry.path = str(self.tmp / entry.name)
+        entry.is_file.side_effect = PermissionError(errno.EACCES, "simulated")
+        with mock.patch.object(cd, "_scan_dir_entries", return_value=[entry]):
+            with self.assertRaisesRegex(cd.DiscoveryError, "cannot stat"):
+                list(cd.discover_sessions(self.tmp, None))
+            errors: list[Exception] = []
+            self.assertEqual(list(cd.discover_sessions(self.tmp, None, errors=errors)), [])
+            self.assertEqual(len(errors), 1)
+            self.assertIsInstance(errors[0], cd.DiscoveryError)
+            rc, out, err = self._run("--sessions")
+        self.assertEqual(rc, 3)
+        self.assertEqual(out, "")
+        self.assertIn("DISCOVERY ERROR", err)
+        self.assertIn("cannot stat", err)
+
+    def test_positional_miss_names_filter_in_no_cells_message(self) -> None:
+        self._cell("present", 100_000)
+        self._session(100_000)
+        for extra in (("absent",), ("--live", "6", "absent"),
+                      ("--sessions", "absent")):
+            with self.subTest(extra=extra):
+                rc, out, err = self._run(*extra)
+                self.assertEqual(rc, 1)
+                self.assertEqual(out, "")
+                self.assertIn("NO CELLS FOUND", err)
+                self.assertIn("(positional filter 'absent' matched none)", err)
 
 
 if __name__ == "__main__":

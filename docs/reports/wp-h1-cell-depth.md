@@ -1,7 +1,9 @@
 # WP-H1: cell_depth selectors completion report
 
-Candidate: build `b4e6a19e`, Reviewer A r1 fixes `6bd5fb99`, and the uncommitted
-Reviewer A r2 tidy reported here. Date: 2026-11-04. Reviewer B: PENDING (orchestrator's seat).
+Committed starting candidate: `f6b53883`, the orchestrator's ledger commit on top of
+`411ce22f` (Reviewer A r2 tidy and this report), following build `b4e6a19e` and
+Reviewer A r1 fixes `6bd5fb99`. Date: 2026-11-04. This turn adds the single
+Reviewer B remediation; the dispatcher records its commit from the return report.
 The package changes the harness reader, its tests, and one dispatch-recipe paragraph.
 It changes no product file, dependency, transcript, or frozen depth interface.
 
@@ -25,7 +27,9 @@ Function-by-function integration:
 - `find_agents` reuses discovered named and anonymous cells. CHARC's later exact-match
   ruling supersedes swing's prefix glob: parsed name/hash equals ID, or the stem
   equals `agent-a<ID>`. Repeated IDs do not duplicate rows. Reusing a name within one
-  session prints one NOTE per ID/session, preserving selection and exit status.
+  session prints one NOTE per ID/session. Matches across sessions without `--session`
+  print one additional NOTE per ID, suggesting a session restriction. Both warnings
+  preserve selection and exit status.
 - `session_transcript_path` derives the parent from the cell's own path. It cannot
   cross into another project. Parent age uses one guarded stat; a missing parent
   excludes an old cell without crashing, while permission errors remain visible.
@@ -69,6 +73,8 @@ negative zero normalized to zero, and positive infinity are valid. Positive infi
 intentionally includes every measurable transcript. F3 requires exact identity and
 rejects an empty ID with 4 before discovery, including when discovery would fail.
 Agent plus live, and agent plus sessions, return 4.
+When a positional filter removes every discovered transcript, exit 1 remains LOUD
+and now names the filter in the NO CELLS FOUND message (B6).
 
 ## Row format and the protected test
 
@@ -137,25 +143,39 @@ Reviewer A r2 adds five tests:
 The existing added zero/infinity test also asserts negative-zero normalization.
 All newly added fixture names are neutral; no locked fixture was renamed.
 
-Counts: reader 47 -> 67 (build) -> 80 (A r1) -> 85 (A r2 tidy);
-harness 382 -> 402 -> 415 -> 420. Turn-5 RED ran 85 tests with four expected
+Reviewer B adds three tests:
+`test_agent_cross_session_note_preserves_rows_and_status`,
+`test_sessions_is_file_failure_is_incomplete_or_strict_error`, and
+`test_positional_miss_names_filter_in_no_cells_message`.
+The added reused-name test now expects the cross-session NOTE when applicable.
+The shared selector `_run` patches the reader's time source to the fixture's
+`self.now`, removing drift from age assertions without changing any old helper.
+The is_file failure test covers strict DiscoveryError, error accumulation, and
+the CLI's exit 3 with DISCOVERY ERROR.
+
+Counts: reader 47 -> 67 (build) -> 80 (A r1) -> 85 (A r2 tidy) -> 88 (B remediation);
+harness 382 -> 402 -> 415 -> 420 -> 423. Turn-5 RED ran 85 tests with four expected
 assertion/subtest failures (warning, missing-id diagnostics, and negative zero),
-with no import errors. Shimmed GREEN ran 85 tests successfully. The shimmed
-whole suite ran 420 tests with three known sandbox failures and one skip.
-The dispatcher's unshimmed suite passed 415 before this tidy; final 420-test
-seat verification remains the orchestrator's gate.
+with no import errors. Reviewer B then ran 85 reader tests and 420 whole-suite
+tests successfully, unshimmed, on `f6b53883` (one whole-suite skip).
+Turn-6 RED ran 88 tests with five expected assertion/subtest failures and no errors
+(missing cross-session NOTE and positional-filter diagnostics). Shimmed GREEN
+ran all 88 tests successfully. This turn's shimmed whole suite ran 423 tests with
+the same three sandbox failures and one skip; the orchestrator will confirm this
+remediated candidate unshimmed.
 
 The exact requested unshimmed reader command was also executed:
 `uv run --no-sync python -m unittest discover -s tests/harness -p test_cell_depth.py`.
-Under the restricted token it ran 85 tests with 71 PermissionErrors and two
+Under the restricted token this turn it ran 88 tests with 73 PermissionErrors and two
 assertion failures caused by temp-directory permissions. Loading the supplied
-`sandbox_mkdir_shim` gives the 85-test GREEN result. The suite command was:
+`sandbox_mkdir_shim` gives the 88-test GREEN result. The suite command was:
 
 ```text
 PYTHONPATH=scripts uv run --no-sync python -c "import sandbox_mkdir_shim, unittest, sys; sys.exit(0 if unittest.main(module=None, argv=['unittest','discover','-s','tests/harness'], exit=False).result.wasSuccessful() else 1)"
 ```
 
-TMP/TEMP point inside `work/wp-h1/turn5/tmp`. Logs are in `work/wp-h1/turn5/`.
+TMP/TEMP point inside `work/wp-h1/turn6/tmp`. This turn's logs are in
+`work/wp-h1/turn6/`; preceding evidence remains in the earlier turn folders.
 The three whole-suite sandbox residuals, unchanged from the preceding turn, are:
 
 - `test_dependency_posture.DependencyPostureTest.test_subprocess_no_site_packages_runs_core`:
@@ -190,16 +210,34 @@ All three pass in the dispatcher's unshimmed seat run. They were not changed.
 | A2 advisory 6 | Implemented | Negative zero normalized; output assertion prevents -0h |
 | A2 advisory 7 | KEPT, no change | Read-error tests remain useful bookkeeping coverage; stat-error cases pin the empty-window guards |
 | A2 advisory 8 | Implemented | Only added fixture strings renamed to neutral names |
-| Reviewer B | PENDING (orchestrator's seat) | Final candidate and live/gate evidence go to the dispatcher |
+| Reviewer B | NO_NEW_CRITICAL_MAJOR on `f6b53883` | 420 OK unshimmed; no false-clean path; 14 of 16 mutations killed; core, lock, row forms, recipe commands, ASCII and LF checks passed |
+| B1 | MINOR, fixed this turn | TranscriptStats uses the exact template wording, removing the pre-existing private-lineage hunk from the re-port |
+| B2 | MINOR, fixed this turn | One cross-session NOTE per ID when no session restriction; repeated IDs do not repeat it; selection and exit codes unchanged |
+| B3 | MINOR, fixed this turn | is_file PermissionError test covers strict, collecting, and CLI paths; swallowing errors or dropping collected errors is killed on copies |
+| B4 | MINOR, fixed this turn | Report refreshed with committed candidate, completed B net, current counts, and re-port correction |
+| B5 | ADVISORY, KEPT | Windows session-case mismatch between cell and sessions modes is documented below |
+| B6 | ADVISORY, fixed this turn | Positional-filter miss is named in the existing LOUD exit-1 diagnostic |
+| B7 | ADVISORY, fixed this turn | Added test class docstring describes selectors without another harness reference |
+| B8 | ADVISORY, fixed this turn | Selector helper freezes main's clock at fixture now |
+| B9 | ADVISORY, KEPT | Historical fixture/live evidence is supplied workspace evidence; reviewer could not independently verify the external archive; figures were internally consistent |
+| B10 | ADVISORY, KEPT | P9 still returns 4 before measurement when any requested ID is cleanly missing |
+| B11 | OUT OF ENVELOPE, ADVISORY, KEPT | JSONL directories, name/full-stem collisions, and empty session names retain existing behavior; limits recorded below |
 
 Verification followed suspect -> independently confirm -> fix -> rerun. No confirmed
 finding was rejected as a false positive. The two STOPs were resolved by explicit
 rulings. Reviewer's r2 full pass found no new critical/major issue; its accepted tidy
-items are now covered by the 85-test run. The final B net has not run at this cell.
+items were covered by the 85-test run. The final B net completed at the
+orchestrator's seat on `f6b53883`; this is its one remediation turn.
 Three extra turn-5 mutations (empty-ID guard removed, session boundary exclusive,
 parent boundary exclusive) each ran all 85 tests and failed the intended new test,
 with no errors. Mutation copies and logs stayed under `work/wp-h1/turn5/`; the
 tracked reader's SHA-256 was unchanged by the mutation runs.
+Turn-6 B3 mutations also run on isolated copies: swallowing the is_file OSError
+and dropping only its collected error each run all 88 tests and are killed by
+`test_sessions_is_file_failure_is_incomplete_or_strict_error`, with no test errors.
+The tracked reader is unchanged by these mutation runs. Reviewer B's other surviving
+probe removed the is_file filter itself; directory entries retain their existing
+skip behavior (B11), and no production discovery rule was redesigned.
 
 ## Live reads at the orchestrator's seat
 
@@ -247,12 +285,16 @@ The re-port delta is exactly:
 The report and ledger are instance records. The template re-port is the orchestrator's
 act at accept, with its template-state checks and template harness suite; no push
 without the owner's word. No template clone was modified by this cell.
+B1 aligns TranscriptStats with template commit `80316172`, using exactly
+`inside one long run. Reported rather than judged: this reader`. The re-port delta
+now carries package changes only, without restoring the private lineage wording.
 
-Tracked changes against `d427d223` consist of those three delta files plus the
-docs-only merge files `CLAUDE.md`, `docs/briefs/wp-h1-brief.md`, and
-`docs/charc-state.md`. This new report is an additional untracked owned file until
-the dispatcher commits it. The four cell-owned changed files have zero CR and
-zero non-ASCII bytes. There is no out-of-envelope implementation change.
+`411ce22f` committed the tidy and report; `f6b53883` committed the orchestrator's
+ledger. The accepted history also includes the docs-only merge files `CLAUDE.md`,
+`docs/briefs/wp-h1-brief.md`, and `docs/charc-state.md`. This turn changes only
+the reader, its test module, and this report. The recipe remains byte-identical
+to the starting candidate. All four package-owned files have zero CR and zero
+non-ASCII bytes. There is no out-of-envelope implementation change.
 
 ## Limits and remaining handoff
 
@@ -262,9 +304,20 @@ zero non-ASCII bytes. There is no out-of-envelope implementation change.
 - F7 remains: any project-level `*.jsonl` reads as a session candidate.
 - A name reused within one session gives several rows. The NOTE and full
   `<name>-<hash>` stem identify the remedy; selection is intentionally unchanged.
+- B2 residue: a name reused across sessions still gives every matching row, and an
+  older over-cap row can decide the exit code. The new NOTE suggests `--session`;
+  it does not select the intended session. A full stem can also recur across sessions.
+- B5: on Windows, cell-mode session-directory lookup follows the filesystem's
+  case-insensitive matching, while sessions mode compares the JSONL session name
+  literally. Use the recorded spelling; mismatched case in sessions mode can give
+  LOUD exit 1 even when cell mode finds the directory.
 - An ID that is a 16-hex name can also match an anonymous hash.
-- The three listed sandbox residuals are environmental; final unshimmed 420-test
-  verification is still the dispatcher's responsibility.
+- B11: a name ending in `-<16hex>` can collide with another cell's full-stem ID;
+  a JSONL-named directory is skipped, and a file named `.jsonl` yields an empty
+  session name. These discovery and identity rules were not expanded in this turn.
+- The three listed sandbox residuals are environmental; Reviewer B passed 420
+  unshimmed before remediation, and the dispatcher will confirm the new 423 count.
 - `_loader` is a sibling import, so run the reader tests with `discover -s`.
-- A2 advisories 5 and 7, and F7, intentionally remain unchanged. Reviewer B,
-  final seat gates, acceptance, and template re-port remain at the orchestrator's seat.
+- A2 advisories 5 and 7, F7, and B5/B9/B10/B11 intentionally remain unchanged.
+  The single B remediation is ready; final seat gates, acceptance, and template
+  re-port remain at the orchestrator's seat.
