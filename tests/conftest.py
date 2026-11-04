@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import getpass
 import os
+import sys
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
@@ -335,8 +336,22 @@ def _footage_skip_reason() -> str | None:
     return f"footage folder configured but not an existing folder: {footage}"
 
 
+MACOS_SKIP_REASON = "macOS native leg (WP6.5)"
+"""The skip reason of every ``macos`` test off darwin (AD-36; WP6.4)."""
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Skip every ``footage``-marked test when no footage folder is available."""
+    """Skip ``macos`` tests off macOS, and ``footage`` tests when no footage folder exists.
+
+    The ``macos`` policy backs up each module's explicit ``skipif``: a ``macos``-marked test
+    is collected on every platform (strict markers; the gate's collection identity counts it)
+    and skipped off darwin with :data:`MACOS_SKIP_REASON`, so no gate expression changes.
+    """
+    if sys.platform != "darwin":
+        macos_skip = pytest.mark.skip(reason=MACOS_SKIP_REASON)
+        for item in items:
+            if item.get_closest_marker("macos") is not None:
+                item.add_marker(macos_skip)
     reason = _footage_skip_reason()
     if reason is None:
         return

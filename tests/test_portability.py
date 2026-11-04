@@ -2597,7 +2597,7 @@ def _gui_p33(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
 
     from clearwater.gui import batch_panel, shell, sources
 
-    chosen = str(tmp_path / "dive café 01.MP4")
+    chosen = str(tmp_path / "dive caf\u00e9 01.MP4")
     seen: list[str] = []
 
     def one(parent: object, caption: str, folder: str, filters: str) -> tuple[str, str]:
