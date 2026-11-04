@@ -77,7 +77,7 @@ class BatchItem:
         outputs: The files the item produced.
         warnings: The warnings its job returned.
         failure: The failure text of a failed item, or None.
-        key: The normalised path two spellings of one file share (duplicate detection).
+        key: The key every spelling of one file shares (:func:`_key`; duplicate detection).
     """
 
     path: Path

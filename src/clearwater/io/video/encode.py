@@ -717,7 +717,7 @@ class FFmpegVideoSink:
             probe: The source's probe result.
             out_path: The output file. It is overwritten: the caller's ``SafeWrite``
                 temporary, which exists empty; never a final name.
-            encoder: ``"hevc_nvenc"`` or ``"libx265"`` (already resolved, never ``"auto"``).
+            encoder: An encoder of this platform's roster (already resolved, never ``"auto"``).
             quality: ``"high"``, ``"standard"`` or ``"draft"`` (D75).
             bit_depth: 8 or 10: the source's own, or 10 for an 8-bit source (D76).
             provenance: The provenance to embed in the ``comment`` tag (D91), or None.
