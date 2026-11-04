@@ -2367,6 +2367,26 @@ def test_portability_filesystem_semantics(
     FS_CASES[site](monkeypatch, tmp_path)
 
 
+def test_portability_export_names_an_encoder_outside_the_roster(tmp_path: Path) -> None:
+    """P62 / D26 at the export (CHARC grant, jobs/export.py): a saved known encoder that the
+    platform's capability report does not list fails with the fixed tail; a listed but
+    unavailable one keeps its own reason."""
+    support = importlib.import_module("test_jobs_export_support")
+    rig = support.Rig(tmp_path)
+    result = rig.run(rig.request(video_encoder="hevc_videotoolbox"))
+    assert result.failure == (
+        "clip.mp4: the encoder hevc_videotoolbox is not available here: "
+        "not offered on this platform"
+    )
+    assert rig.source.iterations == 0
+    (tmp_path / "x").mkdir()
+    rig = support.Rig(tmp_path / "x")
+    result = rig.run(rig.request(video_encoder="hevc_nvenc"))
+    assert result.failure == (
+        "clip.mp4: the encoder hevc_nvenc is not available here: no NVIDIA encoder here"
+    )
+
+
 @pytest.mark.parametrize("char", [":", "\\", "/"])
 def test_portability_output_name_refusal_names_the_character(char: str) -> None:
     """P70, item 9: one refusal per character, naming it and the stem (no silent rename)."""

@@ -878,9 +878,10 @@ class ExportEngine:
         bit_depth = 10 if video.bit_depth == 10 or settings.ten_bit_for_eight_bit else 8
         capability = next((c for c in capabilities if c.name == encoder), None)
         if capability is None or not capability.available:
-            why = (
-                "" if capability is None or capability.reason is None else f": {capability.reason}"
-            )
+            if capability is None:  # a saved known encoder outside this platform's roster (D26)
+                why = ": not offered on this platform"
+            else:
+                why = "" if capability.reason is None else f": {capability.reason}"
             raise _FailureError(f"{run.name}: the encoder {encoder} is not available here{why}")
         if bit_depth not in capability.bit_depths:
             raise _FailureError(
