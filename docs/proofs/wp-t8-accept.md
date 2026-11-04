@@ -88,4 +88,4 @@ Archive: `clearwater-review-evidence\wp-t8\gate\`.
 
 ## Merge
 
-(filled below at the merge)
+Harness gate on `8d2f3a52` (the accept record's commit `22df34c5` plus the merge of main `8e956d71`; the package's code unchanged since `ad385cbb`, the gate of record): `uv run python -m unittest discover -s tests/harness` -> Ran 423 tests, OK (skipped=1); no registration needed for the two new files (`docs/reports/`, `docs/proofs/` are instance-surface prefixes). `main` fast-forwarded to `wp-t8` by the orchestrator. The worktree `.worktrees/wp-t8` is released after the merge (its `work/` pruned only on the owner's word).
