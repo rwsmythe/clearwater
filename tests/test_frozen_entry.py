@@ -20,8 +20,9 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -568,6 +569,40 @@ def _app_data_environ(root: Path) -> dict[str, str]:
     return environ
 
 
+def _within(read: Callable[[], bytes], timeout: float, what: str) -> bytes:
+    """Run one blocking read of a child's pipe on a daemon thread; fail the test at the deadline.
+
+    Reviewer A r5 #1: no raw ``read`` / ``readline`` on a child pipe without a deadline. The
+    thread is a daemon, so a read still blocked at the deadline cannot hold pytest open; the
+    caller's ``finally`` ends the child it started.
+
+    Args:
+        read: The bound read (``stream.readline`` or ``stream.read``).
+        timeout: Seconds to wait for it.
+        what: What is read, for the failure message.
+
+    Returns:
+        The bytes read.
+    """
+    got: list[bytes] = []
+    failed: list[BaseException] = []
+
+    def target() -> None:
+        try:
+            got.append(read())
+        except BaseException as error:  # handed to the test thread below
+            failed.append(error)
+
+    reader = threading.Thread(target=target, daemon=True)
+    reader.start()
+    reader.join(timeout)
+    if reader.is_alive():
+        pytest.fail(f"no {what} within {timeout} s")
+    if failed:
+        raise failed[0]
+    return got[0]
+
+
 def test_a_child_of_the_frozen_worker_branch_inherits_nul_not_the_request_pipe(
     tmp_path: Path,
 ) -> None:
@@ -591,16 +626,19 @@ def test_a_child_of_the_frozen_worker_branch_inherits_nul_not_the_request_pipe(
         stderr=subprocess.PIPE,
         env=_app_data_environ(tmp_path),
     )
-    try:
-        status = process.wait(timeout=60)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        raise
-    finally:
-        assert process.stdin is not None
-        process.stdin.close()
+    assert process.stdin is not None
     assert process.stdout is not None and process.stderr is not None
-    out, err = process.stdout.read().decode(), process.stderr.read().decode()
+    try:
+        status = process.wait(timeout=60)  # the request pipe held open meanwhile
+        process.stdin.close()
+        out = _within(process.stdout.read, 30, "worker stdout").decode()
+        err = _within(process.stderr.read, 30, "worker stderr").decode()
+        process.stdout.close()  # both reads done: no reader thread holds them
+        process.stderr.close()
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=60)
     assert status == 0, err
     seen = json.loads(out.strip().splitlines()[-1])
     assert seen["child_read"] == "0"
@@ -757,10 +795,15 @@ def test_the_end_of_the_request_pipe_reaches_the_workers_reader_through_the_shim
             stderr=subprocess.PIPE,
             env=environ,
         )
-        assert worker.stdin is not None
-        worker.stdin.write(b'{"request": 1}\n')
-        worker.stdin.close()  # the parent's end goes: the worker must see the end of the stream
-        _, err = worker.communicate(timeout=60)
+        try:
+            # communicate() writes the request, then CLOSES the parent's end of the pipe: the
+            # worker must see the end of the stream. No close before it (Reviewer A r5 #4: on
+            # POSIX, communicate() flushes stdin first and raises on a closed one).
+            _, err = worker.communicate(input=b'{"request": 1}\n', timeout=60)
+        finally:
+            if worker.poll() is None:
+                worker.kill()
+                worker.wait(timeout=60)
         assert worker.returncode == 0, err.decode("utf-8", "replace")
     else:
         parent = subprocess.Popen(
@@ -779,17 +822,29 @@ def test_the_end_of_the_request_pipe_reaches_the_workers_reader_through_the_shim
             env=environ,
         )
         assert parent.stdout is not None
-        worker_pid = int(parent.stdout.readline())
-        parent.kill()  # dies holding the request pipe's write end
-        parent.wait(timeout=60)
-        for _ in range(600):  # up to 60 s for the worker's record
-            if record.exists() and record.stat().st_size:
-                break
-            time.sleep(0.1)
-        else:
-            with contextlib.suppress(OSError):
-                os.kill(worker_pid, 9)
-            pytest.fail("the worker never saw the end of its request pipe")
+        worker_pid: int | None = None
+        recorded = False
+        try:
+            # Reviewer A r5 #1: the PID read has a deadline. Should it pass with no PID, the
+            # parent is killed below, and the worker (if any) ends by itself: its request pipe
+            # closes with the parent and its own wait is bounded at 30 s.
+            worker_pid = int(_within(parent.stdout.readline, 60, "worker PID from the parent"))
+            parent.kill()  # dies holding the request pipe's write end
+            parent.wait(timeout=60)
+            for _ in range(600):  # up to 60 s for the worker's record
+                if record.exists() and record.stat().st_size:
+                    recorded = True
+                    break
+                time.sleep(0.1)
+            else:
+                pytest.fail("the worker never saw the end of its request pipe")
+        finally:
+            if parent.poll() is None:
+                parent.kill()
+                parent.wait(timeout=60)
+            if worker_pid is not None and not recorded:
+                with contextlib.suppress(OSError):
+                    os.kill(worker_pid, 9)
     seen = json.loads(record.read_text(encoding="utf-8"))
     assert seen["request"] == '{"request": 1}\n'
     assert seen["eof"] is True
@@ -1546,12 +1601,21 @@ def test_the_option_letters_are_cpythons_by_execution() -> None:
 
 def test_the_long_options_are_cpythons_by_execution() -> None:
     """Reviewer A r4 #1: ``--check-hash-based-pycs`` takes the next argument, one of its three
-    values; CPython refuses the ``=`` spelling, a missing or unknown value and an abbreviation."""
+    values; CPython refuses the ``=`` spelling, a missing or unknown value and an abbreviation.
+
+    The values are NOT read from :data:`LONG_VALUE_OPTIONS` (Reviewer A r5 #2): an independent
+    candidate list, CPython's three documented values plus near misses, is run, and the set
+    CPython accepts must equal both that literal and the production table, so a value dropped
+    from (or added to) the table fails here.
+    """
     import clearwater.__main__ as entry
 
     option = "--check-hash-based-pycs"
-    for value in sorted(entry.LONG_VALUE_OPTIONS[option]):
-        assert _cpython(option, value, "-c", "pass") == (0, "")
+    cpythons_values = {"always", "default", "never"}  # CPython 3.12's own, from its --help-all
+    candidates = cpythons_values | {"ALWAYS", "Default", "checked", "unchecked", "none", "bogus"}
+    accepted = {value for value in candidates if _cpython(option, value, "-c", "pass") == (0, "")}
+    assert accepted == cpythons_values
+    assert set(entry.LONG_VALUE_OPTIONS[option]) == accepted
     assert set(entry.LONG_VALUE_OPTIONS) == {option}
     for refused in (
         [f"{option}=always", "-c", "pass"],

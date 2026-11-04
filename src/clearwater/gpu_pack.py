@@ -1045,7 +1045,10 @@ def activate() -> PackStatus | None:
     """Load the pack from :func:`pack_root` in a frozen build; do nothing otherwise (D4).
 
     Call it before anything imports ``cupy`` (``clearwater.__main__`` does, on its worker,
-    ``-m`` and GUI branches; its refusals end before it).
+    ``-m`` and GUI branches). A named ``-m`` target activates the pack BEFORE it is judged (an
+    absent or rejected pack, or a module not from the pack, is refused after this call); ``-c``,
+    the multiprocessing flags, ``-m`` without a module name and a failed worker stdin isolation
+    are refused before it.
 
     Returns:
         The status in a frozen build; None in a source run (nothing checked, nothing logged).
