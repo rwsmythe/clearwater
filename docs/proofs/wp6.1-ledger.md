@@ -2521,4 +2521,213 @@ A second pass found nothing new.
 
 The owner-log md5 was `69ed0432c562db9445daecbe8f15fe27` after these runs.
 
-Depth at turn-3 group-2b-5 end: DISPATCHER TO FILL
+Depth at turn-3 group-2b-5 end: 371,271 (wp61-cell7, at its final report; read by the dispatcher)
+
+## Turn 3 group 2b-6 (the rebuild of the r4 fold-in and the re-proof) (2026-11-04 ~15:07-15:22Z)
+
+Fresh cell (implementer-opus-high, wp61-cell8), dispatch
+`clearwater-review-evidence/wp6.1/cell/dispatch-11.md`, head at start `926bfdfa` (the r4 fold-in
+`08a96243` + `34f0e15e`, CHARC's pin `09cbba2c`, ledger `926bfdfa`). Evidence:
+`clearwater-review-evidence/wp6.1/cell/t3h/`. This group changed ONLY this ledger. No STOP
+condition was met.
+
+- No desktop input, no GUI launch; no grammar row whose result is "GUI" was run frozen.
+  `t2b/gui_check.py` was not run. Nothing under `t3c/exp/` was run; its onedir executable was
+  only READ, as the read-out's control.
+- No network. Nothing under the real `%APPDATA%\Clearwater` or `%LOCALAPPDATA%\Clearwater` (the
+  latter absent before and after).
+- Every frozen run had APPDATA, LOCALAPPDATA, TEMP / TMP and the five XDG_* variables under
+  `work\wp6.1\t3c\appdata\`, every `CUDA_PATH*` removed, `PATH = C:\Windows\System32;C:\Windows`,
+  and the read-only window watch beside it (UI Automation per PID of the run's tree plus
+  `EnumWindows`, every 0.25 s). The positive control came first (`t3h/control.out`, 15:15:27Z):
+  explorer.exe 2 UIA elements, 9 visible / 46 hidden windows; this Python 0.
+- Only the two NEW builds below were run. The two non-frozen helpers (`t3h/handler_check.py`,
+  `t3h/proof4.py`) import nothing from the pack; both ran with `-B`; the full `--verify`
+  bracketed every pack-activating run.
+
+**Owner log** `%APPDATA%\Clearwater\logs\clearwater.log`: md5 `69ed0432c562db9445daecbe8f15fe27`
+before (15:07:08Z) and after (15:21:22Z) (`t3h/owner-log-md5-{before,after}.txt`; a check only).
+
+### Item 1: the wider run on `926bfdfa`
+
+| Command (worktree root, Git Bash, `PYTEST_ADDOPTS` unset) | Exit | Summary |
+|---|---|---|
+| `uv run --no-sync pytest -q -rs -p no:cacheprovider --timeout 120 --durations=5 --basetemp=<wt>/work/c61h-1 tests/test_gpu_pack.py tests/test_frozen_entry.py tests/test_tools_package_build.py tests/test_jobs_export_process.py tests/test_app_composition.py tests/test_wp42_composition.py tests/test_core_backend.py tests/test_cache_store.py -m "not gpu"` | 0 | **500 passed, 41 deselected in 43.21 s** (the 2b-5 figure; slowest 1.10 s) (`t3h/pytest-wider-c61h-1.log`) |
+| `ruff check .` / `ruff format --check .` | 0 / 0 | All checks passed / 323 files already formatted |
+| `mypy` (strict, configured set) | 0 | no issues in 161 source files |
+
+### Item 2: both rebuilds (from `926bfdfa`; `src` and `tools` clean, only this ledger modified)
+
+| Form | Command (worktree root) | `df -h /c` before | Exit | Wall (shell / build.py) | Result |
+|---|---|---|---|---|---|
+| onedir | `uv run --no-sync python tools/package/build.py --form onedir --with-ffmpeg > work/wp6.1/build-onedir-t3h.log 2>&1` | 77 GB free (15:08Z) | 0 | 86 s / 75.9 s | `_internal` 234,668,819 B + `Clearwater.exe` 10,678,892 B; 668.3 MiB release with FFmpeg; bundle checks 7.4 s |
+| onefile | `... --form onefile --with-ffmpeg > work/wp6.1/build-onefile-t3h.log 2>&1` | 77 GB free (15:10Z) | 0 | 85 s / 81.6 s | `Clearwater.exe` 93,875,800 B (89.5 MiB); 523.9 MiB release; bundle checks 0.9 s |
+
+- Both logs: `61 hidden imports from 376 pack files`; `hidden-import site (scan; named 1x)`;
+  `hidden-import check: PASS (61 modules, each in the bundle)`; `bundle check: PASS (no cupy,
+  cupyx, cupy_backends, cuda, nvidia, fastrlock, tests ...)`. The one warning is the usual
+  `scipy.special._cdflib`. FFmpeg / ffprobe 9.0.2-full_build-www.gyan.dev copied beside each
+  executable.
+- **The resolved set** (`t3h/hidden-imports-on{dir,file}-t3h.json`): 61 members, EQUAL to 2b-4's
+  `t3f/hidden-imports-on{dir,file}-t3f.json` (compared as JSON). Every member is passed as
+  `--hidden-import` on the PyInstaller line of both logs. Logs copied to
+  `t3h/build-on{dir,file}-t3h.log`.
+- The executables grew by 1,680 B (onedir) and 1,774 B (onefile) over 2b-4's: the r4 fold-in's
+  code in the entry script.
+
+**The read-out, before any run of the new builds** (`t3h/handler_check.py` ->
+`t3h/handler-check-t3h.json`). Method:
+
+- `t3f/handler_check.py` copied and extended. PyInstaller's own `CArchiveReader` read each new
+  `Clearwater.exe`; the entry script `__main__` (typecode `s`) and the PYZ entry
+  `clearwater.gpu_pack` were unmarshalled. Nothing was executed.
+- The comparison is with a compile of `git show 926bfdfa:src/clearwater/__main__.py` and
+  `...gpu_pack.py` (`t3h/src-926bfdfa/`; byte-equal to the worktree's files), the build's commit.
+- Functions are now keyed by `co_qualname` (2b-4 keyed by `co_name`, so nested names merged:
+  its "38 of 38" for `gpu_pack` is 53 by qualified name), and each compares bytecode AND
+  non-code constants.
+- The six constants are rebuilt from the BUNDLE's module bytecode by a stack walker over the
+  constant-building opcodes only (`LOAD_CONST`, `BUILD_SET` / `SET_UPDATE`, `BUILD_MAP`,
+  `BUILD_TUPLE`, a `CALL` of the name `frozenset` evaluated with the reader's own builtin); the
+  same walk over the source compile gives the expected values.
+
+| Read in each `Clearwater.exe` (onedir and onefile alike) | Result |
+|---|---|
+| entry script: `interpreter_reentry`, `run_interpreter_option`, `isolate_worker_stdin`, `multiprocessing_reentry`, `main` | present; bytecode AND constants equal the source, each |
+| entry script, every function | **10 of 10 equal** (by qualified name, none missing, none extra); module-level bytecode and constants equal |
+| `main` names `isolate_worker_stdin` and `multiprocessing_reentry` | yes, both |
+| `FLAG_LETTERS` | `frozenset("bBdEiIOPqRsStuvx")`: 16 letters, **`R` and `t` in it**; equal to the source |
+| `VALUE_LETTERS` | `frozenset("WX")`; equal |
+| `LONG_VALUE_OPTIONS` | `{"--check-hash-based-pycs": frozenset({"always", "default", "never"})}`; equal |
+| `MULTIPROCESSING_FLAGS` | `("--multiprocessing-fork", "--multiprocessing-resource-tracker")`; in the module's names and constants; equal |
+| `GRAMMAR_PYTHON_VERSION` | `"3.12.13 (main, Mar  3 2026, 15:01:35) [MSC v.1944 64 bit (AMD64)]"`; equal |
+| `GRAMMAR_PYTHON_VERSION_INFO` | `(3, 12, 13, "final", 0)`; equal |
+| `clearwater.__main__` in the PYZ | no (the entry script is the only copy) |
+| PYZ `clearwater.gpu_pack.add_site_prefix` | present; bytecode and constants equal the source |
+| PYZ `clearwater.gpu_pack.activate` | bytecode and constants equal; its names include `add_site_prefix` |
+| PYZ `clearwater.gpu_pack`, every function | **53 of 53 equal** (by qualified name); module-level bytecode and constants equal |
+
+**READ-OUT: PASS on both. Build commit `926bfdfa`.**
+
+Control: the same check on the `t3c/exp` onedir build, read only
+(`t3h/handler-check-t3h-control-t3c-exp.json`): **`HANDLER CHECK: FAIL`**, exit 1. Its entry
+script has 4 of the 10 functions (1 equal); `interpreter_reentry`, `run_interpreter_option`,
+`isolate_worker_stdin`, `multiprocessing_reentry` absent; none of the six constants found.
+
+### Item 3: the refusals (pack renamed `14.2.0-cu12.renamed`, the watch running)
+
+`t3h/proof4.py argv --form <f> --label <l> --timeout 60 -- <arguments>`; stdin an empty pipe;
+outputs `t3h/argv-<form>-<label>.out`, records in `t3h/proof5.jsonl`. `run_argv` now also
+snapshots every file under the redirected tree (`t3c\appdata`, 3,078 files: size and mtime)
+before and after each run.
+
+| Arguments | Exit (onedir / onefile) | stderr (one line, both forms) | Windows (UIA / visible) | Tree | Left | Redirected tree |
+|---|---|---|---|---|---|---|
+| `-c pass` | 2 / 2 | `Clearwater: -c is not supported` | 0 / 0 | 1 PID / bootloader + child, both 2 | none; no `_MEI` | 0 created, 0 changed, 0 removed |
+| `-m http.server` | 2 / 2 | `Clearwater: -m 'http.server': no GPU pack is loaded` | 0 / 0 | the same | none; no `_MEI` | 0 / 0 / 0 |
+| `--multiprocessing-fork` | 2 / 2 | `Clearwater: multiprocessing children are not supported` | 0 / 0 | the same | none; no `_MEI` | **0 / 0 / 0 (no log file)** |
+| `--multiprocessing-resource-tracker` | 2 / 2 | `Clearwater: multiprocessing children are not supported` | 0 / 0 | the same | none; no `_MEI` | **0 / 0 / 0 (no log file)** |
+| `-R -c pass` (new) | 2 / 2 | `Clearwater: -c is not supported` | 0 / 0 | the same | none; no `_MEI` | 0 / 0 / 0 |
+| `-t -m http.server` (new) | 2 / 2 | `Clearwater: -m 'http.server': no GPU pack is loaded` | 0 / 0 | the same | none; no `_MEI` | 0 / 0 / 0 |
+| `-Rt -c pass` (new) | 2 / 2 | `Clearwater: -c is not supported` | 0 / 0 | the same | none; no `_MEI` | 0 / 0 / 0 |
+| `--check-hash-based-pycs always -c pass` (new) | 2 / 2 | `Clearwater: -c is not supported` | 0 / 0 | the same | none; no `_MEI` | 0 / 0 / 0 |
+| `--check-hash-based-pycs never -m http.server` (new) | 2 / 2 | `Clearwater: -m 'http.server': no GPU pack is loaded` | 0 / 0 | the same | none; no `_MEI` | 0 / 0 / 0 |
+| `-m http.server --multiprocessing-fork` (new) | 2 / 2 | **`Clearwater: multiprocessing children are not supported`** (the refusal comes first) | 0 / 0 | the same | none; no `_MEI` | **0 / 0 / 0 (no log file)** |
+
+- Walls: onedir 0.29-0.43 s; onefile 2.40-2.95 s (bootloader extraction included). Window
+  samples: 1 per onedir run, 8-10 per onefile run; no UIA element, no visible window, no
+  timeout kill. stdout empty in all 20.
+- `tasklist` after the 20 runs: no `Clearwater.exe`, `ffmpeg.exe` or `ffprobe.exe`.
+
+### Item 4: the full `--verify` (the pack renamed back)
+
+`uv run --no-sync python -B tools/package/build.py --verify <t3c pack>`: exit 0, `PASS (11
+distributions; 2701 RECORD rows, each file's sha256 and size; 2701 files, 2412.6 MiB)`
+(`t3h/verify-1-before.log`). `find` gives 2,701 files under `site-packages` and 0 `.pyc`.
+
+The sorted file-list md5 (`t3h/pack-filelist-before.md5`, 15:18:16Z, 2,702 files with
+`manifest.json`):
+
+- paths, `(cd <pack> && find . -type f -printf '%P\n' | LC_ALL=C sort | md5sum)`:
+  `5eba08dc993edf7b7e9441b1d4663ae9`;
+- paths + size + mtime, `... -printf '%P %s %T@\n' ...`: `8c70a2672ff3c5c4ae800aae79f04e3c`.
+
+2b-4's `27f33db1...` did not record its command, and none of the list forms tried here
+reproduces it; so the comparison of record is within this group (before vs after, item 6). The
+pack is unchanged since 2b-4 by `--verify` (every RECORD row's sha256 and size, no unlisted
+file).
+
+### Item 5: the WITH-pack re-proof, headless -- PASS on both forms
+
+- **Tool.** `t3h/proof4.py` is `t3f/proof4.py` copied, with the evidence paths moved to `t3h`,
+  the log `t3h/proof5.jsonl`, and a fresh, empty per-form kernel cache
+  `appdata\cupy-kernel-cache-t3h-<form>`. The spawn, the environment, the tree tracker and the
+  watch are unchanged.
+- **Command.** `<new dist>\Clearwater.exe --export-worker` (`t3b/headless.EXES`, the
+  `dist-on{dir,file}` paths rebuilt in item 2). Requests `heic-ad24-both.heic` -> PNG and
+  `vfr.mp4` -> MP4, c3 defaults, `force_cpu` off, encoder `auto`. Order: onedir HEIC, onedir
+  video, onefile HEIC, onefile video.
+
+| Form | Request (end moment, wall) | Exit | Device | Output, result | Kernel cache `.cubin` | CUDA / CuPy files mapped | Windows (UIA / visible; samples) | Left over |
+|---|---|---|---|---|---|---|---|---|
+| onedir | HEIC -> PNG (15:18:46Z, 19.2 s) | **0** | **`GPU`**; log `export heic-ad24-both.heic: ok; device GPU`; no warning | `heic-ad24-both_corrected.png` 37,080 B; ok | 0 -> 52 (first file 15:18:27Z, inside the run) | 67: 59 pack + 8 driver, **0 elsewhere** | 0 / 0 (68) | none; pack +0 / -0 |
+| onedir | `vfr.mp4` -> MP4 (15:19:01Z, 12.1 s) | **0** | **`GPU`**; `export vfr.mp4: ok; device GPU` | `vfr_corrected.mp4` 55,168 B; ok | 52 -> 62 | 67: 59 + 8, 0 elsewhere | 0 / 0 (34) | none; +0 / -0 |
+| onefile | HEIC -> PNG (15:19:25Z, 20.9 s) | **0** | **`GPU`** | 37,080 B; ok | 0 -> 52 (first file 15:19:06Z) | 67: 59 + 8, 0 elsewhere | 0 / 0 (62) | none; `_MEI` [] / []; +0 / -0 |
+| onefile | `vfr.mp4` -> MP4 (15:19:42Z, 14.8 s) | **0** | **`GPU`** | 55,168 B; ok | 52 -> 62 | 67: 59 + 8, 0 elsewhere | 0 / 0 (38) | none; `_MEI` [] / []; +0 / -0 |
+
+- **Trees.** onedir HEIC: the worker alone. onefile HEIC: the bootloader plus one
+  `Clearwater.exe --export-worker` child, both exit 0. The video trees hold 1.0.0's ffprobe /
+  ffmpeg children and their `conhost.exe` (onedir 26 PIDs, onefile 22), all exit 0 except three
+  short-lived PIDs that ended before psutil read them (no command line), gone at the end.
+  The onefile bootloader's two top-level windows are HIDDEN (`PyInstaller Onefile Hidden
+  Window`, `Default IME`); no UIA element; neither is a Clearwater window.
+- **No CuPy canary child** in any run (no `dynamic_lib_subprocess` command line), as in 2b-4.
+- **stderr**: CuPy's own `cupy\_environment.py:286: UserWarning: CUDA path could not be
+  detected` in every with-pack run, as in 2b-4 (harmless here: the kernels compiled; for WP6.3).
+- No `CUDA*` variable in any child environment.
+
+**Every mapped CUDA / CuPy / NVRTC file over the four runs' trees** (`t3h/mapped-cuda-files.tsv`):
+the same 67 paths in each of the four runs, and the SAME SET as 2b-4's `t3f/mapped-cuda-files.tsv`.
+
+- **Pack, 59 (88.1 %)**, under
+  `<wt>\work\wp6.1\t3c\appdata\Local\Clearwater\gpu-pack\14.2.0-cu12\site-packages\`:
+  `nvidia\cublas\bin\cublas64_12.dll`, `nvidia\cublas\bin\cublasLt64_12.dll`,
+  `nvidia\cuda_nvrtc\bin\nvrtc64_120_0.dll`, `nvidia\cuda_nvrtc\bin\nvrtc-builtins64_129.dll`,
+  and 55 extension modules (45 `cupy\`, 9 `cupy_backends\`, 1 `cupyx\`).
+- **NVIDIA driver, 8 (11.9 %):** `C:\Windows\System32\nvcuda.dll`, and under
+  `C:\Windows\System32\DriverStore\FileRepository\nvami.inf_amd64_00e5dc1fb00a1261\`:
+  `nvcuda64.dll`, `nvapi64.dll`, `nvapi64_impl.dll`, `nvdiagclt64.dll`, `nvdxgdmal64.dll`,
+  `nvobjectloader64.dll`, `Display.NvContainer\NvMessageBus.dll`.
+- **Elsewhere: 0.** 100 % pack + driver.
+
+### Item 6: the WITHOUT-pack regression (pack renamed `14.2.0-cu12.renamed`), then `--verify`
+
+| Form | Request (end moment, wall) | Exit | Device and warning (AD-9's text) | Log | Output | CUDA files | Windows | Left |
+|---|---|---|---|---|---|---|---|---|
+| onedir | HEIC -> PNG (15:20:41Z, 0.6 s) | 0 | **`CPU: CuPy not installed`**; warning `Processed on the CPU (CPU: CuPy not installed).` | `CuPy not installed: No module named 'cupy'`; `export heic-ad24-both.heic: ok; device CPU: CuPy not installed` | `heic-ad24-both_corrected.png` 37,104 B; ok | 0 | 0 / 0 (3) | none |
+| onefile | HEIC -> PNG (15:20:47Z, 3.9 s) | **3221225477** (both PIDs) | the same | the same | 37,104 B; ok | 0 | 0 / 0 (14) | none; no `_MEI` |
+
+- Device, warning, log lines and output size equal 2b-4's without-pack rows.
+- **The onefile run's exit is DR-125's signature, not 0 as in 2b-4.** stderr: `Fatal Python
+  error: _enter_buffered_busy: could not acquire lock for <_io.BufferedReader name=3> at
+  interpreter shutdown, possibly due to daemon threads` (fd 3: the shim's private reader, read
+  by the worker's watcher thread). The result line had been delivered (`ok`, the PNG written);
+  the child exited 0xC0000005 and the bootloader passed it on. Dispatch-9 named this exit
+  expected and not a STOP; dispatch-11's STOP list does not name it. Seen once in 12 frozen
+  worker runs since the shim (2b-4: 0 of 6; this group: 1 of 6). Not chased: DR-125's paydown
+  is its own package.
+- **`--verify` after the runs (pack renamed back): PASS**, the same line and figures: 2701 rows,
+  2701 files, 2412.6 MiB (`t3h/verify-2-after.log`); 0 `.pyc`.
+- **The file-list md5s are UNCHANGED** (`t3h/pack-filelist-after.md5`, 15:21Z): paths
+  `5eba08dc...`, paths + size + mtime `8c70a267...`. No run wrote into the pack.
+- `tasklist` after: no `Clearwater.exe`, `ffmpeg.exe` or `ffprobe.exe`.
+
+### Files changed this group
+
+`docs/proofs/wp6.1-ledger.md` only. Evidence tools (not product, not committed):
+`t3h/handler_check.py` (qualname keys, every function, the constant walker), `t3h/proof4.py`
+(paths, log, kernel cache, the redirected-tree diff in `run_argv`), `t3h/uia_watch.ps1` (copied
+unchanged). The new builds are at `work/wp6.1/dist-on{dir,file}/` (of `926bfdfa`); they replace
+`49150ccf`'s. The pack is unchanged at `work/wp6.1/t3c/appdata/Local/Clearwater/gpu-pack/14.2.0-cu12`.
+
+Depth at turn-3 group-2b-6 end: DISPATCHER TO FILL
