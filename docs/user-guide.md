@@ -64,7 +64,9 @@ the wheels, sizes, destination and NVIDIA licence statement, then press
 **Download and install**. The dialog calculates the download size from the locked
 wheels and shows the installed-space estimate; allow that space before starting.
 Wait for completion and restart Clearwater to use the pack. **Tools > Remove GPU
-support** asks for confirmation and takes effect at the next start. For a terminal
+support** asks for confirmation and takes effect at the next start. If a running
+Clearwater is using the pack, removal is deferred until the next GUI start; close
+other Clearwater windows if removal remains pending. For a terminal
 or script, use `Clearwater.exe --install-gpu-pack > install.log 2>&1` or
 `Clearwater.exe --remove-gpu-pack > remove.log 2>&1`: this windowed executable
 prints only when its output is redirected. The same requests in source are

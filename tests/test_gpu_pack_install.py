@@ -6,6 +6,7 @@ import base64
 import csv
 import errno
 import hashlib
+import importlib.metadata
 import io
 import json
 import os
@@ -155,13 +156,15 @@ def network_guard(monkeypatch):
     assert refused == [], f"test attempted forbidden network: {refused!r}"
 
 
-def _wheel(name, *, hostile=None, omitted=False):
+def _wheel(name, *, hostile=None, omitted=False, nested_data=False):
     metadata = f"{name}-1.0.dist-info"
     files = {
         f"{name}/__init__.py": b"# synthetic package\n" * 100,
         f"{metadata}/METADATA": f"Metadata-Version: 2.1\nName: {name}\nVersion: 1.0\n".encode(),
         f"{metadata}/WHEEL": b"Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
     }
+    if nested_data:
+        files[f"{name}/.data/x"] = b"ordinary package data"
     buffer = io.StringIO(newline="")
     writer = csv.writer(buffer, lineterminator="\n")
     for path, data in files.items():
@@ -240,12 +243,17 @@ def fake_index(tmp_path, monkeypatch, network_guard):
     monkeypatch.setattr(installer, "_RETRY_DELAY", 0)
     monkeypatch.setattr(installer.urllib.request, "getproxies", lambda: {})
 
-    def configure(*, hostile=None, omitted=False):
+    def configure(*, hostile=None, omitted=False, nested_data=False):
         distributions = []
         for index in range(4):
             name = f"synthetic{index}"
             filename = f"{name}-1.0-py3-none-any.whl"
-            data = _wheel(name, hostile=hostile if index == 0 else None, omitted=omitted)
+            data = _wheel(
+                name,
+                hostile=hostile if index == 0 else None,
+                omitted=omitted,
+                nested_data=nested_data,
+            )
             bodies["/" + filename] = data
             distributions.append(
                 gpu_pack.LockedDistribution(
@@ -604,3 +612,288 @@ def test_production_origin_policy_refuses_an_untrusted_url_before_connect(
     result = installer.install(Progress())
     assert not result.ok and "download URL refused" in result.message
     assert list(root.iterdir()) == []
+
+
+def test_nested_package_data_installs(fake_index):
+    fake_index.configure(nested_data=True)
+    result = _installer().install(Progress())
+    assert result.ok, result.message
+    assert (
+        result.path / "site-packages/synthetic0/.data/x"
+    ).read_bytes() == b"ordinary package data"
+
+
+@pytest.mark.parametrize("name", [d.name for d in gpu_pack.LOCKED_DISTRIBUTIONS])
+def test_real_locked_record_member_names_are_allowed(tmp_path, name):
+    try:
+        distribution = importlib.metadata.distribution(name)
+    except importlib.metadata.PackageNotFoundError:
+        pytest.skip(f"{name} is not installed in this environment")
+    text = distribution.read_text("RECORD")
+    assert text is not None
+    for row in csv.reader(io.StringIO(text)):
+        _installer()._member_path(tmp_path / "site-packages", zipfile.ZipInfo(row[0]))
+
+
+def test_oversized_body_never_writes_past_locked_size_or_retries(fake_index, monkeypatch):
+    installer = _installer()
+    first = fake_index.distributions[0]
+    filename, digest, url, _ = first.wheels[0]
+    limit = 128
+    monkeypatch.setattr(installer, "_CHUNK_SIZE", 64)
+    monkeypatch.setattr(
+        gpu_pack,
+        "LOCKED_DISTRIBUTIONS",
+        (
+            gpu_pack.LockedDistribution(
+                first.name, first.version, ((filename, digest, url, limit),)
+            ),
+        ),
+    )
+    sizes = []
+    original_open = Path.open
+
+    def observed_open(path, *args, **kwargs):
+        handle = original_open(path, *args, **kwargs)
+        if path.suffix != ".part":
+            return handle
+
+        class PartWriter:
+            def __enter__(self):
+                handle.__enter__()
+                return self
+
+            def __exit__(self, *exc):
+                return handle.__exit__(*exc)
+
+            def write(self, block):
+                count = handle.write(block)
+                sizes.append(handle.tell())
+                return count
+
+        return PartWriter()
+
+    monkeypatch.setattr(Path, "open", observed_open)
+    result = installer.install(Progress())
+    assert not result.ok and "recorded hash" in result.message
+    assert sizes and max(sizes) <= limit
+    assert len(fake_index.requests) == 1
+    assert list(fake_index.root.iterdir()) == []
+
+
+def test_partial_file_is_skipped_and_logged(fake_index, caplog):
+    stray = fake_index.root / "test-cu12.partial-x"
+    stray.write_text("keep")
+    assert _installer().install(Progress()).ok
+    assert stray.read_text() == "keep"
+    assert "partial" in caplog.text and "skip" in caplog.text
+    assert _installer().remove().ok
+    assert list(fake_index.root.iterdir()) == [stray]
+
+
+@pytest.mark.parametrize("kind", ["symlink", "junction"])
+def test_partial_link_is_never_followed(fake_index, tmp_path, kind, caplog):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "keep").write_bytes(b"untouched")
+    link = fake_index.root / "test-cu12.partial-link"
+    if kind == "junction":
+        if sys.platform != "win32":
+            pytest.skip("NTFS junctions require win32")
+        import _winapi
+
+        _winapi.CreateJunction(str(outside), str(link))
+    else:
+        try:
+            link.symlink_to(outside, target_is_directory=True)
+        except OSError as error:
+            pytest.skip(f"host refuses os.symlink: {error!r}")
+    try:
+        assert _installer().install(Progress()).ok
+        assert _installer().remove().ok
+        assert link.exists() and (outside / "keep").read_bytes() == b"untouched"
+        assert "skipping" in caplog.text
+    finally:
+        if kind == "junction":
+            link.rmdir()
+        else:
+            link.unlink()
+
+
+def _fake_pack(root):
+    folder = root / gpu_pack.STAMP
+    folder.mkdir(parents=True)
+    (folder / "a_first.py").write_bytes(b"keep first")
+    (folder / "z_locked.dll").write_bytes(b"keep locked")
+    return folder
+
+
+def _deny_pack_rename(monkeypatch, folder):
+    replace = os.replace
+
+    def denied(source, target):
+        if Path(source) == folder:
+            raise PermissionError("synthetic file in use")
+        return replace(source, target)
+
+    monkeypatch.setattr(os, "replace", denied)
+
+
+def test_remove_renames_before_deleting(empty_plan, monkeypatch):
+    installer, root = empty_plan
+    folder = _fake_pack(root)
+    replace = os.replace
+    events = []
+
+    def renamed(source, target):
+        events.append("rename")
+        assert Path(source) == folder
+        assert Path(target).name.startswith(gpu_pack.STAMP + ".partial-")
+        return replace(source, target)
+
+    cleanup = installer._remove_tree
+
+    def removed(parent, target):
+        assert events == ["rename"] and not folder.exists()
+        events.append("delete")
+        return cleanup(parent, target)
+
+    monkeypatch.setattr(os, "replace", renamed)
+    monkeypatch.setattr(installer, "_remove_tree", removed)
+    assert installer.remove().ok
+    assert events == ["rename", "delete"]
+    assert list(root.iterdir()) == []
+
+
+def test_remove_in_use_defers_intact_and_is_idempotent(empty_plan, monkeypatch):
+    installer, root = empty_plan
+    folder = _fake_pack(root)
+    _deny_pack_rename(monkeypatch, folder)
+    result = installer.remove()
+    assert result.ok and result.message == "GPU support will be removed at the next start"
+    assert (folder / "a_first.py").read_bytes() == b"keep first"
+    assert (folder / "z_locked.dll").read_bytes() == b"keep locked"
+    assert (root / (gpu_pack.STAMP + ".remove")).read_bytes() == b""
+    monkeypatch.setattr(os, "replace", lambda *args: pytest.fail("second rename"))
+    assert installer.remove() == result
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="POSIX permits renaming open files")
+def test_real_open_file_defers_remove_and_pending_install(empty_plan):
+    installer, root = empty_plan
+    folder = _fake_pack(root)
+    with (folder / "z_locked.dll").open("rb"):
+        assert installer.remove().message == "GPU support will be removed at the next start"
+        assert (folder / "a_first.py").exists()
+        result = installer.install(Progress())
+        assert not result.ok and "close it and try again" in result.message
+    assert installer.apply_pending_removal().ok
+    assert list(root.iterdir()) == []
+
+
+def test_pending_removal_retries_and_clears_marker(empty_plan, monkeypatch, caplog):
+    installer, root = empty_plan
+    folder = _fake_pack(root)
+    marker = root / (gpu_pack.STAMP + ".remove")
+    marker.touch()
+    with monkeypatch.context() as patch:
+        _deny_pack_rename(patch, folder)
+        result = installer.apply_pending_removal()
+        assert not result.ok and marker.exists()
+        assert (folder / "a_first.py").exists()
+        assert len(caplog.records) == 1
+    assert installer.apply_pending_removal().ok
+    assert list(root.iterdir()) == []
+
+
+@pytest.mark.parametrize("in_use", [False, True])
+def test_install_applies_pending_removal_before_network(fake_index, monkeypatch, in_use):
+    installer = _installer()
+    folder = _fake_pack(fake_index.root)
+    marker = fake_index.root / (gpu_pack.STAMP + ".remove")
+    marker.touch()
+    if in_use:
+        _deny_pack_rename(monkeypatch, folder)
+    result = installer.install(Progress())
+    assert result.ok != in_use
+    if in_use:
+        assert "close it and try again" in result.message
+        assert fake_index.requests == [] and marker.exists()
+        assert (folder / "a_first.py").exists()
+    else:
+        assert not marker.exists() and fake_index.requests
+        assert gpu_pack.check_pack(folder) is None
+
+
+@pytest.mark.parametrize("operation", ["install", "remove", "pending"])
+def test_operation_lock_refuses_second_operation(empty_plan, monkeypatch, operation):
+    installer, root = empty_plan
+    folder = _fake_pack(root)
+    marker = root / (gpu_pack.STAMP + ".remove")
+    if operation == "pending":
+        marker.touch()
+    with installer._operation_lock(root):
+        if operation == "install":
+            result = installer.install(Progress())
+        elif operation == "remove":
+            result = installer.remove()
+        else:
+            result = installer.apply_pending_removal()
+        assert not result.ok and result.message == "another GPU pack operation is in progress"
+        assert (folder / "a_first.py").exists()
+    assert not (root / ".install.lock").exists()
+
+
+def test_stale_operation_lock_is_broken(empty_plan):
+    installer, root = empty_plan
+    root.mkdir()
+    (root / ".install.lock").write_text("dead owner")
+    assert installer.install(Progress()).ok
+    assert not (root / ".install.lock").exists()
+
+
+def test_cancel_during_full_check_cleans_without_manifest(fake_index, monkeypatch):
+    installer = _installer()
+    progress = Progress()
+    digest = gpu_pack._file_digest
+    hashes = []
+
+    def cancelling(path):
+        result = digest(path)
+        # Manifest construction hashes RECORDs before the full listed-file walk.
+        if Path(path).name != "RECORD":
+            hashes.append(path)
+            progress.cancel = True
+        return result
+
+    monkeypatch.setattr(gpu_pack, "_file_digest", cancelling)
+    monkeypatch.setattr(
+        installer, "write_staging_manifest", lambda *args: pytest.fail("manifest written")
+    )
+    result = installer.install(progress)
+    assert not result.ok and result.cancelled
+    assert len(hashes) == 1
+    assert list(fake_index.root.iterdir()) == []
+
+
+def test_unpack_reports_work_after_download(fake_index):
+    progress = Progress()
+    assert _installer().install(progress).ok
+    assert any("Unpacking" in message for _, _, message in progress.reports)
+
+
+def test_headless_replacement_notice(fake_index, headless_entry, capsys):
+    _fake_pack(fake_index.root)
+    assert headless_entry.main(["clearwater", "--install-gpu-pack"]) == 0
+    assert (
+        capsys.readouterr().err.splitlines()[0]
+        == "An existing GPU pack is not usable and will be replaced"
+    )
+
+
+@pytest.mark.parametrize("operation", ["install", "remove"])
+def test_headless_lock_refusal_exits_one(empty_plan, headless_entry, operation, capsys):
+    installer, root = empty_plan
+    with installer._operation_lock(root):
+        assert headless_entry.main(["clearwater", f"--{operation}-gpu-pack"]) == 1
+    assert capsys.readouterr().err.strip() == "another GPU pack operation is in progress"

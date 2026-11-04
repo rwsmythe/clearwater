@@ -558,6 +558,11 @@ class MainWindow(ShellWindow):
         self._gpu_busy_changed(False)
         if result.ok:
             text = result.warnings[0] if result.warnings else "GPU support is removed"
+            marker = gpu_pack.pending_removal_path()
+            if marker is not None and marker.exists():
+                self._idle_device = "CPU: GPU pack removal pending"
+                self.device_label.setText(f"Device: {self._idle_device}")
+                self.device_label.setToolTip("")
             self.statusBar().showMessage(messages.ascii_text(text))
             self.presenter.clear(owner="gpu-pack")
         else:

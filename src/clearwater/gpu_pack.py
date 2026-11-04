@@ -54,7 +54,7 @@ import stat
 import sys
 import sysconfig
 import warnings
-from collections.abc import Generator, Iterator, Mapping
+from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Literal
@@ -713,31 +713,54 @@ def check_pack(folder: Path) -> str | None:
         return f"pack check failed: {_safe(type(error).__name__)}"
 
 
+class PackCheckCancelled(Exception):  # noqa: N818 - CHARC's granted public name
+    """The caller cancelled a full pack check at a listed-file boundary."""
+
+
+def pending_removal_path() -> Path | None:
+    """Return the current pack's removal marker path without accessing the filesystem.
+
+    Returns:
+        The marker beside the pack, or None on a platform without GPU packs.
+    """
+    root = pack_root()
+    return None if root is None else root / f"{STAMP}.remove"
+
+
 def pack_problems(
     folder: Path,
     *,
     full: bool = False,
     tags: tuple[str, str] | None = None,
     manifest: object = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> Iterator[str]:
-    """Yield every problem :func:`_pack_problems` finds; any exception ends it as one problem.
+    """Yield check problems, converting errors other than an explicit full-check cancel.
 
     A file-system error becomes ``pack unreadable: <type>`` and any other exception (a
     malformed ``RECORD`` that the row validation did not foresee, say)
-    ``pack check failed: <type>``, so neither start-up (:func:`check_pack`) nor ``--verify``
-    is ever stopped by an exception (Reviewer A r3 #4).
+    ``pack check failed: <type>``. Without a cancellation predicate neither start-up
+    (:func:`check_pack`) nor ``--verify`` is stopped by an exception (Reviewer A r3 #4).
 
     Args:
         folder: The pack folder.
         full: Also hash every listed file.
         tags: The (interpreter, platform) tags to fit; :func:`platform_tags` when None.
         manifest: In-memory manifest for staging verification; None reads the disk file.
+        cancelled: Optional full-check predicate, called before each listed file hash.
 
     Yields:
         Each problem as a short ASCII reason, in check order.
+
+    Raises:
+        PackCheckCancelled: The full-check predicate requests cancellation.
     """
     try:
-        yield from _pack_problems(folder, full=full, tags=tags, manifest=manifest)
+        yield from _pack_problems(
+            folder, full=full, tags=tags, manifest=manifest, cancelled=cancelled
+        )
+    except PackCheckCancelled:
+        raise
     except OSError as error:
         yield f"pack unreadable: {_safe(type(error).__name__)}"
     except Exception as error:  # a rejection, never an escape (A r3 #4)
@@ -750,6 +773,7 @@ def _pack_problems(
     full: bool = False,
     tags: tuple[str, str] | None = None,
     manifest: object = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> Iterator[str]:
     """Yield every way one pack folder differs from the lock and from its ``RECORD`` files.
 
@@ -780,6 +804,7 @@ def _pack_problems(
         full: Also hash every listed file.
         tags: The (interpreter, platform) tags to fit; :func:`platform_tags` when None.
         manifest: In-memory manifest, or None to read the disk file.
+        cancelled: Optional full-check predicate, called before each listed file hash.
 
     Yields:
         Each problem as a short ASCII reason, in check order.
@@ -844,7 +869,7 @@ def _pack_problems(
         for row in rows:
             owned.add(os.path.normcase(PurePosixPath(row.path).parts[0]))
             listed.add(_listed_key(row.path))
-            yield from _row_problems(site, locked, row, full=full)
+            yield from _row_problems(site, locked, row, full=full, cancelled=cancelled)
     if every_record_read:
         with os.scandir(site) as listing:
             names = sorted(item.name for item in listing)
@@ -976,7 +1001,12 @@ def _wheel_tag_problems(
 
 
 def _row_problems(
-    site: Path, locked: LockedDistribution, row: RecordRow, *, full: bool
+    site: Path,
+    locked: LockedDistribution,
+    row: RecordRow,
+    *,
+    full: bool,
+    cancelled: Callable[[], bool] | None = None,
 ) -> Iterator[str]:
     """Check one ``RECORD`` row against the file it names (ruling (a); with ``full``, its hash).
 
@@ -985,6 +1015,7 @@ def _row_problems(
         locked: The distribution the row belongs to.
         row: The row.
         full: Also hash the file and compare it with the row's ``sha256``.
+        cancelled: Optional full-check predicate, ignored on the cheap path.
 
     Yields:
         A missing, unreadable or non-regular file, a size mismatch and, with ``full``, a
@@ -1019,6 +1050,8 @@ def _row_problems(
     if algorithm != "sha256":
         yield f"{name} hash {_safe(algorithm)}, expected sha256"
         return
+    if cancelled is not None and cancelled():
+        raise PackCheckCancelled
     try:
         actual = record_hash(_file_digest(path))
     except OSError as error:

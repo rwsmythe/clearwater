@@ -719,6 +719,54 @@ def test_a_clean_pack_passes_the_cheap_and_the_full_check(
     assert list(gpu_pack.pack_problems(folder, full=True, tags=WINDOWS_TAGS)) == []
 
 
+def test_cancel_hook_default_and_cheap_path_are_unchanged(tmp_path, isolated):
+    """Omitting the hook preserves the full result; cheap checks never consult it."""
+    folder = make_pack(tmp_path)
+    baseline = list(gpu_pack.pack_problems(folder, full=True, tags=WINDOWS_TAGS))
+    assert (
+        list(gpu_pack.pack_problems(folder, full=True, tags=WINDOWS_TAGS, cancelled=None))
+        == baseline
+    )
+
+    def forbidden():
+        pytest.fail("cheap path consulted cancellation")
+
+    assert list(gpu_pack.pack_problems(folder, tags=WINDOWS_TAGS, cancelled=forbidden)) == []
+    assert gpu_pack.check_pack(folder) is None
+
+
+def test_cancel_hook_stops_before_second_file_hash(tmp_path, isolated, monkeypatch):
+    """A flag set during one file's hash prevents every later file hash."""
+    folder = make_pack(tmp_path)
+    digest = gpu_pack._file_digest
+    hashes = []
+
+    def observed(path):
+        hashes.append(path)
+        return digest(path)
+
+    monkeypatch.setattr(gpu_pack, "_file_digest", observed)
+    with pytest.raises(gpu_pack.PackCheckCancelled):
+        list(
+            gpu_pack.pack_problems(
+                folder, full=True, tags=WINDOWS_TAGS, cancelled=lambda: bool(hashes)
+            )
+        )
+    assert len(hashes) == 1
+
+
+def test_cancel_hook_escapes_problem_conversion(tmp_path, isolated):
+    """Cancellation is an exception, never a 'pack check failed' problem string."""
+    folder = make_pack(tmp_path)
+    problems = []
+    with pytest.raises(gpu_pack.PackCheckCancelled):
+        for problem in gpu_pack.pack_problems(
+            folder, full=True, tags=WINDOWS_TAGS, cancelled=lambda: True
+        ):
+            problems.append(problem)
+    assert problems == []
+
+
 def test_a_listed_file_that_is_missing_is_rejected(
     tmp_path: Path, isolated: list[str], caplog: pytest.LogCaptureFixture
 ) -> None:

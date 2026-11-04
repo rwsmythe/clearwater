@@ -20,7 +20,7 @@ from clearwater import gpu_pack, gpu_pack_install
 from clearwater.gui import gpu_pack_dialog as module
 from clearwater.gui.jobs import QtProgress
 from clearwater.interfaces import JobResult
-from gui_support import make_window, presenter_of
+from gui_support import image, make_window, open_and_wait, photo_engines, presenter_of
 
 pytestmark = [pytest.mark.gui, pytest.mark.timeout(10)]
 
@@ -251,3 +251,41 @@ def test_gui_paths_have_no_blocking_dialog_exec():
         # shell.run's QApplication.exec is the application's existing event loop.
         text = (root / name).read_text()
         assert ".exec(" not in text.replace("app.exec(", "application_event_loop(")
+
+
+def test_rejected_pack_plan_warns_before_request(make_window, monkeypatch, isolated_pack):
+    (isolated_pack / gpu_pack.STAMP).mkdir(parents=True)
+    dialog, script, _ = _open(make_window(), monkeypatch)
+    assert (
+        "An existing GPU pack is not usable and will be replaced" in dialog.plan_text.toPlainText()
+    )
+    assert script.calls == []
+
+
+def test_operation_in_progress_is_shown_by_dialog(make_window, monkeypatch):
+    dialog, script, _ = _open(make_window(), monkeypatch)
+    dialog.install_button.click()
+    script.finish(_result(False, "another GPU pack operation is in progress"))
+    assert dialog.status.text() == "another GPU pack operation is in progress"
+    assert dialog.install_button.isEnabled()
+
+
+@pytest.mark.parametrize("source_open", [False, True])
+def test_deferred_remove_updates_cpu_reason(
+    make_window, monkeypatch, isolated_pack, qtbot, source_open
+):
+    (isolated_pack / gpu_pack.STAMP).mkdir(parents=True)
+    path = Path("synthetic.png")
+    window = make_window(photo_engines({path: image(20, 30)}))
+    if source_open:
+        open_and_wait(qtbot, window, path)
+    window.set_idle_device("GPU")
+    script = ScriptedRunner()
+    monkeypatch.setattr(window.jobs, "run", script.run)
+    _, actions = _actions(window)
+    actions["Remove GPU support"].trigger()
+    window._gpu_remove_prompt.button(QMessageBox.StandardButton.Yes).click()
+    (isolated_pack / (gpu_pack.STAMP + ".remove")).touch()
+    script.finish(_result(True, "GPU support will be removed at the next start"))
+    assert window.statusBar().currentMessage() == "GPU support will be removed at the next start"
+    assert window.device_label.text() == "Device: CPU: GPU pack removal pending"

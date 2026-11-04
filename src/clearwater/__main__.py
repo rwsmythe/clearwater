@@ -41,6 +41,7 @@ branch imports what it needs.
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import sys
 from collections.abc import MutableMapping, Sequence
@@ -262,7 +263,7 @@ def run_interpreter_option(arguments: Sequence[str]) -> int:
     if len(arguments) < 3 or not arguments[2]:
         return _refuse("-m needs a module name")
     module = arguments[2]
-    status = gpu_pack.activate()
+    status = None if _removal_pending() else gpu_pack.activate()
     site = None if status is None or status.outcome != "loaded" else status.site_packages
     if site is None:
         return _refuse(f"-m {module!a}: no GPU pack is loaded")
@@ -281,6 +282,15 @@ def run_interpreter_option(arguments: Sequence[str]) -> int:
             traceback.print_exc()
         return 1
     return 0
+
+
+def _removal_pending(*, log: bool = True) -> bool:
+    """Read the shared marker without installer side effects on worker/child branches."""
+    marker = gpu_pack.pending_removal_path()
+    pending = marker is not None and marker.exists()
+    if pending and log:
+        logging.getLogger(__name__).info("GPU pack removal pending")
+    return pending
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -312,7 +322,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
             def report(self, done: int, total: int | None, message: str) -> None:
                 """Print the first byte report for each wheel to redirected stderr."""
-                if message != self._wheel:
+                if message.endswith(".whl") and message != self._wheel:
                     self._wheel = message
                     if sys.stderr is not None:
                         print(f"{message}: {done}/{total} bytes", file=sys.stderr, flush=True)
@@ -321,6 +331,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 """Allow terminal interruption through the installer's KeyboardInterrupt path."""
                 return False
 
+        if arguments[1] == "--install-gpu-pack":
+            notice = gpu_pack_install.replacement_notice()
+            if notice is not None and sys.stderr is not None:
+                print(notice, file=sys.stderr, flush=True)
         outcome = (
             gpu_pack_install.install(ConsoleProgress())
             if arguments[1] == "--install-gpu-pack"
@@ -331,7 +345,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0 if outcome.ok else 1
     if frozen:
         if arguments[1:2] == [WORKER_FLAG]:  # frozen only: a source run is 1.0.0 (A r3 #1)
-            gpu_pack.activate()
+            if not _removal_pending():
+                gpu_pack.activate()
             from clearwater.app import export_worker
 
             return export_worker.main(arguments[2:])
@@ -339,7 +354,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         if reentry is not None:
             return run_interpreter_option([arguments[0], *reentry])
         _start_logging()
-    gpu_pack.activate()
+    marker = gpu_pack.pending_removal_path()
+    if marker is not None and marker.exists():
+        from clearwater import gpu_pack_install
+
+        gpu_pack_install.apply_pending_removal()
+    if not _removal_pending(log=False):
+        gpu_pack.activate()
     from clearwater.app.main import main as gui_main
 
     return gui_main(arguments)

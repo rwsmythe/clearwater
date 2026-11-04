@@ -16,13 +16,15 @@ import os
 import shutil
 import ssl
 import stat
+import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
 import zipfile
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import IO, Protocol
@@ -35,6 +37,10 @@ _DOWNLOAD_ORIGIN = ("https", "files.pythonhosted.org", 443)
 _RETRY_DELAY = 2.0
 # Round up the measured 2,412.6 MiB Windows pack; failures still clean up if space changes.
 _INSTALLED_SIZE = 2413 * (1 << 20)
+_BUSY = "another GPU pack operation is in progress"
+_PENDING = "GPU support will be removed at the next start"
+REPLACE_TEXT = "An existing GPU pack is not usable and will be replaced"
+"""The notice shown before replacing a pack rejected by the cheap check."""
 
 
 class Progress(Protocol):
@@ -153,6 +159,20 @@ def plan() -> InstallPlan:
         filename, digest, url, size = matches[0]
         wheels.append(Wheel(distribution.name, distribution.version, filename, digest, url, size))
     return InstallPlan(gpu_pack.STAMP, tuple(wheels), sum(w.size for w in wheels), _INSTALLED_SIZE)
+
+
+def replacement_notice() -> str | None:
+    """Describe replacement of an existing rejected pack, without modifying it.
+
+    Returns:
+        The replacement notice, or None when no rejected pack folder exists.
+    """
+    root = gpu_pack.pack_root()
+    if root is not None:
+        folder = root / gpu_pack.STAMP
+        if folder.is_dir() and gpu_pack.check_pack(folder) is not None:
+            return REPLACE_TEXT
+    return None
 
 
 def manifest_document(folder: Path) -> dict[str, object]:
@@ -361,12 +381,9 @@ def _member_path(site: Path, member: zipfile.ZipInfo) -> Path:
         or path.is_absolute()
         or windows.drive
         or windows.root
+        or parts[0].endswith(".data")
         or any(
-            part in ("", ".", "..")
-            or ":" in part
-            or part.endswith((".", " "))
-            or part.endswith(".data")
-            for part in parts
+            part in ("", ".", "..") or ":" in part or part.endswith((".", " ")) for part in parts
         )
         or stat.S_IFMT(mode) not in (0, stat.S_IFREG, stat.S_IFDIR)
         or (stat.S_ISDIR(mode) and not member.is_dir())
@@ -378,19 +395,20 @@ def _member_path(site: Path, member: zipfile.ZipInfo) -> Path:
     return target
 
 
-def _unpack(archive: Path, site: Path, progress: Progress) -> None:
+def _unpack(archive: Path, site: Path, reporter: _Reporter, completed: int) -> None:
     """Unpack plain files only, with all member names validated before the first write."""
     with zipfile.ZipFile(archive) as wheel:
         members = [(member, _member_path(site, member)) for member in wheel.infolist()]
         for member, target in members:
-            _cancel(progress)
+            _cancel(reporter.progress)
             if member.is_dir():
                 continue
             target.parent.mkdir(parents=True, exist_ok=True)
             with wheel.open(member) as source, target.open("wb") as output:
                 while block := source.read(_CHUNK_SIZE):
-                    _cancel(progress)
+                    _cancel(reporter.progress)
                     output.write(block)
+            reporter.report(completed, f"Unpacking {archive.name}: {member.orig_filename}")
 
 
 def _contained(root: Path, folder: Path) -> None:
@@ -418,9 +436,126 @@ def _retry_read_only(function: Callable[..., object], path: str, error: BaseExce
 
 
 def _partials(root: Path, stamp: str) -> None:
-    """Remove staging folders left by a dead process before starting a new transaction."""
+    """Under the operation lock, remove plain staging folders left by a dead process."""
     for folder in root.glob(f"{stamp}.partial-*"):
+        info = folder.lstat()
+        reparse = False
+        if sys.platform == "win32":
+            reparse = bool(info.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+        if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode) or reparse:
+            _LOG.warning("skipping non-directory or linked partial: %s", _ascii(folder))
+            continue
         _remove_tree(root, folder)
+
+
+@contextmanager
+def _operation_lock(root: Path) -> Iterator[None]:
+    """Hold an exclusively created pack-root lock, breaking only an unlocked stale file."""
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / ".install.lock"
+    for _ in range(3):
+        try:
+            handle = path.open("xb")
+        except FileExistsError:
+            if sys.platform == "win32":
+                try:
+                    path.unlink()
+                except FileNotFoundError:
+                    continue
+                except OSError as error:
+                    raise _InstallError(_BUSY) from error
+            else:
+                import fcntl
+
+                try:
+                    with path.open("rb") as stale:
+                        fcntl.flock(stale, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        if os.fstat(stale.fileno()).st_ino == path.stat().st_ino:
+                            path.unlink()
+                except FileNotFoundError:
+                    continue
+                except OSError as error:
+                    raise _InstallError(_BUSY) from error
+            continue
+        break
+    else:
+        raise _InstallError(_BUSY)
+    owns_inode = sys.platform == "win32"
+    try:
+        if sys.platform != "win32":
+            import fcntl
+
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as error:
+                raise _InstallError(_BUSY) from error
+            # A stale-lock contender may have unlinked this inode before flock won.
+            # Never enter an operation holding an orphaned lock.
+            try:
+                inode = path.stat().st_ino
+            except FileNotFoundError:
+                inode = None
+            if os.fstat(handle.fileno()).st_ino != inode:
+                raise _InstallError(_BUSY)
+            owns_inode = True
+        yield
+    finally:
+        # Windows forbids unlinking our own open handle; POSIX unlinks while locked.
+        if sys.platform == "win32":
+            handle.close()
+            # A contender can break our now-closed lock and already hold a new one.
+            # Its held-open file must remain; our operation is finished.
+            with suppress(PermissionError):
+                path.unlink(missing_ok=True)
+        else:
+            try:
+                if owns_inode:
+                    path.unlink(missing_ok=True)
+            finally:
+                handle.close()
+
+
+def _rename_remove(root: Path) -> None:
+    """Hide the pack atomically before deleting any file, with the operation lock held."""
+    destination = root / gpu_pack.STAMP
+    _contained(root, destination)
+    if destination.exists():
+        renamed = root / f"{gpu_pack.STAMP}.partial-{uuid.uuid4().hex}"
+        os.replace(destination, renamed)
+        _remove_tree(root, renamed)
+
+
+def _apply_pending_locked(root: Path) -> PackResult:
+    """Apply a pending request under an already-held operation lock."""
+    marker = gpu_pack.pending_removal_path()
+    assert marker is not None
+    if not marker.exists():
+        return PackResult(True, "no GPU pack removal is pending")
+    try:
+        _rename_remove(root)
+        _partials(root, gpu_pack.STAMP)
+        marker.unlink()
+        return PackResult(True, "GPU support is removed; takes effect at the next start")
+    except OSError as error:
+        _LOG.warning("GPU pack removal pending: %s", _ascii(error))
+        return PackResult(False, "GPU pack removal pending")
+
+
+def apply_pending_removal() -> PackResult:
+    """At GUI startup, retry deferred removal without ever loading the pack.
+
+    Returns:
+        Success after clearing the marker, or failure with the marker left for next start.
+    """
+    root = gpu_pack.pack_root()
+    if root is None:
+        return PackResult(False, "GPU support is not available on this platform")
+    try:
+        with _operation_lock(root):
+            return _apply_pending_locked(root)
+    except Exception as error:
+        _LOG.warning("GPU pack removal pending: %s", _ascii(error))
+        return PackResult(False, _ascii(error))
 
 
 def install(progress: Progress) -> PackResult:
@@ -436,8 +571,24 @@ def install(progress: Progress) -> PackResult:
     root = gpu_pack.pack_root()
     if root is None:
         return PackResult(False, "GPU support is not available on this platform")
+    try:
+        with _operation_lock(root):
+            return _install_locked(root, progress)
+    except (_CancelledError, KeyboardInterrupt):
+        return PackResult(False, "GPU support installation cancelled", cancelled=True)
+    except Exception as error:
+        return PackResult(False, _ascii(error))
+
+
+def _install_locked(root: Path, progress: Progress) -> PackResult:
+    """Build and clean up the transaction while the pack-root operation lock is held."""
     staging: Path | None = None
     try:
+        pending = _apply_pending_locked(root)
+        if not pending.ok:
+            raise _InstallError(
+                "GPU support is loaded by a running Clearwater; close it and try again"
+            )
         wanted = plan()
         root.mkdir(parents=True, exist_ok=True)
         _partials(root, wanted.stamp)
@@ -465,13 +616,18 @@ def install(progress: Progress) -> PackResult:
         completed = 0
         for wheel in wanted.wheels:
             archive = _download(wheel, downloads, reporter, completed)
-            _unpack(archive, site, progress)
+            _unpack(archive, site, reporter, completed + wheel.size)
             archive.unlink()
             completed += wheel.size
         downloads.rmdir()
         _cancel(progress)
         document = manifest_document(staging)
-        problem = next(gpu_pack.pack_problems(staging, full=True, manifest=document), None)
+        problem = next(
+            gpu_pack.pack_problems(
+                staging, full=True, manifest=document, cancelled=progress.cancelled
+            ),
+            None,
+        )
         if problem is not None:
             raise _InstallError(problem)
         _cancel(progress)
@@ -484,7 +640,7 @@ def install(progress: Progress) -> PackResult:
         return PackResult(
             True, "GPU support is installed. Restart Clearwater to use it.", destination
         )
-    except (_CancelledError, KeyboardInterrupt):
+    except (_CancelledError, gpu_pack.PackCheckCancelled, KeyboardInterrupt):
         result = PackResult(False, "GPU support installation cancelled", cancelled=True)
     except Exception as error:
         result = PackResult(False, _ascii(error))
@@ -517,14 +673,26 @@ def remove(folder: Path | None = None) -> PackResult:
         _contained(root, target)
         if target != destination:
             raise _InstallError("only the current GPU pack can be removed")
-        present = destination.exists()
-        _remove_tree(root, destination)
-        _partials(root, gpu_pack.STAMP)
-        message = (
-            "GPU support is removed; takes effect at the next start"
-            if present
-            else "no GPU pack is installed"
-        )
-        return PackResult(True, message)
+        with _operation_lock(root):
+            marker = gpu_pack.pending_removal_path()
+            assert marker is not None
+            if marker.exists():
+                return PackResult(True, _PENDING)
+            present = destination.exists()
+            try:
+                _rename_remove(root)
+            except PermissionError:
+                # Rename failure leaves every pack file intact; defer the whole request.
+                if not destination.exists():
+                    raise
+                marker.touch()
+                return PackResult(True, _PENDING)
+            _partials(root, gpu_pack.STAMP)
+            message = (
+                "GPU support is removed; takes effect at the next start"
+                if present
+                else "no GPU pack is installed"
+            )
+            return PackResult(True, message)
     except Exception as error:
         return PackResult(False, _ascii(error))

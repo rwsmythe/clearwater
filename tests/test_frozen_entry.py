@@ -141,6 +141,120 @@ def _fake_gui(monkeypatch: pytest.MonkeyPatch, seen: list[tuple[str, Any]]) -> N
 # Q5 (a): the worker command.
 
 
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("frozen", [False, True])
+@pytest.mark.parametrize("in_use", [False, True])
+def test_gui_start_applies_pending_removal_only_before_activation(
+    monkeypatch,
+    tmp_path,
+    calls,
+    frozen,
+    in_use,
+    caplog,
+):
+    """Only the GUI start may delete a deferred pack; a locked pack stays unactivated."""
+    from clearwater import gpu_pack_install
+
+    if frozen:
+        _frozen(monkeypatch, tmp_path)
+        monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    else:
+        monkeypatch.delattr(sys, "frozen", raising=False)
+    root = tmp_path / "packs"
+    root.mkdir()
+    marker = root / (gpu_pack.STAMP + ".remove")
+    marker.touch()
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: root)
+    entry, blocker = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+
+    def pending():
+        calls.append(("pending", None))
+        if not in_use:
+            marker.unlink()
+        return gpu_pack_install.PackResult(not in_use, "pending")
+
+    monkeypatch.setattr(gpu_pack_install, "apply_pending_removal", pending, raising=False)
+    with caplog.at_level(logging.INFO):
+        assert entry.main(["Clearwater"]) == 3
+    expected = ([("log", tmp_path / "cfg" / "logs")] if frozen else []) + [("pending", None)]
+    if not in_use:
+        expected.append(("activate", None))
+    assert calls == [*expected, ("gui", ["Clearwater"])]
+    assert marker.exists() == in_use
+    assert blocker.attempts == []
+
+
+@pytest.mark.timeout(10)
+def test_gui_start_locked_pack_keeps_marker_and_skips_activation(
+    monkeypatch,
+    tmp_path,
+    calls,
+    caplog,
+):
+    """The real pending-removal path leaves an in-use pack intact at GUI startup."""
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    root = tmp_path / "packs"
+    folder = root / gpu_pack.STAMP
+    folder.mkdir(parents=True)
+    (folder / "keep").write_bytes(b"intact")
+    marker = root / (gpu_pack.STAMP + ".remove")
+    marker.touch()
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: root)
+    entry, blocker = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+
+    def denied(*args):
+        raise PermissionError("synthetic in-use pack")
+
+    monkeypatch.setattr(os, "replace", denied)
+    assert entry.main(["Clearwater"]) == 3
+    assert calls == [("gui", ["Clearwater"])]
+    assert marker.exists() and (folder / "keep").read_bytes() == b"intact"
+    assert len([r for r in caplog.records if "GPU pack removal pending" in r.message]) == 1
+    assert blocker.attempts == []
+
+
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("branch", ["worker", "module"])
+def test_child_pending_removal_is_read_only_and_skips_activation(
+    monkeypatch,
+    tmp_path,
+    calls,
+    branch,
+    capsys,
+    caplog,
+):
+    """Frozen children leave the marker and pack intact and never run the installer."""
+    from clearwater import gpu_pack_install
+
+    _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    root = tmp_path / "packs"
+    root.mkdir()
+    marker = root / (gpu_pack.STAMP + ".remove")
+    marker.touch()
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: root)
+    monkeypatch.setattr(
+        gpu_pack_install,
+        "apply_pending_removal",
+        lambda: pytest.fail("child wrote pack"),
+        raising=False,
+    )
+    entry, blocker = _fresh_entry(monkeypatch)
+    with caplog.at_level(logging.INFO):
+        if branch == "worker":
+            assert entry.main(["Clearwater.exe", "--export-worker"]) == 7
+            assert calls == [("worker", [])]
+        else:
+            assert entry.main(["Clearwater.exe", "-m", "cuda.pathfinder"]) == 2
+            assert "no GPU pack is loaded" in capsys.readouterr().err
+            assert calls == []
+    assert "GPU pack removal pending" in caplog.text
+    assert marker.read_bytes() == b""
+    assert blocker.attempts == []
+
+
 def _frozen(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> str:
     """Make this process look like the frozen ``Clearwater.exe`` in ``tmp_path/dist``."""
     executable = str(tmp_path / "dist" / "Clearwater.exe")

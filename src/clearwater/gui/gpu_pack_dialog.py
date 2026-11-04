@@ -131,6 +131,9 @@ class GpuPackDialog(QDialog):
                     f"Destination: {ascii_text(str(root / wanted.stamp))}",
                 )
             )
+            notice = gpu_pack_install.replacement_notice()
+            if notice is not None:
+                lines.extend(("", notice))
             self.plan_text.setPlainText("\n".join(lines))
         except ValueError as error:
             self.status.setText(ascii_text(str(error)))
