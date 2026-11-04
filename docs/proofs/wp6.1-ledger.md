@@ -1809,3 +1809,166 @@ Owner log md5 after this addition: `69ed0432c562db9445daecbe8f15fe27` (a check o
 - The pack is unchanged at `work/wp6.1/t3c/appdata/Local/Clearwater/gpu-pack/14.2.0-cu12`.
 
 Depth at turn-3 group-2b-3 (items 4-5) end: DISPATCHER TO FILL
+
+## Turn 3 group 2b-3 (F-E shim) (2026-11-04 ~13:35-13:55Z): the F-E shim, rebuilds, the with-pack proof -- STOPPED again (F-F, headers)
+
+Same cell (wp61-cell6). The work: CHARC's F-E ruling (gen 15, 13:32Z), option (a) with its five
+amendments, relayed by the dispatcher. No desktop input, no GUI launch. Every frozen run used
+the isolation redirect and the window watch. Nothing touched the real profile. No network.
+
+### The change (`62198baf`)
+
+- `src/clearwater/__main__.py`: a new function `isolate_worker_stdin()`, called FIRST on the
+  `--export-worker` branch, before `gpu_pack.activate()`, the worker import, its backend probe
+  and any CuPy import (a comment at the call says so). It acts only when frozen.
+  - It duplicates fd 0 to a private descriptor (`os.dup`, not inheritable by PEP 446), which
+    becomes `sys.stdin`.
+  - It points fd 0 at `os.devnull` in AD-36's statement form, `if sys.platform == "win32":`
+    `dup2` and `ctypes.windll.kernel32.SetStdHandle(STD_INPUT_HANDLE, <fd 0's handle>)`,
+    `else:` `dup2` only. This is the ONE new N1 site, for AD-34.
+  - A failed `SetStdHandle` raises `OSError` (the Win32 slot would otherwise name the closed
+    pipe handle).
+  - A process without a standard input is left alone.
+  - The docstring and `tools/package/README.md` (new section "The frozen worker's standard
+    input (a TEMPORARY shim)") say the shim is temporary and that DR-125's package moves the
+    isolation into the worker and removes it.
+- `tests/test_frozen_entry.py`: three new tests, under the isolation rule (rule check
+  `t3e/rule-check.txt`):
+  - (i) `test_a_child_of_the_frozen_worker_branch_inherits_nul_not_the_request_pipe`. A fresh
+    `-I` child plays the frozen worker: the GUI is unimportable, the app data is under
+    `tmp_path`, and its stdin is a pipe the test holds open. The branch's `gpu_pack.activate`
+    is replaced by a spawn, the first thing after the shim. The grandchild (`stdin=None`) reads
+    its stdin to EOF and must report 0 bytes within 10 s. The test also checks: no
+    `clearwater.app.export_worker` / `cupy` import yet; the worker's `sys.stdin.fileno() != 0`;
+    `SetStdHandle` called once on win32.
+  - (ii) `test_the_frozen_worker_reads_its_request_and_the_cancel_line_through_the_private_fd`.
+    This is `test_cancel_is_delivered_on_stdin_and_the_child_ends`, re-pointed. Its own
+    `_run` / `_Progress` (imported from `test_jobs_export_process`, not copied) drive a child
+    running the frozen branch with the REAL `export_worker.main`. A stand-in `run` reads the
+    request and then the `{"cancel": true}` line. The test asserts: `CANCELLED`, the cancel
+    line, the request read, and the descriptor `!= 0`. The non-owned test file was NOT edited.
+  - (iii) `test_the_worker_branch_moves_no_standard_input_when_not_frozen`: the 1.0.0 lock.
+    Source run, `os.dup` replaced by a raiser, `SetStdHandle` by a counter: 0 duplicates, 0
+    calls, `sys.stdin` the same object.
+  - The existing in-process frozen worker-branch test (`..._sets_path_before_either_branch`)
+    now stubs the shim, so it cannot re-point the test process's own stdin.
+
+| Command (worktree root, Git Bash) | Exit | Summary |
+|---|---|---|
+| `pytest ... --timeout 120 --basetemp=<wt>/work/c61f-2 tests/test_frozen_entry.py -k "<the 4>"` | 0 | 4 passed in 1.56 s |
+| BEFORE-record: `tests/test_frozen_entry.py` with `PYTHONPATH` = `git archive 3c67f0f3` src (`c61f-3`; `t3e/pytest-fe-before-on-3c67f0f3.log`; the entry-point grep and rule check first) | 1 | **2 failed, 88 passed**: (i) `:481` `assert 'timeout' == '0'` (the grandchild inherited the pipe and blocked); (ii) `:547` `assert 0 != 0` (the request was read on fd 0). (iii) PASSES by design: it pins 1.0.0 |
+| the wider set (the 7 modules, `-m "not gpu"`, `c61f-4`) | 0 | **361 passed, 41 deselected in 32.14 s** |
+| `ruff check .` / `ruff format --check .` / `mypy` / `mypy --strict` (2 files, win32 and `--platform darwin`) | 0 | All checks passed / 322 files already formatted / 160 files no issues / no issues |
+
+0 CR in each blob (counted with `tr -cd '\r'`).
+
+### Rebuilds (from `62198baf`; 78 GB free)
+
+| Form | Exit | Wall (shell / PyInstaller) | Size | Checks |
+|---|---|---|---|---|
+| onedir | 0 | 67 s / 56.8 s | 668.3 MiB; `Clearwater.exe` 10,672,066 B | 61 hidden imports from 376 pack files; hidden-import check PASS (61); bundle check PASS |
+| onefile | 0 | 77 s / 73.9 s | 523.9 MiB; `Clearwater.exe` 93,869,539 B | the same |
+
+Logs and reports: `t3e/build-on{dir,file}-t3e.log`, `t3e/hidden-imports-on{dir,file}-t3e.json`.
+
+**Read out of both bundles before any run** (`t3e/handler_check.py`, extended;
+`t3e/handler-check-t3e.json`): `interpreter_reentry`, `run_interpreter_option`,
+`isolate_worker_stdin` and `main` are present in the entry script of each `Clearwater.exe`,
+with bytecode and constants equal to `62198baf`'s source. `main` names
+`isolate_worker_stdin`, and `STD_INPUT_HANDLE` is in the module's names. **PASS on both.**
+Control: the `t3c/exp` build (read only) shows the three functions absent and `main` without
+the shim: FAIL.
+
+### The with-pack proof -- STOPPED at the first run again
+
+`--verify` before: PASS. (The file count read 2729: see the pack note below.)
+
+| Form | Request | Exit | Device | Output | CUDA / CuPy files | Canary | Windows | Left |
+|---|---|---|---|---|---|---|---|---|
+| onedir | HEIC -> PNG (`shim-with-heic`, 13:48:41Z, 2.7 s) | 3221225477 (DR-125) | **`CPU: CUDA device unusable`**; log `a test kernel failed on the CUDA device: Failed to find CUDA headers. Please install CUDA toolkit headers (e.g., pip install cupy-cuda12x[ctk]) or specify CUDA_PATH environment variable.` | PNG, ok | 62: 54 pack `.pyd`, 8 driver, **0 elsewhere** | `Clearwater.exe -m ...dynamic_lib_subprocess canary cudart`, **exit 0, alive 1.346-1.591 s (about 0.25 s): F-E is FIXED** | 0 UIA / 0 visible (9 samples) | none |
+
+**The shim works**: the canary now returns at once instead of timing out. But the device is
+still not GPU, which is dispatch-8's STOP condition. No further pack-activating run was made
+(not the onedir video, not onefile, not the site-flag probes on these builds). The regression
+without the pack was NOT run either.
+
+**FINDING F-F (packaging; the STOP): `cuda.pathfinder` looks for the CUDA HEADERS in
+`site.getsitepackages()`, not on `sys.path`, so a frozen process never finds the pack's
+headers.** The headers are in the pack (`nvidia/{cuda_runtime, cuda_nvrtc, cublas, ...}/include`).
+
+- `cuda/pathfinder/_headers/find_nvidia_headers.py:82-86`, step 1 `find_in_site_packages`,
+  calls `find_sub_dirs_all_sitepackages` = `site.getsitepackages()` plus the user site
+  (`_utils/find_sub_dirs.py`). The later steps are conda, the product roots, `CUDA_PATH` /
+  `CUDA_HOME`, the CTK-root canary and the system dirs.
+- In the frozen process the pack is only on `sys.path` (the loader's design), so every step
+  misses and CuPy's kernel compile refuses.
+- The canary's own JSON, read standalone on the e0a90bc5 builds (`t3e/repro-onedir-canary*.out`;
+  the `-m` branch is unchanged since), is `{"status": "not-found", "abs_path": null}`:
+  `cudart` is not on the system search path, so the canary gives no CTK root either.
+
+Reproduced cheaply with base CPython and no product code (`t3e/headers_repro.py`,
+`t3e/headers-repro-{plain,prefixes}.out`; `-B -s`, the redirect, no `CUDA_PATH`). Pathfinder
+was imported from the pack in both runs.
+
+| Mode | The pack in `site.getsitepackages()` | `find_nvidia_header_directory("cudart")` / `("nvrtc")` |
+|---|---|---|
+| `plain`: the pack on `sys.path` only (as the frozen loader leaves it) | no | `None` / `None` |
+| `prefixes`: the same, plus `site.PREFIXES.insert(0, <pack site-packages>)` before the import | yes | `<pack>\nvidia\cuda_runtime\include` / `<pack>\nvidia\cuda_nvrtc\include` |
+
+**Options for CHARC (none made; a code change is a STOP first):**
+
+- (a) Owned, frozen only, in `gpu_pack.activate()` after the `sys.path` insertion: `import
+  site` (bundled since F-C2; inert under `no_site`) and put the pack's `site-packages` first in
+  `site.PREFIXES`.
+  - On Windows `getsitepackages()` then lists it, so pathfinder's site-packages step finds the
+    pack's headers, and its wheel DLLs the intended way.
+  - The `-m` canary child gets it through the same `activate()`.
+  - The repro shows it for the headers.
+  - The Linux form (`lib/python3.12/site-packages` under each prefix) needs a different
+    spelling; that is for WP6.3 / WP6.4.
+- (b) Set `CUDA_PATH` to `<pack>/nvidia/cuda_runtime`. It reaches CuPy's own CUDA-path logic
+  and pathfinder's DLL steps as well, and the NVRTC headers live in another folder. Wider
+  effect; not recommended.
+- (c) Configure or patch pathfinder itself. Fragile.
+
+Recommended: (a), with a test that a frozen activation makes `site.getsitepackages()` list the
+pack and leaves a source run unchanged. Then rebuild, the bundle read-out, and this proof from
+its start (amendment 4's evidence included).
+
+### The site flags (amendment 4)
+
+Not re-run on the shim builds (the STOP). The values of record are the group's earlier
+addition on the `e0a90bc5` builds. The shim does not touch `site`, `sys.path` or `sys.flags`.
+
+### The pack, and a slip of mine (repaired; disclosed)
+
+- My two NON-frozen helper runs wrote bytecode INTO the pack: 28 `cuda/pathfinder/**/__pycache__/*.pyc`
+  files each time.
+  - The first was the earlier user-site control (base CPython, `PYTHONPATH` = the pack, about
+    13:33Z).
+  - The second was `headers_repro.py`. It ran with `-B`, but pathfinder's CTK-root canary
+    spawns `sys.executable -m ...` without `-B`, with the working directory set to the pack's
+    `site-packages`.
+- The frozen runs write none (`write_bytecode` is off in the bootloader; 0 files added in every
+  frozen record).
+- `--verify` cannot see nested unlisted files: it PASSED with 2729 files. I found them by the
+  file count.
+- I deleted exactly those 28 files twice (the same names both times, `t3e/stray-pyc-removed{,-2}.txt`;
+  no RECORD row names a `__pycache__`) and the empty `__pycache__` folders left behind.
+- `--verify` then gave `PASS (11 distributions; 2701 RECORD rows ...; 2701 files, 2412.6 MiB)`
+  (`t3e/verify-5-after-pyc-removal-2.log`), the 2b-2 figures. The shim run at 13:48Z ran while
+  the first 28 files were present; it does not count as a pack-state proof.
+- For WP6.3: a full-content verify that also counts unlisted nested files would have caught
+  this.
+
+Owner log md5 `69ed0432c562db9445daecbe8f15fe27` at every check (13:35-13:55Z; a check only).
+`%LOCALAPPDATA%\Clearwater` is absent. No `Clearwater.exe` is left.
+
+### Files changed
+
+`src/clearwater/__main__.py`, `tests/test_frozen_entry.py`, `tools/package/README.md`
+(`62198baf`) and `docs/proofs/wp6.1-ledger.md`. Evidence tools (not committed): the extended
+`t3e/handler_check.py` and `t3e/proof3.py` (each process's end time), and
+`t3e/headers_repro.py`.
+
+Depth at turn-3 group-2b-3 (F-E shim) end: DISPATCHER TO FILL
