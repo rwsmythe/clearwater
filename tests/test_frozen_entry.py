@@ -89,6 +89,8 @@ def calls(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[tuple[str, An
     def locations(**_: Any) -> config_paths.Locations:
         return config_paths.Locations(config_dir=tmp_path / "cfg", cache_dir=tmp_path / "cache")
 
+    for variable in ("APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
+        monkeypatch.setenv(variable, str(tmp_path / variable.lower()))  # never the user's
     monkeypatch.setattr(gpu_pack, "activate", activate)
     monkeypatch.setattr(export_worker, "main", worker_main)
     monkeypatch.setattr(config_log, "configure_logging", configure)
@@ -351,7 +353,18 @@ def test_the_entry_sets_path_before_either_branch(
 # Reviewer A r2 #11: the worker branch's import graph, in a fresh interpreter.
 
 _WORKER_IMPORT_PROBE = """
+import importlib.abc
 import sys
+
+
+class NoGui(importlib.abc.MetaPathFinder):
+    def find_spec(self, name, path, target=None):
+        if name in ("clearwater.app.main", "clearwater.gui") or name.startswith("clearwater.gui."):
+            raise ImportError("the GUI is blocked by the test: " + name)
+        return None
+
+
+sys.meta_path.insert(0, NoGui())  # no window can open, whatever the entry does
 sys.path.insert(0, sys.argv[1])
 import clearwater.__main__ as entry
 from clearwater.app import export_worker
@@ -361,35 +374,41 @@ loaded = sorted(m for m in sys.modules if m.startswith(tuple(sys.argv[2:])))
 print("status", status, "loaded", ",".join(loaded) or "-")
 """
 """Import the entry and the worker afresh, run the worker branch (its ``main`` stubbed), and
-print which :data:`BLOCKED` modules are then loaded."""
+print which :data:`BLOCKED` modules are then loaded. The GUI modules cannot be imported in the
+child at all (an attempt fails the probe), so no window opens on any code revision."""
 
 
-def _probe_worker_imports(src_root: Path) -> str:
+def _probe_worker_imports(src_root: Path, app_data: Path) -> str:
     """Run :data:`_WORKER_IMPORT_PROBE` on the ``clearwater`` under ``src_root``.
 
     Args:
         src_root: The folder holding the ``clearwater`` package to import.
+        app_data: Where the child's app-data variables point (never the user's folders).
 
     Returns:
         The probe's output line.
     """
+    environ = dict(os.environ)
+    for variable in ("APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
+        environ[variable] = str(app_data / variable.lower())
     done = subprocess.run(
         [sys.executable, "-I", "-c", _WORKER_IMPORT_PROBE, str(src_root), *BLOCKED],
         capture_output=True,
         text=True,
         timeout=120,
         check=False,
+        env=environ,
     )
     assert done.returncode == 0, done.stderr
     return done.stdout.strip()
 
 
-def test_the_worker_branch_imports_no_qt_in_a_fresh_interpreter() -> None:
+def test_the_worker_branch_imports_no_qt_in_a_fresh_interpreter(tmp_path: Path) -> None:
     """The real import graph of ``__main__`` and ``export_worker``: no PySide6, no shiboken6."""
     import clearwater
 
     src_root = Path(clearwater.__file__).resolve().parents[1]
-    assert _probe_worker_imports(src_root) == "status 0 loaded -"
+    assert _probe_worker_imports(src_root, tmp_path) == "status 0 loaded -"
 
 
 def test_the_fresh_interpreter_probe_sees_a_top_level_qt_import(tmp_path: Path) -> None:
@@ -404,7 +423,7 @@ def test_the_fresh_interpreter_probe_sees_a_top_level_qt_import(tmp_path: Path) 
         worker.read_text(encoding="utf-8") + "\nimport PySide6  # the test's mutation\n",
         encoding="utf-8",
     )
-    line = _probe_worker_imports(tmp_path / "src")
+    line = _probe_worker_imports(tmp_path / "src", tmp_path / "app-data")
     assert line.startswith("status 0 loaded PySide6")
     assert "shiboken6" in line
 
