@@ -1,6 +1,6 @@
 # Clearwater
 
-Desktop tool (Python, PySide6) that corrects color cast, contrast loss and haze in amateur underwater photos (iPhone) and video (GoPro). Visual quality is the goal, not physically exact color. Single owner, Windows 11 laptop, open source (GPL-2.0-or-later), private repository for now.
+Desktop tool (Python, PySide6) that corrects color cast, contrast loss and haze in amateur underwater photos (iPhone) and video (GoPro). Visual quality is the goal, not physically exact color. Single owner, Windows 11 laptop, open source (GPL-2.0-or-later), public repository since 2026-11-04 (1.0.0).
 
 ## Read these first, in this order
 
