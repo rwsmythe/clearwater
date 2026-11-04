@@ -465,15 +465,25 @@ def find_agents(cells: list[_Transcript], project: Path, session: str | None,
     """
     selected: set[Path] = set()
     missing: list[str] = []
+    noted: set[tuple[str, str]] = set()
     for agent_id in agent_ids:
-        matches = [path for name, _, path in cells
+        matches = [(session_id, path) for name, session_id, path in cells
                    if name == agent_id or path.stem == f"agent-a{agent_id}"]
         if not matches:
             directory = project / (session if session is not None else "*") / "subagents"
             missing.append(f"{directory / f'agent-a{agent_id}.jsonl'} or "
                            f"{directory / f'agent-a{agent_id}-<16hex>.jsonl'} "
                            "(exact parsed name or filename stem)")
-        selected.update(matches)
+        session_counts: dict[str, int] = {}
+        for session_id, path in matches:
+            selected.add(path)
+            session_counts[session_id] = session_counts.get(session_id, 0) + 1
+        for session_id, count in session_counts.items():
+            if count > 1 and (agent_id, session_id) not in noted:
+                print(f"NOTE: --agent {agent_id} matched {count} transcripts in session "
+                      f"{session_id[:8]}; use the full name-hash stem to read one",
+                      file=sys.stderr)
+                noted.add((agent_id, session_id))
     return [cell for cell in cells if cell[2] in selected], missing
 
 
@@ -617,6 +627,8 @@ def main(argv: list[str] | None = None) -> int:
             raise _ConfigError("--agent ID must not be empty")
         if args.live is not None and (math.isnan(args.live) or args.live < 0):
             raise _ConfigError("--live HOURS must be >= 0 and not NaN")
+        if args.live == 0:
+            args.live = 0.0
     except _ConfigError as exc:
         print(f"USAGE ERROR: {exc}", file=sys.stderr)
         return 4
@@ -651,12 +663,11 @@ def main(argv: list[str] | None = None) -> int:
         if missing:
             for error in discovery_errors:
                 print(f"DISCOVERY ERROR: {error}", file=sys.stderr)
-            if discovery_errors:
-                return 3  # An incomplete listing cannot establish that an ID is absent.
+            prefix = "INCOMPLETE" if discovery_errors else "USAGE ERROR"
             for pattern in missing:
-                print(f"USAGE ERROR: no cell transcript found; searched: {pattern}",
+                print(f"{prefix}: no cell transcript found; searched: {pattern}",
                       file=sys.stderr)
-            return 4
+            return 3 if discovery_errors else 4
     if args.cell:
         cells = [cell for cell in cells if args.cell in cell[0]]
     discovered = bool(cells)

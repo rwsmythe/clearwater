@@ -108,6 +108,7 @@ the `[ctx]` line is printed by the UserPromptSubmit hook, which never fires for 
 Claude cell's depth and tells it the figure. BEFORE assigning the cell work (the PRECONDITION)
 and at every ROUND GATE, read that exact cell at any age with
 `uv run python scripts/cell_depth.py --project "<project>" --session="<session-id>" --agent "<name>"`.
+If a cell name was reused within the session, pass the full `<name>-<hash>` stem.
 The name must equal the parsed cell name (an anonymous cell's hash), or the filename stem must
 equal `agent-a<name>` for a full name-hash ID; a longer sibling's name never matches. Take the
 in-flight cell census with `uv run python scripts/cell_depth.py --project "<project>" --live 6`.

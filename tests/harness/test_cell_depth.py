@@ -1184,26 +1184,27 @@ class SelectorCliTest(unittest.TestCase, TmpDirMixin):
         rc, out, _ = self._run("--live", "0")
         self.assertEqual(rc, 0)
         self.assertEqual(out, "no cells written in the last 0h (cap 400,000); nothing to check\n")
+        self.assertEqual(self._run("--live", "-0")[1], out)
         rc, out, _ = self._run("--live", "inf")
         self.assertEqual(rc, 0)
         self.assertIn("old  current=100000", out)
 
     def test_agent_exact_name_excludes_longer_sibling(self) -> None:
-        self._cell("wp57-cell", 100_000)
-        self._cell("wp57-cell9", 900_000)
-        rc, out, _ = self._run("--agent", "wp57-cell")
+        self._cell("fixture-cell", 100_000)
+        self._cell("fixture-cell9", 900_000)
+        rc, out, _ = self._run("--agent", "fixture-cell")
         self.assertEqual(rc, 0)
-        self.assertIn("wp57-cell  current=100000", out)
-        self.assertNotIn("wp57-cell9", out)
+        self.assertIn("fixture-cell  current=100000", out)
+        self.assertNotIn("fixture-cell9", out)
 
     def test_agent_missing_exact_name_with_prefix_sibling_exits_4(self) -> None:
-        self._cell("wp57-cell9", 100_000)
-        rc, out, err = self._run("--agent", "wp57-cell")
+        self._cell("fixture-cell9", 100_000)
+        rc, out, err = self._run("--agent", "fixture-cell")
         self.assertEqual(rc, 4)
         self.assertEqual(out, "")
         self.assertIn("searched:", err)
-        self.assertIn("agent-awp57-cell.jsonl", err)
-        self.assertIn("agent-awp57-cell-<16hex>.jsonl", err)
+        self.assertIn("agent-afixture-cell.jsonl", err)
+        self.assertIn("agent-afixture-cell-<16hex>.jsonl", err)
 
     def test_agent_full_name_hash_selects_one_transcript(self) -> None:
         self._cell("same-name", 100_000, identity="0123456789abcdef")
@@ -1252,6 +1253,74 @@ class SelectorCliTest(unittest.TestCase, TmpDirMixin):
         self.assertEqual(rc, 0)
         self.assertIn("boundary  current=100000", out)
         self.assertRegex(out, r"age=6\.0h {2}flag=ok\s*$")
+
+
+    def test_agent_reused_name_warns_once_per_session(self) -> None:
+        self._cell("reused", 500_000, age=5, identity="0123456789abcdef")
+        self._cell("reused", 100_000, identity="fedcba9876543210")
+        self._cell("reused", 100_000, session="sess-2")
+        for extra, rows in ((("--session", "sess-1", "--agent", "reused"), 2),
+                            (("--agent", "reused", "--agent", "reused"), 3)):
+            with self.subTest(extra=extra):
+                rc, out, err = self._run(*extra)
+                self.assertEqual(rc, 2)
+                self.assertEqual(len(out.splitlines()), rows)
+                notes = [line for line in err.splitlines() if line.startswith("NOTE:")]
+                self.assertEqual(notes, [
+                    "NOTE: --agent reused matched 2 transcripts in session sess-1; "
+                    "use the full name-hash stem to read one",
+                ])
+        rc, out, err = self._run("--session", "sess-1", "--agent", "reused-fedcba9876543210")
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(out.splitlines()), 1)
+        self.assertNotIn("NOTE:", err)
+
+    def test_agent_empty_id_with_discovery_error_is_usage_error(self) -> None:
+        self._cell("present", 100_000)
+        with mock.patch.object(cd, "_scan_dir_entries",
+                               side_effect=PermissionError(errno.EACCES, "simulated")):
+            rc, out, err = self._run("--agent=")
+        self.assertEqual(rc, 4)
+        self.assertEqual(out, "")
+        self.assertIn("USAGE ERROR", err)
+
+    def test_session_exactly_at_live_boundary_is_listed(self) -> None:
+        self.now = 1_800_000_000.0
+        self._session(100_000, age=6)
+        with mock.patch.object(cd.time, "time", return_value=self.now):
+            rc, out, _ = self._run("--sessions", "--live", "6")
+        self.assertEqual(rc, 0)
+        self.assertIn("sess-1  current=100000", out)
+        self.assertRegex(out, r"age=6\.0h {2}flag=ok\s*$")
+
+    def test_parent_exactly_at_live_boundary_retains_parked_cell(self) -> None:
+        self.now = 1_800_000_000.0
+        self._cell("parked", 100_000, age=7)
+        self._session(age=6)
+        with mock.patch.object(cd.time, "time", return_value=self.now):
+            rc, out, _ = self._run("--live", "6")
+        self.assertEqual(rc, 0)
+        self.assertIn("parked  current=100000", out)
+        self.assertRegex(out, r"age=7\.0h {2}flag=parked\s*$")
+
+    def test_agent_listing_failure_reports_each_unmatched_id(self) -> None:
+        self._cell("hidden", 100_000)
+        real_scan = cd._scan_dir_entries
+
+        def _scan(path: Path):
+            if path == self.tmp / "sess-1" / "subagents":
+                raise PermissionError(errno.EACCES, "simulated")
+            return real_scan(path)
+
+        with mock.patch.object(cd, "_scan_dir_entries", side_effect=_scan):
+            rc, out, err = self._run("--agent", "hidden", "--agent", "missing")
+        self.assertEqual(rc, 3)
+        self.assertEqual(out, "")
+        self.assertIn("DISCOVERY ERROR", err)
+        self.assertEqual(err.count("searched:"), 2)
+        self.assertIn("agent-ahidden.jsonl", err)
+        self.assertIn("agent-amissing.jsonl", err)
+        self.assertNotIn("USAGE ERROR", err)
 
 
 if __name__ == "__main__":
