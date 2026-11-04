@@ -492,3 +492,129 @@ DLL files under 0.1 MiB each):
 No STOP. Group B (the onefile build and the plugin / path checks) is next.
 
 Depth at turn-2 group-A end: DISPATCHER TO FILL
+
+Depth at turn-2 group-A end (dispatcher): 248,067.
+
+## Turn 2 group B (2026-11-04 09:05-09:25Z): the onefile build and the first frozen checks -- STOPPED on an incident
+
+### INCIDENT (first): keystrokes went to a window that was not Clearwater's
+
+- **What ran.** My GUI check script `clearwater-review-evidence/wp6.1/cell/t2b/gui_check.py`
+  drove the onedir build's photo export with PowerShell `WScript.Shell` `AppActivate(<pid>)`
+  plus `SendKeys`.
+- **What went wrong.** AppActivate did NOT bring the Clearwater window forward, so the keys
+  went to whatever window held the focus. Both screenshots from the run show other windows in
+  front, PowerShell / terminal tabs, one of them a conversation session. They stay in
+  `work/wp6.1/t2b/onedir/` and were not copied to evidence.
+- **What was sent, between about 09:12:55Z and 09:19Z, twice:**
+  - `Ctrl+O`;
+  - the full path of a photo copy followed by Enter: first
+    `C:\Users\rwsmy\clearwater\.worktrees\wp6.1\work\wp6.1\t2b\onedir\photos\heic-ad24-both.heic`,
+    then the same folder's `jpeg-gradient-display-p3.jpg`;
+  - `Alt+F`;
+  - `e`.
+- **The consequence is unknown.** If a terminal session had the focus, those two path lines
+  may have been submitted to it as input. The owner should check the foreground
+  terminal / session windows for those lines.
+- **Current state.** No Clearwater process is left (`tasklist`), and I stopped the GUI
+  automation at once. A warning file now sits beside the script
+  (`t2b/WARNING-gui_check-keystrokes.txt`).
+- **Rule for any successor:** no SendKeys, SendInput or keybd_event. Use a method bound to
+  the Clearwater window itself: UI Automation patterns on its own elements, and PrintWindow
+  for screenshots.
+- **Result for this turn:** the GUI photo-export check (HEIC in, PNG out, EXIF), the
+  write-journal check and both first-window screenshots were NOT obtained.
+
+### The onefile build
+
+`df -h /c` read 104 GB free at 09:08Z.
+
+| Command (worktree root) | Exit | Wall | Result |
+|---|---|---|---|
+| `uv run --no-sync python tools/package/build.py --form onefile --with-ffmpeg > work/wp6.1/build-onefile.log 2>&1` | 0 | 104 s (PyInstaller 102.7 s) | `Clearwater.exe` 89.4 MiB; `ffmpeg.exe` 217.3 and `ffprobe.exe` 217.1 MiB beside it; forbidden / allowlist check PASS |
+
+- The build log has the same single warning as onedir (`scipy.special._cdflib`, benign) and
+  the same exclude list.
+- FFmpeg was also copied beside the onedir `Clearwater.exe` by `build.copy_ffmpeg` (one
+  `uv run --no-sync python -c` call).
+
+### Checks obtained (onedir only, before the incident's effect was seen)
+
+From `t2b/result-onedir.json` and `t2b/clearwater-onedir.log`:
+
+- **Run setup.** `APPDATA` / `LOCALAPPDATA` were redirected to
+  `work/wp6.1/t2b/onedir/{roaming,local}`. PATH was SET BY HAND to the exe's folder plus
+  `C:\Windows\System32` and `C:\Windows` (D1 lands in turn 3). The working directory was
+  `work/wp6.1/t2b/onedir`.
+- **First window: PASS.** A top-level window titled `Clearwater`, 1293 x 815. It was
+  detected by an EnumWindows poll over the process tree.
+- **Qt plugins mapped at the first window** (psutil `memory_maps`):
+  `platforms/qwindows.dll` and `styles/qmodernwindowsstyle.dll` only. Every `Qt6*.dll` was
+  mapped from the bundle's `_internal/PySide6`. The dev-run baseline was NOT taken.
+- **Start-up log** (frozen): starter presets installed, then
+  `clearwater.core.backend CuPy not installed: No module named 'cupy'` and
+  `clearwater.app.startup device: CPU: CuPy not installed`. That is AD-9's line, D7's
+  wording, for the no-pack case. The log ends with `Clearwater closed`. `settings.json` was
+  written with the defaults (method `c3`, PNG 16-bit, `_corrected` suffix). Exit code 0.
+- **Not established:**
+  - that FFmpeg beside the exe is used (the start-up log has no encoder line; the check
+    needs a video open or the settings dialog's encoder list);
+  - the write journal (no export happened);
+  - the HEIC / JPEG photo export.
+- **Spec note for the successor:** D22 makes photo output PNG only (8- or 16-bit). The
+  group-B wording "PNG and JPEG out" can only mean HEIC in -> PNG and JPEG in -> PNG.
+  `tests/fixtures/stills/heic/heic-ad24-both.heic` carries EXIF (118 bytes). The JPEG
+  fixtures (`tests/fixtures/stills/jpeg/jpeg-gradient-*.jpg`) carry none (0 tags, an ICC
+  profile only).
+- **The frozen worker.** It is unreachable without the turn-3 code, by reading the code:
+  `composition.py:461` builds `[sys.executable, "-m", "clearwater.app.export_worker"]`,
+  and the frozen `Clearwater.exe` ignores `-m` and starts the GUI (`__main__.py:5-8`). So a
+  video export from the frozen GUI would start a second GUI as its "worker". This was NOT run.
+  It is turn 3's.
+
+Depth at turn-2 end: DISPATCHER TO FILL
+
+## Handoff to turn 3
+
+Built and where (worktree `C:\Users\rwsmy\clearwater\.worktrees\wp6.1`, branch `wp6.1`; all
+outputs gitignored under `work/wp6.1/`):
+
+- **onedir:** `work/wp6.1/dist-onedir/Clearwater-1.0.0-windows-onedir/Clearwater/Clearwater.exe`
+  (233.8 MiB) with `ffmpeg.exe` and `ffprobe.exe` beside it.
+  Built by `uv run --no-sync python tools/package/build.py --form onedir`.
+- **onefile:** `work/wp6.1/dist-onefile/Clearwater-1.0.0-windows-onefile/Clearwater.exe`
+  (89.4 MiB) with FFmpeg beside it. Built by `... --form onefile --with-ffmpeg`.
+- Both builds predate any turn-3 `src/` change; rebuild after it. Each build takes about
+  2-5 minutes of CPU. Read `df -h /c` first (25 GB floor).
+
+Open checks, in order:
+
+1. **Turn 3's product code** (the brief's rulings D1-D4, Q5, Q6): `src/clearwater/gpu_pack.py`;
+   the `__main__.py` dispatch and frozen PATH prepend; the `composition.py:461` frozen
+   command; `tests/test_gpu_pack.py`, `tests/test_frozen_entry.py`. Then rebuild both forms.
+2. **The frozen worker**: one video export and one HEIC -> PNG request through
+   `Clearwater.exe --export-worker`, both forms. Also confirm that the one-file worker reuses
+   the parent's `_MEI` folder (list `%TEMP%\_MEI*` during the export).
+3. **The GUI checks still owed, both forms:**
+   - first-window screenshots;
+   - the Qt plugins against the dev run (`python -m clearwater`);
+   - FFmpeg beside the exe in use;
+   - HEIC -> PNG and JPEG -> PNG through the GUI with EXIF carried;
+   - the write journal (`<APPDATA>/Clearwater/write-journal.json` after an export).
+
+   Use a method bound to the Clearwater window: UI Automation on its own elements, PrintWindow
+   for screenshots, or the owner by hand (D6 already allows "checked by hand"). NEVER
+   keystroke injection (the incident above).
+4. **The GPU pack proof** (brief design 2, ruling D2). Then turn 4's timings.
+
+Commands that worked:
+
+- **The onedir check run**, from the worktree root:
+
+  ```
+  uv run --no-sync python C:\Users\rwsmy\clearwater-review-evidence\wp6.1\cell\t2b\gui_check.py --label onedir --exe <exe> --work <worktree>\work\wp6.1\t2b --window-only
+  ```
+
+  `--window-only` skips the keystroke part. Its `shot()` still calls the unsafe `keys(pid, "")`
+  (an AppActivate plus an empty SendKeys), so replace `shot()` with PrintWindow before reuse.
+- **Without `--exe`**, the same script runs the dev baseline (`python -m clearwater`).
