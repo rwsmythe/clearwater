@@ -1,9 +1,12 @@
 # WP5.5 release preparation - completion report
 
-Candidate: branch `wp5.5`, base `e2cf4752`; build `e7876912`, Reviewer A
-round-1 fixes `6135c496`, followed by this turn's round-2 documentation fixes.
+Candidate: branch `wp5.5`, base `e2cf4752`; `e7876912` (build), `6135c496`
+(A r1 fixes), `51afce88` (A r2 fixes and this report), followed by the B
+remediation commit.
 This report transfers the package to the orchestrator. Reviewer A returned
-**NO_NEW_CRITICAL_MAJOR** in round 2; Reviewer B and acceptance are pending.
+**NO_NEW_CRITICAL_MAJOR** in round 2. Reviewer B on `51afce88` returned
+**NEW_CRITICAL_MAJOR_FOUND**; this is the single bounded B remediation.
+The B re-run, release gate and acceptance remain at the orchestrator's seat.
 The cumulative execution and adjudication record is
 [the WP5.5 ledger](../proofs/wp5.5-ledger.md).
 
@@ -11,9 +14,11 @@ The cumulative execution and adjudication record is
 
 - [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) records Python,
   FFmpeg, all 18 selected runtime/gpu distributions, their native components,
-  and a separate 43-package dev/comms table. It preserves copyrights, licence
-  terms, disclaimers, source pointers, LGPL replacement rights and the optional
-  CUDA position. The final file is **433,096 UTF-8/LF bytes**. Its **44 distinct
+  and a separate 43-package dev/comms table. Native notices also identify MSVC
+  runtime DLLs and Mesa's software OpenGL renderer. It preserves copyrights,
+  licence terms, disclaimers, source pointers, LGPL replacement rights and the
+  optional CUDA and platform-runtime positions. The final file is
+  **435,354 UTF-8/LF bytes**. Its **44 distinct
   texts / 54 source records** represent **399,470 bytes** of distinct
   LF-normalised source text: 35 installed-source texts (including Python) and
   nine upstream supplements. All 44 SHA-256 values and byte counts match their
@@ -72,8 +77,8 @@ required notices are retained per row.
 | Python | 3.12.13 (outside lock) | PSF-2.0 and historical terms | `LICENSE.txt` beside the CPython 3.12.13 installation; text 01 | [Source](https://github.com/python/cpython/tree/v3.12.13); [text](../../THIRD_PARTY_NOTICES.md#text-01) | COMPATIBLE: preserve Python copyright and historical notices. |
 | cuda-pathfinder | 1.8.3 | Apache-2.0 | `cuda_pathfinder-1.8.3.dist-info/licenses/LICENSE` | [Source](https://github.com/NVIDIA/cuda-python); [text](../../THIRD_PARTY_NOTICES.md#text-02) | **COMPATIBLE-WITH-CONDITION**: Retain NVIDIA copyright, Apache licence and notices in the notices; GPLv3-compatible branch under Clearwater's or-later grant. |
 | cuda-toolkit | 12.9.2.0 | No licence declaration; metadata-only | `cuda_toolkit-12.9.2.0.dist-info/METADATA` and `RECORD`; no licence file/code/data | [Source](https://pypi.org/project/cuda-toolkit/12.9.2.0/); [terms](../../THIRD_PARTY_NOTICES.md) | **COMPATIBLE-WITH-CONDITION**: metadata-only meta-package: installs no code or data of its own; selects the nvidia-* component wheels, which are the NVIDIA rows under the NVIDIA EULA (optional component, not redistributed by this repository). |
-| cupy-cuda12x | 14.2.0 | MIT; BSD/Apache-2.0/LLVM-exception component terms | `cupy/_core/include/cupy/_cccl/LICENSE`; all 6 installed files identified by the linked texts/inventory | [Source](https://github.com/cupy/cupy); [text](../../THIRD_PARTY_NOTICES.md#text-03), [text](../../THIRD_PARTY_NOTICES.md#text-04), [text](../../THIRD_PARTY_NOTICES.md#text-05), [text](../../THIRD_PARTY_NOTICES.md#text-06), [text](../../THIRD_PARTY_NOTICES.md#text-07), [text](../../THIRD_PARTY_NOTICES.md#text-08) | **COMPATIBLE-WITH-CONDITION**: Optional gpu extra; retain complete CuPy aggregate and component texts; separately installed CUDA position in the notices. |
-| numpy | 2.5.4 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0; bundled OpenBLAS/LAPACK and GCC runtime exception | `numpy-2.5.4.dist-info/licenses/LICENSE.txt`; all 20 installed files identified by the linked texts/inventory | [Source](https://github.com/numpy/numpy); [text](../../THIRD_PARTY_NOTICES.md#text-09), [text](../../THIRD_PARTY_NOTICES.md#text-10), [text](../../THIRD_PARTY_NOTICES.md#text-11), [text](../../THIRD_PARTY_NOTICES.md#text-12), [text](../../THIRD_PARTY_NOTICES.md#text-13), [text](../../THIRD_PARTY_NOTICES.md#text-14), [text](../../THIRD_PARTY_NOTICES.md#text-15), [text](../../THIRD_PARTY_NOTICES.md#text-16), [text](../../THIRD_PARTY_NOTICES.md#text-17), [text](../../THIRD_PARTY_NOTICES.md#text-18), [text](../../THIRD_PARTY_NOTICES.md#text-19), [text](../../THIRD_PARTY_NOTICES.md#text-20), [text](../../THIRD_PARTY_NOTICES.md#text-21), [text](../../THIRD_PARTY_NOTICES.md#text-22), [text](../../THIRD_PARTY_NOTICES.md#text-23), [text](../../THIRD_PARTY_NOTICES.md#text-24), [text](../../THIRD_PARTY_NOTICES.md#text-25) | **COMPATIBLE-WITH-CONDITION**: Retain the complete aggregate and component copyright, conditions, disclaimers and GCC exception in the notices. |
+| cupy-cuda12x | 14.2.0 | MIT; BSD/Apache-2.0/LLVM-exception component terms | `cupy/_core/include/cupy/_cccl/LICENSE`; all 6 installed licence files identified by the linked texts/inventory | [Source](https://github.com/cupy/cupy); [text](../../THIRD_PARTY_NOTICES.md#text-03), [text](../../THIRD_PARTY_NOTICES.md#text-04), [text](../../THIRD_PARTY_NOTICES.md#text-05), [text](../../THIRD_PARTY_NOTICES.md#text-06), [text](../../THIRD_PARTY_NOTICES.md#text-07), [text](../../THIRD_PARTY_NOTICES.md#text-08) | **COMPATIBLE-WITH-CONDITION**: Optional gpu extra; retain complete CuPy aggregate and component texts; separately installed CUDA position in the notices. |
+| numpy | 2.5.4 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0; bundled OpenBLAS/LAPACK and GCC runtime exception | `numpy-2.5.4.dist-info/licenses/LICENSE.txt`; all 20 installed licence files identified by the linked texts/inventory | [Source](https://github.com/numpy/numpy); [text](../../THIRD_PARTY_NOTICES.md#text-09), [text](../../THIRD_PARTY_NOTICES.md#text-10), [text](../../THIRD_PARTY_NOTICES.md#text-11), [text](../../THIRD_PARTY_NOTICES.md#text-12), [text](../../THIRD_PARTY_NOTICES.md#text-13), [text](../../THIRD_PARTY_NOTICES.md#text-14), [text](../../THIRD_PARTY_NOTICES.md#text-15), [text](../../THIRD_PARTY_NOTICES.md#text-16), [text](../../THIRD_PARTY_NOTICES.md#text-17), [text](../../THIRD_PARTY_NOTICES.md#text-18), [text](../../THIRD_PARTY_NOTICES.md#text-19), [text](../../THIRD_PARTY_NOTICES.md#text-20), [text](../../THIRD_PARTY_NOTICES.md#text-21), [text](../../THIRD_PARTY_NOTICES.md#text-22), [text](../../THIRD_PARTY_NOTICES.md#text-23), [text](../../THIRD_PARTY_NOTICES.md#text-24), [text](../../THIRD_PARTY_NOTICES.md#text-25) | **COMPATIBLE-WITH-CONDITION**: Retain the complete aggregate and component copyright, conditions, disclaimers and GCC exception in the notices. |
 | nvidia-cublas-cu12 | 12.9.2.10 | NVIDIA CUDA EULA (proprietary) | `nvidia_cublas_cu12-12.9.2.10.dist-info/licenses/License.txt` | [Source](https://developer.nvidia.com/cuda-zone); [text](../../THIRD_PARTY_NOTICES.md#text-26) | **COMPATIBLE-WITH-CONDITION**: Optional, user-installed component; not redistributed by Clearwater and not GPL-compatible as a combined work. Retain NVIDIA copyright/EULA and component notices in the notices if redistributing under its terms. |
 | nvidia-cuda-nvrtc-cu12 | 12.9.86 | NVIDIA CUDA EULA (proprietary) | `nvidia_cuda_nvrtc_cu12-12.9.86.dist-info/licenses/License.txt` | [Source](https://developer.nvidia.com/cuda-zone); [text](../../THIRD_PARTY_NOTICES.md#text-26) | **COMPATIBLE-WITH-CONDITION**: Optional, user-installed component; not redistributed by Clearwater and not GPL-compatible as a combined work. Retain NVIDIA copyright/EULA and component notices in the notices if redistributing under its terms. |
 | nvidia-cuda-runtime-cu12 | 12.9.79 | NVIDIA CUDA EULA (proprietary) | `nvidia_cuda_runtime_cu12-12.9.79.dist-info/licenses/License.txt` | [Source](https://developer.nvidia.com/cuda-zone); [text](../../THIRD_PARTY_NOTICES.md#text-26) | **COMPATIBLE-WITH-CONDITION**: Optional, user-installed component; not redistributed by Clearwater and not GPL-compatible as a combined work. Retain NVIDIA copyright/EULA and component notices in the notices if redistributing under its terms. |
@@ -83,17 +88,21 @@ required notices are retained per row.
 | nvidia-cusparse-cu12 | 12.5.10.65 | NVIDIA CUDA EULA (proprietary) | `nvidia_cusparse_cu12-12.5.10.65.dist-info/licenses/License.txt` | [Source](https://developer.nvidia.com/cuda-zone); [text](../../THIRD_PARTY_NOTICES.md#text-26) | **COMPATIBLE-WITH-CONDITION**: Optional, user-installed component; not redistributed by Clearwater and not GPL-compatible as a combined work. Retain NVIDIA copyright/EULA and component notices in the notices if redistributing under its terms. |
 | nvidia-nvjitlink-cu12 | 12.9.86 | NVIDIA CUDA EULA (proprietary) | `nvidia_nvjitlink_cu12-12.9.86.dist-info/licenses/License.txt` | [Source](https://developer.nvidia.com/cuda-zone); [text](../../THIRD_PARTY_NOTICES.md#text-26) | **COMPATIBLE-WITH-CONDITION**: Optional, user-installed component; not redistributed by Clearwater and not GPL-compatible as a combined work. Retain NVIDIA copyright/EULA and component notices in the notices if redistributing under its terms. |
 | pillow | 12.3.0 | MIT-CMU (PIL/HPND family); bundled codec/font terms | `pillow-12.3.0.dist-info/licenses/LICENSE` | [Source](https://github.com/python-pillow/Pillow); [text](../../THIRD_PARTY_NOTICES.md#text-27) | **COMPATIBLE-WITH-CONDITION**: Retain the complete aggregate in the notices, including FreeType and libjpeg acknowledgements. |
-| pillow-heif | 1.8.1 | BSD-3-Clause wrapper; binary wheel GPLv2 with LGPLv3/GPLv2-or-later components | `pillow_heif-1.8.1.dist-info/licenses/LICENSE.txt`; all 2 installed files identified by the linked texts/inventory | [Source](https://github.com/bigcat88/pillow_heif); [text](../../THIRD_PARTY_NOTICES.md#text-28), [text](../../THIRD_PARTY_NOTICES.md#text-29), [text](../../THIRD_PARTY_NOTICES.md#text-37), [text](../../THIRD_PARTY_NOTICES.md#text-38), [text](../../THIRD_PARTY_NOTICES.md#text-39), [text](../../THIRD_PARTY_NOTICES.md#text-40), [text](../../THIRD_PARTY_NOTICES.md#text-41), [text](../../THIRD_PARTY_NOTICES.md#text-42), [text](../../THIRD_PARTY_NOTICES.md#text-43), [text](../../THIRD_PARTY_NOTICES.md#text-44) | **COMPATIBLE-WITH-CONDITION**: Retain wrapper and bundled manifest, native component notices and corresponding-source pointers in the notices; LGPL libraries remain replaceable. |
+| pillow-heif | 1.8.1 | BSD-3-Clause wrapper; binary wheel GPLv2 with LGPLv3/GPLv2-or-later components | `pillow_heif-1.8.1.dist-info/licenses/LICENSE.txt`; all 2 installed licence files identified by the linked texts/inventory | [Source](https://github.com/bigcat88/pillow_heif); [text](../../THIRD_PARTY_NOTICES.md#text-28), [text](../../THIRD_PARTY_NOTICES.md#text-29), [text](../../THIRD_PARTY_NOTICES.md#text-37), [text](../../THIRD_PARTY_NOTICES.md#text-38), [text](../../THIRD_PARTY_NOTICES.md#text-39), [text](../../THIRD_PARTY_NOTICES.md#text-40), [text](../../THIRD_PARTY_NOTICES.md#text-41), [text](../../THIRD_PARTY_NOTICES.md#text-42), [text](../../THIRD_PARTY_NOTICES.md#text-43), [text](../../THIRD_PARTY_NOTICES.md#text-44) | **COMPATIBLE-WITH-CONDITION**: Retain wrapper and bundled manifest, native component notices and corresponding-source pointers in the notices; LGPL libraries remain replaceable. |
 | pyside6-essentials | 6.12.0 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only (metadata) | `pyside6_essentials-6.12.0.dist-info/METADATA`; `pyside6_essentials-6.12.0.dist-info/licenses/LicenseRef-Qt-Commercial.txt` (commercial only; R2) | [Source](https://code.qt.io/cgit/pyside/pyside-setup.git/); [terms](../../THIRD_PARTY_NOTICES.md) | **COMPATIBLE-WITH-CONDITION**: Clearwater relies on LGPL-3.0 for dynamically linked, replaceable QtCore/QtGui/QtWidgets; Qt notice in the notices. |
-| scipy | 1.18.1 | BSD-3-Clause; bundled library terms | `scipy-1.18.1.dist-info/LICENSE.txt`; all 5 installed files identified by the linked texts/inventory | [Source](https://github.com/scipy/scipy); [text](../../THIRD_PARTY_NOTICES.md#text-30), [text](../../THIRD_PARTY_NOTICES.md#text-31), [text](../../THIRD_PARTY_NOTICES.md#text-32), [text](../../THIRD_PARTY_NOTICES.md#text-33), [text](../../THIRD_PARTY_NOTICES.md#text-34) | **COMPATIBLE-WITH-CONDITION**: Retain aggregate OpenBLAS/LAPACK/GCC notices plus uarray, duccfft, DOP and Qhull texts in the notices. |
+| scipy | 1.18.1 | BSD-3-Clause; bundled library terms | `scipy-1.18.1.dist-info/LICENSE.txt`; all 5 installed licence files identified by the linked texts/inventory | [Source](https://github.com/scipy/scipy); [text](../../THIRD_PARTY_NOTICES.md#text-30), [text](../../THIRD_PARTY_NOTICES.md#text-31), [text](../../THIRD_PARTY_NOTICES.md#text-32), [text](../../THIRD_PARTY_NOTICES.md#text-33), [text](../../THIRD_PARTY_NOTICES.md#text-34) | **COMPATIBLE-WITH-CONDITION**: Retain aggregate OpenBLAS/LAPACK/GCC notices plus uarray, duccfft, DOP and Qhull texts in the notices. |
 | shiboken6 | 6.12.0 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only (metadata) | `shiboken6-6.12.0.dist-info/METADATA`; `shiboken6-6.12.0.dist-info/licenses/LicenseRef-Qt-Commercial.txt` (commercial only; R2) | [Source](https://code.qt.io/cgit/pyside/pyside-setup.git/); [terms](../../THIRD_PARTY_NOTICES.md) | **COMPATIBLE-WITH-CONDITION**: LGPL-3.0 binding runtime, dynamically linked and replaceable; Qt notice in the notices. |
 | tifffile | 2026.10.15 | BSD-3-Clause | `tifffile-2026.10.15.dist-info/licenses/LICENSE` | [Source](https://github.com/cgohlke/tifffile); [text](../../THIRD_PARTY_NOTICES.md#text-35) | **COMPATIBLE**: Retain Christoph Gohlke/contributors' copyright, conditions and disclaimer in the notices. |
 | FFmpeg / ffprobe | 9.0.2-full_build-www.gyan.dev (outside lock) | GPL-3.0-or-later | Environment report `ffmpeg_version`; external executable build/licensing pages (not installed as a Python distribution) | [Tested build/source](https://www.gyan.dev/ffmpeg/builds/); [licensing](https://ffmpeg.org/legal.html) | COMPATIBLE-WITH-CONDITION: separate process, not redistributed, located on PATH. User obtains its licence and corresponding source from the build publisher. |
 
+| Microsoft Visual C++ runtime (native component) | DLL versions not established; present in NumPy 2.5.4, PySide6_Essentials 6.12.0 and shiboken6 6.12.0 | Microsoft Software License Terms for Visual C++ Redistributable | The wheels' `RECORD` files: `numpy-2.5.4.dist-info/RECORD` (one `numpy.libs/msvcp140-*.dll`), `pyside6_essentials-6.12.0.dist-info/RECORD` and `shiboken6-6.12.0.dist-info/RECORD` (ten MSVC DLLs each in `PySide6/` and `shiboken6/`); exact paths in native table below. No runtime licence file in the wheels. | [Microsoft terms](https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/) | COMPATIBLE-WITH-CONDITION: Clearwater's compiler/platform system-library position below; user-installed from PyPI, not redistributed by this repository. |
+| Mesa llvmpipe software OpenGL (native component) | Mesa version not identified; PySide6_Essentials 6.12.0 wheel | MIT | `pyside6_essentials-6.12.0.dist-info/RECORD` (`PySide6/opengl32sw.dll`); no separate installed Mesa licence text | [Qt attributions](https://doc.qt.io/qt-6/licenses-used-in-qt.html); [Mesa licence](https://docs.mesa3d.org/license.html) | COMPATIBLE-WITH-CONDITION: preserve applicable copyright, permission notice and disclaimer on redistribution; official source pointers supplied, no new text copied. |
+
 ### Native contents and conditions
 
 The [native component notices](../../THIRD_PARTY_NOTICES.md#native-components-and-conditions)
-cover the wheel contents as well as the Python distributions:
+identify the audited aggregate libraries, compiler/platform runtime DLLs and
+software OpenGL renderer as well as the Python distributions:
 
 | Component | Version / evidence | Licence and disposition |
 | --- | --- | --- |
@@ -103,6 +112,25 @@ cover the wheel contents as well as the Python distributions:
 | libde265 | 1.1.3; same manifest and [versioned source](https://github.com/strukturag/libde265/tree/v1.1.3), texts 40/43 | LGPL-3.0; COMPATIBLE-WITH-CONDITION: same LGPL obligations. |
 | x265 | 4.3; same manifest and [versioned source](https://github.com/Multicorewareinc/x265/tree/4.3), texts 37/38 | GPL-2.0-or-later; COMPATIBLE-WITH-CONDITION: preserve GPL text, Multicoreware copyright/source grant and source access. It is bundled even though Clearwater only reads HEIC. |
 | MinGW-w64 / winpthreads | Version not recorded by the wheel; bundled DLL/manifest evidence; [MinGW](https://github.com/mingw-w64/mingw-w64/blob/master/COPYING) / [winpthreads](https://github.com/mingw-w64/mingw-w64/blob/master/mingw-w64-libraries/winpthreads/COPYING), texts 41/44 | GPL with GCC runtime exception / MIT-BSD; COMPATIBLE-WITH-CONDITION: retain notices and exception. Unversioned upstream copies explicitly dated 2026-11-03; no invented version match. |
+| Microsoft Visual C++ runtime (MSVC) | NumPy 2.5.4: `numpy.libs/msvcp140-a4c2229bdc2a2a630acdc095b4d86008.dll`. PySide6_Essentials 6.12.0: `PySide6/` contains `concrt140.dll`, `msvcp140.dll`, `msvcp140_1.dll`, `msvcp140_2.dll`, `msvcp140_codecvt_ids.dll`, `vcamp140.dll`, `vccorlib140.dll`, `vcomp140.dll`, `vcruntime140.dll`, `vcruntime140_1.dll`. shiboken6 6.12.0: the same ten names under `shiboken6/`. Installed distribution file lists and round-0 `audit.json` identify them. | [Microsoft Software License Terms for Visual C++ Redistributable](https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/); COMPATIBLE-WITH-CONDITION under Clearwater's platform/system-library position below. No runtime licence file is shipped in these wheels; no text reproduced. |
+| Mesa llvmpipe / opengl32sw | `PySide6/opengl32sw.dll` in PySide6_Essentials 6.12.0; no Mesa version identified by installed metadata/licence files. [Qt third-party attributions](https://doc.qt.io/qt-6/licenses-used-in-qt.html) and [Mesa licence](https://docs.mesa3d.org/license.html). | MIT; COMPATIBLE-WITH-CONDITION: preserve applicable copyright, permission notice and disclaimer on redistribution. No separate installed licence text found; no new text copied or version-matched source claimed. |
+
+The two DLL classes are native components of already listed distributions, not
+additional Python packages. Counts remain 18 runtime/gpu and 43 dev/comms
+distributions. The audit table includes two supplementary native rows for them.
+
+Clearwater's position for the MSVC libraries is that these are runtime libraries
+of the C/C++ compiler and operating-system platform, bundled by the wheel
+publishers (NumPy and The Qt Company) under Microsoft's redistribution terms and
+installed by the user from PyPI. This source repository does not redistribute
+them. GPLv2 section 3's exception for major OS/compiler components and GPLv3's
+"System Libraries" definition address such runtime libraries; Microsoft's terms
+remain applicable. This is a COMPATIBLE-WITH-CONDITION position, not a claim
+that the Microsoft licence is itself GPL-compatible. No MSVC or Mesa licence
+file was supplied by the audited wheels, so their official licence/attribution
+URLs are provided without adding a copied text. CHARC CONCURRED with this position (message `df16a115aec924ca`, 2026-11-04 00:40Z), adding that the
+notices list the bundled DLL names per wheel and that the audit evidence for each
+is the wheel's `RECORD`.
 
 CHARC's round-0 ruling, message `ce6094d108b9546f`, resolved the four STOPs:
 
@@ -237,7 +265,20 @@ uv run --no-sync --with "psutil>=6,<8" --with "py-cpuinfo>=9,<10" python tools/e
 ```
 
 It was deliberately not attempted in the cell's network-restricted sandbox.
-**Run at the orchestrator's seat** (2026-11-04 00:26Z, network available; lean environment `work\wp5.5\walkthrough\lean-venv` via `UV_PROJECT_ENVIRONMENT`, output folder `work/wp5.5/walkthrough/environment`): exit 0; report `environment-20261104T002627Z.json`; `python_version` 3.12.13; `ffmpeg_version` "ffmpeg version 9.0.2-full_build-www.gyan.dev"; `unavailable` {}; `uv_version` 0.10.9.
+**Run at the orchestrator's seat** (2026-11-04 00:26Z, network available), with
+`UV_PROJECT_ENVIRONMENT` selecting `work/wp5.5/walkthrough/lean-venv`. The exact
+command, recorded in
+`work/wp5.5/walkthrough/lean-envreport-seat2.record.txt`, was:
+
+```bash
+uv run --no-sync --with "psutil>=6,<8" --with "py-cpuinfo>=9,<10" python tools/environment_report.py --out work/wp5.5/walkthrough/environment > work/wp5.5/walkthrough/lean-envreport-seat2.log 2>&1
+```
+
+Exit **0**; report `environment-20261104T002627Z.json`; `python_version`
+**3.12.13**; `ffmpeg_version`
+**"ffmpeg version 9.0.2-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers"**;
+`unavailable` **{}**; `uv_version` **"uv 0.10.9 (f675560f3 2026-03-06)"**.
+The cell read both the command record and resulting JSON; N4 is complete.
 
 ## Tests and validation
 
@@ -263,6 +304,12 @@ RED preceded the turn-2 implementation. Logs are under `work/wp5.5/`.
 | Turn-4 format check | 0 | 317 files already formatted; `t4-format.log`. |
 | Turn-4 mypy | 0 | Success: no issues found in 158 source files; `t4-mypy.log`. |
 | Turn-4 F1 source-byte verification | 0 | 44 texts, 0 mismatches; 54 source records; hashes/counts equal source bytes; all four mojibake markers 0; full EULA clause matches; `t4-notices-verify.log`. |
+| Reviewer B baseline | 0 | 72 passed, 1 deselected in 70.38s; `work/wp5.5/B-review.txt`. |
+| B remediation targeted | 0 | 72 passed, 1 deselected in 81.19s; `t5.log`. |
+| B remediation ruff check | 0 | All checks passed!; `t5-ruff.log`. |
+| B remediation format check | 0 | 317 files already formatted; `t5-format.log`. |
+| B remediation mypy | 0 | Success: no issues found in 158 source files; `t5-mypy.log`. |
+| B remediation F1 source-byte verification | 0 | 44 texts, 0 mismatches; 54 source records; hashes/counts equal source bytes; all four mojibake markers 0; full EULA clause matches; `t5-notices-verify.log`. |
 
 The cell's pytest runs always used the sandbox shim, disabled cacheprovider
 and a worktree basetemp. The existing slow halo test is the one deselection in
@@ -287,8 +334,9 @@ used this worktree's `.venv`, not the main tree's environment.
 | Turn 2 | Stale D106, CRLF listing and release literal confirmed by RED and fixed; missing/repeated notice conditions addressed during assembly. Suspected lock/dependency drift, README damage and lean install mutation rejected with diff/hash/distribution evidence. Network diagnostic prerequisite confirmed, subsequently resolved at the orchestrator seat. Its notice check compared corrupted evidence copies; F1 corrected that verification weakness in turn 3. |
 | A r1 | **0 critical / 2 major / 4 minor / 4 advisory**, all 10 NEW/in-envelope; 0 reverts, 0 product-code fixes. F1-F9 confirmed/fixed (including UTF-8 source recopy, actual Settings menu and complete EULA quote); F10 confirmed/no change, lean evidence supplied. F5's absent native version remained an explicit disclosure. No finding rejected. Verdict NEW_CRITICAL_MAJOR_FOUND. |
 | A r2 | **0 critical / 0 major / 2 minor / 1 reopened partial / 4 advisory**, all in envelope; NEW N1-N4, REOPENED F7, F8 regression; 0 reverts, 0 product-code fixes. Verdict **NO_NEW_CRITICAL_MAJOR**. All cleanup findings confirmed, none rejected; fixes listed below. F5's native-version disclosure remains accepted. |
+| Reviewer B | **0 critical / 1 major / 2 minor / 4 advisory**, all 7 NEW/in-envelope; 0 reverts, 0 product-code fixes. All confirmed, none rejected. B1 adds omitted MSVC/Mesa notices and native audit rows; B2 closes stale N4 pending statements; B3 corrects CPU fallback/forced-device wording; B4 is banked for the register outside this package's files; B5 discloses unexercised routes; B6 quotes the complete FFmpeg record; B7 identifies the commits. Verdict **NEW_CRITICAL_MAJOR_FOUND**; single bounded remediation, B re-run pending. |
 
-Round-2 fixes in this turn: F7 replaces turn vocabulary/stale re-fetch caveats
+Round-2 fixes in `51afce88`: F7 replaces turn vocabulary/stale re-fetch caveats
 with the 2026-11-03 copy date; F5's remaining dev link points to pydantic-core
 2.50.1's release page; F8 names the required external archive folder; N1 starts
 export through File > Export and locates status/progress/Cancel in its panel;
@@ -296,13 +344,18 @@ N2 links texts 37-44 from pillow-heif's row; N3 uses panel/button wording for
 Batch; N4 pins the two diagnostic ranges. The F1 script was rerun after all
 notices changes, against original source bytes. Reviewer A r2 also re-fetched
 all nine upstream supplements on 2026-11-03: five whole-file matches and four
-matches to the declared selections. The cell did not re-fetch them this turn.
+matches to the declared selections. The cell did not re-fetch them during that
+cleanup or the B remediation.
 
 Reviewer A's loop converged on blocking findings under the fill's criterion;
-this turn is its non-blocking cleanup, not another review round. Detailed
+its non-blocking cleanup is in `51afce88`. Detailed
 per-finding adjudication and transport/version evidence limits are in the
-ledger and the two review copies. Reviewer B remains the orchestrator's
-independent Claude pass on the final candidate.
+ledger and the review copies. Reviewer B was the orchestrator's independent
+Claude pass on `51afce88`; all ten claims-first items passed apart from its
+listed findings. It independently confirmed version/provenance mutations and
+the listing test's CRLF positive control. Its findings copy is
+`work/wp5.5/B-review.txt`. The orchestrator reruns B on the B remediation commit
+before the release gate; no clean B verdict is claimed here.
 
 ## Limits
 
@@ -311,10 +364,13 @@ independent Claude pass on the final candidate.
   refer to the cited reports under their recorded conditions.
 - Only FFmpeg 9.0.2-full_build-www.gyan.dev was exercised. Substitution of
   another FFmpeg build was not tested.
-- The lean sync and successful lean environment-report command were each
-  exercised once (cell and orchestrator seats respectively). Reviewer A's
-  additional diagnostic run does not establish a second lean install. The
-  revised ranged diagnostic still awaits the orchestrator-seat run.
+- The lean CPU sync was exercised once at the cell seat. The orchestrator
+  exercised the original and ranged lean diagnostic commands once each;
+  Reviewer A's additional diagnostic does not establish a second lean install.
+- The GPU installation command `uv sync --no-default-groups --extra gpu` was
+  not exercised. Neither the GUI nor a video export was exercised in the lean
+  environment; only a lean photo export ran. Full-environment GUI startup and
+  video-export evidence do not establish those lean routes.
 - GUI evidence is the offscreen startup smoke only. The GUI walkthrough was
   written from code and checked by Reviewer A against source, not performed
   interactively by a camera user.
@@ -322,6 +378,10 @@ independent Claude pass on the final candidate.
   pointers remain unversioned, with that limitation disclosed.
 - Upstream-only texts were copied on 2026-11-03; their date and selected
   boundaries are stated. Reviewer A independently checked them on that date.
+- MSVC/Mesa additions identify the installed DLLs and official licensing/source
+  pointers; no network fetch or additional licence-text copy was performed in
+  the B remediation. MSVC licence text and a Mesa version/separate licence text
+  are absent from the audited wheels. CHARC CONCURRED with this position (message `df16a115aec924ca`, 2026-11-04 00:40Z).
 
 ## Release gate
 
@@ -369,18 +429,22 @@ baseline and tested platform; no new OS-specific product code was introduced.
 The guide's GPU/default-group distinction follows the locked installation as
 it exists. DR-117 is owner-deferred, not pending a decision.
 
-No unresolved design or licence question remains. Pending actions have named
-owners: the orchestrator exercises the N4 ranged diagnostic and runs Reviewer B
-and the release gate; CHARC records N13 satisfaction, formal DR-119 (a)-(b)
+The interim D106 label in `tools/core_speed.py` / `tests/test_core_speed.py`
+was found by Reviewer B, banked for the register by the orchestrator with CHARC
+as a DR-119 extension; those files are outside this package's ownership.
+
+No unresolved implementation question remains. CHARC CONCURRED with this position (message `df16a115aec924ca`, 2026-11-04 00:40Z). Pending actions have named
+owners: the orchestrator runs the B re-run and the release gate; CHARC records
+N13 satisfaction, formal DR-119 (a)-(b)
 closure, acknowledged debt and Phase 5 closure at acceptance; tagging waits
 for the owner's word. DR-119 (c)-(d) are banked to Phase 6. These are not
 completed cell actions.
 
 The package preserves LICENSE, the spec, the local-config template, dependency
-lists and frozen interfaces. This turn changes only the five authorized
+lists and frozen interfaces. The B remediation changes only the four authorized
 documentation paths, with no code/test/dependency/lockfile change. No footage,
 main-tree work directory or other worktree was read; outputs/logs stay in this
-worktree. No sync, whole-suite/xdist run, git write, mailbox post, remote action,
-installer, packaged executable or unapproved heavy gate was performed. The
-orchestrator commits the named files; this report and the final message are
+worktree. The B remediation performed no sync, whole-suite/xdist run, git write,
+mailbox post, remote action, installer, packaged executable or unapproved heavy
+gate. The orchestrator commits the named files; this report and the final message are
 the acceptance-transfer handoff.

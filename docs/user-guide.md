@@ -208,8 +208,11 @@ The release target is **about 12 minutes of processing per minute of 4K footage*
 on a laptop of the tested class with GPU processing. That is the complete
 analysis-and-export job, not analysis alone. The recorded cold GPU median was
 **10.89 min/min**, on the tested laptop/clip/settings; other footage and hardware
-will differ. The CPU route is many times slower, and Clearwater warns about
-that choice. See [spec D106/N6](underwater-correction-spec.md) and the conditions
+will differ. The CPU route is many times slower. An automatic fallback is reported
+on the export as "Processed on the CPU (...)". Choosing **Force CPU processing**
+in **Tools > Settings**, under **Advanced**, gives no warning. The status bar's
+**Device:** line shows which device is in use. See
+[spec D106/N6](underwater-correction-spec.md) and the conditions
 and figures in [the WP5.2 performance report](reports/wp5.2-performance-memory.md).
 There is no separate fixed analysis-time promise.
 

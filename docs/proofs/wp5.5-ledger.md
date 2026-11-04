@@ -332,3 +332,111 @@ read. All output/log writes remain inside this worktree. No git write, mailbox
 post, remote action or new dependency occurred. Reviewer B, the revised ranged
 lean diagnostic and the final release gate remain at the orchestrator's seat;
 the owner's word still controls tagging. YIELD.
+
+## Reviewer B
+
+Reviewer B: Claude, independent read-only process at the orchestrator's seat
+on `51afce88`. Findings: `work/wp5.5/B-review.txt`; verdict
+**NEW_CRITICAL_MAJOR_FOUND**. Baseline: **72 passed, 1 deselected in 70.38s**.
+All ten claims-first checks passed apart from the listed findings; B independently
+confirmed closure, source-byte fidelity, R1-R4, figures, version mutations,
+DR-119 controls, README identity and locks. The driver transport / CLI version
+was not supplied in the findings copy; none is inferred here.
+
+| Review | Critical | Major | Minor | Advisory | In / out of envelope | NEW / REOPENED | Reverts | Product-code fixes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| B | 0 | 1 | 2 | 4 | 7 / 0 | 7 / 0 | 0 | 0 |
+
+All seven findings are NEW, confirmed and in envelope; none is rejected.
+All are text-bearing at the owned documentation surface. B4's product/tool
+files remain outside ownership; its in-envelope disposition is a report/ledger
+disclosure and banking by the orchestrator with CHARC, not an inline code fix.
+This is the package's single bounded B remediation. The orchestrator runs the
+B re-run on its commit; no clean B or release-gate result is claimed.
+
+Depth at turn-5 start: 110,421 of 258,400 (dispatcher-read turn-4 end).
+
+Depth at turn-5 end: 150,847 of 258,400 (driver footer; session 01a1a3eb)
+
+B1 ruling filled by the dispatcher: CHARC CONCURRED with this position (message `df16a115aec924ca`, 2026-11-04 00:40Z); addition applied to the report: the MSVC and Mesa audit rows cite the wheels' `RECORD` files as evidence (the notices already list the DLL names per wheel). B3: guide wording only, no register row. B4: banked as DR-119 (e) on main `02aac236`.
+
+### Per-finding adjudication
+
+| Finding | Severity | Confirmation and disposition |
+| --- | --- | --- |
+| B1 | MAJOR | CONFIRMED by the installed distribution file lists and the existing round-0 `audit.json`: NumPy has 1 MSVC DLL; PySide6_Essentials has 10 MSVC DLLs plus Mesa `opengl32sw.dll`; shiboken6 has the same 10 MSVC DLLs. Added the per-wheel inventory, Microsoft Software License Terms URL, absent wheel licence-file disclosure and Clearwater's conditional platform/system-library position to the notices; added Mesa MIT / Qt-attribution / licence-page pointers and conditional notice obligations. Added both native classes to the report audit/native tables, narrowed the coverage wording and recorded the evidence limits. No licence text added. CHARC's concurrence on the MSVC position is sought in parallel by the orchestrator; a different ruling is applied at the B re-run, not assumed here. |
+| B2 | MINOR | CONFIRMED. Read `work/wp5.5/walkthrough/lean-envreport-seat2.record.txt` and `environment/reports/environment-20261104T002627Z.json`. The ranged command exited 0 at the orchestrator seat. Removed stale pending statements in report Limits/handoff; the N4 paragraph cites the command record and quotes the executed command exactly, including the package ranges, output folder and log redirection. N4 is complete; the pending references in the older turn-4 execution narrative describe its cell-yield state, superseded by this closure. |
+| B3 | MINOR | CONFIRMED against `jobs/export.py:748-752`, `gui/settings_dialog.py:473-477` and `gui/shell.py:542-554`. The automatic CPU fallback produces "Processed on the CPU (...)"; forced CPU suppresses it. Guide now preserves the report-backed slower CPU figure, states the actual fallback message, locates Force CPU processing in Tools > Settings / Advanced, says it gives no warning and identifies the Device status line. |
+| B4 | ADVISORY | CONFIRMED from Reviewer B's source evidence: `tools/core_speed.py:51,109-111` / `tests/test_core_speed.py:227` retain the interim D106 label. NO CODE CHANGE, as directed. Report deviations say found by Reviewer B, banked for the register by the orchestrator with CHARC as a DR-119 extension. |
+| B5 | ADVISORY | CONFIRMED against the walkthrough record: the CPU lean sync/photo and full-environment video/startup do not exercise the GPU install command, a lean GUI launch or a lean video export. Added those three explicit limits; no new sync/export/GUI run attempted. |
+| B6 | ADVISORY | CONFIRMED against the seat command record and JSON. N4 report now quotes `ffmpeg_version` whole: "ffmpeg version 9.0.2-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers". Python 3.12.13, unavailable {}, and the full uv version are recorded too. |
+| B7 | ADVISORY | CONFIRMED. Report summary names `e7876912` (build), `6135c496` (A r1 fixes), `51afce88` (A r2 fixes and report), and "the B remediation commit". Removed turn wording from that summary and corrected the old A-cleanup paragraph to its commit. |
+
+### DLL inventory entered
+
+`work/wp5.5/t5-dll-inventory.log` records the installed-file / round-0 audit
+comparison, exit 0, **22 matching DLL paths**:
+
+- NumPy 2.5.4: `numpy.libs/msvcp140-a4c2229bdc2a2a630acdc095b4d86008.dll`.
+- PySide6_Essentials 6.12.0: `PySide6/` contains `concrt140.dll`,
+  `msvcp140.dll`, `msvcp140_1.dll`, `msvcp140_2.dll`,
+  `msvcp140_codecvt_ids.dll`, `vcamp140.dll`, `vccorlib140.dll`, `vcomp140.dll`,
+  `vcruntime140.dll`, `vcruntime140_1.dll` and `opengl32sw.dll`.
+- shiboken6 6.12.0: the same ten MSVC names under `shiboken6/`, without
+  `opengl32sw.dll`.
+
+The MSVC licence position is COMPATIBLE-WITH-CONDITION: user-installed platform
+C/C++ runtimes, provided by wheel publishers under Microsoft's redistribution
+terms, not redistributed by this source repository; GPLv2 section 3's
+major-components exception / GPLv3 System Libraries provisions address such
+libraries. The official Visual C++ Redistributable terms URL is given without
+inventing a wheel licence file or copying an absent text. Mesa's MIT position
+links Qt attributions and the Mesa licence page; no version is invented from
+the DLL name. No new upstream fetch or text copy occurred; 18 runtime/gpu and
+43 dev/comms distribution counts remain unchanged.
+
+### Validation
+
+`work/wp5.5/verify_notices_utf8.py` after the notices edits ->
+`work/wp5.5/t5-notices-verify.log`, exit 0:
+
+```text
+TEXTS: 44; MISMATCHES: 0
+SOURCE RECORDS: 54; every duplicate also byte-equal to its original source
+MARKER U+00C2: SOURCE=0; NOTICES=0
+MARKER U+00C3: SOURCE=0; NOTICES=0
+MARKER U+00E2 U+20AC: SOURCE=0; NOTICES=0
+MARKER U+FFFD: SOURCE=0; NOTICES=0
+HASHES/BYTES: all 44 match LF-normalised SOURCE bytes
+NOTICES SIZE: 435354 bytes
+SOURCES: no work/ paths; no harness/ruling references
+EULA: complete section 1.1.1(3) quote matches installed License.txt
+```
+
+Prescribed targeted pytest command, with sandbox_mkdir_shim, no cacheprovider,
+the same marker expression and basetemp `work/wp5.5/t5`, exit 0:
+**72 passed, 1 deselected in 81.19s (0:01:21)**; `work/wp5.5/t5.log`.
+The existing slow halo test remains deselected; no suite/xdist/gate run occurred.
+
+Static checks, all exit 0:
+
+- `work/wp5.5/t5-ruff.log`: **All checks passed!**
+- `work/wp5.5/t5-format.log`: **317 files already formatted**
+- `work/wp5.5/t5-mypy.log`: **Success: no issues found in 158 source files**
+
+uv again ignored the inherited VIRTUAL_ENV mismatch and used the project
+environment. No installation or environment change is inferred from that warning.
+`work/wp5.5/t5-scope-verify.log`, exit 0: all four authorized files UTF-8/LF-only;
+44 unchanged licence blocks; report has 20 distribution/external plus 2 native
+audit rows, the exact recorded N4 command/full FFmpeg field, no stale pending
+diagnostic claim or placeholders, and explicit unexercised routes. Guide/report
+local links resolve; no personal home paths. Git status names exactly the four
+owned files; no src/tools/tests/project/lock/checklist/LICENSE diff.
+`work/wp5.5/t5-diff-check.log`: git diff --check exit 0.
+
+All checks have their logs inside this worktree. No audit regeneration,
+dependency/code/test/lockfile change, new text copy, git write, mailbox post,
+remote action, footage/main-work/other-worktree read or write outside the
+worktree occurred. Only the four owned documentation files changed. Release
+gate/tag/acceptance remain with the orchestrator/CHARC/owner; the next action
+is the single B re-run. YIELD.

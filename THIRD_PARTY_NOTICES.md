@@ -17,7 +17,8 @@ source-delivery and other licence obligations. No third-party licence is changed
 Versions below are pinned by `uv.lock` and matched installed metadata in the
 Windows AMD64 / Python 3.12 audit. Python and FFmpeg are external tools.
 The 18 runtime distributions include the optional gpu extra and every selected
-transitive dependency. Native wheel components are identified separately below.
+transitive dependency. Native component notices, including the platform runtimes
+and software OpenGL renderer, are provided separately below.
 The verdicts and any conditions are stated for each component below.
 
 | Component | Version | Licence | Verdict and required notice | Source / full text |
@@ -73,6 +74,37 @@ The verdicts and any conditions are stated for each component below.
   complete aggregate includes NumPy/SciPy and cuSignal notices, with separate
   CCCL, DLPack, Jitify and ndimage texts below. Apache-bearing combinations rely
   on the GPLv3-compatible branch of Clearwater's or-later grant.
+- **Microsoft Visual C++ runtime (MSVC):** the audited wheels contain the
+  following Microsoft Corporation compiler/platform runtime DLLs:
+  - NumPy 2.5.4: `numpy.libs/msvcp140-a4c2229bdc2a2a630acdc095b4d86008.dll`.
+  - PySide6_Essentials 6.12.0: `PySide6/concrt140.dll`, `msvcp140.dll`,
+    `msvcp140_1.dll`, `msvcp140_2.dll`, `msvcp140_codecvt_ids.dll`,
+    `vcamp140.dll`, `vccorlib140.dll`, `vcomp140.dll`, `vcruntime140.dll` and
+    `vcruntime140_1.dll` (all under `PySide6/`).
+  - shiboken6 6.12.0: the same ten MSVC DLL names under `shiboken6/`.
+
+  These use Microsoft's Visual C++ Redistributable terms
+  ([Microsoft Software License Terms](https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/)).
+  The wheels ship no licence file for these runtimes, so no licence text is
+  reproduced here. **COMPATIBLE-WITH-CONDITION:** Clearwater's position is that
+  these are C/C++ runtime libraries of the compiler and operating-system
+  platform, bundled by the wheel publishers (NumPy and The Qt Company) under
+  Microsoft's redistribution terms and installed by the user from PyPI. This
+  repository does not redistribute them. GPLv2 section 3's major-components
+  exception and GPLv3's definition of "System Libraries" address such platform
+  runtime libraries. Microsoft code retains its own terms; a future binary
+  redistributor must comply with those terms and the applicable GPL obligations.
+- **Mesa llvmpipe software OpenGL renderer:** PySide6_Essentials 6.12.0 includes
+  `PySide6/opengl32sw.dll`, the software renderer shipped by Qt for Windows.
+  Its licence is **MIT**, as identified by
+  [Qt's third-party attributions](https://doc.qt.io/qt-6/licenses-used-in-qt.html);
+  see the [Mesa licence page](https://docs.mesa3d.org/license.html).
+  **COMPATIBLE-WITH-CONDITION:** retain the applicable Mesa copyright notices,
+  MIT permission notice and disclaimer on redistribution. The installed wheel's
+  metadata/licence files identify no Mesa version or separate Mesa licence text,
+  so the source pointer is the Mesa licence page, not a claimed version-matched
+  copy. This repository does not redistribute the renderer; no additional
+  licence text is reproduced here.
 
 ### Qt and Shiboken (LGPL-3.0)
 
