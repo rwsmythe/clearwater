@@ -562,3 +562,100 @@ a process.
 - P71: synthetic offscreen events only; real trackpad momentum is M-GUI.
 
 Depth at group-A yield: 392,066 (wp64-cell2, read by the dispatcher with cell_depth.py at its group-A return; retired, group B to a fresh wp64-cell3)
+
+## Group B
+
+Build turn 3, cell `wp64-cell3` (fresh, implementer-opus-high), on `wp6.4` from `27505be4`, following
+dispatch-3. No group-A product file was edited. Evidence `clearwater-review-evidence\wp6.4\cell\`:
+`row-disposition-group-b.txt` (the 172-row table, generated from the audit's tables) and
+`mypy-darwin-group-b.txt`. Every commit was made by pathspec with `-c core.autocrlf=false`; a blob check
+over all six found 0 CR bytes.
+
+### B.1 Commits
+
+| Commit | Rows | Change |
+|---|---|---|
+| `bbf777bc` | T03 T04 T05 T09 T49-T51 | `bench._windows_power`, `_cpu_brand`, `_platform_name` (`:1467` with its stale comment, D4 (d)) and `transport.idle_gate` in the statement form |
+| `facf31a5` | T14 T16 T17 T26-T29 T52 X46 | NEW `tools/footage_guard.py`, used at the five sites; inventory AppleDouble and casefold; `export_oracle.record_name`; the one-edit `test_export_oracle.py` |
+| `11525691` | T13 T33-T39 T42 | the D4 (a) labels on eight modules; docstrings only, with the AST asserted equal |
+| `9a983ac4` | T01 T02 | `environment_report`: darwin NVIDIA fields null and not run; opt-in `--platform-facts` (S-B1) |
+| `43b7a263` | W rows | the remaining W cases (179 in the module); the D3 parity test |
+| `705bf3a4` | M rows | NEW `tests/test_macos_portability.py` (178 cases); the conftest `macos` policy; one escaped literal |
+
+### B.2 Static at `705bf3a4`
+
+- `ruff check .`: All checks passed.
+- `ruff format --check .`: 326 files already formatted.
+- `mypy`: Success, 162 files.
+- `mypy --platform darwin`: "Success: no issues found in 162 source files", 0 errors. Group A's three
+  tool sites are gone.
+
+### B.3 Counts
+
+| Module | Parallel leg: collected / passed / skipped | Serial leg: collected / passed / skipped |
+|---|---|---|
+| `test_portability` (179) | 162 / 162 / 0 | 17 / 17 / 0 (14 `gui`, 3 `slow`) |
+| `test_macos_portability` (178) | 159 / 0 / 159 | 19 / 0 / 19 (M-GUI 15 + M-BUNDLE 4, `macos` + `gui`) |
+
+Neither module collects anything in the fullclip leg. The skip reason is "macOS native leg (WP6.5)".
+
+Runs (`-p no:cacheprovider --timeout 600`; basetemp `work\wp6.4\tB-par` and `tB-ser`; offscreen for
+the serial leg) covered both new modules and every touched tool's test module, plus
+`test_export_oracle`, `test_fixtures`, `test_inventory`, `test_config_presets` and
+`test_core_backend`. The module list is in `work\wp6.4\tB-mods.txt`.
+- parallel expression, `-n 4`: 1834 passed, 159 skipped;
+- serial expression: 104 passed, 19 skipped.
+
+Against round 0's projection of 358 new cases, there are 357: 179 W + 178 M. The 2 interface docstring
+cases are group A's, in `test_interfaces`. W-GUI has 14 cases, not 13, because group A also put P37 there.
+
+### B.4 Verification loop (suspected / confirmed / rejected / fixed)
+
+1. `footage_guard` bound `os.path.realpath` at import, so the existing alias tests' monkeypatch would
+   not have reached it (`test_export_oracle.py:296`, `test_analysis_breakdown.py:347`). CONFIRMED by
+   reading the code. FIXED before the first run: the seams now look the function up at call time.
+2. `environment_report.main` called `collect(platform_facts=...)`, and
+   `test_same_second_reports_never_overwrite` stubs `collect()` with no arguments. CONFIRMED by the
+   run. FIXED: without the flag, `main` calls `collect()`.
+3. The W-GUI cases ran on the real `windows` QPA when `QT_QPA_PLATFORM` was unset, because the module
+   imported `gui_support` lazily. X39 caught it. CONFIRMED and FIXED: the module now imports
+   `gui_support` at import. A rerun with the variable unset passes 14/14 offscreen. Slip: that one
+   earlier run showed the test windows on the desktop briefly; no input was sent.
+4. W-GUARD markers for X17, X32 and X37 named constructs that are not in those files, and the checker
+   missed a guard made by a skip helper. CONFIRMED by the run. FIXED: the markers now match, and the
+   checker counts a call to a helper that skips off Windows. The planted unguarded control still fails
+   by name.
+5. Non-ASCII literals appeared in two string literals in the test files. CONFIRMED and FIXED: they are
+   now `\u` escapes.
+6. `test_prototype_clip.py::test_open_source_refuses_non_square_pixels` fails when run alone, both here
+   and on main at HEAD (the `clips` folder is created by another test). REJECTED as not caused by this
+   package: the module and the tool are untouched, and it passes in module order.
+7. Under `-n 4`, `test_analysis_breakdown::...replica_differs` (MemoryError) and the container spike's
+   x265 proof failed once. Both pass serially. REJECTED as host load (a shared laptop).
+8. A full pass after these fixes found nothing new: the static checks, both legs, and a re-read of the
+   tool diffs.
+
+### B.5 STOPs, deviations and open items
+
+- **S-B1 (STOP, reproduced): the item-13 environment facts cannot be in the default report without an
+  unowned test edit.** `tests/test_environment_report.py:13-33` pins the exact key list and order. Any
+  new default key fails `test_report_has_every_key`. Built as opt-in `--platform-facts`, so the default
+  output is unchanged and the 19 existing tests pass. **Recommended:** grant a one-edit change to
+  `EXPECTED_KEY_ORDER` and make the facts default, or keep the flag.
+- **S-B2 (STOP): the completion report could not be written by this cell.** The cell's file tool
+  refuses to write a report `.md` from a subagent. The report's full text goes to the dispatcher in the
+  return message, and the dispatcher writes `docs/reports/wp6.4-macos-adaptation.md`.
+- **D-B1: the AppleDouble line needs `inventory.py` lines outside `:822-832`.** These are the new
+  `ScanResult.appledouble` field (default 0), the `_summary_text` / `write_inventory` parameter
+  (default 0), `main` passing the count, and the module and `--exclude` help text. All are in the owned
+  file; the line range was the brief's pointer.
+- **D-B2: T06 and T10 carry no label.** `bench.py` and `transport.py` were granted at the mypy lines
+  only, so W-TOOL pins their Windows process names and the report lists the label as deferred.
+- **Deferred to candidate DR 3: T11 and T12** (`spike_io/licences.py` is not owned). M-TOOL marks them
+  `xfail` until the Mach-O forms land.
+- **Process:**
+  - No bare `cd` ran. One chained command held `&& cd` but stopped before it; `pwd` confirmed the
+    session cwd.
+  - Every new commit is LF.
+
+Depth at group-B yield: DISPATCHER TO FILL
