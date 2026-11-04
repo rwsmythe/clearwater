@@ -869,7 +869,8 @@ def verify_pack(folder: Path) -> list[str]:
     The full check is :func:`clearwater.gpu_pack.pack_problems` with ``full=True``: the cheap
     start-up check (the manifest against the lock, each ``RECORD``'s sha256, the ``WHEEL``
     platform tags, every listed file's existence and size, no unlisted top-level entry) plus
-    each listed file's sha256 against its ``RECORD`` row. Reads only.
+    each listed file's sha256 against its ``RECORD`` row and a walk of every file under
+    ``site-packages`` that lists each one no ``RECORD`` row names (Q2). Reads only.
 
     Args:
         folder: The pack folder, ``<pack root>/<stamp>``.

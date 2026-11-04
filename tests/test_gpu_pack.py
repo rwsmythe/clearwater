@@ -856,8 +856,9 @@ def test_ownership_is_the_first_component_of_any_record_row(
 ) -> None:
     """(b) ``nvidia`` is owned by eight RECORDs; an unlisted file INSIDE an owned folder passes.
 
-    The cheap check looks at the top level only; a nested extra file cannot shadow a
-    top-level module, and the full check does not list it either (it walks RECORD rows).
+    The cheap (start-up) check looks at the top level only; a nested extra file cannot shadow
+    a top-level module. The FULL check (``--verify``) does list it, as an unlisted file (Q2;
+    ``test_the_full_verify_lists_every_unlisted_nested_file``).
     """
     folder = make_pack(tmp_path)
     (_site(folder) / "cupy" / "__pycache__").mkdir()
@@ -1176,6 +1177,33 @@ def test_a_frozen_activation_puts_the_pack_folder_first_in_site_prefixes(
     gpu_pack.activate()
     assert site.PREFIXES.count(entry) == 1
     assert sys.path.count(entry) == 1
+
+
+@pytest.mark.skipif(os.name != "nt", reason="case and '/' fold to one folder on Windows only")
+def test_another_spelling_of_the_pack_folder_is_replaced_not_kept(isolated: list[str]) -> None:
+    """Reviewer A r4 #2, its exact input: a trailing-slash, upper-case, ``/`` spelling goes."""
+    site.PREFIXES[:] = ["C:/PACK/site-packages/", "C:/bundle"]
+    assert gpu_pack.add_site_prefix(Path("C:/pack/site-packages")) is True
+    assert site.PREFIXES == ["C:\\pack\\site-packages", "C:/bundle"]
+    assert gpu_pack.add_site_prefix(Path("C:/pack/site-packages")) is False
+    assert site.PREFIXES == ["C:\\pack\\site-packages", "C:/bundle"]
+
+
+def test_every_existing_equivalent_prefix_is_removed_before_the_one_canonical_entry(
+    tmp_path: Path, isolated: list[str]
+) -> None:
+    """Reviewer A r4 #2: two equivalent duplicates already present (and the exact entry once
+    more) all go; the canonical entry is first, once; the other prefixes keep their order."""
+    folder = tmp_path / "pack" / "site-packages"
+    entry = str(folder)
+    doubled = str(tmp_path / "pack") + os.sep + os.sep + "site-packages"
+    site.PREFIXES[:] = ["/bundle-a", entry + os.sep, entry, doubled, "/bundle-b", entry]
+    prefixes = site.PREFIXES
+    assert gpu_pack.add_site_prefix(folder) is True
+    assert [entry, "/bundle-a", "/bundle-b"] == site.PREFIXES
+    assert site.PREFIXES is prefixes  # changed in place
+    assert gpu_pack.add_site_prefix(folder) is False
+    assert [entry, "/bundle-a", "/bundle-b"] == site.PREFIXES
 
 
 def test_a_source_run_leaves_site_prefixes_untouched(

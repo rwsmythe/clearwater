@@ -1044,8 +1044,8 @@ def load(root: Path | None) -> PackStatus:
 def activate() -> PackStatus | None:
     """Load the pack from :func:`pack_root` in a frozen build; do nothing otherwise (D4).
 
-    Call it before anything imports ``cupy`` (``clearwater.__main__`` does, on both its
-    branches).
+    Call it before anything imports ``cupy`` (``clearwater.__main__`` does, on its worker,
+    ``-m`` and GUI branches; its refusals end before it).
 
     Returns:
         The status in a frozen build; None in a source run (nothing checked, nothing logged).
@@ -1072,6 +1072,12 @@ def add_site_prefix(site_packages: Path) -> bool:
     prefix spelling would differ (``getsitepackages()`` appends ``lib/python3.12/site-packages``
     there); it is not handled here.
 
+    Never twice, in any spelling (Reviewer A r4 #2): EVERY existing entry naming the same folder
+    (compared by ``os.path.normcase(os.path.normpath(...))``: case, a forward slash or a
+    backslash, a trailing separator) is removed, and the one canonical ``str(site_packages)``
+    is put first; the other prefixes keep their order. The list object itself is kept (changed
+    in place).
+
     Called by :func:`activate` only, so only in a frozen build, after the ``sys.path``
     insertion; a source run never touches ``site.PREFIXES`` (1.0.0).
 
@@ -1079,17 +1085,23 @@ def add_site_prefix(site_packages: Path) -> bool:
         site_packages: The loaded pack's ``site-packages`` folder.
 
     Returns:
-        True when the prefix was added; False when it was already first.
+        True when ``site.PREFIXES`` changed; False when the canonical entry was already first
+        and the only one naming the folder.
     """
     import site
 
     entry = str(site_packages)
-    if site.PREFIXES[:1] == [entry]:
+    key = _prefix_key(entry)
+    wanted = [entry, *(prefix for prefix in site.PREFIXES if _prefix_key(prefix) != key)]
+    if wanted == site.PREFIXES:
         return False
-    if entry in site.PREFIXES:
-        site.PREFIXES.remove(entry)
-    site.PREFIXES.insert(0, entry)
+    site.PREFIXES[:] = wanted
     return True
+
+
+def _prefix_key(prefix: str) -> str:
+    """Return a ``site.PREFIXES`` entry in the form two spellings of one folder share."""
+    return os.path.normcase(os.path.normpath(prefix))
 
 
 def _inside(path: str, folder: str) -> bool:

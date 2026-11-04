@@ -10,6 +10,7 @@ frozen build itself is checked by hand (the WP6.1 report).
 from __future__ import annotations
 
 import ast
+import contextlib
 import importlib
 import importlib.abc
 import importlib.util
@@ -19,6 +20,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from types import ModuleType
@@ -231,15 +233,21 @@ def test_a_frozen_multiprocessing_re_entry_is_refused_before_every_branch(
     capsys: pytest.CaptureFixture[str],
     argv: list[str],
 ) -> None:
-    """Any argument naming a multiprocessing child: status 2, one line; nothing else runs."""
+    """Any argument naming a multiprocessing child: status 2, one line; nothing else runs.
+
+    Reviewer A r4 #5: not even the D1 ``PATH`` change (the executable's folder is NOT put
+    first); every recorded effect is absent.
+    """
     executable = _frozen(monkeypatch, tmp_path)
-    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    path = os.pathsep.join(["/x", "/y"])
+    monkeypatch.setenv("PATH", path)
     entry, blocker = _fresh_entry(monkeypatch)
     _fake_gui(monkeypatch, calls)
     _stub_shim(monkeypatch, entry, calls)
     assert entry.main([executable, *argv[1:]]) == 2
     assert capsys.readouterr().err == "Clearwater: multiprocessing children are not supported\n"
     assert calls == []  # no shim, no loader, no worker, no log file, no GUI
+    assert os.environ["PATH"] == path  # no PATH processing either (A r4 #5)
     assert blocker.attempts == []
 
 
@@ -253,7 +261,8 @@ def test_the_real_multiprocessing_spawn_command_line_is_refused_when_frozen(
     import multiprocessing.spawn
 
     executable = _frozen(monkeypatch, tmp_path)
-    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    path = os.pathsep.join(["/x", "/y"])
+    monkeypatch.setenv("PATH", path)
     command = multiprocessing.spawn.get_command_line(parent_pid=123, pipe_handle=456)
     assert command[:2] == [executable, "--multiprocessing-fork"]
     entry, blocker = _fresh_entry(monkeypatch)
@@ -262,6 +271,7 @@ def test_the_real_multiprocessing_spawn_command_line_is_refused_when_frozen(
     assert entry.main(command) == 2
     assert capsys.readouterr().err == "Clearwater: multiprocessing children are not supported\n"
     assert calls == []
+    assert os.environ["PATH"] == path
     assert blocker.attempts == []
 
 
@@ -523,11 +533,14 @@ def spawn_first():
         child = done.stdout.strip()
     except subprocess.TimeoutExpired:
         child = "timeout"
+    import os
+
     print(json.dumps({
         "child_read": child,
         "early": early,
         "set_std_handle": len(set_std_handle),
         "stdin_fd": sys.stdin.fileno(),
+        "stdin_inheritable": os.get_inheritable(sys.stdin.fileno()),
     }), flush=True)
     raise SystemExit(0)
 
@@ -564,8 +577,9 @@ def test_a_child_of_the_frozen_worker_branch_inherits_nul_not_the_request_pipe(
     as the parent holds the request pipe during a job. A child spawned with ``stdin=None``
     that inherited it would block until its 10 s bound; with the shim it inherits the null
     device and reads 0 bytes at once. At the spawn, neither the worker module nor CuPy is
-    imported yet; the worker's own ``sys.stdin`` is the private descriptor, not 0; on Windows
-    ``SetStdHandle`` was called once.
+    imported yet; the worker's own ``sys.stdin`` is the private descriptor, not 0, and that
+    descriptor is NOT inheritable (Reviewer A r4 #3: the child's EOF alone cannot show it, since
+    ``subprocess`` passes only the standard handles); on Windows ``SetStdHandle`` was called once.
     """
     import clearwater
 
@@ -592,6 +606,7 @@ def test_a_child_of_the_frozen_worker_branch_inherits_nul_not_the_request_pipe(
     assert seen["child_read"] == "0"
     assert seen["early"] == []
     assert seen["stdin_fd"] != 0
+    assert seen["stdin_inheritable"] is False
     assert seen["set_std_handle"] == (1 if sys.platform == "win32" else 0)
 
 
@@ -611,8 +626,11 @@ def run(stdin, protocol):
     request = json.loads(stdin.readline())
     send({"progress": [1, 100, "working"]})
     cancel = stdin.readline()
+    import os
+
     Path(sys.argv[2]).write_text(json.dumps({
         "fd": stdin.fileno(),
+        "inheritable": os.get_inheritable(stdin.fileno()),
         "request_keys": sorted(request),
         "cancel": cancel.decode("ascii"),
     }), encoding="utf-8")
@@ -656,6 +674,280 @@ def test_the_frozen_worker_reads_its_request_and_the_cancel_line_through_the_pri
     assert record["cancel"].encode("ascii") == CANCEL_LINE == b'{"cancel": true}\n'
     assert "format_version" in record["request_keys"]
     assert record["fd"] != 0
+    assert record["inheritable"] is False  # Reviewer A r4 #3
+
+
+_EOF_THROUGH_THE_SHIM = (
+    _NO_GUI_PRELUDE
+    + """
+import os
+import threading
+import time
+
+from clearwater.app import export_worker
+
+gpu_pack.activate = lambda: None
+
+
+def run(stdin, protocol):
+    request = stdin.readline()
+    eof = threading.Event()
+    threading.Thread(target=export_worker._watch_stdin, args=(stdin, eof), daemon=True).start()
+    start = time.monotonic()
+    seen = eof.wait(float(sys.argv[3]))
+    Path(sys.argv[2]).write_text(json.dumps({
+        "fd": stdin.fileno(),
+        "inheritable": os.get_inheritable(stdin.fileno()),
+        "request": request.decode("ascii"),
+        "eof": seen,
+        "waited_s": round(time.monotonic() - start, 3),
+    }), encoding="utf-8")
+    return 0
+
+
+export_worker.run = run  # the real main, then the real _watch_stdin on the private reader
+raise SystemExit(entry.main(["Clearwater.exe", "--export-worker"]))
+"""
+)
+"""The frozen worker branch with the real ``export_worker.main``; a stand-in ``run`` reads the
+request line, then runs the REAL cancel watcher (``_watch_stdin``) on the private reader and
+records whether the end of the stream reached it (no cancel line is ever sent)."""
+
+_PARENT_THAT_DIES = """
+import subprocess
+import sys
+import time
+
+worker = subprocess.Popen(
+    [sys.executable, "-I", "-c", sys.argv[1], sys.argv[2], sys.argv[3], "30"],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+worker.stdin.write(b'{"request": 1}\\n')
+worker.stdin.flush()
+print(worker.pid, flush=True)
+time.sleep(120)  # killed by the test long before this ends
+"""
+"""A parent that spawns the worker, writes its request, reports the worker's PID and is then
+killed by the test while still holding the request pipe's write end."""
+
+
+@pytest.mark.parametrize("ending", ["parent-closes", "parent-dies"])
+def test_the_end_of_the_request_pipe_reaches_the_workers_reader_through_the_shim(
+    tmp_path: Path, ending: str
+) -> None:
+    """Reviewer A r4 #3: the pipe's end (closed, or its parent killed) reaches the cancel watcher.
+
+    The worker runs the frozen branch (the shim moves the pipe to the private descriptor) and
+    the REAL ``export_worker._watch_stdin`` reads that descriptor. When the parent closes its
+    end, or dies holding it, the watcher sees the end of the stream at once (well inside its 30
+    s bound), through the private descriptor (not 0, not inheritable).
+    """
+    import clearwater
+
+    src_root = Path(clearwater.__file__).resolve().parents[1]
+    record = tmp_path / "eof.json"
+    environ = _app_data_environ(tmp_path / "app-data")
+    if ending == "parent-closes":
+        worker = subprocess.Popen(
+            [sys.executable, "-I", "-c", _EOF_THROUGH_THE_SHIM, str(src_root), str(record), "30"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            env=environ,
+        )
+        assert worker.stdin is not None
+        worker.stdin.write(b'{"request": 1}\n')
+        worker.stdin.close()  # the parent's end goes: the worker must see the end of the stream
+        _, err = worker.communicate(timeout=60)
+        assert worker.returncode == 0, err.decode("utf-8", "replace")
+    else:
+        parent = subprocess.Popen(
+            [
+                sys.executable,
+                "-I",
+                "-c",
+                _PARENT_THAT_DIES,
+                _EOF_THROUGH_THE_SHIM,
+                str(src_root),
+                str(record),
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            env=environ,
+        )
+        assert parent.stdout is not None
+        worker_pid = int(parent.stdout.readline())
+        parent.kill()  # dies holding the request pipe's write end
+        parent.wait(timeout=60)
+        for _ in range(600):  # up to 60 s for the worker's record
+            if record.exists() and record.stat().st_size:
+                break
+            time.sleep(0.1)
+        else:
+            with contextlib.suppress(OSError):
+                os.kill(worker_pid, 9)
+            pytest.fail("the worker never saw the end of its request pipe")
+    seen = json.loads(record.read_text(encoding="utf-8"))
+    assert seen["request"] == '{"request": 1}\n'
+    assert seen["eof"] is True
+    assert seen["waited_s"] < 20
+    assert seen["fd"] != 0
+    assert seen["inheritable"] is False
+
+
+_SHIM_FAILURE = (
+    _NO_GUI_PRELUDE
+    + """
+import errno
+import io
+import os
+
+
+class NoWorker(importlib.abc.MetaPathFinder):
+    attempts = []
+
+    def find_spec(self, name, path, target=None):
+        if name == "clearwater.app.export_worker":
+            NoWorker.attempts.append(name)
+            raise ImportError("blocked by the test: " + name)
+        return None
+
+
+sys.meta_path.insert(0, NoWorker())  # the worker module is never imported for real
+ran = []
+gpu_pack.activate = lambda: ran.append("activate")
+entry._start_logging = lambda: ran.append("log")
+
+
+def open_fds():
+    found = []
+    for fd in range(256):
+        try:
+            os.fstat(fd)
+        except OSError:
+            continue
+        found.append(fd)
+    return found
+
+
+def raiser(error):
+    def fail(*args, **kwargs):
+        raise error
+
+    return fail
+
+
+mode = sys.argv[2]
+if mode == "open-null":
+    os.open = raiser(OSError(errno.EACCES, "injected by the test"))
+elif mode == "dup2":
+    os.dup2 = raiser(OSError(errno.EBADF, "injected by the test"))
+elif mode == "set-std-handle":
+    import ctypes
+
+    ctypes.windll.kernel32.SetStdHandle = lambda *args: 0
+elif mode == "reader-open":
+    entry.open = raiser(ValueError("injected by the test"))
+elif mode == "reader-wrap":
+    io.TextIOWrapper = raiser(TypeError("injected by the test"))
+elif mode == "dup-emfile":
+    os.dup = raiser(OSError(errno.EMFILE, "injected by the test"))
+elif mode == "dup-ebadf":
+    os.dup = raiser(OSError(errno.EBADF, "injected by the test"))
+before = open_fds()
+try:
+    status, escaped = entry.main(["Clearwater.exe", "--export-worker"]), None
+except ImportError as error:
+    status, escaped = None, type(error).__name__
+print(json.dumps({
+    "status": status,
+    "escaped": escaped,
+    "ran": ran,
+    "worker_imports": NoWorker.attempts,
+    "fds_before": before,
+    "fds_after": open_fds(),
+}), flush=True)
+"""
+)
+"""The frozen worker branch with one step of the shim made to fail (``sys.argv[2]``); the
+loader, the log set-up and the worker import are recorded, never run for real."""
+
+
+@pytest.mark.parametrize(
+    ("mode", "kind"),
+    [
+        ("open-null", "PermissionError"),  # OSError(EACCES, ...) is a PermissionError
+        ("dup2", "OSError"),
+        pytest.param(
+            "set-std-handle",
+            "OSError",
+            marks=pytest.mark.skipif(sys.platform != "win32", reason="the Win32 slot only"),
+        ),
+        ("reader-open", "ValueError"),
+        ("reader-wrap", "TypeError"),
+        ("dup-emfile", "OSError"),
+    ],
+)
+def test_a_failed_stdin_isolation_ends_the_frozen_worker_before_anything_else(
+    tmp_path: Path, mode: str, kind: str
+) -> None:
+    """Reviewer A r4 #4: fail closed. Status 2, one stderr line, no loader / log / worker import,
+    and every descriptor the shim opened is closed again (the open set is unchanged).
+
+    ``dup-emfile``: ``os.dup(0)`` failing for a reason other than ``EBADF`` is such a failure
+    too, not the "no standard input" case.
+    """
+    import clearwater
+
+    src_root = Path(clearwater.__file__).resolve().parents[1]
+    done = subprocess.run(
+        [sys.executable, "-I", "-c", _SHIM_FAILURE, str(src_root), mode],
+        stdin=subprocess.PIPE,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+        env=_app_data_environ(tmp_path),
+    )
+    assert done.returncode == 0, done.stderr
+    seen = json.loads(done.stdout.strip().splitlines()[-1])
+    assert seen["status"] == 2
+    assert done.stderr == f"Clearwater: worker stdin isolation failed: {kind}\n"
+    assert seen["ran"] == []
+    assert seen["worker_imports"] == []
+    assert seen["escaped"] is None
+    assert seen["fds_after"] == seen["fds_before"]
+
+
+def test_a_process_without_a_standard_input_runs_the_worker_branch_on(tmp_path: Path) -> None:
+    """Reviewer A r4 #4: only ``os.dup(0)`` failing with ``EBADF`` is "nothing to move".
+
+    The branch goes on: the loader runs and the worker import is attempted (the test's blocker
+    refuses it), no refusal line is written, and no descriptor is opened.
+    """
+    import clearwater
+
+    src_root = Path(clearwater.__file__).resolve().parents[1]
+    done = subprocess.run(
+        [sys.executable, "-I", "-c", _SHIM_FAILURE, str(src_root), "dup-ebadf"],
+        stdin=subprocess.PIPE,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+        env=_app_data_environ(tmp_path),
+    )
+    assert done.returncode == 0, done.stderr
+    seen = json.loads(done.stdout.strip().splitlines()[-1])
+    assert seen["status"] is None
+    assert seen["escaped"] == "ImportError"
+    assert seen["ran"] == ["activate"]
+    assert seen["worker_imports"] == ["clearwater.app.export_worker"]
+    assert "isolation failed" not in done.stderr
+    assert seen["fds_after"] == seen["fds_before"]
 
 
 def test_the_worker_branch_moves_no_standard_input_when_not_frozen(
@@ -1146,6 +1438,28 @@ def test_the_real_pathfinder_canary_module_runs_through_the_frozen_dash_m(
         (["x", "-IIm", "a"], ["-m", "a"]),
         (["x", "-E", "-s", "-m", "a"], ["-m", "a"]),
         (["x", "-movie.mp4"], ["-m", "ovie.mp4"]),
+        # Reviewer A r4 #1: the letters and the long option CPython 3.12 accepts (by execution)
+        (["x", "-R", "-m", "x"], ["-m", "x"]),
+        (["x", "-t", "-m", "x"], ["-m", "x"]),
+        (["x", "-Rt", "-c", "pass"], ["-c", "pass"]),
+        (["x", "-tRIm", "x"], ["-m", "x"]),
+        (["x", "--check-hash-based-pycs", "always", "-m", "x"], ["-m", "x"]),
+        (["x", "--check-hash-based-pycs", "never", "-c", "pass"], ["-c", "pass"]),
+        (["x", "--check-hash-based-pycs", "default", "-I", "-m", "x"], ["-m", "x"]),
+        (["x", "-I", "--check-hash-based-pycs", "always", "-Xutf8", "-m", "x"], ["-m", "x"]),
+        # ... and what CPython refuses or answers by printing: the GUI, as before
+        (["x", "--check-hash-based-pycs=always", "-m", "x"], None),
+        (["x", "--check-hash-based-pycs"], None),
+        (["x", "--check-hash-based-pycs", "-m", "x"], None),
+        (["x", "--check-hash-based-pycs", "bogus", "-m", "x"], None),
+        (["x", "--check-hash", "always", "-m", "x"], None),
+        (["x", "--help", "-m", "x"], None),
+        (["x", "--help-env", "-m", "x"], None),
+        (["x", "--help-xoptions", "-m", "x"], None),
+        (["x", "--help-all", "-m", "x"], None),
+        (["x", "--version", "-m", "x"], None),
+        (["x", "-a", "-m", "x"], None),
+        (["x", "-Rp", "-m", "x"], None),
         # still not re-entries: they go to the GUI as before
         (["x", "-X"], None),
         (["x", "-Xutf8"], None),
@@ -1169,6 +1483,71 @@ def test_interpreter_reentry_follows_cpythons_grammar(
     import clearwater.__main__ as entry
 
     assert entry.interpreter_reentry(argv) == expected
+
+
+def _cpython(*args: str) -> tuple[int, str]:
+    """Run this interpreter (the dev one; no product code) with ``args``; (exit, stdout)."""
+    environ = {k: v for k, v in os.environ.items() if not k.upper().startswith("PYTHON")}
+    done = subprocess.run(
+        [sys.executable, "-B", *args],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+        env=environ,
+    )
+    return done.returncode, done.stdout
+
+
+def test_the_option_letters_are_cpythons_by_execution() -> None:
+    """Reviewer A r4 #1: :data:`FLAG_LETTERS` / :data:`VALUE_LETTERS` equal what CPython does.
+
+    For every ASCII letter but ``m`` / ``c``: ``-<L> -c pass`` exiting 0 silently is a flag;
+    exiting 0 with output (help, version) is informational; otherwise ``-<L> x -c pass``
+    exiting 0 is a value letter; otherwise CPython refuses it. The interpreter is this test's
+    own (the bundle's version); only ``-c pass`` runs.
+    """
+    import string
+
+    import clearwater.__main__ as entry
+
+    flags, values = set(), set()
+    for letter in string.ascii_letters:
+        if letter in "mc":
+            continue
+        code, out = _cpython(f"-{letter}", "-c", "pass")
+        if code == 0:
+            if not out:
+                flags.add(letter)
+            continue
+        if _cpython(f"-{letter}", "x", "-c", "pass")[0] == 0:
+            values.add(letter)
+    assert flags == set(entry.FLAG_LETTERS)
+    assert values == set(entry.VALUE_LETTERS)
+
+
+def test_the_long_options_are_cpythons_by_execution() -> None:
+    """Reviewer A r4 #1: ``--check-hash-based-pycs`` takes the next argument, one of its three
+    values; CPython refuses the ``=`` spelling, a missing or unknown value and an abbreviation."""
+    import clearwater.__main__ as entry
+
+    option = "--check-hash-based-pycs"
+    for value in sorted(entry.LONG_VALUE_OPTIONS[option]):
+        assert _cpython(option, value, "-c", "pass") == (0, "")
+    assert set(entry.LONG_VALUE_OPTIONS) == {option}
+    for refused in (
+        [f"{option}=always", "-c", "pass"],
+        [option, "bogus", "-c", "pass"],
+        [option, "-c", "pass"],
+        [option],
+        ["--check-hash", "always", "-c", "pass"],
+        ["--other", "-c", "pass"],
+    ):
+        assert _cpython(*refused)[0] != 0, refused
+    for informational in ("--help", "--help-env", "--help-xoptions", "--help-all", "--version"):
+        code, out = _cpython(informational, "-c", "pass")
+        assert code == 0 and out, informational  # it prints and exits: not a re-entry
 
 
 def test_cpythons_own_interpreter_flags_prefix_is_a_re_entry() -> None:
@@ -1214,6 +1593,9 @@ def test_cpythons_own_interpreter_flags_prefix_is_a_re_entry() -> None:
         ["-Wignore", "-m", "packmod_run.probe"],
         ["-OO", "-m", "packmod_run.probe"],
         ["-Es", "-m", "packmod_run.probe"],
+        ["-R", "-m", "packmod_run.probe"],
+        ["-t", "-m", "packmod_run.probe"],
+        ["--check-hash-based-pycs", "always", "-m", "packmod_run.probe"],
     ],
 )
 def test_every_spelling_of_dash_m_runs_a_pack_module(
@@ -1245,6 +1627,8 @@ def test_every_spelling_of_dash_m_runs_a_pack_module(
         (["-X", "utf8", "-m", "json.tool"], "-m 'json.tool': not a GPU pack module"),
         (["-qmljsdebugger=port:1234"], "not a GPU pack module"),
         (["-I", "-m"], "-m needs a module name"),
+        (["-Rt", "-c", "pass"], "-c is not supported"),
+        (["--check-hash-based-pycs", "never", "-c", "pass"], "-c is not supported"),
     ],
 )
 def test_every_spelling_of_dash_c_and_of_a_foreign_dash_m_refuses(
@@ -1275,6 +1659,8 @@ def test_every_spelling_of_dash_c_and_of_a_foreign_dash_m_refuses(
         ["-I"],
         ["-X", "utf8"],
         ["photo.heic", "-m", "x"],
+        ["--check-hash-based-pycs=always", "-m", "x"],
+        ["--check-hash-based-pycs"],
     ],
 )
 def test_qt_options_and_non_reentries_reach_the_gui_as_before_when_frozen(

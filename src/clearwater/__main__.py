@@ -1,17 +1,19 @@
 """``python -m clearwater`` and the packaged executable: start the GUI or the export worker.
 
-The branches of this entry (WP6.1, AD-34):
+The branches of this entry (WP6.1, AD-34), in the order :func:`main` tries them:
 
 - Frozen only, a MULTIPROCESSING re-entry (:func:`multiprocessing_reentry`: any argument in
-  :data:`MULTIPROCESSING_FLAGS`) is refused first, before every other branch: one stderr line,
-  status 2, no GUI (CHARC's ruling on Reviewer A r3 #3; ``freeze_support()`` is declined).
+  :data:`MULTIPROCESSING_FLAGS`) is refused FIRST, before anything else runs (not even the
+  ``PATH`` change below): one stderr line, status 2, no GUI (CHARC's ruling on Reviewer A r3
+  #3, r4 #5; ``freeze_support()`` is declined).
 - Frozen only, ``<exe> --export-worker [args]`` runs :func:`clearwater.app.export_worker.main`
   with the remaining arguments. A packaged build spawns its video export worker this way,
   because its executable cannot run ``-m clearwater.app.export_worker``. This branch imports
   no Qt-bearing module (AD-31). It first moves the request pipe off the standard-input slot
-  (:func:`isolate_worker_stdin`, CHARC's F-E ruling; TEMPORARY, see there). A source run
-  sends ``--export-worker`` to the GUI, as 1.0.0 did (Reviewer A r3 #1); the source worker is
-  ``python -m clearwater.app.export_worker``.
+  (:func:`isolate_worker_stdin`, CHARC's F-E ruling; TEMPORARY, see there); when that fails
+  the worker ends with one stderr line and status 2 before the loader, any log or the worker
+  import (Reviewer A r4 #4). A source run sends ``--export-worker`` to the GUI, as 1.0.0 did
+  (Reviewer A r3 #1); the source worker is ``python -m clearwater.app.export_worker``.
 - Frozen only, an INTERPRETER RE-ENTRY (:func:`interpreter_reentry`: ``-m`` / ``-c`` in any
   form CPython accepts, after interpreter flags; :func:`run_interpreter_option`): a library
   inside the GPU pack re-enters ``sys.executable -m <its module>`` (``cuda.pathfinder``'s
@@ -23,12 +25,14 @@ The branches of this entry (WP6.1, AD-34):
   no such branch.
 - Anything else starts the GUI (:func:`clearwater.app.main.main`, WP4.3).
 
-On every branch the GPU pack loader (:func:`clearwater.gpu_pack.activate`) runs before
-anything can import CuPy. In a frozen build the executable's own folder is first put at the
-front of ``PATH``, so FFmpeg shipped beside the executable is found before any other, and the
-GUI branch opens the log file before the loader logs its line. A source run
-(``python -m clearwater``) does neither, exactly as 1.0.0: the loader is a no-op there and the
-shell configures logging itself.
+Every branch that can import CuPy (the worker, a ``-m`` that names a module, the GUI) runs
+the GPU pack loader (:func:`clearwater.gpu_pack.activate`) before it; a refusal (a
+multiprocessing re-entry, a failed stdin isolation, ``-c``, ``-m`` without a module) ends
+before the loader. In a frozen build, after the multiprocessing check, the executable's own
+folder is put at the front of ``PATH``, so FFmpeg shipped beside the executable is found
+before any other, and the GUI branch opens the log file before the loader logs its line. A
+source run (``python -m clearwater``) does neither, exactly as 1.0.0: the loader is a no-op
+there and the shell configures logging itself.
 
 Only the standard library and :mod:`clearwater.gpu_pack` are imported at module level; each
 branch imports what it needs.
@@ -37,6 +41,7 @@ branch imports what it needs.
 from __future__ import annotations
 
 import contextlib
+import errno
 import io
 import os
 import sys
@@ -54,16 +59,28 @@ COMMAND_OPTION = "-c"
 """The interpreter option a frozen build always refuses."""
 
 REFUSED_STATUS = 2
-"""The exit status of a refused ``-m`` / ``-c`` in a frozen build."""
+"""The exit status of every frozen refusal: ``-m`` / ``-c``, a multiprocessing re-entry, a
+failed worker stdin isolation."""
 
-FLAG_LETTERS = frozenset("bBdEiIOPqsSuvx")
-"""CPython 3.12's option letters that take no value (``python -h``); they may be clustered
-(``-OO``, ``-Es``, ``-IIs``). ``-h``, ``-V`` and ``-?`` are not among them: a cluster holding one
-is not a re-entry (it goes to the GUI)."""
+FLAG_LETTERS = frozenset("bBdEiIOPqRsStuvx")
+"""CPython 3.12's option letters that take no value; they may be clustered (``-OO``, ``-Es``,
+``-IIs``, ``-Rt``). Derived by EXECUTION of the 3.12 interpreter (``python -B -<L> -c pass``
+for every ASCII letter, Reviewer A r4 #1; ``t`` is an accepted no-op, ``R`` the hash-seed
+option). ``-h`` and ``-V`` print and exit, ``-?`` too, and every other letter is refused by
+CPython: a cluster holding one of them is not a re-entry (it goes to the GUI)."""
 
 VALUE_LETTERS = frozenset("WX")
 """CPython's option letters that take a value: the rest of the cluster (``-Xutf8``,
 ``-Wignore``) or, when nothing is attached, the next argument (``-X utf8``)."""
+
+LONG_VALUE_OPTIONS = {"--check-hash-based-pycs": frozenset({"always", "default", "never"})}
+"""CPython 3.12's long options that may come before ``-m`` / ``-c``, with the values it accepts.
+
+Each takes the NEXT argument as its value (CPython refuses ``--check-hash-based-pycs=always``,
+a missing value, any other value and any abbreviation; derived by execution, Reviewer A r4 #1).
+The informational long options (``--help``, ``--help-env``, ``--help-xoptions``,
+``--help-all``, ``--version``) print and exit, and CPython refuses any other ``--`` option:
+neither is a re-entry (the GUI)."""
 
 REENTRY_LETTERS = frozenset("mc")
 """The letters that end CPython's options: ``-m <module>`` and ``-c <code>``, the operand
@@ -80,6 +97,10 @@ refused too by CHARC's ruling on Reviewer A r3 #3.
 
 MULTIPROCESSING_REFUSAL = "multiprocessing children are not supported"
 """The one stderr line (after ``Clearwater: ``) of a refused multiprocessing re-entry."""
+
+STDIN_REFUSAL = "worker stdin isolation failed"
+"""The one stderr line (after ``Clearwater: ``, before ``: <exception type>``) of a frozen
+worker whose standard-input isolation failed (Reviewer A r4 #4)."""
 
 STD_INPUT_HANDLE = -10
 """Win32's ``STD_INPUT_HANDLE`` (``(DWORD)-10``), the slot ``SetStdHandle`` re-points."""
@@ -105,38 +126,55 @@ def isolate_worker_stdin() -> bool:
     TEMPORARY: DR-125's package moves this isolation into the worker itself, for source and
     frozen runs alike, and then removes this function from ``__main__``.
 
+    It FAILS CLOSED (Reviewer A r4 #4): any failure after the duplicate (opening the null
+    device, ``dup2``, ``SetStdHandle``, building the private reader) closes every descriptor
+    this function opened and raises, and :func:`main` then ends the worker with one stderr line
+    and :data:`REFUSED_STATUS`; the worker never runs without the isolation. Only a missing
+    standard input (``os.dup(0)`` failing with ``EBADF``) counts as nothing to move.
+
     Returns:
         True when the standard input was moved; False when not frozen, or when the process
-        has no standard input to move.
+        has no standard input (``EBADF``).
 
     Raises:
-        OSError: ``SetStdHandle`` failed (the Win32 slot would name a closed handle).
+        OSError: ``os.dup(0)`` failed for another reason, or a later step failed.
+        Exception: Building the private reader failed (whatever it raised).
     """
     if not getattr(sys, "frozen", False):
         return False
     try:
         private = os.dup(0)  # PEP 446: the duplicate is not inheritable
-    except OSError:
-        return False  # no standard input at all: nothing a child could inherit
-    null = os.open(os.devnull, os.O_RDONLY)
+    except OSError as error:
+        if error.errno == errno.EBADF:
+            return False  # no standard input at all: nothing a child could inherit
+        raise
+    reader: io.BufferedReader | None = None
     try:
-        if sys.platform == "win32":
-            import ctypes
-            import msvcrt
+        null = os.open(os.devnull, os.O_RDONLY)
+        try:
+            os.dup2(null, 0)
+            if sys.platform == "win32":
+                import ctypes
+                import msvcrt
 
-            os.dup2(null, 0)
-            done = ctypes.windll.kernel32.SetStdHandle(
-                ctypes.c_ulong(STD_INPUT_HANDLE & 0xFFFFFFFF),
-                ctypes.c_void_p(msvcrt.get_osfhandle(0)),
-            )
-            if not done:
-                raise ctypes.WinError()
+                done = ctypes.windll.kernel32.SetStdHandle(
+                    ctypes.c_ulong(STD_INPUT_HANDLE & 0xFFFFFFFF),
+                    ctypes.c_void_p(msvcrt.get_osfhandle(0)),
+                )
+                if not done:
+                    raise ctypes.WinError()
+        finally:
+            os.close(null)
+        encoding = getattr(sys.stdin, "encoding", None) or "utf-8"
+        reader = open(private, "rb")  # noqa: SIM115 -- it owns the descriptor from here on
+        sys.stdin = io.TextIOWrapper(reader, encoding=encoding)
+    except BaseException:
+        if reader is not None:
+            reader.close()
         else:
-            os.dup2(null, 0)
-    finally:
-        os.close(null)
-    encoding = getattr(sys.stdin, "encoding", None) or "utf-8"
-    sys.stdin = io.TextIOWrapper(open(private, "rb"), encoding=encoding)  # noqa: SIM115
+            with contextlib.suppress(OSError):
+                os.close(private)
+        raise
     return True
 
 
@@ -213,14 +251,16 @@ def _refuse(reason: str) -> int:
 def interpreter_reentry(arguments: Sequence[str]) -> list[str] | None:
     """Return a frozen interpreter re-entry's arguments normalised, or None when it is not one.
 
-    CPython's option grammar (Reviewer A r3 #2 as CHARC ruled it): zero or more option
-    arguments, each a cluster of :data:`FLAG_LETTERS` that may end with a
-    :data:`VALUE_LETTERS` letter (its value attached, or the next argument), then the
-    ``-m`` / ``-c`` letter (:data:`REENTRY_LETTERS`, possibly at the end of a cluster, its
-    operand attached or the next argument). The options are dropped (the bootloader configures
-    the frozen interpreter); an attached operand is split off. Anything else (``-I`` alone,
-    ``-X`` without a value, ``-h``, ``--version``, ``-``, ``--``, ``-platform offscreen``, a
-    file) is not a re-entry and goes to the GUI exactly as before.
+    CPython's option grammar (Reviewer A r3 #2 and r4 #1 as ruled; the letters derived by
+    executing CPython 3.12): zero or more option arguments, each either a cluster of
+    :data:`FLAG_LETTERS` that may end with a :data:`VALUE_LETTERS` letter (its value attached,
+    or the next argument), or a :data:`LONG_VALUE_OPTIONS` option with one of its accepted
+    values as the next argument; then the ``-m`` / ``-c`` letter (:data:`REENTRY_LETTERS`,
+    possibly at the end of a cluster, its operand attached or the next argument). The options
+    are dropped (the bootloader configures the frozen interpreter); an attached operand is
+    split off. Anything else (``-I`` alone, ``-X`` without a value, ``-h``, ``--version``,
+    ``--check-hash-based-pycs=always``, ``-``, ``--``, ``-platform offscreen``, a file) is not
+    a re-entry and goes to the GUI exactly as before.
 
     Args:
         arguments: The full command line, program name first.
@@ -231,6 +271,11 @@ def interpreter_reentry(arguments: Sequence[str]) -> list[str] | None:
     index = 1
     while index < len(arguments):
         token = arguments[index]
+        if token in LONG_VALUE_OPTIONS:
+            if index + 1 >= len(arguments) or arguments[index + 1] not in LONG_VALUE_OPTIONS[token]:
+                return None  # CPython refuses a missing or unknown value
+            index += 2
+            continue
         if len(token) < 2 or token[0] != "-" or token[1] == "-":
             return None
         index += 1
@@ -321,14 +366,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         The exit status of the branch run.
     """
     arguments = list(sys.argv if argv is None else argv)
+    frozen = getattr(sys, "frozen", False)
+    if frozen and multiprocessing_reentry(arguments):  # before ANYTHING else (A r3 #3, r4 #5)
+        return _refuse(MULTIPROCESSING_REFUSAL)
     prepend_executable_folder()
-    if getattr(sys, "frozen", False):
-        if multiprocessing_reentry(arguments):  # before every other dispatch (A r3 #3)
-            return _refuse(MULTIPROCESSING_REFUSAL)
+    if frozen:
         if arguments[1:2] == [WORKER_FLAG]:  # frozen only: a source run is 1.0.0 (A r3 #1)
             # F-E: before the worker's first read and before anything that can spawn a child
-            # (the loader, the worker import, its backend probe, any CuPy import).
-            isolate_worker_stdin()
+            # (the loader, the worker import, its backend probe, any CuPy import). It fails
+            # closed: no loader, no log, no worker without the isolation (A r4 #4).
+            try:
+                isolate_worker_stdin()
+            except Exception as error:
+                return _refuse(f"{STDIN_REFUSAL}: {type(error).__name__}")
             gpu_pack.activate()
             from clearwater.app import export_worker
 

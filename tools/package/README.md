@@ -123,8 +123,10 @@ the request pipe, which the worker's cancel thread is reading, and on Windows th
 hangs at start-up until pathfinder kills it at 10 s: the GPU is reported unusable (WP6.1
 finding F-E). So the frozen `--export-worker` branch of `clearwater.__main__`
 (`isolate_worker_stdin`) first moves the pipe to a private descriptor and points the standard
-input (descriptor 0 and, on Windows, the Win32 handle) at the null device. A source run is
-unchanged. The shim is TEMPORARY: DR-125's package moves this isolation into the worker
+input (descriptor 0 and, on Windows, the Win32 handle) at the null device. It fails closed:
+when any step fails, the worker exits 2 with one stderr line (`Clearwater: worker stdin
+isolation failed: <exception type>`) before the GPU pack loader, any log or the worker import.
+A source run is unchanged. The shim is TEMPORARY: DR-125's package moves this isolation into the worker
 itself, for source and frozen runs alike, and removes the shim from `__main__`.
 
 ## The GPU pack manifest
@@ -185,6 +187,8 @@ uv run --no-sync python tools/package/build.py --verify <pack root>/<stamp>
 ```
 
 runs the FULL check: all of the above plus each listed file's sha256 (`RECORD`'s urlsafe
-base64 form) against the file, and any listed file without a hash. It exits 0 with one
+base64 form) against the file, any listed file without a hash, and a walk of every file
+under `site-packages` that lists each one no `RECORD` row names (`unlisted file in
+site-packages: <path>`, `__pycache__` included; Q2). It exits 0 with one
 summary line (rows, files, size) when the pack is clean, and 1 with every problem listed.
 `--verify` excludes `--form` and `--write-manifest`.
