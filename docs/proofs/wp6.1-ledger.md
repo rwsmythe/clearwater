@@ -2398,4 +2398,107 @@ Clearwater's.
 are at `work/wp6.1/dist-on{dir,file}/` (of `49150ccf`); they replace `62198baf`'s. The pack is
 unchanged at `work/wp6.1/t3c/appdata/Local/Clearwater/gpu-pack/14.2.0-cu12`.
 
-Depth at turn-3 group-2b-4 end: DISPATCHER TO FILL
+Depth at turn-3 group-2b-4 end: 210,615 (wp61-cell7, at its yield; read by the dispatcher)
+
+## Turn 3 group 2b-5 (Reviewer A r4 fold-in) (2026-11-04 ~14:45-15:00Z)
+
+Same cell (wp61-cell7), dispatch `clearwater-review-evidence/wp6.1/cell/dispatch-10.md`, on
+Reviewer A round 4 (`clearwater-review-evidence/wp6.1/A/r4/review.txt`, on `e0a90bc5..49150ccf`:
+one MAJOR, four MINOR, two ADVISORY). Evidence: `clearwater-review-evidence/wp6.1/cell/t3g/`.
+
+- MID-BUILD YIELD: no build and no frozen run. Nothing under the pack was run or imported;
+  `--verify` read it once.
+- No desktop input, no GUI launch, no network. Nothing under the real `%APPDATA%\Clearwater`
+  or `%LOCALAPPDATA%\Clearwater` (the latter absent).
+- `jobs/export_process.py`, `io/video/pipes.py` and `app/export_worker.py` are untouched.
+- Code + tests: commit `08a96243`.
+
+**Owner log** md5 `69ed0432c562db9445daecbe8f15fe27` before (14:55:16Z) and after (14:58:57Z)
+(`t3g/owner-log-md5-{before,after}.txt`; a check only).
+
+### The grammar, derived by execution (A r4 #1)
+
+`t3g/derive_grammar.py` -> `t3g/grammar-letters.txt`. It runs only the dev interpreter
+(`.venv\Scripts\python.exe`, CPython 3.12.13, MSC v.1944, the bundle's version) with `-B` and
+`-c pass`, with stdin from NUL and the `PYTHON*` variables removed. No product code runs.
+
+- For every ASCII letter L, it runs `-<L> -c pass`.
+- Where that fails, it also runs `-<L> x -c pass` and `-<L>x -c pass`.
+- It then runs every long option `--help-all` names, with and without values, in the `=` form,
+  and abbreviated.
+
+| Class | Letters / options | Evidence (exit codes) |
+|---|---|---|
+| FLAG (no value; may be clustered) | `b d i q s t u v x B E I O P R S` (16) | `-<L> -c pass`: 0, no output |
+| VALUE (the next argument, or the rest of the cluster) | `W X` | `-<L> -c pass`: 2 (it took `-c` as its value); `-<L> x -c pass` and `-<L>x -c pass`: 0 |
+| INFORMATIONAL (prints, exits) | `h V`, also `-?` | 0 with usage / version text |
+| RE-ENTRY (by definition) | `m c` | -- |
+| REJECTED | the other 30 letters | 2, `Try python -h` |
+| `--check-hash-based-pycs <always\|default\|never>` | accepted, also around `-I`, `-Wignore`, `-Xutf8` | 0 |
+| `--check-hash-based-pycs=always` / `=never`; a missing value; `bogus`; `--check-hash-based-pyc` / `--check-hash` (abbreviations) | REJECTED | 2 |
+| `--help`, `--help-env`, `--help-xoptions`, `--help-all`, `--version` | INFORMATIONAL | 0 with text |
+| `--help-al`, `--vers`, `--other` | REJECTED | 2 |
+| `-R -m this`, `-t -c pass`, `-Rt` / `-tR -c pass` | accepted | 0 |
+
+So `FLAG_LETTERS` gains `R` and `t` (it had 14). `VALUE_LETTERS` stays `WX`.
+
+The new `LONG_VALUE_OPTIONS` is `{"--check-hash-based-pycs": {"always", "default", "never"}}`.
+Its value is ALWAYS the next argument. The `=` form, a missing or unknown value, an
+abbreviation, an informational long option and every other `--x` are not re-entries, so they
+go to the GUI, as CPython refuses them or prints and exits.
+
+### The fold-in table
+
+| # (r4) | Disposition | Fix (file) | Test(s) | On `49150ccf` |
+|---|---|---|---|---|
+| 1 MAJOR | FIX | `__main__`: `FLAG_LETTERS` = the executed FLAG set (adds `R`, `t`). New `LONG_VALUE_OPTIONS`: `interpreter_reentry` consumes `--check-hash-based-pycs <accepted value>` like a separate `-W` / `-X` value. Any other `--...` token (the `=` form, a wrong or missing value, `--help*`, `--version`, unknown) gives None (GUI). The docstrings name the derivation. | grammar table +20 rows: r4's `-R -m x`, `-t -m x`, `-Rt -c pass`, `--check-hash-based-pycs always -m x`, `... never -c pass`, plus `-tRIm x`, `default -I -m x`, `-I ... always -Xutf8 -m x`; the GUI rows `=always`, the option alone, `... -m x` (no value), `bogus`, `--check-hash`, `--help`, `--help-env`, `--help-xoptions`, `--help-all`, `--version`, `-a`, `-Rp`. NEW `test_the_option_letters_are_cpythons_by_execution`: the letter loop, run live against this interpreter, must EQUAL `FLAG_LETTERS` / `VALUE_LETTERS`. NEW `test_the_long_options_are_cpythons_by_execution`: the three values exit 0; `=always`, `bogus`, a missing value, the option alone, `--check-hash` and `--other` fail; the five informational options print. Main-level: `test_every_spelling_of_dash_m_runs_a_pack_module` +3 (`-R`, `-t`, `--check-hash-based-pycs always`); `..._dash_c_..._refuses` +2 (`-Rt -c pass`, `--check-hash-based-pycs never -c pass`); `test_qt_options_..._reach_the_gui` +2 (`=always -m x`, the option alone). | `:1485` x8 (the 8 new re-entry rows); `:1526` (the letter test: `t`/`R` missing); `:1536` (`AttributeError`: no `LONG_VALUE_OPTIONS`); `:51` x3 (the GUI blocker refused `clearwater.app.main`: no window); `:1644` x2 (the GUI stand-in ran: 3, not 2). The new GUI rows PASS there by design. |
+| 2 MINOR | FIX | `gpu_pack.add_site_prefix`: every entry whose `normcase(normpath(...))` equals the folder's is removed, and the canonical `str(site_packages)` is put first. `site.PREFIXES[:] = ...` keeps the list object. Returns False only when that is already the state. New helper `_prefix_key`. | NEW `test_another_spelling_of_the_pack_folder_is_replaced_not_kept` (Windows: r4's exact `["C:/PACK/site-packages/", "C:/bundle"]` + `Path("C:/pack/site-packages")` -> `["C:\pack\site-packages", "C:/bundle"]`, then False); NEW `test_every_existing_equivalent_prefix_is_removed_before_the_one_canonical_entry` (any platform: a trailing-separator copy, the exact entry twice and a doubled-separator copy all go; other prefixes keep their order; the same list object). | `test_gpu_pack.py:1187`, `:1203` |
+| 3 MINOR | FIX (tests only) | -- | F-E (i): the child also reports `os.get_inheritable(sys.stdin.fileno())`, which must be `False`. F-E (ii): the record's `inheritable` must be `False`. NEW `test_the_end_of_the_request_pipe_reaches_the_workers_reader_through_the_shim[parent-closes, parent-dies]`: a child runs the frozen branch with the REAL `export_worker.main`; a stand-in `run` reads the request, then runs the REAL `_watch_stdin` on the private reader. The parent closes its end, or a middle process holding the write end is KILLED. The watcher must see the end of the stream (`eof` true, well inside its 30 s bound), with fd != 0 and not inheritable. | All PASS on `49150ccf`: the shim there already makes a non-inheritable duplicate. The protection is in the tests. **Mutation** (`t3g/mutation-inheritable.diff`: `os.set_inheritable(private, True)` after the `dup`, on a copy of the final `src`; `t3g/pytest-mutation-inheritable.log`): **4 failed** (both F-E tests and both pipe-end cases), each at its `inheritable is False` assertion. |
+| 4 MINOR | FIX, fail closed (the dispatcher's form; CHARC may re-rule) | `isolate_worker_stdin`: only `os.dup(0)` raising `OSError` with `errno.EBADF` returns False (no standard input); any other errno raises. Every later step (`os.open(devnull)`, `dup2`, `SetStdHandle`, `open(private, "rb")`, `TextIOWrapper`) is in one `try`. On any exception: the null descriptor is closed (inner `finally`); `private` is closed by the reader that owns it, or directly; then it re-raises. `main` catches `Exception` from the shim and returns `_refuse("worker stdin isolation failed: <type>")`, status 2, BEFORE `gpu_pack.activate`, any log and the worker import. New `STDIN_REFUSAL` constant; README section updated. | NEW `test_a_failed_stdin_isolation_ends_the_frozen_worker_before_anything_else[open-null (PermissionError), dup2, set-std-handle (win32 only), reader-open (ValueError), reader-wrap (TypeError), dup-emfile]`, each in a fresh `-I` child (NoGui prelude; worker import blocked and recorded; loader and log set-up stubbed and recorded). Each asserts: status 2; stderr EXACTLY `Clearwater: worker stdin isolation failed: <type>\n`; nothing ran; no worker import attempted; the open descriptor set (fstat of 0-255) is the same before and after (no leak). NEW `test_a_process_without_a_standard_input_runs_the_worker_branch_on` (`EBADF`): the branch goes on (loader, worker import attempted), no refusal line, no descriptor left. | `:915` x5 (the 5 non-EMFILE modes: an exception escaped `main`, so the child's traceback and no JSON) and `:917` x1 (`dup-emfile`: the old code took it as "no standard input" and ran on). The EBADF test PASSES there by design: it pins the kept fallback. |
+| 5 MINOR | FIX | `main`: `frozen and multiprocessing_reentry(...)` is checked FIRST, before `prepend_executable_folder()`. | Both multiprocessing refusal tests set `PATH` to `/x;/y` and assert it unchanged after the refusal, as well as `calls == []` and no blocked import. | `:250` x4, `:274` (`PATH` gained the executable's folder) |
+| 6 ADVISORY | FIX | The `__main__` module docstring: the branches in `main`'s order; multiprocessing before `PATH`; the shim's fail-closed refusal; "Every branch that can import CuPy ... runs the loader before it; a refusal ... ends before the loader" replaces "On every branch". `REFUSED_STATUS` now names every refusal. `gpu_pack.activate`: "its worker, `-m` and GUI branches; its refusals end before it". `test_gpu_pack.py` ownership test docstring: the FULL check does list a nested extra (Q2). `tools/package/README.md` (the `--verify` paragraph: the unlisted-file walk; the shim paragraph: fails closed) and `build.py` `verify_pack` docstring (the walk). | docs only | n/a |
+| 7 ADVISORY (OUT of envelope) | BANK | none | none | n/a |
+
+**Banked (r4 #7), for the report's limits and for WP6.3.** The full `--verify` walk uses
+`os.walk` with `followlinks=False`, so it does not follow directory symlinks or junctions. A file
+behind a link planted inside an owned package escapes Q2's accounting. WP6.3's installer
+verification should reject any link (symlink, junction, other reparse point) under the pack.
+
+### Commands (worktree root, Git Bash, `PYTEST_ADDOPTS` unset; logs in `t3g/`)
+
+| Command | Exit | Summary |
+|---|---|---|
+| Rule check first (`t3g/rule-check.txt`): every entry-point call site in `tests/test_frozen_entry.py` / `tests/test_gpu_pack.py` listed. The guards of the new / changed sites: the in-process `calls` + `_fresh_entry` + `_fake_gui`; the children's NoGui prelude + `_app_data_environ`; the parent-dies middle passes that environment on; bounded timeouts. | -- | OK on the new and the old revision |
+| BEFORE-record: the three owned modules with `PYTHONPATH` / `WP61_BUILD_SCRIPT` on `git archive 49150ccf src tools` (`c61g-5`, then `c61g-6` with `-rf` for the names; `t3g/pytest-before-on-49150ccf{,-rf}.log`) | 1 | **28 failed, 278 passed** (lines in the table above) |
+| the three owned modules on the final code (`c61g-7`) | 0 | **306 passed in 17.40 s** (266 before this batch, +40) |
+| the WIDER run (dispatch-9 item 1's 8 modules, `-m "not gpu"`, `--timeout 120`, `c61g-8`) | 0 | **499 passed, 41 deselected in 41.55 s** (459 + 40); slowest 2.77 s, the letter-by-execution test |
+| mutation `os.set_inheritable(private, True)` (`c61g-9`, the copy of the final `src` first on `PYTHONPATH`) | 1 | 4 failed, at the `inheritable is False` lines |
+| `ruff check .` / `ruff format --check .` | 0 / 0 | All checks passed / 323 files already formatted |
+| `mypy` (strict, configured set) | 0 | no issues in 161 source files |
+| `mypy --strict` on the 5 touched Python files, win32 and `--platform darwin` | 0 / 0 | no issues in 5 source files, each |
+| `build.py --verify` (full) on the t3c pack, read only (`t3g/verify.log`) | 0 | PASS: 2701 rows, 2701 files, 2412.6 MiB; 0 `.pyc` |
+
+Every pytest run here used `-p no:cacheprovider` and `--timeout 120`. No test child was left
+(psutil, by command line). The owner-log md5 was unchanged after the before-record runs (14:55:36Z
+and again at the end).
+
+### Self-review (suspected / confirmed / rejected / fixed)
+
+1. `OSError(errno.EACCES, ...)` is constructed as `PermissionError`, so the refusal line names
+   `PermissionError`, not `OSError`. Confirmed by the first run (1 failure). The behaviour is
+   right: the line names the real type. The test's expectation was fixed.
+2. A docstring with an escaped backslash tripped ruff D301. Confirmed. Reworded ("a forward
+   slash or a backslash").
+3. Ruff's SIM300 (three Yoda comparisons) and RUF100 (an unused `noqa: BLE001`). Confirmed.
+   Fixed with `ruff --fix` on the touched files; ruff format then reflowed one file.
+4. A bash heredoc collapsed a `\\n` in a scripted test edit. Confirmed: its own assertion
+   refused to write. Redone with the Edit tool; 0 CR in every blob.
+5. Suspected: the shim's `except BaseException` re-raises `KeyboardInterrupt` past `main`'s
+   `except Exception`. Confirmed. Kept: an interrupt is not an isolation failure, and the
+   descriptors are closed before it propagates.
+6. Suspected: `--check-hash-based-pycs` consumed before the `--` check could hide `--`.
+   REJECTED: `--` is not a key of `LONG_VALUE_OPTIONS`, and the table's `--` rows pass.
+
+A second pass found nothing new.
+
+Depth at turn-3 group-2b-5 end: DISPATCHER TO FILL
