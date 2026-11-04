@@ -27,7 +27,8 @@ dependencies = [
 
 [project.optional-dependencies]
 # WP3.1 (frame section 4 grant, ruling 7): the GPU backend; CUDA files are never redistributed (AD-18).
-gpu = ["cupy-cuda12x[ctk]>=14.2,<15"]
+# WP6.4 (AD-36): not on macOS, whose path is CPU only (no CUDA wheel exists for it).
+gpu = ["cupy-cuda12x[ctk]>=14.2,<15; sys_platform != 'darwin'"]
 
 [dependency-groups]
 # The application toolchain (plan PD9).
@@ -42,8 +43,8 @@ dev = [
     "psutil>=6,<8",
     "py-cpuinfo>=9,<10",
     # WP1.2 Part A GPU candidate (CHARC grant; MIT). The product names it as the [gpu] extra (WP3.1);
-    # kept here so the developer environment has CuPy (WP3.1 ruling 7).
-    "cupy-cuda12x[ctk]>=14.2,<15",
+    # kept here so the developer environment has CuPy (WP3.1 ruling 7); not on macOS: CPU only (AD-36).
+    "cupy-cuda12x[ctk]>=14.2,<15; sys_platform != 'darwin'",
     # WP2.1S transport candidate (CHARC grant 5152ed4302874889). Spike and prototype only.
     "av>=15,<17",
     # WP3.16 ruling 3 (CHARC grant; MIT, AD-18): Qt test fixtures for the headless GUI tests.
@@ -83,6 +84,7 @@ markers = [
     "gui: drives the PySide6 interface",
     "slow: takes more than a few seconds",
     "fullclip: the full-size form of a gate test sized by AD-30 (whole GX011627 or the pre-AD-30 frame count); excluded from both gate legs, run in package windows",
+    "macos: a native macOS test (WP6.4 / WP6.5); skipped off darwin by an explicit platform skip (AD-36)",
 ]
 
 [tool.ruff]
