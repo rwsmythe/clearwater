@@ -1658,7 +1658,7 @@ def build_sheet(out: Path, work: Path) -> dict[str, Any]:
         work: The working folder (the CP5 pack's list and the crops).
 
     Returns:
-        The summary record (also written as ``sheet-<stamp>.json``).
+        The summary record (also written as ``sheet-<stamp>/sheet.json``).
 
     Raises:
         hp.ProbeError: The published records are not exactly the whole set.
@@ -1860,11 +1860,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             modules = suite()
             methods = tuple(args.method or modules.wp42.METHODS)
-            out.mkdir(parents=True)
-            sample = sample_provider(modules, out / "fixtures")
-            record, status = run_v3(modules, out, switches, methods, sample)
-            _write_json(out / "v3.json", record)
-            (out / "v3-table.md").write_text(v3_table(record), encoding="ascii")
+            out.parent.mkdir(parents=True, exist_ok=True)
+            stamp = _stamp()
+            staging = out.parent / f".{out.name}.staging-{stamp}"
+            staging.mkdir()
+            try:
+                sample = sample_provider(modules, staging / "fixtures")
+                record, status = run_v3(modules, staging, switches, methods, sample)
+                _write_json(staging / "v3.json", record)
+                (staging / "v3-table.md").write_text(v3_table(record), encoding="ascii")
+                hp._publish(staging, out, None)
+            except BaseException as exc:
+                note = hp._abandon(staging, out.parent / f".{out.name}.failed-{stamp}")
+                if note:
+                    exc.add_note(f"halo_part3: the V3 run was not published{note}")
+                raise
             if status:
                 print(f"STOP: {record['stop']}")
             return status
@@ -1892,6 +1902,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             cache_dir = checked_output(
                 Path(args.cache_dir) if args.cache_dir else work / PART3 / "cache"
             )
+            if headless_export.inside(cache_dir, out / "items"):
+                raise hp.ProbeError("--cache-dir must not be inside the output items folder")
             by_name = {item["item"]: item for item in items}
             unknown = [name for name in args.items if name not in by_name]
             if unknown:

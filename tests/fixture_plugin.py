@@ -9,10 +9,11 @@ the bare list because the WP-T1 guard tests (``tests/test_conftest_guard.py``) c
 - ``fixture_manifest``: the parsed, validated ``tests/fixtures/manifest.json``.
 - ``sample``: a callable ``sample(sample_id) -> Path``. A committed sample is returned from
   ``tests/fixtures``. A generated one (the AD-14 flicker clip, too large to commit) is returned
-  from ``work/fixtures/generated`` (the working-folder cache), generated first when it is absent
-  or stale, and its decoded frames are hashed against the manifest before it is handed out; a
-  mismatch after regeneration fails the test. If ``work/`` cannot be written the clip is made
-  under pytest's basetemp instead. FFmpeg being absent skips the test with a reason.
+  from ``fixtures-generated`` under an explicit pytest basetemp, otherwise from the MAIN
+  checkout's ``work/fixtures/generated``, generated first when it is absent or stale, and its
+  decoded frames are hashed against the manifest before it is handed out; a mismatch after
+  regeneration fails the test. Failed Git discovery warns with the reason and uses pytest's
+  basetemp; an unwritable main cache also falls back there. FFmpeg absence skips with a reason.
 - ``sample_entry``: a callable ``sample_entry(sample_id) -> dict`` giving the manifest entry.
 - ``sample_ids``: a callable ``sample_ids(group=None) -> list[str]``.
 - ``ffmpeg_tools``: skips the test with a reason when ``ffmpeg``/``ffprobe`` are not on the PATH.
@@ -24,8 +25,10 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import tempfile
 import time
+import warnings
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -40,9 +43,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 FIXTURES_DIR = REPO_ROOT / "tests" / "fixtures"
 """The committed samples and ``manifest.json``."""
-
-GENERATED_DIR = REPO_ROOT / "work" / "fixtures" / "generated"
-"""The cache of generated samples (``work/`` is the gitignored working folder)."""
 
 SKIP_NO_FFMPEG = "ffmpeg and ffprobe are not on the PATH (needed to generate or probe video)"
 """The skip reason when FFmpeg is absent."""
@@ -279,10 +279,50 @@ def ffmpeg_tools() -> None:
 
 @pytest.fixture(scope="session")
 def sample_provider(
-    fixture_manifest: dict[str, Any], tmp_path_factory: pytest.TempPathFactory
+    fixture_manifest: dict[str, Any],
+    tmp_path_factory: pytest.TempPathFactory,
+    pytestconfig: pytest.Config,
 ) -> SampleProvider:
-    """The session's :class:`SampleProvider` (cache in ``work/``, basetemp if that fails)."""
-    cache = GENERATED_DIR
+    """Provide samples under an explicit basetemp, else the main checkout's work cache.
+
+    Git's common directory locates the MAIN checkout without writing Git metadata.
+    Failed Git discovery warns once with its reason and the session-basetemp
+    fallback path. An unwritable main cache also falls back to basetemp.
+
+    Args:
+        fixture_manifest: The validated shared manifest.
+        tmp_path_factory: Supplies the effective worker/session basetemp and scratch folders.
+        pytestconfig: Supplies the explicit ``--basetemp`` option, including xdist's worker root.
+
+    Returns:
+        The session's provider, with generation and verification unchanged.
+    """
+    if pytestconfig.getoption("basetemp") is not None:
+        cache = tmp_path_factory.getbasetemp() / "fixtures-generated"
+    else:
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            cache = tmp_path_factory.getbasetemp() / "fixtures-generated"
+            reason = " ".join(str(error).split())
+            if isinstance(error, subprocess.CalledProcessError) and isinstance(error.stderr, str):
+                reason += f": {' '.join(error.stderr.split())}"
+            warnings.warn(
+                f"Git cache discovery failed ({type(error).__name__}: {reason}); using {cache}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        else:
+            main = Path(result.stdout.strip()).resolve().parent
+            cache = main / "work" / "fixtures" / "generated"
     if not writable_dir(cache):
         cache = tmp_path_factory.getbasetemp() / "fixtures-generated"
     return SampleProvider(

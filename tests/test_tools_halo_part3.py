@@ -1049,6 +1049,73 @@ def test_v3_refuses_the_full_res_bounds_switch(
     assert not out.exists()
 
 
+def test_v3_interrupt_publishes_no_final_folder(
+    working: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An interrupted V3 run keeps partial evidence outside its final name (DR-119 d)."""
+    out = working / "wp5.7" / "part3" / "v3-interrupted"
+    monkeypatch.setattr(p3, "suite", lambda: SimpleNamespace(wp42=SimpleNamespace(METHODS=("c3",))))
+    monkeypatch.setattr(p3, "sample_provider", lambda modules, folder: lambda name: folder / name)
+
+    def interrupted(modules: Any, folder: Path, *args: Any) -> Any:
+        (folder / "partial.txt").write_text("partial", encoding="ascii")
+        raise KeyboardInterrupt("interrupted V3")
+
+    monkeypatch.setattr(p3, "run_v3", interrupted)
+    with pytest.raises(KeyboardInterrupt, match="interrupted V3"):
+        p3.main(["v3", "--out", str(out)])
+    assert not out.exists()
+    failed = list(out.parent.glob(f".{out.name}.failed-*"))
+    assert len(failed) == 1
+    assert (failed[0] / "partial.txt").read_text(encoding="ascii") == "partial"
+    assert not list(out.parent.glob(f".{out.name}.staging-*"))
+
+
+@pytest.mark.parametrize("status", [0, p3.V3_STOP_EXIT])
+def test_v3_publishes_the_record_and_table_together(
+    working: Path, monkeypatch: pytest.MonkeyPatch, status: int
+) -> None:
+    """Normal and diagnostic-STOP results publish only after both artifacts are complete."""
+    out = working / "wp5.7" / "part3" / "v3-complete"
+    monkeypatch.setattr(p3, "suite", lambda: SimpleNamespace(wp42=SimpleNamespace(METHODS=("c3",))))
+    monkeypatch.setattr(p3, "sample_provider", lambda modules, folder: lambda name: folder / name)
+    record = {"rows": [], "stop": "reproduction failed"}
+
+    def run(modules: Any, folder: Path, *args: Any) -> Any:
+        assert not out.exists()
+        return record, status
+
+    monkeypatch.setattr(p3, "run_v3", run)
+    assert p3.main(["v3", "--out", str(out)]) == status
+    assert json.loads((out / "v3.json").read_text(encoding="utf-8")) == record
+    assert (out / "v3-table.md").is_file()
+    assert sorted(path.name for path in out.parent.iterdir()) == [out.name]
+
+
+@pytest.mark.parametrize("child", ["", "nested/cache"])
+def test_wholeset_refuses_a_cache_inside_the_items_folder(
+    working: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    child: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Cache folders must not enter the published-item population (DR-119 d)."""
+    out = working / "wp5.7" / "part3" / "wholeset"
+    cache = out / "items" / child
+    monkeypatch.setattr(p3, "wholeset_items", lambda pack: [{"item": "IMG_0001"}])
+    reached: list[bool] = []
+
+    def run_item(*args: Any, **kwargs: Any) -> str:
+        reached.append(True)
+        return "DONE"
+
+    monkeypatch.setattr(p3, "run_item", run_item)
+    assert p3.main(["wholeset-run", "IMG_0001", "--out", str(out), "--cache-dir", str(cache)]) == 2
+    assert "cache" in capsys.readouterr().err.lower()
+    assert reached == []
+    assert not out.exists()
+
+
 @pytest.mark.slow
 @pytest.mark.usefixtures("ffmpeg_tools")
 def test_build_clips_and_masks_equal_wp42s_fixtures(

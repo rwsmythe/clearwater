@@ -557,6 +557,74 @@ def test_clear_never_follows_a_link(tmp_path: Path) -> None:
     assert link.is_symlink()
 
 
+@pytest.mark.parametrize("writer", ["proxy", "statistics"])
+def test_a_write_refuses_a_preplanted_junction(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, writer: str
+) -> None:
+    """An exact entry-name junction cannot redirect cache writes (DR-118)."""
+    if sys.platform != "win32":
+        pytest.skip("Windows directory junctions are not available on this platform")
+    import _winapi
+
+    target = tmp_path / "target"
+    target.mkdir()
+    sentinel = target / "data.pack"
+    sentinel.write_bytes(b"keep this pack untouched")
+    folder = tmp_path / "cache"
+    folder.mkdir()
+    junction = folder / entry_name(KEY)
+    try:
+        _winapi.CreateJunction(str(target), str(junction))
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"cannot create a Windows directory junction here: {type(exc).__name__}: {exc}")
+    assert junction.is_junction()
+    with lossless_cache(folder) as cache:
+        assert cache.lookup(KEY) is None
+        with (
+            caplog.at_level(logging.WARNING, logger="clearwater.cache"),
+            pytest.raises(OSError, match="cache entry"),
+        ):
+            if writer == "proxy":
+                cache.store_proxy(KEY, 0, pixels(0))
+            else:
+                cache.store_source_statistics(KEY, "s", 0, {"means": np.zeros(3)})
+        assert str(junction) in caplog.text
+        assert cache.lookup(KEY) is None
+    assert junction.is_junction()
+    assert sentinel.read_bytes() == b"keep this pack untouched"
+    assert sorted(path.name for path in target.iterdir()) == ["data.pack"]
+
+
+@pytest.mark.parametrize("writer", ["proxy", "statistics"])
+def test_a_write_refuses_a_preplanted_file(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, writer: str
+) -> None:
+    """A nondirectory entry gets the readable refusal without changing its bytes (DR-118)."""
+    folder = tmp_path / "cache"
+    folder.mkdir()
+    entry = folder / entry_name(KEY)
+    original = b"keep this entry file untouched"
+    entry.write_bytes(original)
+    with lossless_cache(folder) as cache:
+        with (
+            caplog.at_level(logging.WARNING, logger="clearwater.cache"),
+            pytest.raises(OSError, match="refusing cache entry path"),
+        ):
+            if writer == "proxy":
+                cache.store_proxy(KEY, 0, pixels(0))
+            else:
+                cache.store_source_statistics(KEY, "s", 0, {"means": np.zeros(3)})
+        assert any(
+            record.levelno == logging.WARNING
+            and str(entry) in record.getMessage()
+            and "refusing cache entry path" in record.getMessage()
+            for record in caplog.records
+        )
+        assert entry.is_file() and entry.read_bytes() == original
+    assert entry.read_bytes() == original
+    assert sorted(path.name for path in folder.iterdir()) == [entry.name]
+
+
 def test_other_versions_and_unreadable_entries_are_removed_when_opening(tmp_path: Path) -> None:
     folder = tmp_path / "c"
     with lossless_cache(folder) as first:

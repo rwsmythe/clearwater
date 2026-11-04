@@ -81,6 +81,7 @@ if __package__ in (None, ""):
 import video_fidelity as vf
 from clearwater.analysis import AnalysisEngine
 from clearwater.cache import DiskProxyCache, cache_key
+from clearwater.config.atomic import atomic_write_text
 from clearwater.core import select_backend
 from clearwater.core.memory import job_device_memory_estimate_bytes
 from clearwater.interfaces import JobResult, ParameterSet, ProbeResult, Settings, SinkReport
@@ -90,14 +91,15 @@ from clearwater.jobs import ExportEngine, effective_parameters
 from clearwater.jobs.export_seam import ExportRequest
 from clearwater.methods import available_methods
 from local_config import LocalConfigError, find_footage_file, load_local_config
+from n6 import N6_MIN_PER_MIN
 from video_io_bench import StrayWatch, Telemetry, conditions, period, rate, summarise
 
 SUBDIR = Path("wp3.14") / "bench"
 """Where the outputs, cache folders, the synthetic clip and the records go, under the working
 folder."""
 
-D106_MIN_PER_MIN = 12.0
-"""D106 / N6 in spec v0.5.8: minutes of processing per minute of 4K footage, end to end."""
+D106_MIN_PER_MIN = N6_MIN_PER_MIN
+"""The shared D106 / N6 target in minutes of processing per minute of 4K footage."""
 
 DISK_MARGIN_BYTES = 4 * 1024**3
 """Free space wanted beyond the source's own size before a run starts (the output is at most
@@ -759,7 +761,8 @@ def check_disk(source: Path, out_dir: Path) -> None:
 
 
 def _write(path: Path, record: dict[str, Any]) -> None:
-    path.write_text(json.dumps(record, indent=2, default=str), encoding="utf-8")
+    """Publish a complete JSON record by replacing it with a written temporary sibling."""
+    atomic_write_text(path, json.dumps(record, indent=2, default=str))
 
 
 def _describe(leg: Leg) -> str:
@@ -887,8 +890,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"RECORD {record_path}")
                 return 1
             record["runs"].append(run)
-            _write(record_path, record)
             print(row_line(run), flush=True)
+            _write(record_path, record)
             if (run.get("memory_check") or {}).get("passes") is False:
                 if not run["ok"]:
                     record["failed"] = {"leg": asdict(leg), "error": run["failure"]}

@@ -5,7 +5,7 @@ Desktop tool (Python, PySide6) that corrects color cast, contrast loss and haze 
 ## Read these first, in this order
 
 1. `docs/clearwater-implementation-plan.md` — how the work is organized: roles, working rules, work packages (WP0.1 onward), owner checkpoints, interfaces to freeze.
-2. `docs/underwater-correction-spec.md` — v0.5.8. The source of truth for what Clearwater does. Decisions are numbered D1–D117, tests V1–V18, GUI requirements G1–G13, non-functional requirements N1–N13.
+2. `docs/underwater-correction-spec.md` — v0.6.1. The source of truth for what Clearwater does. Decisions are numbered D1–D117, tests V1–V18, GUI requirements G1–G13, non-functional requirements N1–N13.
 3. `docs/underwater-imagery-correction-research.md` — background on the method family; not normative.
 
 If the plan and the spec disagree, the spec wins; raise the disagreement to the owner.
@@ -72,5 +72,7 @@ The repository doubles as a multi-agent harness instance (template: `rwsmythe/ha
 ## Hardware rule (plan §4.3)
 
 **Desktop input rule (2026-11-04, after a WP6.1 incident):** no cell or seat sends synthetic keyboard or mouse input to the desktop (SendKeys, SendInput, keybd_event, AppActivate, mouse_event or equivalents). A GUI check uses UI Automation on Clearwater's own window elements, Qt's offscreen platform and test hooks, PrintWindow for a screenshot of Clearwater's own window, or the owner by hand. A stray keystroke lands in whatever the owner has in front.
+
+**Entry-point isolation rule (2026-11-04, after two more WP6.1 incidents: a library re-entered the frozen executable and reached the GUI branch; a before-record test run against an old revision started the source GUI against the owner's real profile for up to 120 s):** any test, probe or before-record run that calls a product entry point (`clearwater.__main__`, `app.main`, the export worker; in-process or in a child; on ANY revision, old or new) first redirects APPDATA, LOCALAPPDATA and the XDG variables to a disposable root AND blocks the GUI (the PySide6 / shiboken6 imports blocked or `app.main` stubbed), with a bounded timeout. Before a run against an old revision, grep the test file for entry-point calls and confirm the rule holds there. No run activates the GPU pack until the frozen `-m` handler is in the build under test. The owner's real profile under `%APPDATA%\Clearwater` is never edited by a cell or seat, even to undo a stray line.
 
 Agents run on the owner's laptop with direct access to the graphics card. Packages that record timing or memory figures are exclusive: one at a time, nothing else heavy running, timed on a full clip rather than one frame.

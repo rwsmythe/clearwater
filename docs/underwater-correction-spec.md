@@ -2,11 +2,12 @@
 
 ## Specification
 
-**Version:** 0.6.0 (draft)
-**Date:** 29 October 2026
+**Version:** 0.6.1 (draft)
+**Date:** 4 November 2026
 **Status:** Second review (10 concerns, 6 planning questions) worked through with the owner and incorporated. Requirements are stable for implementation planning. Items left to the design stage are listed in Section 14.1. Open decisions, including scope items that depend on test results, are listed in Section 14.2.
 
 **Change log**
+- 0.6.1 — G12 encoder "auto" wording made platform-neutral (owner-approved 2026-11-04 on CHARC's recommendation from the WP6.2 portability audit, verbatim: "concur with your recommendation"): auto = the platform's hardware HEVC encoder when available (NVENC on Windows, VideoToolbox on macOS), else libx265. Behaviour on Windows unchanged; design AD-35.
 - 0.6.0 — Post-1.0.0 platform and distribution requirements (owner-approved 2026-11-04 on CHARC's Phase 6 proposal `docs/briefs/phase6-proposal.md`, verbatim: "D-A two releases, D-B spike, D-C two artifacts, D-D bundle, D-E arm64, D-F actions, D-G spec, D-H not, D-I prune, D-J push"): N1 gains the platform list (Windows 11 x64 from 1.0.0; macOS on Apple Silicon from 1.2.0, CPU path, VideoToolbox HEVC encoder); new N14 packaged distribution (a per-platform self-contained artifact built by a published workflow; one artifact per platform, the CUDA support downloaded on demand on Windows (owner amendment 2026-11-04: "auto-download of the cuda libraries rather than bundle"); FFmpeg bundled with its notices; the shape (one-folder or one-file) set from the WP6.1 spike at CP6a); N6 / D106 noted as the Windows NVIDIA figure, the macOS CPU figure reported as information; N13 extended to every bundled binary. No correction decision changed; 1.0.0 is unaffected.
 - 0.1 — Initial draft.
 - 0.2 — Incorporated review decisions D11–D32; named project.
@@ -411,7 +412,7 @@ Timing and audio sync are the mandatory part of video output fidelity (D105).
 - **G9** GUI stays responsive during analysis, export and batch processing (work runs off the UI thread).
 - **G10** Clear messages for unsupported, damaged, or untagged inputs (Sections 5.1, 5.3, 5.4, 6.5), including ProRAW/DNG.
 - **G11** *(deferred to v2, 0.5.3)* Chapter grouping review: display detected groups, allow adjustment, warn on non-consecutive groups.
-- **G12** Settings: output folder, output suffix, PNG bit depth, video encoder, quality level, 10-bit-for-8-bit option, provenance on/off, cache size limit, clear cache, force CPU processing (Advanced; AD-9). First-run defaults (0.5.4): PNG 16-bit; encoder "auto" (NVENC when available, else the software encoder; provenance records the encoder actually used); quality Standard; cache 20 GB; provenance on; force CPU off.
+- **G12** Settings: output folder, output suffix, PNG bit depth, video encoder, quality level, 10-bit-for-8-bit option, provenance on/off, cache size limit, clear cache, force CPU processing (Advanced; AD-9). First-run defaults (0.5.4): PNG 16-bit; encoder "auto" (0.6.1: the platform's hardware HEVC encoder when available, NVENC on Windows and VideoToolbox on macOS, else libx265; provenance records the encoder actually used); quality Standard; cache 20 GB; provenance on; force CPU off.
 - **G13** Settings and last-used parameters persist between sessions (D89).
 
 Framework: PySide6.
