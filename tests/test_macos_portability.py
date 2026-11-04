@@ -104,10 +104,24 @@ def _run(argv: Sequence[str], *, timeout: int = TIMEOUT_S) -> subprocess.Complet
     )
 
 
+def _lavfi(source: str, seconds: float) -> str:
+    """The lavfi source text: the geometry joins ``source``'s own options with ``:``.
+
+    ``color=c=0x204060`` already has an option, so ``=size=...`` would make the size part of
+    the colour value (Reviewer A r2 item 4); a bare ``testsrc2`` takes ``=``.
+    """
+    separator = ":" if "=" in source else "="
+    return f"{source}{separator}size=1280x720:rate=30000/1001:duration={seconds}"
+
+
 def _clip(
     path: Path, *, seconds: float = 1.0, source: str = "testsrc2", extra: Sequence[str] = ()
 ) -> Path:
-    """Write a synthetic HEVC (x265) clip: ``source`` at 1280x720, 30000/1001, ``seconds`` long."""
+    """Write a synthetic HEVC (x265) clip: ``source`` at 1280x720, 30000/1001, ``seconds`` long.
+
+    ``extra`` holds OUTPUT options only (they follow the input); an input option such as
+    ``-display_rotation`` goes through :func:`_remux`, before its ``-i``.
+    """
     done = _run(
         [
             str(_ffmpeg()),
@@ -119,7 +133,7 @@ def _clip(
             "-f",
             "lavfi",
             "-i",
-            f"{source}=size=1280x720:rate=30000/1001:duration={seconds}",
+            _lavfi(source, seconds),
             "-c:v",
             X265,
             "-x265-params",
@@ -129,6 +143,32 @@ def _clip(
             "-tag:v",
             "hvc1",
             *extra,
+            str(path),
+        ]
+    )
+    assert done.returncode == 0, done.stderr[-1000:]
+    return path
+
+
+def _remux(source: Path, path: Path, *, input_options: Sequence[str]) -> Path:
+    """Copy ``source``'s streams into ``path`` with ``input_options`` BEFORE its ``-i``.
+
+    The order ``tools/fixtures/video.py`` builds its rotated sample with: ``-display_rotation``
+    is an input option, so it must precede the input it applies to.
+    """
+    done = _run(
+        [
+            str(_ffmpeg()),
+            "-nostdin",
+            "-hide_banner",
+            "-v",
+            "error",
+            "-y",
+            *input_options,
+            "-i",
+            str(source),
+            "-c",
+            "copy",
             str(path),
         ]
     )
@@ -152,12 +192,42 @@ def _native_capabilities() -> tuple[Any, ...]:
     return capability._detect(_ffmpeg(), capability.encoder_roster())
 
 
-def _vt_or_skip() -> None:
-    """Skip a VideoToolbox-only case on a host whose VT is PROVED unavailable (its reason)."""
-    vt = next(c for c in _native_capabilities() if c.name == VT)
+def _capability(name: str) -> Any:
+    return next(c for c in _native_capabilities() if c.name == name)
+
+
+def assert_proved_unavailable(row: Any) -> None:
+    """An unavailable encoder is PROVED so: a non-empty ASCII reason and no bit depth (A r2 11)."""
+    assert not row.available
+    assert isinstance(row.reason, str) and row.reason.strip() and row.reason.isascii(), row
+    assert tuple(row.bit_depths) == (), row
+
+
+def assert_advertised(row: Any) -> None:
+    """An available encoder advertises a non-empty subset of the product's depths (8, 10)."""
+    assert row.available and row.bit_depths, row
+    assert set(row.bit_depths) <= {8, 10} and list(row.bit_depths) == sorted(row.bit_depths), row
+
+
+def assert_unadvertised_refused(row: Any) -> None:
+    """Each depth an available encoder does NOT advertise is refused by the sink by name (AD-35
+    permits a working 8-bit VideoToolbox without a 10-bit one); nothing is encoded."""
+    from clearwater.io.video.encode import FFmpegVideoSink, VideoEncodeError
+
+    for depth in sorted({8, 10} - set(row.bit_depths)):
+        with pytest.raises(VideoEncodeError) as caught:
+            FFmpegVideoSink()._check_options(row.name, "standard", depth)
+        assert caught.value.kind == "unavailable" and f"{depth}-bit" in str(caught.value)
+
+
+def _vt_or_skip() -> Any:
+    """Return VideoToolbox's row; skip a VT-only case where VT is PROVED unavailable."""
+    vt = _capability(VT)
     if not vt.available:
-        assert vt.reason and vt.reason.isascii()
+        assert_proved_unavailable(vt)
         pytest.skip(f"VideoToolbox unavailable on this Mac: {vt.reason}")
+    assert_advertised(vt)
+    return vt
 
 
 def _encode(source: Path, out: Path, *, encoder: str, quality: str, bit_depth: int) -> Any:
@@ -558,7 +628,8 @@ def test_macos_ffmpeg_text_and_redaction(
         for row in _native_capabilities():
             assert (row.reason or "").isascii() and "NVIDIA" not in (row.reason or "")
     elif site == "P72":
-        rotated = _clip(tmp_path / "rotated.mp4", seconds=0.2, extra=["-display_rotation", "90"])
+        plain = _clip(tmp_path / "plain.mp4", seconds=0.2)
+        rotated = _remux(plain, tmp_path / "rotated.mp4", input_options=["-display_rotation", "90"])
         from clearwater.io.video import probe
 
         assert probe(rotated).video.rotation in (90, 270)
@@ -597,7 +668,12 @@ def test_macos_videotoolbox_capabilities(
     assert tuple(r.name for r in rows) == (VT, X265) == capability.ENCODERS  # P07 / X43
     vt, x265 = rows
     assert x265.available and x265.bit_depths == (8, 10)  # T44: x265 everywhere
-    assert vt.hw and (vt.available or (vt.reason or "").isascii())
+    assert vt.hw
+    if vt.available:
+        assert_advertised(vt)
+        assert_unadvertised_refused(vt)
+    else:
+        assert_proved_unavailable(vt)  # T44: a reason, no depth, before the x265 fallback
     auto = capability.resolve_encoder("auto", rows)
     assert auto == (VT if vt.available else X265)  # P11
     sink = FFmpegVideoSink()
@@ -611,10 +687,11 @@ def test_macos_videotoolbox_capabilities(
             assert argv[argv.index("-allow_sw") + 1] == "0"
             assert _run(argv).returncode == 0
         clip = _clip(tmp_path / "in.mp4", seconds=0.5)
-        _probe, report = _encode(
-            clip, tmp_path / "out.mp4", encoder=VT, quality="standard", bit_depth=8
-        )
-        assert report.frames_written == 15
+        for depth in vt.bit_depths:  # the ADVERTISED depths only (A r2 item 5)
+            _probe, report = _encode(
+                clip, tmp_path / f"out-{depth}.mp4", encoder=VT, quality="standard", bit_depth=depth
+            )
+            assert report.frames_written == 15
     elif site in ("P55", "T33", "T34", "T35", "T37"):
         with pytest.MonkeyPatch.context() as w_patch:  # the W stubs end before the native half
             _w().CODEC_CASES[site](w_patch, tmp_path)
@@ -637,32 +714,223 @@ def test_macos_videotoolbox_quality_controls(
     EXCLUSIVE measurement (this test bounds them, it does not choose a candidate)."""
     from clearwater.io.video import encode
 
-    _vt_or_skip()
+    vt = _vt_or_skip()
+    assert_unadvertised_refused(vt)
     figures = {}
     for label, source in (("busy", "testsrc2"), ("calm", "color=c=0x204060")):
         clip = _clip(tmp_path / f"{label}.mp4", seconds=2.0, source=source)
         for candidate in ("A", "B"):
             monkeypatch.setattr(encode, "VT_RATE_CONTROL", candidate)
-            out = tmp_path / f"{label}-{candidate}.mp4"
-            probe, report = _encode(clip, out, encoder=VT, quality="draft", bit_depth=10)
-            ceiling = encode.rate_ceiling(
-                probe.video.width, probe.video.height, probe.video.frame_rate, "draft", None
-            ).bits_per_second
-            rate = _bitrate(out)
-            stream = _ffprobe_json(out, "-select_streams", "v:0", "-show_entries", "stream=profile")
-            assert stream["streams"][0]["profile"] == "Main 10"
-            assert rate <= ceiling * 1.10, (label, candidate, rate, ceiling)  # maxrate honoured
-            figures[label, candidate] = (rate, ceiling, report.frames_written)
+            for depth in vt.bit_depths:  # the ADVERTISED depths only (A r2 item 5)
+                out = tmp_path / f"{label}-{candidate}-{depth}.mp4"
+                probe, report = _encode(clip, out, encoder=VT, quality="draft", bit_depth=depth)
+                ceiling = encode.rate_ceiling(
+                    probe.video.width, probe.video.height, probe.video.frame_rate, "draft", None
+                ).bits_per_second
+                rate = _bitrate(out)
+                stream = _ffprobe_json(
+                    out, "-select_streams", "v:0", "-show_entries", "stream=profile"
+                )
+                assert stream["streams"][0]["profile"] == ("Main 10" if depth == 10 else "Main")
+                assert rate <= ceiling * 1.10, (label, candidate, depth, rate, ceiling)
+                figures[label, candidate, depth] = (rate, ceiling, report.frames_written)
     (tmp_path / "figures.json").write_text(json.dumps({str(k): v for k, v in figures.items()}))
 
 
 # --- M-V4 ------------------------------------------------------------------------------------
 
+V4_SAMPLES = {
+    "vid-hevc8-bt709-full": 8,
+    "vid-hevc10": 10,
+    "vid-untagged": 8,
+    "vid-truncated": 8,
+    "vid-vfr": 8,
+    "vid-rotated": 8,
+    "vid-pcm-irregular": 8,
+}
+"""The WP2.3 samples (``tools/fixtures/video.py``) the Windows V4 test encodes, with each one's
+source depth (``test_io_video_encode.DECODABLE``): VFR ticks and durations, a display-matrix
+rotation, 10-bit, untagged (D54), truncated (D86), irregular PCM audio; AAC on the others."""
+
+V4_CLIPS: dict[str, dict[str, Any]] = {
+    "offset": {},
+    "bf-x264-offset": {"codec": "libx264", "bframes": True},
+    "bf-x265-offset": {"codec": "libx265", "bframes": True},
+    "bf-x264-ntsc": {"codec": "libx264", "bframes": True, "offset": "0", "rate": "30000/1001"},
+    "vfr-gap": {"vf_chain": "select='not(between(n,10,14))'"},
+}
+"""The synthetic sources the Windows V4 tests build with ``test_io_video_encode.Clips``: a start
+offset with an empty edit, B-frame composition offsets (AD-22), a variable-rate gap; 8-bit."""
+
+V4_EXACT_ITEMS = (
+    "video per-frame pts (presentation, exact, full sequence)",
+    "start offset: first video frame pts",
+    "video stream duration",
+)
+"""The timing items the Windows B-frame test requires SAME (with the instrument's edit effect)."""
+
+
+def _v4_cases() -> list[Any]:
+    sources = [(f"sample:{k}", d) for k, d in V4_SAMPLES.items()]
+    sources += [(f"clip:{k}", 8) for k in V4_CLIPS]
+    return [
+        pytest.param(source, encoder, out, id=f"{source}-{encoder}-{out}")
+        for source, depth in sources
+        for encoder in (VT, X265)
+        for out in sorted({depth, 10})
+    ]
+
+
+def _v4_clips(tmp_path_factory: pytest.TempPathFactory) -> Any:
+    """The Windows V4 tests' clip builder, on one folder per session."""
+    folder = tmp_path_factory.getbasetemp() / "m-v4-clips"
+    folder.mkdir(exist_ok=True)
+    return importlib.import_module("test_io_video_encode").Clips(folder)
+
+
+def _v4_source(source_id: str, sample: Any, tmp_path_factory: pytest.TempPathFactory) -> Path:
+    kind, name = source_id.split(":", 1)
+    if kind == "sample":
+        path: Path = sample(name)
+        return path
+    built: Path = _v4_clips(tmp_path_factory).make(name, **V4_CLIPS[name])
+    return built
+
+
+def v4_failures(
+    source_id: str, record: dict[str, Any], frames_written: int, warnings: Sequence[str]
+) -> list[str]:
+    """Return what the V4 record of one corpus encode gets wrong (empty when it passes).
+
+    The full instrument's verdict (every mandatory and required item SAME, the roster whole),
+    the frame count, and the per-source checks the Windows V4 tests make on the same source.
+    """
+    vf = importlib.import_module("video_fidelity")
+    items = {item["name"]: item for item in record["items"]}
+    summary = record["summary"]
+    failures = []
+    if not summary["mandatory_and_required_all_same"]:
+        failures.append(f"V4: {summary['different_items']}")
+    if items.get(vf._ROSTER_ITEM, {}).get("status") != "SAME":
+        failures.append("V4: the item roster is not whole")
+    if items.get("video frame count", {}).get("output") != frames_written:
+        failures.append("V4: the frame count differs from the frames written")
+    exact: tuple[str, ...] = ()
+    if source_id.startswith("clip:bf-"):  # as test_bframe_sources_by_presentation_effect
+        exact = (*V4_EXACT_ITEMS, vf.EDIT_EFFECT)
+    elif source_id in ("sample:vid-vfr", "clip:vfr-gap"):  # as test_vfr_pts_are_exact
+        exact = V4_EXACT_ITEMS[:1]
+    for name in exact:
+        if items.get(name, {}).get("status") != "SAME":
+            failures.append(f"V4: {name} is not SAME")
+    if source_id.startswith("clip:bf-"):
+        written = items.get(vf.VIDEO_EDIT_AS_WRITTEN, {})
+        if written.get("source") != written.get("output"):  # media_time differs: AD-22 says so
+            note = str(written.get("note", ""))
+            if not note.startswith("AD-22") or note not in summary["notes"]:
+                failures.append("AD-22: a changed edit list without its note")
+    if source_id == "sample:vid-truncated":
+        if not any("cut short" in w for w in warnings):
+            failures.append("D86: no cut-short warning")
+        if not any(str(n).startswith("D86") for n in summary["notes"]):
+            failures.append("D86: no D86 note")
+    return failures
+
+
+@pytest.mark.parametrize(("source_id", "encoder", "depth"), _v4_cases())
+def test_macos_videotoolbox_v4_corpus(
+    source_id: str,
+    encoder: str,
+    depth: int,
+    sample: Any,
+    tmp_path: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """M-V4 (P15) over the Windows V4 corpus: each source through the product sink with each
+    encoder at each depth it ADVERTISES, judged by the full instrument
+    (``video_fidelity.fidelity_record``); an unadvertised depth is a refusal, never an encode."""
+    from clearwater.io.video import probe
+    from clearwater.io.video.verify import read_packet_table
+
+    vf = importlib.import_module("video_fidelity")
+    row = _capability(encoder)
+    if encoder == X265:
+        assert row.available and row.bit_depths == (8, 10)  # both x265 depths, always
+    elif not row.available:
+        assert_proved_unavailable(row)
+        pytest.skip(f"VideoToolbox unavailable on this Mac: {row.reason}")
+    assert_advertised(row)
+    if depth not in row.bit_depths:
+        assert_unadvertised_refused(row)
+        return
+    source = _v4_source(source_id, sample, tmp_path_factory)
+    out = tmp_path / "out.mp4"
+    run = vf.encode_file(source, out, encoder=encoder, bit_depth=depth)
+    record = vf.fidelity_record(source, out, bit_depth=depth, run=run)
+    assert record["bit_depth"] == depth
+    assert v4_failures(source_id, record, run.report.frames_written, run.report.warnings) == []
+    assert probe(out).video.bit_depth == depth
+    if source_id in ("sample:vid-vfr", "clip:vfr-gap"):
+        assert probe(source).video.vfr
+        assert sorted(read_packet_table(out).video_pts) == sorted(
+            read_packet_table(source).video_pts
+        )
+    if source_id == "sample:vid-rotated":
+        assert probe(out).video.rotation == 90
+    if source_id == "clip:offset":
+        assert probe(out).edit_list == probe(source).edit_list
+
+
+def _negative_timestamps_refused(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """The Windows V4 test's negative-timestamp source (no edit list, every pts shifted below
+    zero, as legal ISO allows) is refused at open by name for each available encoder, before
+    FFmpeg starts and with nothing written."""
+    from dataclasses import replace
+
+    from clearwater.io.video import FFmpegVideoSink, VideoEncodeError, probe
+    from clearwater.io.video import encode as encode_module
+    from clearwater.io.video.verify import read_packet_table
+
+    source = _v4_clips(tmp_path_factory).make(
+        "noedit-False", codec="libx264", bframes=False, offset="0",
+        out_options=("-use_editlist", "0"),
+    )  # fmt: skip
+    table = read_packet_table(source)
+    planted = replace(table, video_pts=tuple(p - 1024 for p in table.video_pts))
+    monkeypatch.setattr(
+        encode_module, "read_packet_table", lambda p, **k: planted if p == source else None
+    )
+
+    def refuse(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("FFmpeg must not start for a refused open")
+
+    monkeypatch.setattr(FFmpegVideoSink, "_start", refuse)
+    for row in _native_capabilities():
+        if not row.available:
+            continue
+        out = tmp_path / f"negative-{row.name}.mp4"
+        out.write_bytes(b"")
+        with pytest.raises(VideoEncodeError) as caught:
+            FFmpegVideoSink().open(
+                probe(source), out, encoder=row.name, quality="standard",
+                bit_depth=row.bit_depths[0], provenance=None,
+            )  # fmt: skip
+        assert caught.value.kind == "refused" and "negative timestamps" in str(caught.value)
+        assert out.stat().st_size == 0
+
 
 @pytest.mark.parametrize("site", ["P15", "P17", "T36", "X42"])
-def test_macos_videotoolbox_v4(site: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """M-V4: real 8 / 10-bit MP4s through the product sink, checked by the full comparator
-    (container_spike.compare, D105's mandatory class); VT where available, x265 otherwise."""
+def test_macos_videotoolbox_v4(
+    site: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """M-V4: HLG refused (P17), the historical labels (T36), each encoder's PROVED capability
+    and the unadvertised-depth refusal, the negative-timestamp refusal (P15 / X42). The
+    encodes and the full comparator are :func:`test_macos_videotoolbox_v4_corpus`'s."""
     from clearwater.io.video import probe as probe_file
 
     if site == "P17":  # HLG is refused before decode or encode, VT available or not
@@ -672,22 +940,15 @@ def test_macos_videotoolbox_v4(site: str, monkeypatch: pytest.MonkeyPatch, tmp_p
         return
     if site == "T36":
         assert _w().labelled_rows("video_fidelity.py") and shutil.which("nvidia-smi") is None
-    compare = importlib.import_module("container_spike.compare")
-    vt = next(c for c in _native_capabilities() if c.name == VT)
-    encoders = [VT, X265] if vt.available else [X265]
-    clip = _clip(tmp_path / "in.mp4", seconds=1.0)
-    for encoder in encoders:
-        for depth in (8, 10):
-            out = tmp_path / f"{encoder}-{depth}.mp4"
-            _encode(clip, out, encoder=encoder, quality="standard", bit_depth=depth)
-            record = compare.compare_files(clip, out)
-            assert record["summary"]["mandatory_all_same"], (encoder, depth, record["summary"])
-            profile = _ffprobe_json(
-                out, "-select_streams", "v:0", "-show_entries", "stream=profile"
-            )
-            assert profile["streams"][0]["profile"] == ("Main 10" if depth == 10 else "Main")
-    if not vt.available:
-        pytest.skip(f"VT-only V4 cases skipped: VideoToolbox unavailable ({vt.reason})")
+    vt, x265 = _capability(VT), _capability(X265)
+    assert x265.available and x265.bit_depths == (8, 10)
+    if vt.available:
+        assert_advertised(vt)
+        assert_unadvertised_refused(vt)
+    else:
+        assert_proved_unavailable(vt)  # A r2 item 11: a reason and no depth before the skip
+    if site in ("P15", "X42"):
+        _negative_timestamps_refused(monkeypatch, tmp_path, tmp_path_factory)
 
 
 # --- M-SPACE ---------------------------------------------------------------------------------
