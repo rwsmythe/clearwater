@@ -381,3 +381,26 @@ Filled by the orchestrator (gen 45) from gen 44's seat run, 2026-11-04
   after. The owner log's md5 is unchanged (`69ed0432...`). No
   `Clearwater.exe` is left running. No GUI or desktop input was used, and
   the DR-125 before shape was not run at the seat.
+
+**Re-check after the Reviewer B fold-in (the check of record).** Turn 8
+changed product bytecode: `except Exception`, and the assembler's search
+start. So the seat rebuilt onedir from `96c364f0` and repeated the whole check
+on 2026-11-04 between 19:20 and 19:22Z. Evidence is in
+`clearwater-review-evidence\wp-dr125\frozen2\`, the same scripts
+re-targeted by `patch_frozen2.py`, with their md5s in `md5-copies.txt`
+(`handler-check.json` `f68dc9f2`, `run12.summary.txt` `6d794141`,
+`refrozen.summary.txt` `429f4387`, `proof-dr125.jsonl` `e2a1d603`).
+
+- The build took 71 s (`work/wp6.1/build-onedir-dr125b.log`). The
+  hidden-import check (61 modules) and the bundle check both PASS.
+- The handler check PASSES. `__main__` (9/9 functions), `gpu_pack` (53/53)
+  and `export_worker` (26/26) are equal to the source at `96c364f0`.
+  `isolate_worker_stdin` is absent.
+- `--verify` PASSES before and after the runs, with the same pack figures as
+  above.
+- 12 of 12 frozen `--export-worker` runs exit 0 with `ok: true` on the GPU,
+  with no failures and no warnings, in 1.6 to 4.2 s each. The CUDA libraries
+  load as before: 59 from the pack, 8 from the driver and 0 from anywhere
+  else. No run shows a window, a timeout kill or a process left behind.
+- The real `%LOCALAPPDATA%\Clearwater` is absent before and after, the owner
+  log's md5 is unchanged, and no `Clearwater.exe` is left running.
