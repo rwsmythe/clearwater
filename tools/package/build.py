@@ -820,30 +820,9 @@ def manifest_document(folder: Path) -> dict[str, object]:
         FileNotFoundError: A distribution's metadata folder or ``RECORD`` is missing.
         ValueError: No locked wheel, or more than one, matches an installed distribution.
     """
-    from clearwater import gpu_pack
+    from clearwater.gpu_pack_install import manifest_document as product_manifest_document
 
-    site = folder / gpu_pack.SITE_PACKAGES_NAME
-    rows: list[dict[str, str]] = []
-    for locked in gpu_pack.LOCKED_DISTRIBUTIONS:
-        dist_info = site / locked.dist_info_name
-        record = dist_info / "RECORD"
-        if not record.is_file():
-            raise FileNotFoundError(f"{locked.name} {locked.version}: no {record}")
-        tags = installed_wheel_tags(dist_info)
-        matches = [w for w in locked.wheels if wheel_file_tags(w[0]) & tags]
-        if len(matches) != 1:
-            raise ValueError(f"{locked.name}: {len(matches)} locked wheels match {sorted(tags)}")
-        wheel, sha256 = matches[0]
-        rows.append(
-            {
-                "name": locked.name,
-                "version": locked.version,
-                "wheel": wheel,
-                "wheel_sha256": sha256,
-                "record_sha256": gpu_pack.file_sha256(record),
-            }
-        )
-    return {"format": gpu_pack.MANIFEST_FORMAT, "stamp": gpu_pack.STAMP, "distributions": rows}
+    return product_manifest_document(folder)
 
 
 def write_manifest(folder: Path) -> Path:
@@ -859,14 +838,9 @@ def write_manifest(folder: Path) -> Path:
         ValueError: The folder is not named for this build's stamp, or a wheel does not match.
         FileNotFoundError: A distribution is not installed.
     """
-    from clearwater import gpu_pack
+    from clearwater.gpu_pack_install import write_manifest as product_write_manifest
 
-    if folder.name != gpu_pack.STAMP:
-        raise ValueError(f"the pack folder must be named {gpu_pack.STAMP!r}, not {folder.name!r}")
-    document = manifest_document(folder)
-    path = folder / gpu_pack.MANIFEST_NAME
-    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
-    return path
+    return product_write_manifest(folder)
 
 
 def verify_pack(folder: Path) -> list[str]:

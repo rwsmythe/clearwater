@@ -20,6 +20,7 @@ import site
 import sys
 import sysconfig
 import tomllib
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
@@ -86,7 +87,7 @@ def _lock() -> dict[str, dict[str, Any]]:
 
 def _windows_wheel(locked: gpu_pack.LockedDistribution) -> str:
     """Return the locked wheel a Windows install uses (the platform one, else the pure one)."""
-    names = [wheel for wheel, _ in locked.wheels]
+    names = [row[0] for row in locked.wheels]
     for name in names:
         if name.endswith("win_amd64.whl"):
             return name
@@ -272,7 +273,7 @@ def test_locked_distributions_equal_the_lock() -> None:
     for name in PACK_NAMES:
         package = lock[name]
         wheels = {
-            (w["url"].rsplit("/", 1)[1], w["hash"].removeprefix("sha256:"))
+            (w["url"].rsplit("/", 1)[1], w["hash"].removeprefix("sha256:"), w["url"], w["size"])
             for w in package["wheels"]
         }
         assert constant[name].version == package["version"], name
@@ -1267,7 +1268,7 @@ def test_the_manifest_helper_records_the_installed_wheel(tmp_path: Path) -> None
     cupy = rows["cupy-cuda12x"]
     assert cupy["wheel"] == "cupy_cuda12x-14.2.0-cp312-cp312-win_amd64.whl"
     locked = {d.name: d for d in gpu_pack.LOCKED_DISTRIBUTIONS}["cupy-cuda12x"]
-    assert (cupy["wheel"], cupy["wheel_sha256"]) in locked.wheels
+    assert (cupy["wheel"], cupy["wheel_sha256"]) in {(w[0], w[1]) for w in locked.wheels}
     record = folder / gpu_pack.SITE_PACKAGES_NAME / locked.dist_info_name / "RECORD"
     assert cupy["record_sha256"] == gpu_pack.file_sha256(record)
     assert rows["cuda-toolkit"]["wheel"] == "cuda_toolkit-12.9.2.0-py2.py3-none-any.whl"
@@ -1290,3 +1291,98 @@ def test_wheel_file_tags_expand_compressed_tag_sets() -> None:
     }
     with pytest.raises(ValueError):
         build.wheel_file_tags("cupy.tar.gz")
+
+
+def _symlink_or_skip(link: Path, target: Path, *, directory: bool = False) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=directory)
+    except OSError as error:
+        pytest.skip(f"host refuses os.symlink: {error!r}")
+
+
+def test_full_check_rejects_a_listed_file_symlink(tmp_path: Path, isolated: list[str]) -> None:
+    folder = make_pack(tmp_path / "root")
+    payload = folder / "site-packages/cupy/__init__.py"
+    target = tmp_path / "original.py"
+    payload.replace(target)
+    _symlink_or_skip(payload, target)
+    try:
+        assert gpu_pack.check_pack(folder) is None
+        assert any("link or reparse point" in p for p in gpu_pack.pack_problems(folder, full=True))
+    finally:
+        payload.unlink()
+
+
+def test_full_check_rejects_a_symlinked_directory(tmp_path: Path, isolated: list[str]) -> None:
+    folder = make_pack(tmp_path / "root")
+    target = tmp_path / "empty"
+    target.mkdir()
+    link = folder / "site-packages/cupy/linked"
+    _symlink_or_skip(link, target, directory=True)
+    try:
+        assert gpu_pack.check_pack(folder) is None
+        assert any("link or reparse point" in p for p in gpu_pack.pack_problems(folder, full=True))
+    finally:
+        link.unlink()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="NTFS junctions are Windows-only")
+def test_full_check_rejects_a_junction(tmp_path: Path, isolated: list[str]) -> None:
+    import _winapi
+
+    folder = make_pack(tmp_path / "root")
+    target = tmp_path / "empty"
+    target.mkdir()
+    link = folder / "site-packages/cupy/junction"
+    _winapi.CreateJunction(str(target), str(link))
+    try:
+        assert gpu_pack.check_pack(folder) is None
+        assert any("link or reparse point" in p for p in gpu_pack.pack_problems(folder, full=True))
+    finally:
+        link.rmdir()
+
+
+def test_full_check_uses_an_in_memory_manifest_without_reading_disk(
+    tmp_path: Path, isolated: list[str]
+) -> None:
+    folder = make_pack(tmp_path)
+    manifest = folder / "manifest.json"
+    document = json.loads(manifest.read_text(encoding="utf-8"))
+    manifest.unlink()
+    assert list(gpu_pack.pack_problems(folder, full=True, manifest=document)) == []
+    assert gpu_pack.check_pack(folder) == "no manifest.json"
+    document["stamp"] = "wrong"
+    assert "manifest stamp" in next(gpu_pack.pack_problems(folder, full=True, manifest=document))
+
+
+@pytest.mark.parametrize("frozen", [False, True])
+def test_activate_filters_only_the_cuda_path_userwarning_when_frozen(
+    monkeypatch: pytest.MonkeyPatch, frozen: bool
+) -> None:
+    monkeypatch.setattr(sys, "frozen", frozen, raising=False)
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: None)
+    calls = []
+
+    def load(root: Path | None) -> gpu_pack.PackStatus:
+        calls.append(root)
+        warnings.warn("CUDA path could not be detected. test", UserWarning, stacklevel=1)
+        warnings.warn("unrelated warning", UserWarning, stacklevel=1)
+        warnings.warn(
+            "CUDA path could not be detected. other category", RuntimeWarning, stacklevel=1
+        )
+        return gpu_pack.PackStatus(gpu_pack.STAMP, "absent")
+
+    monkeypatch.setattr(gpu_pack, "load", load)
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter("always")
+        before = list(warnings.filters)
+        gpu_pack.activate()
+        if frozen:
+            assert [str(w.message) for w in seen] == [
+                "unrelated warning",
+                "CUDA path could not be detected. other category",
+            ]
+            assert calls == [None]
+        else:
+            assert warnings.filters == before
+            assert calls == []

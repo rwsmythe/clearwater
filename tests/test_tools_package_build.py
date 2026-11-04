@@ -29,7 +29,7 @@ from typing import Any
 import pytest
 
 import clearwater
-from clearwater import gpu_pack
+from clearwater import gpu_pack, gpu_pack_install
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -852,3 +852,17 @@ def test_a_pack_distribution_at_another_version_fails_the_scan_and_the_build(
     assert build.build("onedir", out=tmp_path / "out") == 1
     out = capsys.readouterr().out
     assert "FAILED: the pack sources cannot be scanned: cupy-cuda12x: installed 0.0" in out
+
+
+def test_manifest_helpers_delegate_to_the_product_writer(tmp_path: Path, monkeypatch) -> None:
+    document = {"format": 1, "stamp": gpu_pack.STAMP, "distributions": []}
+    folder = tmp_path / gpu_pack.STAMP
+    path = folder / "manifest.json"
+    monkeypatch.setattr(
+        gpu_pack_install, "manifest_document", lambda target: document if target == folder else None
+    )
+    monkeypatch.setattr(
+        gpu_pack_install, "write_manifest", lambda target: path if target == folder else None
+    )
+    assert build.manifest_document(folder) is document
+    assert build.write_manifest(folder) == path
