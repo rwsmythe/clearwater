@@ -3539,7 +3539,8 @@ def test_portability_footage_guard_and_test_helpers(
 
 def test_portability_footage_guard_matches_the_reference_checks(tmp_path: Path) -> None:
     """Q4 / D3: footage_guard agrees with headless_export.inside on containment, and with
-    jobs.naming.is_same_path on the equality subset (mutual containment), on one corpus."""
+    jobs.naming.is_same_path on the equality subset (mutual containment), on one corpus; then
+    both agree on A r2's symlink-then-``..`` topology under a POSIX ``realpath`` model."""
     from clearwater.jobs.naming import is_same_path
 
     footage_guard = importlib.import_module("footage_guard")
