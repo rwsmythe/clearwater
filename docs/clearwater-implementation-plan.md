@@ -366,6 +366,27 @@ Run in order. Each is one implementer's package, working on the main branch afte
 
 ---
 
+### Phase 6 — Packaged distribution and macOS (post-1.0.0; owner-ruled 2026-11-04)
+
+Owner direction 2026-11-04 ("a deployable single-file distributable ... and make it macos compatible"; "This is all post-1.0.0 development"), ruled on CHARC's proposal `docs/briefs/phase6-proposal.md` (every recommendation accepted, verbatim: "D-A two releases, D-B spike, D-C two artifacts, D-D bundle, D-E arm64, D-F actions, D-G spec, D-H not, D-I prune, D-J push"; D-C then amended by the owner to the on-demand download). Spec v0.6.0 (N1 platform list, N14 packaged distribution, N13 extended). Two releases: **1.1.0** the Windows distributable, **1.2.0** macOS. DR-117 is not in this phase. The reference build is the owner's `rwsmythe/TTS160-Alpyca` workflow.
+
+| WP | Title | Size | Depends on | Flags |
+|---|---|---|---|---|
+| WP6.1 | Packaging spike (Windows): one-folder and one-file forms measured; the GPU pack loaded from a per-user folder proved in the frozen build | S | 1.0.0; the prune | exclusive (timings) |
+| WP6.2 | Portability audit (code only, no Mac): the macOS change list | S | 1.0.0 | — |
+| WP-T8 | Tools and tests paydown: DR-119 (c)-(e), DR-120, DR-116, DR-118 | S | none | — |
+| CP6a | Owner picks the artifact shape from WP6.1's figures | — | WP6.1 | owner |
+| WP6.3 | Release workflow (GitHub Actions), the GPU pack downloader (pinned wheels, hashes, per-user folder, GUI and headless entry), FFmpeg bundled, N13 second pass, checklist v2, guide | M | WP6.1, CP6a | — |
+| 1.1.0 | Windows distributable release (local gate, tag on the owner's word, workflow run, clean-account check) | — | WP6.3 | owner |
+| WP6.4 | macOS adaptation: the audit's list, VideoToolbox encoder leg, platform-parameterised tests | M-L | WP6.2 | — |
+| WP6.5 | macOS build and check on the owner's Mac; CPU speed figure; CP6b look check | M | WP6.4, WP6.3 | owner's Mac; `macos` marker |
+| 1.2.0 | macOS release | — | WP6.5, CP6b | owner |
+
+- WP6.1 and WP6.2 run in parallel (6.1 exclusive for its timings), WP-T8 beside them. The Mac is asked for at WP6.5 only.
+- Lanes by task: WP6.1, WP6.4, WP6.5 Claude opus-high (PyInstaller / Qt hooks, the encoder leg and process plumbing); WP6.2, WP6.3, WP-T8 Codex (well-specified reads and fills). Reviewer nets: the other model, as before.
+- Artifacts: one per platform, about 150 MB zipped on Windows; the GPU pack (CuPy + the CUDA wheels, 2.27 GB installed) is downloaded on demand from PyPI at the lock file's pinned versions, never bundled (owner amendment 2026-11-04 to D-C: "auto-download of the cuda libraries rather than bundle"). FFmpeg bundled per platform with its exact source release in the notices.
+- Not in Phase 6: a Metal backend; code signing and notarisation (needs an Apple developer account: an owner decision later); Intel Macs unless the owner's Mac is one; DR-117.
+
 ## 7. Verification matrix
 
 Every acceptance test in spec §11, with where it is built and where it is run to completion.

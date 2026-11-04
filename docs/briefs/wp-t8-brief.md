@@ -1,0 +1,39 @@
+# WP-T8 — Tools and tests paydown: DR-119 (c)-(e), DR-120, DR-118, DR-116 (dispatch brief, DRAFT)
+
+**Status:** DRAFT 2026-11-04 by CHARC (generation 14), the Phase 6 paydown pass the register deferred to Phase 6. The orchestrator fills the dispatch section; CHARC marks it FINAL. Runs beside WP6.1's non-timing turns and WP6.2; never beside WP6.1's exclusive window. Owner decisions inside the package: none.
+
+| Field | Content |
+|---|---|
+| ID and title | WP-T8 — Tools and tests paydown: the four register rows deferred to Phase 6 that touch only tools, tests and one cache-folder guard |
+| Lane | **CODEX** (`implementer-codex-sol-high`): every item is specified by its register row. Reviewer A = Claude at the cell's seat; Reviewer B = Claude at the orchestrator's seat. Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp-t8\`. |
+| Tier and size | STANDARD. Size S. Evaluate at about 200K, STOP near 250K; the DR-116 measurement turn re-seats fresh if needed. |
+| Base | main at dispatch. Worktree `.worktrees/wp-t8`, branch `wp-t8`. |
+| Goal | (a) **DR-119 (c)-(e):** `tools/export_bench.py` writes its JSON to a temp name and renames (no torn file on interrupt); `tools/halo_part3.py` stages its V3 output folder like the sheet, refuses `--cache-dir` inside `<out>/items`, and `build_sheet`'s docstring names `sheet-<stamp>/sheet.json`; `tools/core_speed.py` and `tests/test_core_speed.py` read the N6 figure (12 min/min, 0.4004 s per frame at 29.97 fps) from ONE constant shared with `export_bench.py` (a new `tools/n6.py` or the existing module both import; D106 / spec v0.5.8 named in its docstring), one test. (b) **DR-120:** `tests/fixture_plugin.py`'s generated-sample cache resolves under `--basetemp` when one is given (a gate leg is then contained by its basetemp), else under the MAIN checkout's `work/fixtures/generated` as today; one test. (c) **DR-118:** `cache/store.py` `_entry_for_write` refuses to create or write through a pre-existing junction / symlink at the entry path, with the same refusal the scan applies (`is_symlink() or is_junction()`), one test with a planted junction (skipped where the test cannot create one). (d) **DR-116:** the suite-cost pass: a per-node wall delta of the serial leg against WP-T6's run (`docs/reports/wp-t6-gate-sizing.md` figures) from the gate junits already archived (no new serial run needed for the table), DR-86's banked candidates listed with their measured cost; apply only the no-risk reductions the report names (a fixture reused, a redundant parameterisation dropped) and leave the rest as a recommendation. |
+| Sources | `docs/debt-register.md` rows DR-116, DR-118, DR-119, DR-120, DR-86; `tools/export_bench.py`, `tools/halo_part3.py`, `tools/core_speed.py`, `tests/test_core_speed.py`, `tests/test_export_bench.py`, `tests/test_tools_halo_part3.py`, `tests/fixture_plugin.py`, `tests/conftest.py` (WP-T1 guard), `src/clearwater/cache/store.py` (:573, :652-672), the archived serial junits under `clearwater-review-evidence\` (the WP-T6 run and `release-1.0.0\g40-p55-serial.xml`). |
+| Files owned | The files named in Goal plus NEW `tools/n6.py` (if chosen) and the tests named; `docs/reports/wp-t8-paydown.md`. |
+| NOT owned | Any other product file (the DR-118 change is the one product edit, in one function); the spec; frozen interfaces; `tests/harness/`. |
+| Locks | No figure of record changes (the N6 constant is a label, the figures are unchanged); the cache store's on-disk format is unchanged; the fixture cache's content is unchanged (only its location rule); 0 CR blobs; ruff / mypy; the three gate legs on the final candidate (the store and the fixture plugin are on every leg's path). |
+| Markers | New tests parallel-leg unless they need footage or the GPU (none should). The junction test is `slow`-free and skips with a reason when a junction cannot be created. |
+| Hardware flags | None (DR-116's table is from archived junits). |
+| Out of scope | A new serial-leg run for DR-116 (the report may recommend one); any product behaviour beyond the DR-118 refusal; the harness suite. |
+| Debt and decided items | At the accept CHARC closes DR-119 in full, DR-120, DR-118; DR-116 closed or re-scoped on the report's recommendation; DR-86 updated. |
+| Done | Every item in Goal with its test; the paydown report with the DR-116 table and recommendation; ruff / mypy / the three legs green; Reviewer A converged; Reviewer B clean. |
+
+## Questions (CHARC's recommended answers)
+
+- **Q1 The shared N6 constant's home.** Recommended: a new `tools/n6.py` (`N6_MIN_PER_MIN = 12.0`, `FRAME_BUDGET_S_29_97 = 12.0 / 29.97`, the docstring naming D106 / spec v0.5.8 and the owner's ruling date); `export_bench.py` and `core_speed.py` import it; the tests assert the figures against the spec text by a grep of `docs/underwater-correction-spec.md` N6's line.
+- **Q2 DR-120's rule.** Recommended: basetemp when given (the gate), else the main checkout's `work/` (a developer run); the worktree's own `work/` is never used.
+- **Q3 DR-118's refusal.** Recommended: refuse (raise the store's existing error class, logged) rather than delete the junction; the entry is then skipped for the write, the export continues uncached, exactly as the scan's refusal behaves.
+
+## Completion report (`docs/reports/wp-t8-paydown.md`)
+
+Each item: the change, the test, the register row it pays; the DR-116 table and recommendation; gate figures; limits.
+
+## Yields and depth
+
+Turn 1 = round 0 (read every row and site; the DR-116 junit inventory; Q1-Q3) and YIELD; turn 2 = (a)-(c) RED then GREEN; turn 3 = (d) the table and report; the nets.
+
+## Orchestrator dispatch fill (for CHARC to finalise)
+
+- Lane paces at dispatch; base commit; worktree; evidence folder.
+- GATE_CHECKS: static; collection identity; the three legs (the store and the fixture plugin are on every path); `git diff --name-only main` = the owned paths; 0 CR.

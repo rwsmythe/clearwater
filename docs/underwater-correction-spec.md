@@ -2,11 +2,12 @@
 
 ## Specification
 
-**Version:** 0.5.8 (draft)
+**Version:** 0.6.0 (draft)
 **Date:** 29 October 2026
 **Status:** Second review (10 concerns, 6 planning questions) worked through with the owner and incorporated. Requirements are stable for implementation planning. Items left to the design stage are listed in Section 14.1. Open decisions, including scope items that depend on test results, are listed in Section 14.2.
 
 **Change log**
+- 0.6.0 — Post-1.0.0 platform and distribution requirements (owner-approved 2026-11-04 on CHARC's Phase 6 proposal `docs/briefs/phase6-proposal.md`, verbatim: "D-A two releases, D-B spike, D-C two artifacts, D-D bundle, D-E arm64, D-F actions, D-G spec, D-H not, D-I prune, D-J push"): N1 gains the platform list (Windows 11 x64 from 1.0.0; macOS on Apple Silicon from 1.2.0, CPU path, VideoToolbox HEVC encoder); new N14 packaged distribution (a per-platform self-contained artifact built by a published workflow; one artifact per platform, the CUDA support downloaded on demand on Windows (owner amendment 2026-11-04: "auto-download of the cuda libraries rather than bundle"); FFmpeg bundled with its notices; the shape (one-folder or one-file) set from the WP6.1 spike at CP6a); N6 / D106 noted as the Windows NVIDIA figure, the macOS CPU figure reported as information; N13 extended to every bundled binary. No correction decision changed; 1.0.0 is unaffected.
 - 0.1 — Initial draft.
 - 0.2 — Incorporated review decisions D11–D32; named project.
 - 0.3 — Incorporated review decisions D33–D46.
@@ -437,7 +438,7 @@ The GUI, video and I/O layers depend only on this interface.
 
 ### 10.2 Resources and performance
 - **Target machine (D117):** the owner's laptop, 32 GB RAM. AMD Ryzen 9 7940HS (8C/16T), NVIDIA GeForce RTX 4070 Laptop GPU, 8 GB dedicated memory (confirmed 2026-10-14 by tools/environment_report.py).
-- **N1 Platform:** Windows 11 officially supported; no OS-specific code without the architect's approval. Approved exception (0.5.4, AD-23): the enlarged anonymous-pipe buffer for frame transport on Windows, with an automatic portable fallback that yields identical frames and timestamps.
+- **N1 Platform:** Windows 11 officially supported; no OS-specific code without the architect's approval. Approved exception (0.5.4, AD-23): the enlarged anonymous-pipe buffer for frame transport on Windows, with an automatic portable fallback that yields identical frames and timestamps. **Platform list (0.6.0):** Windows 11 x64 (1.0.0 onward; the NVIDIA graphics-card path and the CPU path); macOS on Apple Silicon (arm64; from 1.2.0; the CPU path only, no graphics-card backend in this version; HEVC encoding through VideoToolbox with libx265 as the software fallback). OS-specific code remains limited to the sites the architect approves and listed in the architecture document; every such site has a portable fallback or a per-platform implementation with the same observable result.
 - **N2 Language:** Python.
 - **N3 Compute (D107):** the core is written so the same code runs on CPU or GPU from the start. GPU is the expected path for export; CPU is the fallback.
 - **N4 Memory (D68, D110, D111):**
@@ -452,7 +453,7 @@ The GUI, video and I/O layers depend only on this interface.
   4. **Gain-cap noise test (D100):** red-channel noise on a deep frame with caps on and off.
   5. **Staged versus flat statistics (D98).**
   6. **Container spike (D104):** one real chapter re-encoded with no correction; source and output compared on tracks, atoms, timestamps, edit list and color tags; the color tags and range the camera writes are recorded; NVENC and 10-bit confirmed in the chosen build.
-- **N6 Performance target (D106):** export takes at most about 12 minutes of processing per minute of 4K footage on the owner's laptop, end to end including decode and encode, in the owner's recording modes (D106, SET 0.5.8 from the WP5.2 re-measure: 10.89 cold median and 10.78 sustained measured, the GUI path about 11.8; the interim 25 of 0.5.4 and the original intent of about 3.3 are history in D106). "At most about" absorbs host noise; the figure states the shipped build on the owner's laptop as used, not a cleaned-host best case. 5.3K is supported but best-effort on speed. No other hard performance targets for v1.
+- **N6 Performance target (D106):** export takes at most about 12 minutes of processing per minute of 4K footage on the owner's laptop, end to end including decode and encode, in the owner's recording modes (D106, SET 0.5.8 from the WP5.2 re-measure: 10.89 cold median and 10.78 sustained measured, the GUI path about 11.8; the interim 25 of 0.5.4 and the original intent of about 3.3 are history in D106). "At most about" absorbs host noise; the figure states the shipped build on the owner's laptop as used, not a cleaned-host best case. 5.3K is supported but best-effort on speed. No other hard performance targets for v1. (0.6.0: N6 is the Windows NVIDIA figure; the macOS CPU figure is measured in WP6.5 and reported as information, not gated.)
 
 ### 10.3 Quality and robustness
 - **N7 Code quality:** well documented, Pythonic, each processing stage independently testable.
@@ -463,7 +464,10 @@ The GUI, video and I/O layers depend only on this interface.
 
 ### 10.4 Licensing
 - **N12** Clearwater is free, open-source software under GPL-2.0-or-later (D93).
-- **N13** Bundled dependency licenses (e.g., GPL x265/FFmpeg builds, LGPL PySide6 and HEIC libraries) are checked for compatibility at packaging, and required notices are included.
+- **N13** Bundled dependency licenses (e.g., GPL x265/FFmpeg builds, LGPL PySide6 and HEIC libraries) are checked for compatibility at packaging, and required notices are included. (0.6.0: this applies to every binary a packaged artifact carries, FFmpeg included, with the exact source release of each GPL / LGPL component named so the source-delivery obligation is met.)
+
+### 10.5 Packaged distribution (0.6.0)
+- **N14 Packaged distribution:** from 1.1.0 each supported platform has a self-contained artifact that runs without a Python installation or a separately installed FFmpeg: one artifact per platform. On Windows the graphics-card support (the CUDA runtime and CuPy wheels, pinned to the lock file's versions) is NOT bundled: the application offers to download it on the user's request into a per-user folder, verifies it against recorded hashes, and loads it at the next start; without it the CPU path runs, as on a machine without an NVIDIA card (owner amendment 2026-11-04: "auto-download of the cuda libraries rather than bundle"; this keeps the NVIDIA components user-obtained from PyPI, as in 1.0.0's notices). On macOS the artifact is CPU only. The artifacts are built by a published workflow in the repository (GitHub Actions) from the tagged commit, after the local release gate, and attached to the release. The artifact shape (a one-folder archive, or a one-file self-extracting executable) is set from the WP6.1 spike's measurements at the owner's checkpoint CP6a and recorded here. Installing from source with uv remains supported (the developer path). No installer, code signing or notarisation is required in this version; the user guide documents the platform's unsigned-application step.
 
 ---
 
