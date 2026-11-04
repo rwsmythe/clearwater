@@ -786,7 +786,7 @@ def cmd_post_verified(args: argparse.Namespace) -> int:
         if primary is not None:
             print(
                 _ascii(
-                    f"notice: mailbox root defaulted to {Path(root).absolute()},"
+                    f"notice: mailbox root defaulted to {Path(root).resolve()},"
                     f" which belongs to a linked working copy. The primary "
                     f"copy's mailbox is {(primary / 'comms').absolute()}. Pass "
                     "--comms-root if you meant that one."),
@@ -846,7 +846,9 @@ def cmd_post_verified(args: argparse.Namespace) -> int:
               "NOT delivered until this is resolved.")
     for final in finals:
         print(f"posted -> {final.relative_to(root).as_posix()}")
-        print(f"verified -> {final.absolute()}")
+        # resolve(), not absolute(): under a Windows 8.3 short-form TEMP the two
+        # are different spellings of one directory (template issue #4, item 2).
+        print(f"verified -> {final.resolve()}")
     return 0
 
 

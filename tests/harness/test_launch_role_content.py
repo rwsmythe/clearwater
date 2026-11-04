@@ -367,17 +367,33 @@ def _marker_scrub_prefix() -> str:
 # The env the launcher SETS in every spawned blob (mirrors $script:SpawnEnv;
 # the launcher-side content assertion is test_spawn_env_sets_disable_autoupdater).
 # CLAUDE_CODE_GIT_BASH_PATH (2026-09-14, the bash-cc.exe launch-path workaround):
-# points a spawned session's Bash tool at the fast same-directory copy instead
-# of the slow C:\...\bin\bash.exe (see Invoke-BashCcPreflight, the fail-loud
-# refusal when the copy is absent).
+# points a spawned session's Bash tool at the fast same-directory copy when it
+# exists, else at the plain bash.exe beside it (Invoke-BashCcPreflight: the copy
+# is optional; only a missing bash.exe refuses). Derived by _expected_bash_path.
 # CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN (2026-09-22, operator-directed): force the
 # classic renderer so a role session's history stays in native scrollback.
 # CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP (2026-10-26, operator-directed): keep
 # Claude Code's low-memory reaper from stopping a role session's background
 # test suite while the session idles (two full suites lost at ~92 % that day).
+_BASH_CC_PATH = "C:\\Program Files\\Git\\usr\\bin\\bash-cc.exe"
+
+
+def _expected_bash_path() -> str:
+    """The CLAUDE_CODE_GIT_BASH_PATH value a -DryRun blob carries: the fast
+    bash-cc.exe copy when it exists, else the plain bash.exe beside it -- the
+    launcher's documented fallback (the copy is OPTIONAL; README machine setup;
+    template issue #4, item 3). HARNESS_BASH_CC_PATH, the DryRun-only override
+    the refusal tests use, is honoured the same way so the fallback branch can be
+    exercised on a machine that has the copy."""
+    path = os.environ.get("HARNESS_BASH_CC_PATH") or _BASH_CC_PATH
+    if os.path.isfile(path):
+        return path
+    return os.path.join(os.path.dirname(path), "bash.exe")
+
+
 _SPAWN_ENV = (
     ("DISABLE_AUTOUPDATER", "1"),
-    ("CLAUDE_CODE_GIT_BASH_PATH", "C:\\Program Files\\Git\\usr\\bin\\bash-cc.exe"),
+    ("CLAUDE_CODE_GIT_BASH_PATH", _expected_bash_path()),
     ("CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN", "1"),
     ("CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP", "1"),
 )
