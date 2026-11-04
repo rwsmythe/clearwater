@@ -65,18 +65,22 @@ magic), opened recursively in memory, never extracted. Names are compared lower-
 violations:
 
 - `cupy`, `cupyx`, `cupy_backends`, `cuda`, `nvidia` or `fastrlock` as ANY component of a
-  path, entry or dotted module name (one exception: SciPy's own vendored adapter
+  path, entry or dotted module name, whatever the entry's type (scripts, run-time hooks and
+  PyInstaller's boot modules included; one exception: SciPy's own vendored adapter
   `scipy/_external/array_api_compat/cupy`, which is SciPy's code, `GPU_NAME_EXCEPTIONS`);
 - `tests` as the first component;
 - a GPU-pack `.dist-info` / `.egg-info` folder at any depth;
-- a CUDA library file name (`cublas*`, `cudart*`, `cufft*`, `curand*`, `cusolver*`,
-  `cusparse*`, `nvjitlink*`, `nvrtc*`, with or without `lib`, ending `.dll`, `.so` or
-  `.so.<n>`);
+- a CUDA library file name (`cublas*`, `cudart*`, `cudnn*`, `cufft*`, `curand*`,
+  `cusolver*`, `cusparse*`, `cutensor*`, `nccl*`, `nvblas*`, `nvjitlink*`, `nvrtc*`, `nvtx*`,
+  with or without `lib`, ending `.dll`, `.so` or `.so.<n>`; a test checks every DLL the locked
+  pack wheels install);
 - a `clearwater` subpackage (or a package `io`) at the top level;
 - a module outside `ALLOWED_TOP_LEVEL` and the standard library: PYZ modules, CArchive module
-  entries (PyInstaller's own boot modules allowed), and loose `.py` / `.pyc` / `.pyd` / `.so`
-  files relative to a folder on the frozen `sys.path` (`_internal`, the one-file root, a ZIP at
-  the bundle's root). `ALLOWED_TOP_LEVEL` is the product's dependency closure from `uv.lock`.
+  entries (PyInstaller's own boot modules exempt from this rule only), the one-file archive's
+  binary and data entries, and loose `.py` / `.pyc` / `.pyd` / `.so` files anywhere in the
+  release folder (under `_internal`, beside the executable or at the release root), and in a
+  ZIP at the bundle's root. `ALLOWED_TOP_LEVEL` is the product's dependency closure from
+  `uv.lock`.
 - a ZIP that cannot be read, or nested deeper than four levels.
 
 Scope: the allowlist names top-level packages, not distributions, so a module of a different

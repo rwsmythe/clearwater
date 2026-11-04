@@ -86,14 +86,24 @@ FORBIDDEN_DIST_INFO_PREFIXES: tuple[str, ...] = (
 FORBIDDEN_LIBRARY_PREFIXES: tuple[str, ...] = (
     "cublas",
     "cudart",
+    "cudnn",
     "cufft",
     "curand",
     "cusolver",
     "cusparse",
+    "cutensor",
+    "nccl",
+    "nvblas",
     "nvjitlink",
     "nvrtc",
+    "nvtx",
 )
-"""CUDA library file-name prefixes (lower case) that must not be bundled."""
+"""CUDA library file-name prefixes (lower case) that must not be bundled.
+
+Every DLL the locked pack wheels install starts with one of these (a test reads their
+``RECORD`` files); ``cudnn``, ``cutensor``, ``nccl`` and ``nvtx`` are CuPy's optional CUDA
+libraries, outside the lock (Reviewer A r2 #4).
+"""
 
 SHADOW_NAMES: tuple[str, ...] = (
     "analysis",
@@ -396,15 +406,16 @@ def module_violations(module: str, *, allow_boot: bool = False) -> list[str]:
 
     Args:
         module: A dotted module name from the PYZ or a CArchive module entry.
-        allow_boot: Accept PyInstaller's boot modules (:data:`BOOT_MODULE_PREFIXES`).
+        allow_boot: Exempt PyInstaller's boot modules (:data:`BOOT_MODULE_PREFIXES`) from the
+            dependency allowlist (``shadow``, ``unexpected-module``) ONLY; their names are still
+            checked for GPU content (Reviewer A r2 #5).
 
     Returns:
         The broken rules, sorted.
     """
-    if allow_boot and module.startswith(BOOT_MODULE_PREFIXES):
-        return []
     parts = module.split(".")
-    return name_violations([*parts[:-1], parts[-1] + ".pyc"], module_root=True)
+    boot = allow_boot and module.startswith(BOOT_MODULE_PREFIXES)
+    return name_violations([*parts[:-1], parts[-1] + ".pyc"], module_root=not boot)
 
 
 def _is_zip_name(name: str) -> bool:
@@ -471,8 +482,10 @@ def _bundle_parts(parts: Sequence[str]) -> tuple[list[str], bool]:
         parts: The path's components relative to the release folder.
 
     Returns:
-        (the components relative to the bundle's root, whether they are under ``_internal``
-        or the one-file release root, i.e. relative to a folder on the frozen ``sys.path``).
+        (the components relative to ``_internal``, or to the folder beside the executable
+        when the path is not under ``_internal``; whether it is under ``_internal``, the
+        one-folder form's folder on the frozen ``sys.path``). The one-file form's ``sys.path``
+        folder is its unpacked archive, checked by :func:`forbidden_entries`.
     """
     rest = list(parts)
     if len(rest) > 1 and rest[0] == APP_NAME:
@@ -499,9 +512,10 @@ def forbidden_paths(root: Path) -> list[str]:
         relative = path.relative_to(root)
         parts, under_internal = _bundle_parts(relative.parts)
         is_file = path.is_file()
-        rooted = under_internal and is_file
+        # Every loose file meets the allowlist, wherever it sits: a module beside the
+        # executable or at the release root is never legitimate (Reviewer A r2 #8).
         label = f"dist:{relative.as_posix()}"
-        found += [f"{label} ({rule})" for rule in name_violations(parts, module_root=rooted)]
+        found += [f"{label} ({rule})" for rule in name_violations(parts, module_root=is_file)]
         if is_file and (_is_zip_name(path.name) or _starts_with_zip_magic(path)):
             found += zip_violations(path, label, module_root=under_internal and len(parts) == 1)
     return sorted(found)
@@ -552,7 +566,8 @@ def forbidden_entries(executable: Path) -> list[str]:
 
     - each entry's name, all components (:func:`name_violations`);
     - each PYZ module, all components, against the allowlist (:func:`module_violations`);
-    - each module entry (PyInstaller's boot modules allowed);
+    - each module entry against the allowlist (PyInstaller's boot modules exempt from the
+      allowlist only), and the script and run-time option entries by name;
     - each data or binary entry that is a ZIP archive (by suffix or magic), recursively and in
       memory (:func:`zip_violations`).
 
@@ -578,7 +593,10 @@ def forbidden_entries(executable: Path) -> list[str]:
             found += [f"{label} ({r})" for r in module_violations(module, allow_boot=True)]
             continue
         if typecode in (readers.PKG_ITEM_PYSOURCE, readers.PKG_ITEM_RUNTIME_OPTION):
-            continue  # the entry script and run-time hooks; options are not files
+            # The entry script and the run-time hooks (options are not files): no allowlist,
+            # but their names are checked for GPU content like every entry's (r2 #5).
+            found += [f"{label} ({rule})" for rule in name_violations(parts, module_root=False)]
+            continue
         found += [f"{label} ({rule})" for rule in name_violations(parts, module_root=True)]
         if typecode in (readers.PKG_ITEM_BINARY, readers.PKG_ITEM_DATA, readers.PKG_ITEM_ZIPFILE):
             data = package.extract(name)

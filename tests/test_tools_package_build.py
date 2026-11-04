@@ -12,6 +12,7 @@ tested.
 
 from __future__ import annotations
 
+import importlib.metadata
 import importlib.util
 import io
 import marshal
@@ -20,13 +21,14 @@ import shutil
 import sys
 import zipfile
 from collections.abc import Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import ModuleType
 from typing import Any
 
 import pytest
 
 import clearwater
+from clearwater import gpu_pack
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -382,3 +384,119 @@ def test_the_version_is_read_without_importing_the_package(
     init = tmp_path / "__init__.py"
     init.write_text('"""doc."""\n\n__version__ = "9.8.7"\n', encoding="utf-8")
     assert build.app_version(init) == "9.8.7"
+
+
+# Reviewer A round 2.
+
+
+def _locked_pack_binaries() -> list[str]:
+    """Every ``.dll`` / ``.pyd`` path the eleven locked pack wheels install, from their RECORD.
+
+    Read-only, from this environment's installed metadata (``importlib.metadata`` reads each
+    distribution's ``RECORD``). Skips when the pack is not installed here at the lock's
+    versions.
+    """
+    paths: list[str] = []
+    for locked in gpu_pack.LOCKED_DISTRIBUTIONS:
+        try:
+            dist = importlib.metadata.distribution(locked.name)
+        except importlib.metadata.PackageNotFoundError:
+            pytest.skip(f"{locked.name} is not installed in this environment")
+        if dist.version != locked.version:
+            pytest.skip(f"{locked.name} {dist.version} is installed, not {locked.version}")
+        files = dist.files or []
+        paths += [f.as_posix() for f in files if f.name.lower().endswith((".dll", ".pyd"))]
+    return sorted(paths)
+
+
+def test_every_dll_the_locked_pack_wheels_install_is_flagged(tmp_path: Path) -> None:
+    """#4: each locked DLL (``nvblas64_12.dll`` included) by its name alone, anywhere.
+
+    Planted outside any GPU-named folder: nested in the one-folder bundle, beside the
+    executable, inside a ZIP, and as a one-file archive entry. ``cudnn64_9.dll`` (CuPy's
+    optional cuDNN, not in the lock) too.
+    """
+    dlls = sorted({PurePosixPath(p).name for p in _locked_pack_binaries() if p.endswith(".dll")})
+    assert "nvblas64_12.dll" in dlls
+    names = [*dlls, "cudnn64_9.dll"]
+    tree(tmp_path, [f"{INTERNAL}/scipy.libs/{n}" for n in names])
+    tree(tmp_path, [f"Clearwater/{n}" for n in names])
+    zipped = zip_bytes({f"deep/{n}": b"x" for n in names})
+    tree(tmp_path, [f"{INTERNAL}/extra.zip"], data=zipped)
+    found = build.forbidden_paths(tmp_path)
+    executable = make_exe(tmp_path / "pkg", [(f"scipy.libs/{n}", b"x", "b") for n in names])
+    entries = build.forbidden_entries(executable)
+    for name in names:
+        assert hits(found, f"{INTERNAL}/scipy.libs/{name} (cuda-library)"), name
+        assert hits(found, f"dist:Clearwater/{name} (cuda-library)"), name
+        assert hits(found, f"extra.zip!deep/{name} (cuda-library)"), name
+        assert hits(entries, f"pkg:scipy.libs/{name} (cuda-library)"), name
+
+
+def test_every_extension_module_the_locked_pack_wheels_install_is_flagged(tmp_path: Path) -> None:
+    """#4: each locked ``.pyd`` at its installed path, at the bundle root and the release root."""
+    pyds = [p for p in _locked_pack_binaries() if p.endswith(".pyd")]
+    assert pyds
+    names = sorted({PurePosixPath(p).name for p in pyds})
+    tree(tmp_path, [f"{INTERNAL}/{p}" for p in pyds])
+    tree(tmp_path, [f"{INTERNAL}/{n}" for n in names])
+    tree(tmp_path, names)
+    found = build.forbidden_paths(tmp_path)
+    for path in pyds:
+        assert hits(found, f"dist:{INTERNAL}/{path} (gpu-module)"), path
+    for name in names:  # unexpected-module, or shadow for a clearwater name such as core
+        assert hits(found, f"dist:{INTERNAL}/{name} ("), name
+        assert hits(found, f"dist:{name} ("), name
+
+
+def test_script_and_boot_module_entries_are_checked_for_gpu_names(tmp_path: Path) -> None:
+    """#5: script entries are named-checked; the boot exemption covers the allowlist only."""
+    executable = make_exe(
+        tmp_path,
+        [
+            ("cupy/__init__.py", b"pass\n", "s"),
+            ("tests/accidental.py", b"pass\n", "s"),
+            ("pyimod_accidental.cupy", pyc("pyimod_accidental.cupy"), "m"),
+            # What a real bundle holds: no violation.
+            ("pyiboot01_bootstrap", b"pass\n", "s"),
+            ("pyi_rth_pyside6", b"pass\n", "s"),
+            ("__main__", b"pass\n", "s"),
+            ("pyimod01_archive", pyc("pyimod01_archive"), "m"),
+            ("pyi-contents-directory _internal", b"", "o"),
+        ],
+    )
+    found = build.forbidden_entries(executable)
+    assert hits(found, "pkg:cupy/__init__.py (gpu-module)")
+    assert hits(found, "pkg:tests/accidental.py (tests)")
+    assert hits(found, "pkg:pyimod_accidental.cupy (gpu-module)")
+    assert len(found) == 3, found
+
+
+def test_an_extension_module_beside_the_executable_is_found(tmp_path: Path) -> None:
+    """#8: ``av.pyd`` at the release root or beside the executable meets the allowlist."""
+    tree(tmp_path, ["av.pyd", "Clearwater/av.pyd", "Clearwater/yaml/__init__.pyc"])
+    found = build.forbidden_paths(tmp_path)
+    assert hits(found, "dist:av.pyd (unexpected-module)")
+    assert hits(found, "dist:Clearwater/av.pyd (unexpected-module)")
+    assert hits(found, "dist:Clearwater/yaml/__init__.pyc (unexpected-module)")
+
+
+def test_each_copied_tool_is_run_from_the_destination(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#13: ``copy_ffmpeg`` runs ``tool_version`` on each copy and returns its line."""
+    tree(tmp_path / "bin", ["ffmpeg-9.exe", "ffprobe-9.exe"])
+    monkeypatch.setattr(build.shutil, "which", lambda tool: str(tmp_path / "bin" / f"{tool}-9.exe"))
+    ran: list[Path] = []
+
+    def version(path: Path) -> str:
+        ran.append(path)
+        return f"{path.stem} version test"
+
+    monkeypatch.setattr(build, "tool_version", version)
+    destination = tmp_path / "dist"
+    destination.mkdir()
+    copied = build.copy_ffmpeg(destination, ["ffmpeg", "ffprobe"])
+    expected = [destination / build.tool_file_name(t) for t in ("ffmpeg", "ffprobe")]
+    assert ran == expected
+    assert copied == [(expected[0], "ffmpeg version test"), (expected[1], "ffprobe version test")]
