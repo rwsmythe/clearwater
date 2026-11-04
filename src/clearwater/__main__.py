@@ -9,11 +9,11 @@ The branches of this entry (WP6.1, AD-34), in the order :func:`main` tries them:
 - Frozen only, ``<exe> --export-worker [args]`` runs :func:`clearwater.app.export_worker.main`
   with the remaining arguments. A packaged build spawns its video export worker this way,
   because its executable cannot run ``-m clearwater.app.export_worker``. This branch imports
-  no Qt-bearing module (AD-31). It first moves the request pipe off the standard-input slot
-  (:func:`isolate_worker_stdin`, CHARC's F-E ruling; TEMPORARY, see there); when that fails
-  the worker ends with one stderr line and status 2 before the loader, any log or the worker
-  import (Reviewer A r4 #4). A source run sends ``--export-worker`` to the GUI, as 1.0.0 did
-  (Reviewer A r3 #1); the source worker is ``python -m clearwater.app.export_worker``.
+  no Qt-bearing module (AD-31). After the GPU pack loader, the worker isolates its own
+  standard input: only its private raw reader consumes the request pipe, while children
+  inherit the null device. This applies to source workers too. A source run sends
+  ``--export-worker`` to the GUI, as 1.0.0 did (Reviewer A r3 #1); the source worker is
+  ``python -m clearwater.app.export_worker``.
 - Frozen only, an INTERPRETER RE-ENTRY (:func:`interpreter_reentry`: ``-m`` / ``-c`` in any
   form CPython accepts, after interpreter flags; :func:`run_interpreter_option`): a library
   inside the GPU pack re-enters ``sys.executable -m <its module>`` (``cuda.pathfinder``'s
@@ -27,7 +27,7 @@ The branches of this entry (WP6.1, AD-34), in the order :func:`main` tries them:
 
 Every branch that can import CuPy (the worker, a ``-m`` that names a module, the GUI) runs
 the GPU pack loader (:func:`clearwater.gpu_pack.activate`) before it; a refusal (a
-multiprocessing re-entry, a failed stdin isolation, ``-c``, ``-m`` without a module) ends
+multiprocessing re-entry, ``-c``, ``-m`` without a module) ends
 before the loader. In a frozen build, after the multiprocessing check, the executable's own
 folder is put at the front of ``PATH``, so FFmpeg shipped beside the executable is found
 before any other, and the GUI branch opens the log file before the loader logs its line. A
@@ -41,8 +41,6 @@ branch imports what it needs.
 from __future__ import annotations
 
 import contextlib
-import errno
-import io
 import os
 import sys
 from collections.abc import MutableMapping, Sequence
@@ -59,8 +57,7 @@ COMMAND_OPTION = "-c"
 """The interpreter option a frozen build always refuses."""
 
 REFUSED_STATUS = 2
-"""The exit status of every frozen refusal: ``-m`` / ``-c``, a multiprocessing re-entry, a
-failed worker stdin isolation."""
+"""The exit status of a frozen ``-m`` / ``-c`` or multiprocessing refusal."""
 
 FLAG_LETTERS = frozenset("bBdEiIOPqRsStuvx")
 """CPython 3.12's option letters that take no value; they may be clustered (``-OO``, ``-Es``,
@@ -106,85 +103,6 @@ refused too by CHARC's ruling on Reviewer A r3 #3.
 
 MULTIPROCESSING_REFUSAL = "multiprocessing children are not supported"
 """The one stderr line (after ``Clearwater: ``) of a refused multiprocessing re-entry."""
-
-STDIN_REFUSAL = "worker stdin isolation failed"
-"""The one stderr line (after ``Clearwater: ``, before ``: <exception type>``) of a frozen
-worker whose standard-input isolation failed (Reviewer A r4 #4)."""
-
-STD_INPUT_HANDLE = -10
-"""Win32's ``STD_INPUT_HANDLE`` (``(DWORD)-10``), the slot ``SetStdHandle`` re-points."""
-
-
-def isolate_worker_stdin() -> bool:
-    """Frozen worker only: read the request pipe privately; children inherit NUL (F-E).
-
-    The export worker's cancel thread blocks reading its standard input (the request pipe)
-    for the whole job. A child spawned with ``stdin=None`` inherits that pipe, and on Windows
-    a Python child (``cuda.pathfinder``'s canary probe, ``sys.executable -m ...``) then hangs
-    in its own start-up while the parent's read is pending (WP6.1 finding F-E). So the pipe is
-    duplicated to a private descriptor (not inheritable, PEP 446) that becomes ``sys.stdin``,
-    and descriptor 0 is pointed at the null device. On Windows the process's Win32
-    standard-input handle is pointed there too with ``SetStdHandle``, because the windowed
-    executable is a GUI-subsystem process whose C runtime does not update it on ``dup2``, and
-    ``subprocess`` gives a child that handle (CHARC's ruling; the one N1 site, AD-34).
-
-    Must run before the worker's first read and before anything that can spawn a child (the
-    GPU pack loader, the worker import, its backend probe, any CuPy import). A source run is
-    unchanged (1.0.0): nothing is duplicated and nothing re-pointed.
-
-    TEMPORARY: DR-125's package moves this isolation into the worker itself, for source and
-    frozen runs alike, and then removes this function from ``__main__``.
-
-    It FAILS CLOSED (Reviewer A r4 #4): any failure after the duplicate (opening the null
-    device, ``dup2``, ``SetStdHandle``, building the private reader) closes every descriptor
-    this function opened and raises, and :func:`main` then ends the worker with one stderr line
-    and :data:`REFUSED_STATUS`; the worker never runs without the isolation. Only a missing
-    standard input (``os.dup(0)`` failing with ``EBADF``) counts as nothing to move.
-
-    Returns:
-        True when the standard input was moved; False when not frozen, or when the process
-        has no standard input (``EBADF``).
-
-    Raises:
-        OSError: ``os.dup(0)`` failed for another reason, or a later step failed.
-        Exception: Building the private reader failed (whatever it raised).
-    """
-    if not getattr(sys, "frozen", False):
-        return False
-    try:
-        private = os.dup(0)  # PEP 446: the duplicate is not inheritable
-    except OSError as error:
-        if error.errno == errno.EBADF:
-            return False  # no standard input at all: nothing a child could inherit
-        raise
-    reader: io.BufferedReader | None = None
-    try:
-        null = os.open(os.devnull, os.O_RDONLY)
-        try:
-            os.dup2(null, 0)
-            if sys.platform == "win32":
-                import ctypes
-                import msvcrt
-
-                done = ctypes.windll.kernel32.SetStdHandle(
-                    ctypes.c_ulong(STD_INPUT_HANDLE & 0xFFFFFFFF),
-                    ctypes.c_void_p(msvcrt.get_osfhandle(0)),
-                )
-                if not done:
-                    raise ctypes.WinError()
-        finally:
-            os.close(null)
-        encoding = getattr(sys.stdin, "encoding", None) or "utf-8"
-        reader = open(private, "rb")  # noqa: SIM115 -- it owns the descriptor from here on
-        sys.stdin = io.TextIOWrapper(reader, encoding=encoding)
-    except BaseException:
-        if reader is not None:
-            reader.close()
-        else:
-            with contextlib.suppress(OSError):
-                os.close(private)
-        raise
-    return True
 
 
 def prepend_executable_folder(environ: MutableMapping[str, str] | None = None) -> bool:
@@ -413,13 +331,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0 if outcome.ok else 1
     if frozen:
         if arguments[1:2] == [WORKER_FLAG]:  # frozen only: a source run is 1.0.0 (A r3 #1)
-            # F-E: before the worker's first read and before anything that can spawn a child
-            # (the loader, the worker import, its backend probe, any CuPy import). It fails
-            # closed: no loader, no log, no worker without the isolation (A r4 #4).
-            try:
-                isolate_worker_stdin()
-            except Exception as error:
-                return _refuse(f"{STDIN_REFUSAL}: {type(error).__name__}")
             gpu_pack.activate()
             from clearwater.app import export_worker
 

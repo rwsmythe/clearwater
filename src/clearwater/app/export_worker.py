@@ -5,8 +5,13 @@ export engine through the composition root with its own proxy cache over the req
 folder, runs the job and writes the result. The line protocol, the request's keys and the
 parent's side are documented in :mod:`clearwater.jobs.export_process`, which spawns this module.
 
-The worker's channel to the parent is its ORIGINAL stdout, taken over by :func:`main` before
-anything else runs: file descriptor 1 and ``sys.stdout`` then point at stderr, so a stray print
+Before reading its request or probing a backend, :func:`main` moves the request pipe to a
+private non-inheritable descriptor and points standard input at the null device, including
+the Win32 standard handle. Children therefore inherit EOF. The private reader uses raw
+``os.read`` calls: the daemon cancel watcher holds no buffered-reader lock at shutdown.
+
+The worker's channel to the parent is its ORIGINAL stdout, taken over after stdin isolation:
+file descriptor 1 and ``sys.stdout`` then point at stderr, so a stray print
 reaches the crash tail, never the protocol. Every protocol line is ASCII JSON ended by ``\n``,
 written whole under a lock (the engine logs from more than one thread):
 
@@ -28,6 +33,7 @@ through the composition root's backend selector.
 
 from __future__ import annotations
 
+import errno
 import json
 import logging
 import os
@@ -36,7 +42,7 @@ import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, BinaryIO, Literal
+from typing import Any, BinaryIO, Literal, Protocol
 
 from clearwater.app import composition
 from clearwater.interfaces import ArrayBackend, JobResult, ParameterSet, Settings, VideoSink
@@ -72,6 +78,108 @@ _REQUEST_KEYS = frozenset(
         "app_version",
     }
 )
+
+
+class _RequestReader(Protocol):
+    """The request/cancel input shared by binary test streams and the private raw reader."""
+
+    def readline(self) -> bytes:
+        """Return a line including its newline, or the final bytes, then empty bytes at EOF."""
+        ...
+
+    def close(self) -> None:
+        """Release the input when no watcher can be using it."""
+        ...
+
+
+class _RawStdinReader:
+    """Read private stdin without an IO buffer or a lock used by interpreter finalization."""
+
+    def __init__(self, fd: int | None) -> None:
+        self._fd = fd
+        self._remainder = bytearray()
+        self._eof = fd is None
+
+    def readline(self) -> bytes:
+        """Assemble one line from raw reads, preserving read-ahead and a final partial line.
+
+        Returns:
+            The next line, including its newline when present; empty bytes after EOF.
+
+        Raises:
+            OSError: Reading the descriptor failed; the cancel watcher treats this as EOF.
+        """
+        search_start = 0
+        while True:
+            end = self._remainder.find(b"\n", search_start)
+            if end >= 0:
+                line = bytes(self._remainder[: end + 1])
+                del self._remainder[: end + 1]
+                return line
+            if self._eof:
+                line = bytes(self._remainder)
+                self._remainder.clear()
+                return line
+            assert self._fd is not None
+            search_start = len(self._remainder)
+            chunk = os.read(self._fd, 65536)
+            if chunk:
+                self._remainder.extend(chunk)
+            else:
+                self._eof = True
+
+    def close(self) -> None:
+        """Close the private descriptor once; never called while the daemon watcher owns it."""
+        fd, self._fd = self._fd, None
+        self._eof = True
+        self._remainder.clear()
+        if fd is not None:
+            os.close(fd)
+
+
+def _isolate_stdin() -> _RawStdinReader:
+    """Move the request pipe off standard input before any worker read or backend probe.
+
+    The duplicate is non-inheritable (PEP 446). Descriptor 0 and, on Windows, the Win32
+    standard-input slot point at the null device. ``sys.stdin`` is not rebound. Only the
+    returned reader consumes the pipe, first for the request and then for cancellation.
+
+    Returns:
+        The private raw reader, or an empty reader when descriptor 0 was absent (EBADF).
+        Absent stdin follows the normal empty-request refusal, before any watcher starts.
+
+    Raises:
+        Exception: Isolation failed. All descriptors opened here are closed before raising;
+            ``main`` refuses the request before protocol takeover or job activity.
+    """
+    try:
+        private = os.dup(0)
+    except OSError as error:
+        if error.errno == errno.EBADF:
+            return _RawStdinReader(None)
+        raise
+    try:
+        null = os.open(os.devnull, os.O_RDONLY)
+        try:
+            os.dup2(null, 0)
+            if sys.platform == "win32":
+                import ctypes
+                import msvcrt
+
+                done = ctypes.windll.kernel32.SetStdHandle(
+                    ctypes.c_ulong(-10 & 0xFFFFFFFF),  # Win32 STD_INPUT_HANDLE
+                    ctypes.c_void_p(msvcrt.get_osfhandle(0)),
+                )
+                if not done:
+                    raise ctypes.WinError()
+            else:
+                pass  # POSIX children inherit descriptor 0 directly.
+        finally:
+            os.close(null)
+        return _RawStdinReader(private)
+    except BaseException:
+        os.close(private)
+        raise
 
 
 @dataclass(frozen=True)
@@ -211,7 +319,7 @@ class _ProtocolHandler(logging.Handler):
             self.handleError(record)
 
 
-def _watch_stdin(stdin: BinaryIO, cancel: threading.Event) -> None:
+def _watch_stdin(stdin: BinaryIO | _RequestReader, cancel: threading.Event) -> None:
     """Set ``cancel`` at the cancel line or at the end of the stdin."""
     try:
         while line := stdin.readline():
@@ -241,7 +349,7 @@ def _result_message(result: JobResult) -> dict[str, Any]:
 
 
 def run(
-    stdin: BinaryIO,
+    stdin: BinaryIO | _RequestReader,
     protocol: BinaryIO,
     *,
     cancel: threading.Event | None = None,
@@ -297,7 +405,7 @@ def run(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the worker as a process: take over stdout for the protocol, then serve one request.
+    """Isolate stdin, take over stdout for the protocol, then serve one request.
 
     Args:
         argv: The arguments after the module name; the worker takes none.
@@ -309,14 +417,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments:
         sys.stderr.write("export worker: takes no arguments\n")
         return EXIT_BAD_REQUEST
+    try:
+        stdin = _isolate_stdin()
+    except Exception as error:
+        sys.stderr.write(f"export worker: stdin isolation failed: {type(error).__name__}\n")
+        sys.stderr.flush()
+        return EXIT_BAD_REQUEST
     sys.stdout.flush()
     protocol = os.fdopen(os.dup(sys.stdout.fileno()), "wb")
     os.dup2(sys.stderr.fileno(), sys.stdout.fileno())
     sys.stdout = sys.stderr
     try:
-        return run(sys.stdin.buffer, protocol)
+        return run(stdin, protocol)
     finally:
         protocol.close()
+        # Never close or join here: closing while the daemon blocks in os.read can block
+        # the close on Windows and hang the worker after its result. Process exit releases
+        # the descriptor; no IO buffer remains for finalization to contend for (DR-125).
 
 
 if __name__ == "__main__":

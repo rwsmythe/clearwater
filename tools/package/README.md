@@ -117,19 +117,19 @@ PyInstaller runs, and so does a pack distribution that is not installed in the b
 environment. So a lock bump that brings a new standard-library need fails the build or
 bundles the module; it never reaches a user's GPU as an import error.
 
-## The frozen worker's standard input (a TEMPORARY shim)
+## The export worker's standard input
 
-`cuda.pathfinder` checks a CUDA library in a child process (`sys.executable -m ...`, its
-canary probe) that inherits the parent's standard input. In the frozen export worker that is
-the request pipe, which the worker's cancel thread is reading, and on Windows the child then
-hangs at start-up until pathfinder kills it at 10 s: the GPU is reported unusable (WP6.1
-finding F-E). So the frozen `--export-worker` branch of `clearwater.__main__`
-(`isolate_worker_stdin`) first moves the pipe to a private descriptor and points the standard
-input (descriptor 0 and, on Windows, the Win32 handle) at the null device. It fails closed:
-when any step fails, the worker exits 2 with one stderr line (`Clearwater: worker stdin
-isolation failed: <exception type>`) before the GPU pack loader, any log or the worker import.
-A source run is unchanged. The shim is TEMPORARY: DR-125's package moves this isolation into the worker
-itself, for source and frozen runs alike, and removes the shim from `__main__`.
+The export worker isolates its own standard input in source and frozen runs, after its
+argument check and before reading the request or running any backend probe or job. It
+duplicates the request pipe to a private, non-inheritable descriptor and points descriptor 0
+(and the Win32 standard-input handle on Windows) at the null device, so every child it spawns
+with inherited stdin gets EOF, including CuPy's pathfinder canary. One raw `os.read` reader
+serves the request and the daemon cancel watcher without a buffered-reader lock at interpreter
+shutdown. The original `sys.stdin` object stays bound to descriptor 0; the watcher is neither
+joined nor closed at exit. Isolation fails closed on any `Exception`, with status 2 and one stderr
+line (`export worker: stdin isolation failed: <exception type>`); absent stdin follows the normal
+empty-request refusal. The frozen entry branch runs the GPU pack loader and then the worker;
+it has no stdin shim.
 
 ## The GPU pack manifest
 

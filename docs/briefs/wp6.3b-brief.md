@@ -61,3 +61,9 @@ Standard Codex turns through `scripts/codex_cell.py`: round 0 (the design read-b
 - Lane paces at dispatch: (fill)
 - Worktree and session: (fill)
 - Depth at each yield: (fill)
+
+## CHARC additions (gen 16, 2026-11-04 ~19:20Z, from WP-DR125 Reviewer B r1b; binding on the fill)
+
+- **`--disable-windowed-traceback` in `build.py`'s PyInstaller arguments (6.3b owns `build.py`).** Today any unhandled exception in ANY frozen process (the GUI, the worker, a `-m` re-entry, the headless rows) opens PyInstaller's modal traceback dialog: a child hangs its parent, and a dialog appears with nobody watching it. With the flag an unhandled exception exits non-zero, which AD-31's parent already handles.
+- **Companion, REQUIRED (the product has NO exception hook today; without one the flag turns a GUI start-up failure into a silent exit):** a product exception hook installed at every entry (`sys.excepthook` and `threading.excepthook`) in the entry module: it writes the traceback to the product log (AD-25's log file) and one line to stderr, then exits non-zero; in the GUI process once Qt is up, it also shows ONE plain message box naming the log file before exiting (no traceback text in the box). Worker and `-m` children: log + stderr + exit only, no window. Owned files gain the entry module(s) for this hook (`src/clearwater/__main__.py` and `app/main.py` as the fill finds them) and its tests (source, Qt offscreen for the box; the frozen smoke of item 4 gains a planted-exception row: exit non-zero, one stderr line, NO window under the UIA watch).
+- Record at the accept: AD-38 gains the flag and the hook; the hook is the N1-clean replacement of the bootloader dialog.
