@@ -126,8 +126,8 @@ duplicates the request pipe to a private, non-inheritable descriptor and points 
 with inherited stdin gets EOF, including CuPy's pathfinder canary. One raw `os.read` reader
 serves the request and the daemon cancel watcher without a buffered-reader lock at interpreter
 shutdown. The original `sys.stdin` object stays bound to descriptor 0; the watcher is neither
-joined nor closed at exit. Isolation fails closed with status 2 and one stderr line
-(`export worker: stdin isolation failed: <exception type>`); absent stdin follows the normal
+joined nor closed at exit. Isolation fails closed on any exception, with status 2 and one stderr
+line (`export worker: stdin isolation failed: <exception type>`); absent stdin follows the normal
 empty-request refusal. The frozen entry branch runs the GPU pack loader and then the worker;
 it has no stdin shim.
 

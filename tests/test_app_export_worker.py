@@ -76,7 +76,8 @@ def _isolated_profile_and_children(tmp_path, monkeypatch):
     hooks = tmp_path / "hooks"
     hooks.mkdir()
     (hooks / "sitecustomize.py").write_text(_NO_GUI, encoding="utf-8")
-    monkeypatch.setenv("PYTHONPATH", str(hooks) + os.pathsep + os.environ.get("PYTHONPATH", ""))
+    path_parts = [str(hooks), *os.environ.get("PYTHONPATH", "").split(os.pathsep)]
+    monkeypatch.setenv("PYTHONPATH", os.pathsep.join(part for part in path_parts if part))
     children = []
     lock = threading.Lock()
     real_popen = subprocess.Popen
@@ -424,6 +425,10 @@ if mode == 'dup2':
     os.dup2 = broken_dup2
 if mode == 'handle':
     ctypes.windll.kernel32.SetStdHandle = lambda *args: 0
+if mode == 'handle-runtime':
+    def broken_handle(*args):
+        raise RuntimeError('injected by the isolation test')
+    ctypes.windll.kernel32.SetStdHandle = broken_handle
 def forbidden(*args, **kwargs):
     raise AssertionError('isolation failure reached protocol takeover or engine')
 worker.composition.export_jobs = forbidden
@@ -443,6 +448,9 @@ print(json.dumps({'status': status, 'opened': sorted(opened),
         "open",
         "dup2",
         pytest.param("handle", marks=pytest.mark.skipif(sys.platform != "win32", reason="Win32")),
+        pytest.param(
+            "handle-runtime", marks=pytest.mark.skipif(sys.platform != "win32", reason="Win32")
+        ),
     ],
 )
 def test_isolation_fails_closed_without_leaking_descriptors(tmp_path, mode):
@@ -455,16 +463,57 @@ def test_isolation_fails_closed_without_leaking_descriptors(tmp_path, mode):
     assert record["status"] == 2
     assert record["opened"] == []
     assert record["before"] == record["after"]
-    kind = "PermissionError" if mode == "open" else "OSError"
+    kind = {"open": "PermissionError", "handle-runtime": "RuntimeError"}.get(mode, "OSError")
     assert err.decode().splitlines() == [f"export worker: stdin isolation failed: {kind}"]
 
 
-def test_source_and_frozen_use_the_same_isolation_function():
-    import inspect
+_ISOLATION_FACTS = """
+import json
+import os
+import stat
+from clearwater.app import export_worker as worker
 
-    from clearwater.app import export_worker
+if sys.argv[1] == 'frozen':
+    sys.frozen = True
+elif hasattr(sys, 'frozen'):
+    del sys.frozen
+reader = worker._isolate_stdin()
+try:
+    null = os.open(os.devnull, os.O_RDONLY)
+    try:
+        facts = {
+            'fd0_null': os.path.samestat(os.fstat(0), os.fstat(null))
+                        and stat.S_ISCHR(os.fstat(0).st_mode),
+            'private_reader_type': type(reader).__name__,
+        }
+    finally:
+        os.close(null)
+    if sys.platform == 'win32':
+        import ctypes
+        import msvcrt
+        get_handle = ctypes.windll.kernel32.GetStdHandle
+        get_handle.argtypes = [ctypes.c_ulong]
+        get_handle.restype = ctypes.c_void_p
+        facts['win32_input_matches_fd0'] = (
+            get_handle(ctypes.c_ulong(-10 & 0xFFFFFFFF)) == msvcrt.get_osfhandle(0)
+        )
+finally:
+    reader.close()  # neither child starts a watcher
+print(json.dumps(facts))
+"""
 
-    assert "frozen" not in inspect.getsource(export_worker._isolate_stdin)
+
+def test_source_and_frozen_use_the_same_isolation_function(tmp_path):
+    facts = []
+    for mode in ("source", "frozen"):
+        child = _child(_ISOLATION_FACTS, tmp_path, mode)
+        out, err = child.communicate(timeout=10)
+        assert child.returncode == 0, err.decode(errors="replace")
+        facts.append(json.loads(out))
+    expected = {"fd0_null": True, "private_reader_type": "_RawStdinReader"}
+    if sys.platform == "win32":
+        expected["win32_input_matches_fd0"] = True
+    assert facts == [expected, expected]
 
 
 _SHUTDOWN_STANDIN = """
@@ -485,6 +534,10 @@ print('result', flush=True)
 
 
 def test_shutdown_with_a_blocked_daemon_reader(tmp_path):
+    """Mechanism witness of design item 4, not a product regression guard.
+
+    The stand-in imports no product code.
+    """
     records = []
     for _ in range(5):
         child = _child(_SHUTDOWN_STANDIN, tmp_path)
@@ -805,6 +858,30 @@ def test_raw_read_error_cancels_the_watcher(monkeypatch) -> None:
     cancel = threading.Event()
     export_worker._watch_stdin(export_worker._RawStdinReader(123), cancel)
     assert cancel.is_set()
+
+
+def test_raw_reader_preserves_a_200000_byte_line_from_one_byte_writes():
+    from clearwater.app import export_worker
+
+    payload = b"x" * 199999 + b"\n"
+    read_fd, write_fd = os.pipe()
+
+    def write():
+        try:
+            for byte in payload:
+                os.write(write_fd, bytes([byte]))
+        finally:
+            os.close(write_fd)
+
+    writer = threading.Thread(target=write, daemon=True)
+    reader = export_worker._RawStdinReader(read_fd)
+    writer.start()
+    try:
+        assert reader.readline() == payload
+        assert reader.readline() == b""
+    finally:
+        reader.close()
+        writer.join()
 
 
 def test_raw_reader_close_owns_only_its_private_descriptor(monkeypatch) -> None:

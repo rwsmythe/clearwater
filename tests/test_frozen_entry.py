@@ -240,7 +240,7 @@ def test_a_frozen_multiprocessing_re_entry_is_refused_before_every_branch(
     _fake_gui(monkeypatch, calls)
     assert entry.main([executable, *argv[1:]]) == 2
     assert capsys.readouterr().err == "Clearwater: multiprocessing children are not supported\n"
-    assert calls == []  # no shim, no loader, no worker, no log file, no GUI
+    assert calls == []  # no loader, no worker, no log file, no GUI
     assert os.environ["PATH"] == path  # no PATH processing either (A r4 #5)
     assert blocker.attempts == []
 

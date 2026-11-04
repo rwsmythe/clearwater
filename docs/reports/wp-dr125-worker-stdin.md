@@ -97,13 +97,16 @@ claim 1. No crash dialog was seen at that seat. This report carries the seat's
 natural exits and the unsuppressed sandbox hang as separate observations. The
 turn-4 ruling stands; this cell has not rerun the buffered shape in turn 6.
 
-Regression guards for a BufferedReader swapped back into the worker are
-`test_a_worker_child_inherits_null_instead_of_the_request_pipe`,
-`test_twenty_workers_exit_zero_after_their_result_with_stdin_held_open` and
-`test_private_reader_has_no_io_buffer_or_instance_readline`. The structural
-test checks the exact reader class, forbids an instance `readline` override,
-and rejects `io.BufferedIOBase` or `io.RawIOBase` attributes. It catches the
-private-buffer shell mutant that a private-buffer shutdown series alone missed.
+The guard against a private buffered reader (`io.open(private, 'rb')`) is
+`test_private_reader_has_no_io_buffer_or_instance_readline`. It checks the
+exact reader class, forbids an instance `readline` override, and rejects
+`io.BufferedIOBase` or `io.RawIOBase` attributes. It catches the private-buffer
+shell mutant that a private-buffer shutdown series alone missed.
+
+`test_a_worker_child_inherits_null_instead_of_the_request_pipe` and
+`test_twenty_workers_exit_zero_after_their_result_with_stdin_held_open` guard
+against isolation being reverted or reads returning to `sys.stdin.buffer`.
+They do not guard against a private-buffer reader when isolation stays intact.
 
 ## Matched before/after records
 
@@ -222,6 +225,8 @@ the dispatcher's after-B ledger commit, is:
 | Round | Counts | Envelope | NEW / REOPENED | Reverts | Fix surface | Transport / depth |
 |---|---|---|---|---|---|---|
 | A r1 | 0 critical, 2 major, 3 minor, 4 advisory | All 5 formal findings in; a6 no change (ruling: fail-closed in effect); 3 other advisories in | 9 / 0 | 0 | Tests and docs only; 0 product changes | Seat Claude process, read-only; CLI version and depth dispatcher-supplied, not available to cell |
+| B r1 | 0 critical, 0 major, 1 minor | Exit-comment finding in envelope | 1 / 0 | 0 | Folded in turn 7: comment only, no executable product change | Seat Claude process; CLI version and depth dispatcher-supplied |
+| B r1b | 0 critical, 0 major, 4 minor, 7 advisory | 4 minor and 5 advisory folded; A-2 out of envelope and A-7 legacy deadline banked | 11 / 0 | 0 | Folded in turn 8: product handler/assembler, tests and docs | Seat Claude process on 5da7aad7; CLI version and depth dispatcher-supplied |
 
 All r1 findings are dispositioned. This fold-in does not claim convergence;
 the next independent reviewer pass remains with the dispatcher.
@@ -232,6 +237,28 @@ stderr before checking status, and correct the a6 wording. Reviewer B returned
 NO_NEW_CRITICAL_MAJOR; its MINOR exit-comment finding is folded in turn 7.
 The comment now names the Windows close-under-pending-read hang. No product
 code changed. B's remaining advisory list is being re-collected at the seat.
+
+Reviewer B's complete re-run is NO_NEW_CRITICAL_MAJOR, with four MINOR and
+seven ADVISORY findings. Source:
+`C:/Users/rwsmy/clearwater-review-evidence/wp-dr125/B/r1b/review.txt`.
+Turns 7-8 fold the in-scope items. M-1 supersedes the earlier a6 no-change
+disposition for the frozen windowed edge: `main` now catches any `Exception`
+from isolation and returns the one-line status-2 refusal. Existing
+`BaseException` cleanup already closes the opened descriptors in that case.
+The new non-OSError case checks status, stderr and descriptor bookkeeping;
+the `except OSError` mutant fails it (`work/wp-dr125/mutation-8.log`).
+M-2 separates the regression guards above, M-3 compares source/frozen facts
+in isolated children, and M-4 labels the product-free stand-in as a mechanism
+witness. A-1 makes newline searches linear and adds a 200,000-byte line fed
+in one-byte pipe writes, without a wall-clock assertion. A-3 records the
+handle-value assumption below. A-4 removes empty PYTHONPATH entries, A-5
+corrects the stale refusal comment, and A-6 matches the README to the new
+broader refusal. A-2 (hostile-parent unbounded input) is out of envelope;
+A-7 (the unchanged legacy export deadline) is banked with no change.
+The `--disable-windowed-traceback` build flag is banked for the seat's CHARC
+discussion for WP6.3b; this cell changes no build flag. The handler and
+assembler change product bytecode, so the seat rebuilds and repeats the
+frozen check. The existing seat section below is preserved pending that refill.
 
 ## Validation and collection
 
@@ -298,6 +325,10 @@ found no further in-scope issue. Reviewer A r1 is dispositioned above;
 convergence and Reviewer B remain separate seat work.
 
 ## Limits
+
+The windowed slot test's `after != before` relies on Windows not immediately
+reusing a freed handle value; Reviewer B measured 0 reuses in 300 `dup2` calls
+on Windows 11 (`B/r1b/review.txt`).
 
 The buffered before shape is evidence rather than a gate test because its
 fatal abort enters Windows Error Reporting and can wait for a crash dialog.

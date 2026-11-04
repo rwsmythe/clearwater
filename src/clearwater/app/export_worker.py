@@ -109,8 +109,9 @@ class _RawStdinReader:
         Raises:
             OSError: Reading the descriptor failed; the cancel watcher treats this as EOF.
         """
+        search_start = 0
         while True:
-            end = self._remainder.find(b"\n")
+            end = self._remainder.find(b"\n", search_start)
             if end >= 0:
                 line = bytes(self._remainder[: end + 1])
                 del self._remainder[: end + 1]
@@ -120,6 +121,7 @@ class _RawStdinReader:
                 self._remainder.clear()
                 return line
             assert self._fd is not None
+            search_start = len(self._remainder)
             chunk = os.read(self._fd, 65536)
             if chunk:
                 self._remainder.extend(chunk)
@@ -147,7 +149,7 @@ def _isolate_stdin() -> _RawStdinReader:
         Absent stdin follows the normal empty-request refusal, before any watcher starts.
 
     Raises:
-        OSError: Isolation failed. All descriptors opened here are closed before raising;
+        Exception: Isolation failed. All descriptors opened here are closed before raising;
             ``main`` refuses the request before protocol takeover or job activity.
     """
     try:
@@ -417,7 +419,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_BAD_REQUEST
     try:
         stdin = _isolate_stdin()
-    except OSError as error:
+    except Exception as error:
         sys.stderr.write(f"export worker: stdin isolation failed: {type(error).__name__}\n")
         sys.stderr.flush()
         return EXIT_BAD_REQUEST
