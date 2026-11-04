@@ -73,6 +73,15 @@ VALUE_LETTERS = frozenset("WX")
 """CPython's option letters that take a value: the rest of the cluster (``-Xutf8``,
 ``-Wignore``) or, when nothing is attached, the next argument (``-X utf8``)."""
 
+GRAMMAR_PYTHON_VERSION = "3.12.13 (main, Mar  3 2026, 15:01:35) [MSC v.1944 64 bit (AMD64)]"
+"""``sys.version`` of the interpreter :data:`FLAG_LETTERS`, :data:`VALUE_LETTERS` and
+:data:`LONG_VALUE_OPTIONS` were derived from by execution (WP6.1 2b-5; CHARC bae5dba5 (1))."""
+
+GRAMMAR_PYTHON_VERSION_INFO = (3, 12, 13, "final", 0)
+"""``tuple(sys.version_info)`` of that interpreter. A test fails when the running
+interpreter's ``sys.version_info[:2]`` differs, so a Python bump re-derives the table on
+purpose rather than inheriting a stale one."""
+
 LONG_VALUE_OPTIONS = {"--check-hash-based-pycs": frozenset({"always", "default", "never"})}
 """CPython 3.12's long options that may come before ``-m`` / ``-c``, with the values it accepts.
 
@@ -366,9 +375,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         The exit status of the branch run.
     """
     arguments = list(sys.argv if argv is None else argv)
-    frozen = getattr(sys, "frozen", False)
-    if frozen and multiprocessing_reentry(arguments):  # before ANYTHING else (A r3 #3, r4 #5)
+    # The FIRST statement after the arguments are read (A r3 #3, r4 #5; CHARC bae5dba5 (3)).
+    if getattr(sys, "frozen", False) and multiprocessing_reentry(arguments):
         return _refuse(MULTIPROCESSING_REFUSAL)
+    frozen = getattr(sys, "frozen", False)
     prepend_executable_folder()
     if frozen:
         if arguments[1:2] == [WORKER_FLAG]:  # frozen only: a source run is 1.0.0 (A r3 #1)

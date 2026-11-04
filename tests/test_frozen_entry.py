@@ -1500,6 +1500,23 @@ def _cpython(*args: str) -> tuple[int, str]:
     return done.returncode, done.stdout
 
 
+def test_the_grammar_table_was_derived_from_this_python_minor_version() -> None:
+    """CHARC bae5dba5 (1): the table records its CPython; another minor version FAILS here.
+
+    A Python bump must re-derive :data:`FLAG_LETTERS`, :data:`VALUE_LETTERS` and
+    :data:`LONG_VALUE_OPTIONS` (``t3g/derive_grammar.py``) and update the recorded version, on
+    purpose; the table is never silently carried to an interpreter it was not derived from.
+    """
+    import clearwater.__main__ as entry
+
+    recorded = entry.GRAMMAR_PYTHON_VERSION_INFO
+    assert entry.GRAMMAR_PYTHON_VERSION.startswith(".".join(str(part) for part in recorded[:3]))
+    assert sys.version_info[:2] == recorded[:2], (
+        f"the interpreter grammar was derived on Python {entry.GRAMMAR_PYTHON_VERSION}; "
+        f"this is {sys.version}: re-derive it"
+    )
+
+
 def test_the_option_letters_are_cpythons_by_execution() -> None:
     """Reviewer A r4 #1: :data:`FLAG_LETTERS` / :data:`VALUE_LETTERS` equal what CPython does.
 
