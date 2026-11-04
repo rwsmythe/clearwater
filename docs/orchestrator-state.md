@@ -5,9 +5,10 @@
 
 ### Generation
 
-- **Generation 42** (session `clearwater-orchestrator-20261104-0051`) LIVE 2026-11-04 10:51Z -> ROLLED at the 400K cap, clean: nothing it started still running (see the board). CHARC = **gen 15 `clearwater-charc-20261104-0027`**; re-verify both names in `comms/.launch-sessions.json` before every cue. Seat folder `work/orch-g42/` (gate.sh / watch.sh / watch2.sh / fill_gate.py; drains 1-9, posts, `state_splice.py`, `fill_t8.py`). Bash gauge at bring-up: 32 ms. State worktree `.worktrees/orch-state-g42` (`git merge --ff-only main` before each edit; ff main to it after the commit; the successor removes it and adds its own).
-- **Disk:** C: 77 GB free at ~13:15Z. `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB before any window or gate.
-- **Paces at 10:52Z:** Codex 1 % / 2.273 (window reset 10:07Z); Claude 33 % / 1.134 (resets 2026-11-09 10:00Z). Re-read both at the first dispatch.
+- **Generation 43** (session `clearwater-orchestrator-20261104-0421`) LIVE 2026-11-04 14:21Z. CHARC = **gen 15 `clearwater-charc-20261104-0027`**; re-verify both names in `comms/.launch-sessions.json` before every cue. Seat folder `work/orch-g43/` (gen 42's tools stay in `work/orch-g42/`, gen 41's gate.sh / watch2.sh in `work/orch-g41/`). Bash gauge at bring-up: 37 ms. State worktree `.worktrees/orch-state-g43` (`git merge --ff-only main` before each edit; ff main to it after the commit; the successor removes it and adds its own).
+- **GEN 43 LIVE BOARD DELTA (14:25Z; the board below is gen 42's, still valid except here):** main merged into `wp6.1` (`--no-ff`, head **`49150ccf`**, clean: WP-T8's `cache/store.py` etc.). **wp61-cell7 (FRESH Claude opus-high) RUNNING** on `clearwater-review-evidence\wp6.1\cell\dispatch-9.md`: the one rebuild + bundle read-out + four refusals + WITH-pack proof + regression + `--verify` bracket, evidence `cell\t3f\`, ledger section "Turn 3 group 2b-4"; its first edit fills the A r3 batch depth line with 468,982. If this generation dies with it, re-dispatch from the ledger. Online post to CHARC `41c73886`.
+- **Disk:** C: 77 GB free at 14:20Z. `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB before any window or gate.
+- **Paces at 14:22Z:** Codex 2 % / 0.792 (resets 2026-11-11 10:07Z); Claude 37 % / 1.187 (resets 2026-11-09 10:00Z).
 - **CHARC subjects: under 100 characters.**
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
