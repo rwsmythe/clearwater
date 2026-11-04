@@ -9,10 +9,11 @@ or from the evidence folder `C:\Users\rwsmy\clearwater-review-evidence\wp6.1\` (
 Status: code-complete. Reviewer A converged at round 5. Reviewer B, the gate and the owner's
 D6 hand check are still to come.
 
-## 1. Summary and recommendation for CP6a
+## 1. Summary and the CP6a inputs
 
-**Recommendation: ship the one-folder form.** The owner decides at CP6a; this is the cell's
-recommendation from the records.
+CP6a is the owner's decision, presented by CHARC. The owner's choice is recorded in the accept
+record and the WP6.3 brief, not in this report. This section lays out the inputs from the
+records; it does not recommend a form.
 
 What both forms do (both PASS):
 
@@ -21,38 +22,46 @@ What both forms do (both PASS):
   (`device GPU`). All CUDA files come from the pack or the NVIDIA driver, none from elsewhere.
 - Without the pack, both fall back to the CPU with AD-9's text, `CPU: CuPy not installed`.
 
-The reasons for one-folder, each from the measured table (section 2):
+Where the forms differ (figures from section 2 unless another source is named):
 
-1. **Warm start.** One-folder starts warm in 0.893 s (median). One-file needs 3.170 s.
-   One-file is never faster warm than cold, because every launch unpacks the bundle into a new
-   `_MEI` folder in `%TEMP%`.
-2. **Cold start favours one-file** (2.771 s against 4.469 s). This is the only figure in its
-   favour. It is paid once after a reboot; the warm penalty is paid on every launch.
-3. **Each worker start pays the unpacking too, in the measured form.** The headless first
-   export took 1.285 s (one-folder) against 3.220 s (one-file) on a warm kernel cache, and
-   0.531 s against 2.728 s on the CPU. (These workers were started on their own, not from a
-   one-file GUI. Whether a worker started by the one-file GUI reuses the GUI's `_MEI` folder
-   was not measured; see section 9.)
-4. **F-B: in the one-file form the process the parent holds is the bootloader, not the
-   worker.** When that PID was killed, the Python worker under it ran on and finished the
-   export, and an orphaned `_MEI` folder stayed in `%TEMP%` (ledger, "Turn 3 group 2b-1",
-   "The write journal (D85)"). The product's hung-worker kill (`process.kill()` in
-   `jobs/export_process.py`) would therefore not stop a one-file worker. One-file would need
-   a job-object kill. One-folder has no such layer.
-5. **`_MEI` handling.** When the one-file bootloader itself is killed, its `_MEI` copy of the
-   bundle stays in `%TEMP%` (seen twice in 2b-1). When the worker under it was killed, or
-   crashed after its result (DR-125), the bootloader removed the folder. One-folder unpacks
-   nothing at launch.
-6. **Size favours one-file**: 523.9 MiB against 668.3 MiB for the release folder, both with
-   FFmpeg (434.4 MiB of each). Without FFmpeg: one 89.5 MiB `Clearwater.exe` against a
-   234.0 MiB folder. The zipped size was not measured.
-7. **The D6 hand check is still to come** for both forms (the GUI's own photo and video
-   exports, by the owner). It may add facts for either form.
+| Input | One-folder | One-file |
+|---|---|---|
+| Release size, with FFmpeg (434.4 MiB of each) | 668.3 MiB | 523.9 MiB |
+| Without FFmpeg | a 234.0 MiB folder (`Clearwater.exe` plus `_internal`) | one 89.5 MiB `Clearwater.exe` |
+| Zipped size | not measured | not measured |
+| Cold start, median | 4.469 s | 2.771 s |
+| Warm start, median | 0.893 s | 3.170 s |
+| First export, GPU, warm kernel cache, median | 1.285 s | 3.220 s |
+| First export, GPU, empty kernel cache | 15.460 s | 18.284 s |
+| First export, CPU, no pack | 0.531 s | 2.728 s |
+| Unpacking at launch | none | every launch unpacks the bundle into a new `_MEI` folder in `%TEMP%` |
+| The PID the parent holds for a worker (F-B) | the worker | the bootloader |
+| `_MEI` left in `%TEMP%` | none | when the bootloader itself is killed (seen twice in 2b-1) |
 
-Other observations worth carrying to CP6a:
+Notes on these inputs:
+
+- **One-file's per-launch extraction.** Every one-file launch unpacks the bundle, so its warm
+  start is not faster than its cold start (3.170 s against 2.771 s, warm spread 1.059 s). The
+  one-folder cold start is about 5x its warm start, because the unbuffered copy left
+  `_internal` out of the file cache.
+- **The export rows** were measured with headless workers started on their own, so each
+  one-file worker unpacked its own bundle. Whether a worker started by the one-file GUI
+  reuses the GUI's `_MEI` folder was not measured (section 9).
+- **F-B.** In the one-file form, when the bootloader's PID was killed, the Python worker under
+  it ran on and finished the export, and an orphaned `_MEI` folder stayed in `%TEMP%` (ledger,
+  "Turn 3 group 2b-1", "The write journal (D85)"). The product's hung-worker kill
+  (`process.kill()` in `jobs/export_process.py`) ends only the process it holds, so a one-file
+  build would need a job-object kill (section 8). The one-folder form has no bootloader layer.
+- **`_MEI` handling.** When the worker under a one-file bootloader was killed, or crashed after
+  its result (DR-125), the bootloader removed its `_MEI` folder. Only a kill of the bootloader
+  itself left the folder behind.
+- **The D6 hand check is still to come** for both forms (the GUI's own photo and video exports,
+  by the owner). It may add inputs for either form.
+
+Other observations from the records:
 
 - The first GPU export with an empty kernel cache takes about 14-15 s longer than with a warm
-  one (the kernel compile): 15.460 s against 1.285 s one-folder.
+  one (the kernel compile), in both forms.
 - **The device fallback chain worked as designed.** Twice before the final code (F-E and F-F
   below), the GPU path failed in the frozen worker. Each time the export finished on the CPU
   with a readable reason (`CPU: CUDA device unusable`, and the cause in the log), the result
@@ -432,7 +441,7 @@ win_amd64`). Each gave the CPU path and a written PNG, both forms.
 |---|---|---|
 | D1 | FFmpeg "beside the executable" is not found by `shutil.which` unless it is the working directory. | Frozen `PATH` prepend of the executable's folder (CHARC D1), later move-to-front with dedupe (r2 #10, r3 #6). |
 | F-A | The export worker crashes after its result line at interpreter shutdown (exit 3221225477). A 1.0.0 worker defect, reproduced on the source worker. | DR-125. Not fixed here (`app/export_worker.py` is not owned). See section 9. |
-| F-B | One-file: the parent holds the bootloader's PID; killing it leaves the worker running and an orphaned `_MEI`. | A point against one-file at CP6a. If one-file is chosen, WP6.3 needs a job-object kill. |
+| F-B | One-file: the parent holds the bootloader's PID; killing it leaves the worker running and an orphaned `_MEI`. | A CP6a input (section 1). If one-file is chosen, WP6.3 needs a job-object kill. |
 | F-C | `uv pip install --target` leaves an empty `.lock` file that the ownership check rejects. | Removed by hand from the spike's pack; README step. CHARC: no allowlist. |
 | F-C2 | The bundle lacked stdlib modules that only the pack imports (`ctypes.wintypes`, `graphlib`, also `site`, `ctypes.util`, `unittest.mock`). | The 61-module hidden-import set and its build-failing check (section 4). |
 | F-D | `cuda.pathfinder`'s canary `[sys.executable, "-m", ...]` started the frozen GUI branch. | The pack-scoped frozen `-m` handler, `-c` refused, the full grammar (section 6). |

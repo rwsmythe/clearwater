@@ -3075,11 +3075,17 @@ Fresh cell (implementer-opus-high, wp61-cell9), dispatch
 frozen; no GUI, no build, no timing. The report was written from the brief, this ledger and the
 evidence only.
 
-Written: `docs/reports/wp6.1-packaging-spike.md`, nine sections as dispatch-14 lists them. Its
-recommendation for CP6a: the one-folder form (warm start 0.893 s against 3.170 s, a worker start
-without the per-launch unpacking, no bootloader layer between the parent and the worker (F-B), no
-`_MEI` left by a kill), against one-file's smaller release (523.9 against 668.3 MiB) and faster
-cold start (2.771 against 4.469 s); the owner decides.
+Written: `docs/reports/wp6.1-packaging-spike.md`, nine sections as dispatch-14 lists them.
+
+**Amendment (CHARC ruling 85e45a92, relayed by the dispatcher after the first commit `865e12ee`):
+the report is FORM-NEUTRAL.** The first version's section 1 recommended the one-folder form. It was
+rewritten as "Summary and the CP6a inputs": the trade-offs from the records (sizes, cold / warm
+start, the first-export rows, one-file's per-launch extraction, F-B, `_MEI` handling) in one table
+with notes, and the statement that CP6a is the owner's decision, presented by CHARC, recorded in
+the accept record and the WP6.3 brief, not in this report. The F-B row of section 8 ("a point
+against one-file") now reads "a CP6a input". A grep of the report for `recommend`, `favour`,
+`point against`, `better`, `ship`, `outweigh`, `prefer`, `should` finds only the sentence saying
+it does not recommend a form. No figure changed.
 
 Fact check (every figure re-read from its source; sources named in the report):
 
