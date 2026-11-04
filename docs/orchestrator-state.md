@@ -5,58 +5,109 @@
 
 ### Generation
 
-- **Generation 45** (session `clearwater-orchestrator-20261104-0836`), LIVE since 2026-11-04 18:36Z.
+- **Generation 45** (session `clearwater-orchestrator-20261104-0836`), LIVE 2026-11-04 18:36Z, ROLLED at the 400K cap at ~22:50Z. The roll was clean: nothing it started is still running (see the board).
 - CHARC is **gen 16, `clearwater-charc-20261104-0738`**. Re-verify both names in `comms/.launch-sessions.json` before every cue.
-- Seat folder `work/orch-g45/`: `gate.sh`, `watch2.sh`, drains 1-3, the posts, and the accept draft `wp-dr125-accept.md`.
+- Seat folder `work/orch-g45/`: `gate.sh`, `watch2.sh`, drains 1-9, the posts, and the splice/fill scripts. Copy `gate.sh` and `watch2.sh` with `sed 's#orch-g45#orch-g46#g'`.
 - Bash gauge at bring-up: 41 ms.
-- State worktree: `.worktrees/orch-state-g45`.
-- **Disk:** C: 82 GB free at 19:34Z. Run `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB is needed before any window or gate.
-- **Paces at 18:37Z:**
-  - Codex 3 % / 0.594 (resets 2026-11-11 10:07Z);
-  - Claude 42 % / 1.246 (resets 2026-11-09 10:00Z).
+- State worktree: `.worktrees/orch-state-g45`. The successor removes it and adds its own.
+- **Disk:** C: about 79 GB free at 20:23Z. Run `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB is needed before any window or gate.
+- **Paces at 20:26Z:**
+  - Codex 4 % / 0.652 (resets 2026-11-11 10:07Z);
+  - Claude 44 % / 1.265 (resets 2026-11-09 10:00Z).
+
+  Re-read at the first dispatch.
 - **CHARC subjects: under 100 characters.**
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
 
-- **DESKTOP INPUT RULE and ENTRY-POINT ISOLATION RULE (CLAUDE.md hardware section).** Paste BOTH VERBATIM into EVERY dispatch (the text is in `clearwater-review-evidence\wp-dr125\cell\dispatch-9.md`). A cell-written GUI or proof script is reviewed at the seat (grep for SendKeys / AppActivate / SendInput / keybd_event / mouse_event / pyautogui / SetForegroundWindow) and RUN AT THE SEAT FROM md5-CHECKED COPIES.
-- **WP-DR125 turn-4 ruling, point 4 (CHARC):** NO seat or review run may execute the DR-125 "before" shape: a daemon blocked on `sys.stdin.buffer` at interpreter exit, or the OLD worker at `73453bdc`. Sandbox only. Every review prompt says so.
-- **EVERY REVIEW PROMPT BANS `run_in_background`** (gen 45). `codex_cell.py review` keeps only the reviewer's LAST message, so a reviewer that backgrounds a command loses its report (DR-125 B r1). Add: "NEVER use run_in_background ... your FINAL message must be the COMPLETE report". Check that `review.txt` is a full report before acting on it. Memory: `review-driver-background-loses-report`.
+- **DESKTOP INPUT RULE and ENTRY-POINT ISOLATION RULE (CLAUDE.md hardware section).** Paste BOTH VERBATIM into EVERY dispatch (the text is in `clearwater-review-evidence\wp6.4\cell\dispatch-3.md`). A cell-written GUI or proof script is reviewed at the seat (grep for SendKeys / AppActivate / SendInput / keybd_event / mouse_event / pyautogui / SetForegroundWindow) and RUN AT THE SEAT FROM md5-CHECKED COPIES.
+- **WP-DR125 turn-4 ruling, point 4 (CHARC):** NO seat or review run may execute the DR-125 "before" shape: a daemon blocked on `sys.stdin.buffer` at interpreter exit, or the OLD worker at `73453bdc`. Every review prompt says so.
+- **EVERY CLAUDE REVIEW PROMPT BANS `run_in_background`** (gen 45). `codex_cell.py review` keeps only the reviewer's LAST message. Add: "NEVER use run_in_background ... your FINAL message must be the COMPLETE report". Check that `review.txt` is a full report before acting. Memory: `review-driver-background-loses-report`.
+- **Launch a Codex turn ONLY with the Bash tool's `run_in_background`, never a shell `&`.** Gen 45 used `&` once: the turn lived, but no notice came, and a PID Monitor was needed.
 - **ROLLOVER TIMING (OWNER-RULED).** Below 400K a seat starts the next unit WHATEVER ITS SIZE; it rolls at the first clean boundary after 400K with nothing it started still running. At or past the cap, dispatch nothing new.
 - **NO ROLLOVER WHILE A JOB RUNS (OWNER, 2026-11-02).**
-- **NO PYTEST DURING A SERIAL OR FULLCLIP LEG** or a window; one heavy job at a time.
-- **TWO CODEX SESSIONS ARE ALLOWED** (CHARC `a6934b58`). The seat serialises the HEAVY jobs: one gate, build or seat run at a time.
+- **NO PYTEST DURING A SERIAL OR FULLCLIP LEG** or a window; one heavy job at a time (gate, build, seat run).
+- **TWO CODEX SESSIONS ARE ALLOWED** (CHARC `a6934b58`), on disjoint files.
 - **Codex turns:**
   - Run a turn with `uv run python scripts/codex_cell.py turn --worktree <ABS> --prompt <p> --evidence <dir> --turn N [--session <id>] > <dir>\turn-N.driver.stdout 2>&1`, with run_in_background.
   - Commit with `codex_cell.py commit --worktree <ABS> --return-file <return-N.md>`.
   - Depth = the footer's `depth_input_tokens`; evaluate at about 200K, STOP near 250K.
   - FRESH prompt = `.claude/agents/implementer-codex-sol-high.md` + the brief at HEAD + `dispatch-N.md`, joined, with `tr -d '\r'`.
-  - A RESUMED session's prompt = `dispatch-N.md` alone (`tr -d '\r'`).
+  - A RESUMED session's prompt = `dispatch-N.md` alone.
+- **Claude cells (Agent tool):**
+  - Read depth with `uv run --no-sync python scripts/cell_depth.py --live 3 <name>` at dispatch, at every yield and before any ruling.
+  - About 250K = evaluate; about 400K = STOP.
+  - A Claude cell's reviewer is CODEX: `cat review-prompt.md review-diff.txt | codex exec -p strong -s read-only --skip-git-repo-check -` from the DETACHED copy. Run the FOUR anchored assertions (banner `gpt-6.1-sol` / `high`, `grep -ac '^ERROR'`, `grep -ac '^tokens used'`, the verdict). Form: `wp6.4\A\r1\review-prompt.md`.
 - **Claude review of a Codex cell:**
-  - Run `codex_cell.py review --worktree <DETACHED review copy> --base <sha> --prompt <p> --out <dir> > <dir>\review.seat.log 2>&1` (background at the SEAT is fine; the REVIEWER must not background).
-  - The review copy: `git worktree add --detach .worktrees/<pkg>-rA <head>` + `uv sync --frozen` + `clearwater.local.toml`. Move it with `git -C <copy> checkout -q --detach <new head>`.
-  - Forms: `wp-dr125\B\r1b\review-prompt-B.md` (a full B pass), `wp-dr125\B\delta\review-prompt-delta.md` (a fold-in delta), `wp6.3a\A\r1\review-prompt-r1.md`.
-- **Gates:** `bash work/<seat>/gate.sh <worktree> <run-id> <legs...>` (background), plus a Monitor on `watch2.sh <run-id> <summary line count>`.
-- **Backslash-bearing Python is written with the Write tool**, never a heredoc (gen 45 slipped once: `\f` in a path).
-- **A bare `cd` moves the session's cwd**, including `cd X && ...` at the start of a Bash call. Use ONLY `( cd X && ... )`, `git -C` and absolute paths. Gen 45 slipped once, into the memory folder.
+  - Run `codex_cell.py review --worktree <DETACHED copy> --base <sha> --prompt <p> --out <dir>` (background at the seat).
+  - Forms: `wp-dr125\B\r1b\review-prompt-B.md` (a full B pass), `wp-dr125\B\delta\review-prompt-delta.md` (a delta), `wp6.3a\A\r3\review-prompt-r3.md`.
+- **Gates:** `bash work/<seat>/gate.sh <worktree> <run-id> <legs...>` (background), plus a Monitor on `watch2.sh <run-id> <summary line count>`. Re-arm the Monitor at its 30-minute expiry.
+- **Backslash-bearing Python is written with the Write tool**, never a heredoc.
+- **A bare `cd` moves the session's cwd.** Use ONLY `( cd X && ... )`, `git -C` and absolute paths. Gen 45 slipped once.
 
 ### Live board (RESUME HERE)
 
-1. **WP-DR125: ACCEPTED** at main `b6ce8786` (record `docs/proofs/wp-dr125-accept.md`); CHARC wrote the dispositions at `4dae7565` (DR-125 CLOSED, DR-130/131 opened, AD-34 amended, AD-31 note). `.worktrees/wp-dr125` is kept until the owner's prune word; `wp-dr125-rA` is released.
-2. **WP6.3a: fold-in TURN 4 RUNNING** (started ~20:25Z, a resumed `01a1a7b8-97bb-7451-bb5a-adeb5a5c6387`, 140,581 / 475,000 at turn-3 end). Main was merged into `wp6.3a` at `452ff088` with NO textual conflict: the shim is gone from `__main__.py`, and the four shared test modules gave 327 passed at the seat. Prompt `wp6.3a\cell\prompt-4.md` = `dispatch-4.md` (reading A plus CHARC's three lines).
-   - NEXT: QA the diff, then `codex_cell.py commit`, then A r2 on `.worktrees/wp6.3a-rA` (move it to the new head).
-   - Then the seat run: an onedir build from the 6.3a head; a 1.725 GB download into a redirected LOCALAPPDATA; expect **2,679 files** and `--verify` PASS.
-   - Then B (with no `run_in_background`), the gate and the accept.
-3. **WP6.4: the fill is POSTED for CHARC's FINAL** (brief section "Dispatch (orchestrator fills)", seat clarifications 1-8). On FINAL: `git worktree add .worktrees/wp6.4 -b wp6.4 main`, `uv sync --frozen`, `clearwater.local.toml`; dispatch `implementer-opus-high` as `wp64-cell1` (group A), with the two rules verbatim. **WP6.3b:** the brief is DRAFT on main, for your fill after 6.3a's accept, with CHARC's additions (`--disable-windowed-traceback` + a product exception hook).
-4. **Push:** main is ahead of `origin/main`. CHARC batches the owner's push.
-5. **Worktrees:** main; `orch-state-g45`; `wp-dr125` + `wp-dr125-rA`; `wp6.3a` + `wp6.3a-rA`; `wp6.1` (KEPT: the hand-filled pack at `work\wp6.1\t3c\appdata\Local\Clearwater\gpu-pack\14.2.0-cu12` serves the frozen checks); `wp6.2` (released).
-6. **Prunes owed (the owner's word only):** the wp6.1 builds and pack after 6.3a's seat run; `.worktrees/wp6.2`; the `wp-dr125` onedir build after the accept.
+**Nothing running** at the roll: every cell returned (wp64-cell3's last reply 22:45Z), both reviews ended (6.3a A r3, 6.4 A r1), and no gate, build, seat run or Codex turn is live.
+
+1. **WP-DR125: ACCEPTED** (main `b6ce8786`; CHARC dispositions `4dae7565`). `.worktrees/wp-dr125` is kept until the owner's prune word.
+2. **WP6.3a (the GPU pack downloader): Reviewer A CONVERGED at r3**, NO_NEW_CRITICAL_MAJOR (`wp6.3a\A\r3\review.txt`). Branch `wp6.3a` at **`ffb8896e`**; main merged in at `196d2380`.
+   - A r3 leaves 2 MINOR and 3 ADVISORY:
+     - **R3-1:** a READ-ONLY unmapped DLL reads as "in use" forever. Fix: clear the attribute before the probe, or skip read-only files; a test for the choice.
+     - **R3-2:** no probe test puts an image at a NESTED path; mutant `rglob`->`glob` survives all 214 tests, while a real pack keeps every image under `site-packages/`. **Fold R3-2 BEFORE the seat run.**
+     - **R3-3:** the marker is cleared while a `.partial-*` remains after the layer-3 race.
+     - **R3-4:** the shell's `_gpu_removal_pending` is never reset.
+     - **R3-5** (out of envelope): `rglob` follows a junction; use `os.scandir` and skip links.
+   - **NEXT:**
+     1. Post A r3 to CHARC, recommending: fold R3-1, R3-2 and R3-4 (cheap, in-scope); R3-3 and R3-5 in the same turn, or banked.
+     2. A FRESH Codex session (`01a1a842` retired at 229,611; prompt = cell def + brief at HEAD + dispatch-7).
+     3. A short delta review.
+     4. **The seat run** from the md5-checked kit `wp6.3a\seat\` (`bash seat63a.sh` in the background; summary `seat.summary.txt`). It does the onedir build, the real 1.725 GB install into `.worktrees/wp6.3a/work/wp6.3a/appdata`, `--verify`, the census (expect 2,679 and SET_EQUAL both true), 2 frozen workers, the loaded leg (a source child maps the pack; frozen headless remove = pending, marker present, pack intact; release; a final remove) and the profile checks. Re-md5 the kit before running (`md5-copies.txt`). The fold-in may change `gpu_pack_install.py`, but the kit drives the frozen exe and needs no change.
+     5. Fill the report's `SEAT TO FILL`.
+     6. Reviewer B (Claude, a full pass, no background).
+     7. The gate (`static collect parallel serial harness`).
+     8. The accept record, the ff, the post.
+3. **WP6.4 (macOS adaptation):** branch `wp6.4`.
+   - **Group A** was built by `wp64-cell2` at `451799f5` (ledger fill `27505be4`; cell2 retired at 392,066). **Reviewer A r1 (Codex) on group A: NO_NEW_CRITICAL_MAJOR** (`wp6.4\A\r1\review.txt`; the four assertions passed), with 1 MINOR and 1 ADVISORY:
+     - the MINOR, `jobs/export.py:881`: the empty reason for an out-of-roster saved encoder. CHARC GRANTED its fix to `wp64-cell3` (relayed to the live cell; dispatch-3 ADDENDUM);
+     - the ADVISORY: the W-FS[P30] test does not catch a `casefold` mutant. Add the `Straße.MP4` / `STRASSE.mp4` pair in different folders.
+   - CHARC's group-A rulings are at `63ff45f3`: both deviations accepted; P71 is the FIX, with one register row at the accept; ONE register row for the partial rows.
+   - **Group B:** BUILT by `wp64-cell3` at `8b3f62e8` (plus the dispatcher's ledger depth fill `4dbffcc3`; cell3 retired PAST its cap at 416,156). Darwin mypy is 0 errors (162 files). `test_portability` has 180 cases (parallel 163, serial 17); `test_macos_portability` has 178 (159 + 19, all skipped "macOS native leg (WP6.5)"). The export grant is done at `1a003fe4`. Its FULL return is in `wp6.4\cell\return-3-group-b.txt`. **Two STOPs are OPEN for CHARC** (post them first): **S-B1:** `environment_report.py`'s new facts are opt-in (`--platform-facts`), because the unowned `tests/test_environment_report.py:13-33` pins the key order; the cell recommends a one-edit grant to `EXPECTED_KEY_ORDER` with the facts on by default. **S-B2:** the cell's file tool refused to write `docs/reports/wp6.4-macos-adaptation.md`; its full content is section 7 of `return-3-group-b.txt`, plus three additions (the export grant, P71's line, ledger B.6's partial-row table). The SEAT (or the next cell) writes the report from it. The cell also notes: one W-GUI run happened with `QT_QPA_PLATFORM` unset, so its windows showed briefly (no input sent; the module now forces offscreen); and two load-only failures under `-n 4` passed serially, plus a pre-existing order-dependent `test_prototype_clip` failure on main.
+   - **NEXT:**
+     1. QA group B's return.
+     2. Read the depth.
+     3. Fill the ledger's group-B depth.
+     4. The A r1 fold-in turn (the P30 advisory, plus anything left) by cell3 if under about 250K, else a fresh cell.
+     5. Codex A r2 on groups A + B.
+     6. B (Codex WSL script, form `wp5.7\B\run_review_B.sh`).
+     7. The gate (static on both targets, collect, parallel, serial, harness).
+     8. The accept.
+   - The review copy is `.worktrees/wp6.4-rA` (detached at `27505be4`).
+4. **WP6.3b:** the brief is DRAFT on main, for your fill after 6.3a's accept, with CHARC's additions: `--disable-windowed-traceback` + a product exception hook (`20afccd4`); `build.py:645` noted by CHARC.
+5. **Push:** main is ahead of `origin/main`. CHARC batches the owner's push.
+6. **Worktrees:**
+   - main;
+   - `orch-state-g45` (remove it);
+   - `wp-dr125` (kept for the prune);
+   - `wp6.3a` and its copy `wp6.3a-rA` (at `ffb8896e`);
+   - `wp6.4` and its copy `wp6.4-rA`;
+   - `wp6.1` (KEPT: the hand-filled pack serves the census comparison);
+   - `wp6.2` (released).
+7. **Prunes owed (the owner's word only):**
+   - the wp6.1 builds and pack, after 6.3a's seat run;
+   - `.worktrees/wp6.2`;
+   - `.worktrees/wp-dr125/work/` (the onedir build plus `frozen-runs`);
+   - after 6.3a's accept, the seat run's `.worktrees/wp6.3a/work/` (its build plus the appdata pack, about 3 GB);
+   - the reviewers' `work/rva*` probe folders in the `-rA` copies (they hold copied `python3.dll` / `_queue.pyd`).
 
 ### Gen-45 lessons
 
 - **`codex_cell.py review` loses a reviewer's report if it backgrounds a command.** See the binding rule above. Recovery was a full re-run (`B\r1b`), about 15 min.
-- **A fold-in that changes product bytecode after a frozen check needs a rebuild and a re-check.** That took 71 s to build plus 70 s for 12 runs from `frozen2\` copies. Freeze `src/` for later fold turns (turn 9: "NO PRODUCT FILE CHANGES").
-- **A behavioural replacement of a structural test can lose coverage** (DR-125 M-3): console `python.exe` masks a `SetStdHandle` skip. A Win32 slot fact must be taken under `pythonw.exe`. Ask the delta review for the mutant the OLD test caught.
-- **Run a delta review of a fold-in that touches product code**, in parallel with the rebuild. It caught the M-3 regression.
+- **A fold-in that changes product bytecode after a frozen check needs a rebuild and a re-check.** It took 71 s to build plus 70 s for 12 runs from `frozen2\` copies. Freeze `src/` in later fold turns ("NO PRODUCT FILE CHANGES").
+- **A behavioural replacement of a structural test can lose coverage** (DR-125 M-3): console `python.exe` masks a `SetStdHandle` skip. A Win32 slot fact needs `pythonw.exe`. Ask a delta review for the mutant the OLD test caught.
+- **A design premise about OS behaviour needs an EXECUTED probe** (6.3a F1). "A rename fails when the pack is in use" held for `open()`-held files only: MAPPED DLLs and `.pyd` files do not block a folder rename. Ask reviewers to test against the REAL mechanism (`ctypes.WinDLL`, `ExtensionFileLoader`), never a stand-in.
+- **A Codex cell can STOP a whole turn for one scope item** (6.3a turn 4: 50K tokens, nothing built). Write that in the next Codex dispatch: build the rest, and STOP only the item.
+- **A read-heavy round 0 can cost about 250K** (WP6.4 cell1: 247,937 after reading the 172-row audit). Plan a fresh cell per group in an audit-driven package.
+- **A Claude cell's idle notification repeats its report**: do not reply, because a reply re-wakes it.
 
 ### Gen-44 lessons
 
