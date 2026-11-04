@@ -89,9 +89,27 @@ class BatchItem:
     key: str = field(default="", repr=False)
 
 
+_stat = os.stat
+"""The call that reads a queued file's identity; a test replaces it with a fake provider."""
+
+
 def _key(path: Path) -> str:
-    """Return the key two spellings of one path share (no filesystem access)."""
-    return os.path.normcase(os.path.abspath(path))
+    """Return the key every spelling of one file shares (DR-121).
+
+    An existing file's key is its identity, the device and file number ``os.stat`` reports: one
+    file under two case spellings is one item, and two distinct files whose names differ only
+    by case (a case-sensitive volume) are two. A path that cannot be read, or a file system
+    that reports no file number, falls back to the lexical key (``normcase`` of the absolute
+    path), as before.
+    """
+    absolute = os.path.abspath(path)
+    try:
+        info = _stat(absolute)
+    except OSError:
+        info = None
+    if info is None or info.st_ino == 0:
+        return "path:" + os.path.normcase(absolute)
+    return f"file:{info.st_dev}:{info.st_ino}"
 
 
 def item_labels(items: list[BatchItem]) -> list[str]:
@@ -102,7 +120,8 @@ def item_labels(items: list[BatchItem]) -> list[str]:
 
     Returns:
         One label per item, in order: ``name``, or ``name (parent folder)`` for every item whose
-        file name (compared as the filesystem does, see :func:`_key`) is shared by another.
+        file name (compared with ``normcase``: case-blind on Windows only) is shared by another.
+        Two queued items are always two files (:func:`_key`), so a label never hides one.
     """
     names = [os.path.normcase(item.path.name) for item in items]
     counts = Counter(names)
