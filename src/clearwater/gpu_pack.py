@@ -926,3 +926,56 @@ def activate() -> PackStatus | None:
     if not getattr(sys, "frozen", False):
         return None
     return load(pack_root())
+
+
+def _inside(path: str, folder: str) -> bool:
+    """Return True when ``path`` lies in ``folder`` (both resolved, compared case-folded)."""
+    try:
+        resolved = os.path.normcase(os.path.realpath(path))
+        common = os.path.commonpath([resolved, folder])
+    except (OSError, ValueError):  # another drive, an empty or unresolvable path
+        return False
+    return common == folder
+
+
+def module_from_pack(module: str, site_packages: Path) -> bool:
+    """Return True when ``module``'s top-level package resolves from the pack's folder.
+
+    The frozen entry runs ``-m <module>`` only for such a module (CHARC's F-D ruling): a
+    library inside the pack (``cuda.pathfinder``'s canary probe) re-enters the executable as
+    ``sys.executable -m <its module>``. The top-level name is resolved with
+    :func:`importlib.util.find_spec` against the CURRENT ``sys.path`` and import hooks, so a
+    name that exists both in the bundle and in the pack is judged by whichever comes first
+    (the loaded pack is first on ``sys.path``). The spec's locations are its ``origin`` (when
+    it is a file location) and every entry of ``submodule_search_locations`` (every portion of
+    a namespace package such as ``cuda``); ALL of them must lie inside ``site_packages``,
+    compared after ``os.path.realpath`` and ``os.path.normcase``. A built-in or frozen module,
+    a name that does not resolve, or a malformed name (empty, relative) is not from the pack.
+    Finding the spec of a top-level name executes none of its code.
+
+    Args:
+        module: The dotted module name given to ``-m``.
+        site_packages: The loaded pack's ``site-packages`` (:attr:`PackStatus.site_packages`).
+
+    Returns:
+        True when every location of the top-level package lies inside ``site_packages``.
+    """
+    import importlib.util
+
+    top = module.split(".", 1)[0]
+    if not top or not top.isidentifier():
+        return False
+    try:
+        spec = importlib.util.find_spec(top)
+    except (ImportError, ValueError):
+        return False
+    if spec is None:
+        return False
+    locations = list(spec.submodule_search_locations or ())
+    if spec.has_location and spec.origin:
+        locations.append(spec.origin)
+    try:
+        folder = os.path.normcase(os.path.realpath(site_packages))
+    except OSError:
+        return False
+    return bool(locations) and all(_inside(str(path), folder) for path in locations)

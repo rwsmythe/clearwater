@@ -9,14 +9,16 @@ frozen build itself is checked by hand (the WP6.1 report).
 
 from __future__ import annotations
 
+import ast
 import importlib
 import importlib.abc
+import importlib.util
 import logging
 import os
 import shutil
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -405,3 +407,322 @@ def test_the_fresh_interpreter_probe_sees_a_top_level_qt_import(tmp_path: Path) 
     line = _probe_worker_imports(tmp_path / "src")
     assert line.startswith("status 0 loaded PySide6")
     assert "shiboken6" in line
+
+
+# CHARC's F-D ruling: a frozen ``-m`` runs a GPU pack module only; ``-c`` and the rest refuse.
+
+PROBE_BODY = """
+import sys
+from pathlib import Path
+Path(sys.argv[1]).write_text(repr((__name__, sys.argv[2:], __file__)), encoding="utf-8")
+"""
+"""A pack module that records its ``__name__``, its arguments and its file, then returns."""
+
+
+def _package(root: Path, name: str, *, init: bool = True, body: str = "") -> Path:
+    """Write a package ``name`` under ``root`` (a regular one when ``init``) with ``probe.py``."""
+    folder = root / name
+    folder.mkdir(parents=True)
+    if init:
+        (folder / "__init__.py").write_text("", encoding="utf-8")
+    (folder / "probe.py").write_text(body or PROBE_BODY, encoding="utf-8")
+    return folder
+
+
+def _no_real_app_data(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, seen: list[tuple[str, Any]]
+) -> None:
+    """App data under ``tmp_path`` and the log set-up stubbed (recorded), whatever runs."""
+    for variable in ("APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
+        monkeypatch.setenv(variable, str(tmp_path / variable.lower()))
+
+    def configure(folder: Path, **_: Any) -> Path:
+        seen.append(("log", folder))
+        return folder / "clearwater.log"
+
+    monkeypatch.setattr(config_log, "configure_logging", configure)
+
+
+def _drop_modules(prefix: str) -> None:
+    """Forget every test package imported under ``prefix`` (the synthetic pack modules)."""
+    for name in [m for m in sys.modules if m == prefix or m.startswith(prefix)]:
+        del sys.modules[name]
+    importlib.invalidate_caches()
+
+
+@pytest.fixture
+def pack(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[tuple[Path, list[tuple[str, Any]]]]:
+    """A loaded synthetic pack: the frozen entry, a fake GUI, ``activate`` returning ``loaded``.
+
+    The stand-in loader puts ``tmp_path/pack/site-packages`` first on ``sys.path`` (as the real
+    one does) and records its call. ``sys.argv`` and ``sys.path`` are restored after the test
+    and every ``packmod_*`` module is forgotten.
+
+    Yields:
+        The pack's ``site-packages`` and the recorded calls.
+    """
+    site = tmp_path / "pack" / "site-packages"
+    site.mkdir(parents=True)
+    seen: list[tuple[str, Any]] = []
+
+    def activate() -> gpu_pack.PackStatus:
+        seen.append(("activate", None))
+        sys.path.insert(0, str(site))
+        return gpu_pack.PackStatus(gpu_pack.STAMP, "loaded", site_packages=site)
+
+    _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    monkeypatch.setattr(sys, "argv", list(sys.argv))
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.setattr(gpu_pack, "activate", activate)
+    _fake_gui(monkeypatch, seen)
+    _no_real_app_data(monkeypatch, tmp_path, seen)
+    yield site, seen
+    _drop_modules("packmod_")
+
+
+def test_a_frozen_dash_m_runs_a_pack_module_after_the_loader_without_qt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pack: tuple[Path, list[tuple[str, Any]]]
+) -> None:
+    """``<exe> -m <pack module> a b``: loader first, then the module as ``__main__``, no Qt."""
+    site, seen = pack
+    _package(site, "packmod_run")
+    record = tmp_path / "ran.txt"
+    entry, blocker = _fresh_entry(monkeypatch)
+    status = entry.main(["Clearwater.exe", "-m", "packmod_run.probe", str(record), "a", "b"])
+    assert status == 0
+    name, args, file = ast.literal_eval(record.read_text(encoding="utf-8"))
+    assert (name, args) == ("__main__", ["a", "b"])
+    assert Path(file) == site / "packmod_run" / "probe.py"
+    assert seen == [("activate", None)]  # the loader ran; the GUI did not
+    assert blocker.attempts == []
+    assert not [m for m in sys.modules if m.startswith(BLOCKED)]
+
+
+@pytest.mark.parametrize(
+    ("argv", "line"),
+    [
+        (["Clearwater.exe", "-m", "http.server"], "-m 'http.server': not a GPU pack module"),
+        (["Clearwater.exe", "-m", "json.tool", "x"], "-m 'json.tool': not a GPU pack module"),
+        (["Clearwater.exe", "-m", "clearwater"], "-m 'clearwater': not a GPU pack module"),
+        (["Clearwater.exe", "-m", "no_such_module_x"], "not a GPU pack module"),
+        (["Clearwater.exe", "-m", ".relative"], "not a GPU pack module"),
+        (["Clearwater.exe", "-m"], "-m needs a module name"),
+        (["Clearwater.exe", "-m", ""], "-m needs a module name"),
+        (["Clearwater.exe", "-c", "print(1)"], "-c is not supported"),
+        (["Clearwater.exe", "-c"], "-c is not supported"),
+    ],
+)
+def test_a_frozen_dash_m_of_anything_else_and_dash_c_refuse_with_one_line(
+    pack: tuple[Path, list[tuple[str, Any]]],
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+    line: str,
+) -> None:
+    """Refused: exit 2, ONE stderr line, nothing on stdout, no GUI; ``-c`` before the loader."""
+    _, seen = pack
+    import clearwater.__main__ as entry
+
+    assert entry.main(argv) == 2
+    out, err = capsys.readouterr()
+    assert out == ""
+    assert err.count("\n") == 1
+    assert err.startswith("Clearwater: ")
+    assert line in err
+    loader_first = argv[1] == "-m" and len(argv) > 2 and argv[2] != ""
+    assert seen == ([("activate", None)] if loader_first else [])
+
+
+@pytest.mark.parametrize("outcome", ["absent", "rejected"])
+def test_a_frozen_dash_m_refuses_when_no_pack_is_loaded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    outcome: gpu_pack.Outcome,
+) -> None:
+    """An absent or rejected pack: no ``-m`` target resolves from it, even one on ``sys.path``."""
+    _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    seen: list[tuple[str, Any]] = []
+    _fake_gui(monkeypatch, seen)
+    _no_real_app_data(monkeypatch, tmp_path, seen)
+    site = tmp_path / "site"
+    _package(site, "packmod_absent")
+    monkeypatch.syspath_prepend(str(site))
+
+    def activate() -> gpu_pack.PackStatus:
+        return gpu_pack.PackStatus(gpu_pack.STAMP, outcome, reason="x")
+
+    monkeypatch.setattr(gpu_pack, "activate", activate)
+    import clearwater.__main__ as entry
+
+    try:
+        assert entry.main(["Clearwater.exe", "-m", "packmod_absent.probe", "f"]) == 2
+        assert "no GPU pack is loaded" in capsys.readouterr().err
+        assert seen == []
+        assert "packmod_absent" not in sys.modules
+    finally:
+        _drop_modules("packmod_")
+
+
+def test_a_name_in_the_bundle_and_the_pack_is_judged_by_the_first_on_sys_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pack: tuple[Path, list[tuple[str, Any]]]
+) -> None:
+    """The bundle copy first: not from the pack. The pack first: from it, and its copy runs."""
+    site, _ = pack
+    bundle = tmp_path / "bundle"
+    _package(site, "packmod_shared")
+    _package(bundle, "packmod_shared")
+    sys.path.insert(0, str(bundle))
+    sys.path.insert(1, str(site))
+    importlib.invalidate_caches()
+    assert not gpu_pack.module_from_pack("packmod_shared.probe", site)
+    sys.path.remove(str(site))
+    sys.path.insert(0, str(site))
+    importlib.invalidate_caches()
+    assert gpu_pack.module_from_pack("packmod_shared.probe", site)
+    import clearwater.__main__ as entry
+
+    record = tmp_path / "ran.txt"
+    # The stand-in loader puts the pack first (again), ahead of the bundle's copy.
+    assert entry.main(["Clearwater.exe", "-m", "packmod_shared.probe", str(record)]) == 0
+    _, _, file = ast.literal_eval(record.read_text(encoding="utf-8"))
+    assert Path(file) == site / "packmod_shared" / "probe.py"
+
+
+def test_a_namespace_package_is_from_the_pack_only_when_every_portion_is(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``cuda`` is a namespace package: one portion outside the pack refuses the name."""
+    site = tmp_path / "site"
+    other = tmp_path / "other"
+    _package(site, "packmod_ns", init=False)
+    monkeypatch.setattr(sys, "path", [str(site), *sys.path])
+    importlib.invalidate_caches()
+    try:
+        assert gpu_pack.module_from_pack("packmod_ns.probe", site)
+        (other / "packmod_ns").mkdir(parents=True)
+        sys.path.insert(1, str(other))
+        importlib.invalidate_caches()
+        assert not gpu_pack.module_from_pack("packmod_ns.probe", site)
+    finally:
+        _drop_modules("packmod_")
+
+
+def test_built_in_stdlib_and_bundle_modules_are_not_from_the_pack(tmp_path: Path) -> None:
+    """A built-in (``sys``), the stdlib, the bundle's own packages: never pack modules."""
+    for name in ("sys", "os", "http.server", "clearwater.app.export_worker", "numpy"):
+        assert not gpu_pack.module_from_pack(name, tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("body", "status"), [("raise SystemExit(5)", 5), ("raise RuntimeError('boom')", 1)]
+)
+def test_a_pack_modules_exit_passes_and_its_exception_is_printed_not_raised(
+    capsys: pytest.CaptureFixture[str],
+    pack: tuple[Path, list[tuple[str, Any]]],
+    body: str,
+    status: int,
+) -> None:
+    """``SystemExit`` keeps its code; any other exception is printed, status 1 (no dialog)."""
+    site, _ = pack
+    name = f"packmod_exit{status}"
+    _package(site, name, body=body)
+    import clearwater.__main__ as entry
+
+    result: object
+    try:
+        result = entry.main(["Clearwater.exe", "-m", f"{name}.probe"])
+    except SystemExit as stop:
+        result = stop.code
+    assert result == status
+    err = capsys.readouterr().err
+    assert ("RuntimeError: boom" in err) == (status == 1)
+
+
+@pytest.mark.parametrize(
+    "argv", [["clearwater", "-m", "x"], ["clearwater", "-c", "print(1)"], ["clearwater", "-m"]]
+)
+def test_a_source_run_sends_dash_m_and_dash_c_to_the_gui_as_before(
+    monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]], argv: list[str]
+) -> None:
+    """Not frozen: no new branch; ``python -m clearwater -m x`` reaches the GUI as on 1.0.0."""
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    _fake_gui(monkeypatch, calls)
+    import clearwater.__main__ as entry
+
+    assert entry.main(argv) == 3
+    assert calls == [("activate", None), ("gui", argv)]
+
+
+_PATHFINDER_PROBE = """
+import importlib.abc
+import sys
+import types
+from pathlib import Path
+
+
+class NoQt(importlib.abc.MetaPathFinder):
+    def find_spec(self, name, path, target=None):
+        if name.split(".")[0] in ("PySide6", "shiboken6"):
+            raise ImportError("blocked by the test: " + name)
+        return None
+
+
+sys.meta_path.insert(0, NoQt())  # no window can open, whatever branch runs
+gui = types.ModuleType("clearwater.app.main")
+gui.main = lambda argv=None: print("gui reached") or 9
+sys.modules["clearwater.app.main"] = gui
+sys.path.insert(0, sys.argv[1])
+sys.frozen = True
+import clearwater.__main__ as entry
+from clearwater import gpu_pack
+site = Path(sys.argv[2])
+gpu_pack.activate = lambda: gpu_pack.PackStatus(gpu_pack.STAMP, "loaded", site_packages=site)
+try:
+    status = entry.main(["Clearwater.exe", "-m", sys.argv[3], "canary", "nvrtc"])
+except SystemExit as stop:
+    status = stop.code
+loaded = sorted(m for m in sys.modules if m.startswith(("PySide6", "shiboken6")))
+print("status", status, "qt", ",".join(loaded) or "-")
+"""
+"""Run the real ``cuda.pathfinder`` canary module through the frozen ``-m`` branch."""
+
+
+def test_the_real_pathfinder_canary_module_runs_through_the_frozen_dash_m(
+    tmp_path: Path,
+) -> None:
+    """``cuda.pathfinder``'s probe module (the F-D re-entry), from where it is installed.
+
+    A fresh interpreter (``-I``) plays the frozen executable; its loaded "pack" is the
+    ``site-packages`` that holds ``cuda.pathfinder`` here. The probe prints its JSON payload
+    (``ok`` or ``not-found``: either proves it ran), exits 0, and no PySide6 is imported.
+    Fail-safe on any code: PySide6 is unimportable in the child, the GUI's ``main`` is a
+    stand-in that prints ``gui reached``, and the app-data variables point under ``tmp_path``.
+    """
+    import clearwater
+
+    spec = importlib.util.find_spec("cuda.pathfinder")
+    if spec is None or not spec.submodule_search_locations:
+        pytest.skip("cuda.pathfinder is not installed (the gpu extra)")
+    site = Path(next(iter(spec.submodule_search_locations))).parents[1]
+    module = "cuda.pathfinder._dynamic_libs.dynamic_lib_subprocess"
+    src_root = Path(clearwater.__file__).resolve().parents[1]
+    environ = dict(os.environ)
+    for variable in ("APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
+        environ[variable] = str(tmp_path / variable.lower())
+    done = subprocess.run(
+        [sys.executable, "-I", "-c", _PATHFINDER_PROBE, str(src_root), str(site), module],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+        env=environ,
+    )
+    assert done.returncode == 0, done.stderr
+    lines = done.stdout.strip().splitlines()
+    assert lines[-1] == "status 0 qt -"
+    assert '"status": ' in lines[-2]
+    assert '"abs_path": ' in lines[-2]
