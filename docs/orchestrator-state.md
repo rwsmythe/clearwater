@@ -21,18 +21,31 @@
 - **Backslash-bearing Python helpers are written with the Write tool**, never a heredoc. **`rm` takes literal absolute paths.** **Worktree release:** a released worktree's `work/` is pruned only on the owner's word; junits copied to `clearwater-review-evidence\<pkg>\gate\` first.
 - **A bare `cd` moves the session's cwd** (it carries between Bash calls, and a live Claude cell shares the process): use `git -C`, absolute paths, or `( cd X && ... )`.
 
-### Live board (RESUME HERE) -- gen 40, 2026-11-04 ~05:55Z, NOTHING RUNNING (no cell live, no job)
+### Live board (RESUME HERE) -- gen 40, 2026-11-04 ~07:00Z, NOTHING RUNNING (no cell live, no job)
 
-1. **Clearwater 1.0.0 RELEASED.**
-   - Tag `v1.0.0` (annotated) is on `40d2ce04`, applied 05:45:31Z on the owner's word "tag 1.0.0" relayed by CHARC (`d1af354bc5607d86`). **NOT pushed**: a push needs the owner's separate word.
-   - CHARC's release record is `docs/proofs/release-1.0.0.md` (main `d62eb37e`). Phase 5 is CLOSED.
-2. **WP-H1 dispatch fill POSTED for CHARC's FINAL** (`docs/briefs/wp-h1-brief.md`, section "Dispatch fill (orchestrator gen 40 ...)").
-   - It adds Q4 (exit code of an empty `--live` window; recommended 0) and Q5 (`scripts/` is ruff-excluded, 25 pre-existing explicit-path findings; recommended the project ruff gate plus no new rule code).
-   - It corrects the swing selector test count: 15, not 12.
-   - On FINAL: dispatch Codex round 0, read-only, in `.worktrees/wp-h1` from main.
-   - Evidence `clearwater-review-evidence\wp-h1\`. At the accept, the template re-port is a local branch in `C:\Users\rwsmy\harness-template` with NO push.
-- Owner-pending: nothing for the orchestrator. CHARC will ask for the prune word with the Phase 6 proposals.
-- Kept worktrees until the owner's word: `wp5.3`, `wp5.7`, `wp5.8`, `wp-dr25`, `wp5.5`; mine is `orch-state-g40`. Prunes of `work\wp5.7\` and `work\wp-dr25\` only on the owner's word.
+1. **Clearwater 1.0.0 released and PUSHED.**
+   - Tag `v1.0.0` (annotated) on `40d2ce04`.
+   - `origin/main` = `f46e0d71` and the tag were pushed 06:12Z on the owner's word "push now" (`a6907a198a747cf0`). The owner then made the repository public.
+   - main has moved on locally since then; **a further push needs the owner's word.**
+2. **WP-H1 ACCEPTED**: main fast-forwarded to `5dc227dd` (record `docs/proofs/wp-h1-accept.md`, ledger, report `docs/reports/wp-h1-cell-depth.md`).
+   - Harness 423 OK.
+   - Codex built it in one session `01a1a51b` (six turns). Both nets were Claude: A converged in r2, and B was clean with its single remediation `3dba892b`.
+   - **Template re-port DONE LOCALLY:** `C:\Users\rwsmy\harness-template`, branch `clearwater-upstream-2026-11-04` = `911e783`, template suite 423 OK (plain `python`). The clone is back on `master`, clean. **NOT PUSHED**: the push, PR and merge need the owner's word.
+   - CHARC writes the upstream record's item 2 DONE and the re-port section.
+3. **Next:** CHARC's Phase 6 proposals.
+- Owner-pending: the template push (when CHARC asks), and the prune word for the kept worktrees.
+- Kept worktrees until the owner's word: `wp5.3`, `wp5.7`, `wp5.8`, `wp-dr25`, `wp5.5`, `wp-h1`; mine is `orch-state-g40`. Prunes of `work\wp5.7\` and `work\wp-dr25\` only on the owner's word.
+
+### Gen-40 lessons (WP-H1 additions)
+
+- **A reviewer's mutation probes find untested guards that a green suite hides.** Both nets did it on WP-H1 (A r1 F1 MAJOR; B3). Ask every review prompt for mutation probes against a COPY of the code under the probe folder.
+- **A re-port diff (instance → template) can carry hunks that predate the package.** WP-H1's would have put back a private identifier the template had deliberately removed. Before the accept, diff against `template/main` and scan the added lines for instance vocabulary.
+- **The Codex sandbox's restricted token cannot list `tempfile.mkdtemp`'s 0o700 dirs.** Preload `scripts/sandbox_mkdir_shim.py` into unittest:
+  `PYTHONPATH=scripts uv run --no-sync python -c "import sandbox_mkdir_shim, unittest, sys; ..."`
+  The seat's unshimmed run is the suite of record.
+- **A dispatch's command spelling can trip a doc guard.** `test_doc_acceptance` bans the literal `--session ` (with a space), so write `--session=<id>` in kernel docs.
+- `tests/harness/test_cell_depth.py` imports a sibling `_loader`: run it with `discover -s tests/harness -p test_cell_depth.py`, not `-m unittest tests.harness...`.
+- **Native Windows Python does not resolve `/c/...` paths.** Read the driver JSON with `grep`, or pass `C:\` paths.
 
 ### Gen-40 lessons
 
