@@ -1,7 +1,7 @@
 # WP6.2 portability audit: macOS arm64 CPU path
 
 Date: 2026-11-04. Audited source: 5671a927, branch wp6.2.
-Status: full report for Reviewer A; acceptance and both review nets pending.
+Status: Reviewer A round 1 remediated; round 2 and acceptance pending.
 Scope: src/clearwater, tools, and product tests. Scripts and tests/harness are
 excluded. This report changes no product, tool, test, interface, or dependency.
 
@@ -12,8 +12,8 @@ explicit Windows executable/path spellings. Class 2 means platform assumptions
 without those conditionals: encoder/device models, filesystem identity, native
 GUI behaviour, external-tool wording, and test coverage.
 
-The accepted round-0 searches produced these matching-line / matching-file
-counts. Comments and test data count; these are screening counts, not counts of
+The round-0 searches (W/R rerun at Reviewer A round 1) produced these
+matching-line / matching-file counts. Comments and test data count; these are screening counts, not counts of
 executable branches. Searches overlap and must not be summed as unique sites.
 
 | Search | Class / purpose | src/clearwater | tools | tests excluding harness |
@@ -31,14 +31,17 @@ not regex hits; they include already-portable mechanisms that need a Mac leg.
 
 | Tree | Class 1 rows | Class 2 rows | Total rows |
 |---|---:|---:|---:|
-| src/clearwater | 3 | 52 | 55 |
+| src/clearwater | 6 | 58 | 64 |
 | tools | 6 | 42 | 48 |
 | tests excluding harness | 26 | 19 | 45 |
-| Total | 35 | 113 | 148 |
+| Total | 38 | 119 | 157 |
+
+The product total includes three ruled sites arriving with WP6.1, not yet on
+main (P56-P58); those are not included in the grep counts of current code.
 
 REASONED: the existing product has a usable CPU/x265 path and an automatic
 default decoder-pipe fallback. The missing commissioned leg is VideoToolbox;
-the current encoder registry cannot select it. Native Library folders, APFS
+the current encoder registry cannot select it. The proposed Library policy, APFS
 identity cases, native GUI behaviour, and a self-contained arm64 bundle need
 follow-on implementation or validation. No Windows product defect was confirmed.
 
@@ -50,9 +53,10 @@ Recommended changes and proposed tests are future work, not completed work.
 
 ## 2. Grep record
 
-These are the accepted round-0 commands and counts; the complete scans were not
-repeated in turn 2. PowerShell was the shell. Each pattern below was assigned
-to $p and counted separately for each root by this exact loop:
+These are the accepted round-0 commands and counts; W and R were rerun exactly
+at Reviewer A round 1 on 4f67743f. Other scans were not repeated. PowerShell was
+the shell. Each pattern below was assigned to $p and counted separately for each
+root by this exact loop:
 
     foreach ($root in @('src/clearwater','tools','tests')) {
         $a = @(rg -n -g '!**/harness/**' -e $p $root)
@@ -126,8 +130,201 @@ classified as data/format handling rather than Windows filesystem dependencies.
 Targeted rg reads then followed the actual mechanics at the file:line sites
 below: suffix routing, containment/identity, encoder options and stderr parsing,
 memory selection, native GUI entry points, and Windows-only test controls.
-No scripts were audited, no shell "where" or PowerShell command was executed,
-and no footage was opened.
+No scripts were audited, no product/tool subprocess invoking "where" or
+PowerShell was run, and no footage was opened.
+
+### Reviewer A round 1: W/R reproduction record
+
+Tool: `rg --version` returned `ripgrep 15.2.0 (rev e89fff89ac)`;
+features +pcre2, PCRE2 10.45 available, default regex engine used (no -P).
+The exact W/R patterns and per-root loop above reproduce the original totals:
+W = 103/31, 166/30, 286/62; R = 19/2, 36/5, 88/21.
+Per-file matching-line counts below were produced with:
+
+    rg -c -g '!**/harness/**' -e $p $root
+
+An independent Python re scan over git ls-files also reproduced those totals
+when UTF-8 bytes were split on literal LF, retaining CR. Its command was
+`python -` with the following input, run from this worktree (read-only):
+
+```python
+from pathlib import Path
+import re
+import subprocess
+
+report = Path("docs/reports/wp6.2-portability-audit.md").read_text()
+for key in ("W", "R"):
+    section = report.split("### " + key + ":", 1)[1]
+    pattern = re.search(r"(?m)^    \$p = '(.*)'$", section)[1]
+    for root in ("src/clearwater", "tools", "tests"):
+        lines = files = 0
+        names = subprocess.check_output(["git", "ls-files", root], text=True)
+        for name in names.splitlines():
+            if "/harness/" in name:
+                continue
+            try:
+                text = Path(name).read_bytes().decode("utf-8")
+            except UnicodeError:
+                continue
+            hits = sum(bool(re.search(pattern, line)) for line in text.split("\n"))
+            lines += hits
+            files += bool(hits)
+        print(key, root, lines, files)
+```
+
+CR handling explains a concrete difference: read_text().splitlines() removes
+the CR that rg can match with W's terminal \s. That variant gives W 103/31,
+164/30, 285/62; it loses tools/lookcheck/pack.py:422,
+tools/prototype/pipeline.py:488 and tests/test_prototype_backend.py:211, each
+ending in "where". R still reproduces 19/2, 36/5, 88/21 in that variant.
+This explains three missing W lines, not all of the reviewer's lower figures.
+The review supplied no Python program; the remainder of its discrepancy cannot
+be established from "Python re over git ls-files" alone. No binary/encoding or
+regex-engine cause is asserted. The exact rg rerun, independent Python command
+and per-file roster are the reproducible record; counts have not been guessed.
+
+W/R per-file roster: src/clearwater (tests/harness excluded).
+
+| File relative to tree | W lines | R lines |
+|---|---:|---:|
+| analysis/store.py | 1 | 0 |
+| app/composition.py | 2 | 0 |
+| app/export_worker.py | 1 | 0 |
+| cache/keys.py | 1 | 0 |
+| cache/layout.py | 1 | 0 |
+| cache/store.py | 2 | 0 |
+| config/log.py | 2 | 0 |
+| config/paths.py | 7 | 6 |
+| config/presets.py | 3 | 0 |
+| core/backend.py | 1 | 0 |
+| gui/analysis_service.py | 2 | 0 |
+| gui/contract.py | 1 | 0 |
+| gui/messages.py | 1 | 0 |
+| gui/shell.py | 1 | 0 |
+| gui/timeline.py | 1 | 0 |
+| interfaces/parameters.py | 1 | 0 |
+| interfaces/settings.py | 1 | 0 |
+| io/photo/errors.py | 1 | 0 |
+| io/video/capability.py | 3 | 0 |
+| io/video/decode.py | 9 | 0 |
+| io/video/encode.py | 6 | 0 |
+| io/video/pipes.py | 9 | 13 |
+| io/video/probe.py | 2 | 0 |
+| io/video/verify.py | 18 | 0 |
+| jobs/disk_space.py | 1 | 0 |
+| jobs/export.py | 6 | 0 |
+| jobs/export_process.py | 12 | 0 |
+| jobs/naming.py | 1 | 0 |
+| jobs/safe_write.py | 3 | 0 |
+| methods/compensation.py | 2 | 0 |
+| methods/fusion.py | 1 | 0 |
+
+W/R per-file roster: tools (tests/harness excluded).
+
+| File relative to tree | W lines | R lines |
+|---|---:|---:|
+| analysis_breakdown.py | 1 | 0 |
+| container_spike/compare.py | 5 | 0 |
+| core_speed.py | 1 | 0 |
+| environment_report.py | 0 | 1 |
+| export_bench.py | 2 | 0 |
+| fixtures/files.py | 2 | 0 |
+| fixtures/flicker.py | 1 | 0 |
+| fixtures/manifest.py | 1 | 0 |
+| fixtures/stills.py | 2 | 0 |
+| fixtures/video.py | 1 | 0 |
+| halo_part3.py | 6 | 0 |
+| halo_probe.py | 9 | 0 |
+| headless_export.py | 6 | 0 |
+| inventory.py | 11 | 0 |
+| local_config.py | 3 | 0 |
+| lookcheck/frames.py | 3 | 0 |
+| lookcheck/pack.py | 3 | 0 |
+| lookcheck/scan.py | 1 | 0 |
+| noise_experiments.py | 6 | 0 |
+| prototype/bench.py | 22 | 12 |
+| prototype/clip.py | 18 | 0 |
+| prototype/pipeline.py | 6 | 0 |
+| prototype/run.py | 1 | 0 |
+| prototype/temporal.py | 6 | 0 |
+| reviewpack/build.py | 4 | 0 |
+| spike_io/licences.py | 1 | 1 |
+| spike_io/photo.py | 2 | 0 |
+| spike_io/transport.py | 31 | 21 |
+| statistics_experiments.py | 3 | 0 |
+| video_fidelity.py | 4 | 0 |
+| video_io_bench.py | 4 | 1 |
+
+W/R per-file roster: tests (tests/harness excluded).
+
+| File relative to tree | W lines | R lines |
+|---|---:|---:|
+| acceptance_support.py | 1 | 0 |
+| conftest.py | 8 | 4 |
+| fixture_plugin.py | 1 | 0 |
+| gui_support.py | 1 | 0 |
+| test_app_activity.py | 1 | 0 |
+| test_app_composition.py | 1 | 0 |
+| test_app_export_worker.py | 4 | 0 |
+| test_app_interface_load.py | 2 | 0 |
+| test_app_leftovers.py | 2 | 0 |
+| test_app_preview_fft.py | 3 | 0 |
+| test_app_startup.py | 4 | 2 |
+| test_app_v7.py | 2 | 0 |
+| test_app_v8_v18.py | 2 | 0 |
+| test_app_wiring.py | 5 | 1 |
+| test_color_roundtrip.py | 3 | 0 |
+| test_config_isolation.py | 0 | 2 |
+| test_config_log.py | 1 | 0 |
+| test_config_paths.py | 7 | 5 |
+| test_config_presets.py | 3 | 0 |
+| test_config_settings.py | 3 | 1 |
+| test_conftest_guard.py | 19 | 18 |
+| test_container_spike.py | 1 | 0 |
+| test_core_backend.py | 1 | 0 |
+| test_core_speed.py | 1 | 0 |
+| test_fixture_cache_lock.py | 1 | 0 |
+| test_fixtures.py | 5 | 0 |
+| test_footage_locator.py | 4 | 2 |
+| test_gate_timeout.py | 1 | 0 |
+| test_gui_deps.py | 0 | 1 |
+| test_gui_startup.py | 0 | 1 |
+| test_gui_timeline.py | 1 | 0 |
+| test_headless_export.py | 20 | 4 |
+| test_inventory.py | 9 | 0 |
+| test_io_video_decode_lifecycle.py | 6 | 2 |
+| test_io_video_decode_rules.py | 0 | 2 |
+| test_io_video_encode.py | 2 | 0 |
+| test_io_video_encode_bench.py | 3 | 1 |
+| test_io_video_encode_units.py | 4 | 0 |
+| test_io_video_spawn.py | 56 | 21 |
+| test_jobs_export.py | 6 | 0 |
+| test_jobs_export_process.py | 29 | 4 |
+| test_jobs_export_support.py | 1 | 0 |
+| test_jobs_naming.py | 1 | 2 |
+| test_jobs_safe_write.py | 1 | 0 |
+| test_local_config.py | 3 | 0 |
+| test_lookcheck.py | 1 | 0 |
+| test_lookcheck_deep.py | 2 | 0 |
+| test_methods_assembly_prototype.py | 1 | 0 |
+| test_methods_compensation.py | 1 | 0 |
+| test_methods_fusion_prototype.py | 1 | 0 |
+| test_photo_verify.py | 3 | 0 |
+| test_prototype_backend.py | 2 | 0 |
+| test_prototype_clip.py | 8 | 0 |
+| test_prototype_pipeline.py | 1 | 0 |
+| test_reviewpack.py | 4 | 5 |
+| test_spike_io_photo.py | 1 | 0 |
+| test_tools_halo_probe.py | 6 | 0 |
+| test_v51_photo_acceptance.py | 1 | 0 |
+| test_video_fidelity.py | 1 | 0 |
+| test_wp321_device_frames.py | 1 | 0 |
+| test_wp42_composition.py | 2 | 0 |
+| test_wp42_runner_video.py | 3 | 2 |
+| test_wp42_v3_figures.py | 1 | 0 |
+| test_wp42a_runner_hardening.py | 14 | 7 |
+| test_wp42b_naming_guard.py | 2 | 1 |
+| test_wp43_runner_redaction.py | 1 | 0 |
 
 ## 3. Site table and test references
 
@@ -144,22 +341,22 @@ M references all require the proposed macos marker. No named new test exists yet
 
 | ID | File:line | Class | Assumption / mechanic | macOS today | Recommended change | Windows-side test | macos test |
 |---|---|---|---|---|---|---|---|
-| P01 | config/paths.py:115 | 1 | win32 uses APPDATA/LOCALAPPDATA; all else XDG | REASONED works via XDG, no Library branch | Add darwin locations from section 5; retain Windows/XDG | W-PATH[P01] | M-PATH[P01] |
+| P01 | config/paths.py:115 | 1 | win32 uses APPDATA/LOCALAPPDATA; all else XDG | REASONED works via XDG, compliant with AD-25(a), no Library branch | PROPOSED Library locations in section 5 need CHARC's AD-25(a) amendment and N1 approval; retain Windows/XDG | W-PATH[P01] | M-PATH[P01] |
 | P02 | io/video/pipes.py:56 | 1 | CREATE_NO_WINDOW only on win32 | REASONED works with zero flags | Retain guarded constant and FFREPORT removal | W-SPAWN[P02] | M-SPAWN[P02] |
-| P03 | io/video/pipes.py:67,85,122 | 1 | _winapi/msvcrt enlarged pipe; OSError caught | REASONED works via default-pipe fallback | Retain default pipe for darwin, Q2 | W-PIPE[P03] | M-PIPE[P03] |
+| P03 | io/video/pipes.py:67,85,95,112-116 | 1 | _winapi/msvcrt enlarged pipe; OSError caught, fallback WARNING | REASONED works via default-pipe fallback | Retain default pipe for darwin, Q2; INFO off Windows is proposed, not decided | W-PIPE[P03] | M-PIPE[P03] |
 | P04 | io/video/decode.py:335,350 | 2 | Separate enlarged/default stdout paths | REASONED works by fallback; throughput untested | Retain both lifecycle paths; validate frames/PTS | W-PIPE[P04] | M-PIPE[P04] |
 | P05 | io/video/decode.py:152,246 | 2 | Actual CUDA trial enables hwaccel cuda | REASONED software decode available | Keep CPU path; no CUDA or Metal requirement on Mac | W-DEVICE[P05] | M-DEVICE[P05] |
 | P06 | io/video/decode.py:72 | 2 | Exact showinfo prefix, frame and time-base fields | REASONED untested on Mac FFmpeg | Validate pinned build text; change parser only for demonstrated difference | W-TEXT[P06] | M-TEXT[P06] |
-| P07 | io/video/capability.py:33 | 2 | Registry offers NVENC/x265 only | REASONED fails to offer VT; x265 available | Platform encoder roster: darwin VT then x265 | W-CODEC[P07] | M-CODEC[P07] |
+| P07 | io/video/capability.py:35-42 | 2 | Registry offers NVENC/x265 only | REASONED fails to offer VT; x265 available | Platform encoder roster: darwin VT then x265 | W-CODEC[P07] | M-CODEC[P07] |
 | P08 | io/video/capability.py:109 | 2 | Encoder-list flag/name parsing | REASONED untested against Mac build | Parse listing plus actual trial; include absent/failed VT cases | W-TEXT[P08] | M-TEXT[P08] |
-| P09 | io/video/capability.py:123 | 2 | Trial format/profile table knows two encoders | REASONED VT absent | Add independent 8/10-bit VT trials | W-CODEC[P09] | M-CODEC[P09] |
-| P10 | io/video/capability.py:172 | 2 | NVIDIA stderr fragments explain failures | REASONED generic failure path works; VT reason absent | Keep NVENC markers scoped to NVENC; preserve ASCII-safe VT diagnostic | W-TEXT[P10] | M-TEXT[P10] |
+| P09 | io/video/capability.py:50-56 | 2 | Trial format/profile table knows two encoders | REASONED VT absent | Add independent 8/10-bit VT trials | W-CODEC[P09] | M-CODEC[P09] |
+| P10 | io/video/capability.py:57-66,160-169 | 2 | NVIDIA stderr fragments explain failures | REASONED generic failure path works; VT reason absent | Keep NVENC markers scoped to NVENC; preserve ASCII-safe VT diagnostic | W-TEXT[P10] | M-TEXT[P10] |
 | P11 | io/video/capability.py:249 | 2 | auto follows existing two-name tuple | REASONED selects x265, never VT | Platform preference with fallback; explicit selection still validated | W-CODEC[P11] | M-CODEC[P11] |
 | P12 | io/video/encode.py:107 | 2 | cq 22/26/30 and crf 21/26/30 are encoder-specific | REASONED x265 works; VT mapping absent | Separate VT controls; no numeric cq-to-qscale translation | W-RATE[P12] | M-RATE[P12] |
 | P13 | io/video/encode.py:256 | 2 | NVENC output pixel-rate/level ceiling | REASONED arithmetic portable; VT application absent | Reuse numeric rule through an approved internal helper; map VT separately | W-RATE[P13] | M-RATE[P13] |
 | P14 | io/video/encode.py:323 | 2 | non-NVENC branch emits x265 options | REASONED no VT command branch | Add explicit VT branch, never x265 params/preset/crf for VT | W-CODEC[P14] | M-CODEC[P14] |
-| P15 | io/video/encode.py:100,434,450 | 2 | gpmd allowlist, hvc1 and regenerated tmcd | REASONED platform-neutral arguments; Mac mux untested | Preserve container policy; run full V4 comparison | W-V4[P15] | M-V4[P15] |
-| P16 | io/video/probe.py:100 | 2 | shutil.which locates ffmpeg/ffprobe | REASONED source install works with PATH; bundle untested | Bundle-aware absolute tool lookup, source PATH fallback, WP6.5 | W-SPAWN[P16] | M-BUNDLE[P16] |
+| P15 | io/video/encode.py:100,404-405,418-421,434-455 | 2 | gpmd allowlist, hvc1, tmcd, rotation/NUT input, cut, timescale and negative CTS offsets | REASONED platform-neutral arguments; Mac mux/reorder behaviour untested | Preserve container policy in section 4; run full V4 and VT reorder/edit-list comparison | W-V4[P15] | M-V4[P15] |
+| P16 | io/video/probe.py:100; WP6.1 brief, round-0 ruling D1 | 2 | shutil.which locates ffmpeg/ffprobe; frozen PATH prepend already ruled | REASONED source install works with PATH; bundle untested | Retain find_tool; validate D1's bundled-first lookup and resolved absolute paths, P57 | W-SPAWN[P16] | M-BUNDLE[P16] |
 | P17 | io/video/probe.py:74 | 2 | Transfer identifiers refuse HLG/PQ | REASONED works independently of encoder | Retain refusal before decode/encode; add VT selection control | W-V4[P17] | M-V4[P17] |
 | P18 | core/memory.py:50 | 2 | D111 formula bounds CUDA working arrays | REASONED portable arithmetic, not a Mac RAM admission rule | Retain formula; report CPU RAM separately | W-DEVICE[P18] | M-DEVICE[P18] |
 | P19 | core/memory.py:85 | 2 | CUDA/NVDEC/NVENC constants fitted on NVIDIA | REASONED inapplicable to Mac CPU jobs | Do not present these as unified-memory estimates | W-DEVICE[P19] | M-DEVICE[P19] |
@@ -167,9 +364,9 @@ M references all require the proposed macos marker. No named new test exists yet
 | P21 | core/backend.py:797 | 2 | CUDA free memory plus reusable CuPy pool | REASONED unused on CPU path | Keep CUDA-specific; no Apple GPU substitution | W-DEVICE[P21] | M-DEVICE[P21] |
 | P22 | core/backend.py:933 | 2 | Optional CuPy import/device/kernel probe | REASONED absent CuPy returns CPU reason | Retain graceful missing/unusable-CUDA paths | W-DEVICE[P22] | M-DEVICE[P22] |
 | P23 | core/backend.py:1027 | 2 | force_cpu/no CUDA returns before free-device query | REASONED works; Mac RSS unmeasured | Pin no-CUDA selection and distinguish RSS from GPU estimates | W-DEVICE[P23] | M-DEVICE[P23] |
-| P24 | app/composition.py:461 | 2 | Worker is sys.executable -m module | REASONED source launch works; frozen launch untested | WP6.5 frozen-worker dispatch preserving AD-31 protocol | W-SPAWN[P24] | M-BUNDLE[P24] |
+| P24 | app/composition.py:461; WP6.1 brief, FINAL ruling Q5 | 2 | Current source worker is sys.executable -m module; frozen --export-worker re-entry already ruled, arriving with WP6.1 | DOC (repository) Q5 fixes mechanism; REASONED Mac bundle untested | VALIDATION only: Contents/MacOS re-entry, Qt-free/no extra GUI or Dock icon, protocol/cancel, no orphan FFmpeg; AD-34 at WP6.1 accept | W-SPAWN[P24] | M-BUNDLE[P24] |
 | P25 | app/main.py:270 | 2 | Journal receives Locations.config_dir | REASONED follows current XDG resolver | Keep injected folder; native darwin branch flows through | W-PATH[P25] | M-PATH[P25] |
-| P26 | app/startup.py:69 | 2 | write-journal.json resides in config_dir | REASONED works under XDG | Persist under Application Support, not cache or app bundle | W-PATH[P26] | M-PATH[P26] |
+| P26 | app/startup.py:69 | 2 | write-journal.json resides in config_dir | REASONED works under XDG | Keep persistent config placement; Application Support is PROPOSED pending AD-25(a), never cache/app bundle | W-PATH[P26] | M-PATH[P26] |
 | P27 | gui/sources.py:38 | 2 | Dialog filters enumerate lower-case suffix globs | REASONED native filter case behaviour untested | Validate mixed-case visibility; add upper-case globs only if needed | W-GUI[P27] | M-GUI[P27] |
 | P28 | gui/sources.py:57 | 2 | Route lower-cases suffix | REASONED works for upper/lower extensions | Retain case-insensitive routing | W-FS[P28] | M-FS[P28] |
 | P29 | gui/batch_panel.py:94 | 2 | normcase(abspath) is queue identity | REASONED APFS case-alias risk, DR candidate 1 | Existing-file identity plus conservative nonexistent fallback; preserve distinct files | W-FS[P29] | M-FS[P29] |
@@ -200,6 +397,22 @@ M references all require the proposed macos marker. No named new test exists yet
 | P54 | io/photo/reader.py:319 | 2 | DNG suffix lower-cased plus metadata detection | REASONED portable logic; native codec wheels untested | Retain refusal/detection and validate HEIC/JPEG/TIFF codec stack | W-FS[P54] | M-FS[P54] |
 | P55 | interfaces/settings.py:34,66 | 2 | Frozen-interface documentation names NVENC/x265 auto preference | REASONED stale for proposed VT roster | CHARC approves documentation disposition; preserve fields/signatures | W-CODEC[P55] | M-CODEC[P55] |
 
+The following WP6.1 rows cite the rulings in docs/briefs/wp6.1-brief.md rather
+than invented future code lines. P56-P58 are **arriving with WP6.1, not yet on
+main**; DOC here means the mechanism is ruled, not executed on macOS.
+
+| ID | File:line or ruling | Class | Assumption / mechanic | macOS today | Recommended change | Windows-side test | macos test |
+|---|---|---|---|---|---|---|---|
+| P56 | gpu_pack.py, pack_root; WP6.1 brief, FINAL Q6 | 1 | Windows LOCALAPPDATA/Clearwater/gpu-pack; Linux XDG_DATA_HOME/clearwater/gpu-pack (default ~/.local/share); darwin None | DOC (repository) darwin no-op ruled by N14; REASONED native run untested | Validate no CUDA pack lookup/load on Mac; preserve Windows/Linux roots | W-PATH[P56] | M-PATH[P56] |
+| P57 | __main__.py; WP6.1 brief, round-0 D1 | 1 | Frozen-only dirname(sys.executable) prepended to PATH using os.pathsep before tool lookup | DOC (repository) portable prepend ruled; REASONED Contents/MacOS tool placement untested | Validate actual bundle placement resolves bundled tools first without external PATH; keep find_tool unchanged | W-SPAWN[P57] | M-BUNDLE[P57] |
+| P58 | gpu_pack.py; WP6.1 brief, round-0 D2 | 1 | os.add_dll_directory on nvidia/*/bin under win32 guard | DOC (repository) Windows-only call approved; REASONED darwin must not invoke it | Retain guard and no-op Mac loader; Linux equivalent stays WP6.3/WP6.4 open item | W-SPAWN[P58] | M-SPAWN[P58] |
+| P59 | io/video/encode.py:403-408 | 2 | encode_command computes rate only for HARDWARE_ENCODER (NVENC) | REASONED VT command would have no numeric ceiling | Map approved VT rate rule separately here and in _prepare, retaining NVENC | W-RATE[P59] | M-RATE[P59] |
+| P60 | io/video/encode.py:703-713 | 2 | _prepare computes NVENC-only rate and geometry refusal | REASONED VT would bypass this admission path | Apply approved numeric rule and geometry refusal to VT before spawn | W-RATE[P60] | M-RATE[P60] |
+| P61 | io/video/encode.py:593-595 | 2 | VideoSink.nvenc_rate is NVENC state; None for x265, outside frozen SinkReport | REASONED no VT rate state/reporting contract | Keep NVENC attribute semantics; add internal VT state only as approved, no frozen-interface change | W-RATE[P61] | M-RATE[P61] |
+| P62 | io/video/encode.py:838-842 | 2 | _check_options refuses names outside ENCODERS | REASONED VT refused today | Align validation with approved platform roster and actual capability; retain unknown/unavailable refusal | W-CODEC[P62] | M-CODEC[P62] |
+| P63 | gui/settings_dialog.py:95,507 | 2 | AUTO_TEXT hard-codes Automatic (NVENC when available) | REASONED inaccurate for proposed darwin VT preference | Platform-aware automatic label; CHARC routes owner-reserved G12 wording item, section 7 | W-GUI[P63] | M-GUI[P63] |
+| P64 | jobs/disk_space.py:70-120,161 | 2 | D87/DR-48 estimate relies on NVENC ceiling and measured x265 sizes; disk_usage reports free bytes | REASONED VT estimate unproved; APFS purgeable capacity not represented as an explicit field | Pin existing arithmetic/Windows behaviour; WP6.5 measures VT sizes versus estimate and APFS free/purgeable-space behaviour | W-SPACE[P64] | M-SPACE[P64] |
+
 ### 3.2 Tools
 
 | ID | File:line | Class | Assumption / mechanic | macOS today | Recommended change | Windows-side test | macos test |
@@ -217,7 +430,7 @@ M references all require the proposed macos marker. No named new test exists yet
 | T11 | spike_io/licences.py:149 | 2 | Library evidence scans *.dll | REASONED misses Mach-O/dylib evidence | Candidate DR 3: platform binary discovery for bundled artefacts | W-TOOL[T11] | M-TOOL[T11] |
 | T12 | spike_io/licences.py:188 | 2 | Code suffixes include pyd/dll/exe | REASONED Mac binary coverage incomplete | Candidate DR 3: include Mac extension/library forms, retain Windows forms | W-TOOL[T12] | M-TOOL[T12] |
 | T13 | video_io_bench.py:118 | 2 | Sampler names accept bare and .exe | REASONED portable name set for existing sampler | Retain; label NVIDIA sampler | W-TOOL[T13] | M-TOOL[T13] |
-| T14 | inventory.py:828,832 | 2 | Lower-case suffix, POSIX report-relative paths | REASONED works on case-sensitive volume | Retain distinct discovered paths and stable slash serialization | W-FS[T14] | M-FS[T14] |
+| T14 | inventory.py:822-832 | 2 | os.walk, lower-case suffix, POSIX report-relative paths | REASONED works on case-sensitive volume; AppleDouble ._* names can pass suffix filter | Retain distinct paths/slash serialization; exclude AppleDouble or report unreadable, with synthetic control | W-FS[T14] | M-FS[T14] |
 | T15 | inventory.py:293,301 | 2 | LRV stem/name matching ignores case | REASONED works | Retain sidecar matching independently of volume case | W-FS[T15] | M-FS[T15] |
 | T16 | inventory.py:825 | 2 | Exclude comparison uses normcase | REASONED exclusion case treatment differs on Darwin | Make documented folder-name policy explicit; test exact and varied case | W-FS[T16] | M-FS[T16] |
 | T17 | inventory.py:1112,1155 | 2 | Resolved/normcased text guards footage | REASONED APFS alias risk, candidate DR 2 | Add existing-ancestor identity containment before any mkdir/write | W-FS[T17] | M-FS[T17] |
@@ -309,11 +522,13 @@ on Windows; they do not launch Windows APIs under a fake Darwin platform.
 | X45 | acceptance_support.py:73 | 2 | Privacy assertion normalizes separators and casefolds | REASONED conservative portable assertion | Retain; add native POSIX/Unicode path spellings | W-TEXT[X45] | M-TEXT[X45] |
 
 Screening-only Class 1 matches not requiring another product change include
-test_config_settings.py:461 malformed NUL paths, test_gui_deps.py:79 forbidden
+test_config_settings.py:367 (R: a parameter named "where"), test_gui_deps.py:79 forbidden
 environment-access assertions, test_io_video_encode_bench.py:44 a Windows
 launcher comment, test_jobs_export_process.py:522/858 foreign path text, and
 test_reviewpack.py:2237/2589 Windows DLL diagnostic strings. They remain data,
-mocking, or policy controls. ASCII backslash escaping in io/photo/errors.py:30,
+mocking, or policy controls. test_config_settings.py:461 is a W match for "nul"
+(the malformed-NUL-path control), not an R/Class 1 refined match.
+ASCII backslash escaping in io/photo/errors.py:30,
 io/video/inputs.py:42, gui/messages.py:48, jobs/disk_space.py:66,
 jobs/export_process.py:775 and app/export_worker.py:267 is deliberately
 platform-independent and should be retained, not changed to a path conversion.
@@ -322,7 +537,7 @@ platform-independent and should be retained, not changed to a path conversion.
 
 ### Current contract and proposed roster
 
-REASONED from capability.py:33,123,249 and encode.py:323: the application currently
+REASONED from capability.py:35-42,50-56,249 and encode.py:323: the application currently
 offers only hevc_nvenc and libx265. Actual trial success determines availability
 and depth; NVIDIA-specific stderr matching improves reasons, not the success
 predicate. The generic failure path already captures a bounded ASCII-safe tail.
@@ -380,6 +595,12 @@ If a required control is unsupported, surface that fact and use the documented
 fallback policy; do not silently claim NVENC-equivalent control. The brief
 explicitly reserves this measurement and choice for WP6.5.
 
+REASONED from jobs/disk_space.py:70-120,161 (P64): its NVENC-bounded estimate is
+not yet proved conservative for VT, especially candidate A's potentially ignored
+ceiling; WP6.5 must compare actual output bytes with the estimate at every quality
+and depth, and check APFS free versus purgeable capacity rather than treating the
+disk_usage free figure as Finder's reclaimable capacity.
+
 ### Rate-rule mapping from encode.py:256
 
 The existing nvenc_rate function is the exact numeric reference, not a loose
@@ -409,11 +630,14 @@ not the Windows NVIDIA timing acceptance threshold (spec N1/N6 v0.6.0).
 
 ### Container and decoder invariants
 
-REASONED from encode.py:100,417-454, probe.py:74 and verify.py:525: the current
+REASONED from encode.py:100,404-455, probe.py:74 and verify.py:525: the current
 MP4/FFprobe policy is platform-neutral, but the Mac build has not been exercised.
 Retain hvc1, explicit color primaries/transfer/matrix/range, SAR/orientation,
 copyts, passthrough fps mode, demux encoder time base, metadata mapping, and
-timecode regeneration. Only gpmd is the currently proved non-timecode MP4 data
+timecode regeneration. Also retain -movflags +negative_cts_offsets (:454-455),
+-video_track_timescale (:440-441), -noautorotate and conditional -display_rotation
+(:404,418-419), the NUT input -bsf:v (:420-421), and the conditional -to cut
+(:405,426) before the original-source input. Only gpmd is the currently proved non-timecode MP4 data
 allowlist; mebx remains reported not carried, not newly advertised as preserved.
 
 The Mac V4 leg must compare source/output through both the product verifier and
@@ -427,6 +651,9 @@ between mandatory/required and best-effort results; never promote a tag merely
 because its name appears in FFprobe JSON. Product verify.py does not list data
 packet payloads, so it alone cannot prove gpmd/timecode payload fidelity.
 Use existing equivalences for orientation, unset square SAR and mono layout.
+REASONED: VT's reorder depth can differ from NVENC/x265; M-V4 must include a
+reordered-frame case with negative CTS offsets and AD-22 edit-list reproduction,
+checking presentation PTS/start/duration through both verifier and comparator.
 
 REASONED: FFprobe's structured identifiers and container boxes do not depend on
 a Windows shell. The showinfo parser and diagnostic-reason fragments do depend
@@ -441,8 +668,11 @@ Tests must prove a VT-capable machine still refuses both transfers unchanged.
 
 Current behaviour is REASONED from config/paths.py:115: darwin takes the XDG
 branch, with ~/.config/clearwater and ~/.cache/clearwater fallbacks.
-Recommendation for the approved darwin branch, using the existing injectable
-home and Locations shape:
+DOC (repository), docs/decisions.md:34, AD-25(a), specifies XDG directories
+outside Windows: today's darwin behaviour complies. The Library branch below is
+PROPOSED, not approved; it requires CHARC's AD-25(a) amendment and approval of the
+new N1 platform site. Retaining XDG is the currently compliant alternative.
+The proposal uses the existing injectable home and Locations shape:
 
 | Purpose | Proposed darwin path | Existing filename/subfolder |
 |---|---|---|
@@ -460,6 +690,9 @@ developer's XDG data, is an explicit CHARC item, not an automatic destructive mo
 Windows APPDATA/LOCALAPPDATA and Linux XDG behaviour remain separately tested.
 Do not make a bundled app use its current directory or installation directory
 as an app-data location.
+REASONED: ~/Library/Logs/Clearwater is an alternative native log location for
+CHARC to consider with AD-25(a); the table preserves Locations.log_dir's current
+logs-under-config contract pending that decision.
 
 Both footage and working paths still come from local configuration; none of
 these conventions replaces those owner-supplied paths. No audit command reads
@@ -504,6 +737,10 @@ DOC (repository): WP2.1S, docs/reports/wp2.1s-io-spike.md:234 and :236, measured
 decode of GX011627, 681 frames at 3840x2160; byte hashes and PTS agreed.
 These are historical Windows results under that report's conditions, not new
 measurements or Mac forecasts. AD-23 expressly selects fallback for macOS.
+DOC (repository): WP2.1S row s (:240) measured loopback TCP at 24.3 ms/frame on
+Windows; REASONED: it is a candidate for a later Mac pipe study, not a 1.2.0 change.
+REASONED from pipes.py:95: darwin's designed fallback emits WARNING once per
+process; WP6.4 should consider INFO off Windows (proposal, not an approved decision).
 
 REASONED: a future full-clip Mac run would establish its actual default-pipe
 throughput, RSS, bytes/frame counts, exact PTS pairing and cancellation/EOF
@@ -511,13 +748,19 @@ cleanup. A later pipe-tuning study would compare alternatives on that host.
 This package measures nothing and does not infer a Mac regression from Windows
 buffer figures.
 
-Retain AD-31's Qt-free worker protocol, stdin cancellation, stderr capture,
-bounded result handling and per-job scratch cache. WP6.5 must replace the source
-sys.executable -m launch in a frozen app with an explicit worker entry mode or
-dedicated bundled worker, without recursively opening another GUI. That adapter
-must preserve the protocol and resolve app paths in the parent. Native tests
-must cover cancellation, forced worker stop and leftover FFmpeg cleanup;
-Windows process-tree assumptions cannot serve as Mac lifetime evidence.
+DOC (repository), docs/briefs/wp6.1-brief.md, CHARC rulings at FINAL Q5:
+app/composition.py builds [sys.executable, "--export-worker"] when sys.frozen,
+retaining the source -m command otherwise; __main__.py dispatches --export-worker
+to export_worker.main before any Qt-bearing import and passes remaining arguments
+through unchanged. AD-34 is to be recorded at WP6.1's accept. This mechanism is
+already ruled and arriving with WP6.1, not an open WP6.5 design item.
+Retain AD-31's parent-resolved paths, Qt-free protocol, stdin cancellation,
+stderr capture, bounded result handling and per-job scratch cache. REASONED:
+the Mac work is VALIDATION of Contents/MacOS executable re-entry, no GUI or extra
+Dock icon for the worker, progress/result/cancel, forced stop and no orphaned
+FFmpeg; Windows process-tree evidence cannot establish Mac lifetime behaviour.
+DOC (repository), WP6.1 round-0 D1/D2 and FINAL Q6 also rule the frozen PATH
+prepend, win32-only DLL-directory call and darwin GPU-pack no-op (P56-P58).
 
 ## 7. GUI
 
@@ -539,6 +782,11 @@ preview control with a known pixel pattern, fit and 1:1 views, zoom/split
 interaction, and export/preview consistency. Keep the GUI free of direct
 correction-backend imports and the export worker free of Qt.
 
+REASONED from settings_dialog.py:95 (P63): AUTO_TEXT names only NVENC and needs a
+platform-aware label for VT. CHARC must route the spec G12 wording item
+(docs/underwater-correction-spec.md:414, NVENC/software auto preference) to the
+owner; the spec is owner-reserved, and this report proposes no replacement text.
+
 ## 8. Tests: named platform parameters and Mac legs
 
 All following tests are proposed for WP6.4/WP6.5, not tests run by this audit.
@@ -555,19 +803,25 @@ subprocesses or UI as stated.
 
 | Reference | Proposed Windows-side function | Required platform parameters / meaningful control | Proposed macos-marked function |
 |---|---|---|---|
-| W-PATH / M-PATH | test_portability_app_locations | win32/darwin/linux; injected absolute home/env; missing/empty/relative env; settings/cache/log/journal roots; assert resolver creates nothing | test_macos_app_locations_and_isolation: native HOME redirection, stores/cache/journal under disposable home, no bundle/CWD writes |
-| W-SPAWN / M-SPAWN | test_portability_spawn_policy | win32/darwin/linux; stub Windows constant; zero other flags; FFREPORT variants removed; spaces/non-ASCII argv; explicit worker/tool command selection | test_macos_tool_and_worker_spawn: extensionless binaries, clean FFREPORT env, complete protocol/cancel/child cleanup |
+| W-PATH / M-PATH | test_portability_app_locations | win32/darwin/linux; injected absolute home/env; missing/empty/relative env; settings/cache/log/journal roots; WP6.1 Q6 pack roots including XDG_DATA_HOME and darwin None; assert resolvers create nothing | test_macos_app_locations_and_isolation: native HOME redirection, stores/cache/journal under disposable home, no bundle/CWD writes, GPU-pack root None/no load |
+| W-SPAWN / M-SPAWN | test_portability_spawn_policy | win32/darwin/linux; stub Windows constant and DLL-directory API; zero other flags; FFREPORT variants removed; spaces/non-ASCII argv; source/frozen worker and PATH selection | test_macos_tool_and_worker_spawn: extensionless binaries, clean FFREPORT env, complete protocol/cancel/child cleanup, no Windows DLL API call |
 | W-PIPE / M-PIPE | test_portability_default_pipe | win32 large success/failure and darwin/linux fallback; force pipe-sizing OSError; bytes/PTS/EOF/cancel and descriptor ownership | test_macos_default_pipe_fidelity: real decoder default pipe, bytes/PTS match fixture, no descriptor/child leak on cancel |
 | W-DEVICE / M-DEVICE | test_portability_cpu_selection | force_cpu, no CuPy, failed CuPy import/kernel, fake CUDA success/free-memory failure; darwin CPU profile; never reinterpret NVIDIA constants as CPU RAM | test_macos_cpu_without_cuda: clean CPU-only environment, correction/export, reason/RSS reporting; GPU-only instrument explicitly unavailable |
 | W-CODEC / M-CODEC | test_portability_encoder_roster_and_commands | win32 NVENC/x265 and darwin VT/x265; listing absent/present; trial success/failure/8-only/10-bit; auto/explicit/saved-unavailable; no x265 options in VT | test_macos_videotoolbox_capabilities: actual VT/x265 trials, 8/10-bit outcome, unavailable fallback, explicit choice |
 | W-RATE / M-RATE | test_portability_encoder_rate_mapping | platform/encoder, high/standard/draft; Fraction fps, VFR average, source Main/High/unknown caps, geometry/rounding/clamp; both VT candidates; unchanged Windows arguments | test_macos_videotoolbox_quality_controls: both candidates on busy/calm SDR, stderr and output rate/quality/profile/level; WP6.5 exclusive measurement |
-| W-V4 / M-V4 | test_portability_container_contract | platform/encoder command snapshots plus structured FFprobe/container fixtures; preserve hvc1/color/SAR/timing/maps; HLG/PQ refusal even with VT available | test_macos_videotoolbox_v4: real 8/10-bit MP4, VFR/start/edit-list/orientation/audio/metadata/provenance fixtures; product verifier plus full comparator |
+| W-V4 / M-V4 | test_portability_container_contract | platform/encoder command snapshots plus structured FFprobe/container fixtures; preserve hvc1/color/SAR/timing/maps, NUT bsf, rotation, timescale, cut, negative CTS offsets; HLG/PQ refusal even with VT available | test_macos_videotoolbox_v4: real 8/10-bit MP4, VFR/start/edit-list/orientation/audio/metadata/provenance fixtures, VT reorder-depth/negative-CTS AD-22 case; product verifier plus full comparator |
+| W-SPACE / M-SPACE | test_portability_disk_space_estimate | platform/encoder/quality/depth; pin D87/DR-48 arithmetic, injected disk_usage free bytes and insufficient-space refusal; do not count unproved purgeable bytes; preserve Windows results | test_macos_videotoolbox_space_estimate: actual VT output size versus estimate for both Q1 candidates, depths and qualities; APFS free/purgeable-space behaviour, WP6.5 exclusive measurement |
 | W-TEXT / M-TEXT | test_portability_tool_text_and_redaction | Windows/Mac FFmpeg text fixtures; unknown wording/generic reason; malformed/missing showinfo; escaped drive and POSIX paths; planted privacy leak | test_macos_ffmpeg_text_and_redaction: actual pinned build listing/showinfo/failure tails; native path corpus, no private roots in output |
-| W-FS / M-FS | test_portability_filesystem_semantics | win32/darwin/linux syntax independent of host; fake samefile identities, distinct-file control, case-sensitive/insensitive modes; suffix/names/normalization/link/publish failures | test_macos_filesystem_semantics: actual case-insensitive and case-sensitive volumes, same-object aliases versus distinct files, links, no-clobber, codec outputs |
+| W-FS / M-FS | test_portability_filesystem_semantics | win32/darwin/linux syntax independent of host; fake samefile identities, distinct-file control, case-sensitive/insensitive modes; suffix/names/normalization/link/publish failures, AppleDouble ._clip.MP4 versus real clip.MP4 | test_macos_filesystem_semantics: actual case-insensitive and case-sensitive volumes, same-object aliases versus distinct files, links, no-clobber, codec outputs, exFAT AppleDouble exclusion/unreadable outcome |
 | W-GUARD / M-GUARD | test_portability_footage_guard_and_test_helpers | platform, temp origin, native-only API guard, alias topology; synthetic footage only; planted unsafe root must fail before writes, safe root must pass | test_macos_footage_guard_and_helpers: TMPDIR/TEMP/TMP/basetemp, ancestors/symlinks/hard links/loops/case aliases; snapshot synthetic footage unchanged |
-| W-GUI / M-GUI | test_portability_gui_contract | platform capability rows/dialog stubs/shortcuts/DPR 1,2; cancellation and saved paths; missing offscreen plugin produces explicit environment failure | test_macos_native_gui_contract: cocoa menus/Command keys/native dialogs/Retina; separate offscreen Qt unit-suite startup |
+| W-GUI / M-GUI | test_portability_gui_contract | platform capability rows and automatic label/dialog stubs/shortcuts/DPR 1,2; cancellation and saved paths; missing offscreen plugin produces explicit environment failure | test_macos_native_gui_contract: cocoa menus/Command keys/native dialogs/Retina, VT-aware automatic label; separate offscreen Qt unit-suite startup |
 | W-TOOL / M-TOOL | test_portability_tool_reporting | win32/darwin/Linux reports; missing NVIDIA tool, stderr, unknown CPU model, binary suffix corpus and unsupported historical instrument; no fake telemetry | test_macos_tool_reporting: native environment facts, bundled binary inventory and notices, CPU tools run without NVIDIA dependencies |
-| M-BUNDLE | W-SPAWN checks proposed source/frozen command construction; no Mac binary is run on Windows | source versus frozen; tool path and worker dispatch stubs; external PATH unavailable | test_macos_bundle_smoke: Finder/Terminal launch, no Python/FFmpeg on PATH, worker export/cancel, native Qt plugins and persistent paths |
+| M-BUNDLE | W-SPAWN checks WP6.1's ruled source/frozen command construction; no Mac binary is run on Windows | source versus frozen; tool path and worker dispatch stubs; external PATH unavailable | test_macos_bundle_smoke: Finder/Terminal launch, no Python/FFmpeg on PATH, Contents/MacOS worker re-entry with no extra GUI/Dock icon, export/cancel/no orphan FFmpeg, native Qt plugins and persistent paths |
+
+REASONED: GitHub macos-latest CI may have no VT hardware; M-CODEC must accept a
+proved "VT unavailable" capability/reason with x265 fallback, and M-V4 must run
+x265 while explicitly skipping VT-only cases with that reason; neither replaces
+the owner's hardware-Mac VT capability/V4 evidence required for WP6.5.
 
 For a platform parameter that changes a source policy test, include a planted
 forbidden launch/OS dependency and prove the checker fails by name, retaining the
@@ -617,6 +871,8 @@ covers text-only footage containment in older tools; the headless runner already
 has an identity fallback and supplies a useful semantic reference, not blanket
 permission to copy its implementation without tests. The inventory folder
 exclusion policy also needs explicit case treatment.
+REASONED from inventory.py:822-832: macOS AppleDouble ._* files on exFAT/FAT can
+pass the video suffix filter; WP6.4 should exclude them or show unreadable, not count them as playable clips (T14).
 
 Historical prototype/spike instruments remain evidence of their original
 Windows/NVIDIA experiments. WP6.4 need not retrofit every historical benchmark
@@ -660,21 +916,25 @@ WP6.5 build/validation checklist:
    bundled binary. Do not decide onedir versus onefile here.
 3. Include FFmpeg and FFprobe with the required VideoToolbox and x265 capabilities,
    dependent non-system dylibs, executable permissions, recorded versions/hashes
-   and notices. Invoke their absolute bundled paths, independent of Finder PATH.
+   and notices. Validate WP6.1 D1's frozen executable-directory PATH prepend
+   against Contents/MacOS and invoke the resolved absolute paths from find_tool,
+   independent of Finder's external PATH; no new lookup mechanism is proposed.
 4. Use PyInstaller's PySide6 hooks, inspect the resulting Qt plugin search paths/
    qt.conf where applicable, and include the cocoa platform plugin
    (logical plugins/platforms/libqcocoa.dylib) and required image-format plugins.
    REASONED: exact placement must follow the produced bundle/hook layout, not a
    guessed Windows plugins directory. Prove no development-machine Qt is loaded.
    Offscreen availability for tests is a separate leg.
-5. Provide a frozen worker entry mode or dedicated worker executable for P24.
-   Prove one video export starts a Qt-free worker, not another application
-   window; receives progress/result; cancels; and leaves no FFmpeg children.
+5. Validate WP6.1 FINAL Q5's ruled [sys.executable, "--export-worker"] re-entry
+   and pre-Qt __main__ dispatch (P24), with AD-34 at WP6.1's accept. Prove the
+   Contents/MacOS executable starts a Qt-free worker with no GUI or extra Dock
+   icon, receives progress/result, cancels, and leaves no FFmpeg children.
 6. Launch from Finder and Terminal on a clean arm64 machine without installed
    Python/FFmpeg/CUDA. Test first-run settings, journal cleanup, cache, one photo
    and 8/10-bit video export, unavailable VT/x265 diagnostics, and native dialogs.
-   Restart and confirm persistent state lives under Library, never inside .app
-   or a onefile extraction directory.
+   Restart and confirm persistent state uses the approved resolver policy
+   (XDG today, Library only after AD-25(a) amendment), never inside .app or a
+   onefile extraction directory.
 7. Exercise a downloaded/quarantined copy and publish the actual unsigned-app
    opening steps for the tested macOS version. DOC [APPLE-OPEN]: Apple's supported
    override is System Settings > Privacy & Security > Open Anyway, followed by
@@ -684,6 +944,10 @@ WP6.5 build/validation checklist:
 8. Preserve app-bundle symlinks/executable modes in the release archive and test
    extraction. Run V4 and the native GUI/worker/path tests on that extracted copy,
    then record Mac timing/RSS as information with the required exclusive window.
+
+DOC (repository), AD-31 (decisions.md:46) notes a 7.8 GB worker-tree private peak
+as "not of record" Windows GPU evidence; REASONED: GUI plus CPU worker pressure
+on 8/16 GB Macs is a WP6.5 risk to measure, not a Mac memory estimate or acceptance result.
 
 ## 11. Metal: information only
 
@@ -736,8 +1000,8 @@ not findings to disguise as uncommissioned defects.
 
 No Mac, no Mac emulator, no footage reads, no native GUI run, no encoding,
 no throughput/RSS measurement, no pytest, no build and no instrument run.
-Only this Markdown report is authorized to change. All test names and commands
-above are proposals. Platform simulation on Windows cannot prove native Mac
+Only this Markdown report is authorized to change. All future test names and
+encoding commands above are proposals. Platform simulation on Windows cannot prove native Mac
 behaviour. The report's source line numbers refer to 5671a927.
 
 Source labels used in DOC assessments and recommendations:
@@ -761,8 +1025,9 @@ Source labels used in DOC assessments and recommendations:
   architecture validation and ad-hoc signing.
 - [APPLE-OPEN] [Apple: safely open apps on your Mac](https://support.apple.com/en-ie/102445):
   Privacy & Security override procedure.
-- Repository sources: docs/decisions.md AD-12/AD-23/AD-31; docs/architecture.md;
-  spec v0.6.0 N1/N14 and D75/D111; docs/reports/wp2.1s-io-spike.md:234/:236.
+- Repository sources: docs/decisions.md AD-12/AD-23/AD-25(a)/AD-31; docs/architecture.md;
+  spec v0.6.0 N1/N14 and D75/D111; docs/reports/wp2.1s-io-spike.md:234/:236/:240;
+  docs/briefs/wp6.1-brief.md, CHARC FINAL Q5/Q6 and round-0 D1/D2.
   These establish intended policy and historical Windows measurements, not
   executed Mac results.
 
@@ -778,9 +1043,41 @@ Verification loop at this report boundary:
 | VT exit zero proves its requested ceiling | Release-tagged FFmpeg rate-property error handling | Rejected; Mac test must inspect stderr and rates |
 | Full report claims Mac tests or measurements | Checked labels and proposed-test language | No Mac execution claim authorized |
 
-Reviewer A and Reviewer B have not yet reviewed this candidate. Their findings,
-adjudications and any cumulative ledger are handled by the dispatcher's next
-rounds; this report does not claim convergence or acceptance. CHARC owns the
-new AD rows, dependency-group disposition, candidate-DR disposition and WP6.4
-brief. WP6.5 owns native packaging and the deferred quality/performance choice.
+Reviewer A round 1 is adjudicated below; round 2 and Reviewer B remain pending.
+This report does not claim convergence or acceptance. CHARC owns the new AD
+rows, AD-25(a)/N1 path disposition, owner-reserved G12 wording referral,
+dependency-group disposition, candidate-DR disposition and WP6.4 brief.
+WP6.5 owns native packaging validation and the deferred quality/performance choice.
 
+## 15. Reviewer A cumulative round ledger
+
+The dispatch restricts edits to this report; the ledger is retained here for
+transfer to the dispatcher, with no separate proof-file edit. Durable review:
+C:/Users/rwsmy/clearwater-review-evidence/wp6.2/A/r1/review.txt (read once in full).
+
+| Round | Severity counts | Envelope | New / reopened | Text-bearing / non-text-bearing | Reverts | Fix type | Depth | Disposition |
+|---|---|---|---|---|---|---|---|---|
+| A r1 | 0 critical, 1 major, 7 minor, 5 advisory | 13 in, 0 out | 13 / 0 | 12 / 1 (F13) | 0 | 13 documentation fixes; 0 product-code, 0 test-only | Fresh cell; no current figure supplied | All FIXED; yield for A r2, no convergence claim |
+
+| Finding | Severity / classification | Adjudication and evidence in this report |
+|---|---|---|
+| F1 | MAJOR, text-bearing | FIXED: P24/P56-P58, sections 6/10 and M-BUNDLE cite WP6.1 FINAL Q5/Q6 and round-0 D1/D2; worker mechanism ruled, Mac work validation only |
+| F2 | minor, text-bearing | FIXED: section 5 and P01/P26 cite AD-25(a); XDG compliant, Library PROPOSED pending CHARC amendment/N1 approval |
+| F3 | minor, text-bearing | FIXED: P59-P62 cite the four confirmed encode.py sites; rate/state/validation test mappings added |
+| F4 | minor, text-bearing | FIXED: P63 and section 7 cover AUTO_TEXT and owner-reserved spec G12 wording referral |
+| F5 | minor, text-bearing | FIXED: P03/P07/P09/P10 point to confirmed catch, registry, trial table and reason mechanics |
+| F6 | minor, text-bearing | FIXED: section 2 records exact W/R rerun, rg version, independent Python command, CR comparison and per-file roster; reviewer's remaining counting discrepancy explicitly unestablished |
+| F7 | minor, text-bearing | FIXED: P64, section 4 and W-SPACE/M-SPACE cover unproved VT bound and APFS free/purgeable-space validation |
+| F8 | minor, text-bearing | FIXED: P15, section 4 and W-V4/M-V4 retain all named arguments and add VT reorder/negative-CTS/edit-list case |
+| F9 | advisory, text-bearing | FIXED: section 6 cites WP2.1S TCP row s and proposes INFO off Windows for pipes.py:95, not a decision |
+| F10 | advisory, text-bearing | FIXED: T14, section 9 and W-FS/M-FS cover AppleDouble ._* suffix admission and exclusion/unreadable outcome |
+| F11 | advisory, text-bearing | FIXED: section 8 declares VT-unavailable CI expectation, x265 leg and explicit VT skip; hardware Mac evidence still required |
+| F12 | advisory, text-bearing | FIXED: section 10 labels AD-31's 7.8 GB Windows GPU figure not of record and flags 8/16 GB Mac memory risk |
+| F13 | advisory, non-text-bearing (review classification) | FIXED: screening paragraph distinguishes test_config_settings.py:367 R/where from :461 W/nul |
+
+Boundary verification: source anchors for new/corrected citations were inspected;
+W/R counts independently reproduced; semantic rows are 64 product (including
+3 arriving WP6.1 sites), 48 tools, 45 tests, 157 total. No Mac execution or
+Windows product defect is claimed. The final yield reports the on-disk diff,
+ASCII/LF checks and report-only status. No application, instrument, build,
+pytest or harness suite was run by this remediation cell.
