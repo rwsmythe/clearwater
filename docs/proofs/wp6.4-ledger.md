@@ -696,4 +696,4 @@ cases are group A's, in `test_interfaces`. W-GUI has 14 cases, not 13, because g
 | P16 P24 P57 X28 | source / frozen command construction (W-SPAWN) | M-BUNDLE with `CLEARWATER_MAC_BUNDLE`, plus the owner's Finder, Dock-Quit and Cmd-Q checks |
 | M-DEVICE AD-11 | none on Windows | the Mac CPU output against the Windows references within AD-11's tolerances; not yet written, WP6.5 |
 
-Depth at group-B yield: DISPATCHER TO FILL
+Depth at group-B yield: 416,156 (wp64-cell3, read by the dispatcher with cell_depth.py after its final return incl. the export grant; PAST its cap, retired; the A r1 fold-in goes to a fresh cell)
