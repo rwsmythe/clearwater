@@ -78,7 +78,45 @@ Standard Codex turns through `scripts/codex_cell.py`: round 0 (the design read-b
 
 ## Dispatch (orchestrator fills)
 
-- Base commit: (fill)
-- Lane paces at dispatch: (fill)
-- Worktree and session: (fill)
-- Depth at each yield: (fill)
+- **Base commit:** main at the commit that marks this brief FINAL. The worktree `.worktrees/wp6.3a` (branch `wp6.3a`) is created from that commit; the seat runs `uv sync --frozen` there before turn 1. The cell reads the brief at that HEAD.
+- **Lane paces at dispatch** (read 2026-11-04 17:21Z; re-read at turn 1): Codex 2 % / pace 0.464 (resets 2026-11-11 10:07Z); Claude 39 % / pace 1.183 (resets 2026-11-09 10:00Z). The lane is **CODEX**, as commissioned.
+- **Runs BESIDE WP-DR125** (CHARC `a6934b58`: allowed when the Codex pace leaves room and the files are disjoint). This makes two Codex sessions, one per worktree. The seat serialises the HEAVY jobs: one gate, one frozen build or one seat run at a time, and no pytest beside a serial leg.
+- **Files shared with WP-DR125** (it is expected to accept first):
+  - `src/clearwater/__main__.py`: WP-DR125 deletes the shim; 6.3a adds ONE dispatch row;
+  - `tests/test_frozen_entry.py`: WP-DR125 deletes or re-points the shim tests; 6.3a adds ONE dispatch test;
+  - `tools/package/README.md`: WP-DR125 rewrites the stdin section; 6.3a edits the hand-filled-pack section.
+
+  The cell edits ONLY its own rows, sections and tests in those three files and never touches the shim's lines (`isolate_worker_stdin`, `STDIN_REFUSAL`, the four shim tests, the stdin README section). When WP-DR125 has landed, the seat merges main into `wp6.3a` (`--no-ff`) before Reviewer B and the gate, and resolves conflicts in those three files by keeping both packages' changes. A non-trivial conflict is a resumed turn for the cell.
+- **Worktree and session:** `C:\Users\rwsmy\clearwater\.worktrees\wp6.3a`, branch `wp6.3a`.
+  - `implementer-codex-sol-high` runs through `scripts/codex_cell.py turn`, one FRESH session from turn 1. The session id is recorded from turn 1's driver footer and resumed for each later turn.
+  - Evidence goes in `C:\Users\rwsmy\clearwater-review-evidence\wp6.3a\` (`cell\`, `A\r<n>\`, `B\`, `seat\`, `gate\`).
+- **Turns and yields.**
+  - **Turn 1 = round 0, read-only:** the design read-back; Q1-Q3; any dispute. A dispute goes to CHARC as a STOP.
+  - **Turn 2 = the build:** the table and its lock test, the installer, the removal, the headless rows, the filter, the `build.py` delegation and the tests. A mid-build yield is allowed before the GUI.
+  - **Turn 3 = the dialog and the shell wiring**, the guide paragraph, the README section and the report.
+  - **Then one resumed turn per Reviewer A round.**
+  - The seat run follows A's convergence and precedes B.
+- **Seat clarifications (binding on the cell; CHARC may strike any at FINAL):**
+  1. **The fake index in the Codex sandbox.** The sandbox has no network, and it may also refuse a loopback bind or connect on `127.0.0.1`. If it does, the cell does NOT work around it: no mocked `urlopen` replacing the server, and no change to the design's transport. It names the refusal with its evidence (the exact `OSError` and errno) and yields. The fake-index tests then run at the orchestrator's seat, and that run is of record. The cell's own suite runs the tests that need no socket.
+  2. **No test reaches the real index.** Every fake-index test asserts at teardown that the server saw only its own requests. Add ONE guard: an autouse fixture in `test_gpu_pack_install.py` that makes `socket.create_connection` / `socket.socket.connect` refuse any address other than the fake server's loopback port. A test that tries `files.pythonhosted.org` then fails loudly instead of downloading.
+  3. **The entry-point rows.** `--install-gpu-pack` / `--remove-gpu-pack` tests in `test_frozen_entry.py` and `test_gpu_pack_install.py` that call `clearwater.__main__.main` obey the ENTRY-POINT ISOLATION RULE (APPDATA / LOCALAPPDATA / XDG redirected to `tmp_path`, Qt blocked, the installer stubbed or pointed at the fake index, a bounded timeout). No test calls the real installer against the real `pack_root()`.
+  4. **The dialog test is offscreen only** (`QT_QPA_PLATFORM=offscreen`, pytest-qt). No real window, no `exec()`, no synthetic input (the DESKTOP INPUT RULE). The scripted job is a stub `Progress`; the dialog never runs the real downloader in a test.
+  5. **`build.py`'s delegation:** `tools/package/build.py` imports the writer from `clearwater.gpu_pack_install`. `--verify` and the bundle checker are unchanged. `test_tools_package_build.py`'s existing tests stay green unchanged, plus the delegation assertion. The WP6.1 fold-in advisories (a), (b) and (e) belong to 6.3b's brief, NOT here, unless CHARC moves (b) (this brief's "Debt" row lets the cell tighten the dist-info rule in one line; if it does, it says so in the report).
+  6. **The seat run is the orchestrator's.** The cell writes no download or seat script. The seat:
+     - builds onedir from the candidate (`build.py --form onedir`, with 25 GB free);
+     - runs `--install-gpu-pack` into `work\wp6.3a\appdata\` (LOCALAPPDATA and APPDATA redirected; the real profile is checked absent before and after);
+     - runs `--verify`;
+     - checks the census against 2,701 / 2,412.6 MiB;
+     - makes 2 worker runs on WP6.1's pattern with md5-checked copies;
+     - removes the pack;
+     - records it all in `wp6.3a\seat\`.
+  7. **Codex sandbox residuals** are named as such, with their evidence; the seat run is of record. Preload `scripts/sandbox_mkdir_shim.py` (`PYTHONPATH=scripts`, `-p sandbox_mkdir_shim`) for pytest in the sandbox.
+- **Reviewers.**
+  - Reviewer A is a Claude pass at the orchestrator's seat (`codex_cell.py review`, read-only), run on each candidate head to convergence. Its prompt carries mutation probes against a copy: the hash check removed; the redirect handler removed; the member-name validation weakened (allow `..`); the staging rename moved before the full check; the manifest written before the verify. It also carries the no-real-network guard check.
+  - Reviewer B is a separate Claude pass at the seat on the final head.
+- **The gate:** static, collect, parallel, serial (the `gui` dialog test), harness. Then the footprint (the owned paths only, 0 CR) and the real `%LOCALAPPDATA%\Clearwater` absent.
+- **Depth at each yield** (Codex input tokens from the driver footer, with the window and the moment): evaluate at about 200K, STOP near 250K. If a yield is over 200K and a large load remains, the next turn goes to a FRESH session with a ledger handoff.
+  - Turn 1 (round 0) end: (fill at yield)
+  - Turn 2 (build) end: (fill at yield)
+  - Turn 3 (dialog + report) end: (fill at yield)
+  - Each Reviewer A round's fold-in end: (fill at yield)
