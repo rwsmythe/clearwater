@@ -1,16 +1,20 @@
 """The frozen-build entry: the worker re-entry and the bundled-tool PATH (WP6.1, AD-34, D1).
 
-Parallel leg, synthetic, in this process: ``sys.frozen`` and ``sys.executable`` are
-monkeypatched, the export worker's ``main``, the GPU pack loader, the log set-up and the GUI's
-``main`` are stubbed, so nothing is spawned, no window opens and no real app-data folder is
-touched. The frozen build itself is checked by hand (the WP6.1 report).
+Parallel leg, synthetic: ``sys.frozen`` and ``sys.executable`` are monkeypatched, the export
+worker's ``main``, the GPU pack loader, the log set-up and the GUI's ``main`` are stubbed, so no
+window opens and no real app-data folder is touched. One check runs in a fresh interpreter
+(``python -I -c``), because only a fresh import graph shows what the worker branch imports. The
+frozen build itself is checked by hand (the WP6.1 report).
 """
 
 from __future__ import annotations
 
 import importlib
 import importlib.abc
+import logging
 import os
+import shutil
+import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -178,8 +182,9 @@ def test_anything_else_starts_the_gui_after_logging_and_the_loader(
     calls: list[tuple[str, Any]],
     argv: list[str],
 ) -> None:
-    """GUI branch: the log file first (D3), then the loader, then the GUI with the argv."""
-    monkeypatch.delattr(sys, "frozen", raising=False)
+    """Frozen GUI branch: the log file first (D3), then the loader, then the GUI with the argv."""
+    _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))  # restored after the D1 prepend
     _fake_gui(monkeypatch, calls)
     import clearwater.__main__ as entry
 
@@ -187,11 +192,42 @@ def test_anything_else_starts_the_gui_after_logging_and_the_loader(
     assert calls == [("log", tmp_path / "cfg" / "logs"), ("activate", None), ("gui", argv)]
 
 
-def test_a_log_folder_failure_does_not_stop_the_gui(
-    monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]]
+def test_a_source_run_starts_the_gui_as_1_0_0_did(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The shell reports a log failure itself; the entry carries on to the loader and GUI."""
+    """Reviewer A r2 #6: not frozen, no log folder exists before the GUI starts (1.0.0).
+
+    The real ``app_locations`` and ``configure_logging`` run, with the app-data folders
+    redirected under ``tmp_path``; only the GUI is a stand-in, which looks for the log folder.
+    """
     monkeypatch.delattr(sys, "frozen", raising=False)
+    for variable in ("APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
+        monkeypatch.setenv(variable, str(tmp_path / variable.lower()))
+    log_dir = config_paths.app_locations().log_dir
+    assert log_dir.is_relative_to(tmp_path)
+    seen: list[tuple[str, Any]] = []
+    _fake_gui(monkeypatch, seen)
+    logger = logging.getLogger(config_log.LOGGER_NAME)
+    handlers = list(logger.handlers)
+    import clearwater.__main__ as entry
+
+    try:
+        assert entry.main(["python -m clearwater"]) == 3
+        assert seen == [("gui", ["python -m clearwater"])]
+        assert not log_dir.exists()
+        assert logger.handlers == handlers
+    finally:
+        for handler in [h for h in logger.handlers if h not in handlers]:
+            logger.removeHandler(handler)
+            handler.close()
+
+
+def test_a_log_folder_failure_does_not_stop_the_gui(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, calls: list[tuple[str, Any]]
+) -> None:
+    """Frozen: the shell reports a log failure itself; the entry carries on to loader and GUI."""
+    _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
     _fake_gui(monkeypatch, calls)
 
     def refuse(folder: Path, **_: Any) -> Path:
@@ -225,6 +261,32 @@ def test_frozen_puts_the_executable_folder_first_on_path(
     assert empty == {"PATH": folder}
 
 
+def test_a_worker_whose_path_was_changed_by_pyside6_does_not_add_the_folder_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reviewer A r2 #10: membership, not position, decides (no duplicate entry).
+
+    The parent prepends the folder; the frozen child inherits that ``PATH``, and before its
+    entry runs, PyInstaller's PySide6 run-time hook prepends the bundle folder and PySide6's
+    start-up its package folder. The child's entry must then leave ``PATH`` as it is.
+    """
+    executable = _frozen(monkeypatch, tmp_path)
+    folder = os.path.dirname(executable)
+    import clearwater.__main__ as entry
+
+    environ = {"PATH": os.pathsep.join(["/a", "/b"])}
+    assert entry.prepend_executable_folder(environ) is True  # the GUI process
+    bundle = os.path.join(folder, "_internal")
+    pyside = os.path.join(bundle, "PySide6")
+    environ["PATH"] = pyside + os.pathsep + bundle + os.pathsep + environ["PATH"]
+    inherited = environ["PATH"]
+    assert entry.prepend_executable_folder(environ) is False  # the worker process
+    assert environ["PATH"] == inherited
+    assert environ["PATH"].split(os.pathsep).count(folder) == 1
+    trailing = {"PATH": os.pathsep.join(["/a", folder + os.sep])}
+    assert entry.prepend_executable_folder(trailing) is False  # the same folder, spelt with /
+
+
 def test_a_source_run_leaves_path_alone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Not frozen: PATH is not touched."""
     monkeypatch.delattr(sys, "frozen", raising=False)
@@ -245,3 +307,64 @@ def test_the_entry_sets_path_before_either_branch(
     entry.main([executable, "--export-worker"])
     first = os.environ["PATH"].split(os.pathsep)[0]
     assert first == os.path.dirname(executable)
+
+
+# Reviewer A r2 #11: the worker branch's import graph, in a fresh interpreter.
+
+_WORKER_IMPORT_PROBE = """
+import sys
+sys.path.insert(0, sys.argv[1])
+import clearwater.__main__ as entry
+from clearwater.app import export_worker
+export_worker.main = lambda argv=None: 0
+status = entry.main(["Clearwater.exe", "--export-worker"])
+loaded = sorted(m for m in sys.modules if m.startswith(tuple(sys.argv[2:])))
+print("status", status, "loaded", ",".join(loaded) or "-")
+"""
+"""Import the entry and the worker afresh, run the worker branch (its ``main`` stubbed), and
+print which :data:`BLOCKED` modules are then loaded."""
+
+
+def _probe_worker_imports(src_root: Path) -> str:
+    """Run :data:`_WORKER_IMPORT_PROBE` on the ``clearwater`` under ``src_root``.
+
+    Args:
+        src_root: The folder holding the ``clearwater`` package to import.
+
+    Returns:
+        The probe's output line.
+    """
+    done = subprocess.run(
+        [sys.executable, "-I", "-c", _WORKER_IMPORT_PROBE, str(src_root), *BLOCKED],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    return done.stdout.strip()
+
+
+def test_the_worker_branch_imports_no_qt_in_a_fresh_interpreter() -> None:
+    """The real import graph of ``__main__`` and ``export_worker``: no PySide6, no shiboken6."""
+    import clearwater
+
+    src_root = Path(clearwater.__file__).resolve().parents[1]
+    assert _probe_worker_imports(src_root) == "status 0 loaded -"
+
+
+def test_the_fresh_interpreter_probe_sees_a_top_level_qt_import(tmp_path: Path) -> None:
+    """The probe distinguishes: a copy whose ``export_worker`` imports PySide6 is caught."""
+    import clearwater
+
+    package = Path(clearwater.__file__).resolve().parent
+    copy = tmp_path / "src" / "clearwater"
+    shutil.copytree(package, copy, ignore=shutil.ignore_patterns("__pycache__"))
+    worker = copy / "app" / "export_worker.py"
+    worker.write_text(
+        worker.read_text(encoding="utf-8") + "\nimport PySide6  # the test's mutation\n",
+        encoding="utf-8",
+    )
+    line = _probe_worker_imports(tmp_path / "src")
+    assert line.startswith("status 0 loaded PySide6")
+    assert "shiboken6" in line

@@ -539,6 +539,66 @@ def test_an_extra_or_duplicated_distribution_is_rejected(
     _rejected(tmp_path, folder, "unexpected distribution cupy\\xe9", caplog)  # ASCII-safe
 
 
+def test_a_reason_is_always_one_line(
+    tmp_path: Path, isolated: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """Reviewer A r2 #12: newline, tab and CR in manifest text are escaped, not logged raw."""
+    folder = make_pack(tmp_path)
+
+    def control(document: dict[str, Any]) -> None:
+        name = "cupy\nsecond log line\t\r\x7f"
+        document["distributions"].append(dict(entry(document, "cuda-pathfinder"), name=name))
+
+    edit_manifest(folder, control)
+    reason = "unexpected distribution cupy\\x0asecond log line\\x09\\x0d\\x7f"
+    _rejected(tmp_path, folder, reason, caplog)
+    assert all(ch.isprintable() for ch in caplog.records[0].getMessage())
+
+
+def _refusing(monkeypatch: pytest.MonkeyPatch, method: str, target: Path, error: OSError) -> None:
+    """Make ``Path.<method>()`` raise ``error`` for ``target`` alone (a locked folder or file)."""
+    real = getattr(Path, method)
+
+    def refuse(self: Path, *args: Any, **kwargs: Any) -> Any:
+        if self == target:
+            raise error
+        return real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, method, refuse)
+
+
+@pytest.mark.parametrize(
+    ("method", "where", "reason"),
+    [
+        ("is_dir", ".", "pack unreadable: PermissionError"),
+        ("is_file", "manifest.json", "pack unreadable: PermissionError"),
+        ("is_dir", "site-packages", "pack unreadable: PermissionError"),
+        (
+            "is_file",
+            "site-packages/cupy_cuda12x-14.2.0.dist-info/RECORD",
+            "pack unreadable: PermissionError",
+        ),
+        ("is_dir", "site-packages/nvidia/cufft/bin", "DLL folders unreadable: PermissionError"),
+    ],
+)
+def test_a_file_system_error_is_a_rejection_not_an_exception(
+    tmp_path: Path,
+    isolated: list[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
+    where: str,
+    reason: str,
+) -> None:
+    """Reviewer A r2 #9: an existence or type check that raises means the CPU path, not a crash."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    folder = make_pack(tmp_path)
+    target = folder if where == "." else folder / where
+    _refusing(monkeypatch, method, target, PermissionError(13, "Access is denied"))
+    _rejected(tmp_path, folder, reason, caplog)
+    assert isolated == []
+
+
 def test_an_unreadable_record_is_rejected(
     tmp_path: Path,
     isolated: list[str],

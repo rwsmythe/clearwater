@@ -10,7 +10,10 @@ Two branches share this entry (WP6.1, AD-34):
 
 On both branches the GPU pack loader (:func:`clearwater.gpu_pack.activate`) runs before
 anything can import CuPy. In a frozen build the executable's own folder is first put at the
-front of ``PATH``, so FFmpeg shipped beside the executable is found before any other.
+front of ``PATH``, so FFmpeg shipped beside the executable is found before any other, and the
+GUI branch opens the log file before the loader logs its line. A source run
+(``python -m clearwater``) does neither, exactly as 1.0.0: the loader is a no-op there and the
+shell configures logging itself.
 
 Only the standard library and :mod:`clearwater.gpu_pack` are imported at module level; each
 branch imports what it needs.
@@ -33,8 +36,11 @@ def prepend_executable_folder(environ: MutableMapping[str, str] | None = None) -
     """In a frozen build, put the executable's folder at the front of ``PATH`` (D1).
 
     Tools are found with ``shutil.which`` (``PATH``), so a bundled ``ffmpeg`` beside the
-    executable is found first. Nothing changes when the folder is already the first entry
-    (a spawned worker inherits its parent's ``PATH``) or in a source run.
+    executable is found first. Nothing changes in a source run, or when the folder is already
+    ANY entry of ``PATH`` (Reviewer A r2 #10): a spawned worker inherits its parent's
+    ``PATH``, and before the entry runs PyInstaller's PySide6 run-time hook puts the bundle
+    folder, and PySide6's own start-up its package folder, in front of it, so a first-entry
+    test would add it a second time.
 
     Args:
         environ: The environment to change; ``os.environ`` when None.
@@ -47,15 +53,23 @@ def prepend_executable_folder(environ: MutableMapping[str, str] | None = None) -
     env = os.environ if environ is None else environ
     folder = os.path.dirname(sys.executable)
     current = env.get("PATH", "")
-    entries = current.split(os.pathsep) if current else []
-    if entries and os.path.normcase(entries[0]) == os.path.normcase(folder):
+    wanted = _path_key(folder)
+    if any(_path_key(entry) == wanted for entry in current.split(os.pathsep) if entry):
         return False
     env["PATH"] = folder + os.pathsep + current if current else folder
     return True
 
 
+def _path_key(entry: str) -> str:
+    """Return a ``PATH`` entry in the form two entries naming one folder share."""
+    return os.path.normcase(os.path.normpath(entry))
+
+
 def _start_logging() -> None:
-    """Open the application's log file before the loader logs its line (D3).
+    """In a frozen build, open the log file before the loader logs its line (D3).
+
+    Called on the frozen GUI branch only (Reviewer A r2 #6): a source run creates no log
+    folder before Qt starts, as in 1.0.0.
 
     The shell's own later call for the same folder only updates the level. A failure is left
     to the shell, which reports it on its start-up line.
@@ -83,7 +97,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         from clearwater.app import export_worker
 
         return export_worker.main(arguments[2:])
-    _start_logging()
+    if getattr(sys, "frozen", False):
+        _start_logging()
     gpu_pack.activate()
     from clearwater.app.main import main as gui_main
 

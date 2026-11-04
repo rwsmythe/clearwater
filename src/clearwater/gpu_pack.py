@@ -400,10 +400,22 @@ class PackStatus:
         return f"gpu pack {self.stamp}: {self.outcome}"
 
 
+_CONTROL_CHARACTER = re.compile(r"[\x00-\x1f\x7f]")
+"""An ASCII control character (newline, tab, carriage return and the rest)."""
+
+
 def _safe(value: object) -> str:
-    """Return a value from the manifest as short ASCII text for a reason (at most 80 chars)."""
+    """Return a value from the manifest as short one-line ASCII text for a reason.
+
+    Non-ASCII characters and ASCII control characters (newline, tab, carriage return and the
+    rest) become backslash escapes (``e`` with an acute accent as backslash-``xe9``, a newline
+    as backslash-``x0a``), so a reason is always one printable log line (at most 80
+    characters of the value; Reviewer A r2 #12).
+    """
     text = value if isinstance(value, str) else repr(value)
-    return text.encode("ascii", "backslashreplace").decode("ascii")[:80]
+    ascii_text = text.encode("ascii", "backslashreplace").decode("ascii")
+    one_line = _CONTROL_CHARACTER.sub(lambda m: f"\\x{ord(m.group()):02x}", ascii_text)
+    return one_line[:80]
 
 
 def _manifest_entries(document: object) -> list[dict[str, str]] | str:
@@ -441,13 +453,29 @@ def check_pack(folder: Path) -> str | None:
     stamp is :data:`STAMP`; ``site-packages`` exists; the distributions are exactly
     :data:`LOCKED_DISTRIBUTIONS`, each at its locked version and naming one of its locked
     wheels with that wheel's sha256; and each distribution's installed ``RECORD`` file exists
-    with the sha256 the manifest records.
+    with the sha256 the manifest records. A file-system error on any check (an existence or
+    type check included) is a rejection, never an exception out of start-up.
 
     Args:
         folder: The pack folder.
 
     Returns:
         None when the pack passes, else the first failed check as a short ASCII reason.
+    """
+    try:
+        return _check_pack(folder)
+    except OSError as error:
+        return f"pack unreadable: {type(error).__name__}"
+
+
+def _check_pack(folder: Path) -> str | None:
+    """Run :func:`check_pack`'s checks; an ``OSError`` from a path check propagates to it.
+
+    Args:
+        folder: The pack folder.
+
+    Returns:
+        None when the pack passes, else the first failed check.
     """
     manifest = folder / MANIFEST_NAME
     if not manifest.is_file():
@@ -504,10 +532,13 @@ def _add_dll_directories(site: Path) -> tuple[Path, ...] | str:
         site: The pack's ``site-packages`` folder.
 
     Returns:
-        The folders added (none on other platforms), or a rejection reason when one cannot
-        be added (the ones already added are removed again).
+        The folders added (none on other platforms), or a rejection reason when they cannot
+        be listed or one cannot be added (the ones already added are removed again).
     """
-    folders = tuple(sorted(p for p in (site / "nvidia").glob("*/bin") if p.is_dir()))
+    try:
+        folders = tuple(sorted(p for p in (site / "nvidia").glob("*/bin") if p.is_dir()))
+    except OSError as error:
+        return f"DLL folders unreadable: {type(error).__name__}"
     if sys.platform == "win32":
         added: list[object] = []
         for folder in folders:
@@ -547,6 +578,23 @@ def _load_folder(folder: Path) -> PackStatus:
     return PackStatus(STAMP, "loaded", site_packages=site, dll_directories=dlls)
 
 
+def _find_and_load(folder: Path) -> PackStatus:
+    """Load ``<pack root>/<stamp>`` when it is a folder; absent when it is not.
+
+    Args:
+        folder: ``<pack root>/<stamp>``.
+
+    Returns:
+        ``absent``, ``loaded`` or ``rejected`` (also when the folder cannot even be looked at:
+        a file-system error is a rejection, never an exception out of start-up).
+    """
+    try:
+        present = folder.is_dir()
+    except OSError as error:
+        return PackStatus(STAMP, "rejected", reason=f"pack unreadable: {type(error).__name__}")
+    return _load_folder(folder) if present else PackStatus(STAMP, "absent")
+
+
 def load(root: Path | None) -> PackStatus:
     """Look for this build's pack under ``root``, load it when it passes, and log one line.
 
@@ -560,11 +608,7 @@ def load(root: Path | None) -> PackStatus:
     Returns:
         The status (its :attr:`PackStatus.line` is the line logged).
     """
-    folder = None if root is None else root / STAMP
-    if folder is None or not folder.is_dir():
-        status = PackStatus(STAMP, "absent")
-    else:
-        status = _load_folder(folder)
+    status = PackStatus(STAMP, "absent") if root is None else _find_and_load(root / STAMP)
     _LOG.info("%s", status.line)
     return status
 
