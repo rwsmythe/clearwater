@@ -15,16 +15,16 @@ source-delivery and other licence obligations. No third-party licence is changed
 ## Runtime dependency audit
 
 Versions below are pinned by `uv.lock` and matched installed metadata in the
-round-0 Windows AMD64 / Python 3.12 audit. Python and FFmpeg are external tools.
+Windows AMD64 / Python 3.12 audit. Python and FFmpeg are external tools.
 The 18 runtime distributions include the optional gpu extra and every selected
 transitive dependency. Native wheel components are identified separately below.
-Verdicts use the release's CHARC rulings R1-R4, `ce6094d108b9546f`.
+The verdicts and any conditions are stated for each component below.
 
 | Component | Version | Licence | Verdict and required notice | Source / full text |
 | --- | --- | --- | --- | --- |
 | Python | 3.12.13 (outside lock) | PSF-2.0 and historical terms | COMPATIBLE: preserve Python copyright and historical notices. | [Source](https://github.com/python/cpython/tree/v3.12.13); [text](#text-01) |
 | cuda-pathfinder | 1.8.3 | Apache-2.0 | **COMPATIBLE-WITH-CONDITION**: Retain NVIDIA copyright, Apache licence and notices below; GPLv3-compatible branch under Clearwater's or-later grant. | [Source](https://github.com/NVIDIA/cuda-python); [text](#text-02) |
-| cuda-toolkit | 12.9.2.0 | No licence declaration; metadata-only | **COMPATIBLE-WITH-CONDITION**: Metadata-only meta-package: installs no code or data of its own; selects the nvidia-* component wheels, which are the NVIDIA rows under the NVIDIA EULA (optional component, not redistributed by this repository). | [Source](https://pypi.org/project/cuda-toolkit/12.9.2.0/); see notices below |
+| cuda-toolkit | 12.9.2.0 | No licence declaration; metadata-only | **COMPATIBLE-WITH-CONDITION**: metadata-only meta-package: installs no code or data of its own; selects the nvidia-* component wheels, which are the NVIDIA rows under the NVIDIA EULA (optional component, not redistributed by this repository). | [Source](https://pypi.org/project/cuda-toolkit/12.9.2.0/); see notices below |
 | cupy-cuda12x | 14.2.0 | MIT; BSD/Apache-2.0/LLVM-exception component terms | **COMPATIBLE-WITH-CONDITION**: Optional gpu extra; retain complete CuPy aggregate and component texts; separately installed CUDA position below. | [Source](https://github.com/cupy/cupy); [text](#text-03), [text](#text-04), [text](#text-05), [text](#text-06), [text](#text-07), [text](#text-08) |
 | numpy | 2.5.4 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0; bundled OpenBLAS/LAPACK and GCC runtime exception | **COMPATIBLE-WITH-CONDITION**: Retain the complete aggregate and component copyright, conditions, disclaimers and GCC exception below. | [Source](https://github.com/numpy/numpy); [text](#text-09), [text](#text-10), [text](#text-11), [text](#text-12), [text](#text-13), [text](#text-14), [text](#text-15), [text](#text-16), [text](#text-17), [text](#text-18), [text](#text-19), [text](#text-20), [text](#text-21), [text](#text-22), [text](#text-23), [text](#text-24), [text](#text-25) |
 | nvidia-cublas-cu12 | 12.9.2.10 | NVIDIA CUDA EULA (proprietary) | **COMPATIBLE-WITH-CONDITION**: Optional, user-installed component; not redistributed by Clearwater and not GPL-compatible as a combined work. Retain NVIDIA copyright/EULA and component notices below if redistributing under its terms. | [Source](https://developer.nvidia.com/cuda-zone); [text](#text-26) |
@@ -66,6 +66,9 @@ Verdicts use the release's CHARC rulings R1-R4, `ce6094d108b9546f`.
   manifest, MinGW notices below and the GCC exception in the aggregate texts.
   These components are COMPATIBLE-WITH-CONDITION: preserve their notices,
   corresponding-source access and LGPL replacement/relinking rights.
+  The wheel manifest names no MinGW-w64 or winpthreads version, so a tagged
+  copy matching the shipped runtime cannot be identified. The two unversioned
+  upstream notices below identify their turn-2 copy provenance explicitly.
 - **CuPy:** Preferred Infrastructure, Inc. / Preferred Networks, Inc.; the
   complete aggregate includes NumPy/SciPy and cuSignal notices, with separate
   CCCL, DLPack, Jitify and ndimage texts below. Apache-bearing combinations rely
@@ -84,7 +87,7 @@ modules in the Essentials wheel are not used by Clearwater (and would be
 compatible via GPL-2.0-or-later). Each installed wheel ships only the commercial
 licence file; its metadata declares
 `LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only`, and the upstream licensing and
-attribution pages supply the open-source evidence under CHARC ruling R2.
+attribution pages supply the open-source licensing evidence.
 The LGPL-3.0 text is reproduced once below: [text](#text-36).
 The accompanying GPLv3 text is also present in the NumPy/SciPy aggregate notices.
 Users may replace/relink these libraries and debug modifications, including
@@ -99,11 +102,11 @@ the NVIDIA runtime wheels separately. A plain developer `uv sync` also installs
 that extra through the default dev group; the user guide gives a lean install.
 NVIDIA's EULA permits redistribution of designated runtime components subject
 to its conditions; it is **not GPL-compatible as a combined work**. Clearwater
-does not bundle CUDA or claim such a redistribution grant. The release relies
-on the optional-component / system-library position accepted by CHARC and the
-owner, not on relicensing NVIDIA code. Section 1.1.1(3) grants the right to:
+does not bundle CUDA or claim such a redistribution grant. Clearwater's position
+is that these are optional, separately installed components / system libraries;
+NVIDIA code retains its own terms. Section 1.1.1(3) grants the right to:
 
-> Distribute those portions of the SDK that are identified in this Agreement as distributable
+> Distribute those portions of the SDK that are identified in this Agreement as distributable, as incorporated in object code format into a software application that meets the distribution requirements indicated in this Agreement.
 
 Read the restrictions and CUDA supplement too:
 [NVIDIA CUDA 12.9 EULA](https://docs.nvidia.com/cuda/archive/12.9.1/eula/index.html).
@@ -173,17 +176,19 @@ claim to describe wheel-native contents for other operating systems.
 ## Full licence texts and copyright notices
 
 The following texts are copied programmatically from the installed-distribution
-licence evidence, supplemented by the explicitly identified upstream texts.
-Only line endings are normalized to LF; non-ASCII text is retained. Identical
-texts are reproduced once with links from each applicable row. Source paths are
-release-audit evidence paths relative to the repository, not user installation
-instructions. No commercial Qt licence is reproduced or relied on here.
+licence files read as bytes and decoded explicitly as UTF-8, supplemented by the
+identified upstream texts. Only CRLF line endings are normalized to LF;
+non-ASCII text is retained. Identical texts are reproduced once with links from
+each applicable row. Each Source names the installed distribution and its path
+inside site-packages, the Python installation's licence, or an upstream URL.
+Locate installed files inside the Python environment selected for Clearwater.
+No commercial Qt licence is reproduced or relied on here.
 
 <a id="text-01"></a>
 
 ### Python runtime licence and historical notices
 
-Source: `work/wp5.5/round0/python-license.txt`. SHA-256: `160a384f3520ae891b3197f14ff8b1db1d6a1270873424383045dc025a083908`. UTF-8/LF bytes: 24926.
+Source: `CPython 3.12.13: LICENSE.txt in the Python installation`. SHA-256: `160a384f3520ae891b3197f14ff8b1db1d6a1270873424383045dc025a083908`. UTF-8/LF bytes: 24926.
 
 ````text
 A. HISTORY OF THE SOFTWARE
@@ -694,7 +699,7 @@ docs/license.html_lib.
 
 ### cuda-pathfinder: cuda_pathfinder-1.8.3.dist-info/licenses/LICENSE
 
-Source: `work/wp5.5/round0/licenses/cuda-pathfinder/cuda_pathfinder-1.8.3.dist-info/licenses/LICENSE`. SHA-256: `dc94465a4d540f776490e4b7a73d717d09fffbb1d5a7a6eaab47a0ca6f6624ab`. UTF-8/LF bytes: 11436.
+Source: `cuda-pathfinder 1.8.3: cuda_pathfinder-1.8.3.dist-info/licenses/LICENSE`. SHA-256: `dc94465a4d540f776490e4b7a73d717d09fffbb1d5a7a6eaab47a0ca6f6624ab`. UTF-8/LF bytes: 11436.
 
 ````text
 Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
@@ -906,7 +911,7 @@ Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 ### cupy-cuda12x: cupy/_core/include/cupy/_cccl/LICENSE
 
-Source: `work/wp5.5/round0/licenses/cupy-cuda12x/cupy/_core/include/cupy/_cccl/LICENSE`. SHA-256: `f96f51edda77fb9897de29d924d615e6bd153f4969db85fc6b7a22d7a624631e`. UTF-8/LF bytes: 22452.
+Source: `cupy-cuda12x 14.2.0: cupy/_core/include/cupy/_cccl/LICENSE`. SHA-256: `f96f51edda77fb9897de29d924d615e6bd153f4969db85fc6b7a22d7a624631e`. UTF-8/LF bytes: 22452.
 
 ````text
 ==============================================================================
@@ -1325,7 +1330,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### cupy-cuda12x: cupy/_core/include/cupy/_dlpack/LICENSE
 
-Source: `work/wp5.5/round0/licenses/cupy-cuda12x/cupy/_core/include/cupy/_dlpack/LICENSE`. SHA-256: `3e8f6bc39276a586d60c8c5aaece2ff989262181cf2b3d2a128db58f97a9300c`. UTF-8/LF bytes: 11345.
+Source: `cupy-cuda12x 14.2.0: cupy/_core/include/cupy/_dlpack/LICENSE`. SHA-256: `3e8f6bc39276a586d60c8c5aaece2ff989262181cf2b3d2a128db58f97a9300c`. UTF-8/LF bytes: 11345.
 
 ````text
                                  Apache License
@@ -1535,7 +1540,7 @@ Source: `work/wp5.5/round0/licenses/cupy-cuda12x/cupy/_core/include/cupy/_dlpack
 
 ### cupy-cuda12x: cupy/_core/include/cupy/_jitify/LICENSE
 
-Source: `work/wp5.5/round0/licenses/cupy-cuda12x/cupy/_core/include/cupy/_jitify/LICENSE`. SHA-256: `2a6e7492dac91efeb0ed31317870153e49123c30727e9dc354f51c8d50732091`. UTF-8/LF bytes: 1523.
+Source: `cupy-cuda12x 14.2.0: cupy/_core/include/cupy/_jitify/LICENSE`. SHA-256: `2a6e7492dac91efeb0ed31317870153e49123c30727e9dc354f51c8d50732091`. UTF-8/LF bytes: 1523.
 
 ````text
 BSD 3-Clause License
@@ -1573,7 +1578,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### cupy-cuda12x: cupy_cuda12x-14.2.0.dist-info/licenses/LICENSE
 
-Source: `work/wp5.5/round0/licenses/cupy-cuda12x/cupy_cuda12x-14.2.0.dist-info/licenses/LICENSE`. SHA-256: `231c4efc36295f733f4d278eb254f592cf9d1955a7503971fc47af4136c7442b`. UTF-8/LF bytes: 1118.
+Source: `cupy-cuda12x 14.2.0: cupy_cuda12x-14.2.0.dist-info/licenses/LICENSE`. SHA-256: `231c4efc36295f733f4d278eb254f592cf9d1955a7503971fc47af4136c7442b`. UTF-8/LF bytes: 1118.
 
 ````text
 Copyright (c) 2015 Preferred Infrastructure, Inc.
@@ -1602,7 +1607,7 @@ THE SOFTWARE.
 
 ### cupy-cuda12x: cupy_cuda12x-14.2.0.dist-info/licenses/docs/source/license.rst
 
-Source: `work/wp5.5/round0/licenses/cupy-cuda12x/cupy_cuda12x-14.2.0.dist-info/licenses/docs/source/license.rst`. SHA-256: `918713532257491ac8ddcda50b1e8302425456b13b3176f2dcbd454bdfc9c8ab`. UTF-8/LF bytes: 5723.
+Source: `cupy-cuda12x 14.2.0: cupy_cuda12x-14.2.0.dist-info/licenses/docs/source/license.rst`. SHA-256: `918713532257491ac8ddcda50b1e8302425456b13b3176f2dcbd454bdfc9c8ab`. UTF-8/LF bytes: 5723.
 
 ````text
 License
@@ -1745,7 +1750,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### cupy-cuda12x: cupyx/scipy/ndimage/cuda/LICENSE
 
-Source: `work/wp5.5/round0/licenses/cupy-cuda12x/cupyx/scipy/ndimage/cuda/LICENSE`. SHA-256: `a509b83d419cbe3020ec4d69db6fab449ef9e10f9048920ee7d7551a7e163d4c`. UTF-8/LF bytes: 1110.
+Source: `cupy-cuda12x 14.2.0: cupyx/scipy/ndimage/cuda/LICENSE`. SHA-256: `a509b83d419cbe3020ec4d69db6fab449ef9e10f9048920ee7d7551a7e163d4c`. UTF-8/LF bytes: 1110.
 
 ````text
 MIT License
@@ -1775,7 +1780,7 @@ SOFTWARE.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/LICENSE.txt
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/LICENSE.txt`. SHA-256: `dc97d59562c75c04557f1e9a68f3eae326699eb119d569cd4ed6a4eafe5f9abb`. UTF-8/LF bytes: 45801.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/LICENSE.txt`. SHA-256: `dc97d59562c75c04557f1e9a68f3eae326699eb119d569cd4ed6a4eafe5f9abb`. UTF-8/LF bytes: 45801.
 
 ````text
 Copyright (c) 2005-2025, NumPy Developers.
@@ -2698,7 +2703,7 @@ Public License instead of this License.  But first, please read
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/_core/include/numpy/libdivide/LICENSE.txt
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/_core/include/numpy/libdivide/LICENSE.txt`. SHA-256: `fbc539f47d0cf83bc61378080fb873d5c14630126cacbfe754035c3926daa5ec`. UTF-8/LF bytes: 1018.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/_core/include/numpy/libdivide/LICENSE.txt`. SHA-256: `fbc539f47d0cf83bc61378080fb873d5c14630126cacbfe754035c3926daa5ec`. UTF-8/LF bytes: 1018.
 
 ````text
   zlib License
@@ -2728,7 +2733,7 @@ Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/_
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/_core/src/common/pythoncapi-compat/COPYING
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/_core/src/common/pythoncapi-compat/COPYING`. SHA-256: `3f2c1ffa76383a55ae0aac01c9737cd70050dff63e1f026694fbe9d662573c98`. UTF-8/LF bytes: 690.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/_core/src/common/pythoncapi-compat/COPYING`. SHA-256: `3f2c1ffa76383a55ae0aac01c9737cd70050dff63e1f026694fbe9d662573c98`. UTF-8/LF bytes: 690.
 
 ````text
 BSD Zero Clause License
@@ -2751,7 +2756,7 @@ PERFORMANCE OF THIS SOFTWARE.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/_core/src/highway/LICENSE
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/_core/src/highway/LICENSE`. SHA-256: `e340270d4f64384569a91d546acb5b094d69ce47f0c015db77abb74dc6f815af`. UTF-8/LF bytes: 20785.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/_core/src/highway/LICENSE`. SHA-256: `e340270d4f64384569a91d546acb5b094d69ce47f0c015db77abb74dc6f815af`. UTF-8/LF bytes: 20785.
 
 ````text
 This project is primarily dual-licensed under your choice of either the Apache
@@ -3131,7 +3136,7 @@ express Statement of Purpose.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/_core/src/multiarray/dragon4_LICENSE.txt
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/_core/src/multiarray/dragon4_LICENSE.txt`. SHA-256: `f7b14309e5f54e5022b26448eefd419988ada2aec01d3c1162d84a0ea8f21f2c`. UTF-8/LF bytes: 1414.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/_core/src/multiarray/dragon4_LICENSE.txt`. SHA-256: `f7b14309e5f54e5022b26448eefd419988ada2aec01d3c1162d84a0ea8f21f2c`. UTF-8/LF bytes: 1414.
 
 ````text
 Copyright (c) 2014 Ryan Juckett
@@ -3167,7 +3172,7 @@ permission to include it under the MIT license instead.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/_core/src/npysort/x86-simd-sort/LICENSE.md
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/_core/src/npysort/x86-simd-sort/LICENSE.md`. SHA-256: `211e7d737d6179a08f791ebb0a99897ce7cd2457410c542876d125576edfe910`. UTF-8/LF bytes: 1514.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/_core/src/npysort/x86-simd-sort/LICENSE.md`. SHA-256: `211e7d737d6179a08f791ebb0a99897ce7cd2457410c542876d125576edfe910`. UTF-8/LF bytes: 1514.
 
 ````text
 BSD 3-Clause License
@@ -3204,7 +3209,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/_core/src/umath/svml/LICENSE
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/_core/src/umath/svml/LICENSE`. SHA-256: `c17011467b4fe6e20fbfbeda4df09e58c2bca5480a063e55735a4000a379aad9`. UTF-8/LF bytes: 1543.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/_core/src/umath/svml/LICENSE`. SHA-256: `c17011467b4fe6e20fbfbeda4df09e58c2bca5480a063e55735a4000a379aad9`. UTF-8/LF bytes: 1543.
 
 ````text
 Copyright (c) 2005-2021, NumPy Developers.
@@ -3243,7 +3248,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/fft/pocketfft/LICENSE.md
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/fft/pocketfft/LICENSE.md`. SHA-256: `a85ca13fdf90160b64a0698215868c13b74d835ad0a4e2ba44713b8c5058a056`. UTF-8/LF bytes: 1498.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/fft/pocketfft/LICENSE.md`. SHA-256: `a85ca13fdf90160b64a0698215868c13b74d835ad0a4e2ba44713b8c5058a056`. UTF-8/LF bytes: 1498.
 
 ````text
 Copyright (C) 2010-2018 Max-Planck-Society
@@ -3277,7 +3282,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/linalg/lapack_lite/LICENSE.txt
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/linalg/lapack_lite/LICENSE.txt`. SHA-256: `a14cc25e10d40a3aa705b7de2fb764a6535d8ee9b2db4e1724900585457dfd55`. UTF-8/LF bytes: 2266.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/linalg/lapack_lite/LICENSE.txt`. SHA-256: `a14cc25e10d40a3aa705b7de2fb764a6535d8ee9b2db4e1724900585457dfd55`. UTF-8/LF bytes: 2266.
 
 ````text
 Copyright (c) 1992-2013 The University of Tennessee and The University
@@ -3334,7 +3339,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/ma/LICENSE
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/ma/LICENSE`. SHA-256: `05f3b88351988ecfad10abe92c0c50e5875c6452d5009a0084cc291551ffcca6`. UTF-8/LF bytes: 1593.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/ma/LICENSE`. SHA-256: `05f3b88351988ecfad10abe92c0c50e5875c6452d5009a0084cc291551ffcca6`. UTF-8/LF bytes: 1593.
 
 ````text
 * Copyright (c) 2006, University of Georgia and Pierre G.F. Gerard-Marchant
@@ -3367,7 +3372,7 @@ Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/m
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/random/LICENSE.md
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/random/LICENSE.md`. SHA-256: `103166b62b80443afb9eb3488e052ea06be0cff566b908f199e561fde49af19f`. UTF-8/LF bytes: 3511.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/random/LICENSE.md`. SHA-256: `103166b62b80443afb9eb3488e052ea06be0cff566b908f199e561fde49af19f`. UTF-8/LF bytes: 3511.
 
 ````text
 **This software is dual-licensed under the The University of Illinois/NCSA
@@ -3447,7 +3452,7 @@ the component code.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/random/src/distributions/LICENSE.md
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/random/src/distributions/LICENSE.md`. SHA-256: `469778be8f33d54e1bcaab28c281cc472916d2d273f835e55bc487d30503face`. UTF-8/LF bytes: 2745.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/random/src/distributions/LICENSE.md`. SHA-256: `469778be8f33d54e1bcaab28c281cc472916d2d273f835e55bc487d30503face`. UTF-8/LF bytes: 2745.
 
 ````text
 ## NumPy
@@ -3517,7 +3522,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/random/src/mt19937/LICENSE.md
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/random/src/mt19937/LICENSE.md`. SHA-256: `0e111337b25494a773106695f0e799f642b8567aaacca4f116a74a8177179156`. UTF-8/LF bytes: 2926.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/random/src/mt19937/LICENSE.md`. SHA-256: `0e111337b25494a773106695f0e799f642b8567aaacca4f116a74a8177179156`. UTF-8/LF bytes: 2926.
 
 ````text
 # MT19937
@@ -3587,7 +3592,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/random/src/pcg64/LICENSE.md
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/random/src/pcg64/LICENSE.md`. SHA-256: `e7d4f4fb20358f314210a892ae17351e04993813646f697ec387385ca2a36918`. UTF-8/LF bytes: 1154.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/random/src/pcg64/LICENSE.md`. SHA-256: `e7d4f4fb20358f314210a892ae17351e04993813646f697ec387385ca2a36918`. UTF-8/LF bytes: 1154.
 
 ````text
 # PCG64
@@ -3618,7 +3623,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/random/src/philox/LICENSE.md
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/random/src/philox/LICENSE.md`. SHA-256: `6f5828a57223d4cc7f8ea505a2623e7b978b242752c1515e355f46ba2cec1800`. UTF-8/LF bytes: 1509.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/random/src/philox/LICENSE.md`. SHA-256: `6f5828a57223d4cc7f8ea505a2623e7b978b242752c1515e355f46ba2cec1800`. UTF-8/LF bytes: 1509.
 
 ````text
 # PHILOX
@@ -3658,7 +3663,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/random/src/sfc64/LICENSE.md
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/random/src/sfc64/LICENSE.md`. SHA-256: `9d4098846018319cd68e228ee6220361787f73bccbf00237a85e4fc9621b998f`. UTF-8/LF bytes: 1226.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/random/src/sfc64/LICENSE.md`. SHA-256: `9d4098846018319cd68e228ee6220361787f73bccbf00237a85e4fc9621b998f`. UTF-8/LF bytes: 1226.
 
 ````text
 # SFC64
@@ -3694,7 +3699,7 @@ DEALINGS IN THE SOFTWARE.
 
 ### numpy: numpy-2.5.4.dist-info/licenses/numpy/random/src/splitmix64/LICENSE.md
 
-Source: `work/wp5.5/round0/licenses/numpy/numpy-2.5.4.dist-info/licenses/numpy/random/src/splitmix64/LICENSE.md`. SHA-256: `268b0ca06759d31ea3ca68dd35f20e877916e927b1c2a835e4592a3c4354b1f9`. UTF-8/LF bytes: 332.
+Source: `numpy 2.5.4: numpy-2.5.4.dist-info/licenses/numpy/random/src/splitmix64/LICENSE.md`. SHA-256: `268b0ca06759d31ea3ca68dd35f20e877916e927b1c2a835e4592a3c4354b1f9`. UTF-8/LF bytes: 332.
 
 ````text
 # SPLITMIX64
@@ -3712,7 +3717,7 @@ See <http://creativecommons.org/publicdomain/zero/1.0/>.
 
 ### nvidia-cublas-cu12: nvidia_cublas_cu12-12.9.2.10.dist-info/licenses/License.txt
 
-Source: `work/wp5.5/round0/licenses/nvidia-cublas-cu12/nvidia_cublas_cu12-12.9.2.10.dist-info/licenses/License.txt`. SHA-256: `7ecaf73eb36d2135e76f139265a6b8e24c20ef86c2a825d53b808a04a829c47c`. UTF-8/LF bytes: 59408.
+Source: `nvidia-cublas-cu12 12.9.2.10: nvidia_cublas_cu12-12.9.2.10.dist-info/licenses/License.txt`. SHA-256: `ad6f5853fba0ca0d159d0f58d49ae49830c2f8c93f7a92648b9ce90adb4c6ccd`. UTF-8/LF bytes: 59262.
 
 ````text
 End User License Agreement
@@ -3825,9 +3830,9 @@ copying or using the licensed software:
 -------------------------------------------------------
 
 This license agreement, including exhibits attached
-("Agreementâ€�) is a legal agreement between you and NVIDIA
+("Agreement”) is a legal agreement between you and NVIDIA
 Corporation ("NVIDIA") and governs your use of a NVIDIA
-software development kit (â€œSDKâ€�).
+software development kit (“SDK”).
 
 Each SDK has its own set of software and materials, but here
 is a description of the types of items that may be included in
@@ -3843,10 +3848,10 @@ of majority in the country in which the SDK is used.
 If you are entering into this Agreement on behalf of a company
 or other legal entity, you represent that you have the legal
 authority to bind the entity to this Agreement, in which case
-â€œyouâ€� will mean the entity you represent.
+“you” will mean the entity you represent.
 
-If you donâ€™t have the required age or authority to accept
-this Agreement, or if you donâ€™t accept all the terms and
+If you don’t have the required age or authority to accept
+this Agreement, or if you don’t accept all the terms and
 conditions of this Agreement, do not download, install or use
 the SDK.
 
@@ -3890,8 +3895,8 @@ the distribution grant:
 
   3. The following notice shall be included in modifications
     and derivative works of sample source code distributed:
-    â€œThis software contains source code provided by NVIDIA
-    Corporation.â€�
+    “This software contains source code provided by NVIDIA
+    Corporation.”
 
   4. Unless a developer tool is identified in this Agreement
     as distributable, it is delivered for your internal use
@@ -3901,7 +3906,7 @@ the distribution grant:
     must be consistent with the terms of this Agreement,
     including (without limitation) terms relating to the
     license grant and license restrictions and protection of
-    NVIDIAâ€™s intellectual property rights. Additionally, you
+    NVIDIA’s intellectual property rights. Additionally, you
     agree that you will protect the privacy, security and
     legal rights of your application users.
 
@@ -3924,7 +3929,7 @@ use the SDK from your secure network.
 
 You are responsible for the compliance with the terms of this
 Agreement by your authorized users. If you become aware that
-your authorized users didnâ€™t follow the terms of this
+your authorized users didn’t follow the terms of this
 Agreement, you agree to take reasonable steps to resolve the
 non-compliance and prevent new occurrences.
 
@@ -4033,7 +4038,7 @@ SDK:
     contractors, agents, officers and directors, from and
     against any and all claims, damages, obligations, losses,
     liabilities, costs or debt, fines, restitutions and
-    expenses (including but not limited to attorneyâ€™s fees
+    expenses (including but not limited to attorney’s fees
     and costs incident to establishing the right of
     indemnification) arising out of or related to your use of
     the SDK outside of the scope of this Agreement, or not in
@@ -4047,7 +4052,7 @@ SDK:
     derivative works, including their respective intellectual
     property rights, subject to your rights described in this
     section. This SDK may include software and materials from
-    NVIDIAâ€™s licensors, and these licensors are intended
+    NVIDIA’s licensors, and these licensors are intended
     third party beneficiaries that may enforce this Agreement
     with respect to their intellectual property rights.
 
@@ -4055,9 +4060,9 @@ SDK:
     applications and your derivative works of the sample
     source code delivered in the SDK, including their
     respective intellectual property rights, subject to
-    NVIDIAâ€™s rights described in this section.
+    NVIDIA’s rights described in this section.
 
-  3. You may, but donâ€™t have to, provide to NVIDIA
+  3. You may, but don’t have to, provide to NVIDIA
     suggestions, feature requests or other feedback regarding
     the SDK, including possible enhancements or modifications
     to the SDK. For any feedback that you voluntarily provide,
@@ -4074,8 +4079,8 @@ SDK:
 
 1.4. No Warranties
 
-THE SDK IS PROVIDED BY NVIDIA â€œAS ISâ€� AND â€œWITH ALL
-FAULTS.â€� TO THE MAXIMUM EXTENT PERMITTED BY LAW, NVIDIA AND
+THE SDK IS PROVIDED BY NVIDIA “AS IS” AND “WITH ALL
+FAULTS.” TO THE MAXIMUM EXTENT PERMITTED BY LAW, NVIDIA AND
 ITS AFFILIATES EXPRESSLY DISCLAIM ALL WARRANTIES OF ANY KIND
 OR NATURE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING,
 BUT NOT LIMITED TO, ANY WARRANTIES OF MERCHANTABILITY, FITNESS
@@ -4096,7 +4101,7 @@ WITH THIS AGREEMENT OR THE USE OR PERFORMANCE OF THE SDK,
 WHETHER SUCH LIABILITY ARISES FROM ANY CLAIM BASED UPON BREACH
 OF CONTRACT, BREACH OF WARRANTY, TORT (INCLUDING NEGLIGENCE),
 PRODUCT LIABILITY OR ANY OTHER CAUSE OF ACTION OR THEORY OF
-LIABILITY. IN NO EVENT WILL NVIDIAâ€™S AND ITS AFFILIATES
+LIABILITY. IN NO EVENT WILL NVIDIA’S AND ITS AFFILIATES
 TOTAL CUMULATIVE LIABILITY UNDER OR ARISING OUT OF THIS
 AGREEMENT EXCEED US$10.00. THE NATURE OF THE LIABILITY OR THE
 NUMBER OF CLAIMS OR SUITS SHALL NOT ENLARGE OR EXTEND THIS
@@ -4126,14 +4131,14 @@ would be substantially different.
       a. (i) you fail to comply with any term of this
         Agreement and the non-compliance is not fixed within
         thirty (30) days following notice from NVIDIA (or
-        immediately if you violate NVIDIAâ€™s intellectual
+        immediately if you violate NVIDIA’s intellectual
         property rights);
 
       b. (ii) you commence or participate in any legal
         proceeding against NVIDIA with respect to the SDK; or
 
       c. (iii) NVIDIA decides to no longer provide the SDK in
-        a country or, in NVIDIAâ€™s sole discretion, the
+        a country or, in NVIDIA’s sole discretion, the
         continued use of it is no longer commercially viable.
 
   4. Upon any termination of this Agreement, you agree to
@@ -4189,9 +4194,9 @@ Each party acknowledges and agrees that the other is an
 independent contractor in the performance of this Agreement.
 
 The SDK has been developed entirely at private expense and is
-â€œcommercial itemsâ€� consisting of â€œcommercial computer
-softwareâ€� and â€œcommercial computer software
-documentationâ€� provided with RESTRICTED RIGHTS. Use,
+“commercial items” consisting of “commercial computer
+software” and “commercial computer software
+documentation” provided with RESTRICTED RIGHTS. Use,
 duplication or disclosure by the U.S. Government or a U.S.
 Government subcontractor is subject to the restrictions in
 this Agreement pursuant to DFARS 227.7202-3(a) or as set forth
@@ -4205,7 +4210,7 @@ regulations. You agree that you will not ship, transfer or
 export the SDK into any country, or use the SDK in any manner,
 prohibited by the United States Bureau of Industry and
 Security or economic sanctions regulations administered by the
-U.S. Department of Treasuryâ€™s Office of Foreign Assets
+U.S. Department of Treasury’s Office of Foreign Assets
 Control (OFAC), or any applicable export laws, restrictions or
 regulations. These laws include restrictions on destinations,
 end users and end use. By accepting this Agreement, you
@@ -4242,7 +4247,7 @@ Release date: August 16, 2018
 
 The terms in this supplement govern your use of the NVIDIA
 CUDA Toolkit SDK under the terms of your license agreement
-(â€œAgreementâ€�) as modified by this supplement. Capitalized
+(“Agreement”) as modified by this supplement. Capitalized
 terms used but not defined below have the meaning assigned to
 them in the Agreement.
 
@@ -5289,17 +5294,17 @@ conditions:
 
 ### pillow: pillow-12.3.0.dist-info/licenses/LICENSE
 
-Source: `work/wp5.5/round0/licenses/pillow/pillow-12.3.0.dist-info/licenses/LICENSE`. SHA-256: `6c3a7df625f2ecf3f54e36a82bec14baa847fab1ff1bfe25405ae8fd4d852613`. UTF-8/LF bytes: 76485.
+Source: `pillow 12.3.0: pillow-12.3.0.dist-info/licenses/LICENSE`. SHA-256: `51ed379cf673c9676b7fa7e1bedbfc5d4ad63caac4f6f99eeec5ccab50c3e0ef`. UTF-8/LF bytes: 76435.
 
 ````text
 The Python Imaging Library (PIL) is
 
-    Copyright Â© 1997-2011 by Secret Labs AB
-    Copyright Â© 1995-2011 by Fredrik Lundh and contributors
+    Copyright © 1997-2011 by Secret Labs AB
+    Copyright © 1995-2011 by Fredrik Lundh and contributors
 
 Pillow is the friendly PIL fork. It is
 
-    Copyright Â© 2010 by Jeffrey 'Alex' Clark and contributors
+    Copyright © 2010 by Jeffrey 'Alex' Clark and contributors
 
 Like PIL, Pillow is licensed under the open source MIT-CMU License:
 
@@ -5444,7 +5449,7 @@ Introduction
   encourage you to use the following text:
 
    """
-    Portions of this software are copyright Â© <year> The FreeType
+    Portions of this software are copyright © <year> The FreeType
     Project (https://freetype.org).  All rights reserved.
    """
 
@@ -5910,23 +5915,23 @@ HarfBuzz is licensed under the so-called "Old MIT" license.  Details follow.
 For parts of HarfBuzz that are licensed under different licenses see individual
 files names COPYING in subdirectories where applicable.
 
-Copyright Â© 2010-2022  Google, Inc.
-Copyright Â© 2015-2020  Ebrahim Byagowi
-Copyright Â© 2019,2020  Facebook, Inc.
-Copyright Â© 2012,2015  Mozilla Foundation
-Copyright Â© 2011  Codethink Limited
-Copyright Â© 2008,2010  Nokia Corporation and/or its subsidiary(-ies)
-Copyright Â© 2009  Keith Stribley
-Copyright Â© 2011  Martin Hosken and SIL International
-Copyright Â© 2007  Chris Wilson
-Copyright Â© 2005,2006,2020,2021,2022,2023  Behdad Esfahbod
-Copyright Â© 2004,2007,2008,2009,2010,2013,2021,2022,2023  Red Hat, Inc.
-Copyright Â© 1998-2005  David Turner and Werner Lemberg
-Copyright Â© 2016  Igalia S.L.
-Copyright Â© 2022  Matthias Clasen
-Copyright Â© 2018,2021  Khaled Hosny
-Copyright Â© 2018,2019,2020  Adobe, Inc
-Copyright Â© 2013-2015  Alexei Podtelezhnikov
+Copyright © 2010-2022  Google, Inc.
+Copyright © 2015-2020  Ebrahim Byagowi
+Copyright © 2019,2020  Facebook, Inc.
+Copyright © 2012,2015  Mozilla Foundation
+Copyright © 2011  Codethink Limited
+Copyright © 2008,2010  Nokia Corporation and/or its subsidiary(-ies)
+Copyright © 2009  Keith Stribley
+Copyright © 2011  Martin Hosken and SIL International
+Copyright © 2007  Chris Wilson
+Copyright © 2005,2006,2020,2021,2022,2023  Behdad Esfahbod
+Copyright © 2004,2007,2008,2009,2010,2013,2021,2022,2023  Red Hat, Inc.
+Copyright © 1998-2005  David Turner and Werner Lemberg
+Copyright © 2016  Igalia S.L.
+Copyright © 2022  Matthias Clasen
+Copyright © 2018,2021  Khaled Hosny
+Copyright © 2018,2019,2020  Adobe, Inc
+Copyright © 2013-2015  Alexei Podtelezhnikov
 
 For full copyright notices consult the individual files in the package.
 
@@ -6003,7 +6008,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Files: src/obu.c
 
-Copyright Â© 2018-2019, VideoLAN and dav1d authors
+Copyright © 2018-2019, VideoLAN and dav1d authors
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -6512,7 +6517,7 @@ The Modified (3-clause) BSD License
 ===================================
 
 Copyright (C) 2009-2026 D. R. Commander.  All Rights Reserved.<br>
-Copyright (C) 2015 Viktor SzathmÃ¡ry.  All Rights Reserved.
+Copyright (C) 2015 Viktor Szathmáry.  All Rights Reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -6767,8 +6772,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # LibTIFF license
 
-Copyright Â© 1988-1997 Sam Leffler\
-Copyright Â© 1991-1997 Silicon Graphics, Inc.
+Copyright © 1988-1997 Sam Leffler\
+Copyright © 1991-1997 Silicon Graphics, Inc.
 
 Permission to use, copy, modify, distribute, and sell this software and 
 its documentation for any purpose is hereby granted without fee, provided
@@ -6915,7 +6920,7 @@ freely, subject to the following restrictions:
 
 ### pillow-heif: pillow_heif-1.8.1.dist-info/licenses/LICENSE.txt
 
-Source: `work/wp5.5/round0/licenses/pillow-heif/pillow_heif-1.8.1.dist-info/licenses/LICENSE.txt`. SHA-256: `9e2635f155b00af5a46cb2f2c9b052072ec546d59837ee74efc9cba2cbb83f3d`. UTF-8/LF bytes: 1546.
+Source: `pillow-heif 1.8.1: pillow_heif-1.8.1.dist-info/licenses/LICENSE.txt`. SHA-256: `9e2635f155b00af5a46cb2f2c9b052072ec546d59837ee74efc9cba2cbb83f3d`. UTF-8/LF bytes: 1546.
 
 ````text
 Copyright (c) 2021-2023, Pillow-Heif contributors.
@@ -6954,7 +6959,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### pillow-heif: pillow_heif-1.8.1.dist-info/licenses/LICENSES_bundled.txt
 
-Source: `work/wp5.5/round0/licenses/pillow-heif/pillow_heif-1.8.1.dist-info/licenses/LICENSES_bundled.txt`. SHA-256: `7c5eab5b0bc4ed21688891149081b38432b2bbe8e8b49c12708a8ddcf7d700d8`. UTF-8/LF bytes: 1147.
+Source: `pillow-heif 1.8.1: pillow_heif-1.8.1.dist-info/licenses/LICENSES_bundled.txt`. SHA-256: `7c5eab5b0bc4ed21688891149081b38432b2bbe8e8b49c12708a8ddcf7d700d8`. UTF-8/LF bytes: 1147.
 
 ````text
 The "pillow-heif" source code is licensed under the BSD-3-Clause license, see LICENSE.txt.
@@ -6990,7 +6995,7 @@ Files: libgcc_s_seh-1.dll, libstdc++-6.dll, libwinpthread-1.dll
 
 ### scipy: scipy-1.18.1.dist-info/LICENSE.txt
 
-Source: `work/wp5.5/round0/licenses/scipy/scipy-1.18.1.dist-info/LICENSE.txt`. SHA-256: `c803fb373fe0f3b038f3f841bf706d63e076ffc554ec889cdeb258e5b29802bb`. UTF-8/LF bytes: 45851.
+Source: `scipy 1.18.1: scipy-1.18.1.dist-info/LICENSE.txt`. SHA-256: `c803fb373fe0f3b038f3f841bf706d63e076ffc554ec889cdeb258e5b29802bb`. UTF-8/LF bytes: 45851.
 
 ````text
 Copyright (c) 2001-2002 Enthought, Inc. 2003, SciPy Developers.
@@ -7914,7 +7919,7 @@ Public License instead of this License.  But first, please read
 
 ### scipy: scipy/_lib/_uarray/LICENSE
 
-Source: `work/wp5.5/round0/licenses/scipy/scipy/_lib/_uarray/LICENSE`. SHA-256: `c80c39b5fce06ba4897e14e0b0a88b54458334d951eb1361402ffad2cfb863b4`. UTF-8/LF bytes: 1514.
+Source: `scipy 1.18.1: scipy/_lib/_uarray/LICENSE`. SHA-256: `c80c39b5fce06ba4897e14e0b0a88b54458334d951eb1361402ffad2cfb863b4`. UTF-8/LF bytes: 1514.
 
 ````text
 BSD 3-Clause License
@@ -7952,7 +7957,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### scipy: scipy/fft/_duccfft/LICENSE.md
 
-Source: `work/wp5.5/round0/licenses/scipy/scipy/fft/_duccfft/LICENSE.md`. SHA-256: `c254b2b5fd30ae3c89d36ba061730563b9760fca04f1b746a1b2c3157da2c789`. UTF-8/LF bytes: 1498.
+Source: `scipy 1.18.1: scipy/fft/_duccfft/LICENSE.md`. SHA-256: `c254b2b5fd30ae3c89d36ba061730563b9760fca04f1b746a1b2c3157da2c789`. UTF-8/LF bytes: 1498.
 
 ````text
 Copyright (C) 2010-2019 Max-Planck-Society
@@ -7986,7 +7991,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### scipy: scipy/integrate/LICENSE_DOP
 
-Source: `work/wp5.5/round0/licenses/scipy/scipy/integrate/LICENSE_DOP`. SHA-256: `ed9bf58c6d74d3fad9d92d1d67d9bff8141d8ab60de784516b0711364fd43357`. UTF-8/LF bytes: 3572.
+Source: `scipy 1.18.1: scipy/integrate/LICENSE_DOP`. SHA-256: `ed9bf58c6d74d3fad9d92d1d67d9bff8141d8ab60de784516b0711364fd43357`. UTF-8/LF bytes: 3572.
 
 ````text
 Copyright (C) 2025 SciPy developers
@@ -8071,7 +8076,7 @@ Wanner with the original descriptions below.
 
 ### scipy: scipy/spatial/qhull_src/COPYING_QHULL.txt
 
-Source: `work/wp5.5/round0/licenses/scipy/scipy/spatial/qhull_src/COPYING_QHULL.txt`. SHA-256: `106d55c931fd6a84822e5345d900273d059f1c27310d02567ccb313c5d18c55d`. UTF-8/LF bytes: 1720.
+Source: `scipy 1.18.1: scipy/spatial/qhull_src/COPYING_QHULL.txt`. SHA-256: `106d55c931fd6a84822e5345d900273d059f1c27310d02567ccb313c5d18c55d`. UTF-8/LF bytes: 1720.
 
 ````text
                     Qhull, Copyright (c) 1993-2020
@@ -8119,7 +8124,7 @@ modified, and redistributed under the following conditions:
 
 ### tifffile: tifffile-2026.10.15.dist-info/licenses/LICENSE
 
-Source: `work/wp5.5/round0/licenses/tifffile/tifffile-2026.10.15.dist-info/licenses/LICENSE`. SHA-256: `3cf196b1625812d2d119518294043e71017fe858355a58eb48e1e35b61213ce9`. UTF-8/LF bytes: 1529.
+Source: `tifffile 2026.10.15: tifffile-2026.10.15.dist-info/licenses/LICENSE`. SHA-256: `3cf196b1625812d2d119518294043e71017fe858355a58eb48e1e35b61213ce9`. UTF-8/LF bytes: 1529.
 
 ````text
 BSD-3-Clause license
@@ -8158,9 +8163,9 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ### LGPL-3.0.txt
 
-Source: `work/wp5.5/license-upstream/LGPL-3.0.txt`. SHA-256: `97628afebc60f026f5c2b25d7491c46a5c4ee61f693e7cfa07fbd2c03605979b`. UTF-8/LF bytes: 7652.
+Source: `https://raw.githubusercontent.com/qt/qtbase/v6.12.0/LICENSES/LGPL-3.0-only.txt`. SHA-256: `97628afebc60f026f5c2b25d7491c46a5c4ee61f693e7cfa07fbd2c03605979b`. UTF-8/LF bytes: 7652.
 
-Upstream: https://raw.githubusercontent.com/qt/qtbase/v6.12.0/LICENSES/LGPL-3.0-only.txt
+Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision.
 
 ````text
                    GNU LESSER GENERAL PUBLIC LICENSE
@@ -8335,9 +8340,9 @@ Library.
 
 ### x265-COPYING.txt
 
-Source: `work/wp5.5/license-upstream/x265-COPYING.txt`. SHA-256: `0daef7961f72671c6bbdf2afc64cb3001597bfb626a5f2882214f0736da9a532`. UTF-8/LF bytes: 18121.
+Source: `https://raw.githubusercontent.com/Multicorewareinc/x265/4.3/COPYING`. SHA-256: `0daef7961f72671c6bbdf2afc64cb3001597bfb626a5f2882214f0736da9a532`. UTF-8/LF bytes: 18121.
 
-Upstream: https://raw.githubusercontent.com/Multicorewareinc/x265/4.3/COPYING
+Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision.
 
 ````text
 		    GNU GENERAL PUBLIC LICENSE
@@ -8690,9 +8695,9 @@ For more information, contact us at license @ x265.com.
 
 ### x265-header.txt
 
-Source: `work/wp5.5/license-upstream/x265-header.txt`. SHA-256: `e8557aeb23ac7c220cc9298b485864e87df4ae9d7418ef0359cd0e5ccec34d01`. UTF-8/LF bytes: 1143.
+Source: `https://raw.githubusercontent.com/Multicorewareinc/x265/4.3/source/x265.h`. SHA-256: `e8557aeb23ac7c220cc9298b485864e87df4ae9d7418ef0359cd0e5ccec34d01`. UTF-8/LF bytes: 1143.
 
-Upstream: https://raw.githubusercontent.com/Multicorewareinc/x265/4.3/source/x265.h
+Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. Selection: initial copyright/licence comment through */ plus LF. The common licence texts are supplied separately below.
 
 ````text
 /*****************************************************************************
@@ -8724,9 +8729,9 @@ Upstream: https://raw.githubusercontent.com/Multicorewareinc/x265/4.3/source/x26
 
 ### libheif-COPYING.txt
 
-Source: `work/wp5.5/license-upstream/libheif-COPYING.txt`. SHA-256: `b9e2b836cce4c53bd189668e18467d0d88fbfa0fc4a9ff092fb275ce08e60b4a`. UTF-8/LF bytes: 285.
+Source: `https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/COPYING`. SHA-256: `b9e2b836cce4c53bd189668e18467d0d88fbfa0fc4a9ff092fb275ce08e60b4a`. UTF-8/LF bytes: 285.
 
-Upstream: https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/COPYING
+Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. Selection: project notice preceding common LGPLv3/GPLv3 texts. The common licence texts are supplied separately below.
 
 ````text
 * The library `libheif` is distributed under the terms of the GNU Lesser General Public License.
@@ -8740,9 +8745,9 @@ License texts below and in the `COPYING` files of the corresponding subfolders.
 
 ### libde265-COPYING.txt
 
-Source: `work/wp5.5/license-upstream/libde265-COPYING.txt`. SHA-256: `df06f23f556f4cac64ab2af63995d81cdc4412a2cb44696947bb62f11c6a70d0`. UTF-8/LF bytes: 258.
+Source: `https://raw.githubusercontent.com/strukturag/libde265/v1.1.3/COPYING`. SHA-256: `df06f23f556f4cac64ab2af63995d81cdc4412a2cb44696947bb62f11c6a70d0`. UTF-8/LF bytes: 258.
 
-Upstream: https://raw.githubusercontent.com/strukturag/libde265/v1.1.3/COPYING
+Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. Selection: project notice preceding common LGPLv3/GPLv3 texts. The common licence texts are supplied separately below.
 
 ````text
 * The library `libde265` is distributed under the terms of the GNU Lesser General Public License.
@@ -8756,9 +8761,9 @@ License texts below and in the `COPYING` files of the corresponding subfolders.
 
 ### mingw-COPYING.txt
 
-Source: `work/wp5.5/license-upstream/mingw-COPYING.txt`. SHA-256: `8f604966c08c3b8490f543a60b4952c42b951d466dce20a5ab81c3515d757d73`. UTF-8/LF bytes: 2327.
+Source: `https://raw.githubusercontent.com/mingw-w64/mingw-w64/master/COPYING`. SHA-256: `8f604966c08c3b8490f543a60b4952c42b951d466dce20a5ab81c3515d757d73`. UTF-8/LF bytes: 2327.
 
-Upstream: https://raw.githubusercontent.com/mingw-w64/mingw-w64/master/COPYING
+Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. The pillow-heif wheel manifest names no MinGW-w64 or winpthreads version, so no version-matched tagged copy can be identified; this unversioned source is disclosed rather than assigning an unverified tag.
 
 ````text
 With exception of certain parts that are prominently marked as being
@@ -8811,9 +8816,9 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### libheif-header.txt
 
-Source: `work/wp5.5/license-upstream/libheif-header.txt`. SHA-256: `c0acdafc58cf45f394ab796d279001f16b7748a3b74d63dab34574d95ac8a42f`. UTF-8/LF bytes: 774.
+Source: `https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/libheif/api/libheif/heif.h`. SHA-256: `c0acdafc58cf45f394ab796d279001f16b7748a3b74d63dab34574d95ac8a42f`. UTF-8/LF bytes: 774.
 
-Upstream: https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/libheif/api/libheif/heif.h
+Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. Selection: initial copyright/licence comment through */ plus LF. The common licence texts are supplied separately below.
 
 ````text
 /*
@@ -8841,9 +8846,9 @@ Upstream: https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/libheif/a
 
 ### libde265-header.txt
 
-Source: `work/wp5.5/license-upstream/libde265-header.txt`. SHA-256: `01810f59b757ca00a898b869481ea776f8478d75a900868970f7d151fcf0c9ab`. UTF-8/LF bytes: 794.
+Source: `https://raw.githubusercontent.com/strukturag/libde265/v1.1.3/libde265/de265.h`. SHA-256: `01810f59b757ca00a898b869481ea776f8478d75a900868970f7d151fcf0c9ab`. UTF-8/LF bytes: 794.
 
-Upstream: https://raw.githubusercontent.com/strukturag/libde265/v1.1.3/libde265/de265.h
+Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. Selection: initial copyright/licence comment through */ plus LF. The common licence texts are supplied separately below.
 
 ````text
 /*
@@ -8871,9 +8876,9 @@ Upstream: https://raw.githubusercontent.com/strukturag/libde265/v1.1.3/libde265/
 
 ### winpthreads-COPYING.txt
 
-Source: `work/wp5.5/license-upstream/winpthreads-COPYING.txt`. SHA-256: `7cc7c4b3acea31b22251b3610ec898d13d081e9860766d725754e6c18472a1e0`. UTF-8/LF bytes: 2884.
+Source: `https://raw.githubusercontent.com/mingw-w64/mingw-w64/master/mingw-w64-libraries/winpthreads/COPYING`. SHA-256: `7cc7c4b3acea31b22251b3610ec898d13d081e9860766d725754e6c18472a1e0`. UTF-8/LF bytes: 2884.
 
-Upstream: https://raw.githubusercontent.com/mingw-w64/mingw-w64/master/mingw-w64-libraries/winpthreads/COPYING
+Copied from this URL as it stood at turn 2; no re-fetch was possible for this review revision. The pillow-heif wheel manifest names no MinGW-w64 or winpthreads version, so no version-matched tagged copy can be identified; this unversioned source is disclosed rather than assigning an unverified tag.
 
 ````text
 Copyright (c) 2011 mingw-w64 project

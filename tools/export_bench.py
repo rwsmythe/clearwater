@@ -23,10 +23,9 @@ processing per minute of footage against D106 / N6's spec v0.5.8 figure of 12 mi
 (0.4004 s/frame at 30000/1001 fps), the per-frame median / p90 / max (the first frame apart),
 the phase times and the analysis share, the strays over the whole run and the conditions
 (strays, graphics-card clocks and temperature, CPU) before and after, the peak resident memory
-of the process tree
-(FFmpeg children included) and the peak graphics memory in use (N4, both from WP3.10's
-:class:`~video_io_bench.Telemetry`), and the NVENC proof (DR-18 (1)). On the GPU backend the
-record also holds the two-instrument memory check (WP3.21 task 10, CHARC ruling
+of the process tree (FFmpeg children included) and the peak graphics memory in use (N4, both
+from WP3.10's :class:`~video_io_bench.Telemetry`), and the NVENC proof (DR-18 (1)). On the GPU
+backend the record also holds the two-instrument memory check (WP3.21 task 10, CHARC ruling
 ``cadc39fc8a199a57`` item 3, :func:`memory_check`): the device-wide peak against the job's
 device-wide estimate (``core.memory.job_device_memory_estimate_bytes``), the idle before the run
 stated, and the in-process pool's reserved peak, sampled through the backend, against the

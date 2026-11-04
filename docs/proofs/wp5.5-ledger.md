@@ -90,16 +90,15 @@ orchestrator's seat.
   **62 distribution METADATA hashes unchanged** (`lean-run.log`,
   `lean-run-offline.log`). Independent lean headless photo export exited **0**
   and wrote `lean-photo/jpeg-gradient-srgb_corrected.png` (`lean-photo.log`).
-- **STOP [MAJOR, walkthrough environment]:** the guide's lean environment-report
+- **Turn-2 STOP [MAJOR, walkthrough environment; resolved before Round 1]:** the guide's lean environment-report
   command could not resolve its temporary psutil/py-cpuinfo dependencies.
   Online exit **2**, package-index connection refused (WinError 10061):
   `lean-environment-report-online.log`. Offline exit **1**, psutil missing from
   cache: `lean-environment-report.log`. The initial offline lean sync also
   lacked the PySide wheel; normal sync then succeeded. This is an execution
   prerequisite failure, not evidence of a product fault or an incorrect guide
-  command. Dispatcher disposition needed: provide working index access or cache
-  the two diagnostic packages, then rerun the unchanged guide command in the
-  lean environment. Do not claim step 8(c) fully exercised yet.
+  command. The dispatcher subsequently ran the unchanged guide command with
+  network access; the successful orchestrator-seat result is recorded below.
 - The report tool itself ran successfully through the full environment (exit
   **0**): `environment-report.log`,
   `environment/reports/environment-20261103T234509Z.json`; no unavailable
@@ -125,14 +124,105 @@ orchestrator's seat.
 | Notices might omit aggregate/native conditions or repeat LGPLv3 | Source inventory and independent extraction/hash checks | Confirmed during assembly and FIXED: complete aggregate/native texts, common LGPLv3 once |
 | README prepend or platform checkout might rewrite harness content | Compare suffix against git HEAD blob and additions-only diff | REJECTED as false positive on delivered diff; original blob retained |
 | Lean install could pull in CUDA/test tools or mutate .venv | Count installed distributions and compare main METADATA hashes | REJECTED as false positive: 8 lean distributions, no pytest/CuPy, main unchanged |
-| Lean diagnostics might be unavailable | Online connection-refused and offline missing-cache reproductions | CONFIRMED / OPEN to dispatcher; no product fix attempted |
+| Lean diagnostics might be unavailable | Online connection-refused and offline missing-cache reproductions | CONFIRMED at cell seat / RESOLVED at orchestrator seat before Round 1; no product fix needed |
 
-Final file-constraint pass found no further product/document defect. Execution
-remains incomplete only for the lean diagnostic above. DR-119 (a)-(b) are paid
-down in the candidate; formal closure, N13 satisfaction, Reviewer A/B, the full
-release gate, merge, tag and release record remain with the dispatcher/CHARC.
+The turn-2 file-constraint pass found no further issue; Reviewer A subsequently
+identified the encoding/menu defects recorded in Round 1 below. DR-119 (a)-(b)
+are paid down in the candidate; formal closure, N13 satisfaction, Reviewer A/B,
+the full release gate, merge, tag and release record remain with the dispatcher/CHARC.
 No footage was read; no unowned tracked file, dependency list or frozen interface
 changed. No dependency was added/removed, git write, mailbox post, remote action,
 installer, timing window or fabricated gate claim occurred. All runtime export
-outputs stayed under this worktree. YIELD for the dispatcher to disposition the
-environment blocker and run Reviewer A.
+outputs stayed under this worktree. Turn 2 yielded for the dispatcher to
+disposition the environment blocker and run Reviewer A.
+
+## Round 1
+
+Reviewer A: Claude, read-only process at the orchestrator's seat on `e7876912`.
+Findings copy: `work/wp5.5/A-r1-review.txt`; verdict
+**NEW_CRITICAL_MAJOR_FOUND**. Reviewer baseline: **72 passed, 1 deselected in
+67.36s**. Driver transport / CLI version is dispatcher-owned, not supplied in
+the findings copy; no version is inferred here.
+
+| Round | Critical | Major | Minor | Advisory | In / out of envelope | NEW / REOPENED | Reverts | Product-code fixes | Tools docstring | Other fixes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A r1 | 0 | 2 | 4 | 4 | 10 / 0 | 10 / 0 | 0 | 0 | 1 | Documentation; F10 requires no change |
+
+Depth at turn-3 start: 156,273 of 258,400 (previous turn's driver footer)
+
+Depth at turn-3 end: 192,011 of 258,400 (driver footer; session 01a1a3bf)
+
+### Per-finding adjudication
+
+All ten findings are confirmed and in envelope under the binding dispatch;
+none is rejected or reopened.
+
+| Finding | Severity | Confirmation and fix |
+| --- | --- | --- |
+| F1 | MAJOR | CONFIRMED. The round-0 audit used locale-default `read_text(errors="replace")` on valid UTF-8 source files, then wrote those mis-decoded strings as UTF-8. Turn 2 copied the already corrupted evidence bytes and compared them back to that evidence, so its hashes did not establish source fidelity. Regenerated every installed text directly from original source BYTES, decoded UTF-8 explicitly; CRLF -> LF only. Upstream texts use their existing UTF-8 cached files and declared source selections. The independent source-byte verifier checks original files, not the audit copies or merely the generated hashes. |
+| F2 | MAJOR | CONFIRMED by `ShellWindow._build_actions` at `gui/shell.py:458-489` and `set_settings_dialog` at `:399-407`. Changed all three guide paths to Tools > Settings. Checked File > Open/Export/Quit; View > Fit/1:1/Zoom in/Zoom out/Reset split; Tools > Settings against the actual action wiring. No other incorrect menu path remains. |
+| F3 | MINOR | CONFIRMED against the installed NVIDIA License.txt. The quote now contains the whole section 1.1.1(3), through "meets the distribution requirements indicated in this Agreement." It is extracted programmatically, with whitespace joined for the prose quote; the full licence text remains a byte-true copy. |
+| F4 | MINOR | CONFIRMED. Every Source line now names its distribution/version and installed package/dist-info path, the Python installation's LICENSE.txt, or an upstream URL. No Source line contains a work/ path. |
+| F5 | MINOR | CONFIRMED. Qt LGPL text uses v6.12.0; x265 uses 4.3, libheif v1.23.6, libde265 v1.1.3. All upstream-only texts explicitly state they were copied from the URL as it stood at turn 2 and were not re-fetched. The actual wheel manifest specifies no MinGW/winpthreads version, so no version-matched tag can be identified; the native component entry and both unversioned source entries disclose that gap instead of inventing a tag. The manifest's own upstream URL is retained verbatim in its copied text. |
+| F6 | MINOR | CONFIRMED. User-facing fixture commands now use work/try/photo, video, cache and settings, with work/try/photo.json and video.json records. Source paths, command flags and expected output names are unchanged from the exercised commands. |
+| F7 | ADVISORY | CONFIRMED. Removed CHARC, ruling identifiers, R2 and "accepted by" framing from the third-party notices. Stated the LGPL and optional CUDA positions plainly; the licensing substance is unchanged. Also matched R1's lowercase "metadata-only" sentence exactly. |
+| F8 | ADVISORY | CONFIRMED. Checklist archive path is now <evidence-folder>\release-1.0.0\, described as the harness's review-evidence folder outside the repository. |
+| F9 | ADVISORY | CONFIRMED. Reflowed the ragged export_bench module docstring; no executable statement changed. |
+| F10 | ADVISORY | CONFIRMED / NO CHANGE, as directed. Turn-2 lean sync succeeded with 8 distributions; the orchestrator then ran the lean diagnostic successfully. Seat and evidence are recorded in the walkthrough table below. |
+
+### Walkthrough closure
+
+The network prerequisite from turn 2 is resolved; no product or guide-command
+fix was necessary.
+
+| Step | Seat / command / result |
+| --- | --- |
+| Lean sync | Cell seat, turn 2: `uv sync --no-default-groups`, exit 0; 8 distributions, pytest/CuPy absent. |
+| Lean environment report | **Run at the orchestrator's seat**, with UV_PROJECT_ENVIRONMENT set to this worktree's work/wp5.5/walkthrough/lean-venv: `uv run --no-sync --with psutil --with py-cpuinfo python tools/environment_report.py --out work/wp5.5/walkthrough/environment`; exit 0, "Installed 2 packages" (dispatcher-supplied execution result). |
+| Report evidence | work/wp5.5/walkthrough/environment/reports/environment-20261103T234816Z.json; Python 3.12.13; FFmpeg 9.0.2-full_build-www.gyan.dev; unavailable {}. Cell read the resulting report and confirmed those fields. |
+| Lean environment after diagnostic | Still 8 installed distributions, confirmed from its dist-info directories at the cell seat. The two diagnostic packages were temporary. |
+| Lean photo export | Cell seat, turn 2: exit 0, jpeg-gradient-srgb_corrected.png; previously recorded above. |
+
+### Validation
+
+`work/wp5.5/verify_notices_utf8.py` -> `t3-notices-verify.log`, exit 0:
+
+```text
+TEXTS: 44; MISMATCHES: 0
+SOURCE RECORDS: 54; every duplicate also byte-equal to its original source
+MARKER U+00C2: SOURCE=0; NOTICES=0
+MARKER U+00C3: SOURCE=0; NOTICES=0
+MARKER U+00E2 U+20AC: SOURCE=0; NOTICES=0
+MARKER U+FFFD: SOURCE=0; NOTICES=0
+HASHES/BYTES: all 44 match LF-normalised SOURCE bytes
+NOTICES SIZE: 433520 bytes
+SOURCES: no work/ paths; no harness/ruling references
+EULA: complete section 1.1.1(3) quote matches installed License.txt
+```
+
+Corrected source-byte inventory (source location, SHA-256, LF-normalised byte
+count per text): `work/wp5.5/notices-inventory.json` and `notices-inventory.md`.
+This replaces turn 2's corrupted-source inventory for the completion report.
+The nine upstream-only source texts were not re-fetched in this turn.
+
+`work/wp5.5/t3-guide-verify.log`, exit 0: all documented menu paths agree with
+the shell action wiring; three Settings paths corrected; neutral walkthrough
+folders checked; orchestrator report fields and eight-distribution lean state
+confirmed.
+
+Prescribed targeted pytest command (sandbox_mkdir_shim, no cacheprovider,
+basetemp work/wp5.5/t3), `work/wp5.5/t3.log`, exit 0:
+**72 passed, 1 deselected in 72.09s (0:01:12)**.
+
+Static checks, all exit 0:
+
+- `work/wp5.5/t3-ruff.log`: **All checks passed!**
+- `work/wp5.5/t3-format.log`: **317 files already formatted**
+- `work/wp5.5/t3-mypy.log`: **Success: no issues found in 158 source files**
+
+Round 1 fixes introduce no executable product/tool changes, tests, dependencies,
+lockfile changes, footage reads or writes outside this worktree. Reviewer A's
+next pass remains at the dispatcher seat; no convergence claim is made here.
+`work/wp5.5/t3-scope-verify.log`, exit 0: exactly five owned paths changed;
+all UTF-8/LF-only; export_bench AST identical with its module docstring excluded;
+version/dependency files unchanged; git diff --check clean.

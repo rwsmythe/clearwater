@@ -113,7 +113,7 @@ Edit the copy's two placeholders to absolute paths: footage_path is your read-on
 source collection, and working_path is a separate writable folder for tool
 outputs, caches and reports. Follow the template's Windows path-quoting examples.
 This private file is ignored by Git. It has no FFmpeg setting and does not choose
-the GUI's output/cache folders; use **File > Settings** for those.
+the GUI's output/cache folders; use **Tools > Settings** for those.
 
 ## 3. First run: open, compare, adjust and export
 
@@ -146,7 +146,7 @@ uv run python -m clearwater
    your current settings. **Rename...**, **Delete**, **Import...** and
    **Export...** manage/share presets. Loading a preset changes the current
    correction; it does not overwrite the source.
-5. Before exporting, open **File > Settings**. Choose a writable **Output
+5. Before exporting, open **Tools > Settings**. Choose a writable **Output
    folder**. **Use source folder** selects the default behavior of writing beside
    each source. For a read-only source collection, always choose a separate
    working/output folder. The default **Output suffix** is _corrected; change it
@@ -171,19 +171,19 @@ The repository includes small synthetic fixtures so you can try an export
 without your own footage. Make separate output/cache/settings folders first:
 
 ```powershell
-New-Item -ItemType Directory -Force work/wp5.5/walkthrough/photo, work/wp5.5/walkthrough/video, work/wp5.5/walkthrough/cache, work/wp5.5/walkthrough/settings
+New-Item -ItemType Directory -Force work/try/photo, work/try/video, work/try/cache, work/try/settings
 ```
 
 Export one 16-bit photo using the CPU:
 
 ```powershell
-uv run --no-sync python tools/headless_export.py tests/fixtures/stills/jpeg/jpeg-gradient-srgb.jpg --out work/wp5.5/walkthrough/photo --settings-dir work/wp5.5/walkthrough/settings --force-cpu --bit-depth 16 --record work/wp5.5/walkthrough/photo.json
+uv run --no-sync python tools/headless_export.py tests/fixtures/stills/jpeg/jpeg-gradient-srgb.jpg --out work/try/photo --settings-dir work/try/settings --force-cpu --bit-depth 16 --record work/try/photo.json
 ```
 
 Export the small clip with the CPU and the software encoder:
 
 ```powershell
-uv run --no-sync python tools/headless_export.py tests/fixtures/video/hevc8-bt709-full.mp4 --out work/wp5.5/walkthrough/video --settings-dir work/wp5.5/walkthrough/settings --cache-dir work/wp5.5/walkthrough/cache --force-cpu --encoder libx265 --quality standard --record work/wp5.5/walkthrough/video.json
+uv run --no-sync python tools/headless_export.py tests/fixtures/video/hevc8-bt709-full.mp4 --out work/try/video --settings-dir work/try/settings --cache-dir work/try/cache --force-cpu --encoder libx265 --quality standard --record work/try/video.json
 ```
 
 The outputs should be jpeg-gradient-srgb_corrected.png and
@@ -212,7 +212,7 @@ and figures in [the WP5.2 performance report](reports/wp5.2-performance-memory.m
 There is no separate fixed analysis-time promise.
 
 Clearwater caches analysis statistics and small JPEG preview proxies. It reuses
-matching complete entries and removes older entries to respect **File > Settings
+matching complete entries and removes older entries to respect **Tools > Settings
 > Cache size limit**. **Clear cache** frees that space; analysis must be rebuilt
 when needed. On Windows the cache is under %LOCALAPPDATA%\Clearwater\cache.
 These are Clearwater's own proxies; camera .LRV files are not used.
