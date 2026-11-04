@@ -1505,5 +1505,88 @@ final head (`test_jobs_export_process`, `test_app_composition`, `test_wp42_compo
 (309 passed).
 
 
-MID-BUILD YIELD here. The builds and the with-pack proof (items 4-5) follow on the
-dispatcher's word.
+MID-BUILD YIELDS here (twice: after F-C2 / F-D, and after the widening). The dispatcher then
+ended this cell's scope at the code (depth 270,675 at the second yield, past the evaluation
+point). The builds and the with-pack proof (items 4-5) go to a fresh cell: see the handoff below.
+
+**Before-record of the widening against `1c61bc37`**, as the dispatcher asked (`t3d/c61e-13.log`):
+- `src` there is byte-identical to `584d711d` (`git diff --stat 584d711d 1c61bc37 -- src` is
+  empty).
+- The rule check was re-run first: 19 of 19 OK.
+- Result: **35 failed, 52 passed**, the same lines as above (`:786` x22, `:48` x5, `:840` x8).
+- The focused run on the final code (`c61e-14`): **87 passed in 4.00 s**.
+- The static checks on the two touched files are clean: ruff check, ruff format, `mypy
+  --strict`, and `mypy --strict --platform darwin`.
+- The owner's log md5 is unchanged, and `%LOCALAPPDATA%\Clearwater` is absent.
+
+### Handoff to item 4 (for the fresh cell; wp61-cell5 retires at the code end by the depth rule)
+
+State: head `9e87f85d` + this ledger commit. The product code for F-C2 and F-D (with its
+widening) is complete. Nothing is built from it yet. The existing builds under
+`work/wp6.1/dist-*` predate it and lack the handler, as do the `t3c/exp/` builds. NEVER run any
+of them with the pack present.
+
+1. **Item 3's wider run** (deferred under the host note; on the dispatcher's word):
+   - Run `pytest -q -rs -p no:cacheprovider --timeout 120 --basetemp=<wt>/work/<n>` over
+     `tests/test_gpu_pack.py`, `tests/test_frozen_entry.py`, `tests/test_tools_package_build.py`,
+     `tests/test_jobs_export_process.py`, `tests/test_app_composition.py`,
+     `tests/test_wp42_composition.py` and `tests/test_core_backend.py`, with `-m "not gpu"`.
+   - Expect about 350 tests in about 40 s.
+2. **Builds**, from the worktree root, after `df -h /c` (25 GB floor):
+   - Run `uv run --no-sync python tools/package/build.py --form onedir --with-ffmpeg >
+     work/wp6.1/build-onedir-t3d.log 2>&1`, then the same with `--form onefile`
+     (`build-onefile-t3d.log`).
+   - The log must show `<n> hidden imports from 376 pack files`: 61 expected, the members in
+     the list above.
+   - It must show `hidden-import check: PASS (61 modules, each in the bundle)` and the
+     existing `bundle check: PASS`.
+   - The report goes to `work/wp6.1/hidden-imports-<form>.json`. Copy it to `t3d/`.
+   - A FAILED line is a build failure. Do not work around it; report it. `site` is the member
+     to watch, because PyInstaller may treat it specially.
+3. **The pack.** It is at
+   `<wt>\work\wp6.1\t3c\appdata\Local\Clearwater\gpu-pack\14.2.0-cu12\` (2,701 files,
+   2,412.6 MiB). Its site-packages has no `.lock` file. Run `uv run --no-sync python
+   tools/package/build.py --verify <that folder>` before the proof and again after it; the
+   expected result is PASS with the same counts.
+4. **The proof, headless.** The tool is
+   `clearwater-review-evidence\wp6.1\cell\t3c\proof.py`, reused as in 2b-2. It spawns the
+   worker as `export_process.py` does.
+   - Its environment: `LOCALAPPDATA` / `APPDATA` / `TEMP` / `TMP` under `t3c\appdata\`;
+     `PATH = C:\Windows\System32;C:\Windows`; every `CUDA_PATH*` removed; `CUPY_CACHE_DIR` under
+     the redirected tree; the working directory `work\wp6.1\t3c\runs\<form>`.
+   - Before running it, check that its child command is `<new dist>\Clearwater.exe
+     --export-worker`, pointed at the NEW dists. Check also that it redirects every app-data
+     variable (CLAUDE.md's entry-point isolation rule).
+   - Order: the onedir form first, then onefile. For each: the HEIC -> PNG request, then the
+     `vfr.mp4` request.
+   - Record for each run:
+     - the exit (3221225477 is DR-125);
+     - the device line, which must be the GPU / CUDA backend;
+     - the output;
+     - every mapped CUDA / CuPy file over the run's process tree, sampled during the run
+       (psutil `memory_maps()`). Each must lie under the pack or the NVIDIA driver. List them
+       all;
+     - the canary children: psutil command lines, and their exits;
+     - the leftovers (tasklist; `_MEI*` in the redirected `TEMP` for onefile).
+   - Then one without-pack run per form (the folder renamed, as in 2b-2), with the device
+     `CPU: CuPy not installed`.
+5. **The window watch** (read-only; my planned form; not yet written).
+   - A sampler runs beside each with-pack run. Every 0.25 s it lists the run's process tree
+     by PID (psutil, from the worker's PID down: the canary children included).
+   - For each PID it asks UI Automation for top-level windows: PowerShell `Add-Type
+     -AssemblyName UIAutomationClient`, then
+     `[System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children,
+     (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+     <pid>)))`.
+   - It writes the count and names to a JSONL file. ANY element is a STOP.
+   - Alternative: `ctypes` `EnumWindows` + `GetWindowThreadProcessId` filtered to the
+     tree's PIDs, also read-only.
+   - It never sends input and never activates or focuses a window.
+6. **Item 5.** Ledger: the builds, the resolved set as built, the proof table, the canary
+   observations.
+   - The report's limits get two lines: CHARC's on the library re-entry ("a library's own
+     re-entry reached the GUI branch; the rule held"), and this group's before-record
+     incident.
+   - Name the `-qmljsdebugger` collateral in the report.
+
+Depth at turn-3 group-2b-3 (code) end: DISPATCHER TO FILL
