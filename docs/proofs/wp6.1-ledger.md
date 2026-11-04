@@ -1589,4 +1589,158 @@ of them with the pack present.
      incident.
    - Name the `-qmljsdebugger` collateral in the report.
 
-Depth at turn-3 group-2b-3 (code) end: DISPATCHER TO FILL
+Depth at turn-3 group-2b-3 (code) end: 304,242 (wp61-cell5, at its final report; read by the dispatcher)
+
+## Turn 3 group 2b-3 (items 4-5) (2026-11-04 ~13:10-13:30Z): both rebuilds, the handler check, the with-pack proof -- STOPPED at the first with-pack run (F-E)
+
+Fresh cell (implementer-opus-high, wp61-cell6), dispatch
+`clearwater-review-evidence/wp6.1/cell/dispatch-8.md`, head at start `e0a90bc5`. Evidence:
+`clearwater-review-evidence/wp6.1/cell/t3e/`. No desktop input was sent. No GUI launch.
+`t2b/gui_check.py`, the 2b-2 builds and `t3c/exp/` were not run (`t3c/exp/` was only READ, as
+the handler check's control). No network. Nothing under the real `%APPDATA%\Clearwater` or
+`%LOCALAPPDATA%\Clearwater` (the latter absent before and after). Every frozen run had APPDATA,
+LOCALAPPDATA, TEMP / TMP, XDG_DATA_HOME / XDG_CONFIG_HOME / XDG_CACHE_HOME / XDG_STATE_HOME and
+XDG_RUNTIME_DIR under `work\wp6.1\t3c\appdata\`, every `CUDA_PATH*` removed, and
+`PATH = C:\Windows\System32;C:\Windows`.
+
+**Owner log** `%APPDATA%\Clearwater\logs\clearwater.log`: md5 `69ed0432c562db9445daecbe8f15fe27`
+before (13:12:50Z) and after (13:27:08Z) (`t3e/owner-log-md5-{before,after}.txt`).
+
+### Item 1: the wider run on `e0a90bc5`
+
+| Command (worktree root, Git Bash, `PYTEST_ADDOPTS` unset) | Exit | Summary |
+|---|---|---|
+| `uv run --no-sync pytest -q -rs -p no:cacheprovider --timeout 120 --durations=5 --basetemp=<wt>/work/c61f-1 tests/test_gpu_pack.py tests/test_frozen_entry.py tests/test_tools_package_build.py tests/test_jobs_export_process.py tests/test_app_composition.py tests/test_wp42_composition.py tests/test_core_backend.py -m "not gpu"` | 0 | **358 passed, 41 deselected in 46.01 s** (slowest 4.61 s, `test_the_real_pack_scan_finds_ctypes_wintypes`) (`t3e/pytest-wider-c61f-1.log`) |
+
+### Item 2: both rebuilds (from `e0a90bc5`; `src` and `tools` clean, only this ledger modified)
+
+| Form | Command (worktree root) | `df -h /c` before | Exit | Wall (shell / PyInstaller) | Result |
+|---|---|---|---|---|---|
+| onedir | `uv run --no-sync python tools/package/build.py --form onedir --with-ffmpeg > work/wp6.1/build-onedir-t3d.log 2>&1` | 77 GB free (13:14Z) | 0 | 89 s / 77.7 s | `_internal` 225 MB (du) + `Clearwater.exe` 10,670,591 B; 668.3 MiB release with FFmpeg; bundle checks 7.9 s |
+| onefile | `... --form onefile --with-ffmpeg > work/wp6.1/build-onefile-t3d.log 2>&1` | 77 GB free (13:15Z) | 0 | 88 s / 84.1 s | `Clearwater.exe` 93,866,946 B (89.5 MiB); 523.9 MiB release; bundle checks 0.8 s |
+
+- Both logs show `61 hidden imports from 376 pack files`, `hidden-import site (scan; named 1x)`,
+  `hidden-import check: PASS (61 modules, each in the bundle)` and `bundle check: PASS`.
+- The single warning is the usual `scipy.special._cdflib` (benign). FFmpeg and ffprobe
+  9.0.2-full_build-www.gyan.dev were copied.
+- The resolved set is the 61 members listed in group 2b-3 (60 from the scan, `graphlib`
+  committed). `site` was bundled without complaint.
+- Copies: `t3e/build-on{dir,file}-t3d.log`, `t3e/hidden-imports-on{dir,file}.json`.
+
+**The handler check, read-only** (`t3e/handler_check.py` -> `t3e/handler-check.json`).
+
+- Method: PyInstaller's own `CArchiveReader` on each new `Clearwater.exe`; the entry script
+  `__main__` (typecode `s`) unmarshalled; nothing executed.
+- Both builds: `interpreter_reentry` and `run_interpreter_option` are PRESENT, and their
+  bytecode and constants EQUAL a compile of `src/clearwater/__main__.py` at `e0a90bc5`.
+  `REENTRY_ARGUMENT` is in the module's names. `clearwater.__main__` is not in the PYZ: the
+  entry script is the only copy. **PASS on both.**
+- Control: the same check on the 2b-2 experimental build
+  (`t3c/exp/dist-onedir/.../Clearwater.exe`) gives `present: false` for both functions and
+  `HANDLER CHECK: FAIL` (`t3e/handler-check-control-t3c-exp.json`). So the check distinguishes.
+
+**The window watch** (`t3e/proof3.py` + `t3e/uia_watch.ps1`; read-only, no input, no focus).
+
+- A process-tree tracker runs every 0.02 s. It records each PID's command line and parent and
+  keeps an `OpenProcess` handle, so a child's EXIT code can be read after it ends.
+- Every 0.25 s it queries, for each PID of the tree, the UI Automation top-level elements (a
+  long-lived PowerShell `FindAll(Children, ProcessId = pid)`) and `EnumWindows`.
+- A UIA element or a visible top-level window = kill the tree by PID (create time checked)
+  and STOP. A hard timeout also kills the tree.
+- Positive control (`t3e/control.out`, counts only): explorer.exe showed 2 UIA elements and 9
+  visible / 46 hidden windows; this Python showed 0.
+
+**The second check, executed** (pack folder renamed `14.2.0-cu12.renamed`, watch running;
+`t3e/argv-*.out`, `t3e/proof3.jsonl`):
+
+| Form | Arguments | Exit | stderr (one line) | Windows (UIA / visible) | Tree | Left |
+|---|---|---|---|---|---|---|
+| onedir | `-c pass` | 2 | `Clearwater: -c is not supported` | 0 / 0 (1 sample) | 1 PID | none |
+| onedir | `-m http.server` | 2 | `Clearwater: -m 'http.server': no GPU pack is loaded` | 0 / 0 | 1 PID | none |
+| onefile | `-c pass` | 2 | `Clearwater: -c is not supported` | 0 / 0 (9 samples) | bootloader + child, both exit 2 | none; no `_MEI` |
+| onefile | `-m http.server` | 2 | `Clearwater: -m 'http.server': no GPU pack is loaded` | 0 / 0 (8 samples) | the same | none; no `_MEI` |
+
+### Item 3: `--verify` (pack renamed back)
+
+`build.py --verify <t3c pack>`: exit 0, `PASS (11 distributions; 2701 RECORD rows, each file's
+sha256 and size; 2701 files, 2412.6 MiB)`, the same as 2b-2's figures (`t3e/verify-1-before.log`).
+`site-packages` has no `.lock` and no unlisted entry.
+
+### Item 4: the with-pack proof -- STOPPED at the first run
+
+| Form | Request | Exit | Device (worker result) | Output | CUDA / CuPy files mapped | Canary children | Windows | Left over |
+|---|---|---|---|---|---|---|---|---|
+| onedir | HEIC -> PNG (`with-heic-t3e`, 13:22:38Z, 11.8 s) | 0 (not DR-125 this time) | **`CPU: CUDA device unusable`**; log `a test kernel failed on the CUDA device: Canary probe child process timed out after 10.0 seconds.` (child stderr empty); warning `Processed on the CPU (CPU: CUDA device unusable).` | `heic-ad24-both_corrected.png`, ok | 62: 54 CuPy / cupyx `.pyd` files from the pack and 8 driver files (`System32\nvcuda.dll`; `DriverStore\FileRepository\nvami.inf_amd64_...\{nvcuda64, nvapi64, nvapi64_impl, nvdiagclt64, nvdxgdmal64, nvobjectloader64, Display.NvContainer\NvMessageBus}.dll`); **0 elsewhere**; no NVIDIA-wheel DLL (the failure came first) (`t3e/with-onedir-heic-cuda-files.txt`) | ONE: `Clearwater.exe -m cuda.pathfinder._dynamic_libs.dynamic_lib_subprocess canary cudart`, exit **1** (pathfinder's kill at 10 s) | 0 UIA / 0 visible in 41 samples | none (psutil, tasklist); 0 files added to the pack |
+
+This is the dispatch's STOP condition: the device is not GPU and the canary timed out.
+
+- No further pack-activating run was made: not the onedir video, not onefile.
+- Item 5's without-pack regression was NOT run. The builds will change with the fix, so it is
+  owed on the next builds.
+
+**FINDING F-E (packaging; the STOP): the canary child hangs at start-up because the export
+worker's cancel thread is blocked reading the inherited stdin pipe.**
+
+The cheap reproduction: `t3e/repro_stdin.py` and `t3e/stdin_parent.py`. The parent is a
+plain-Python stand-in with a PIPE stdin (no product code). The grandchild runs under the window
+watch. Outputs are in `t3e/repro-*.out`.
+
+| Stand-in parent | Child (stdin inherited, `capture_output=True`, timeout 15 s) | Result |
+|---|---|---|
+| no thread reading stdin | new onedir `Clearwater.exe -m ...dynamic_lib_subprocess canary cudart` | returncode 0 in 0.24 s, `{"status": "not-found", "abs_path": null}` |
+| a daemon thread blocked in `sys.stdin.buffer.readline()` (as `export_worker._watch_stdin`) | the same | **timeout 15 s**, empty stderr; killed (exit 1) |
+| the same | base CPython 3.12 `python.exe -I -c "print(1)"` | **timeout 15 s** |
+| the same | new onedir `Clearwater.exe -c pass` (refused in `__main__`'s first lines) | **timeout 15 s** |
+| (direct, `t3e/repro-onedir-canary*.out`) no parent thread; worker-like cwd (pack `site-packages`) and / or stdin left open | the canary | exit 0 in about 0.42 s, the same payload |
+
+- So ANY Python child hangs when it inherits a pipe stdin on which its parent has a pending
+  synchronous read. The hang is in the child's process start-up (CPython / the bootloader),
+  before Clearwater's code runs. Nothing in the `-m` handler can fix it.
+- In the frozen worker, `cuda.pathfinder` runs its canary with `subprocess.run(...,
+  capture_output=True)` and no `stdin`. So the canary inherits the worker's protocol stdin,
+  and `export_worker._watch_stdin` is blocked reading it (`app/export_worker.py:214-217`; the
+  thread is started at `:273`).
+- The source run never reached the canary: pathfinder finds the wheels through
+  `site.getsitepackages()` in the venv. That is why 2b-2's import-gap source run was GPU.
+- Side observation for DR-125 (a lead, not a claim about the cause): in every run where its
+  daemon thread was still blocked in the stdin read at exit, the stand-in parent itself exited
+  `3221225477`. Where there was no such thread, it exited `0`.
+
+**Options for CHARC (none made; a code change is a STOP first):**
+
+- (a) Owned, frozen only, in `src/clearwater/__main__.py`. On the `--export-worker` branch,
+  before `export_worker.main()`, move the protocol pipe off the standard-input slot:
+  - duplicate fd 0 to a private, non-inheritable descriptor and point `sys.stdin` at it;
+  - point fd 0 and the Win32 standard input handle at `os.devnull`. The windowed build is a
+    GUI-subsystem process, so the CRT's `_dup2` may not update the Win32 handle. An explicit
+    `SetStdHandle` is an N1 site under `sys.platform`.
+
+  Children then inherit NUL. 1.0.0's source run is unchanged.
+- (b) Not owned, product-wide: the same inside `app/export_worker.py` (source and frozen
+  alike), or start the cancel thread only after the backend probe.
+- (c) Avoid the canary through pathfinder's own configuration. This is fragile, as 2b-2 (ii).
+
+Recommended: (a), with a test that a child spawned by the frozen worker branch inherits no
+pipe stdin. Then both rebuilds, the handler check, and this proof from its start.
+
+### Item 5 (partial)
+
+- `--verify` after the runs: exit 0, the same PASS line and figures (`t3e/verify-2-after.log`).
+  No run wrote into the pack.
+- The without-pack regression: NOT run (see above).
+
+### Slips (mine)
+
+- One tool call carried a bare `cd` into the worktree (a `py_compile` of an evidence script).
+  It was harmless here (the subagent's shell cwd resets per call) and was not repeated.
+
+### Files changed this group
+
+`docs/proofs/wp6.1-ledger.md` only.
+
+- Evidence tools (not product, not committed): `t3e/handler_check.py`, `t3e/proof3.py`,
+  `t3e/uia_watch.ps1`, `t3e/repro_stdin.py`, `t3e/stdin_parent.py`.
+- The new builds are at `work/wp6.1/dist-on{dir,file}/`; they replace the 2b-2 builds.
+- The pack is unchanged at `work/wp6.1/t3c/appdata/Local/Clearwater/gpu-pack/14.2.0-cu12`.
+
+Depth at turn-3 group-2b-3 (items 4-5) end: DISPATCHER TO FILL
