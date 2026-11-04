@@ -750,4 +750,111 @@ Commits: `3ed5c409` feat(wp6.1): GPU pack loader from a per-user folder, its tes
 manifest helper; `01cdd6ca` feat(wp6.1): frozen entry -- --export-worker re-entry, PATH
 prepend, frozen worker command.
 
-Depth at turn-3 group-1 end: DISPATCHER TO FILL
+Deviation (accepted by the dispatcher at dispatch-4): `process_export_jobs`'s one-line
+conditional became an if / elif / else on the same statement; the behaviour is Q5(a)'s.
+
+Depth at turn-3 group-1 end (dispatcher): 190,972.
+
+## Turn 3 group 2a (2026-11-04 ~09:30-10:00Z): Reviewer A round 1 fixes, both rebuilds
+
+Dispatch `clearwater-review-evidence/wp6.1/cell/dispatch-4.md`. No GUI launch, no
+`--export-worker` run, no synthetic input. Group 1's composition deviation was accepted by
+the dispatcher (above).
+
+### Reviewer A round 1 adjudication
+
+Review: Codex at the orchestrator's seat, on turn 2's `tools/package` at `526f3a8f`. Full text
+`clearwater-review-evidence/wp6.1/A/r1/review.txt`. Verdict NEW_CRITICAL_MAJOR.
+
+Every finding is FIXED; none is disputed. The tests are in the new module
+`tests/test_tools_package_build.py` (21 tests).
+
+The turn-2 column comes from running the same module against turn 2's `build.py`
+(`git show 526f3a8f:tools/package/build.py`, loaded through `WP61_BUILD_SCRIPT`;
+`t3/pytest-9-turn2.log`). The result was 20 failed, 1 passed (the no-false-positive test).
+
+| # | Sev | Verdict | Fix (`tools/package/build.py`) | Test(s) | On turn 2's code |
+|---|---|---|---|---|---|
+| F1 | MAJOR | FIXED | `name_violations` checks EVERY component, lower-cased, of every dist path, CArchive entry, ZIP member and dotted PYZ module against `GPU_MODULE_NAMES`. `CUDA_LIBRARY` is applied to each basename. | `test_a_nested_cuda_library_in_the_dist_is_found`, `test_a_nested_gpu_package_in_the_dist_is_found`, `test_nested_gpu_entries_in_the_package_archive_are_found` (a real CArchive + PYZ) | `assert []`: the nested DLL, the nested `cupy_backends`, the CArchive entries and `PySide6.cupy_backends` all passed |
+| F2 | MAJOR | FIXED | All comparisons are made after lower-casing. | `test_gpu_names_in_another_case_are_found_in_the_dist`, `..._in_the_package_archive` | `assert []` for `Cupy/__init__.pyc` and `NVIDIA/cublas/bin/cublas64_12.dll` |
+| F3 | MAJOR | FIXED | `zip_violations` opens each ZIP in memory and recurses to depth 4. A ZIP is found by suffix (`.zip` / `.egg` / `.whl`) or by the `PK\x03\x04` magic, in the dist and in CArchive data / binary entries. Nothing is extracted to disk. An unreadable ZIP is a violation. | `test_a_gpu_module_inside_base_library_zip_is_found`, `test_a_gpu_module_inside_an_archived_zip_is_found`, `test_zips_are_found_by_magic_and_opened_recursively`, `test_an_unreadable_zip_fails_closed`, `test_zip_members_are_never_extracted_to_disk` | `assert []` in each |
+| F4 | MAJOR | FIXED | `build()` sets `PYINSTALLER_CONFIG_DIR=<out>/pyinstaller-config` before PyInstaller is run or imported for the build. | `test_pyinstallers_cache_is_kept_under_the_output_folder` | `assert None is not None` (the variable was not set) |
+| F5 | minor | FIXED | The allowlist (`ALLOWED_TOP_LEVEL` plus the stdlib) now also covers loose `.py` / `.pyc` / `.pyd` / `.so` files relative to a `sys.path` root (`_internal`, the one-file root, a root-level ZIP), and CArchive module entries (PyInstaller's `pyimod*` / `pyiboot*` / `pyi_rth_*` allowed). The README is corrected. | `test_an_unexpected_extension_module_in_the_dist_is_found`, `..._in_the_package_archive_is_found`; no false positive: `test_the_products_own_modules_and_the_stdlib_pass` | `assert []` for `av/_core...pyd` and `yaml/__init__.pyc` |
+| F6 | minor | FIXED | `clean_release_dir` deletes `dist-<form>/<release>` (and only that, after checking it lies inside `out`) before each build. | `test_a_rebuild_starts_from_an_empty_release_folder` | stale `ffmpeg.exe` was still present when PyInstaller ran |
+| F7 | minor | FIXED | `copy_ffmpeg` copies to the canonical `ffmpeg.exe` / `ffprobe.exe`. `tool_version` then runs each copy's `-version` from the dist folder with PATH = that folder only; it requires exit 0 and a `version` line, and the build prints that line. | `test_ffmpeg_is_copied_under_its_canonical_name`, `test_a_copied_tool_that_does_not_run_as_ffmpeg_is_refused` | `['ffmpeg-9.0.2.exe'] == ['ffmpeg.exe']` failed; `tool_version` absent |
+| F8 | minor | FIXED | `app_version()` parses `src/clearwater/__init__.py` with `ast` (no import). The `--write-manifest` branch sets `sys.dont_write_bytecode` before its lazy `clearwater.gpu_pack` import. The module-level `from clearwater import gpu_pack` that group 1 added is gone. | `test_the_version_is_read_without_importing_the_package` | `'stale-installed' == '1.0.0'` failed |
+| F9 | advisory | BANKED | The allowlist names top-level packages, not distributions (`PySide6.QtCharts` would pass). Out of envelope: the locked environment has no Addons. Stated in the README's scope. | none | n/a |
+| F10 | advisory | FIXED (by F8) | No import, so a pre-imported stale `clearwater` cannot supply the version. | same test as F8 | same failure |
+| F11 | advisory | FIXED (one pattern) | `CUDA_LIBRARY` takes an optional `lib` prefix and `.dll` / `.so` / `.so.<n>`. The README states that validation was on Windows only. | `test_linux_cuda_library_names_are_found` | `assert []` |
+
+Also added:
+
+- `test_the_scipy_adapter_exception_is_narrow`. On turn 2's code it fails only on the new
+  violation label.
+- `test_shadowing_top_level_modules_are_found`. This one is a regression test: turn 2 also
+  flagged these names, and the test fails there only because the label format changed.
+
+**One new adjudication, for the dispatcher to see.** On the turn-2 dists (read-only,
+`t3/calibrate-turn2-dists.txt`), the deeper check found four PYZ modules:
+`scipy._external.array_api_compat.cupy` (+ `._aliases`, `._info`, `._typing`).
+
+- These are SciPy's own vendored array-API adapter, shipped inside the scipy wheel. They are
+  not CuPy code; they import `cupy` only when handed CuPy arrays.
+- I did not exclude them, because that would change what SciPy can import.
+- Instead I added `GPU_NAME_EXCEPTIONS = (("scipy", "_external", "array_api_compat", "cupy"),)`.
+  It excuses only that one `cupy` component; every other component of such a path is still
+  checked (the narrow test pins this).
+- The alternative is `--exclude-module scipy._external.array_api_compat.cupy`. The
+  dispatcher rules if wanted.
+
+### F4: the default cache, before and after
+
+- Turn 2's three builds each logged `Removing temporary files and cleaning cache in
+  C:\Users\rwsmy\AppData\Local\pyinstaller`: `build-onedir.log`, `build-onedir-2.log`,
+  `build-onefile.log`.
+- So turn 2's builds DID clean PyInstaller's default cache folder. That folder is
+  PyInstaller's own bincache and nothing else; PyInstaller's `--clean` removes only its cache
+  folder.
+- Before this group's builds (09:53Z), `%LOCALAPPDATA%\pyinstaller` did not exist. After
+  both builds, it still does not exist.
+- This group's build logs name `...\work\wp6.1\pyinstaller-config\pyinstaller` as the cleaned
+  cache instead.
+
+### The rebuilds
+
+Both builds ran with the fixed script and group 1's product code (`51ae68f6`), from the
+worktree root.
+
+| # | Command | `df -h /c` before | Exit | Wall (shell / PyInstaller) | Result |
+|---|---|---|---|---|---|
+| 3 | `uv run --no-sync python tools/package/build.py --form onedir --with-ffmpeg > work/wp6.1/build-onedir-3.log 2>&1` | 101 GB free (09:53:59Z) | 0 | 116 s / 106.1 s | `_internal` 223.8 MiB + `Clearwater.exe` 10.1 MiB = 233.9 MiB bundle; 668.2 MiB release with FFmpeg; bundle checks 7.8 s: **PASS** |
+| 4 | `uv run --no-sync python tools/package/build.py --form onefile --with-ffmpeg > work/wp6.1/build-onefile-2.log 2>&1` | 100 GB free (09:56:10Z) | 0 | 100 s / 97.6 s | `Clearwater.exe` 89.4 MiB; 523.8 MiB release with FFmpeg; bundle checks 0.9 s: **PASS** |
+
+- FFmpeg (F7, design item 5): each copy ran `-version` from its dist folder with PATH set to
+  that folder only.
+  - `ffmpeg version 9.0.2-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers`
+  - `ffprobe version 9.0.2-full_build-www.gyan.dev Copyright (c) 2007-2026 the FFmpeg developers`
+
+  The licence line is the report's (turn 4).
+- Build-log warnings, the same in both builds and in all three turn-2 builds:
+  - `Hidden import "scipy.special._cdflib" not found!` (benign; turn 2 group A).
+  - A CuPy `UserWarning: CUDA path could not be detected`, printed during PyInstaller's
+    "Looking for dynamic libraries" step. PyInstaller's isolated analysis process imports
+    the dev venv's CuPy at that point, at BUILD time only. The bundle check shows no CuPy
+    reached either artifact. A note for the report.
+
+### Commands and exits (outputs in `t3/`)
+
+| Command | Exit | Summary |
+|---|---|---|
+| `pytest -q -rs -p no:cacheprovider --basetemp=<wt>/work/c61b-10 tests/test_tools_package_build.py tests/test_gpu_pack.py tests/test_frozen_entry.py` | 0 | 70 passed in 4.25 s |
+| `WP61_BUILD_SCRIPT=<turn-2 build.py> pytest ... tests/test_tools_package_build.py` (`--basetemp=<wt>/work/c61b-9`) | 1 | 20 failed, 1 passed (the before record) |
+| `ruff check .` | 0 | All checks passed |
+| `ruff format --check .` | 0 | 322 files already formatted |
+| `mypy` (strict, configured set) | 0 | no issues in 160 source files |
+| `mypy --platform darwin tools/package/build.py src/clearwater/gpu_pack.py src/clearwater/__main__.py` | 0 | no issues in 3 source files |
+
+Commit: `51ae68f6` fix(wp6.1): bundle checks at every depth, case and ZIP member; build
+hygiene (Reviewer A r1).
+
+Depth at turn-3 group-2a end: DISPATCHER TO FILL
