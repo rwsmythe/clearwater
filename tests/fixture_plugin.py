@@ -12,8 +12,8 @@ the bare list because the WP-T1 guard tests (``tests/test_conftest_guard.py``) c
   from ``fixtures-generated`` under an explicit pytest basetemp, otherwise from the MAIN
   checkout's ``work/fixtures/generated``, generated first when it is absent or stale, and its
   decoded frames are hashed against the manifest before it is handed out; a mismatch after
-  regeneration fails the test. Failed Git discovery uses this checkout's work cache; an
-  unwritable cache falls back to pytest's basetemp. FFmpeg being absent skips with a reason.
+  regeneration fails the test. Failed Git discovery warns with the reason and uses pytest's
+  basetemp; an unwritable main cache also falls back there. FFmpeg absence skips with a reason.
 - ``sample_entry``: a callable ``sample_entry(sample_id) -> dict`` giving the manifest entry.
 - ``sample_ids``: a callable ``sample_ids(group=None) -> list[str]``.
 - ``ffmpeg_tools``: skips the test with a reason when ``ffmpeg``/``ffprobe`` are not on the PATH.
@@ -28,6 +28,7 @@ import os
 import subprocess
 import tempfile
 import time
+import warnings
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -285,8 +286,8 @@ def sample_provider(
     """Provide samples under an explicit basetemp, else the main checkout's work cache.
 
     Git's common directory locates the MAIN checkout without writing Git metadata.
-    Failed Git discovery uses this checkout's work cache. An unwritable cache
-    falls back to this session's basetemp.
+    Failed Git discovery warns once with its reason and the session-basetemp
+    fallback path. An unwritable main cache also falls back to basetemp.
 
     Args:
         fixture_manifest: The validated shared manifest.
@@ -305,11 +306,20 @@ def sample_provider(
                 cwd=REPO_ROOT,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 check=True,
                 timeout=10,
             )
-        except (OSError, subprocess.SubprocessError):
-            cache = REPO_ROOT / "work" / "fixtures" / "generated"
+        except (OSError, subprocess.SubprocessError) as error:
+            cache = tmp_path_factory.getbasetemp() / "fixtures-generated"
+            reason = " ".join(str(error).split())
+            if isinstance(error, subprocess.CalledProcessError) and isinstance(error.stderr, str):
+                reason += f": {' '.join(error.stderr.split())}"
+            warnings.warn(
+                f"Git cache discovery failed ({type(error).__name__}: {reason}); using {cache}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
         else:
             main = Path(result.stdout.strip()).resolve().parent
             cache = main / "work" / "fixtures" / "generated"

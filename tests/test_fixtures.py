@@ -1641,18 +1641,25 @@ def test_generated_cache_without_basetemp_uses_the_main_checkout(
 
 
 @pytest.mark.parametrize(
-    "error",
+    "error, reason",
     [
-        FileNotFoundError("git is not on PATH"),
-        subprocess.CalledProcessError(128, ["git", "rev-parse"], stderr="not a git repository"),
-        subprocess.TimeoutExpired(["git", "rev-parse"], 10),
+        (FileNotFoundError("git is not on PATH"), "git is not on PATH"),
+        (
+            subprocess.CalledProcessError(
+                128,
+                ["git", "rev-parse"],
+                stderr="fatal: not a git repository\ntry another folder\n",
+            ),
+            "fatal: not a git repository",
+        ),
+        (subprocess.TimeoutExpired(["git", "rev-parse"], 10), "timed out after 10 seconds"),
     ],
     ids=["missing-git", "not-a-checkout", "git-timeout"],
 )
-def test_generated_cache_without_git_uses_the_checkout(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
+def test_generated_cache_without_git_uses_the_basetemp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: Exception, reason: str
 ) -> None:
-    """Failed Git discovery keeps the checkout cache usable without basetemp (DR-120)."""
+    """Failed Git discovery warns once and contains the cache under basetemp (DR-120)."""
     checkout = tmp_path / "source-copy"
     monkeypatch.setattr(fixture_plugin, "REPO_ROOT", checkout)
 
@@ -1663,9 +1670,16 @@ def test_generated_cache_without_git_uses_the_checkout(
     factory = SimpleNamespace(
         getbasetemp=lambda: tmp_path / "fallback", mktemp=lambda name: tmp_path / name
     )
-    provider = _location_provider(SimpleNamespace(getoption=lambda name: None), factory)
-    assert provider.generated_dir == checkout / "work" / "fixtures" / "generated"
+    with pytest.warns(RuntimeWarning) as recorded:
+        provider = _location_provider(SimpleNamespace(getoption=lambda name: None), factory)
+    assert len(recorded) == 1
+    warning = str(recorded[0].message)
+    assert str(tmp_path / "fallback" / "fixtures-generated") in warning
+    assert type(error).__name__ in warning and reason in warning
+    assert "\n" not in warning and "\r" not in warning
+    assert provider.generated_dir == tmp_path / "fallback" / "fixtures-generated"
     assert provider.generated_dir.is_dir()
+    assert not (checkout / "work").exists()
     assert provider.path("vid-hlg") == FIXTURES_DIR / "video" / "hlg.mp4"
 
 

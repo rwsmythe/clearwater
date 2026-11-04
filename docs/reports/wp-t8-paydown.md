@@ -1,17 +1,21 @@
 # WP-T8 tools, cache guard and suite-cost paydown
 
-Status: groups 1 and 2 are committed at `90fd9263` and `d558c48a`.
+Status: groups 1 and 2 are committed at `90fd9263` and `d558c48a`;
+Reviewer A cleanup is `0e784986`, followed by the Reviewer B follow-up
+(this revision, after merge `a844a37f`).
 The DR-116 archive analysis and item (d)'s apply step are CLOSED with no
 reduction applied, by CHARC's generation-15 ruling at 11:17Z on 2026-11-04.
 DR-116 closes at acceptance on the attribution; its host-load-or-creep
 hypothesis is refuted. Reviewer A round 1 found no new critical/major;
-this revision addresses its minor findings. Reviewer B, the final three
-gate legs and acceptance await the dispatcher. WP-T8 does not claim a
+Reviewer B also found no new critical/major. This revision addresses its
+minor and granted advisories. The final three gate legs and acceptance
+await the dispatcher. WP-T8 does not claim a
 measured reduction in serial-leg time.
 
 ## Changes and regression coverage
 
-The implementation below is the diff of `90fd9263` and `d558c48a`.
+The implementation below includes `90fd9263`, `d558c48a`, Reviewer A's
+`0e784986`, and this revision's Reviewer B follow-up.
 Historical RED witnesses and development results are recorded in
 `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/cell/return-2.md` and
 `return-3.md`; their earlier interpreter problem is qualified below.
@@ -19,11 +23,11 @@ The current seat result is the validation of record.
 
 | Register item | Change | Regression test in `tests/` |
 |---|---|---|
-| DR-119(c) | `tools/export_bench.py::_write` uses `atomic_write_text`: write and close a temporary sibling before replacing the final JSON. | `test_export_bench.py::test_record_interrupt_preserves_the_previous_publication[False]` and `[True]` preserve an absent or previous final file after an interrupted write; `test_record_updates_replace_the_complete_json` checks repeated successful replacement and temporary cleanup. |
+| DR-119(c) | `tools/export_bench.py::_write` uses `atomic_write_text`: write and close a temporary sibling before replacing the final JSON. The completed run's ROW prints and flushes before that replacement, so its figures survive a blocked JSON publication. | `test_export_bench.py::test_record_interrupt_preserves_the_previous_publication[False]` and `[True]` preserve an absent or previous final file after an interrupted write; `test_record_updates_replace_the_complete_json` checks repeated successful replacement and temporary cleanup. `test_completed_run_prints_its_row_before_a_record_permission_error` checks the completed figures and readable propagated `PermissionError`. |
 | DR-119(d), V3 output | `tools/halo_part3.py::main` builds the V3 run in staging, publishes after JSON and table are complete, and abandons interrupted staging under a failed name. | `test_tools_halo_part3.py::test_v3_interrupt_publishes_no_final_folder`; `test_v3_publishes_the_record_and_table_together` covers success and the diagnostic STOP status. |
 | DR-119(d), overlap and documentation | `wholeset-run` refuses a resolved cache equal to or below `<out>/items` before processing. `build_sheet` documents `sheet-<stamp>/sheet.json`. | `test_tools_halo_part3.py::test_wholeset_refuses_a_cache_inside_the_items_folder` covers equality and a nested cache, with no processing or output creation; existing sheet tests cover the published record. |
 | DR-119(e) | `tools/n6.py` defines `N6_MIN_PER_MIN` and `FRAME_BUDGET_S_29_97`. `core_speed.py` and `export_bench.py` import the shared target. The module names D106, spec v0.5.8 and the owner's ruling date. | `test_core_speed.py::test_the_bar_is_d106_at_29_97_fps` extracts the current target from the spec's N6 line, checks both instruments and the frame conversion. |
-| DR-120 | `tests/fixture_plugin.py::sample_provider` uses `tmp_path_factory.getbasetemp()/fixtures-generated` when basetemp is explicit, including xdist's worker basetemp. Only a non-xdist run without basetemp reaches Git discovery of the main checkout's `work/fixtures/generated`; failed Git discovery keeps the former checkout-local work cache. An unwritable cache falls back under basetemp. Each fresh root costs about 3.3 s generation + 0.7 s verification and 89,227,437 bytes; up to four parallel worker roots cost about 357 MB, plus serial/fullclip roots if used (Reviewer A measurement, F2, source below). | `test_fixtures.py::test_generated_cache_prefers_an_explicit_basetemp`, `test_generated_cache_without_basetemp_uses_the_main_checkout`, `test_generated_cache_without_git_uses_the_checkout`, and `test_relocated_session_cache_keeps_the_manifest_content`. The fallback test covers missing Git, a non-checkout and timeout; the content test checks the unchanged manifest. |
+| DR-120 | `tests/fixture_plugin.py::sample_provider` uses `tmp_path_factory.getbasetemp()/fixtures-generated` when basetemp is explicit, including xdist's worker basetemp. Only a non-xdist run without basetemp reaches Git discovery of the main checkout's `work/fixtures/generated`; failed Git discovery warns once with the error reason and falls back to the session basetemp. An unwritable cache falls back under basetemp. Pytest deletes an explicit basetemp at session start, so every run of that root regenerates the cache (about 4 s per root, charged to its first consumer); later serial figures are not strictly comparable with the DR-116 pair on that account (Reviewer B, B3). Each fresh root costs about 3.3 s generation + 0.7 s verification and 89,227,437 bytes; up to four parallel worker roots cost about 357 MB, plus serial/fullclip roots if used (Reviewer A measurement, F2, source below). | `test_fixtures.py::test_generated_cache_prefers_an_explicit_basetemp`, `test_generated_cache_without_basetemp_uses_the_main_checkout`, `test_generated_cache_without_git_uses_the_basetemp`, and `test_relocated_session_cache_keeps_the_manifest_content`. The fallback test covers missing Git, a non-checkout and timeout; the content test checks the unchanged manifest. |
 | DR-118 | Only `DiskProxyCache._entry_for_write` changes in product code. It refuses a pre-existing symlink, junction or nondirectory, logs a WARNING naming the path and raises `OSError`, preserving the path and target. | `test_cache_store.py::test_a_write_refuses_a_preplanted_junction[proxy]` and `[statistics]` check refusal, warning, unchanged sentinel bytes and the surviving junction. Creation failures skip with an explicit platform/filesystem reason. Added `test_a_write_refuses_a_preplanted_file[proxy]` and `[statistics]` check the readable refusal, WARNING naming the file, and unchanged bytes, without platform privileges. |
 | DR-116 / DR-86 | Join the archived serial JUnits by `(classname, name)`, retain parameter suffixes, reconcile wall and node changes, and update banked candidate costs. Item (d)'s apply step is CLOSED with no reduction applied by CHARC's ruling; DR-86 candidates stay banked. | The stdlib analysis script checks unique keys, suite counts, skips, no errors/failures, the complete wall reconciliation, module sums and the fixed historical tail membership. Independent XML/CSV checks are recorded below. |
 
@@ -53,10 +57,12 @@ An xdist developer run without `--basetemp` still gets explicit
 `popen-gwN` worker basetemps under `%TEMP%`, so each worker generates
 there instead of reaching the main-checkout rule. This is additional
 generation and storage per fresh root, not changed fixture content.
-The non-xdist no-basetemp path falls back to
-`REPO_ROOT / "work" / "fixtures" / "generated"` if Git is missing,
-times out, or reports that the directory is not a checkout. The
-existing unwritable-cache fallback then still applies.
+The non-xdist no-basetemp path falls back if Git is missing,
+times out, or reports that the directory is not a checkout, using
+`tmp_path_factory.getbasetemp()/fixtures-generated`. A single warning
+names that contained fallback and the Git error's one-line reason.
+Git path output is decoded explicitly as UTF-8. The existing
+unwritable-main-cache fallback still applies.
 
 ## Validation environment and the resolved STOP
 
@@ -402,7 +408,7 @@ that gate is verification, not a newly commissioned suite-cost pass.
 | Fullclip leg | TO FILL AT THE GATE |
 | Owned-path diff and zero-CR check on final candidate | TO FILL AT THE GATE |
 | Reviewer A | R1 `NO_NEW_CRITICAL_MAJOR`; terminating-round cleanup verified below |
-| Reviewer B | TO FILL AT THE GATE |
+| Reviewer B | `NO_NEW_CRITICAL_MAJOR`; this revision addresses its minor and granted advisories |
 
 The earlier groups' static/development summaries are in the supplied
 returns; they are not substituted for these final-candidate gates.
@@ -436,11 +442,12 @@ and `cell/return-5.md`, and Reviewer A's independent re-derivation in
 Limits: archived timings are one pair of serial executions, rounded per
 node, with different code, inputs available and fixture/order state.
 They are costs, not controlled benchmarks or additive saving forecasts.
+`tools/fixtures/generate.py:12` and the manifest's `command` still document `--generated-out work/fixtures/generated`; this is documentation only and is not changed here (Reviewer B, B6).
 The evidence copies and generated CSVs are retained in the durable paths above.
 The sandbox audit residual has a seat ruling and no new DR. No reduction,
 interface, dependency, manifest, harness file or other product behavior
 was changed in the archive-analysis turn. This cleanup edits only the
-report, fixture plugin and two additive test files; the footage and main
+report, fixture plugin and scoped tools/tests; the footage and main
 working-folder contents remain unread by the cell.
 
 F7 coverage limit (Reviewer A advisory): eleven V8 look-check nodes have
@@ -449,7 +456,7 @@ to `D:/clearwater-archive/`; the frames formerly under the main checkout's
 `work/wp1.3/frames` are absent. This is a coverage loss outside WP-T8,
 routed by the orchestrator to CHARC. Source:
 `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/A/r1/review.txt` and
-the binding TURN-6 dispatch. This cell did not inspect those folders.
+the binding TURN-6 dispatch. CHARC ruled at 11:34Z that the two frames be restored from the archive; they have been restored, so the gate of record runs these eleven nodes again (TURN-7 dispatch). Gate figures remain TO FILL AT THE GATE. This cell did not inspect those folders.
 
 ## Reviewer A round 1 disposition and cumulative ledger
 
@@ -457,13 +464,13 @@ Source: `C:/Users/rwsmy/clearwater-review-evidence/wp-t8/A/r1/review.txt`,
 on `92bea573..6d0a249a`. Verdict `NO_NEW_CRITICAL_MAJOR`; the seat's
 five-module run passed, static checks were clean, and all DR-116 figures
 were independently re-derived. This is the terminating round's cleanup;
-the dispatcher owns Reviewer B and the final gates.
+Reviewer B has since returned; its follow-up is below, and the dispatcher owns the final gates.
 
 | Finding | Classification | Disposition |
 |---|---|---|
 | F1 | MINOR, in envelope, NEW | Confirmed by removing only the nondirectory clause in memory; both new planted-file writer cases fail on the missing refusal message and pass on real code. Product source unchanged. |
 | F2 | MINOR, in envelope, NEW | Accepted: DR-120 row now states generation/verification time, bytes per root, worker multiplicity and the xdist exception. |
-| F3 | MINOR, in envelope, NEW | Confirmed by injected missing-Git, non-checkout and timeout failures. Catch the ruled exception families and keep the original checkout cache fallback; all three cases pass after the fix. |
+| F3 | MINOR, in envelope, NEW | Confirmed by injected missing-Git, non-checkout and timeout failures. At A cleanup, caught the ruled exception families and kept the then-ruled checkout cache fallback; all three cases passed. B1 below supersedes that fallback with contained basetemp and a warning. |
 | F4 | MINOR, in envelope, NEW | Accepted: sources of record now name the durable archives, analysis, seat logs and ruling, rather than scratch paths. |
 | F5 | MINOR, in envelope, NEW | Accepted: module and top-delta tables now show BEFORE -> AFTER pass/skip status. |
 | F6 | MINOR, in envelope, NEW | Resolved by CHARC's ruling: apply step CLOSED, no reduction applied, DR-116 closes at accept on attribution. |
@@ -500,3 +507,48 @@ and `-p no:cacheprovider`. Its only failures were
 `test_ffmpeg_is_told_to_write_only_into_the_output_folders` in
 `test_fixtures.py`: the ruled `nul` access and 55/56 launch residual.
 The seed tests gain lines only; no product source is changed in cleanup.
+
+## Reviewer B follow-up
+
+Source: Findings section of
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/B/review.txt`, on
+`a844a37f`; binding rulings are in the TURN-7 dispatch. Verdict:
+`NO_NEW_CRITICAL_MAJOR`. This section records the small follow-up;
+the final gate figures above remain TO FILL AT THE GATE.
+
+| Finding | Classification | Disposition |
+|---|---|---|
+| B1 | MINOR, in envelope, NEW | Git failure now falls back under basetemp and warns once with path, error class and one-line reason; updated all three F3 cases. |
+| B2 | MINOR, out of envelope, NEW | Report's eleven V8 nodes retained; the register correction belongs to CHARC/orchestrator. No register edit. |
+| B3 | ADVISORY, in envelope, NEW | DR-120 row states basetemp deletion, regeneration per run, first-consumer charging and serial-comparison limit. |
+| B4 | ADVISORY, in envelope, NEW | ROW prints and flushes before JSON writing; one regression catches a blocked replacement after a completed run. `PermissionError` still propagates with its readable reason and record path. |
+| B5 | ADVISORY, in envelope, NEW | Noted limit: concurrent developer runs without basetemp/xdist share the main-checkout cache; a manifest-changing branch can regenerate it while another run uses it. Gate legs are contained and unaffected. |
+| B6 | ADVISORY, in envelope, NEW | Disclosed the unchanged manual-generation command documentation under limits. |
+| B7 | ADVISORY, in envelope, NEW | Status and Changes name `0e784986` and the Reviewer B follow-up. |
+| B8 | ADVISORY, originally out of envelope, NEW; correction explicitly granted | Git subprocess decoding is UTF-8. |
+| B9 | ADVISORY, in envelope, NEW | Missing N6 prefix yields an assertion naming the expected prefix, using `next(..., None)`. |
+
+| Round | Critical / major / minor / advisory | In / out as reviewed | NEW / REOPENED | Reverts | Product fixes / tools and test fixes | Dispatcher-read depth at entry |
+|---|---|---|---|---|---|---|
+| B follow-up | 0 / 0 / 2 / 7 | 7 / 2 (B8 correction granted) | 9 / 0 | 0 | 0 / 3 (fixture fallback/decoding; ROW publication order; N6 diagnostic), plus report changes | 207,206 of 475,000 |
+
+Before these changes, the updated Git-failure cases failed for missing
+warnings and the new blocked-write case failed because no ROW was printed.
+The focused GREEN run passed all changed behaviors and the N6 assertion.
+Execution evidence is transferred by the dispatcher to
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t8/cell/return-7.md` and
+`cell/turn-7.txt`; scratch logs are not sources of record.
+
+TURN-7 checks: focused GREEN is 5 passed in 0.76 s. The requested
+`test_fixtures.py`, `test_export_bench.py` and `test_core_speed.py` run
+is 391 passed, 1 deselected and only the 3 ruled sandbox audit failures
+in 129.12 s. Those failures are
+`test_generators_write_only_inside_their_output_folders`,
+`test_generators_read_only_their_own_code_and_libraries`, and
+`test_ffmpeg_is_told_to_write_only_into_the_output_folders`. No other
+test failed. The run used the parallel-leg markers, explicit `ct8-20`
+basetemp, the sandbox mkdir shim and no cacheprovider. Ruff passes;
+format reports 5 files already formatted. Scope/encoding checks pass:
+six owned files, zero CR, fixture-test changes confined to the turn-6
+F3 addition, export-bench regression additions only, and clean diff
+whitespace. Final three-leg gate figures remain TO FILL AT THE GATE.

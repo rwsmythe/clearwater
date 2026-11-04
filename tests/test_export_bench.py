@@ -310,6 +310,43 @@ def test_run_writes_the_record_and_leaves_the_footage_alone(
     assert (clip.read_bytes(), clip.stat().st_mtime_ns) == footage
 
 
+def test_completed_run_prints_its_row_before_a_record_permission_error(
+    folders: LocalConfig, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A reader blocking record replacement cannot hide the completed run's figures (B4)."""
+    (folders.footage_path / "GX000001.mp4").write_bytes(b"synthetic source")
+    completed = {
+        "clip": "GX000001.mp4",
+        "leg": {"method": "c3", "cache": "cold"},
+        "encoder": "libx265",
+        "ok": True,
+        "frames": 45,
+        "total": {"s_per_frame": 0.2, "min_per_min": 6.0},
+        "per_frame": {"median": 0.1, "p90": 0.2, "max": 0.3},
+        "telemetry": {"peak_tree_rss_bytes": 128 * 1024**2, "peak_gpu_memory_used_mib": 0},
+        "meets_d106": True,
+        "analysis_share": 0.1,
+        "nvenc_proof": {"tied": False},
+    }
+    monkeypatch.setattr(bench, "run_once", lambda *args, **kwargs: completed)
+
+    def blocked_record(path: Path, record: dict[str, Any]) -> None:
+        assert record["runs"] == [completed]
+        raise PermissionError(13, "record is held open", str(path))
+
+    monkeypatch.setattr(bench, "_write", blocked_record)
+    with pytest.raises(PermissionError, match="record is held open") as failure:
+        bench.main(["run", "GX000001", "--encoder", "libx265", "--force-cpu"])
+    rows = [line for line in capsys.readouterr().out.splitlines() if line.startswith("ROW ")]
+    assert len(rows) == 1
+    assert rows[0].startswith(
+        "ROW GX000001.mp4 c3 libx265 cold: 45 frames, 0.2000 s/frame, 6.00 min/min"
+    )
+    assert "median 0.1000, p90 0.2000, max 0.3000" in rows[0]
+    assert failure.value.filename is not None
+    assert Path(failure.value.filename).parent == folders.working_path / bench.SUBDIR
+
+
 def test_a_failed_job_keeps_the_record_and_exits_1(
     folders: LocalConfig, capsys: pytest.CaptureFixture[str]
 ) -> None:

@@ -890,8 +890,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"RECORD {record_path}")
                 return 1
             record["runs"].append(run)
-            _write(record_path, record)
             print(row_line(run), flush=True)
+            _write(record_path, record)
             if (run.get("memory_check") or {}).get("passes") is False:
                 if not run["ok"]:
                     record["failed"] = {"leg": asdict(leg), "error": run["failure"]}

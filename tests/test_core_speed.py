@@ -228,11 +228,12 @@ def test_proxy_is_the_s3_block_mean() -> None:
 def test_the_bar_is_d106_at_29_97_fps() -> None:
     """Both instruments label their figures with the spec's current N6 target (DR-119 e)."""
     spec = Path(__file__).resolve().parents[1] / "docs" / "underwater-correction-spec.md"
+    prefix = "- **N6 Performance target (D106):**"
     line = next(
-        line
-        for line in spec.read_text(encoding="utf-8").splitlines()
-        if line.startswith("- **N6 Performance target (D106):**")
+        (line for line in spec.read_text(encoding="utf-8").splitlines() if line.startswith(prefix)),
+        None,
     )
+    assert line is not None, f"N6 spec line not found; expected prefix: {prefix}"
     match = re.search(r"at most about ([0-9.]+) minutes", line)
     assert match is not None
     target = float(match.group(1))
