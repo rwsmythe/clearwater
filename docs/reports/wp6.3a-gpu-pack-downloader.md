@@ -4,8 +4,10 @@ Candidate report, 2026-11-04. Parts 1 and 2 added the installer and request
 surfaces. Dispatch 5 folds Reviewer A r1 into the merged candidate at
 `f00172a6`, following CHARC's rulings including the checker-cancellation grant.
 Dispatch 6 folds Reviewer A r2 into `196d2380`, revising removal for mapped
-images under CHARC's three-layer ruling. Reviewer A r3, Reviewer B, the release gate and the real-download seat proof
-remain with the orchestrator.
+images under CHARC's three-layer ruling. Reviewer A converged at r3 on
+`ffb8896e` (NO_NEW_CRITICAL_MAJOR). Dispatch 7 folds all five remaining r3
+findings into merged HEAD `852fcee8`; the short delta review, real-download
+seat proof, Reviewer B and release gate remain with the orchestrator.
 
 ## Design as built
 
@@ -61,8 +63,12 @@ pack to a partial folder before deleting any file. A blocked probe or rename
 leaves the pack intact and writes the empty `<stamp>.remove` marker. A delete
 PermissionError after rename also returns pending, keeping the remainder for
 a future partial sweep. Other filesystem failures are reported. Matching plain partial folders are cleaned
-under the operation lock; files, symlinks and reparse points with partial names
-are skipped and logged without being followed.
+under the operation lock on every GUI startup, install and remove; files,
+symlinks and reparse points with partial names are skipped and logged without
+being followed. The image probe uses a recursive `os.scandir` walk that skips
+symlinks and all Windows reparse points, for both files and directories.
+Before probing an owned read-only image it clears FILE_ATTRIBUTE_READONLY;
+failure to clear means in use and defers removal with the pack intact.
 
 `build.py` delegates its manifest construction and writer to the product
 module. Its hand-filled writer retains the folder-name-equals-STAMP refusal;
@@ -296,12 +302,13 @@ and a passing `--verify`, rather than equality with uv's extra files. These are
 expectations, not cell results. Real download, frozen build, two GPU worker runs, mapped-file
 proof, product removal and real-profile absence checks belong to the seat.
 The cell wrote no seat/download script and ran no frozen executable. Reviewer
-A convergence, Reviewer B and the final gate are pending.
+A converged at r3; its short cleanup delta review, Reviewer B and the final
+gate are pending.
 
 ## Reviewer A r1 fold-in (dispatch 5)
 
 All eleven findings were adjudicated against CHARC's complete ruling packet.
-The candidate does not claim Reviewer A convergence until the seat runs r2.
+At the r1 handoff, Reviewer A r2 was still pending (historical).
 
 | Finding | Classification and change | Discriminating coverage |
 | --- | --- | --- |
@@ -439,7 +446,8 @@ cell's footprint. Depth is supplied by the dispatcher's driver, not estimated.
 | Round | C / M / minor / advisory | In / out | NEW / REOPENED | Reverts | Product-code / test-only / documentation fixes | Banked | Depth |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | A r1, initial fold-in; #2 reopened at r2 | 1 / 1 / 4 / 5 | 10 / 1 | 11 / 0 | 0 | 6 initial / 1 / 1 finding groups; #2 corrected below | 7, 10, 11 per CHARC | Turn-5 end: 160,597 / 475,000, supplied at dispatch 6 |
-| A r2, adjudicated and folded in | 0 / 1 / 2 / 2 | 5 / 0 | 4 / 1 (#2) | 0 | 3 / 2 / 0 finding groups | No new banked finding | DISPATCHER TO FILL |
+| A r2, adjudicated and folded in | 0 / 1 / 2 / 2 | 5 / 0 | 4 / 1 (#2) | 0 | 3 / 2 / 0 finding groups | No new banked finding | Turn-6 end: 229,611, supplied at dispatch 7 |
+| A r3, CONVERGED; all five cleanup findings folded in | 0 / 0 / 2 / 3 | 4 / 1 (R3-5, expressly granted) | 5 / 0 | 0 | 4 / 1 / 0 finding groups | None of r3's five left open | DISPATCHER TO FILL |
 
 The r1 turn bundled its ruled remediation groups in one logical review
 fold-in. At that handoff Reviewer A r2 and the real-download seat proof were
@@ -568,3 +576,94 @@ product-code finding groups and two test-only groups. R1 advisories 7, 10 and
 the gate remain with the orchestrator. This turn bundles F1-F5 as commissioned;
 no new dependency, real download, frozen/build run, desktop input, git write,
 footage/profile write or edit to DR-125/core backend/app wiring occurred.
+
+## Reviewer A r3 fold-in (dispatch 7)
+
+Reviewer A r3 (`A/r3/review.txt` at the dispatcher evidence root) reported
+NO_NEW_CRITICAL_MAJOR and 15/16 mutants caught. Its two MINOR and three
+ADVISORY findings are confirmed; CHARC granted all five for this cleanup.
+R3-5 was classified outside the original envelope by the reviewer and is
+implemented under the explicit dispatch-7 grant. No item is stopped or left
+half-done. This turn bundles the five commissioned cleanup findings.
+
+| Finding | Change | Discriminating test / evidence |
+| --- | --- | --- |
+| R3-1 MINOR | Before a Windows image write-open, clear FILE_ATTRIBUTE_READONLY using `os.chmod`; any OSError clearing it returns in-use/pending before a rename | `test_read_only_unmapped_image_removes_cleanly`; `test_read_only_image_attribute_failure_defers_intact` for PermissionError and OSError. Actual read-only image removal failed before the fix; generic attribute OSError initially returned failure, then passed after widening the clear-failure handling |
+| R3-2 MINOR, test-only | Child-mapped DLL is under `site-packages/nvidia/x/bin/`; child-loaded `.pyd` and the observed uppercase extension are under `site-packages/pkg/`. Byte/mtime snapshots cover nested files | `test_child_mapped_image_keeps_pack_intact_until_exit[dll/pyd]` and `test_probe_opens_both_image_extensions_without_writing`; all three fail the top-level-only mutant and pass the restored implementation |
+| R3-3 ADVISORY | `apply_pending_removal()` sweeps partials on every GUI start under the operation lock, even without a marker. Busy lock refuses immediately; per-partial PermissionError stays logged/tolerated | `test_startup_sweeps_leftover_partial_without_marker` and `test_startup_busy_lock_skips_partial_sweep`; both failed before the fix. Existing four-way delete-race and unreadable-partial tests remain green |
+| R3-4 ADVISORY | Menu-action refresh clears `_gpu_removal_pending` when the marker is gone, including successful install and removal completions. The label then says `CPU: GPU support changes take effect at the next start`; later ordinary device reasons work again | Offscreen `test_pending_reason_clears_after_marker_is_gone[install/remove]`; both failed before the fix. Existing startup-marker precedence test remains green |
+| R3-5 ADVISORY, originally out of envelope, granted | Replace `rglob` with an iterative `os.scandir` walk; inspect entries without following links, skip symlinks/all reparse points, and recurse only into plain directories | `test_probe_never_enters_linked_images[junction/directory-symlink/file-symlink]`; actual junction and file-symlink cases failed against the old walk. All three pass here, with a guard that rejects any outside image write-open and an unchanged outside payload |
+
+The startup call in `__main__` is unchanged. The partial sweep moved out of
+the marker-only helper to the already-called GUI-start wrapper. Install and
+remove retain their own lock-held sweeps. A partial still locked after a
+mapping race can remain when the absent stamp's marker is cleared; every
+later GUI start now retries that partial without needing the marker. This
+supersedes the r2 historical gap described above. Child entry branches remain
+read-only. The shell does not activate GPU support after any operation; a
+restart still applies the change.
+
+### R3 validation
+
+All runner output is under `work/wp6.3a/`. Every pytest command set
+`PYTHONPATH=scripts` and `QT_QPA_PLATFORM=offscreen`, loaded
+`-p sandbox_mkdir_shim -p no:cacheprovider`, used the stated bounded timeout
+and wrote only to its disposable worktree basetemp. The required sandbox shim
+was added to the dispatch's GUI command. The shell tests are in the same
+dialog module; there is no second shell module to run.
+
+| Command | Result / evidence |
+| --- | --- |
+| `uv run --no-sync ruff check .` | All checks passed, exit 0; `r3-ruff.log` |
+| `uv run --no-sync ruff format --check .` | 327 files already formatted, exit 0; `r3-format-check.log` |
+| `uv run --no-sync mypy` | No issues in 163 source files, exit 0; `r3-mypy.log` |
+| `uv run --no-sync mypy --platform darwin` | Exactly 4 accepted errors in 3 files / 163 checked, exit 1; `r3-darwin.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_gpu_pack.py tests/test_gpu_pack_install.py tests/test_tools_package_build.py tests/test_frozen_entry.py --basetemp=work/c63a-7 --junitxml=work/wp6.3a/r3-tests.xml --durations=0` | **434 passed in 30.25 s**, exit 0; `r3-tests.log` / XML |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_gpu_pack_install.py --basetemp=work/c63a-7m` | **91 passed in 8.82 s**, exit 0; `r3-module-alone.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 600 tests/test_gui_gpu_pack_dialog.py --basetemp=work/c63a-7gui --junitxml=work/wp6.3a/r3-gui.xml` | **21 passed in 1.08 s**, exit 0; `r3-gui.log` / XML |
+| `uv run --no-sync python work/wp6.3a/r3-mutant.py` | Expected exit 1, **3 failed in 0.45 s**; `r3-mutant.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_gpu_pack_install.py::test_probe_opens_both_image_extensions_without_writing tests/test_gpu_pack_install.py::test_child_mapped_image_keeps_pack_intact_until_exit --basetemp=work/c63a-7restored` | Restored code: **3 passed in 0.36 s**, exit 0; `r3-restored.log` |
+| `uv run --no-sync python work/wp6.3a/r3-audit.py` (includes `git diff --name-only` and `git diff --check`) | Exactly 5 owned changed files, 0 CR bytes, clean diff check; XML confirms 434 non-GUI / 21 GUI cases and 0 failures/errors/skips, exit 0; `r3-audit.log` |
+
+Darwin's errors are exactly `src/clearwater/io/video/pipes.py:56`,
+`tools/prototype/bench.py:1159`, `tools/prototype/bench.py:1480` and
+`tools/spike_io/transport.py:950`; there is no new error. No required run has a
+skip, and no sandbox refusal/residual occurred: actual junctions, symlinks,
+loopback and child-mapped images worked. Timings are test-run durations,
+not real-pack performance measurements. In the final four-module XML, all
+91 installer cases were below 10 seconds (maximum 2.198 s); the child DLL
+and `.pyd` cases took 0.177 s and 0.158 s, including fixtures.
+
+The mutation is the same top-level-only behavior as r3's surviving
+`rglob`-to-`glob` mutant. With the new scanner, the in-memory mutation disables
+its directory-enqueue statement. The script patches only that function in
+its own process; no product file is edited. Both child-mapped tests fail at
+the intact-pack assertion, and the extension test fails because the nested
+`.PYD` was not probed. A fresh normal process passes all three. The scripts
+and synthetic DLL copies stay ignored under `work/`; no seat or download
+script was written.
+
+### R3 verification loop and handoff
+
+| Suspected issue | Independent confirmation / rejection | Disposition |
+| --- | --- | --- |
+| Read-only image can be pending forever | Actual attribute test failed against the pre-change implementation (`r3-red.log`) | Confirmed and fixed; clean removal plus two attribute-failure pending controls pass |
+| Attribute-clear failure may escape as a raw failure | Explicit generic OSError control failed (`r3-attribute-red.log`: 1 failed / 1 passed) | Confirmed and fixed; clear-failure OSError is in-use, not a failed removal |
+| Probe recursion remains unprotected | Equivalent in-memory M12 mutant fails three named tests | Rejected as a remaining gap; restored code passes three |
+| A markerless race remainder never gets another startup sweep | New markerless and busy-lock cases both failed against old code | Confirmed and fixed; sweep occurs under lock and retries at the next unlocked startup |
+| Pending status remains after the marker disappears | Both install/remove GUI cases failed (`r3-gui-red.log`) | Confirmed and fixed; ordinary later device reason and tooltip work again |
+| Probe can write-open outside the pack via a link | Actual junction and file-symlink regressions failed against `rglob` (`r3-red.log`) | Confirmed and fixed; all three linked-entry controls pass |
+| Final in-envelope pass | 434 required non-GUI tests, 91 module-alone tests, 21 offscreen tests, restored mutant controls, static checks and owned-file audit | No further in-envelope finding |
+
+The cumulative r3 ledger row above records 0 critical / 0 major / 2 minor /
+3 advisory, 5 NEW / 0 REOPENED, 0 reverts, four product-code finding groups
+and one test-only group. Depth is DISPATCHER TO FILL. Reviewer A remains
+converged; this handoff is for its short delta review, then the staged seat
+run, Reviewer B and gate. The seat section remains **SEAT TO FILL**.
+
+Exactly the five dispatch-7 owned files changed, with zero CR bytes and a
+passing `git diff --check` (`r3-audit.log`). No new dependency, frozen
+interface change, real network fetch, GPU activation, frozen run/build,
+desktop input, git write, footage/profile write or edit outside the owned
+files occurred. All five rulings are implemented; no deviation or open
+question needs a ruling in this turn.

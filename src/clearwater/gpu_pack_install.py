@@ -525,16 +525,39 @@ def _mark_pending() -> None:
     marker.touch()
 
 
+def _pack_images(folder: Path) -> Iterator[tuple[Path, os.stat_result]]:
+    """Walk plain pack directories without following symlinks or Windows reparse points."""
+    directories = [folder]
+    while directories:
+        with os.scandir(directories.pop()) as entries:
+            for entry in entries:
+                info = entry.stat(follow_symlinks=False)
+                reparse = False
+                if sys.platform == "win32":
+                    reparse = bool(info.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+                if stat.S_ISLNK(info.st_mode) or reparse:
+                    continue
+                path = Path(entry.path)
+                if stat.S_ISDIR(info.st_mode):
+                    directories.append(path)
+                elif stat.S_ISREG(info.st_mode) and path.suffix.lower() in (".pyd", ".dll"):
+                    yield path, info
+
+
 def _pack_in_use(folder: Path) -> bool:
-    """On Windows, probe mapped images by write-open, never by renaming their folder."""
+    """On Windows, clear read-only image attributes, then probe mapped images by write-open."""
     if sys.platform == "win32":
-        for path in folder.rglob("*"):
-            if path.suffix.lower() in (".pyd", ".dll") and path.is_file():
+        for path, info in _pack_images(folder):
+            if info.st_file_attributes & stat.FILE_ATTRIBUTE_READONLY:
                 try:
-                    descriptor = os.open(path, os.O_RDWR)
-                except PermissionError:
+                    os.chmod(path, info.st_mode | stat.S_IWUSR)
+                except OSError:
                     return True
-                os.close(descriptor)
+            try:
+                descriptor = os.open(path, os.O_RDWR)
+            except PermissionError:
+                return True
+            os.close(descriptor)
     return False
 
 
@@ -585,7 +608,6 @@ def _apply_pending_locked(root: Path) -> PackResult:
         if not _rename_remove(root):
             _LOG.warning("GPU pack removal pending")
             return PackResult(False, "GPU pack removal pending")
-        _partials(root, gpu_pack.STAMP)
         marker.unlink()
         return PackResult(True, "GPU support is removed; takes effect at the next start")
     except OSError as error:
@@ -594,16 +616,18 @@ def _apply_pending_locked(root: Path) -> PackResult:
 
 
 def apply_pending_removal() -> PackResult:
-    """At GUI startup, retry deferred removal without ever loading the pack.
+    """At every GUI startup, sweep partials and retry deferred removal without loading a pack.
 
     Returns:
         Success after clearing the marker, or failure with the marker left for next start.
+        A busy operation lock skips cleanup immediately; the next startup can retry it.
     """
     root = gpu_pack.pack_root()
     if root is None:
         return PackResult(False, "GPU support is not available on this platform")
     try:
         with _operation_lock(root):
+            _partials(root, gpu_pack.STAMP)
             return _apply_pending_locked(root)
     except Exception as error:
         _LOG.warning("GPU pack removal pending: %s", _ascii(error))

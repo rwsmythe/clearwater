@@ -304,6 +304,36 @@ def test_startup_marker_shows_pending_reason_without_install_hint(make_window, i
     assert window.device_label.toolTip() == ""
 
 
+@pytest.mark.parametrize("completion", ["install", "remove"])
+def test_pending_reason_clears_after_marker_is_gone(
+    make_window, monkeypatch, isolated_pack, completion
+):
+    (isolated_pack / gpu_pack.STAMP).mkdir(parents=True)
+    marker = isolated_pack / (gpu_pack.STAMP + ".remove")
+    marker.touch()
+    window = make_window()
+    assert window.device_label.text() == "Device: CPU: GPU pack removal pending"
+    if completion == "install":
+        dialog, script, _ = _open(window, monkeypatch)
+        dialog.install_button.click()
+        marker.unlink()
+        script.finish(_result(True, "GPU support is installed. Restart Clearwater to use it."))
+        assert dialog.status.text() == "GPU support is installed. Restart Clearwater to use it."
+    else:
+        script = ScriptedRunner()
+        monkeypatch.setattr(window.jobs, "run", script.run)
+        _, actions = _actions(window)
+        actions["Remove GPU support"].trigger()
+        window._gpu_remove_prompt.button(QMessageBox.StandardButton.Yes).click()
+        marker.unlink()
+        (isolated_pack / gpu_pack.STAMP).rmdir()
+        script.finish(_result(True, "GPU support is removed; takes effect at the next start"))
+    assert "removal pending" not in window.device_label.text()
+    window.set_idle_device("CPU: CuPy not installed")
+    assert window.device_label.text() == "Device: CPU: CuPy not installed"
+    assert window.device_label.toolTip() == "Tools > Install GPU support..."
+
+
 def test_this_process_loaded_remove_only_writes_marker(make_window, monkeypatch, isolated_pack):
     folder = isolated_pack / gpu_pack.STAMP
     folder.mkdir(parents=True)

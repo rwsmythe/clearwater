@@ -507,6 +507,10 @@ class MainWindow(ShellWindow):
     def _update_gpu_actions(self) -> None:
         """Expose the platform's pack actions and refresh presence without loading a pack."""
         root = gpu_pack.pack_root()
+        marker = gpu_pack.pending_removal_path()
+        if self._gpu_removal_pending and (marker is None or not marker.exists()):
+            self._gpu_removal_pending = False
+            self.set_idle_device("CPU: GPU support changes take effect at the next start")
         supported = root is not None
         self._gpu_install.setVisible(supported)
         self._gpu_remove.setVisible(supported)

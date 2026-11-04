@@ -948,8 +948,14 @@ def test_write_open_probe_defers_before_any_rename(fake_index, monkeypatch, oper
 def test_probe_opens_both_image_extensions_without_writing(empty_plan, monkeypatch):
     installer, root = empty_plan
     folder = _fake_pack(root)
-    (folder / "extension.PYD").write_bytes(b"extension")
-    before = {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in folder.iterdir()}
+    extension = folder / "site-packages" / "pkg" / "extension.PYD"
+    extension.parent.mkdir(parents=True)
+    extension.write_bytes(b"extension")
+    before = {
+        p.relative_to(folder): (p.read_bytes(), p.stat().st_mtime_ns)
+        for p in folder.rglob("*")
+        if p.is_file()
+    }
     original_open = os.open
     probes = []
 
@@ -965,7 +971,94 @@ def test_probe_opens_both_image_extensions_without_writing(empty_plan, monkeypat
     for _, _, fd in probes:
         with pytest.raises(OSError):
             os.fstat(fd)
-    assert before == {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in folder.iterdir()}
+    assert before == {
+        p.relative_to(folder): (p.read_bytes(), p.stat().st_mtime_ns)
+        for p in folder.rglob("*")
+        if p.is_file()
+    }
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows read-only image attributes")
+def test_read_only_unmapped_image_removes_cleanly(empty_plan):
+    installer, root = empty_plan
+    folder = _fake_pack(root)
+    image = folder / "z_locked.dll"
+    image.chmod(stat.S_IREAD)
+    try:
+        assert image.stat().st_file_attributes & stat.FILE_ATTRIBUTE_READONLY
+        result = installer.remove()
+        assert result.ok and "will be removed" not in result.message
+        assert list(root.iterdir()) == []
+    finally:
+        if image.exists():
+            image.chmod(stat.S_IREAD | stat.S_IWRITE)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows read-only image attributes")
+@pytest.mark.parametrize("failure", [PermissionError, OSError])
+def test_read_only_image_attribute_failure_defers_intact(empty_plan, monkeypatch, failure):
+    installer, root = empty_plan
+    folder = _fake_pack(root)
+    image = folder / "z_locked.dll"
+    image.chmod(stat.S_IREAD)
+    chmod = os.chmod
+    attempts = []
+
+    def denied(path, mode, *args, **kwargs):
+        if Path(path) == image:
+            attempts.append(Path(path))
+            raise failure("cannot clear image attribute")
+        return chmod(path, mode, *args, **kwargs)
+
+    try:
+        monkeypatch.setattr(os, "chmod", denied)
+        monkeypatch.setattr(os, "replace", lambda *args: pytest.fail("pack renamed"))
+        result = installer.remove()
+        assert result.ok and result.message == "GPU support will be removed at the next start"
+        assert attempts == [image]
+        assert image.read_bytes() == b"keep locked"
+        assert gpu_pack.pending_removal_path().exists()
+    finally:
+        chmod(image, stat.S_IREAD | stat.S_IWRITE)
+
+
+@pytest.mark.parametrize("kind", ["junction", "directory-symlink", "file-symlink"])
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows reparse-point probe exclusion")
+def test_probe_never_enters_linked_images(empty_plan, tmp_path, monkeypatch, kind):
+    installer, root = empty_plan
+    folder = _fake_pack(root)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    image = outside / "outside.dll"
+    image.write_bytes(b"outside remains untouched")
+    link = folder / ("linked.dll" if kind == "file-symlink" else "linked")
+    if kind == "junction":
+        import _winapi
+
+        _winapi.CreateJunction(str(outside), str(link))
+    else:
+        try:
+            link.symlink_to(
+                image if kind == "file-symlink" else outside,
+                target_is_directory=kind == "directory-symlink",
+            )
+        except OSError as error:
+            pytest.skip(f"host refuses os.symlink: {error!r}")
+    original_open = os.open
+
+    def guarded_open(path, flags, *args, **kwargs):
+        assert not Path(path).resolve().is_relative_to(outside), "outside image was probed"
+        return original_open(path, flags, *args, **kwargs)
+
+    try:
+        monkeypatch.setattr(os, "open", guarded_open)
+        assert not installer._pack_in_use(folder)
+        assert image.read_bytes() == b"outside remains untouched"
+    finally:
+        if kind == "junction":
+            link.rmdir()
+        else:
+            link.unlink()
 
 
 def test_no_image_probe_off_win32(empty_plan, monkeypatch):
@@ -1045,6 +1138,29 @@ def test_unreadable_partial_does_not_keep_absent_pack_marker(empty_plan, monkeyp
     assert list(root.iterdir()) == []
 
 
+def test_startup_sweeps_leftover_partial_without_marker(empty_plan):
+    installer, root = empty_plan
+    partial = root / (gpu_pack.STAMP + ".partial-leftover")
+    partial.mkdir(parents=True)
+    (partial / "left.dll").write_bytes(b"unmapped race remainder")
+    assert not gpu_pack.pending_removal_path().exists()
+    assert installer.apply_pending_removal().ok
+    assert list(root.iterdir()) == []
+
+
+def test_startup_busy_lock_skips_partial_sweep(empty_plan):
+    installer, root = empty_plan
+    partial = root / (gpu_pack.STAMP + ".partial-leftover")
+    partial.mkdir(parents=True)
+    (partial / "left.dll").write_bytes(b"keep until next start")
+    with installer._operation_lock(root):
+        result = installer.apply_pending_removal()
+        assert not result.ok and "operation is in progress" in result.message
+        assert (partial / "left.dll").read_bytes() == b"keep until next start"
+    assert installer.apply_pending_removal().ok
+    assert list(root.iterdir()) == []
+
+
 def test_real_record_validator_skips_mismatched_environment(tmp_path, monkeypatch):
     name = gpu_pack.LOCKED_DISTRIBUTIONS[0].name
     stale = SimpleNamespace(version="0.0", read_text=lambda _: pytest.fail("stale RECORD read"))
@@ -1060,10 +1176,11 @@ def test_child_mapped_image_keeps_pack_intact_until_exit(empty_plan, tmp_path, k
     folder = _fake_pack(root)
     if kind == "dll":
         source = Path(sys.base_prefix) / "python3.dll"
-        target = folder / "mapped.dll"
+        target = folder / "site-packages" / "nvidia" / "x" / "bin" / "mapped.dll"
     else:
         source = Path(importlib.util.find_spec("_queue").origin)
-        target = folder / "_queue.pyd"
+        target = folder / "site-packages" / "pkg" / "_queue.pyd"
+    target.parent.mkdir(parents=True)
     shutil.copy2(source, target)
     ready, release = tmp_path / "ready", tmp_path / "release"
     environment = os.environ.copy()
@@ -1100,7 +1217,11 @@ while not Path(release).exists():
         raise SystemExit('mapped-image child timed out')
     time.sleep(0.02)
 """
-    before = {p.name: p.read_bytes() for p in folder.iterdir()}
+
+    def snapshot():
+        return {p.relative_to(folder): p.read_bytes() for p in folder.rglob("*") if p.is_file()}
+
+    before = snapshot()
     with (tmp_path / "mapped-child.log").open("wb") as log:
         child = subprocess.Popen(
             [sys.executable, "-c", code, kind, str(target), str(ready), str(release)],
@@ -1119,11 +1240,11 @@ while not Path(release).exists():
             marker = root / (gpu_pack.STAMP + ".remove")
             assert marker.read_bytes() == b""
             assert folder.is_dir() and not list(root.glob("*.partial-*"))
-            assert {p.name: p.read_bytes() for p in folder.iterdir()} == before
+            assert snapshot() == before
             assert not installer.apply_pending_removal().ok
-            assert {p.name: p.read_bytes() for p in folder.iterdir()} == before
+            assert snapshot() == before
             assert not installer.install(Progress()).ok
-            assert {p.name: p.read_bytes() for p in folder.iterdir()} == before
+            assert snapshot() == before
         finally:
             release.touch()
             try:
