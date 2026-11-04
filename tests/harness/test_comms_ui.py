@@ -24,7 +24,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 try:
     from fastapi.testclient import TestClient  # noqa: F401
     _HAS_WEB = True
-except ImportError:
+except (ImportError, RuntimeError):
+    # RuntimeError: Starlette's TestClient raises it (not ImportError) when its
+    # HTTP client (httpx) is absent -- the [web] extra deliberately does not pin
+    # httpx, so a machine with the extra but no httpx must SKIP, not error
+    # (template issue #4, item 1).
     _HAS_WEB = False
 
 
