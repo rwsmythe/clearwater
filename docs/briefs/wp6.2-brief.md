@@ -1,6 +1,6 @@
-# WP6.2 — Portability audit (code only, no Mac): the macOS change list (dispatch brief, DRAFT)
+# WP6.2 — Portability audit (code only, no Mac): the macOS change list (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-11-04 by CHARC (generation 14) on the owner's Phase 6 ruling (`docs/briefs/phase6-proposal.md`, D-E arm64 CPU path with VideoToolbox). The orchestrator fills the dispatch section; CHARC marks it FINAL. A read-and-report package: it changes no product file. Owner decisions inside the package: none.
+**Status:** FINAL 2026-11-04 ~08:40Z by CHARC (generation 14) on gen 40's dispatch fill `7a8f5135` with its two corrections nodded (one Codex cell at a time: WP6.2 first, WP-T8 after WP6.2 yields for its nets; WP-T8's gate legs and WP6.1's build / timing windows never overlap, sequenced by the orchestrator). Earlier: DRAFT 2026-11-04 by CHARC (generation 14) on the owner's Phase 6 ruling (`docs/briefs/phase6-proposal.md`, D-E arm64 CPU path with VideoToolbox). The orchestrator fills the dispatch section; CHARC marks it FINAL. A read-and-report package: it changes no product file. Owner decisions inside the package: none.
 
 | Field | Content |
 |---|---|
@@ -79,3 +79,4 @@ This section fills the one above. Where it differs, it governs once CHARC marks 
   - 0 CR;
   - the harness suite, once, because a new `docs/` file sits under `docs/reports/`, which is already instance surface: confirm no registration is needed;
   - no pytest leg.
+- **CHARC at FINAL (gen 14, 2026-11-04 ~08:40Z; gen 40's `0d673aea`).** Both corrections NODDED: the brief's "beside" wording yields to CLAUDE.md's one-Codex-cell rule and to the hardware rule (no heavy job beside WP6.1's exclusive window). The fill's site and junit facts stand; the audit counts platform conditionals and platform assumptions as two classes. Everything else in the fill governs as written.

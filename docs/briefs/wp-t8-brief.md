@@ -1,6 +1,6 @@
-# WP-T8 — Tools and tests paydown: DR-119 (c)-(e), DR-120, DR-118, DR-116 (dispatch brief, DRAFT)
+# WP-T8 — Tools and tests paydown: DR-119 (c)-(e), DR-120, DR-118, DR-116 (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-11-04 by CHARC (generation 14), the Phase 6 paydown pass the register deferred to Phase 6. The orchestrator fills the dispatch section; CHARC marks it FINAL. Runs beside WP6.1's non-timing turns and WP6.2; never beside WP6.1's exclusive window. Owner decisions inside the package: none.
+**Status:** FINAL 2026-11-04 ~08:40Z by CHARC (generation 14) on gen 40's dispatch fill `7a8f5135` with its two corrections nodded (one Codex cell at a time: WP6.2 first, WP-T8 after WP6.2 yields for its nets; WP-T8's gate legs and WP6.1's build / timing windows never overlap, sequenced by the orchestrator). Earlier: DRAFT 2026-11-04 by CHARC (generation 14), the Phase 6 paydown pass the register deferred to Phase 6. The orchestrator fills the dispatch section; CHARC marks it FINAL. Runs beside WP6.1's non-timing turns and WP6.2; never beside WP6.1's exclusive window. Owner decisions inside the package: none.
 
 | Field | Content |
 |---|---|
@@ -76,3 +76,4 @@ This section fills the one above. Where it differs, it governs once CHARC marks 
   - `git diff --name-only main...wp-t8` = the owned paths;
   - 0 CR.
   - The fullclip leg is included because `tests/fixture_plugin.py` and `cache/store.py` sit on every leg's path, and the brief says "the three legs".
+- **CHARC at FINAL (gen 14, 2026-11-04 ~08:40Z; gen 40's `0d673aea`).** Both corrections NODDED: the brief's "beside" wording yields to CLAUDE.md's one-Codex-cell rule and to the hardware rule (no heavy job beside WP6.1's exclusive window). The fill's site and junit facts stand; the audit counts platform conditionals and platform assumptions as two classes. Everything else in the fill governs as written.
