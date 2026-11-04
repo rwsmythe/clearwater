@@ -1032,4 +1032,294 @@ throughout. The sampling itself costs some time, the same for every form.
 - About 1 GiB of private memory in all three forms, the source worker included, is the
   worker's own (not a packaging effect); recorded only.
 
-Depth at turn-3 group-2b-1 end: DISPATCHER TO FILL
+Depth at turn-3 group-2b-1 end: 296,797 (wp61-cell3, at its yield; read by the dispatcher)
+
+## Turn 3 group 2b-2 (2026-11-04 ~11:00-11:45Z): the pack check, `--verify`, #10, the hand-filled pack -- STOPPED on two findings
+
+Fresh cell (implementer-opus-high, wp61-cell4), dispatch
+`clearwater-review-evidence/wp6.1/cell/dispatch-6.md`, worktree head at start `1e043cfc`.
+No desktop input was sent. `t2b/gui_check.py` was not run. Nothing was written under the real
+`%LOCALAPPDATA%\Clearwater` (checked at the end: the folder does not exist) or the footage
+folder. No network access (the pack came from the uv cache, `--offline`). Evidence:
+`clearwater-review-evidence/wp6.1/cell/t3c/`.
+
+One unintended start of the frozen executable without `--export-worker` happened in an
+EXPERIMENTAL run (finding F-D below). It may have started the GUI branch for up to 10 s; no
+Clearwater log or settings file appeared in the redirected tree. I made no further run that
+could reach it.
+
+### Rulings applied (CHARC gen 15, on group 2b-1)
+
+1. #3 ACCEPT (i): nothing built. The report text is CHARC's.
+2. F-A = DR-125. Recorded only; `app/export_worker.py` was not touched. Every frozen run below
+   exits `3221225477` after its result line, which is DR-125.
+3. F-B is a point against onefile at CP6a. Recorded only.
+4. #10: move-to-front with dedupe, built (item 3).
+
+### Items 1-4: the fix / feature table
+
+Before record: the three owned test modules were run against `fcc88ee1`'s `src` and
+`build.py` (`git archive fcc88ee1`, then `PYTHONPATH` and `WP61_BUILD_SCRIPT` pointing at the
+copy; `test_gpu_pack.py` now honours `WP61_BUILD_SCRIPT` as `test_tools_package_build.py`
+does). Log `t3c/pytest-2-on-fcc88ee1.log`: **39 failed, 87 passed**. Per test, the first
+failing line is in `t3c/before-table.txt`. Every planted rejection fails at
+`tests/test_gpu_pack.py:428` (`_rejected`: `assert 'loaded' == 'rejected'`, so the old
+loader accepted the planted pack).
+
+| Item | What (file) | Tests | On `fcc88ee1` |
+|---|---|---|---|
+| 1 (a) RECORD rows | `gpu_pack.pack_problems` / `_record_problems` / `_row_problems`: every row of the eleven RECORD files names a regular file that exists with the row's size (`os.stat`, no hashing). A row without a size is existence-only. `parse_record` (CSV) rejects a malformed row (not three fields, empty path, non-integer size) and a row that leaves `site-packages` (absolute, drive, or `..`). | `test_a_listed_file_that_is_missing_is_rejected`, `test_a_listed_file_of_another_size_is_rejected`, `test_a_listed_folder_where_a_file_should_be_is_rejected`, `test_a_row_without_a_size_is_checked_for_existence_only`, `test_a_malformed_or_escaping_record_row_is_rejected[dotdot, absolute, drive, two-fields, bad-size]` | all fail at `:428` (loaded) |
+| 1 no hashing | only the RECORD files are read and hashed at start-up | `test_the_cheap_check_hashes_no_listed_file` (`_file_digest` replaced by a raiser; a same-size content change still passes the cheap check) | passes (the old check hashed no listed file either; it pins the property) |
+| 1 (b) ownership | a top-level entry of `site-packages` is OWNED when it equals (`os.path.normcase`) the FIRST PATH COMPONENT of some row of the eleven RECORD files; any other entry is `unlisted entry in site-packages: <name>`. Skipped when a RECORD could not be read (that problem is reported first). | `test_an_unlisted_top_level_entry_is_rejected[package (numpy), module, pth, dist-info]`; no false positive: `test_ownership_is_the_first_component_of_any_record_row` (an extra file INSIDE `cupy/` passes; top level only), `test_ownership_ignores_case_where_the_platform_does` | the four planted cases fail at `:428`; the two no-false-positive tests pass |
+| 1 (c) platform tag (#7) | `_wheel_tag_problems`: at least one `Tag:` line of each `WHEEL` file must fit `platform_tags()` (`cp312`, `win_amd64` here, from `sys.implementation` / `sysconfig.get_platform()`), by `tag_fits` (python `cp312` / `py3` / `py312`; ABI `none` / `cp312` / `abi3`; platform `any`, the running tag, or on Linux a `manylinux` tag of the same machine, glibc not compared). A missing `WHEEL`, or one with no `Tag:` line, is a rejection. | `test_a_locked_wheel_for_another_platform_is_rejected` (the LINUX locked CuPy wheel, installed whole with a true manifest, on Windows); `test_a_wheel_file_without_a_usable_tag_is_rejected`; `test_tag_fits[13 cases]`; `test_platform_tags_name_the_running_interpreter_and_platform` | fail at `:428`, or `AttributeError` (no `tag_fits` / `platform_tags`) |
+| 1 (d) manifest = lock | kept as it was (now the first step of `pack_problems`) | the existing tests, unchanged in what they assert | n/a |
+| 1 OSError in the walk | a listed file that cannot be `stat`-ed becomes `<dist> file <path> unreadable: <type>`; a `site-packages` listing failure becomes `pack unreadable: <type>` (via `check_pack`) | `test_an_os_error_during_the_walk_is_a_rejection` (`os.stat` refused for one listed file, then `os.scandir` refused for `site-packages`) | fails at `:428` |
+| 1 clean pack | -- | `test_a_clean_pack_passes_the_cheap_and_the_full_check`, `test_a_valid_pack_is_loaded` (synthetic packs now have real RECORD rows, hashes, sizes, WHEEL / METADATA / INSTALLER files) | `AttributeError` (no `pack_problems`) |
+| 2 `--verify` | `build.py --verify <pack folder>` = `verify_pack` (`gpu_pack.pack_problems(folder, full=True)`: everything above plus each listed file's sha256 in RECORD's urlsafe-base64 form, and any listed file without a hash, RECORD's own row excepted) + `pack_census`. Exit 0 with one summary line, 1 with each problem listed. A third member of the `--form` / `--write-manifest` exclusive group. README section added. | `test_verify_passes_a_clean_pack_with_one_line`, `test_verify_lists_every_mismatch` (content changed at the same size, size changed, file missing, unlisted top-level entry: 5 lines), `test_verify_also_runs_the_start_up_checks` ((c) and (d)), `test_verify_flags_a_listed_file_without_a_hash`, `test_verify_is_exclusive_with_the_other_actions[--form, --write-manifest]` | all fail (argparse: no `--verify`) |
+| 3 #10 | `__main__.prepend_executable_folder`: every spelling of the executable's folder is removed (`normcase(normpath)`), the folder is put first, and the other entries keep their order (empty entries included). No change when the folder is already first and appears once. Only the given environment (`os.environ`) is written. | NEW `test_a_path_listing_the_folder_behind_another_ffmpeg_puts_it_first_once`; 2b-1's `test_a_worker_whose_path_was_changed_by_pyside6_does_not_add_the_folder_again` kept and still green on its no-duplicate check (see the deviation below) | new test `test_frozen_entry.py:319` `assert False is True`; 2b-1's test `:290` the same |
+
+**Deviation (for the dispatcher): 2b-1's membership test had to change its expectation.** Its
+worker case asserted that `PATH` stays UNCHANGED when the PySide6 hook has put
+`_internal\PySide6;_internal` in front of the folder. Under ruling 4 ("the exe folder is first
+on PATH and appears once") that is impossible, because the folder is no longer first. The
+test now asserts: the folder is moved back to the front; it appears once; the hook's entries
+keep their order; a trailing-separator spelling counts as the folder; and a folder that is
+already first is left unchanged. Its name and its scenario are unchanged. Nothing else
+depends on the old order: the folder holds only `Clearwater.exe`, `ffmpeg.exe`, `ffprobe.exe`
+and `_internal`, and Python 3.8+ resolves extension-module DLLs without `PATH`.
+
+**Design note (b).** "Owned" = the first path component of any RECORD row of the eleven. So
+`nvidia` is owned by eight distributions and `cupy` / `cupyx` / `cupy_backends` by one; each
+`.dist-info` folder owns itself through its own RECORD row. Nested extra files (a
+`__pycache__` inside `cupy/`) are not the cheap check's concern: they cannot shadow a
+top-level module.
+
+Self-review (suspected / confirmed / rejected / fixed):
+
+1. The ownership key first used `PureWindowsPath` for the component and `PurePosixPath` for
+   the stat path. On Linux a backslash name would be keyed differently: confirmed by reading,
+   fixed (both `PurePosixPath`).
+2. A version or wheel mismatch no longer stops the walk, so the full check lists all
+   problems. The cheap check still returns the first, in the old order: confirmed by the
+   unchanged reasons of the existing tests.
+3. `test_an_unreadable_record_is_rejected` monkeypatched `gpu_pack.file_sha256`, which the
+   RECORD read no longer uses. Confirmed. The test now refuses `Path.read_bytes` / `Path.open`
+   for that RECORD. It passes on `fcc88ee1` too, as it should (that code also reported the
+   file as unreadable).
+
+A second pass found nothing new.
+
+Commands (worktree root, Git Bash, `PYTEST_ADDOPTS` unset, outputs in `t3c/`):
+
+| Command | Exit | Summary |
+|---|---|---|
+| `pytest -q -rs -p no:cacheprovider --basetemp=<wt>/work/c61d-1 tests/test_gpu_pack.py tests/test_frozen_entry.py tests/test_tools_package_build.py` | 0 | 126 passed in 9.52 s |
+| the same against `fcc88ee1` (`c61d-2`, `PYTHONPATH` + `WP61_BUILD_SCRIPT`) | 1 | 39 failed, 87 passed (the before record) |
+| `pytest ... --basetemp=<wt>/work/c61d-3 <the three> tests/test_jobs_export_process.py tests/test_app_composition.py tests/test_wp42_composition.py tests/test_core_backend.py -m "not gpu" --durations=5` | 0 | 277 passed, 41 deselected in 30.54 s (slowest 2.34 s, `test_jobs_export_process`) |
+| `ruff check .` / `ruff format --check .` | 0 / 0 | All checks passed / 322 files already formatted |
+| `mypy` (strict, configured set) | 0 | no issues in 160 source files |
+| `mypy --platform darwin tools/package/build.py src/clearwater/gpu_pack.py src/clearwater/__main__.py` | 0 | no issues in 3 source files |
+| `mypy --strict` on the three test modules, win32 and `--platform darwin` | 0 / 0 | no issues in 3 source files |
+
+Commits: `7af84366` feat(wp6.1): cheap GPU pack check at every start-up (RECORD sizes,
+ownership, platform tags); build.py --verify; `472b0b6e` fix(wp6.1): the executable folder
+first on PATH and once (move-to-front with dedupe). 0 CR in every blob.
+
+### Item 5: the rebuilds (from `472b0b6e`)
+
+| # | Command (worktree root) | `df -h /c` before | Exit | Wall (shell / PyInstaller) | Result |
+|---|---|---|---|---|---|
+| 7 | `uv run --no-sync python tools/package/build.py --form onedir --with-ffmpeg > work/wp6.1/build-onedir-t3c.log 2>&1` | 86 GB free (11:07Z) | 0 | 88 s / 79.1 s | `_internal` 225 MB (du) + `Clearwater.exe` 10.1 MiB; 668.2 MiB release with FFmpeg; bundle checks 7.3 s: **PASS** |
+| 8 | `... --form onefile --with-ffmpeg > work/wp6.1/build-onefile-t3c.log 2>&1` | 86 GB free | 0 | 84 s / 82.0 s | `Clearwater.exe` 93,764,460 B (89.4 MiB); 523.8 MiB release; bundle checks 0.7 s: **PASS** |
+
+Both logs have the same single warning as every earlier build (`scipy.special._cdflib`,
+benign). FFmpeg copies: `ffmpeg version 9.0.2-full_build-www.gyan.dev` and `ffprobe version
+9.0.2-full_build-www.gyan.dev`. Copies of the logs are in `t3c/`.
+
+### Item 6: the hand-filled GPU pack (redirected `LOCALAPPDATA`)
+
+- **Root.** `LOCALAPPDATA` = `<wt>\work\wp6.1\t3c\appdata\Local` (with `APPDATA` = `...\Roaming`,
+  `TEMP` / `TMP` = `...\Temp` beside it). Pack folder =
+  `<LOCALAPPDATA>\Clearwater\gpu-pack\14.2.0-cu12\` (`gpu_pack.pack_root()` + `STAMP`).
+  `df -h /c` before filling: 86 GB free (11:11Z).
+- **Fill** (`t3c/fill.log`, exit 0, 14 s, all from the uv cache):
+  `uv pip install --python <wt>\.venv\Scripts\python.exe --target <pack>\site-packages
+  --offline --no-deps --link-mode copy` of `cupy-cuda12x==14.2.0 cuda-pathfinder==1.8.3
+  cuda-toolkit==12.9.2.0 nvidia-cublas-cu12==12.9.2.10 nvidia-cuda-nvrtc-cu12==12.9.86
+  nvidia-cuda-runtime-cu12==12.9.79 nvidia-cufft-cu12==11.4.1.4 nvidia-curand-cu12==10.3.10.19
+  nvidia-cusolver-cu12==11.7.5.82 nvidia-cusparse-cu12==12.5.10.65
+  nvidia-nvjitlink-cu12==12.9.86`. "Resolved 11 packages ... Installed 11 packages."
+  `--link-mode copy` was used so that a planted change cannot reach the uv cache through a
+  hard link.
+- **Manifest:** `build.py --write-manifest <pack>`, exit 0. A copy is at `t3c/manifest.json`
+  (sha256 `6f7ee900...b536bd`, equal to the pack's).
+- **`--verify`, first run: FAIL** (`t3c/verify-1-with-uv-lock.log`, 26 s, cold file cache):
+  `unlisted entry in site-packages: .lock`.
+- **FINDING F-C (packaging, for WP6.3 and the README).** `uv pip install --target` leaves an
+  EMPTY `.lock` file (uv's own install lock, 0 B) at the top of `site-packages`. No RECORD
+  owns it, so ruling 2's ownership check rejects it, as specified. I deleted that 0-byte
+  file from my own fill (looked at first) and added a README step. The WP6.3 downloader
+  must leave no such file, or CHARC may rule an allowlist.
+- **`--verify` after that** (`t3c/verify-2.log`, exit 0, 4 s warm):
+  `verify ...\14.2.0-cu12: PASS (11 distributions; 2701 RECORD rows, each file's sha256 and
+  size; 2701 files, 2412.6 MiB)`. **The pack: 2,701 files, 2,529,777,432 B (2,412.6 MiB) in
+  `site-packages`, plus `manifest.json`.** The RECORD rows equal the files on disk, so no
+  unlisted nested file exists.
+- After all the runs below, `--verify` again PASSES with the same figures
+  (`t3c/verify-3-after-cases.log`). **No run wrote into the pack:** every record shows 0 files
+  added and 0 removed (CuPy's partial import wrote no bytecode there).
+
+### Item 7: the proof, headless -- STOPPED at "WITH the pack"
+
+Tools: `t3c/proof.py` (2b-1's `t3b/headless.py` helpers; the worker spawned as
+`export_process.py` spawns it) and `t3c/loader_probe.py` (the product's
+`gpu_pack.check_pack` / `gpu_pack.load` from the dev environment). The child environment is
+the redirected tree plus `CUPY_CACHE_DIR = appdata\cupy-kernel-cache` (empty, so CuPy must
+compile with the pack's NVRTC; the product default would be `%USERPROFILE%\.cupy\kernel_cache`,
+a write outside `%LOCALAPPDATA%` for WP6.3 to note). Every `CUDA_PATH*` variable is removed,
+`PATH = C:\Windows\System32;C:\Windows`, and the working directory is
+`work\wp6.1\t3c\runs\<form>`. Requests: `heic-ad24-both.heic` -> PNG and `vfr.mp4` -> MP4, c3
+defaults, `force_cpu` off, encoder `auto`. Every record is in `t3c/proof.jsonl`.
+
+**The loader's line.** The frozen WORKER logs no pack line (D3: no handler yet, and INFO is
+below the last-resort handler). Only the frozen GUI branch writes it, to its log file, so
+**the frozen loader line verbatim moves to group 2c.** Headless, the line comes from the
+product function on the same folder (`loader_probe.py`), and the frozen worker's device text
+shows which way its own loader went: an accepted pack gives `CuPy failed to load` (CuPy was
+importable); an absent or rejected pack gives `CuPy not installed`.
+
+| Form | Case | Loader line (product function, same folder) | Exit | Device (worker result) | Output | CUDA DLLs mapped | Left over |
+|---|---|---|---|---|---|---|---|
+| onedir | with, video | `gpu pack 14.2.0-cu12: loaded` | 3221225477 (DR-125) | `CPU: CuPy failed to load` (log: `ModuleNotFoundError: No module named 'ctypes.wintypes'`) | `vfr_corrected.mp4` 55,166 B, ok | none | none; no `_MEI` |
+| onedir | with, heic | the same | 3221225477 | the same | `heic-ad24-both_corrected.png` 37,105 B, ok | none | none |
+| onefile | with, video | the same | 3221225477 | the same (`ctypes.wintypes`) | 55,166 B, ok | none | none; `_MEI` before [] after [] |
+| onefile | with, heic | the same | 3221225477 | the same | 37,105 B, ok | none | none; no `_MEI` |
+| onedir | without (folder renamed `14.2.0-cu12.renamed`) | `gpu pack 14.2.0-cu12: absent` | 3221225477 | **`CPU: CuPy not installed`**; log `CuPy not installed: No module named 'cupy'`; warning `Processed on the CPU (CPU: CuPy not installed).` (AD-9's text, in the worker's result) | 37,104 B, ok | none | none |
+| onefile | without | the same | 3221225477 | the same | 37,104 B, ok | none | none; no `_MEI` |
+| onedir | broken (a): one byte appended to `cupy/__init__.py` | `gpu pack 14.2.0-cu12: rejected: cupy-cuda12x file cupy/__init__.py size 42867, RECORD says 42866` | 3221225477 | `CPU: CuPy not installed` (rejected) | 37,104 B, ok | none | none |
+| onefile | broken (a) | the same | 3221225477 | the same | 37,104 B, ok | none | none; no `_MEI` |
+| onedir | broken (b): an empty `site-packages/numpy/__init__.py` | `gpu pack 14.2.0-cu12: rejected: unlisted entry in site-packages: numpy` | 3221225477 | `CPU: CuPy not installed` | 37,104 B, ok | none | none |
+| onefile | broken (b) | the same | 3221225477 | the same | 37,104 B, ok | none | none; no `_MEI` |
+| onedir | broken (c): cupy's `WHEEL` `Tag:` set to `cp312-cp312-manylinux2014_x86_64` | `gpu pack 14.2.0-cu12: rejected: cupy-cuda12x wheel tag cp312-cp312-manylinux2014_x86_64 is not for win_amd64` | 3221225477 | `CPU: CuPy not installed` | 37,104 B, ok | none | none |
+| onefile | broken (c) | the same | 3221225477 | the same | 37,104 B, ok | none | none; no `_MEI` |
+
+The broken cases ran on a COPY of the pack (`cp -r`) placed at the stamp path, with the
+original renamed beside it. Each case was planted, run on both forms, and reverted (`cmp`
+against the original). The copy was then deleted and the original renamed back. After every
+run: no process of the run's tree alive (psutil, by PID); `tasklist` shows no `Clearwater.exe`
+and no `ffmpeg.exe` (one record shows another session's `ffmpeg.exe`, PID 47016, not in the
+run's tree); `TEMP\_MEI*` empty before and after every onefile run.
+
+**FINDING F-C2 (packaging, blocks "WITH the pack"): the bundle lacks stdlib modules that only
+the pack imports.** PyInstaller collects the stdlib modules its analysis sees. CuPy and
+`cuda.pathfinder` live outside the bundle, so what they alone import is missing:
+
+- `ctypes.wintypes` (`cuda/pathfinder/_dynamic_libs/load_dl_windows.py:7`);
+- `graphlib`, imported by a CuPy extension module (no pack `.py` names it).
+
+Measure, `t3c/import_gap.py` -> `t3c/import-gap.json`: the SOURCE worker, with
+`-X importtime` and the venv's CuPy 14.2.0, ran one GPU HEIC and one GPU video request
+(device `GPU` both). Its imported set was diffed against the onedir bundle's PYZ,
+`base_library.zip`, the `.pyd` files and the builtins:
+
+- 948 modules imported, 279 of them the pack's own.
+- The real gap is `ctypes.wintypes` and `graphlib`.
+- The rest of the diff is not a gap: failed optional imports (`posix`, `fcntl`,
+  `charset_normalizer`, `cython`, `ml_dtypes`, ...), venv start-up modules (`site`,
+  `_virtualenv`, `sitecustomize`), and `struct` (a PyInstaller CArchive module, not in the
+  PYZ).
+
+**EXPERIMENT (evidence only; the committed `build.py` is unchanged).** `t3c/build_exp.py`
+loads `build.py`, appends `--hidden-import` arguments, and runs its `build()` into
+`work/wp6.1/t3c/exp/`. Bundle checks PASS, 668.2 MiB release.
+
+- **Build 1, `ctypes.wintypes` only** (`t3c/build-exp-onedir-1.log`). Onedir video: CuPy got
+  further, then failed with `ModuleNotFoundError: No module named 'graphlib'`. CuPy's
+  import-failure report resolved each DLL dependency, and 27 CUDA / CuPy files were mapped,
+  all under the pack or the driver, 0 elsewhere:
+  - 8 NVIDIA-wheel DLLs from the pack's `nvidia/*/bin`: `cublas64_12`, `cublasLt64_12`,
+    `nvrtc64_120_0`, `cufft64_11`, `curand64_10`, `cusolver64_11`, `cusparse64_12`,
+    `nvJitLink_120_0`. This is D2's `os.add_dll_directory` at work: no `CUDA_PATH`, no
+    toolkit `bin`.
+  - 18 CuPy `.pyd` files from the pack.
+  - `C:\Windows\System32\nvcuda.dll`.
+
+  The report also named `cuTENSOR.dll` / `cuTENSORMg.dll` as not found (not in the lock;
+  optional).
+- **Build 2, both modules** (`t3c/build-exp-onedir.log`). Onedir video: CuPy imports. 62
+  files were mapped, 0 elsewhere:
+  - 54 CuPy / cupyx `.pyd` files from the pack;
+  - 8 driver files: `System32\nvcuda.dll` and
+    `DriverStore\FileRepository\nvami.inf_amd64_...\{nvcuda64, nvapi64, nvapi64_impl,
+    nvdiagclt64, nvdxgdmal64, nvobjectloader64, NvMessageBus}.dll`;
+  - NO NVIDIA-wheel DLL: the failure below came before `cuda.pathfinder` loaded one.
+
+  The device test then failed: log `a test kernel failed on the CUDA device: Canary probe
+  child process timed out after 10.0 seconds.`, device **`CPU: CUDA device unusable`**,
+  export ok on the CPU.
+
+**FINDING F-D (packaging; a STOP, and the unintended start).**
+`cuda/pathfinder/_dynamic_libs/subprocess_protocol.py:42` builds its canary probe as
+`[sys.executable, "-m", <pathfinder probe module>, mode, libname]` and runs it with
+`subprocess.run(..., timeout=10)` (`load_nvidia_dynamic_lib.py:107-116`). In a frozen build
+`sys.executable` is `Clearwater.exe`. `__main__.main` sends every first argument other than
+`--export-worker` to the GUI branch (`src/clearwater/__main__.py`, `main`). So the probe
+started the frozen GUI branch, which never answered, and pathfinder killed it at 10 s.
+
+- No Clearwater log folder and no settings file appeared in the redirected `LOCALAPPDATA` /
+  `APPDATA`. That suggests the branch had not reached `_start_logging` when it was killed,
+  but a window cannot be ruled out.
+- No input was sent. No `Clearwater.exe` was left (`tasklist`).
+- I made NO further WITH-pack run on the experimental build, and none on the onefile form.
+
+This is the same class as Q5: a library inside the pack re-enters the interpreter through
+`sys.executable -m`. Options for CHARC, for the record (not chosen; no change made):
+
+- (i) `__main__` handles `-m <module> [args]` in a frozen build: `runpy.run_module` with
+  `alter_sys=True`, after the pack loader, Qt-free. The frozen executable then acts as an
+  interpreter for `-m`, as CPython does for the canary.
+- (ii) Make the canary unnecessary: pathfinder's earlier search steps must find the libraries
+  first. Its site-packages step reads `site.getsitepackages()`, not `sys.path`, so this
+  needs pathfinder's own configuration, which is fragile.
+- (iii) A frozen executable refuses unknown arguments (exit non-zero, no GUI). That is safe,
+  but the canary then fails and the GPU path stays off.
+
+Whichever is chosen, the GUI branch should never start for an unknown first argument (a
+`-m` / `-c` re-entry).
+
+**What item 7 needs from CHARC before it can finish:**
+
+- (1) how the bundle carries the pack's stdlib needs (F-C2): the two observed modules as
+  hidden imports in `build.py`; the whole stdlib; or the observed set plus an AST-derived
+  set from the pack's `.py` files;
+- (2) the F-D mechanism.
+
+Then: the WITH-pack GPU export (video and HEIC), both forms, with every CUDA DLL path; the
+experimental build's DLL list above is the expected shape. Owed to group 2c (GUI only): the
+frozen loader's log line verbatim.
+
+### Item 8: the cheap check's start-up cost (a guide, not of record; the host was shared with WP-T8)
+
+| Measure | Runs | Median | Range |
+|---|---|---|---|
+| `gpu_pack.check_pack(<pack>)` alone, the dev environment, a fresh process each (`t3c/cost-check.jsonl`); 2,701 rows stat-ed, 11 RECORD files hashed | 5 | **0.066 s** | 0.058-0.072 s |
+| onedir worker, `Popen` -> first protocol message, WITH the pack (the loader accepts; CuPy's import fails later, after the first message) | 3 | 0.605 s | 0.596-0.646 s |
+| onedir worker, the same, WITHOUT (folder renamed) | 3 | 0.590 s | 0.529-0.593 s |
+| onefile worker, WITH | 3 | 2.483 s | 2.455-2.505 s |
+| onefile worker, WITHOUT | 3 | 2.418 s | 2.338-2.809 s |
+
+Runs interleaved with / without per form (`t3c/cost-frozen.txt`, `proof.jsonl` labels
+`cost-*`). The frozen difference (+0.015 s onedir, +0.065 s onefile) is within the spread and
+agrees with the 0.066 s check alone. The first `--verify` (full hashing, cold) took 26 s,
+warm 4 s: that cost belongs to install time, not start-up.
+
+### Files changed this group
+
+`src/clearwater/gpu_pack.py`, `src/clearwater/__main__.py`, `tools/package/build.py`,
+`tools/package/README.md`, `tests/test_gpu_pack.py`, `tests/test_frozen_entry.py`,
+`docs/proofs/wp6.1-ledger.md`. Evidence tools (not product, not committed):
+`t3c/proof.py`, `t3c/loader_probe.py`, `t3c/import_gap.py`, `t3c/build_exp.py`. The pack,
+both builds and the experimental onedir build stay under `work/wp6.1/` (pack 2.4 GB at
+`work/wp6.1/t3c/appdata/Local/Clearwater/gpu-pack/14.2.0-cu12`, kept for item 7's resumption).
+
+Depth at turn-3 group-2b-2 end: DISPATCHER TO FILL

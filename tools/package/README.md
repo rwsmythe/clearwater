@@ -111,6 +111,11 @@ uv pip install --offline --no-deps --target <pack root>/<stamp>/site-packages <t
 uv run --no-sync python tools/package/build.py --write-manifest <pack root>/<stamp>
 ```
 
+`uv pip install --target` leaves an empty `.lock` file in `site-packages` (uv's own
+install lock). No `RECORD` owns it, so the loader's ownership check rejects the pack
+until it is removed: delete `<pack root>/<stamp>/site-packages/.lock` before writing the
+manifest.
+
 The folder must be named for this build's stamp. For each distribution in
 `gpu_pack.LOCKED_DISTRIBUTIONS`, the manifest records its version, the locked wheel whose tags
 match the installed `WHEEL` file, that wheel's sha256 from `uv.lock`, and the sha256 of the
