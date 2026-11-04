@@ -36,7 +36,7 @@
 
 ### Owner-pending (ask nothing twice; the owner answers in one word or line)
 
-- **Merge of harness-template PR #5** (`https://github.com/rwsmythe/harness-template/pull/5`: the four issue-#4 portability fixes, suite 423 OK, verified red-then-green; my merge attempt was refused by the classifier as "merge without review"). On the word: `gh pr merge 5 --merge` in `C:\Users\rwsmy\harness-template`, pull master, update Clearwater's tracking ref with `git fetch C:/Users/rwsmy/harness-template master:refs/remotes/template/main` (no `template` remote is configured), close the issue if GitHub did not, notify the swing and coa CHARCs ONLY if the owner says so.
+- **harness-template PR #5 MERGED 2026-11-04 ~11:00Z on the owner's word (verbatim "merge"): master `bb86ae4`, issue #4 CLOSED by GitHub, Clearwater's `template/main` ref refreshed. Sibling CHARCs NOT notified (the owner did not say so).** Still pending: the push of Clearwater main (28 ahead of origin) on the owner's word.
 - Nothing else. (The G12 wording request above is MINE to raise, not yet raised.)
 
 ### Standing rules and facts changed TODAY (read these before acting)
