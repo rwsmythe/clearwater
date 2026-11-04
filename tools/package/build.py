@@ -19,6 +19,10 @@ Usage::
 
     uv run --no-sync python tools/package/build.py --form onedir
     uv run --no-sync python tools/package/build.py --form onefile --with-ffmpeg
+    uv run --no-sync python tools/package/build.py --write-manifest <pack root>/<stamp>
+
+``--write-manifest`` writes ``manifest.json`` for a GPU pack filled by hand (the loader's
+layout, :mod:`clearwater.gpu_pack`); the WP6.3 downloader will write the same file.
 
 This is spike tooling (evidence, not product): see ``tools/package/README.md``.
 """
@@ -27,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import os
 import shutil
 import sys
@@ -34,6 +39,8 @@ import time
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Literal, cast
+
+from clearwater import gpu_pack
 
 Form = Literal["onedir", "onefile"]
 """The two PyInstaller forms the spike measures."""
@@ -453,6 +460,110 @@ def copy_ffmpeg(destination: Path, tools: Iterable[str] = FFMPEG_TOOLS) -> list[
     return copied
 
 
+def wheel_file_tags(filename: str) -> frozenset[str]:
+    """Return the ``python-abi-platform`` tags a wheel file name declares.
+
+    A compressed tag set (``py2.py3-none-any``) expands to each of its tags.
+
+    Args:
+        filename: A wheel file name, ``<name>-<version>[-<build>]-<py>-<abi>-<plat>.whl``.
+
+    Returns:
+        The tags, for example ``{"py2-none-any", "py3-none-any"}``.
+
+    Raises:
+        ValueError: The name is not a wheel file name.
+    """
+    if not filename.endswith(".whl"):
+        raise ValueError(f"not a wheel file name: {filename!r}")
+    parts = filename[: -len(".whl")].split("-")
+    if len(parts) < 5:
+        raise ValueError(f"not a wheel file name: {filename!r}")
+    pythons, abis, platforms = (part.split(".") for part in parts[-3:])
+    return frozenset(f"{p}-{a}-{t}" for p in pythons for a in abis for t in platforms)
+
+
+def installed_wheel_tags(dist_info: Path) -> frozenset[str]:
+    """Return the tags an installed distribution's ``WHEEL`` file records.
+
+    Args:
+        dist_info: The distribution's ``.dist-info`` folder.
+
+    Returns:
+        The ``Tag:`` values.
+
+    Raises:
+        OSError: The ``WHEEL`` file cannot be read.
+    """
+    text = (dist_info / "WHEEL").read_text(encoding="utf-8")
+    return frozenset(
+        line.split(":", 1)[1].strip() for line in text.splitlines() if line.startswith("Tag:")
+    )
+
+
+def manifest_document(folder: Path) -> dict[str, object]:
+    """Return the manifest for a pack folder filled by hand with the lock's wheels.
+
+    Each distribution of :data:`clearwater.gpu_pack.LOCKED_DISTRIBUTIONS` must be installed in
+    ``folder/site-packages`` at its locked version. Its wheel is the one locked wheel whose
+    tags match the installed ``WHEEL`` file's; the manifest records that wheel's lock sha256
+    and the sha256 of the installed ``RECORD`` file. Reads only.
+
+    Args:
+        folder: The pack folder, ``<pack root>/<stamp>``.
+
+    Returns:
+        The manifest (format, stamp, distributions).
+
+    Raises:
+        FileNotFoundError: A distribution's metadata folder or ``RECORD`` is missing.
+        ValueError: No locked wheel, or more than one, matches an installed distribution.
+    """
+    site = folder / gpu_pack.SITE_PACKAGES_NAME
+    rows: list[dict[str, str]] = []
+    for locked in gpu_pack.LOCKED_DISTRIBUTIONS:
+        dist_info = site / locked.dist_info_name
+        record = dist_info / "RECORD"
+        if not record.is_file():
+            raise FileNotFoundError(f"{locked.name} {locked.version}: no {record}")
+        tags = installed_wheel_tags(dist_info)
+        matches = [w for w in locked.wheels if wheel_file_tags(w[0]) & tags]
+        if len(matches) != 1:
+            raise ValueError(f"{locked.name}: {len(matches)} locked wheels match {sorted(tags)}")
+        wheel, sha256 = matches[0]
+        rows.append(
+            {
+                "name": locked.name,
+                "version": locked.version,
+                "wheel": wheel,
+                "wheel_sha256": sha256,
+                "record_sha256": gpu_pack.file_sha256(record),
+            }
+        )
+    return {"format": gpu_pack.MANIFEST_FORMAT, "stamp": gpu_pack.STAMP, "distributions": rows}
+
+
+def write_manifest(folder: Path) -> Path:
+    """Write ``manifest.json`` into a pack folder filled by hand (design item 2).
+
+    Args:
+        folder: The pack folder; its name must be :data:`clearwater.gpu_pack.STAMP`.
+
+    Returns:
+        The manifest's path.
+
+    Raises:
+        ValueError: The folder is not named for this build's stamp, or a wheel does not match.
+        FileNotFoundError: A distribution is not installed.
+    """
+    if folder.name != gpu_pack.STAMP:
+        raise ValueError(f"the pack folder must be named {gpu_pack.STAMP!r}, not {folder.name!r}")
+    document = manifest_document(folder)
+    path = folder / gpu_pack.MANIFEST_NAME
+    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
+    return path
+
+
 def run_pyinstaller(args: Sequence[str]) -> None:
     """Run PyInstaller in this process: ``PyInstaller.__main__.run(args)``.
 
@@ -510,10 +621,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         argv: The arguments; ``sys.argv[1:]`` when None.
 
     Returns:
-        The parsed namespace (``form``, ``out``, ``with_ffmpeg``).
+        The parsed namespace (``form``, ``out``, ``with_ffmpeg``, ``write_manifest``).
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    parser.add_argument("--form", choices=FORMS, required=True)
+    action = parser.add_mutually_exclusive_group(required=True)
+    action.add_argument("--form", choices=FORMS)
+    action.add_argument("--write-manifest", type=Path, metavar="PACK_FOLDER")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--with-ffmpeg", action="store_true")
     return parser.parse_args(argv)
@@ -529,6 +642,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         The exit status.
     """
     options = parse_args(argv)
+    if options.write_manifest is not None:
+        path = write_manifest(Path(os.path.abspath(options.write_manifest)))
+        print(f"wrote {path} (stamp {gpu_pack.STAMP})")
+        return 0
     out = Path(os.path.abspath(options.out))
     return build(cast(Form, options.form), out=out, with_ffmpeg=options.with_ffmpeg)
 
