@@ -1,0 +1,54 @@
+# Phase 6 proposal: a deployable distributable and macOS (post-1.0.0)
+
+**Status:** PROPOSED 2026-11-04 by CHARC (generation 14) to the owner. Nothing in it is commissioned until the owner rules on the decisions in section 1. On the ruling, CHARC writes the plan's Phase 6 section and the first brief.
+
+**Owner direction (2026-11-04, verbatim):** "once we get things finished up, I want to roll into two capabilities: a deployable single-file distributable (whether it runs within the single file or unpacks itself can be discussed), and make it macos compatible (I have a mac to test on, if needed)." and "This is all post-1.0.0 development". The repository is public since 2026-11-04.
+
+**Reference supplied by the owner:** `rwsmythe/TTS160-Alpyca`: a PyInstaller one-folder build driven by a short Python script, built by a manually dispatched GitHub Actions workflow with a Windows / Linux / macOS / Raspberry Pi matrix and a release job that attaches the zips to a GitHub release. The workflow shape is reused here; the differences are Qt, the CUDA wheels, FFmpeg as a separate GPL process and the N13 obligations of a binary redistributor.
+
+## 1. Decisions for the owner (recommended answer first)
+
+| # | Decision | Recommended | Alternative |
+|---|---|---|---|
+| D-A | Version numbers | **Two releases: 1.1.0 = the Windows distributable; 1.2.0 = macOS.** Each is its own tag and release record. | One release 1.1.0 carrying both (longer before anything ships). 2.0.0 is not warranted: the correction and its look do not change. |
+| D-B | Bundle shape | **Decided by the WP6.1 spike's measurements at CP6**, with the one-folder zip as the floor. The spike builds both the one-folder form and the one-file self-extracting form from the same script and reports size, cold-start time and any Qt / plugin failure. The owner picks at CP6. | Decide now: one-file (simplest to hand out; unpacks to a temp folder at each start; typically seconds slower to open a Qt application) or one-folder (fastest, a zip to unpack once). |
+| D-C | The graphics-card path in the bundle | **Two Windows artifacts: `cpu` and `gpu`.** The CUDA wheels alone are 2.27 GB installed (NVIDIA 2,266 MB + CuPy 147 MB); the CPU bundle is about 400 MB installed (PySide6 215, scipy 90, numpy 26, Pillow 16, the interpreter) and roughly 150 MB zipped. A first-run download of the GPU pack is a third option that needs network and installer code inside a frozen application; not recommended for the first release. | One `gpu` artifact only (about 2.8 GB; every user downloads CUDA). |
+| D-D | FFmpeg | **Bundle it per platform** (today's biggest installation step; the user guide's PATH instructions become a fallback). FFmpeg is GPL-3.0-or-later, so the notices gain its exact source release and build (the gyan.dev 9.0.2 full build on Windows; a static arm64 build on macOS) and the source-delivery obligation is met by pointing at the exact source archive; the notices audit (N13) is re-run for every bundled binary. | Keep FFmpeg external on PATH (no new obligations; the user installs it as today). |
+| D-E | macOS scope | **Apple Silicon only, CPU path only, VideoToolbox HEVC encoder.** No Metal backend in Phase 6 (a backend is a phase of its own; the CPU path's speed on the Mac is measured and reported against N6 as information, not as a gate). Which Mac the owner has decides the architecture: an Intel Mac would add an x86_64 build. | Intel + Apple Silicon (universal2 or two artifacts). |
+| D-F | Build infrastructure | **GitHub Actions on the public repository** (free minutes for public repositories, macOS runners included): a dispatched workflow with a version input, matrix windows-latest / macos-latest, tests, build, zip, and a draft release attached to the tag. The orchestrator still runs the local release gate before the tag; the workflow builds the artifacts after it. | Local builds only on the laptop and the owner's Mac (no CI; macOS builds need the Mac each time). |
+| D-G | Spec | **Spec v0.6.0:** N1 gains the platform list (Windows 11 x64; macOS arm64), a new non-functional requirement for the packaged distribution (what is bundled, the CPU / GPU artifacts, the start-up bound from the spike), and D106 / N6 noted as the Windows NVIDIA figure. Owner-reserved: the spec change is approved with this proposal or not at all. | No spec change (the distribution stays a plan-only matter; not recommended: the platform list is a requirement). |
+| D-H | DR-117 (the halo clip) in Phase 6 | **Not in Phase 6.** Phase 6 is the two capabilities; the edge-aware clip inside N6 is proposed as Phase 7's first item, or as 1.3.0, on its own owner look check. | Add it as WP6.6 after the macOS release. |
+| D-I | Prune | **Approve the prune list in section 4** (worktrees wp5.3, wp5.5, wp5.7, wp5.8, wp-dr25, wp-h1 and their `work/` folders; branches kept). | Keep until the next phase-end. |
+| D-J | The template re-port branch | **Push `clearwater-upstream-2026-11-04` and open PR #2** (the orchestrator pushes on the owner's word; CHARC opens the PR; the merge is the owner's click, as PR #1 was). | Hold until a later batch. |
+
+## 2. Work packages (proposed; sizes S / M / L; lane by task)
+
+| WP | Title | Size | Lane | Depends on | What it delivers |
+|---|---|---|---|---|---|
+| WP6.1 | Packaging spike (Windows) | S | Claude opus-high (PyInstaller + Qt hooks are reasoning-dense) | 1.0.0 | A build script under `tools/package/` producing the one-folder and the one-file forms of the CPU build and the one-folder GPU build; measured: zipped size, unpacked size, cold start to the first window, first export; every PySide6 plugin and the HEIC / TIFF / ICC paths exercised from the frozen build; the exclude list; report `docs/reports/wp6.1-packaging-spike.md`. Exclusive (timing). The owner picks the shape at **CP6a**. |
+| WP6.2 | Portability audit (code only, no Mac) | S | Codex (well-specified read: every platform-conditional site and path rule) | 1.0.0 | The macOS change list from the code: the 9 Windows-conditional sites in `src/clearwater` (the 32 MiB decoder pipe that raises on any platform but Windows in `io/video/pipes.py`, the `CREATE_NO_WINDOW` spawn flag, the config and cache paths), the encoder capability model (NVENC / libx265 today; VideoToolbox as a third encoder with its own rate rule), CuPy absent = CPU path, HEIC via pillow-heif's macOS wheel, Qt on macOS (menu bar, app bundle, file associations), the test markers that need a platform parameter; report with a file-by-file table. |
+| WP6.3 | Release workflow and notices (Windows) | M | Codex (a workflow, a checklist, a notices pass against a fixed list) | WP6.1, CP6a | `.github/workflows/release.yml` (dispatch with a version; windows-latest: tests minus footage / gpu / gui, the spike's build script, zip, artifact, draft release on the tag); FFmpeg bundled per D-D with the N13 second pass (every bundled binary named with its licence, source release and build); `docs/release-checklist.md` v2 (the local gate, the tag, the workflow run, the artifact check on a clean machine); the user guide's installation section rewritten around the artifacts with uv as the developer path. |
+| **1.1.0** | Windows distributable release | - | orchestrator | WP6.3 | The local release gate, the tag on the owner's word, the workflow run, the artifacts checked on a clean Windows user account (no Python, no FFmpeg); release record. |
+| WP6.4 | macOS adaptation | M-L | Claude opus-high (encoder leg + process plumbing) | WP6.2 | The audit's list implemented: the pipe, the spawn flags, the paths, the VideoToolbox encoder leg (capability probe, rate rule, V4-class container checks), the platform-parameterised tests green on Windows; macOS-only tests marked `macos` and skipped elsewhere. The Windows gate unchanged. |
+| WP6.5 | macOS build and check | M | Claude opus-high; the owner's Mac for the real-footage runs | WP6.4, WP6.3 | The workflow's macos-latest job (tests, PyInstaller app bundle, zip or dmg); on the owner's Mac: the `macos` tests, a photo and a video export on real footage, the CPU speed figure at 4K, the V4 container check on the VideoToolbox output; **CP6b: the owner's look check on the Mac output** (the same items as a CP5 subset; the correction is the same code, so a small set). Not signed or notarised: the guide documents the Gatekeeper override; signing is a later owner decision (needs an Apple developer account). |
+| **1.2.0** | macOS release | - | orchestrator | WP6.5, CP6b | As 1.1.0, both platforms' artifacts. |
+| WP-T8 | Tools and tests paydown | S | Codex | none (parallel) | DR-119 (c)-(e), DR-120, DR-116 (the serial-leg cost pass), DR-118; harness suite + product gate. |
+
+Order: WP6.1 and WP6.2 in parallel (6.1 exclusive for its timings; 6.2 is a read), WP-T8 beside them; CP6a; WP6.3; 1.1.0; WP6.4; WP6.5 with CP6b; 1.2.0. The Mac is asked for at WP6.5 only.
+
+## 3. Facts the proposal rests on
+
+- Installed sizes in the 1.0.0 environment (Python 3.12.13, `site-packages` 2,988 MB): NVIDIA CUDA wheels 2,266 MB, PySide6 215, CuPy 147, scipy 90, numpy 26, Pillow 16, shiboken6 4, pillow-heif 1.
+- `src/clearwater` is 32,720 lines with 9 Windows-conditional sites; `io/video/pipes.py` raises on any platform but Windows for the 32 MiB decoder pipe (AD-23); the encoder set is `hevc_nvenc` / `libx265` (`io/video/capability.py`).
+- FFmpeg on the laptop: 9.0.2 gyan.dev full build, found on PATH; not redistributed by 1.0.0 (`THIRD_PARTY_NOTICES.md` states the binary-redistributor obligation explicitly).
+- The reference project's one-folder build zipped to 60-107 MB per platform with no CUDA and no Qt.
+- Public repositories get GitHub-hosted runners at no charge, macOS included.
+- CLAUDE.md's "No CI service, installer or packaged executable is planned. Raise it if wanted." is lifted by the owner's direction; the plan's WP5.5 line "No installer is included" stays true for 1.0.0.
+
+## 4. Prune request (D-I)
+
+Worktrees `.worktrees/wp5.3`, `wp5.5`, `wp5.7`, `wp5.8`, `wp-dr25`, `wp-h1` (branches kept, every commit on main or reachable) and their `work/` folders; `orch-state-g40` stays (the live orchestrator's seat). Sizes: see the figures CHARC posts with this proposal. Evidence folders under `clearwater-review-evidence\` are untouched. On the owner's word "prune", the orchestrator removes them and CHARC writes `docs/proofs/prune-2026-11-04.md`.
+
+## 5. What the owner says
+
+One line per decision is enough: "D-A two releases, D-B spike, D-C two artifacts, D-D bundle, D-E arm64, D-F actions, D-G spec, D-H not, D-I prune, D-J push" accepts every recommendation. Plus: which Mac (Apple Silicon or Intel).
