@@ -347,4 +347,218 @@ The new files are:
 None needs `INSTANCE_SURFACE_RELPATHS` registration: `tests/`, `tools/`, `docs/reports/` and
 `docs/proofs/` are all `INSTANCE_SURFACE_PREFIXES` (`tests/harness/genericity_lists.py:253-268`).
 
-Depth at round-0 end: DISPATCHER TO FILL
+Depth at round-0 end: 247,937 (wp64-cell1, read by the dispatcher with cell_depth.py at its round-0 return)
+
+## Group A
+
+Build turn 2, cell `wp64-cell2` (fresh, implementer-opus-high), on `wp6.4` from `3a3ffbab`
+(the base `c1458747` plus main `0de7d429`; `src`, `tools`, `tests`, `pyproject.toml` and
+`uv.lock` are identical between the two). It follows dispatch-2 and CHARC's round-0 rulings.
+Evidence: `clearwater-review-evidence\wp6.4\cell\` (`snapshot-base-c1458747.json`,
+`snapshot-head-283b9d78.json`, `capture_snapshots.py`, `uv-lock.record.txt`, `uv-lock.log`,
+`vt-argument-lists-group-a.txt`).
+
+### A.1 Build cycles (failing check first, then the change)
+
+| # | Commit | P rows | Change | Test (`tests/test_portability.py` unless named) | Red before the change |
+|---|---|---|---|---|---|
+| 0 | `62b45d70` | lock | none: snapshot literals captured from `git archive c1458747 src` into `work\wp6.4\base-c1458747` (`clearwater.__file__` printed from that tree) | `test_portability_windows_encoder_command_snapshot[hevc_nvenc, libx265]`: 24-case sha256 grid, 4 full literals, 4 trial commands | green on the unchanged code, as required |
+| 1 | `07a4f0f4` | P55 | `interfaces/settings.py` docstrings only (`:34`, `:66-69`): "the platform's hardware HEVC encoder" | `tests/test_interfaces.py::test_settings_auto_encoder_docs_are_platform_neutral_and_the_fields_unchanged` (field names and defaults as read from base); W-CODEC[P55] | P55 failed on "NVENC" |
+| 2 | `c0d2497e` | P07 P09 P10 P11 P12 P13 P14 P37 P59 P60 P61 P62 | `capability.py`: `encoder_roster` (darwin VT + x265; else NVENC + x265 as ruled), `KNOWN_ENCODERS`, `HARDWARE_ENCODERS`, VT trials with `-allow_sw 0`, `_VT_NO_SESSION_MARKERS` (NVENC markers still scoped to NVENC), `_detect(roster)`, `resolve_encoder(roster=)`, which keeps a known name (D26), `not_offered_reason`. `encode.py`: `rate_ceiling` / `RateCeiling` (`nvenc_rate` built on it), the VT branch behind `VT_RATE_CONTROL` (default `"B"`), `VT_Q_LEVEL` PLACEHOLDER 65/55/45, the geometry refusal for VT in `_prepare`, `_vt_ceiling`, `_check_options` (an unknown name is refused; a known name outside the roster is unavailable with its reason) | W-CODEC (11 sites), W-RATE (5), W-V4 (2) | 17 of 20 failed (import / attribute errors); P15 is a contract test and was green both ways |
+| 3 | `494842c7` | P02 P03 P16 P65 P74 | `pipes.py`: AD-36 statement form, `start_new_session` (False on win32, True elsewhere) in the one dict, `_create_pipe` raise moved into `else`, fallback INFO off Windows. `probe.py:118-119`: the second sentence names FFmpeg and the user guide | W-SPAWN (9), W-PIPE (6); a guard-form checker over `src/` with planted expression and early-return controls | P02 named `pipes.py:56` and `:67`; P16 found "command prompt"; P74 / X26 had no `start_new_session`; P03 logged WARNING (30) on darwin |
+| 4 | `723aa6dd` | P01 P25 P26 P56 X13-X16, DR-124 | `config/paths.py`: a darwin branch, `~/Library/Application Support/Clearwater` and `~/Library/Caches/Clearwater` from the injectable home, no XDG and no migration; one branch per platform. S2: `tests/test_config_paths.py:44` parametrize is `["linux"]`. DR-124: `tests/test_app_startup.py` sets HOME / USERPROFILE and expects only the platform's disposable folder; `tests/test_gui_startup.py` asserts every platform's resolution lands in the sentinel | W-PATH (8) | P01, X13, X15, X16 failed |
+| 5 | `dd6b8a3f` | P22 P37 P63 | `settings_dialog.py`: `AUTO_TEXT` and `auto_tooltip` (the roster's hardware encoder, by family name, read from the capability report). `backend.py`: on darwin a missing CuPy gives `MACOS_CPU_REASON`; force CPU still gives "CPU: forced" | W-GUI P22 P37 P63 (`gui`) | all three failed |
+| 6 | `4b7b634f` | P29 (P30 per D5) | `batch_panel._key`: `(st_dev, st_ino)` through the injectable `_stat`; the lexical key when stat fails or `st_ino == 0` | W-FS P29 (two spellings of one object = one key; two case-distinct objects = two keys; a blanket casefold fails the second control), P30 | P29 failed (`_stat` absent) |
+| 7 | `dba46023` | P71 | `preview.wheelEvent`: one step per 120 accumulated units, reset on a direction change; `WHEEL_STEP_UNITS` | W-GUI P71: synthetic `QWheelEvent`s sent to the offscreen widget only (3 x 40 = one step; one notch; reversal; 240 = two steps) | failed (import) |
+| 8 | `c404a20a` | P70 | `naming._base_plan`: the refusal keeps its pinned clause and names the character and the stem | W-FS P70; `test_portability_output_name_refusal_names_the_character[:, \, /]`, video and photo | 4 failed |
+| 9 | `32bc1143` | P73 | `presets._rename_without_replace`: case-only uses `os.rename`; otherwise `os.link` then `os.unlink`; on `_LINKS_REFUSED` (EPERM, EXDEV, ENOTSUP, EOPNOTSUPP, EMLINK) `os.rename` with one WARNING naming the file; Windows `os.rename`. The platform is read through the new `config/paths.rename_replaces` (deviation 1) | W-FS P73: case-only, link, taken (FileExistsError), exFAT fallback, Windows; all stubbed | failed (`_LOG` absent) |
+| 10 | `c50a6e73` | AD-36 deps | `pyproject.toml`: `; sys_platform != 'darwin'` on cupy in the `gpu` extra and the `dev` group, plus the `macos` marker; `uv lock --offline` | `test_gpu_pack.py::test_locked_distributions_equal_the_lock`; A.4 | n/a |
+| 11 | `d2fdcb61` | P07 P09 P11 (native) | none in product. W-CODEC[P62] now stubs the sink's capabilities, so no unmarked test runs a real trial | `test_portability_encoder_trials_on_this_laptop[P07, P09, P11]` (`slow`) | n/a |
+| 12 | `283b9d78` | docs | two docstrings: `FFmpegVideoSink.open` encoder argument; `BatchItem.key` | none (docstring only) | n/a |
+
+Every commit was made by pathspec with `-c core.autocrlf=false`. A blob check over all 13
+commits found 0 CR bytes (`tr -cd '\r' | wc -c`; `grep -c $'\r'` miscounts in this shell).
+
+### A.2 The VT argument lists (encoder segment; from `snapshot_argv`, record `vt-argument-lists-group-a.txt`)
+
+The encoder segment for every depth and quality, for both Q1 candidates. Everything outside it
+is NVENC's argument list, byte for byte (W-V4[P15]). Each R below is `nvenc_rate`'s maxrate
+for the same case (W-RATE[P13]).
+
+- 4K60 HEVC source (level 5.1 Main, so R is capped at 40 Mb/s):
+  - High: R = 40,000,000.
+  - Standard: R = 20,000,000.
+  - Draft: R = 10,000,000.
+- 1080p29.97 H.264 source (no source cap):
+  - High: R = 14,915,004.
+  - Standard: R = 7,457,502.
+  - Draft: R = 3,728,751.
+
+Candidate B (the default):
+
+    -c:v hevc_videotoolbox -allow_sw 0 -b:v R -maxrate R -pix_fmt yuv420p -profile:v main      (8-bit)
+    -c:v hevc_videotoolbox -allow_sw 0 -b:v R -maxrate R -pix_fmt p010le -profile:v main10     (10-bit)
+
+Candidate A (`VT_RATE_CONTROL = "A"`). The Q values are PLACEHOLDERS (High 65, Standard 55,
+Draft 45):
+
+    -c:v hevc_videotoolbox -allow_sw 0 -q:v Q -maxrate R -pix_fmt yuv420p -profile:v main      (8-bit)
+    -c:v hevc_videotoolbox -allow_sw 0 -q:v Q -maxrate R -pix_fmt p010le -profile:v main10     (10-bit)
+
+At 10-bit the `-vf` chain still ends `format=yuv420p10le,setparams=...` (AD-10 unchanged).
+The trials are `-c:v hevc_videotoolbox -allow_sw 0 -pix_fmt yuv420p -profile:v main` (8-bit)
+and `... -pix_fmt p010le -profile:v main10` (10-bit).
+
+### A.3 Snapshot evidence
+
+`capture_snapshots.py` was run on the base tree (`snapshot-base-c1458747.json`) and on the
+head (`snapshot-head-283b9d78.json`). Comparing the two:
+- grid: 24 cases, equal;
+- full literals: 4, equal;
+- trial commands: 4, equal.
+
+The test holds the base literals and passed on the unchanged code before any edit. It passes
+on every later commit.
+
+### A.4 `uv lock` (record `uv-lock.record.txt`)
+
+- Commands: `uv lock --offline` exited 0 (uv 0.10.9, 70 packages); no network was needed.
+  `uv lock --check --offline` also exited 0.
+- tomllib comparison against `c1458747:uv.lock`:
+  - the top-level keys are equal (`version 1`, `revision 3`, no `resolution-markers`);
+  - the same 70 package names;
+  - no package other than `clearwater` changed, and no version moved.
+- The diff is 4 lines, all in the `clearwater` entry: the darwin marker on the four cupy edges
+  (dev-dependencies, optional-dependencies, requires-dev, requires-dist). requires-dist
+  combines the markers as `sys_platform != 'darwin' and extra == 'gpu'`.
+- `test_locked_distributions_equal_the_lock` passed, so the eleven pack wheels are unchanged.
+- No STOP.
+
+### A.5 Static and counts at `283b9d78` (all run from the worktree root)
+
+- `ruff check .`: All checks passed.
+- `ruff format --check .`: 324 files already formatted.
+- `mypy`: Success, 161 files.
+- `mypy --platform darwin`: exit 1, "Found 3 errors in 2 files". These are exactly group B's
+  three sites, and `pipes.py:56` is clean:
+  - `tools\prototype\bench.py:1159` [unreachable];
+  - `tools\prototype\bench.py:1480` [attr-defined, getwindowsversion];
+  - `tools\spike_io\transport.py:950` [unreachable].
+
+Tests ran with `-p no:cacheprovider --timeout 600`, with basetemp under `work\wp6.4\`, and with
+`QT_QPA_PLATFORM=offscreen` for the serial chunks:
+- parallel expression, `-n 4`: 2019 passed, 0 failed, 0 skipped;
+- serial expression: 300 + 33 = 333 passed, 0 skipped.
+
+The suites are the dispatch's list plus the existing modules of every touched product file.
+
+| Module | Parallel | Serial |
+|---|---|---|
+| test_portability | 50 | 7 (3 `slow`, 4 `gui`) |
+| test_io_video_encode_units | 137 | - |
+| test_io_video_encode | 115 | 20 |
+| test_wp44_mov_input | 6 | 1 |
+| test_io_video_spawn | 263 | - |
+| test_io_video_decode_lifecycle | 32 | - |
+| test_io_video_decode_rules | 19 | - |
+| test_io_video_probe | 83 | - |
+| test_gui_open | - | 31 |
+| test_config_paths | 10 | - |
+| test_config_isolation | 14 | - |
+| test_config_presets | 121 | - |
+| test_core_select / test_core_deps / test_core_wp34 | 17 / 4 / 29 | 1 / - / 1 |
+| test_gui_status / settings_dialog / batch_panel / preview / preset_panel | - | 13 / 95 / 44 / 51 / 46 |
+| test_jobs_naming | 877 | - |
+| test_wp42a_runner_hardening / test_wp42b_naming_guard / test_wp42_runner_video | 55 / 3 / 14 | - |
+| test_interfaces / test_interfaces_stubs | 48 / 22 | - |
+| test_app_startup / test_gui_startup | - | 10 / 13 |
+| test_gpu_pack | 100 | - |
+
+`test_portability` has 57 cases at this point (group A), listed by function with the number of
+sites each covers:
+- snapshot 2;
+- W-PATH 8;
+- W-SPAWN 9;
+- W-PIPE 6;
+- W-CODEC 11 + 3 `slow`;
+- W-RATE 5;
+- W-V4 2;
+- W-FS 4;
+- refusal 3;
+- W-GUI 4 `gui`.
+
+A Popen-refusing pytest plugin ran the 50 unmarked cases; all 50 passed, so none of them spawns
+a process.
+
+### A.6 Verification loop (suspected / confirmed / rejected / fixed)
+
+1. The parallel leg failed `test_config_isolation.py::test_only_paths_py_touches_the_environment_or_the_home_folder`
+   with "presets.py:106 uses .platform". CONFIRMED by the run and FIXED in `32bc1143`: the
+   platform is now read in `paths.rename_replaces` (deviation 1).
+2. W-CODEC[P62] ran the real `detect_capabilities`, which spawns FFmpeg, in an unmarked test.
+   CONFIRMED by reading the code and FIXED in `d2fdcb61`: the capabilities are stubbed, and
+   the Popen-refusing plugin run proves it.
+3. Two docstrings were stale (`open`'s encoder argument, `BatchItem.key`). CONFIRMED and FIXED
+   in `283b9d78`.
+4. ruff SIM300 / RUF059 / E501 / SIM114 in my own edits. FIXED before each commit.
+5. Suspected: `jobs/export.py:879-883` (unowned) refuses a saved known encoder outside the
+   roster with an empty reason, so the sink's `not_offered_reason` is not reached. CONFIRMED
+   by reading the code. NOT FIXED: the file is outside the owned set (open item 3).
+6. A full pass after fix 3 found nothing new: the static checks above, the snapshot comparison,
+   and a re-read of every product diff.
+
+### A.7 Deviations and open items for the seat / CHARC
+
+1. **`config/paths.rename_replaces` (new public function).** The brief puts P73's platform
+   branch in `presets.py`. The unowned `tests/test_config_isolation.py:51-65` forbids any
+   `.platform` attribute in `clearwater.config` outside `paths.py`. The function keeps
+   `paths.py` as config's one platform site, and the `app_locations` docstring now says so.
+   No owned-file boundary is crossed. Alternative: grant the isolation test an exemption.
+2. **D1 reading.** On Windows a preset rename stays `os.rename`. This is cell1's D1
+   recommendation, which CHARC accepted; the ruling's "otherwise link then unlink" is read as
+   POSIX only. On Windows nothing observable changes.
+3. **The export's empty reason** (A.6 item 5). A Mac user whose saved encoder is `hevc_nvenc`
+   gets the export's own "not available" message without the reason; the settings dialog does
+   show `NOT_FOUND_REASON`. Suggested follow-up (unowned): pass `not_offered_reason` there.
+4. **P71 changes Windows behaviour (the brief's pre-existing-defect rule; CHARC opens the DR).**
+   A mouse notch (120) is unchanged. Sub-120 precision-touchpad deltas now accumulate: before,
+   each event was a full step. A single event of 240 now takes two steps; before, it took one.
+   Not checked on real hardware.
+5. **New public names in owned modules (none in `interfaces/`):**
+   - `capability`: `VIDEOTOOLBOX_ENCODER`, `KNOWN_ENCODERS`, `HARDWARE_ENCODERS`,
+     `encoder_roster`, `not_offered_reason`; a keyword-only `roster=` on `resolve_encoder`;
+   - `encode`: `RateCeiling`, `rate_ceiling`, `VT_RATE_CONTROL`, `VT_Q_LEVEL`;
+   - `settings_dialog`: `auto_tooltip`, `ENCODER_FAMILIES`;
+   - `backend`: `MACOS_CPU_REASON`;
+   - `preview`: `WHEEL_STEP_UNITS`;
+   - `pipes`: `start_new_session` added to the private TypedDict.
+6. **W-CODEC T33-T37 are left to group B.** They pin group B's tool-docstring labels.
+   W-PIPE[T07/T08] reads `tools/spike_io/transport.py:376-395` through the AST, without
+   running it.
+7. **The `macos` marker is registered** (`pyproject.toml`, owned). Its conftest skip policy
+   and the M tests are group B's.
+8. **Process slips.**
+   - One bare `cd` inside a command (the snapshot-assembly call, into the worktree). The
+     session cwd read `/c/Users/rwsmy/clearwater` right after; later directory changes were
+     subshells only.
+   - `tests/test_app_startup.py`'s test runs the real entry point under offscreen QPA. That is
+     the test's purpose, and it was not changed. Its app data AND now its home are redirected
+     under `tmp_path`, with a 180 s timeout. It was run as the dispatch lists it.
+
+### A.8 Rows built only in part without a Mac (for the next DR)
+
+- P09 / P10 / P14 / P12 / P59: the VT trials, reasons and commands are built and pinned by
+  argument list only. No VideoToolbox encode has run. The VT stderr markers and both listing
+  texts are SYNTHETIC (`tests/ffmpeg_text/README.md`); WP6.5 replaces them with a capture.
+- P01 / P25 / P26: the Library paths are injected on Windows; no native macOS home has been
+  resolved yet (M-PATH).
+- P03 / P74: INFO logging and `start_new_session=True` are constructed and stubbed. No child
+  has run in its own session (M-SPAWN, `os.killpg`).
+- P22: the darwin AD-9 text is reached with a patched platform only (M-DEVICE / M-GUI).
+- P29: the identity key is checked against a fake stat provider and real NTFS. APFS in
+  case-sensitive and case-insensitive modes is M-FS.
+- P73: the link, unlink and fallback branches are stubbed. The APFS folding corpus and exFAT
+  are M-FS.
+- P71: synthetic offscreen events only; real trackpad momentum is M-GUI.
+
+Depth at group-A yield: DISPATCHER TO FILL
