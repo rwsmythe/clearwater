@@ -46,3 +46,91 @@ Turn 1 = round 0 (read both readers and both test modules; the merge plan functi
 
 - Lane paces at dispatch; base commit; worktree; evidence folder; the template clone's state (`origin/master` and `refs/remotes/template/main` equal) checked before the re-port.
 - GATE_CHECKS: the harness suite on the final candidate (not the product gate; `scripts/` changed, so the harness gate is the rule in CLAUDE.md); `git diff --name-only main` holds only the owned paths.
+
+## Dispatch fill (orchestrator gen 40, 2026-11-04 ~05:50Z; after the tag)
+
+Fills the section above. Where it differs from the table, the design or the questions, this fill governs once CHARC marks it FINAL. Corrections to the brief's text are marked **[corr]**.
+
+- **Precondition met.** The tag `v1.0.0` (annotated) is on `40d2ce04`, applied 05:45:31Z on the owner's word relayed by CHARC (`d1af354bc5607d86`); no push. Nothing runs: no cell, no gate, no pytest.
+- **Base, worktree and evidence.** Base = main at dispatch (`d62eb37e`, CHARC's release record, plus this fill's commit). Worktree `.worktrees/wp-h1`, branch `wp-h1`. No `clearwater.local.toml` is needed: the package reads no footage or config. Evidence goes to `C:\Users\rwsmy\clearwater-review-evidence\wp-h1\`, with folders `cell\`, `A\`, `B\` and `gate\`. Disk: C: 37 GB free. The harness suite is the only job, so the 25 GB gate floor is met with room.
+- **Lane paces at 05:46Z.**
+  - Codex: 22 % used, pace 0.226. The window resets 2026-11-04 10:07Z, so a long package may cross the reset; it does not affect the lane.
+  - Claude: 19 % used, pace 0.729.
+  - Codex has the lower pace, and it is the brief's lane: CODEX (`implementer-codex-sol-high`, a FRESH session).
+  - Reviewer A = a Claude pass at the orchestrator's seat each round (`scripts/codex_cell.py review`).
+  - Reviewer B = a Claude pass at the orchestrator's seat on the final candidate. It is the other model in both nets.
+- **Sources verified at the seat (05:47Z).**
+  - Clearwater `scripts/cell_depth.py`: 551 lines. `tests/harness/test_cell_depth.py`: 850 lines, 47 tests. The harness suite: 382 OK.
+  - Swing `scripts\cell_depth.py`: 365 lines. `tests\scripts\test_cell_depth.py`: 471 lines, 29 tests. Both files are clean in swing's working tree; the last commit on the reader is `4e412db9`. All three named commits resolve: `b09bbc02`, `d4986324` and `4e412db9`.
+  - The Codex sandbox reads `C:\Users\rwsmy\swing-trading\` but must never write there (READ-ONLY, as in the brief).
+- **[corr] Swing has 15 selector tests, not 12.** All 15 are ported, so the done count is 382 + 15 + the exit-map tests:
+  - `test_live_filter_selects_by_transcript_age`
+  - `test_sessions_mode_reads_main_transcripts_and_excludes_cells`
+  - four `test_agent_*`:
+    - `reads_a_parked_cell_older_than_the_live_window`
+    - `is_repeatable_and_applies_the_cap`
+    - `unknown_id_exits_2_naming_the_searched_glob`
+    - `with_live_is_a_usage_error`
+  - NINE `test_r3_*`, not six:
+    - `a_old_cell_with_a_fresh_parent_is_listed_and_flagged_parked`
+    - `b_old_cell_with_an_old_parent_is_not_listed`
+    - `c_a_fresh_cell_is_listed_not_flagged_parked`
+    - `d_a_parked_cell_over_the_cap_exits_1`
+    - `a_missing_parent_transcript_does_not_crash`
+    - `toctou_deletion_between_check_and_stat_does_not_crash`
+    - `session_transcript_path_never_crosses_project_dirs`
+    - `sessions_mode_with_live_is_unaffected_by_parked_logic`
+    - `over_cap_and_parked_flag_form_is_OVER_comma_parked`
+- **The exit-code map in full (Q1 extended).** Read from both `main()`s:
+
+  | Case | Swing | Clearwater |
+  |---|---|---|
+  | over the cap | 1 | **2** |
+  | no transcript discovered | 2 | **1**, with the LOUD `NO CELLS FOUND` line on stderr |
+  | unknown `--agent` id | 2 | **4** |
+  | argparse usage error (`parser.error`) | 2 | **4** (Clearwater's `_ConfigError`) |
+  | `--live` window empty after a non-empty discovery | 0 (stdout "nothing to check") | **see Q4** |
+
+  So the ported tests change their asserted codes as follows. `test_agent_unknown_id_exits_2...` asserts 4, and `test_r3_d_..._exits_1` asserts 2; renaming both to the Clearwater code is part of the port. One test per mapped row.
+- **Q4 (new, the orchestrator's; CHARC to rule at FINAL).** What does `--live H` (or `--sessions --live H`) return when discovery found transcripts but none falls in the window?
+  - **Recommended: exit 0**, with swing's stdout line `no cells written in the last <H>h (cap <N>); nothing to check` (`sessions` for `--sessions`).
+  - Discovery-empty stays exit 1 with the loud line. The loud 1 exists against a glob that missed `subagents/`. A non-empty discovery disproves that, so an empty window is a clean negative: at a quiet seat the census correctly lists no live cell.
+  - The alternative is exit 1 for both. That makes every quiet-seat census read as a discovery failure.
+- **Q5 (new; CHARC to rule at FINAL): the brief's ruff line cannot be met as written.**
+  - `pyproject.toml` `[tool.ruff] extend-exclude` lists `scripts` and `tests/harness`, as upstream scaffold. So `uv run ruff check .` and `ruff format --check .` never see the script.
+  - Run on the explicit path, `uv run ruff check scripts/cell_depth.py` reports **25 pre-existing findings** at main. They are the docstring layout (D205/D209), import order, `N818`, `D103` on `main`, and so on.
+  - Clearing them would reformat a file the template shares, which is out of scope and makes the re-port delta larger.
+  - **Recommended:**
+    - The gate is the project's own `ruff check .` and `ruff format --check .`, clean as at main.
+    - The explicit-path count is recorded before and after in the report, for information. New code follows the file's existing style, and no NEW rule code appears in the explicit-path run.
+    - mypy is not run on `scripts/` (as the brief says).
+- **Row parsers: none known.**
+  - `scripts/` names the reader only in a comment, `launch_role.ps1:226`.
+  - The kernel docs name it at `docs/dispatch-recipe.md:108` (owned, the paragraph) and `docs/model-prompting-standard.md:116` (not owned, no command).
+  - The cells name it at `.claude/agents/implementer-opus-high.md:72` and `implementer-sonnet-high.md:68` (not owned, no command).
+  - Nothing parses a row. The cell re-greps in round 0 and states the result; the `age` column is still APPENDED, so existing columns keep their order and width.
+- **Files owned, added:** `docs/reports/wp-h1-cell-depth.md` (the report, the cell's) and `docs/proofs/wp-h1-ledger.md` (the orchestrator's). Both are under prefixes that are already instance surface, so `tests/harness/genericity_lists.py` stays NOT owned. If the harness's manifest accounting refuses either, that is a STOP to me, not an edit.
+- **The template clone** `C:\Users\rwsmy\harness-template` at 05:47Z:
+  - local `master` = `origin/master` = Clearwater's `refs/remotes/template/main` = `4335ff6` (PR #1's merge); working tree clean (0 porcelain lines).
+  - Today's delta `git diff template/main HEAD -- scripts/cell_depth.py tests/harness/test_cell_depth.py` is 1 line in the reader, which the re-port carries along.
+  - All three are re-checked before the re-port. If they are unequal, STOP to CHARC.
+- **The re-port (Q3, the orchestrator's act at the accept).**
+  - In the template clone: a branch `clearwater-upstream-2026-11-04` (date of the act), `git apply --index`, LF working tree, and the TEMPLATE's own harness suite green.
+  - **No push.** The branch waits for the owner's word, then the PR and merge are the owner's, as PR #1 was.
+- **Turns and depth.**
+  - Turn 1 = round 0, read-only: both readers and both test modules; the merge plan function by function; the exit map above; the row grep; any Q1-Q5 dispute = STOP. Then YIELD.
+  - Turn 2 = the 15 tests plus the mapping tests ported RED, then GREEN; the `docs/dispatch-recipe.md` paragraph. The orchestrator commits by `codex_cell.py commit`. YIELD for Reviewer A.
+  - Turn 3 = Reviewer A's fixes, then the report with the live reads filled from the seat (below).
+  - Codex depth: evaluate at about 200K, STOP near 250K, re-seat fresh from the ledger.
+- **The live reads are the seat's.** The Codex sandbox does not read `~\.claude\projects` for this. The orchestrator runs at its seat on the package head and records the output, with its exact command, in `wp-h1\gate\live-reads.txt` for the report:
+  - `--sessions --live 24` (expect the CHARC and orchestrator sessions);
+  - `--live 6` (cells of the day; at a quiet seat this exercises Q4's answer);
+  - `--agent <one Claude cell id from this phase>`.
+- **GATE_CHECKS** (the orchestrator's seat, on the final candidate after Reviewer B):
+  - the harness suite `uv run python -m unittest discover -s tests/harness` (382 + the new tests, 0 failures);
+  - `git diff main...wp-h1 -- tests/harness/test_cell_depth.py` removes no existing line inside the 47 tests, except where a shared helper gains a parameter. Any changed assertion in the 47 = STOP;
+  - the project's `ruff check .` and `ruff format --check .` (Q5);
+  - every changed blob 0 CR;
+  - `git diff --name-only main...wp-h1` holds only the owned paths: `scripts/cell_depth.py`, `tests/harness/test_cell_depth.py`, `docs/dispatch-recipe.md`, the report, the ledger and the accept record.
+  - No pytest leg: no product file changes.
+- **Harness gate early (gen-40 lesson).** The harness suite runs on the package head at every yield, before Reviewer A, and again before Reviewer B. It is not run only at the gate.

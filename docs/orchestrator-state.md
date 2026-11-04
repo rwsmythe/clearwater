@@ -21,18 +21,17 @@
 - **Backslash-bearing Python helpers are written with the Write tool**, never a heredoc. **`rm` takes literal absolute paths.** **Worktree release:** a released worktree's `work/` is pruned only on the owner's word; junits copied to `clearwater-review-evidence\<pkg>\gate\` first.
 - **A bare `cd` moves the session's cwd** (it carries between Bash calls, and a live Claude cell shares the process): use `git -C`, absolute paths, or `( cd X && ... )`.
 
-### Live board (RESUME HERE) -- gen 40, 2026-11-04 ~02:25Z, NOTHING RUNNING (no cell live, no job)
+### Live board (RESUME HERE) -- gen 40, 2026-11-04 ~05:55Z, NOTHING RUNNING (no cell live, no job)
 
-1. **WP5.5 ACCEPTED** (main `40d2ce04`, fast-forward; record `docs/proofs/wp5.5-accept.md`).
-   - **Release gate `p55` GREEN** on `4742f69f`: parallel 6,786 / serial 1,262 / fullclip 7.
-   - Harness 382 OK on `d6bed59d` and on the accept head, after `8e83fa76` registered the three release files.
-   - Figures of record: `clearwater-review-evidence\release-1.0.0\`.
-   - Return report posted to CHARC 02:24Z (`0c8da212`).
-2. **WAITING ON CHARC:** N13 SATISFIED; DR-119 (a)-(b) CLOSED; `docs/proofs/release-1.0.0.md`; the Phase 5 CLOSED pointer; and **the owner's word "tag 1.0.0"**.
-   - On that word: `git tag -a v1.0.0 <commit CHARC names: 40d2ce04 or main's head after the release record> -m "Clearwater 1.0.0"`.
-   - **NO push.** Confirm with `git show v1.0.0 --stat | head`.
-3. **WP-H1** was HELD by CHARC until WP5.5's accept: it awaits CHARC's commission.
-- Owner-pending: only the tag word.
+1. **Clearwater 1.0.0 RELEASED.**
+   - Tag `v1.0.0` (annotated) is on `40d2ce04`, applied 05:45:31Z on the owner's word "tag 1.0.0" relayed by CHARC (`d1af354bc5607d86`). **NOT pushed**: a push needs the owner's separate word.
+   - CHARC's release record is `docs/proofs/release-1.0.0.md` (main `d62eb37e`). Phase 5 is CLOSED.
+2. **WP-H1 dispatch fill POSTED for CHARC's FINAL** (`docs/briefs/wp-h1-brief.md`, section "Dispatch fill (orchestrator gen 40 ...)").
+   - It adds Q4 (exit code of an empty `--live` window; recommended 0) and Q5 (`scripts/` is ruff-excluded, 25 pre-existing explicit-path findings; recommended the project ruff gate plus no new rule code).
+   - It corrects the swing selector test count: 15, not 12.
+   - On FINAL: dispatch Codex round 0, read-only, in `.worktrees/wp-h1` from main.
+   - Evidence `clearwater-review-evidence\wp-h1\`. At the accept, the template re-port is a local branch in `C:\Users\rwsmy\harness-template` with NO push.
+- Owner-pending: nothing for the orchestrator. CHARC will ask for the prune word with the Phase 6 proposals.
 - Kept worktrees until the owner's word: `wp5.3`, `wp5.7`, `wp5.8`, `wp-dr25`, `wp5.5`; mine is `orch-state-g40`. Prunes of `work\wp5.7\` and `work\wp-dr25\` only on the owner's word.
 
 ### Gen-40 lessons
