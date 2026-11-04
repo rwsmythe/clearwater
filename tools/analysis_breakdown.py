@@ -115,6 +115,7 @@ from clearwater.interfaces import (
 from clearwater.io.video import FFmpegVideoSink, FFmpegVideoSource, resolve_encoder
 from clearwater.jobs import effective_parameters
 from clearwater.methods import available_methods
+from footage_guard import is_inside
 from local_config import LocalConfigError, find_footage_file, load_local_config
 from video_io_bench import Telemetry, period, summarise
 
@@ -980,10 +981,9 @@ def refuse_inside(folder: Path, footage: Path) -> None:
     Raises:
         BreakdownError: It does.
     """
-    # Lexical and resolved forms: the resolved one follows a link or junction (F7, round 1).
-    outs = [Path(os.path.normcase(f(folder))) for f in (os.path.abspath, os.path.realpath)]
-    roots = [Path(os.path.normcase(f(footage))) for f in (os.path.abspath, os.path.realpath)]
-    if any(out == root or root in out.parents for out in outs for root in roots):
+    # Lexical and resolved forms (a link or junction, F7, round 1), then file identity where
+    # the path exists (a differently cased APFS spelling; footage_guard, DR-122).
+    if is_inside(folder, footage):
         raise BreakdownError(f"{folder} lies inside the footage folder; nothing is written there")
 
 

@@ -11,7 +11,9 @@ row per file, an empty ``category`` column for the owner to fill in) and
 ``.LRV`` coverage, probe errors). Nothing is ever written under the footage folder, and an
 existing report is never overwritten: on a name collision both files take a numeric suffix.
 ``--exclude NAME`` prunes one top-level folder before listing or probing it; the exact
-name comparison is case-insensitive on Windows. Its contents contribute no rows or counts.
+name comparison is case-insensitive on every platform. Its contents contribute no rows or
+counts. macOS AppleDouble metadata files (``._`` names) are counted on their own summary line
+and never probed or listed, whatever their suffix (WP6.4, T14).
 
 A file that cannot be probed (truncated, locked, unreadable) still gets a row with ``error``
 set; a file that vanishes before it is read is counted as skipped. The run never aborts on
@@ -44,6 +46,7 @@ from typing import IO, Any
 import pillow_heif
 from PIL import Image, ImageCms
 
+from footage_guard import is_inside
 from local_config import VIDEO_EXTENSIONS, LocalConfigError, load_local_config
 
 FFPROBE_TIMEOUT_SECONDS = 60.0
@@ -223,12 +226,15 @@ class ScanResult:
         skipped: Files that vanished before they were read, plus folders that could not
             be listed.
         sidecars: ``.lrv`` and ``.thm`` files (not rows).
+        appledouble: macOS AppleDouble metadata files (``._`` names, written by macOS on
+            exFAT / FAT volumes; never media, so never rows, whatever their suffix; T14).
     """
 
     records: tuple[Record, ...]
     ignored: int
     skipped: int
     sidecars: int
+    appledouble: int = 0
 
 
 class _ProbeError(Exception):
@@ -805,7 +811,8 @@ def scan_tree(footage_root: Path, *, exclude: str | None = None) -> ScanResult:
     Args:
         footage_root: The footage folder; nothing is created or changed under it.
         exclude: One exact top-level folder name to prune before listing or probing it,
-            case-insensitively on Windows. Its contents contribute no rows or counts.
+            case-insensitively (``str.casefold``) on every platform. Its contents contribute
+            no rows or counts.
 
     Returns:
         The records (relative paths, sorted) and the counts of other files.
@@ -813,6 +820,7 @@ def scan_tree(footage_root: Path, *, exclude: str | None = None) -> ScanResult:
     skipped = 0
     ignored = 0
     sidecars = 0
+    appledouble = 0
     found: list[tuple[str, Path, bool]] = []
 
     def on_walk_error(_error: OSError) -> None:
@@ -821,10 +829,12 @@ def scan_tree(footage_root: Path, *, exclude: str | None = None) -> ScanResult:
 
     for directory, folders, names in os.walk(footage_root, onerror=on_walk_error):
         if exclude is not None and Path(directory) == footage_root:
-            folders[:] = [
-                name for name in folders if os.path.normcase(name) != os.path.normcase(exclude)
-            ]
+            # Case-insensitive on every platform (T16): the folder NAME policy, not the volume's.
+            folders[:] = [name for name in folders if name.casefold() != exclude.casefold()]
         for name in names:
+            if name.startswith("._"):  # AppleDouble metadata (T14): counted apart, never probed
+                appledouble += 1
+                continue
             suffix = Path(name).suffix.lower()
             full = Path(directory) / name
             if suffix in VIDEO_EXTENSIONS or suffix in PHOTO_EXTENSIONS:
@@ -852,7 +862,7 @@ def scan_tree(footage_root: Path, *, exclude: str | None = None) -> ScanResult:
             reason = f"unexpected failure: {type(exc).__name__}: {exc}"
             record = _failed_video(full, 0, reason) if is_video else _failed_photo(full, 0, reason)
         records.append(dataclasses.replace(record, path=relative))
-    return ScanResult(tuple(records), ignored, skipped, sidecars)
+    return ScanResult(tuple(records), ignored, skipped, sidecars, appledouble)
 
 
 def scan(footage_root: Path) -> list[Record]:
@@ -932,6 +942,7 @@ def _summary_text(
     ignored: int,
     skipped: int,
     sidecars: int,
+    appledouble: int = 0,
 ) -> str:
     videos = [r for r in records if isinstance(r, VideoRecord)]
     photos = [r for r in records if isinstance(r, PhotoRecord)]
@@ -950,6 +961,7 @@ def _summary_text(
         f"- Files with probe errors: {len(failing)}",
         f"- Ignored files (not media, not sidecars): {ignored}",
         f"- Sidecar files (.lrv, .thm; not rows): {sidecars}",
+        f"- AppleDouble files (._ names, macOS metadata; not rows): {appledouble}",
         f"- Skipped (vanished before reading, or folder not listable): {skipped}",
         "",
         "## Video recording modes",
@@ -997,6 +1009,7 @@ def write_inventory(
     sidecars: int = 0,
     footage_root: Path | None = None,
     stamp: str | None = None,
+    appledouble: int = 0,
 ) -> tuple[Path, Path]:
     """Write the inventory CSV and its summary under ``<working>/reports``.
 
@@ -1014,6 +1027,7 @@ def write_inventory(
         sidecars: Count of sidecar files, for the summary.
         footage_root: Footage folder to name in the summary, if any.
         stamp: ``YYYYMMDDTHHMMSSZ`` text for the file names; defaults to the current UTC time.
+        appledouble: Count of AppleDouble ``._`` files, for the summary.
 
     Returns:
         The paths of the CSV and the summary.
@@ -1024,7 +1038,9 @@ def write_inventory(
     stamp = stamp or datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     reports = working / "reports"
     reports.mkdir(parents=True, exist_ok=True)
-    summary_text = _summary_text(records, stamp, footage_root, ignored, skipped, sidecars)
+    summary_text = _summary_text(
+        records, stamp, footage_root, ignored, skipped, sidecars, appledouble
+    )
 
     def write_csv(handle: IO[str]) -> None:
         writer = csv.DictWriter(handle, fieldnames=CSV_COLUMNS)
@@ -1108,10 +1124,6 @@ def _publish(temp: Path, final: Path) -> None:
         raise
 
 
-def _resolved(path: Path) -> Path:
-    return Path(os.path.normcase(path.resolve()))
-
-
 def main(argv: list[str] | None = None) -> int:
     """Inventory the footage folder and print the paths of the two reports.
 
@@ -1130,7 +1142,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--footage", type=Path, help="footage folder instead of the configured one")
     parser.add_argument("--out", type=Path, help="working folder instead of the configured one")
     parser.add_argument(
-        "--exclude", help="exclude one exact top-level folder name (case-insensitive on Windows)"
+        "--exclude", help="exclude one exact top-level folder name (case-insensitive)"
     )
     args = parser.parse_args(argv)
 
@@ -1148,11 +1160,11 @@ def main(argv: list[str] | None = None) -> int:
     if not footage.is_dir():
         print(f"error: footage folder not found: {footage}", file=sys.stderr)
         return 2
-    footage_resolved = _resolved(footage)
     # The reports folder is checked too: it may be a link that leads back into the footage.
+    # By identity where the path exists (footage_guard, DR-122), so a differently cased
+    # spelling of the footage folder on a case-insensitive APFS volume is refused too.
     for target in (working, working / "reports"):
-        target_resolved = _resolved(target)
-        if target_resolved == footage_resolved or footage_resolved in target_resolved.parents:
+        if is_inside(target, footage):
             print(
                 f"error: working folder {working} must lie outside the footage folder",
                 file=sys.stderr,
@@ -1174,6 +1186,7 @@ def main(argv: list[str] | None = None) -> int:
             skipped=result.skipped,
             sidecars=result.sidecars,
             footage_root=footage,
+            appledouble=result.appledouble,
         )
     except OSError as exc:
         print(f"error: cannot write the reports under {working}: {exc}", file=sys.stderr)

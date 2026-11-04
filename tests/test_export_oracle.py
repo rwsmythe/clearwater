@@ -303,8 +303,6 @@ def test_refuse_inside_follows_an_alias_of_the_footage_folder(
 @pytest.mark.parametrize("name", ["", ".", "..", "../escape", "a/b", "a\\b", "/abs", "C:x"])
 def test_record_name_refuses_anything_but_a_plain_name(name: str) -> None:
     # Reviewer A round 1, F8: ``--name`` is one folder under the output folder.
-    if name == "a\\b" and os.sep == "/":
-        pytest.skip("a backslash is a plain character in a POSIX name")
     with pytest.raises(eo.OracleError, match="not a plain folder name"):
         eo.record_name(name)
     assert eo.record_name("ref-GX011627-c3") == "ref-GX011627-c3"

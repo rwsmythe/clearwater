@@ -67,6 +67,7 @@ if not __package__:
     # importable.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from footage_guard import is_inside
 from local_config import LocalConfigError, load_local_config
 
 MANDATORY = "MANDATORY"
@@ -1873,7 +1874,7 @@ def markdown_table(record: Mapping[str, Any]) -> str:
 
 
 def _normalised(path: Path) -> Path:
-    """Resolve links and normalise case for a containment check."""
+    """Resolve links and normalise case for the output-folder check (not the footage one)."""
     return Path(os.path.normcase(path.resolve()))
 
 
@@ -1902,8 +1903,7 @@ def check_output_path(path: Path, allowed_root: Path, footage_root: Path) -> Pat
     """
     resolved = _normalised(path)
     allowed = _normalised(allowed_root)
-    footage = _normalised(footage_root)
-    if resolved == footage or footage in resolved.parents:
+    if is_inside(path, footage_root):  # by identity where it exists (footage_guard, DR-122)
         raise OutputPathError(f"output path {path} lies inside the footage folder")
     if resolved != allowed and allowed not in resolved.parents:
         raise OutputPathError(f"output path {path} lies outside the spike folder {allowed_root}")

@@ -78,6 +78,7 @@ from clearwater.io.video import FFmpegVideoSink, FFmpegVideoSource, find_tool
 from clearwater.jobs import ExportEngine
 from clearwater.jobs.export_seam import ExportRequest
 from clearwater.methods import available_methods
+from footage_guard import is_inside
 from local_config import LocalConfigError, find_footage_file, load_local_config
 
 SUBDIR = Path("wp3.21") / "oracle"
@@ -625,8 +626,9 @@ def refuse_inside(path: Path, footage: Path, what: str) -> None:
     Raises:
         OracleError: It does.
     """
-    targets, roots = path_forms(path), path_forms(footage)
-    if any(target == root or root in target.parents for target in targets for root in roots):
+    # The lexical and resolved forms (path_forms), then file identity where the path exists
+    # (a differently cased APFS spelling of the footage folder; footage_guard, DR-122).
+    if is_inside(path, footage):
         raise OracleError(f"the {what} {path} lies inside the footage folder")
 
 
@@ -657,8 +659,16 @@ def record_name(name: str) -> str:
 
     Raises:
         OracleError: It is empty, ``.`` or ``..``, absolute, or holds a separator or a drive.
+            A colon and a backslash are refused explicitly on every platform (T52): on
+            POSIX ``C:x`` and ``a`` + backslash + ``b`` are legal names, but not on
+            Windows, so a record name stays portable.
     """
-    if name in {"", ".", ".."} or Path(name).name != name or Path(name).anchor:
+    if (
+        name in {"", ".", ".."}
+        or any(ch in name for ch in ":\\")
+        or Path(name).name != name
+        or Path(name).anchor
+    ):
         raise OracleError(f"the record name {name!r} is not a plain folder name")
     return name
 
