@@ -9,6 +9,7 @@ dispatcher fills the depth figures.
 | Round | Reviewer | Blocking (crit/major) | Minor/nit | In-envelope / out | NEW / REOPENED | Reverts | Fixes: product / tests-only | Transport, CLI | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|---|
 | 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | - | 247,937 (cell1, at return) |
+| A r2 (group B; folded turn 5) | Reviewer A, Codex | 0 / 6 | 2 minor, 3 advisory | 11 / 0 | 11 NEW / 0 REOPENED | 0 | tool 1 (item 1, `tools/footage_guard.py`) / tests-only 8 (items 2-6, 9-11); item 7 REJECTED, item 8 a report sentence | Codex review; cell5 fold | DISPATCHER TO FILL (cell5) |
 
 ## Round 0
 
@@ -881,3 +882,115 @@ recorder saw 0); that the M-TOOL context leaves a stub live (rejected: the repla
 file would commit CR (confirmed in the working copy; fixed before the commit). Nothing new.
 
 Depth at turn-4 yield: 175,078 (cell_depth.py --live, read at the seat 2026-11-04 ~23:08Z after the final return; 69 turns); cell4 retired, the A r2 fold-in goes to a fresh cell.
+
+## Reviewer A r2 fold-in (turn 5)
+
+Cell `wp64-cell5` (implementer-opus-high, FRESH), dispatch-5, base `51c50faf`. The fold as CHARC
+ruled it (brief tail "Reviewer A r2 rulings"); A r2's report
+`clearwater-review-evidence\wp6.4\A\r2\review.txt`. Evidence scripts and logs in `work\wp6.4\`:
+`t5_mutants.py`, `t5_probes.py`, `t5_guard_survey.py`, `t5_counts.py`, `t5-*.log`, the pre-fold
+blobs `t5-old-m-51c50faf.py` / `t5-old-w-51c50faf.py` (read by the probes, never imported as tests).
+
+### T5.1 Commits
+
+| Commit | What |
+|---|---|
+| `36651814` | items 1-3: `footage_guard._absolute` resolves the original spelling; the topology in D3 parity and the five caller refusals; M native symlink case; every borrowed W case in its own context; the AST pin; M-PATH's W folder |
+| `f1175b92` | items 4, 5, 11 and item 6's M-V4: `_lavfi`, `_remux`; advertised depths only, unadvertised refused; `assert_proved_unavailable`; the M-V4 corpus test |
+| `a9dc9adb` | items 6, 9, 10: M-PIPE, M-FS presets, M-SPACE; the W-GUARD polarity instrument; the D87 pins |
+| `c5b2608a` | the D3 parity docstring |
+| (this commit) | docs: the report's turn-5 section, counts and limits; this section |
+
+All by pathspec with `-c core.autocrlf=false` and the Co-Authored-By line; blob check 0 CR, 0
+non-ASCII byte in every committed file.
+
+### T5.2 The fold, item by item (r2 numbering)
+
+The report's section 1 "Turn 5" table carries finding -> change -> test -> mutant result. In short:
+
+- **Item 1 (MAJOR) DONE.** `_absolute` = `PurePath(_realpath(os.fspath(path)))`. The W topology
+  goes through a POSIX `realpath` model (`posix_link_model`): via the `_realpath` seam for the five
+  callers, via `os.path.realpath` itself for D3 parity (so `headless_export.inside`'s
+  `Path.resolve` sees the same model). The old body in memory (`t5_mutants.py old-absolute`): 6
+  FAILED of 6 (`t5-m1-old-absolute.log`); clean 6 passed. The caller tests assert the refusal and
+  the unchanged tree BEFORE `is_inside`, so the mutant fails on the caller's own behaviour (T17:
+  inventory wrote; T26-T29: no refusal).
+- **Item 2 (MAJOR) DONE.** Six call sites moved into contexts (M-TOOL already was). The pin is a W
+  test (the M module is skipped off darwin, so a pin there would never run on the gate). Replay
+  (`t5_probes.py item2`): at `51c50faf` P45 `ntpath.samefile`, P48 `os.link`, X03
+  `ntpath.samefile` live in the native half; at the head none. Pin: head `[]`, `51c50faf` 6
+  offenders, one site reverted in memory 1.
+- **Item 3 (MINOR) DONE.** `51c50faf` FileNotFoundError; head PASS (`item3`).
+- **Item 4 (MAJOR) DONE.** Argv captured (`item4`, `t5-probes-a.log`).
+- **Item 5 (MAJOR) DONE.** VT `(8,)` (`item5_11`, `item6_v4`): M-RATE `51c50faf` ERROR on 10-bit,
+  head 8-bit only; M-V4 `51c50faf` encodes `(VT, 10)`, the head corpus takes the refusal path.
+- **Item 6 (MAJOR) DONE as split.** M-PIPE, M-FS, M-SPACE, M-V4 folded, each with its mutant
+  (`item6_*`, `t5-probes-c.log`). Banked to WP6.5 (ONE register row candidate in the report's
+  limits): M-DEVICE AD-11, M-SPAWN / M-BUNDLE protocol + cancel + descendant clean-up, M-GUI native
+  checks.
+- **Item 7 REJECTED** (no marker added).
+- **Item 8 ADVISORY DONE** (one sentence in the report's limits).
+- **Item 9 (ADVISORY) DONE.** Survey of the 20 real guard forms first (`t5_guard_survey.py`): skipif
+  decorators, early skips (direct, nested, inside an `except` before the construct, in a called
+  helper), Windows-true branches, an `and` with a Windows-true operand, a constant used under one,
+  a stubbed `subprocess`, callers. The new instrument handles each by AST and evaluated polarity;
+  all 20 sites stay clean; the probes in the report (`item9`, `t5-probes-d.log`).
+- **Item 10 (ADVISORY) DONE.** `margin-doubled`, `estimate-doubled`, `ceiling-dropped` each FAIL
+  (`t5-m10-*.log`); clean passes.
+- **Item 11 (MINOR) DONE.** reason None / `""` / depths `(8,)`: `51c50faf` PASS, head FAIL.
+
+**Interpretation recorded (not a STOP):** the ruling's M-V4 corpus names "start offset, negative
+CTS" under `tools/fixtures/video.py`, which has no such builder. The cell used the builders the
+Windows V4 tests actually use: `test_io_video_encode.Clips` (offset, B-frame, VFR-gap) and that
+module's planted negative-timestamp table. The real-footage leg is not built (as ruled).
+
+### T5.3 Static and counts at `c5b2608a` (from the worktree root)
+
+    uv run --no-sync ruff check .                  All checks passed!
+    uv run --no-sync ruff format --check .         326 files already formatted
+    uv run --no-sync mypy                          Success: no issues found in 162 source files
+    uv run --no-sync mypy --platform darwin        Success: no issues found in 162 source files
+
+| Module | Parallel leg, `-n 4` (collected / passed / skipped) | Serial leg (collected / passed / skipped) | Fullclip |
+|---|---|---|---|
+| `test_portability` | 164 / 164 / 0 | 17 / 17 / 0 | 0 |
+| `test_macos_portability` | 205 / 0 / 205 | 19 / 0 / 19 | 0 |
+| `test_environment_report` | 19 / 19 / 0 | 0 | 0 |
+| the three together | 388 / 183 / 205 | 36 / 17 / 19 | 0 |
+| plus the guard callers' 7 modules | 826 / 621 / 205 | 44 / 25 / 19 | 0 |
+
+Every skip reads "macOS native leg (WP6.5)" (`t5_counts.py` over `t5-par.xml` / `t5-ser.xml`).
+`sb1_check.py` re-run: parallel `183 passed, 205 skipped`, `CHECK: 0 unstubbed seam calls`;
+serial `17 passed, 19 skipped`, `CHECK: 0 unstubbed seam calls`.
+
+### T5.4 Verification loop (suspected / confirmed / rejected / fixed)
+
+- Suspected: the caller refusal tests fail only on the guard's own assertion under the mutant, not
+  on the caller. Confirmed (first mutant run); fixed by asserting refusal and tree first.
+- Suspected: the D3 model reaches only footage_guard. Confirmed by reading `headless_export`
+  (`Path.resolve` -> `ntpath.realpath`); fixed by modelling `os.path.realpath` itself there.
+- Suspected: the new W-GUARD instrument flags real sites (X09's `except` skip, X05's constant, X32's
+  called helper, X37's skip text). Rejected by the run: all 20 clean, after building the rules the
+  survey showed were needed.
+- Suspected: M-V4's VFR checks over-assert items the Windows VFR test does not require. Confirmed by
+  reading `test_vfr_pts_are_exact`; fixed (the VFR sources require the pts item only; the B-frame
+  clips the four timing items, as their Windows test).
+- Suspected: the M-CODEC probe failed on the Windows roster, not on the check. Confirmed; the probe
+  binds the darwin roster (`capability.ENCODERS`) before the M function runs.
+- Suspected: the heredoc collapsed a `\n` escape in an edit script. Confirmed (an edit missed); redone with
+  the Edit tool; the planted strings verified by the passing self-check.
+- A second pass over the three edited source files (ruff, format, ASCII, CR, the full module runs)
+  found nothing new.
+
+### T5.5 Discipline record
+
+No bare `cd` (subshells only), no stash, no mailbox post, no edit outside the owned files, no real
+FFmpeg / ffprobe / encoder trial / `nvidia-smi` / `hdiutil` from a W test or probe (the probes
+replace `subprocess.run` and `Popen` with a raising stub), every test run offscreen with
+`PYTEST_ADDOPTS` unset. One slip: the first edit script was written to `/tmp` instead of the session
+scratchpad; nothing else was written there.
+
+Depth at point 1 (`36651814`): DISPATCHER TO FILL
+Depth at point 2 (`f1175b92`): DISPATCHER TO FILL
+Depth at point 3 (`a9dc9adb`): DISPATCHER TO FILL
+Depth at turn-5 yield: DISPATCHER TO FILL

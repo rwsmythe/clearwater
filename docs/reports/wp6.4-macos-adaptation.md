@@ -12,10 +12,13 @@ group-B yield rulings).
 - `wp64-cell4` ran the A r1 fold-in turn: the W-FS[P30] pair, this report and the ledger's turn-4
   section; then, on CHARC's turn-4 STOP ruling (`a5ca96e5`), S-B1 (the environment facts on by
   default) and the M-TOOL monkeypatch fix (section 10).
+- `wp64-cell5` ran the Reviewer A r2 fold-in (turn 5): the footage guard's symlink-then-`..`
+  fix and the folded M and W instruments (section 1, "Turn 5").
 
 The ledger is `docs/proofs/wp6.4-ledger.md`, branch `wp6.4`. **No Mac was run.** Every M test is
-written to run natively and is UNEXECUTED until WP6.5. The counts below are the turn-4 cell's own
-runs at `a6294d43`. Reviewer A (Codex) round 2 on groups A + B and the package gate follow.
+written to run natively and is UNEXECUTED until WP6.5. The counts below are the turn-5 cell's own
+runs at `c5b2608a`. Reviewer A (Codex) r2 on group B returned NEW_CRITICAL_MAJOR_FOUND and was
+folded in turn 5; the Codex delta / r3 on turns 4 + 5 and the package gate follow.
 
 ## 1. What was built
 
@@ -143,6 +146,57 @@ The per-item build cycles are recorded in ledger A.1.
   failed. The W case now runs in its own `pytest.MonkeyPatch.context()`; a replay shows the stubs
   live inside it and every original restored after it. Native T01 / T02 stay on `macos` only (no
   `slow`): a real VT / x265 trial is the native leg's point, and no case moves between legs.
+
+### Turn 5: the Reviewer A r2 fold-in
+
+Reviewer A r2 (Codex) on group B (`27505be4..107e6c77`) returned NEW_CRITICAL_MAJOR_FOUND: 6 MAJOR,
+2 MINOR, 3 ADVISORY. CHARC ruled the fold (brief tail "Reviewer A r2 rulings"); `wp64-cell5` built
+it. Commits: `36651814` (items 1-3), `f1175b92` (items 4, 5, 11 and item 6's M-V4), `a9dc9adb`
+(items 6, 9, 10), `c5b2608a` (a docstring). The one product-side change is the tool
+`tools/footage_guard.py` (item 1); everything else is test code.
+
+Every mutant and probe below ran on Windows, in memory, with the native dependencies STUBBED
+(no FFmpeg, ffprobe, encoder trial, `nvidia-smi` or `hdiutil` started). The scripts are
+`work\wp6.4\t5_mutants.py` (pytest plugins) and `work\wp6.4\t5_probes.py` (the M functions called
+directly, at this head and at the pre-fold head `51c50faf`).
+
+| A r2 finding | Change | Test | Mutant or probe: result |
+|---|---|---|---|
+| 1 MAJOR: symlink then `..` (`footage_guard.py:55`) | `_absolute` resolves the ORIGINAL spelling (`_realpath(os.fspath(path))`): links first, then `..`; the lexical spelling stays a second candidate in `_texts` | The topology (`alias -> Footage/sub`, target `alias/../output`) through a POSIX `realpath` model (`posix_link_model`; Win32 collapses `..` before a junction, so it cannot be built natively here): in D3 parity (footage_guard and `headless_export.inside` both under the model, 5 paths), and in each caller's refusal (T17 inventory, T26 lookcheck, T27 container_spike, T28 analysis_breakdown, T29 export_oracle): refused, the tree (files AND folders) unchanged. M-FS[T17, T26-T29] repeats it with a real symlink | The old `_absolute` in memory: 6 of 6 FAIL (T17 at the tree check: inventory wrote `output/reports`; T26-T29 at the refusal; D3 at `is_inside`). Unmutated: 6 pass |
+| 2 MAJOR: a shared monkeypatch | Every borrowed W case (M-PATH, M-DEVICE, M-TEXT, M-CODEC, M-FS, M-GUARD; M-TOOL since turn 4) runs in its own `pytest.MonkeyPatch.context()`, exited before the native half | NEW W pin `test_portability_macos_module_isolates_every_borrowed_case`: an AST check that each `_w().*_CASES[...]` is called directly with the name of an enclosing context that holds only that call and is used nowhere else; five planted leak forms | Replay with the native half replaced by a recorder: at `51c50faf` P45 runs under `ntpath.samefile`, P48 under `os.link`, X03 under `ntpath.samefile`; at this head none. The pin: this head `[]`; M-FS reverted in memory: 1 offender; `51c50faf`: 6 offenders (M-PATH, M-DEVICE, M-TEXT, M-CODEC, M-FS, M-GUARD; M-TOOL was fixed in turn 4); each planted form: 1 offender |
+| 3 MINOR: M-PATH[P01] scratch | `tmp_path / "w"` created before the W case | M-PATH | Native child stubbed: `51c50faf` FileNotFoundError; this head PASS |
+| 4 MAJOR: the `_clip` argv | `_lavfi` joins the geometry with `:` when the source has an option; `-display_rotation` moves to `_remux`, BEFORE its `-i` (as `tools/fixtures/video.py:844`) | M-TEXT[P72], M-RATE | Captured argv (no process): `-i color=c=0x204060:size=1280x720:rate=30000/1001:duration=2.0` (was `color=c=0x204060=size=...`); `-display_rotation 90 -i plain.mp4 -c copy rotated.mp4` (was `... -tag:v hvc1 -display_rotation 90 rotated.mp4`) |
+| 5 MAJOR: unadvertised depths encoded | M-CODEC, M-RATE, M-SPACE and M-V4 encode only `bit_depths`; `assert_unadvertised_refused` checks each other depth is refused by the sink by name (`unavailable`, "N-bit"); x265 keeps (8, 10) | M-CODEC, M-RATE, M-SPACE, both M-V4 functions | VT `available=True, bit_depths=(8,)`, an encode stub enforcing it: M-RATE at `51c50faf` ERROR (asked for 10-bit), here PASS with 8-bit only; M-V4[P15] at `51c50faf` ERROR (encodes `(VT, 8), (VT, 10)`); the corpus case `(VT, 10)` here takes the refusal path, no encode |
+| 6 MAJOR: weak M mechanics (the split as ruled) | M-PIPE: each frame byte-identical to the product's own decode command written to a FILE, pts_ticks equal to ffprobe's, pts exactly `i * 1001/30000` (`pipe_fidelity_failures`). M-FS: save and RENAME INTO each folding-corpus twin (U+0131, U+00DF / SS, NFC / NFD, case) refused on both APFS modes, the occupant's and the mover's bytes unchanged, a free name taking the mover's bytes. M-SPACE: candidates A and B x the advertised depths x the three qualities, each output within D87, the full set asserted. M-V4: NEW `test_macos_videotoolbox_v4_corpus`, 46 cases (below) | M-PIPE[P04, T07], M-FS[P40, P41, P49, P73], M-SPACE[P64], M-V4 corpus | M-PIPE: frame 7's pixels flipped and `pts_ticks = i*i`: `51c50faf` PASS, here FAIL. M-FS (real PresetStore on two NTFS folders): the product passes both heads; a rename mutant checking the exact file name only: `51c50faf` PASS, here FAIL (DID NOT RAISE). M-SPACE: one oversized output at (B, 10, high): `51c50faf` PASS (it encodes only (B, 8, *)), here FAIL (it encodes all 12). M-V4: a record with the pts item DIFFERENT, or the summary not all SAME: FAIL |
+| 7 MAJOR: `slow` on native paths | REJECTED (CHARC); no marker added | - | - |
+| 8 ADVISORY: `._` hides media | No code; one sentence in section 10 | - | - |
+| 9 ADVISORY: W-GUARD text check | `platform_guard_offenders` walks the AST from each marker and EVALUATES each controlling test's polarity (`platform_polarity`: per host, `sys.platform` / `os.name` / `WINDOWS` bound); comments never count | W-GUARD X05-X38 (all 20 real sites still clean), 8 planted probes (`GUARD_PROBES`) | Probes, offenders at this head vs `51c50faf`: a comment 1 vs 0; `if sys.platform != "win32":` 1 vs 0; an inverted early skip 1 vs 0; `skipif(os.name == "nt")` 1 vs 0; the three guarded controls 0 vs 0. X17's real guard inverted in memory: `['test_app_wiring.py:419']` vs `[]`; made a comment: offender vs `[]` |
+| 10 ADVISORY: W-SPACE shared constants | `D87_CONTRACT` pins 0.24 bit/pixel, the 1 / 2 / 4 shares, the 1.1 / 0.5 / 0.25 ratios and the 1.25 margin in the test; `SPACE_INPUTS` has one input where the size term binds and one where the ceiling binds (asserted) | W-SPACE[P64] | `MARGIN *= 2`: FAIL (the pin); the estimate doubled: FAIL (the arithmetic); the ceiling term dropped: FAIL (the ceiling-binding input); clean: PASS |
+| 11 MINOR: an unavailable VT without a reason | `assert_proved_unavailable`: a non-empty ASCII reason AND `bit_depths == ()`, in M-CODEC, both M-V4 functions and `_vt_or_skip` | M-CODEC[T44], M-V4 | VT unavailable with reason None, `""`, or depths (8,): `51c50faf` PASS, here FAIL; with a reason and no depth: PASS on both |
+
+**The M-V4 corpus** (item 6, as ruled: the synthetic sources the Windows V4 tests build; no
+real-footage leg). Sources: the seven WP2.3 samples the Windows V4 test encodes (`tools/fixtures/
+video.py`; `test_io_video_encode.DECODABLE`: 8-bit BT.709 full, 10-bit, untagged, truncated, VFR,
+rotated, PCM MOV; AAC on the others) and the five sources the Windows V4 tests build with
+`test_io_video_encode.Clips` (the start offset with an empty edit, three B-frame composition-offset
+clips, the variable-rate gap). Each x {VT, x265} x {the source depth, 10} = 46 cases. Each runs
+`video_fidelity.encode_file` and `fidelity_record` (every mandatory and required item SAME, the
+roster whole, the frame count), plus the Windows tests' own per-source checks: exact pts for the
+VFR sources, the B-frame clips' timing items and their AD-22 note, the rotation kept, the edit list
+kept, the D86 warning and note for the truncated sample. The negative-timestamp case is the Windows
+test's planted one (`test_open_refuses_negative_timestamps_by_name`: no edit list, every pts
+shifted below zero) on the natively built source, refused at open by name for each available
+encoder before FFmpeg starts (M-V4[P15, X42]). Reading "start offset, negative CTS" as these
+`Clips` builders and the planted table is this cell's interpretation of the ruling (the module
+`tools/fixtures/video.py` itself has no such builder).
+
+**Banked to WP6.5 (not built; ONE register row candidate, beside the partial-row row):**
+- M-DEVICE: the Mac CPU correction / export against the Windows references within AD-11's
+  tolerances. Closure: WP6.5 writes and runs it on the Mac, with the Mac's numbers.
+- M-SPAWN / M-BUNDLE: the worker protocol, cancel and descendant clean-up through the frozen
+  bundle. Closure: WP6.5, on its own `Clearwater.app`.
+- M-GUI: the application-menu merge, native dialog behaviour and Retina pixel mapping. Closure:
+  WP6.5's native checks on the Mac, plus the owner's hand checks.
 
 ### Notable tests
 
@@ -430,20 +484,29 @@ Source: ledger A.4 and `uv-lock.record.txt`.
 
 ## 7. The W and M test counts per gate leg
 
-Re-taken by the turn-4 cell at `a6294d43` (`-p no:cacheprovider --timeout 600`,
-`QT_QPA_PLATFORM=offscreen`; the parallel expression with `-n 4`, the serial expression without):
+Re-taken by the turn-5 cell at `c5b2608a` (`-p no:cacheprovider --timeout 600`,
+`QT_QPA_PLATFORM=offscreen`, `PYTEST_ADDOPTS` unset; the parallel expression with `-n 4`, the
+serial expression without):
 
 | Module | Parallel leg (collected / passed / skipped) | Serial leg (collected / passed / skipped) | Fullclip |
 |---|---|---|---|
-| `test_portability` (180) | 163 / 163 / 0 | 17 / 17 / 0 (14 `gui`, 3 `slow`) | 0 |
-| `test_macos_portability` (178) | 159 / 0 / 159 | 19 / 0 / 19 (`macos` + `gui`: M-GUI 15, M-BUNDLE 4) | 0 |
+| `test_portability` (181) | 164 / 164 / 0 | 17 / 17 / 0 (14 `gui`, 3 `slow`) | 0 |
+| `test_macos_portability` (224) | 205 / 0 / 205 | 19 / 0 / 19 (`macos` + `gui`: M-GUI 15, M-BUNDLE 4) | 0 |
 | `test_environment_report` (19) | 19 / 19 / 0 | 0 | 0 |
 
-The three modules together: parallel 182 passed, 159 skipped; serial 17 passed, 19 skipped.
+The three modules together: parallel 183 passed, 205 skipped; serial 17 passed, 19 skipped. The
+W module gains one case (the item-2 pin); the M module gains 46 (the M-V4 corpus), all on the
+parallel leg and all skipped off darwin. No case moved between legs.
+
+The footage guard's callers' modules, the same run (all passed, none skipped): `test_inventory`,
+`test_export_oracle`, `test_lookcheck`, `test_lookcheck_deep`, `test_container_spike`,
+`test_container_spike_compare_equivalences`, `test_analysis_breakdown`. All ten modules together:
+parallel 826 collected, 621 passed, 205 skipped; serial 44 collected, 25 passed, 19 skipped.
 
 On Windows every M case is collected and skipped with "macOS native leg (WP6.5)"; no other skip
 reason appears. The gate's two marker expressions are unchanged, and the collection identity
-counts the M cases.
+counts the M cases. The S-B1 seam check (`work\wp6.4\sb1_check.py`) re-run on both legs: 0
+unstubbed seam calls.
 
 The M functions, with their case counts:
 
@@ -458,6 +521,7 @@ The M functions, with their case counts:
 | M-CODEC | 12 |
 | M-RATE | 5 |
 | M-V4 | 4 |
+| M-V4 corpus | 46 |
 | M-SPACE | 2 |
 | M-FS | 51 |
 | M-GUARD | 24 |
@@ -496,8 +560,16 @@ A Mac `uv sync` installs no CuPy, and the product runs CPU-only (P22).
 - **Interactive checks are the owner's.** The native file dialogs (P33-P36: picking a file), and
   the bundle's Finder / Terminal launch, Dock Quit, Cmd-Q and logout during an export, are the
   owner's hand checks at WP6.5. No synthetic desktop input is used.
-- **M-DEVICE checks the CPU-only selection and reasons natively.** The comparison of the Mac CPU
-  output with the Windows references within AD-11's tolerances is not written yet; it is WP6.5's.
+- **Banked to WP6.5 (Reviewer A r2 item 6, as ruled; ONE register row candidate, beside the
+  partial-row row below), each with its closure:** M-DEVICE's AD-11 comparison of the Mac CPU
+  output with the Windows references (WP6.5 writes and runs it with the Mac's numbers); M-SPAWN /
+  M-BUNDLE's worker protocol, cancel and descendant clean-up (WP6.5, through its own frozen
+  bundle); M-GUI's application-menu merge, native dialog behaviour and Retina mapping (WP6.5's
+  native checks and the owner's hand checks). WP6.5's brief lists them as owned work.
+- **`._` is a reserved inventory prefix** (Reviewer A r2 item 8): every `._` name is counted as
+  AppleDouble metadata by name, so a real clip named `._name.MP4` is not listed.
+- **The native tests are unmarked beyond `macos` by ruling** (A r2 item 7, REJECTED): they run
+  real FFmpeg and encoder trials on the Mac; WP6.5 sets their markers from the measured walls.
 - **Linux has a roster (NVENC then x265, as ruled), but nothing is proved for Linux.**
 - **P71's Windows behaviour change is the FIX of a pre-existing Windows defect.** The old
   `wheelEvent` zoomed a full step on any non-zero delta, so a precision touchpad over-zoomed.
@@ -528,11 +600,10 @@ A Mac `uv sync` installs no CuPy, and the product runs CPU-only (P22).
 | P73 | the link / unlink / fallback branches stubbed (W-FS) | M-FS[P40, P41, P49, P73]: the DR-34(a) folding corpus on both APFS modes. M-FS[P48]: exFAT link refusal |
 | P71 | synthetic offscreen `QWheelEvent`s (W-GUI) | M-GUI[P71]: Cocoa wheel phases including momentum; the owner's trackpad by hand |
 | T14 | a synthetic `._` tree (W-FS) | M-FS[T14]: exFAT AppleDouble files made by `xattr` |
-| T17 T26-T29 | the planted case alias reproduced through footage_guard's text and link-resolution seams on NTFS (W-FS) | M-FS[T17, T26-T29]: a native symlink alias and a native case alias |
+| T17 T26-T29 | the planted case alias reproduced through footage_guard's text and link-resolution seams on NTFS, and the symlink-then-`..` alias through a POSIX `realpath` model (W-FS, D3 parity) | M-FS[T17, T26-T29]: a native symlink alias, a native case alias and a native symlink-then-`..` alias |
 | T01 T02 | the environment facts with stubs (W-TOOL); on by default (S-B1) | M-TOOL[T01, T02]: the native report (arm64, macosx-*, NVIDIA not applicable, the VT / x265 rows) |
 | T11 T12 | the Windows licence-scan forms are pinned (W-TOOL) | M-TOOL[T11, T12]: xfail until candidate DR 3 adds the Mach-O forms |
 | P16 P24 P57 X28 | source / frozen command construction (W-SPAWN) | M-BUNDLE with `CLEARWATER_MAC_BUNDLE`, plus the owner's Finder, Dock-Quit and Cmd-Q checks |
-| (no row ID) M-DEVICE AD-11 | none on Windows | the Mac CPU output against the Windows references within AD-11's tolerances; not yet written, WP6.5 |
 
 - **Other notes.**
   - The P30 labels are unchanged (D5); turn 4's Unicode pair pins that against a casefold change.
