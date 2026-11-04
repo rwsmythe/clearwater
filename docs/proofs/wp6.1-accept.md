@@ -26,7 +26,7 @@
   - `d6\`;
   - `gate\` (gate `p61`).
 
-**Candidate:** branch `wp6.1`. The code is FINAL at `dc784b4f`; then the report at `68cc1f33`, the B fold-in at `7316b3ce`, and the merge of main `2503f196` at `e0bb6136` (the gate's head). This record and the ledger's depth fills follow.
+**Candidate:** branch `wp6.1`. The code is FINAL at `dc784b4f`; then the report at `68cc1f33`, the B fold-in at `7316b3ce`, and the merge of main at `e0bb6136` (the gate's head; its second parent is `e284f953`, CHARC's docs-only state commit, though the merge message names `2503f196`, which main held a minute earlier; both are `docs/charc-state.md` only). This record and the ledger's depth fills follow.
 
 **Footprint** (`git diff --name-only main...wp6.1`), every path owned by the brief:
 - the product:
