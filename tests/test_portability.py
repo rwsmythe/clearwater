@@ -751,6 +751,8 @@ def _codec_p55(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 def _codec_p62(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """P62: a known encoder outside the roster is unavailable with a reason; unknown is refused."""
     sink = FFmpegVideoSink()
+    native = _caps((capability.ENCODERS[0], True, (8, 10)), ("libx265", True, (8, 10)))
+    monkeypatch.setattr(sink, "capabilities", lambda: native)  # no real FFmpeg trial here
     other = "hevc_videotoolbox" if sys.platform != "darwin" else "hevc_nvenc"
     with pytest.raises(VideoEncodeError) as caught:
         sink._check_options(other, "standard", 8)
@@ -843,6 +845,46 @@ def test_portability_encoder_roster_and_commands(
 ) -> None:
     """W-CODEC: the roster per platform, the VT trials and branch, the D26 refusals."""
     CODEC_CASES[site](monkeypatch, tmp_path)
+
+
+def _real_ffmpeg() -> Path:
+    from clearwater.io.video.probe import VideoProbeError, find_tool
+
+    try:
+        return find_tool("ffmpeg")
+    except VideoProbeError:
+        pytest.skip("no ffmpeg on the PATH: the real-trial rows need the installed FFmpeg")
+
+
+@pytest.mark.slow  # spawns the real one-frame FFmpeg trials (about two seconds), serial leg
+@pytest.mark.parametrize("site", ["P07", "P09", "P11"])
+def test_portability_encoder_trials_on_this_laptop(site: str) -> None:
+    """W-CODEC on the host's own FFmpeg: the native roster, real trials, the auto rule.
+
+    Either availability outcome is accepted (no graphics card, or a build without the hardware
+    encoder); the reason must then say why. The trials go through ``capability._run`` (AD-23's
+    helper, ``stdin`` set to DEVNULL explicitly). No ``gpu`` marker: NVENC is only tried.
+    """
+    ffmpeg = _real_ffmpeg()
+    roster = capability.encoder_roster()
+    if site == "P07":
+        listed, error = capability._listed(ffmpeg)
+        assert error is None and "libx265" in listed  # T44: x265 on every platform
+        return
+    rows = capability._detect(ffmpeg, roster)
+    assert tuple(c.name for c in rows) == roster
+    for row in rows:
+        assert row.hw is (row.name in capability.HARDWARE_ENCODERS)
+        assert (row.reason is None) is row.available, row
+        assert set(row.bit_depths) <= {8, 10} and (row.available is bool(row.bit_depths))
+        assert (row.reason or "").isascii()
+    if site == "P11":
+        available = [c.name for c in rows if c.available]
+        if available:
+            assert resolve_encoder("auto", rows, roster=roster) == available[0]
+        else:
+            with pytest.raises(VideoEncodeError):
+                resolve_encoder("auto", rows, roster=roster)
 
 
 # --- W-RATE: the shared rate ceiling and the two VideoToolbox candidates (AD-12, AD-35) ------
