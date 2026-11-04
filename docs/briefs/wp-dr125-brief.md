@@ -35,6 +35,8 @@ The same stand-in showed DR-125's crash: it exited 0xC0000005 whenever its daemo
 6. **`__main__`.** Delete `isolate_worker_stdin`, `STDIN_REFUSAL`, the try/except around the call and the now-unused imports; the frozen branch is `gpu_pack.activate()` then `export_worker.main(arguments[2:])`. The module docstring and `tools/package/README.md` describe the worker-side isolation in one paragraph each. The entry-script read-out that WP6.3's build performs will see the function gone; that is expected.
 7. **Threads.** Nothing else changes: the engine's threads, the `_Channel` lock and the logging handler are untouched.
 
+8. **The private reader's surface (CHARC at FINAL, carried by dispatch-1).** The object `main()` passes to `run()` exposes exactly `readline() -> bytes` (`b""` at end of pipe) and `close()`, nothing else; it is the cell's own small class over `os.read` (clarification 1), and `run()`'s `stdin` parameter is typed by a `Protocol` with those two methods or an equally narrow duck type so a `BytesIO` still satisfies the tests; no `cast`, mypy strict decides.
+
 ## Tests (the cell writes these; Reviewer A checks they discriminate)
 
 In `tests/test_app_export_worker.py`, each worker a child process with a redirected profile and a bounded timeout:
