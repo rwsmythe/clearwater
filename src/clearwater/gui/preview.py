@@ -86,6 +86,10 @@ def display_profile(source: OpenedSource | None) -> bytes | None:
     return None if chosen is None else chosen[1]
 
 
+WHEEL_STEP_UNITS = 120
+"""``angleDelta`` units per zoom step: one mouse-wheel notch (Qt's eighths of a degree x 15)."""
+
+
 class PreviewWidget(QWidget):
     """The split view. Main thread only; it paints ``QImage`` results it is given.
 
@@ -115,6 +119,7 @@ class PreviewWidget(QWidget):
         self._drag: str | None = None
         self._drag_from = QPointF()
         self._drag_center = (0.0, 0.0)
+        self._wheel_units = 0
 
     # State.
 
@@ -392,10 +397,23 @@ class PreviewWidget(QWidget):
         self._drag = None
 
     def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 -- Qt override
-        """Zoom in or out by one step."""
-        if event.angleDelta().y() > 0:
+        """Zoom one step per :data:`WHEEL_STEP_UNITS` of accumulated vertical wheel movement.
+
+        A mouse notch is one step, as before. A trackpad or precision touchpad sends smaller
+        deltas; they add up until a step's worth (P71), and a change of direction starts the
+        count again.
+        """
+        delta = event.angleDelta().y()
+        if delta == 0:
+            return
+        if self._wheel_units != 0 and (delta > 0) != (self._wheel_units > 0):
+            self._wheel_units = 0
+        self._wheel_units += delta
+        while self._wheel_units >= WHEEL_STEP_UNITS:
+            self._wheel_units -= WHEEL_STEP_UNITS
             self.zoom_in()
-        elif event.angleDelta().y() < 0:
+        while self._wheel_units <= -WHEEL_STEP_UNITS:
+            self._wheel_units += WHEEL_STEP_UNITS
             self.zoom_out()
 
 
