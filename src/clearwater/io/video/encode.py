@@ -26,6 +26,12 @@ sets ``-tier main`` and an explicit ``-level`` (the lowest Main-tier level that 
 ceiling and the picture format), and ``close`` warns when the output still signals a higher
 level or tier than an HEVC source's own.
 
+VideoToolbox (macOS, AD-35) takes the same numeric ceiling (:func:`rate_ceiling`, the helper
+:func:`nvenc_rate` is built on) but none of NVENC's level, tier or buffer flags, and none of
+x265's options. Which control it gets is :data:`VT_RATE_CONTROL` (Q1, OPEN until WP6.5 measures
+both on a Mac): candidate ``"B"`` (the default) ``-b:v R -maxrate R``, candidate ``"A"``
+``-q:v`` per level plus ``-maxrate R``. Every VideoToolbox command carries ``-allow_sw 0``.
+
 Colour (D54, D55, D114): the frames are converted to the source's Y'CbCr matrix, range, chroma
 subsampling and siting by :func:`clearwater.color.encode_filter`, and the output is tagged with
 the source's resolved colour description, the D54 assumed values included (with a warning).
@@ -75,7 +81,10 @@ from clearwater.io.video.capability import (
     BIT_DEPTHS,
     ENCODERS,
     HARDWARE_ENCODER,
+    KNOWN_ENCODERS,
+    VIDEOTOOLBOX_ENCODER,
     detect_capabilities,
+    not_offered_reason,
 )
 from clearwater.io.video.decode import DeviceFrameBackend
 from clearwater.io.video.inputs import ascii_text
@@ -109,6 +118,16 @@ NVENC_CQ = {"high": 22, "standard": 26, "draft": 30}
 
 X265_CRF = {"high": 21, "standard": 26, "draft": 30}
 """libx265's ``-crf`` value per level (AD-12, ruled on WP3.10's measured figures)."""
+
+VT_RATE_CONTROL: Literal["A", "B"] = "B"
+"""Which VideoToolbox rate control the sink uses (AD-35 Q1, OPEN; WP6.5 measures both).
+
+``"B"`` (the default, CHARC's recommendation): ``-b:v R -maxrate R``, R from
+:func:`rate_ceiling`. ``"A"``: ``-q:v`` from :data:`VT_Q_LEVEL` plus ``-maxrate R``."""
+
+VT_Q_LEVEL = {"high": 65, "standard": 55, "draft": 45}
+"""PLACEHOLDER values: VideoToolbox's ``-q:v`` per level for candidate ``"A"``. WP6.5 measures
+them on a Mac; they are not NVENC's ``-cq`` values translated (AD-35)."""
 
 NVENC_BITS_PER_PIXEL = Fraction(24, 100)
 """NVENC's High ceiling in bits per output pixel (AD-12 as amended, CHARC 17f12f9dc7eba3ae;
@@ -248,15 +267,31 @@ class NvencRate:
     level: str
 
 
+@dataclass(frozen=True)
+class RateCeiling:
+    """The numeric rate ceiling of one output (:func:`rate_ceiling`; AD-12, AD-35).
+
+    Internal to this module and its tests: not part of the frozen ``SinkReport`` (IF-5).
+
+    Attributes:
+        bits_per_second: R, the ceiling in bits per second.
+        level_idc: The lowest Main-tier HEVC level (``general_level_idc``, 30 times the level
+            number) that holds the picture and R, or the highest that holds the picture.
+    """
+
+    bits_per_second: int
+    level_idc: int
+
+
 def _main_tier_cap(level_idc: int) -> int | None:
     """Return a level's Main-tier MaxBR in bits per second, or None for an unknown level."""
     return next((cap for idc, _, _, cap in HEVC_MAIN_TIER_LEVELS if idc == level_idc), None)
 
 
-def nvenc_rate(
+def rate_ceiling(
     width: int, height: int, frame_rate: Fraction, quality: str, source_level: HevcLevel | None
-) -> NvencRate:
-    """Return NVENC's rate ceiling and level for an output (AD-12 as amended).
+) -> RateCeiling:
+    """Return the numeric rate ceiling and its HEVC level for an output (AD-12 as amended).
 
     The High ceiling is :data:`NVENC_BITS_PER_PIXEL` times the output's pixel rate, rounded
     down; for an HEVC source signalling a Main-tier level it is at most that level's Main-tier
@@ -266,6 +301,8 @@ def nvenc_rate(
     picture (luma picture size, each dimension, luma sample rate) and the ceiling; a ceiling
     above every Main-tier cap that holds the picture is cut to the highest such cap.
 
+    NVENC applies it through :func:`nvenc_rate`; VideoToolbox takes R alone (AD-35).
+
     Args:
         width: The output width in pixels.
         height: The output height in pixels.
@@ -274,7 +311,7 @@ def nvenc_rate(
         source_level: The level and tier the source signals, or None (not HEVC, or unread).
 
     Returns:
-        The ceiling, the buffer and the level.
+        R and the level.
 
     Raises:
         ValueError: If the frame rate is not positive or no HEVC level holds the picture.
@@ -296,8 +333,32 @@ def nvenc_rate(
     if not fitting:
         raise ValueError(f"no HEVC level holds {width}x{height} at {float(frame_rate):.3f} fps")
     idc, cap = next(((i, c) for i, c in fitting if c >= maxrate), fitting[-1])
-    maxrate = min(maxrate, cap)
-    return NvencRate(maxrate=maxrate, bufsize=maxrate, level=f"{idc / 30:.1f}")
+    return RateCeiling(bits_per_second=min(maxrate, cap), level_idc=idc)
+
+
+def nvenc_rate(
+    width: int, height: int, frame_rate: Fraction, quality: str, source_level: HevcLevel | None
+) -> NvencRate:
+    """Return NVENC's rate ceiling and level for an output (AD-12 as amended).
+
+    The ceiling and the level are :func:`rate_ceiling`'s; NVENC's buffer is one second at it.
+
+    Args:
+        width: The output width in pixels.
+        height: The output height in pixels.
+        frame_rate: The frames per second (the source's average for a variable-rate source).
+        quality: ``"high"``, ``"standard"`` or ``"draft"``.
+        source_level: The level and tier the source signals, or None (not HEVC, or unread).
+
+    Returns:
+        The ceiling, the buffer and the level.
+
+    Raises:
+        ValueError: If the frame rate is not positive or no HEVC level holds the picture.
+    """
+    ceiling = rate_ceiling(width, height, frame_rate, quality, source_level)
+    maxrate = ceiling.bits_per_second
+    return NvencRate(maxrate=maxrate, bufsize=maxrate, level=f"{ceiling.level_idc / 30:.1f}")
 
 
 def level_warning(source: HevcLevel | None, output: HevcLevel | None) -> str | None:
@@ -320,16 +381,34 @@ def level_warning(source: HevcLevel | None, output: HevcLevel | None) -> str | N
     )
 
 
+def _videotoolbox_options(quality: str, ceiling: int) -> list[str]:
+    """Return VideoToolbox's encoder and rate options (AD-35; Q1 by :data:`VT_RATE_CONTROL`)."""
+    options = ["-c:v", VIDEOTOOLBOX_ENCODER, "-allow_sw", "0"]
+    if VT_RATE_CONTROL == "A":
+        options += ["-q:v", str(VT_Q_LEVEL[quality]), "-maxrate", str(ceiling)]
+    else:
+        options += ["-b:v", str(ceiling), "-maxrate", str(ceiling)]
+    return options
+
+
 def _encoder_options(
-    encoder: str, quality: str, bit_depth: int, rate: NvencRate | None
+    encoder: str,
+    quality: str,
+    bit_depth: int,
+    rate: NvencRate | None,
+    vt_ceiling: RateCeiling | None = None,
 ) -> list[str]:
-    """Return the encoder, rate control, pixel format and profile options (AD-12)."""
+    """Return the encoder, rate control, pixel format and profile options (AD-12, AD-35)."""
     value = str((NVENC_CQ if encoder == HARDWARE_ENCODER else X265_CRF)[quality])
     if encoder == HARDWARE_ENCODER:
         assert rate is not None  # encode_command computes it for NVENC
         options = ["-c:v", encoder, "-preset", "p5", "-tune", "hq", "-rc", "vbr", "-b:v", "0"]
         options += ["-cq", value, "-maxrate", str(rate.maxrate), "-bufsize", str(rate.bufsize)]
         options += ["-tier", "main", "-level", rate.level]
+        pix_fmt = "p010le" if bit_depth == 10 else "yuv420p"
+    elif encoder == VIDEOTOOLBOX_ENCODER:
+        assert vt_ceiling is not None  # encode_command computes it for VideoToolbox
+        options = _videotoolbox_options(quality, vt_ceiling.bits_per_second)
         pix_fmt = "p010le" if bit_depth == 10 else "yuv420p"
     else:
         options = ["-c:v", encoder, "-preset", "medium", "-crf", value]
@@ -364,20 +443,21 @@ def encode_command(
         ffmpeg: The ``ffmpeg`` executable.
         probe: The source's probe result (its path is the second input).
         out_path: The output file; overwritten (``-y``: the caller's temporary exists, empty).
-        encoder: ``"hevc_nvenc"`` or ``"libx265"``.
+        encoder: ``"hevc_nvenc"``, ``"hevc_videotoolbox"`` or ``"libx265"``.
         quality: ``"high"``, ``"standard"`` or ``"draft"``.
         bit_depth: The output bit depth (the source's, or 10 for an 8-bit source, D76).
         comment: The provenance JSON, or the empty string.
         cut_at: Where to stop reading the source's audio and data tracks, as FFmpeg's input
             ``-to`` reads it (seconds after the input's start), or None to copy them whole.
-        source_level: The HEVC level and tier the source signals, for NVENC's ceiling
-            (:func:`nvenc_rate`), or None.
+        source_level: The HEVC level and tier the source signals, for the NVENC and
+            VideoToolbox ceiling (:func:`rate_ceiling`), or None.
 
     Returns:
         The command.
 
     Raises:
-        ValueError: For NVENC, if :func:`nvenc_rate` cannot set a ceiling for the picture.
+        ValueError: For NVENC or VideoToolbox, if :func:`rate_ceiling` cannot set a ceiling
+            for the picture.
     """
     video = probe.video
     names = ffmpeg_color_names(video.color)
@@ -406,6 +486,11 @@ def encode_command(
     rate = None
     if encoder == HARDWARE_ENCODER:
         rate = nvenc_rate(video.width, video.height, video.frame_rate, quality, source_level)
+    vt_ceiling = None
+    if encoder == VIDEOTOOLBOX_ENCODER:
+        vt_ceiling = rate_ceiling(
+            video.width, video.height, video.frame_rate, quality, source_level
+        )
     return [
         str(ffmpeg),
         "-nostdin",
@@ -429,7 +514,7 @@ def encode_command(
         *maps,
         "-vf",
         vf,
-        *_encoder_options(encoder, quality, bit_depth, rate),
+        *_encoder_options(encoder, quality, bit_depth, rate, vt_ceiling),
         *tags,
         "-tag:v",
         "hvc1",
@@ -593,6 +678,7 @@ class FFmpegVideoSink:
         self.nvenc_rate: NvencRate | None = None
         """NVENC's ceiling and level chosen at ``open`` (:func:`nvenc_rate`); None for libx265
         or before ``open``. ``SinkReport`` (IF-5, frozen) has no field for it."""
+        self._vt_ceiling: RateCeiling | None = None  # VideoToolbox's R at open (AD-35, P61)
 
     # --- IF-5 -------------------------------------------------------------------------------
 
@@ -600,7 +686,8 @@ class FFmpegVideoSink:
         """Return the encoder options and whether each is available (D74).
 
         Returns:
-            One entry per encoder (``hevc_nvenc``, ``libx265``), detected once per process.
+            One entry per encoder of this platform's roster (``hevc_nvenc`` or
+            ``hevc_videotoolbox``, then ``libx265``), detected once per process.
         """
         return detect_capabilities()
 
@@ -701,16 +788,21 @@ class FFmpegVideoSink:
         self._check_source(probe, source)
         source_level = _source_level(probe)
         rate = None
-        if encoder == HARDWARE_ENCODER:
-            video = probe.video
-            try:
+        vt_ceiling = None
+        video = probe.video
+        try:
+            if encoder == HARDWARE_ENCODER:
                 rate = nvenc_rate(
                     video.width, video.height, video.frame_rate, quality, source_level
                 )
-            except ValueError as error:
-                raise VideoEncodeError(
-                    "refused", f"This video cannot be written: {ascii_text(str(error))}"
-                ) from error
+            elif encoder == VIDEOTOOLBOX_ENCODER:
+                vt_ceiling = rate_ceiling(
+                    video.width, video.height, video.frame_rate, quality, source_level
+                )
+        except ValueError as error:
+            raise VideoEncodeError(
+                "refused", f"This video cannot be written: {ascii_text(str(error))}"
+            ) from error
         cut_at = self._plan_tracks(probe, source)
         self._probe, self._source = probe, source
         self._source_pts = frozenset(source.video_pts)
@@ -731,6 +823,7 @@ class FFmpegVideoSink:
             source_level=source_level,
         )
         self._source_level, self.nvenc_rate = source_level, rate
+        self._vt_ceiling = vt_ceiling
         try:  # built before FFmpeg starts, so a failure here leaves nothing running
             header = nut.stream_header(
                 width=probe.video.width,
@@ -835,7 +928,7 @@ class FFmpegVideoSink:
             raise VideoEncodeError(
                 "refused", 'The encoder "auto" must be resolved before export (resolve_encoder).'
             )
-        if encoder not in ENCODERS:
+        if encoder not in KNOWN_ENCODERS:
             raise VideoEncodeError(
                 "refused",
                 f"The encoder {ascii_text(str(encoder))!r} is not one of: " + ", ".join(ENCODERS),
@@ -852,7 +945,8 @@ class FFmpegVideoSink:
             )
         capability = next((c for c in self.capabilities() if c.name == encoder), None)
         if capability is None or not capability.available:
-            reason = capability.reason if capability is not None else None
+            # None: a known encoder this platform does not offer (D26: kept, refused here)
+            reason = capability.reason if capability is not None else not_offered_reason(encoder)
             raise VideoEncodeError(
                 "unavailable", f"The {encoder} encoder is not available: {reason or 'unknown'}"
             )

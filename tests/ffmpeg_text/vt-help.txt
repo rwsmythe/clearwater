@@ -1,0 +1,15 @@
+# SYNTHETIC help text, hand-written for WP6.4 (no arm64 FFmpeg capture was available offline).
+# The shape of `ffmpeg -hide_banner -h encoder=hevc_videotoolbox`, trimmed to the lines the
+# tests read. WP6.5 replaces this file with a real capture (see README.md).
+Encoder hevc_videotoolbox [VideoToolbox H.265 Encoder]:
+    General capabilities: dr1 delay hardware
+    Threading capabilities: none
+    Supported hardware devices: videotoolbox
+    Supported pixel formats: videotoolbox_vld nv12 yuv420p bgra ayuv p010le
+hevc_videotoolbox AVOptions:
+  -profile           <int>        E..V....... Profile (from -99 to INT_MAX) (default -99)
+     main            1            E..V.......
+     main10          2            E..V.......
+  -allow_sw          <boolean>    E..V....... Allow software encoding (default false)
+  -require_sw        <boolean>    E..V....... Require software encoding (default false)
+  -realtime          <boolean>    E..V....... Hint that encoding should happen in real-time if not faster (default false)

@@ -1,0 +1,20 @@
+# SYNTHETIC listing, hand-written for WP6.4 (no arm64 FFmpeg capture was available offline).
+# The shape of `ffmpeg -hide_banner -encoders` on an arm64 macOS build with VideoToolbox and
+# libx265. WP6.5 replaces this file with a real capture (see README.md).
+Encoders:
+ V..... = Video
+ A..... = Audio
+ S..... = Subtitle
+ .F.... = Frame-level multithreading
+ ..S... = Slice-level multithreading
+ ...X.. = Codec is experimental
+ ....B. = Supports draw_horiz_band
+ .....D = Supports direct rendering method 1
+ ------
+ V....D libx264              libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (codec h264)
+ V....D h264_videotoolbox    VideoToolbox H.264 Encoder (codec h264)
+ V....D libx265              libx265 H.265 / HEVC (codec hevc)
+ V....D hevc_videotoolbox    VideoToolbox H.265 Encoder (codec hevc)
+ V....D prores_videotoolbox  VideoToolbox ProRes Encoder (codec prores)
+ A....D aac                  AAC (Advanced Audio Coding)
+ A....D aac_at               aac (AudioToolbox) (codec aac)
