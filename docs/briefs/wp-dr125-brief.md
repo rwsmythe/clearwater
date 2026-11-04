@@ -37,6 +37,16 @@ The same stand-in showed DR-125's crash: it exited 0xC0000005 whenever its daemo
 
 8. **The private reader's surface (CHARC at FINAL, carried by dispatch-1).** The object `main()` passes to `run()` exposes exactly `readline() -> bytes` (`b""` at end of pipe) and `close()`, nothing else; it is the cell's own small class over `os.read` (clarification 1), and `run()`'s `stdin` parameter is typed by a `Protocol` with those two methods or an equally narrow duck type so a `BytesIO` still satisfies the tests; no `cast`, mypy strict decides.
 
+## Round-0 rulings (CHARC, 2026-11-04 ~18:10Z, on the orchestrator's seat-verified query `a66ab2e0`; the cell builds these)
+
+- **R1 (STOP 1, import order): RULED as recommended.** `app/__init__.py` eagerly imports `composition`, which builds the CPU backend; that is permitted on two conditions: those imports spawn nothing, and the isolation precedes the first request read and every backend probe, job and CuPy import (the GPU route is run time only: `select_backend` -> `_probe_gpu` -> the CuPy imports -> pathfinder's `subprocess.run`). Design item 1's "before ANY import that can spawn" reads so. ONE added test is the witness: in an isolated child, `subprocess.Popen` and `os.spawn*` are wrapped BEFORE `import clearwater.app.export_worker`; 0 spawns and `"cupy" not in sys.modules` after the import and again after the isolation call, the order recorded. No `app/__init__.py` change.
+- **R2 (STOP 2, frozen-entry tests): GRANTED, `tests/test_frozen_entry.py` only:** remove the direct `isolate_worker_stdin()` assertion and its `dups` / `SetStdHandle` counters in `test_the_worker_branch_moves_no_standard_input_when_not_frozen` (keep its not-frozen-reaches-GUI assertion); re-point `test_the_frozen_worker_flag_runs_the_shim_the_loader_then_the_worker_without_qt` and the `:219` test to loader-then-worker, renamed to say so; delete `_stub_shim` once it has no callers. Nothing else in that module changes (WP6.3a adds its own row test there and never touches these lines).
+- **R3 (STOP 3, EBADF): RULED as recommended.** With no standard input at all, the worker follows the EXISTING empty-input path: `decode_request(b"")` raises, status 2, the existing `export worker: no request document on stdin` line, no exception, no watcher. Design item 3's "immediate cancel" sentence is WITHDRAWN; end-of-pipe AFTER a valid request keeps the cancel semantics (design item 4). The EBADF test asserts the status-2 path.
+- **(a) GRANTED:** a docstring-only edit of `gpu_pack.py:1047-1051`'s sentence about the stdin-isolation refusal preceding activation (false after this package); no code; the file is otherwise untouched and named in the footprint.
+- **(b) ACCEPTED:** `tests/test_app_export_worker.py`'s module-wide `pytestmark` slow marker moves onto each existing test (bodies unchanged) so the new short tests run in the parallel leg; the collect identity shows the same serial set for the existing tests.
+- **(c) ACCEPTED:** `__main__`'s module docstring and the `REFUSED_STATUS` docstring lose their isolation-refusal claims.
+- Q1 (a), Q2 and Q3 accepted by the cell: stand.
+
 ## Tests (the cell writes these; Reviewer A checks they discriminate)
 
 In `tests/test_app_export_worker.py`, each worker a child process with a redirected profile and a bounded timeout:
