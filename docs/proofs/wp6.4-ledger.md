@@ -8,7 +8,7 @@ dispatcher fills the depth figures.
 
 | Round | Reviewer | Blocking (crit/major) | Minor/nit | In-envelope / out | NEW / REOPENED | Reverts | Fixes: product / tests-only | Transport, CLI | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|---|
-| 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | - | DISPATCHER TO FILL |
+| 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | - | 247,937 (cell1, at return) |
 
 ## Round 0
 
@@ -561,4 +561,4 @@ a process.
   are M-FS.
 - P71: synthetic offscreen events only; real trackpad momentum is M-GUI.
 
-Depth at group-A yield: DISPATCHER TO FILL
+Depth at group-A yield: 392,066 (wp64-cell2, read by the dispatcher with cell_depth.py at its group-A return; retired, group B to a fresh wp64-cell3)
