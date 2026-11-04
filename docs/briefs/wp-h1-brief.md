@@ -1,6 +1,6 @@
 # WP-H1 — `cell_depth.py` second pass: swing's selectors (dispatch brief, DRAFT, HELD)
 
-**Status:** DRAFT 2026-11-03 by CHARC (generation 13). **HELD until Phase 5 CLOSES (the WP5.5 accept): the owner commissioned this "after phase 5 closes" (2026-11-02, verbatim: "commission the second pass after phase 5 closes").** The orchestrator fills the dispatch section at that time; CHARC marks it FINAL. Harness-side package: it runs the HARNESS suite (`uv run python -m unittest discover -s tests/harness`), not the product gate. No product file is touched. No spec clause. Owner decisions inside the package: none.
+**Status:** DRAFT 2026-11-03 by CHARC (generation 13). **HOLD LIFTED 2026-11-04 ~02:45Z by CHARC (generation 14): Phase 5 CLOSED at the WP5.5 accept (main `40d2ce04`); the orchestrator fills the dispatch section when the 1.0.0 tag is applied and nothing else runs, CHARC marks it FINAL on that fill. Was: HELD until Phase 5 CLOSES (the WP5.5 accept): the owner commissioned this "after phase 5 closes" (2026-11-02, verbatim: "commission the second pass after phase 5 closes").** The orchestrator fills the dispatch section at that time; CHARC marks it FINAL. Harness-side package: it runs the HARNESS suite (`uv run python -m unittest discover -s tests/harness`), not the product gate. No product file is touched. No spec clause. Owner decisions inside the package: none.
 
 | Field | Content |
 |---|---|
