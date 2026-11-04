@@ -15,6 +15,8 @@ caller passes in.
 from __future__ import annotations
 
 import dataclasses
+import errno
+import logging
 import os
 import unicodedata
 from collections.abc import Mapping, Sequence
@@ -38,6 +40,7 @@ from clearwater.interfaces.parameters import loads_object
 from .atomic import atomic_write_text
 from .keys import check_parameter_set_keys, check_string_keys
 from .migration import MigrationRegistry, migrate
+from .paths import rename_replaces
 
 STARTER_SNORKEL = "Snorkel (shallow)"
 """The first starter preset's name (AD-13)."""
@@ -72,6 +75,53 @@ _RESERVED_DEVICE_NAMES = frozenset(
     {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"}
     | {f"{device}{digit}" for device in ("COM", "LPT") for digit in "0123456789¹²³"}
 )
+
+
+_LOG = logging.getLogger(__name__)
+
+_LINKS_REFUSED = frozenset(
+    {errno.EPERM, errno.EXDEV, errno.ENOTSUP, errno.EOPNOTSUPP, errno.EMLINK}
+)
+"""The ``os.link`` errors that mean the volume makes no hard link (exFAT on a Mac, for one)."""
+
+
+def _rename_without_replace(source: Path, target: Path, *, case_only: bool) -> None:
+    """Rename a preset file without replacing another file at ``target`` (P73, DR-34(a)).
+
+    Windows: ``os.rename``, which refuses an existing target. Elsewhere ``os.rename`` replaces
+    one silently, so: a case-only rename (the target is the source itself on a case-insensitive
+    volume) uses ``os.rename``, which is safe there; any other rename links ``target`` to the
+    file, which fails when ``target`` exists, then unlinks ``source``. On a volume that makes
+    no hard links the rename falls back to ``os.rename`` with one WARNING naming the file (the
+    NFC / casefold check before it still stands; the residual race is DR-34(a)'s).
+
+    Args:
+        source: The existing preset file.
+        target: The new file name in the same folder.
+        case_only: True when the new name differs from the old one by case or composition only.
+
+    Raises:
+        OSError: The rename failed; ``FileExistsError`` when ``target`` already exists.
+    """
+    if not rename_replaces():
+        os.rename(source, target)  # Windows refuses an existing target
+    elif case_only:
+        os.rename(source, target)  # the target is the source itself (case-insensitive)
+    else:
+        try:
+            os.link(source, target)
+        except OSError as error:
+            if error.errno not in _LINKS_REFUSED:
+                raise
+            _LOG.warning(
+                "preset %s: the volume makes no hard link (%s); renamed without the "
+                "no-replace check",
+                ascii(target.name),
+                errno.errorcode.get(error.errno or 0, "unknown"),
+            )
+            os.rename(source, target)
+        else:
+            os.unlink(source)
 
 
 class PresetError(Exception):
@@ -395,11 +445,13 @@ class PresetStore:
         source = self._existing(old)
         target = self._path(new)
         self._read_preset(source)
-        for other in self._matches(new):
+        matches = self._matches(new)
+        for other in matches:
             if other.name != source.name:
                 raise PresetError(f"a preset named {other.stem!r} already exists")
         if source.name != target.name:  # as strings: Windows Path equality ignores case
-            os.rename(source, target)
+            case_only = any(other.name == source.name for other in matches)
+            _rename_without_replace(source, target, case_only=case_only)
         return target
 
     def delete(self, name: str) -> None:

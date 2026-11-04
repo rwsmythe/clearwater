@@ -105,9 +105,10 @@ def app_locations(
 ) -> Locations:
     """Resolve the app-data folders for this machine (AD-25(a)). Creates nothing.
 
-    This is the only function in ``clearwater.config`` that reads the environment, the platform
-    or the home folder. The keyword arguments exist so a test can resolve for another platform
-    or a fake environment; production code passes none.
+    This is the only function in ``clearwater.config`` that reads the environment or the home
+    folder, and with :func:`rename_replaces` the only one that reads the platform. The keyword
+    arguments exist so a test can resolve for another platform or a fake environment;
+    production code passes none.
 
     Args:
         environ: The environment to read; ``os.environ`` when None.
@@ -150,6 +151,23 @@ def app_locations(
             cache_dir=cache_root / POSIX_FOLDER_NAME,
         )
     return found
+
+
+def rename_replaces(platform: str | None = None) -> bool:
+    """Tell whether ``os.rename`` silently replaces an existing target on a platform.
+
+    False on Windows, where ``os.rename`` refuses an existing target; True elsewhere (POSIX
+    ``rename``). The preset store asks here instead of reading the platform itself, so this
+    module stays ``clearwater.config``'s one platform site (P73, DR-34(a)).
+
+    Args:
+        platform: A ``sys.platform`` value; the running one when None.
+
+    Returns:
+        Whether a rename can replace another file.
+    """
+    kind = sys.platform if platform is None else platform
+    return kind != "win32"
 
 
 def ensure_directory(path: Path) -> Path:
