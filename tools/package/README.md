@@ -88,6 +88,33 @@ distribution under an allowed name (for example `PySide6.QtCharts` from PySide6-
 pass; the locked environment holds no such distribution. The checks were validated on Windows
 builds; the Linux library names are covered by the pattern but not by a real Linux build.
 
+## The GPU pack's standard-library needs (hidden imports)
+
+The pack lives outside the bundle, so PyInstaller cannot see the standard-library modules
+that only the pack imports (`ctypes.wintypes` from `cuda-pathfinder`, say). Before PyInstaller
+runs, `build.py`:
+
+1. scans every `.py` file the eleven pack distributions install in the build environment
+   (their `RECORD`, through `importlib.metadata`; the distributions are
+   `clearwater.gpu_pack.LOCKED_DISTRIBUTIONS`) with `ast`. An import anywhere counts
+   (module level, functions, `if` / `try` blocks), and so do `from __future__ import ...`,
+   `importlib.import_module("x")` and `__import__("x")` with a string literal. Relative
+   imports, third-party names and non-literal dynamic imports are skipped. A name that
+   does not exist on the build platform (`fcntl` on Windows) is recorded, not imported;
+2. adds the committed list `PACK_EXTENSION_STDLIB_NEEDS` (`graphlib` today), the needs of
+   the pack's extension modules, which no `.py` file names;
+3. passes each member as `--hidden-import`, and writes the set, each member marked
+   `scan` and / or `committed`, to `work/wp6.1/hidden-imports-<form>.json` and to the
+   build log.
+
+After the build, the hidden-import check FAILS the build (exit 1) when any member is
+missing from the bundle: the PYZ, the package archive's module entries, `base_library.zip`,
+the extension modules (`_internal/` or the one-file archive's binaries), or the
+interpreter's built-ins. A pack file that cannot be parsed fails the build before
+PyInstaller runs, and so does a pack distribution that is not installed in the build
+environment. So a lock bump that brings a new standard-library need fails the build or
+bundles the module; it never reaches a user's GPU as an import error.
+
 ## The GPU pack manifest
 
 The frozen application loads CuPy and the CUDA wheels from a per-user folder, the GPU pack

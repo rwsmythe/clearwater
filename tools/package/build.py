@@ -14,6 +14,9 @@ working folder given by ``--out`` (default ``<repo>/work/wp6.1``)::
 The GPU support (CuPy, ``cuda-pathfinder`` and the NVIDIA wheels) is NEVER bundled (the
 owner's D-C amendment; spec N14): it is excluded here and the build fails if any of it, or
 the test suite, reaches the dist or the frozen-module archive (:func:`forbidden_entries`).
+The standard-library modules that only the pack imports are bundled as hidden imports (a scan
+of the pack's ``.py`` files plus :data:`PACK_EXTENSION_STDLIB_NEEDS`), and the build fails if
+any of them is missing from the bundle (:func:`missing_hidden_imports`; CHARC's F-C2 ruling).
 
 Usage::
 
@@ -46,7 +49,7 @@ import time
 import zipfile
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
-from typing import Literal, Protocol, cast
+from typing import Literal, NamedTuple, Protocol, cast
 
 Form = Literal["onedir", "onefile"]
 """The two PyInstaller forms the spike measures."""
@@ -301,13 +304,17 @@ def release_dir(out: Path, form: Form, version: str) -> Path:
     return out / f"dist-{form}" / release_name(form, version)
 
 
-def pyinstaller_args(form: Form, *, out: Path, version: str) -> list[str]:
+def pyinstaller_args(
+    form: Form, *, out: Path, version: str, hidden: Sequence[str] = ()
+) -> list[str]:
     """Return PyInstaller's command line for one form: the ONE spec of both forms.
 
     Args:
         form: ``"onedir"`` or ``"onefile"``; the only difference between the two lists.
         out: The output folder; ``dist-<form>``, ``build-<form>`` and ``spec-<form>`` go there.
         version: The application version (it names the release folder).
+        hidden: Modules passed as ``--hidden-import`` (the GPU pack's standard-library needs,
+            :func:`hidden_imports`), in the order given.
 
     Returns:
         The arguments for ``PyInstaller.__main__.run``.
@@ -336,6 +343,8 @@ def pyinstaller_args(form: Form, *, out: Path, version: str) -> list[str]:
     ]
     for module in EXCLUDED_MODULES:
         args += ["--exclude-module", module]
+    for module in hidden:
+        args += ["--hidden-import", module]
     return args
 
 
@@ -927,6 +936,402 @@ def verify(folder: Path) -> int:
     return 0
 
 
+# F-C2: the standard-library modules the GPU pack needs from the bundle.
+
+PACK_EXTENSION_STDLIB_NEEDS: tuple[str, ...] = ("graphlib",)
+"""Standard-library modules that only the pack's EXTENSION modules import (CHARC's F-C2).
+
+No ``.py`` file of the pack names them, so :func:`scan_stdlib_imports` cannot find them:
+``graphlib`` is imported by a CuPy extension module (measured in group 2b-2,
+``t3c/import-gap.json``). The list is committed and edited by hand on a lock bump.
+"""
+
+ImportKind = Literal["builtin", "module", "package"]
+"""How a standard-library module exists on the build platform."""
+
+
+def stdlib_search_path() -> list[str]:
+    """Return the build interpreter's standard-library folders (sources and extensions).
+
+    Returns:
+        The existing folders among ``sysconfig``'s ``stdlib`` and ``platstdlib``, their
+        ``lib-dynload`` (POSIX) and ``<base prefix>/DLLs`` (Windows), without repeats.
+    """
+    import sysconfig
+
+    folders: list[str] = []
+    for key in ("stdlib", "platstdlib"):
+        base = sysconfig.get_path(key)
+        folders += [base, os.path.join(base, "lib-dynload")]
+    folders.append(os.path.join(sys.base_prefix, "DLLs"))
+    seen: list[str] = []
+    for folder in folders:
+        if os.path.isdir(folder) and folder not in seen:
+            seen.append(folder)
+    return seen
+
+
+def stdlib_kind(name: str, search: Sequence[str] | None = None) -> ImportKind | None:
+    """Return how the standard-library module ``name`` exists here, or None when it does not.
+
+    Found WITHOUT importing anything: built-ins from ``sys.builtin_module_names``, the rest by
+    ``importlib.machinery.PathFinder`` over :func:`stdlib_search_path`, one dotted part at a
+    time (a part is looked for only inside a package found for the part before it).
+
+    Args:
+        name: A dotted module name whose top level is in ``sys.stdlib_module_names``.
+        search: The standard-library folders; :func:`stdlib_search_path` when None.
+
+    Returns:
+        ``"builtin"``, ``"package"`` or ``"module"``; None when no such module exists here
+        (not on this platform, or not a module at all).
+    """
+    import importlib.machinery
+
+    parts = name.split(".")
+    if len(parts) == 1 and name in sys.builtin_module_names:
+        return "builtin"
+    locations: list[str] | None = list(stdlib_search_path() if search is None else search)
+    spec = None
+    for index in range(len(parts)):
+        if locations is None:
+            return None
+        spec = importlib.machinery.PathFinder.find_spec(".".join(parts[: index + 1]), locations)
+        if spec is None:
+            return None
+        found = spec.submodule_search_locations
+        locations = None if found is None else list(found)
+    return "package" if locations is not None else "module"
+
+
+class StdlibScan:
+    """What :func:`scan_stdlib_imports` found.
+
+    Attributes:
+        modules: Each standard-library module that exists here -> where it is named
+            (``<label>:<line>``).
+        unavailable: Each standard-library name that does not exist on this platform (an
+            import under a platform guard, such as ``fcntl`` on Windows) -> where named.
+        unparsable: The files that could not be parsed (``<label>: <error>``).
+    """
+
+    def __init__(self) -> None:
+        """Start an empty scan (a plain class: ``build.py`` is loaded by path in the tests)."""
+        self.modules: dict[str, list[str]] = {}
+        self.unavailable: dict[str, list[str]] = {}
+        self.unparsable: list[str] = []
+
+
+class HiddenImport(NamedTuple):
+    """One member of the resolved hidden-import set.
+
+    Attributes:
+        name: The dotted module name passed to ``--hidden-import``.
+        sources: ``"committed"`` (:data:`PACK_EXTENSION_STDLIB_NEEDS`) and / or ``"scan"``.
+        named_by: The first three places the scan found it (``<dist>:<path>:<line>``).
+        named: How many places the scan found it.
+    """
+
+    name: str
+    sources: tuple[str, ...]
+    named_by: tuple[str, ...] = ()
+    named: int = 0
+
+
+def _literal_import(call: ast.Call) -> str | None:
+    """Return the module a literal ``importlib.import_module("x")`` / ``__import__("x")`` names.
+
+    None for any other call: a non-literal argument or a relative name.
+    """
+    func = call.func
+    named = (isinstance(func, ast.Name) and func.id in ("import_module", "__import__")) or (
+        isinstance(func, ast.Attribute)
+        and func.attr == "import_module"
+        and isinstance(func.value, ast.Name)
+        and func.value.id == "importlib"
+    )
+    if not named or not call.args:
+        return None
+    first = call.args[0]
+    if not isinstance(first, ast.Constant) or not isinstance(first.value, str):
+        return None
+    return first.value if first.value and not first.value.startswith(".") else None
+
+
+def import_candidates(tree: ast.AST) -> list[tuple[str, int, bool]]:
+    """Return every absolute module name a parsed file may import, with its line.
+
+    Rules (CHARC's F-C2 (b)): every ``import a.b`` and ``from a.b import c`` ANYWHERE in the
+    tree (module level, functions, ``if`` / ``try`` blocks: conditional imports count);
+    ``importlib.import_module("x")`` and ``__import__("x")`` with a string literal; relative
+    imports (``from . import x``, ``import_module(".x", ...)``) are skipped, as is any
+    non-literal dynamic import. ``from __future__ import x`` counts: it imports
+    ``__future__`` at run time.
+
+    Args:
+        tree: A parsed module.
+
+    Returns:
+        (name, line, attribute_ok): ``attribute_ok`` marks ``a.b.c`` from ``from a.b import
+        c``, which names a submodule only when one exists (else ``c`` is an attribute).
+    """
+    found: list[tuple[str, int, bool]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found += [(alias.name, node.lineno, False) for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            found.append((node.module, node.lineno, False))
+            found += [
+                (f"{node.module}.{alias.name}", node.lineno, True)
+                for alias in node.names
+                if alias.name != "*"
+            ]
+        elif isinstance(node, ast.Call):
+            literal = _literal_import(node)
+            if literal is not None:
+                found.append((literal, node.lineno, False))
+    return found
+
+
+def _resolve(name: str, attribute_ok: bool, search: Sequence[str]) -> tuple[str | None, bool]:
+    """Resolve one candidate to the standard-library module it needs.
+
+    Returns:
+        (module, available): the module (None when the candidate needs none: not the
+        standard library, or an attribute), and whether it exists here. ``import os.path``
+        resolves to ``os`` (``path`` is an attribute of a module that is not a package).
+    """
+    parts = name.split(".")
+    if parts[0] not in sys.stdlib_module_names:
+        return None, True
+    if stdlib_kind(parts[0], search) is None:
+        return (None, True) if attribute_ok else (parts[0], False)
+    resolved = parts[0]
+    for part in parts[1:]:
+        kind = stdlib_kind(resolved, search)
+        if kind != "package":
+            return resolved, True  # the rest is an attribute (os.path)
+        candidate = f"{resolved}.{part}"
+        if stdlib_kind(candidate, search) is None:
+            return (None if attribute_ok else candidate), attribute_ok
+        resolved = candidate
+    return (None if attribute_ok and resolved != name else resolved), True
+
+
+def scan_stdlib_imports(
+    files: Iterable[tuple[str, Path]], search: Sequence[str] | None = None
+) -> StdlibScan:
+    """Return the standard-library modules that the given ``.py`` files import.
+
+    See :func:`import_candidates` for what counts as an import. Third-party names (a top level
+    not in ``sys.stdlib_module_names``) are not reported. A ``from a import b`` adds ``a.b``
+    only when ``a`` is a package with a submodule ``b``.
+
+    Args:
+        files: (label, path) of each ``.py`` file; the label names it in the result.
+        search: The standard-library folders; :func:`stdlib_search_path` when None.
+
+    Returns:
+        The scan.
+    """
+    folders = list(stdlib_search_path() if search is None else search)
+    scan = StdlibScan()
+    resolved: dict[tuple[str, bool], tuple[str | None, bool]] = {}
+    for label, path in files:
+        try:
+            tree = ast.parse(path.read_bytes(), filename=str(path))
+        except (SyntaxError, ValueError, OSError) as error:
+            scan.unparsable.append(f"{label}: {type(error).__name__}")
+            continue
+        for name, line, attribute_ok in import_candidates(tree):
+            key = (name, attribute_ok)
+            if key not in resolved:
+                resolved[key] = _resolve(name, attribute_ok, folders)
+            module, available = resolved[key]
+            if module is not None:
+                target = scan.modules if available else scan.unavailable
+                target.setdefault(module, []).append(f"{label}:{line}")
+    return scan
+
+
+def pack_sources(names: Iterable[str] | None = None) -> list[tuple[str, Path]]:
+    """Return every ``.py`` file the pack distributions install, from this environment.
+
+    The distributions are the lock's pack set (:data:`clearwater.gpu_pack.LOCKED_DISTRIBUTIONS`,
+    the set the manifest names), read from the build environment's installed copies through
+    their ``RECORD`` (``importlib.metadata``).
+
+    Args:
+        names: Distribution names; the pack's eleven when None.
+
+    Returns:
+        (``<distribution>:<path in RECORD>``, absolute path) pairs, sorted.
+
+    Raises:
+        importlib.metadata.PackageNotFoundError: A distribution is not installed here.
+        ValueError: A distribution lists no files.
+    """
+    import importlib.metadata
+
+    if names is None:
+        sys.dont_write_bytecode = True  # importing clearwater must not write into src (F8)
+        from clearwater import gpu_pack
+
+        names = [locked.name for locked in gpu_pack.LOCKED_DISTRIBUTIONS]
+    rows: list[tuple[str, Path]] = []
+    for name in names:
+        distribution = importlib.metadata.distribution(name)
+        files = distribution.files
+        if files is None:
+            raise ValueError(f"{name}: no RECORD")
+        for file in files:
+            if file.suffix == ".py":
+                rows.append(
+                    (f"{name}:{file.as_posix()}", Path(str(distribution.locate_file(file))))
+                )
+    return sorted(rows)
+
+
+def hidden_imports(
+    scan: StdlibScan, committed: Sequence[str] = PACK_EXTENSION_STDLIB_NEEDS
+) -> list[HiddenImport]:
+    """Return the resolved hidden-import set: the scan's modules plus the committed list.
+
+    Args:
+        scan: :func:`scan_stdlib_imports` over :func:`pack_sources`.
+        committed: The committed list (:data:`PACK_EXTENSION_STDLIB_NEEDS`).
+
+    Returns:
+        One entry per module name, sorted by name, each marked by its source(s).
+    """
+    rows: list[HiddenImport] = []
+    for name in sorted(set(scan.modules) | set(committed)):
+        places = scan.modules.get(name, [])
+        sources = tuple(
+            source
+            for source, hit in (("committed", name in committed), ("scan", bool(places)))
+            if hit
+        )
+        rows.append(HiddenImport(name, sources, tuple(places[:3]), len(places)))
+    return rows
+
+
+def _archive_module_names(names: Iterable[str]) -> set[str]:
+    """Return the module names that ZIP member or file paths hold (``a/b.pyc`` -> ``a.b``)."""
+    modules: set[str] = set()
+    for name in names:
+        parts = [p for p in name.replace("\\", "/").split("/") if p]
+        if parts and parts[0] == "lib-dynload":
+            parts = parts[1:]
+        if not parts:
+            continue
+        stem, _, suffix = parts[-1].partition(".")
+        if not suffix or "." + suffix.rsplit(".", 1)[-1] not in MODULE_SUFFIXES:
+            continue
+        dotted = [*parts[:-1]] if stem == "__init__" else [*parts[:-1], stem]
+        if dotted:
+            modules.add(".".join(dotted))
+    return modules
+
+
+def bundled_modules(executable: Path) -> set[str]:
+    """Return every module name the built bundle can import, wherever PyInstaller put it.
+
+    Looked in: the PYZ archive(s) inside the executable's package archive (pure-Python
+    modules); the package archive's own module entries (``struct`` and PyInstaller's boot
+    modules); ``base_library.zip`` (the boot-time standard library: ``_internal/`` in the
+    one-folder form, a package-archive entry in the one-file form); the extension modules
+    (``.pyd`` / ``.so``: files under ``_internal/`` in the one-folder form, binary entries of
+    the package archive in the one-file form); and the interpreter's built-in modules (inside
+    the bundled ``python3*.dll``, the same build as this interpreter's).
+
+    Args:
+        executable: The built executable.
+
+    Returns:
+        The dotted module names.
+    """
+    readers = importlib.import_module("PyInstaller.archive.readers")
+    package = read_package(executable)
+    modules: set[str] = set(sys.builtin_module_names)
+    entries: list[str] = []
+    for name, entry in package.toc.items():
+        typecode = entry[-1]
+        if typecode == readers.PKG_ITEM_PYZ:
+            modules.update(_pyz_modules(package, name))
+        elif typecode in (readers.PKG_ITEM_PYMODULE, readers.PKG_ITEM_PYPACKAGE):
+            modules.add(name.replace("\\", ".").replace("/", "."))  # ``struct``, the boot modules
+        elif name.replace("\\", "/").split("/")[-1] == "base_library.zip":
+            with zipfile.ZipFile(io.BytesIO(package.extract(name))) as archive:
+                modules |= _archive_module_names(archive.namelist())
+        else:
+            entries.append(name)
+    modules |= _archive_module_names(entries)
+    internal = executable.parent / "_internal"
+    if internal.is_dir():
+        files = [p.relative_to(internal).as_posix() for p in internal.rglob("*") if p.is_file()]
+        modules |= _archive_module_names(files)
+        base = internal / "base_library.zip"
+        if base.is_file():
+            with zipfile.ZipFile(base) as archive:
+                modules |= _archive_module_names(archive.namelist())
+    return modules
+
+
+def missing_hidden_imports(
+    executable: Path, wanted: Sequence[HiddenImport], bundled: set[str] | None = None
+) -> list[str]:
+    """Return each member of the hidden-import set that the bundle lacks, by name and source.
+
+    Args:
+        executable: The built executable.
+        wanted: :func:`hidden_imports`.
+        bundled: :func:`bundled_modules` (computed when None).
+
+    Returns:
+        ``hidden-import missing from the bundle: <name> (<sources>)`` lines, sorted.
+    """
+    have = bundled_modules(executable) if bundled is None else bundled
+    return [
+        f"hidden-import missing from the bundle: {row.name} ({'+'.join(row.sources)})"
+        for row in wanted
+        if row.name not in have
+    ]
+
+
+def write_hidden_import_report(
+    path: Path, wanted: Sequence[HiddenImport], scan: StdlibScan, files: int
+) -> Path:
+    """Write the resolved hidden-import set as JSON (F-C2 (a): a lock bump shows its delta).
+
+    Args:
+        path: The report file.
+        wanted: :func:`hidden_imports`.
+        scan: The scan it came from (its unavailable names are recorded, not imported).
+        files: How many ``.py`` files were scanned.
+
+    Returns:
+        ``path``.
+    """
+    document = {
+        "committed": list(PACK_EXTENSION_STDLIB_NEEDS),
+        "scanned_files": files,
+        "hidden_imports": {
+            row.name: {
+                "sources": list(row.sources),
+                "named_by": list(row.named_by),
+                "named": row.named,
+            }
+            for row in wanted
+        },
+        "unavailable_here": {k: v[:3] for k, v in sorted(scan.unavailable.items())},
+        "unparsable": scan.unparsable,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
 def run_pyinstaller(args: Sequence[str]) -> None:
     """Run PyInstaller in this process: ``PyInstaller.__main__.run(args)``.
 
@@ -992,9 +1397,23 @@ def build(form: Form, *, out: Path, with_ffmpeg: bool = False) -> int:
         0 when the build succeeded and the bundle holds nothing forbidden, else 1.
     """
     version = app_version()
+    sources = pack_sources()
+    scan = scan_stdlib_imports(sources)
+    wanted = hidden_imports(scan)
+    report = write_hidden_import_report(
+        out / f"hidden-imports-{form}.json", wanted, scan, len(sources)
+    )
+    print(f"build {form}: {len(wanted)} hidden imports from {len(sources)} pack files; {report}")
+    for row in wanted:
+        print(f"  hidden-import {row.name} ({'+'.join(row.sources)}; named {row.named}x)")
+    if scan.unparsable:
+        print(f"FAILED: {len(scan.unparsable)} pack files could not be scanned:")
+        for line in scan.unparsable:
+            print(f"  {line}")
+        return 1
     os.environ["PYINSTALLER_CONFIG_DIR"] = str(pyinstaller_config_dir(out))
     root = clean_release_dir(out, form, version)
-    args = pyinstaller_args(form, out=out, version=version)
+    args = pyinstaller_args(form, out=out, version=version, hidden=[row.name for row in wanted])
     print(f"build {form}: PYINSTALLER_CONFIG_DIR={os.environ['PYINSTALLER_CONFIG_DIR']}")
     print(f"build {form}: PyInstaller {' '.join(args)}", flush=True)
     start = time.monotonic()
@@ -1006,17 +1425,24 @@ def build(form: Form, *, out: Path, with_ffmpeg: bool = False) -> int:
             print(f"copied {path}: {line}")
     check_start = time.monotonic()
     bad = forbidden_paths(root) + forbidden_entries(executable)
+    missing = missing_hidden_imports(executable, wanted)
     check_wall = time.monotonic() - check_start
     print(f"build {form}: wall {wall:.1f} s; executable {executable}")
     for name, size in size_by_top_level(executable):
         print(f"  size {size / 2**20:10.1f} MiB  {name}")
     print(f"  total {tree_size(root) / 2**20:.1f} MiB under {root}")
     print(f"  bundle checks took {check_wall:.1f} s")
+    if missing:
+        print(f"FAILED: the bundle lacks {len(missing)} of the pack's standard-library needs:")
+        for line in missing:
+            print(f"  {line}")
     if bad:
         print(f"FORBIDDEN in the bundle ({len(bad)}):")
         for name in bad[:50]:
             print(f"  {name}")
+    if missing or bad:
         return 1
+    print(f"hidden-import check: PASS ({len(wanted)} modules, each in the bundle)")
     print("bundle check: PASS (no " + ", ".join(FORBIDDEN_TOP_LEVEL) + " at any depth or in")
     print("  any ZIP; no CUDA library; every module's top-level name allowed)")
     return 0

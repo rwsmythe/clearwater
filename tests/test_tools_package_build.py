@@ -15,6 +15,7 @@ from __future__ import annotations
 import importlib.metadata
 import importlib.util
 import io
+import json
 import marshal
 import os
 import shutil
@@ -314,6 +315,7 @@ def _stopping_build(monkeypatch: pytest.MonkeyPatch, out: Path, seen: dict[str, 
         raise _StopBuildError
 
     monkeypatch.setattr(build, "run_pyinstaller", stand_in)
+    monkeypatch.setattr(build, "pack_sources", list)  # no pack scan: the F-C2 tests cover it
     with pytest.raises(_StopBuildError):
         build.build("onefile", out=out)
 
@@ -500,3 +502,244 @@ def test_each_copied_tool_is_run_from_the_destination(
     expected = [destination / build.tool_file_name(t) for t in ("ffmpeg", "ffprobe")]
     assert ran == expected
     assert copied == [(expected[0], "ffmpeg version test"), (expected[1], "ffprobe version test")]
+
+
+# F-C2 (CHARC's ruling 1): the GPU pack's standard-library needs, scanned and checked.
+
+FIXTURE_FILES: dict[str, str] = {
+    "fixpkg/__init__.py": (
+        "from __future__ import annotations\n"
+        "import json\n"
+        "import os.path\n"
+        "import numpy\n"
+        "from . import sibling\n"
+        "from .sibling import thing\n"
+        "from ctypes import wintypes\n"
+        "from collections import OrderedDict, abc\n"
+    ),
+    "fixpkg/sibling.py": (
+        "import sys\n"
+        "try:\n"
+        "    import tomllib\n"
+        "except ImportError:\n"
+        "    tomllib = None\n"
+        "if sys.platform == 'win32':\n"
+        "    import winreg\n"
+        "else:\n"
+        "    import fcntl\n"
+        "def later():\n"
+        "    import graphlib\n"
+        "    import importlib\n"
+        "    importlib.import_module('csv')\n"
+        "    importlib.import_module('.relative', __package__)\n"
+        "    importlib.import_module(later.__name__)\n"
+        "    __import__('zlib')\n"
+        "    from fcntl import flock\n"
+        "    from xml.etree import ElementTree\n"
+        "    import scipy.ndimage\n"
+        "thing = 1\n"
+    ),
+}
+"""A fixture package with a known import set (each rule of :func:`build.import_candidates`)."""
+
+EXPECTED_STDLIB = {
+    "__future__",  # a real import at run time (IMPORT_NAME __future__)
+    "json",
+    "os",  # ``import os.path``: path is an attribute of the module os
+    "ctypes",
+    "ctypes.wintypes",  # ``from ctypes import wintypes``: a submodule
+    "collections",
+    "collections.abc",  # ``from collections import abc``; OrderedDict is an attribute
+    "sys",  # a built-in
+    "tomllib",  # inside try / except: counted
+    "graphlib",  # inside a function: counted
+    "importlib",
+    "csv",  # importlib.import_module with a literal
+    "zlib",  # __import__ with a literal
+    "xml.etree",
+    "xml.etree.ElementTree",
+}
+"""Exactly what the scan must report as needed (relative, third-party and non-literal skipped)."""
+
+PLATFORM_GUARDED = {"winreg", "fcntl"}
+"""Each exists on one platform only: needed where it exists, ``unavailable`` elsewhere."""
+
+
+def _fixture_files(root: Path) -> list[tuple[str, Path]]:
+    """Write :data:`FIXTURE_FILES` under ``root`` and return them as scan input."""
+    for name, text in FIXTURE_FILES.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    return [(f"fixture:{name}", root / name) for name in sorted(FIXTURE_FILES)]
+
+
+def test_the_scan_of_a_fixture_package_returns_exactly_its_stdlib_imports(
+    tmp_path: Path,
+) -> None:
+    """(b): relative, third-party and non-literal imports skipped; the rest exactly."""
+    scan = build.scan_stdlib_imports(_fixture_files(tmp_path))
+    here = {name for name in PLATFORM_GUARDED if build.stdlib_kind(name) is not None}
+    assert set(scan.modules) == EXPECTED_STDLIB | here
+    assert set(scan.unavailable) == PLATFORM_GUARDED - here
+    assert here == ({"winreg"} if sys.platform == "win32" else {"fcntl"})
+    assert scan.unparsable == []
+    assert scan.modules["ctypes.wintypes"] == ["fixture:fixpkg/__init__.py:7"]
+    assert scan.modules["graphlib"] == ["fixture:fixpkg/sibling.py:11"]
+
+
+def test_a_file_that_cannot_be_parsed_is_reported(tmp_path: Path) -> None:
+    """An unparsable pack file is listed (the build then fails: its imports are unknown)."""
+    bad = tmp_path / "bad.py"
+    bad.write_text("def broken(:\n", encoding="utf-8")
+    scan = build.scan_stdlib_imports([("fixture:bad.py", bad)])
+    assert scan.unparsable == ["fixture:bad.py: SyntaxError"]
+    assert scan.modules == {}
+
+
+def test_the_hidden_import_set_marks_each_member_by_its_source(tmp_path: Path) -> None:
+    """(a): the scanned names and the committed list, each marked; one member can be both."""
+    scan = build.scan_stdlib_imports(_fixture_files(tmp_path))
+    wanted = {row.name: row for row in build.hidden_imports(scan, committed=("graphlib", "x1"))}
+    assert wanted["graphlib"].sources == ("committed", "scan")
+    assert wanted["x1"].sources == ("committed",)
+    assert wanted["json"].sources == ("scan",)
+    assert wanted["json"].named_by == ("fixture:fixpkg/__init__.py:2",)
+    assert list(wanted) == sorted(wanted)
+
+
+def test_the_committed_list_is_graphlib() -> None:
+    """``graphlib`` is imported by a CuPy extension module only (no ``.py`` names it)."""
+    assert build.PACK_EXTENSION_STDLIB_NEEDS == ("graphlib",)
+
+
+def test_every_hidden_import_is_passed_to_pyinstaller(tmp_path: Path) -> None:
+    """Each member becomes one ``--hidden-import`` argument, in order, in both forms."""
+    for form in build.FORMS:
+        args = build.pyinstaller_args(form, out=tmp_path, version="1", hidden=["a.b", "c"])
+        assert args[-4:] == ["--hidden-import", "a.b", "--hidden-import", "c"]
+    assert "--hidden-import" not in build.pyinstaller_args("onedir", out=tmp_path, version="1")
+
+
+def test_a_planted_removal_from_the_committed_list_fails_the_bundle_check_by_name(
+    tmp_path: Path,
+) -> None:
+    """A build from the list WITHOUT ``graphlib`` lacks it; the check names it, by source."""
+    scan = build.StdlibScan()
+    scan.modules["ctypes.wintypes"] = ["cuda-pathfinder:x.py:7"]
+    wanted = build.hidden_imports(scan)
+    planted = build.hidden_imports(scan, committed=())  # graphlib removed from the list
+    args = build.pyinstaller_args(
+        "onefile", out=tmp_path, version="1", hidden=[r.name for r in planted]
+    )
+    assert "graphlib" not in args
+    bundled = [row.name for row in planted]  # what that build's PYZ would hold
+    without = make_exe(tmp_path / "without", [], modules=["ctypes", *bundled])
+    assert build.missing_hidden_imports(without, wanted) == [
+        "hidden-import missing from the bundle: graphlib (committed)"
+    ]
+    full = make_exe(tmp_path / "full", [], modules=["ctypes", *bundled, "graphlib"])
+    assert build.missing_hidden_imports(full, wanted) == []
+
+
+def test_the_bundle_check_looks_in_every_place_pyinstaller_puts_a_module(tmp_path: Path) -> None:
+    """PYZ, the archive's module entries, ``base_library.zip``, extension modules, built-ins."""
+    base = zip_bytes({"encodings/__init__.pyc": b"", "codecs.pyc": b""})
+    executable = make_exe(
+        tmp_path / "onefile",
+        [
+            ("struct", pyc("struct"), "m"),
+            ("base_library.zip", base, "x"),
+            ("_ctypes.pyd", b"MZ", "b"),
+            ("unicodedata.cp312-win_amd64.pyd", b"MZ", "b"),
+        ],
+        modules=["json", "ctypes", "ctypes.wintypes"],
+    )
+    have = build.bundled_modules(executable)
+    for name in ("json", "ctypes.wintypes", "struct", "encodings", "codecs", "_ctypes"):
+        assert name in have, name
+    assert "unicodedata" in have
+    assert "sys" in have  # built into the interpreter's DLL
+    onedir = tmp_path / "onedir" / "Clearwater"
+    tree(onedir / "_internal", ["select.pyd", "lib-dynload/_bz2.so"])
+    (onedir / "_internal" / "base_library.zip").write_bytes(zip_bytes({"abc.pyc": b""}))
+    exe = make_exe(onedir, [], modules=["os"])
+    have = build.bundled_modules(exe)
+    for name in ("select", "_bz2", "abc", "os"):
+        assert name in have, name
+    wanted = [build.HiddenImport(n, ("scan",)) for n in ("select", "abc", "graphlib")]
+    assert build.missing_hidden_imports(exe, wanted) == [
+        "hidden-import missing from the bundle: graphlib (scan)"
+    ]
+
+
+def _fake_pyinstaller(
+    monkeypatch: pytest.MonkeyPatch, out: Path, modules: Sequence[str], seen: dict[str, Any]
+) -> None:
+    """Replace PyInstaller with a writer of a one-file release whose PYZ holds ``modules``."""
+
+    def stand_in(args: Sequence[str]) -> None:
+        seen["args"] = list(args)
+        root = build.release_dir(out, "onefile", build.app_version())
+        root.mkdir(parents=True, exist_ok=True)
+        made = make_exe(tmp := out / "fake-sources", [], modules=["clearwater", *modules])
+        shutil.move(str(made), root / "Clearwater.exe")
+        shutil.rmtree(tmp)
+
+    monkeypatch.setattr(build, "run_pyinstaller", stand_in)
+
+
+@pytest.mark.parametrize(("bundle_has", "status"), [(["graphlib", "json"], 0), (["json"], 1)])
+def test_a_missing_member_fails_the_build_and_the_set_is_written_to_the_report(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    bundle_has: list[str],
+    status: int,
+) -> None:
+    """A build whose bundle lacks a member of the set exits 1 (a FAILURE, never a warning)."""
+    monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
+    out = tmp_path / "out"
+    source = tmp_path / "pack" / "mod.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("import json\n", encoding="utf-8")
+    monkeypatch.setattr(build, "pack_sources", lambda: [("pack:mod.py", source)])
+    seen: dict[str, Any] = {}
+    _fake_pyinstaller(monkeypatch, out, bundle_has, seen)
+    assert build.build("onefile", out=out) == status
+    printed = capsys.readouterr().out
+    hidden = [seen["args"][i + 1] for i, a in enumerate(seen["args"]) if a == "--hidden-import"]
+    assert hidden == ["graphlib", "json"]
+    report = json.loads((out / "hidden-imports-onefile.json").read_text(encoding="utf-8"))
+    assert report["hidden_imports"]["graphlib"]["sources"] == ["committed"]
+    assert report["hidden_imports"]["json"]["sources"] == ["scan"]
+    assert report["hidden_imports"]["json"]["named_by"] == ["pack:mod.py:1"]
+    missing = "hidden-import missing from the bundle: graphlib (committed)"
+    assert (missing in printed) == (status == 1)
+    assert ("hidden-import check: PASS" in printed) == (status == 0)
+
+
+def test_an_unparsable_pack_file_fails_the_build_before_pyinstaller(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Imports that cannot be read are unknown needs: the build stops, PyInstaller never runs."""
+    bad = tmp_path / "bad.py"
+    bad.write_text("def broken(:\n", encoding="utf-8")
+    monkeypatch.setattr(build, "pack_sources", lambda: [("pack:bad.py", bad)])
+    seen: dict[str, Any] = {}
+    _fake_pyinstaller(monkeypatch, tmp_path / "out", [], seen)
+    assert build.build("onefile", out=tmp_path / "out") == 1
+    assert "args" not in seen
+    assert "pack:bad.py: SyntaxError" in capsys.readouterr().out
+
+
+def test_the_real_pack_scan_finds_ctypes_wintypes() -> None:
+    """The locked pack's own ``.py`` files name ``ctypes.wintypes`` (the scan, not the list)."""
+    try:
+        sources = build.pack_sources()
+    except importlib.metadata.PackageNotFoundError:
+        pytest.skip("the GPU pack distributions are not installed (the gpu extra)")
+    scan = build.scan_stdlib_imports(sources)
+    assert scan.unparsable == []
+    assert any(p.startswith("cuda-pathfinder:") for p in scan.modules["ctypes.wintypes"])
+    assert "graphlib" not in scan.modules  # the extension-only need the list carries
