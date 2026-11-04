@@ -880,4 +880,4 @@ Verification loop, second pass: suspected that a W-TOOL or M-TOOL caller still p
 recorder saw 0); that the M-TOOL context leaves a stub live (rejected: the replay); that the test
 file would commit CR (confirmed in the working copy; fixed before the commit). Nothing new.
 
-Depth at turn-4 yield: DISPATCHER TO FILL
+Depth at turn-4 yield: 175,078 (cell_depth.py --live, read at the seat 2026-11-04 ~23:08Z after the final return; 69 turns); cell4 retired, the A r2 fold-in goes to a fresh cell.
