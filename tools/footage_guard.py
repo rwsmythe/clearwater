@@ -6,7 +6,11 @@ cased spelling of the footage folder (``/Volumes/Dive/FOOTAGE`` for ``/Volumes/D
 passed the text check and a tool could write into the read-only folder. :func:`is_inside`
 decides by FILE IDENTITY wherever the path exists and by text only where it does not:
 
-1. Both paths are made absolute and resolved (links in their existing parts followed).
+1. Both paths are resolved from their ORIGINAL spelling (links in their existing parts
+   followed, then ``..`` applied to what a link led to, as POSIX does) and made absolute.
+   Collapsing ``..`` first would be wrong on POSIX: with ``alias -> Footage/sub``,
+   ``alias/../output`` is ``Footage/output``, not ``output`` beside ``alias`` (Reviewer A r2).
+   Win32 itself collapses ``..`` before it follows a junction, so there the two orders agree.
 2. Each is split into its nearest EXISTING ancestor (itself when it exists) and the lexical
    tail of names below it that do not exist yet.
 3. ``path`` is inside ``root`` when the root's existing ancestor is, by identity
@@ -51,12 +55,20 @@ def _realpath(text: str) -> str:
 
 
 def _absolute(path: Path) -> PurePath:
-    """Return ``path`` made absolute with ``..`` collapsed and existing links followed."""
-    return PurePath(_realpath(os.path.abspath(path)))
+    """Return ``path`` resolved from its original spelling: links followed, then ``..``.
+
+    ``realpath`` takes the names in order, so a ``..`` after a link leaves the link's TARGET,
+    and makes a relative path absolute against the working folder itself.
+    """
+    return PurePath(_realpath(os.fspath(path)))
 
 
 def _texts(path: Path) -> list[PurePath]:
-    """Return the lexical and the resolved spellings of ``path``, ``normcase``-d."""
+    """Return the lexical and the resolved spellings of ``path``, ``normcase``-d.
+
+    The lexical one (``..`` collapsed by text) is kept as a second candidate, so a path either
+    spelling places inside is refused.
+    """
     spellings = {os.path.abspath(path), str(_absolute(path))}
     return [PurePath(_normcase(text)) for text in spellings]
 

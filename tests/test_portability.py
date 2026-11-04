@@ -2259,6 +2259,68 @@ def _planted(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     return root, alias, alias / "out", sibling / "out"
 
 
+def posix_link_model(links: dict[Path, Path]) -> Any:
+    """A ``realpath`` in POSIX's order over a virtual link table, in this host's path syntax.
+
+    The names are taken left to right; a name the table holds as a link is replaced by its
+    target (itself resolved), and a ``..`` then drops the last name of the RESOLVED prefix.
+    Win32 collapses ``..`` by text BEFORE it follows a junction, so this topology cannot be
+    built natively on Windows; the M module builds it with a real symlink on the Mac.
+    """
+    table = {os.path.normcase(str(link)): target for link, target in links.items()}
+
+    def realpath(path: Any, *, strict: bool = False) -> str:
+        given = Path(os.fspath(path))
+        if not given.is_absolute():
+            given = Path(os.getcwd()) / given
+        current = Path(given.anchor)
+        for name in given.parts[1:]:
+            if name == "..":
+                current = current.parent
+            elif name != ".":
+                current = current / name
+                target = table.get(os.path.normcase(str(current)))
+                if target is not None:
+                    current = Path(realpath(target))
+        return str(current)
+
+    return realpath
+
+
+def link_topology(tmp_path: Path) -> tuple[Path, Path, dict[Path, Path]]:
+    """Reviewer A r2's topology: ``alias -> Footage/sub``; ``alias/../output`` is in Footage.
+
+    Returns the footage root, the target spelled through the link, and the link table for
+    :func:`posix_link_model` (the M module makes ``alias`` a real symlink instead).
+    """
+    root = tmp_path / "Footage"
+    (root / "sub").mkdir(parents=True)
+    (root / "sub" / "GX01.MP4").write_bytes(b"synthetic")
+    (tmp_path / "Footage-out").mkdir()
+    alias = tmp_path / "alias"
+    return root, alias / ".." / "output", {alias: root / "sub"}
+
+
+def tree(root: Path) -> list[str]:
+    """Every file and folder under ``root`` (a refusal before any write leaves it unchanged)."""
+    return sorted(p.relative_to(root).as_posix() for p in root.rglob("*"))
+
+
+def _link_then_dotdot_refused(site: str, tmp_path: Path) -> None:
+    """The symlink-then-``..`` alias (POSIX order, through the ``_realpath`` seam) is refused
+    by the site before any write; the guard itself places the target inside."""
+    footage_guard = importlib.import_module("footage_guard")
+    folder = tmp_path / "link"
+    root, unsafe, links = link_topology(folder)
+    with pytest.MonkeyPatch.context() as model:
+        model.setattr(footage_guard, "_realpath", posix_link_model(links))
+        before = tree(folder)
+        refusal = _guard_refusals(site, root, unsafe)
+        assert tree(folder) == before  # refused before any write (files and folders)
+        assert refusal, (site, unsafe)
+        assert footage_guard.is_inside(unsafe, root), unsafe
+
+
 def _guard_refusals(site: str, root: Path, target: Path) -> Any:
     """Run one tool site's guard; return its refusal (an exception or exit status) or None."""
     if site == "T17":
@@ -2286,7 +2348,9 @@ def _guard_refusals(site: str, root: Path, target: Path) -> Any:
 
 def _fs_guard_site(site: str) -> Any:
     def case(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-        """T17 / T26-T29: an aliased footage root is refused BEFORE any write; a sibling passes."""
+        """T17 / T26-T29: an aliased footage root (a case alias; a symlink then ``..``) is
+        refused BEFORE any write; a sibling passes."""
+        _link_then_dotdot_refused(site, tmp_path)
         guard = _guard_seams(monkeypatch)
         root, alias, unsafe, safe = _planted(tmp_path)
         if sys.platform != "win32" and not alias.exists():
@@ -3290,6 +3354,24 @@ def test_portability_footage_guard_matches_the_reference_checks(tmp_path: Path) 
     for path in (root / "clips", tmp_path / "Footage-out"):
         mutual = footage_guard.is_inside(path, root) and footage_guard.is_inside(root, path)
         assert mutual is is_same_path(path, root) is False, path
+    # Reviewer A r2: a symlink followed by ``..`` (POSIX order). ``os.path.realpath`` itself is
+    # the model here, so footage_guard's seam and headless_export's Path.resolve both see it.
+    linked, unsafe, links = link_topology(tmp_path / "link")
+    alias = next(iter(links))
+    outside = tmp_path / "link" / "out-alias"
+    links[outside] = tmp_path / "link" / "Footage-out" / "deep"
+    topology = {
+        unsafe: True,  # alias/../output = Footage/output
+        alias: True,
+        alias / "x": True,
+        alias / ".." / ".." / "Footage-out": False,
+        outside / ".." / "x": False,  # Footage-out/x
+    }
+    with pytest.MonkeyPatch.context() as model:
+        model.setattr(os.path, "realpath", posix_link_model(links))
+        for path, expected in topology.items():
+            assert footage_guard.is_inside(path, linked) is expected, path
+            assert he.inside(path, linked) is expected, path
 
 
 # --- W-TOOL: the tools' platform reporting, no fake telemetry ------------------------------
@@ -3473,3 +3555,97 @@ def test_portability_tool_reporting(
 ) -> None:
     """W-TOOL: the environment report per platform, honest absences, the historical labels."""
     TOOL_CASES[site](monkeypatch, tmp_path)
+
+
+# --- the M module's borrowed W cases (A r2 item 2: no monkeypatch shared with a native half) ---
+
+
+def _is_patch_context(node: ast.expr) -> bool:
+    """Whether ``node`` is the call ``pytest.MonkeyPatch.context()``."""
+    return isinstance(node, ast.Call) and ast.unparse(node.func) == "pytest.MonkeyPatch.context"
+
+
+def shared_monkeypatch_offenders(source: str) -> list[str]:
+    """Return ``function:line`` for each borrowed W case that could share a monkeypatch.
+
+    A borrowed case is any ``..._CASES[...]`` subscript of ``_w()``. It is isolated only when it
+    is called directly, its first argument is the name bound by an enclosing ``with
+    pytest.MonkeyPatch.context() as NAME``, that ``with`` holds nothing but the call (so no
+    native check runs under it) and NAME is used nowhere else in the function.
+    """
+    tree = ast.parse(source)
+    offenders = []
+    for function in (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)):
+        withs = [n for n in ast.walk(function) if isinstance(n, ast.With)]
+        for node in ast.walk(function):
+            if not (
+                isinstance(node, ast.Subscript)
+                and isinstance(node.value, ast.Attribute)
+                and node.value.attr.endswith("_CASES")
+                and ast.unparse(node.value.value) == "_w()"
+            ):
+                continue
+            call = next(
+                (c for c in ast.walk(function) if isinstance(c, ast.Call) and c.func is node), None
+            )
+            first = call.args[0] if call is not None and call.args else None
+            owner = next(
+                (
+                    w
+                    for w in withs
+                    if len(w.items) == 1
+                    and _is_patch_context(w.items[0].context_expr)
+                    and isinstance(w.items[0].optional_vars, ast.Name)
+                    and isinstance(first, ast.Name)
+                    and w.items[0].optional_vars.id == first.id
+                    and len(w.body) == 1
+                    and isinstance(w.body[0], ast.Expr)
+                    and w.body[0].value is call
+                ),
+                None,
+            )
+            uses = (
+                [
+                    n
+                    for n in ast.walk(function)
+                    if isinstance(n, ast.Name) and n.id == first.id and n is not first
+                ]
+                if isinstance(first, ast.Name)
+                else []
+            )
+            bound = owner is not None and uses == [owner.items[0].optional_vars]
+            if not bound:
+                offenders.append(f"{function.name}:{node.lineno}")
+    return offenders
+
+
+def test_portability_macos_module_isolates_every_borrowed_case() -> None:
+    """A r2 item 2 (the M-TOOL class): every W case the M module re-runs gets its own
+    ``MonkeyPatch.context()``, exited before the native half; planted leaks are caught."""
+    source = (Path(__file__).parent / "test_macos_portability.py").read_text(encoding="utf-8")
+    assert source.count("_CASES[site]") >= 7  # PATH DEVICE TEXT CODEC FS GUARD TOOL
+    assert shared_monkeypatch_offenders(source) == []
+    isolated = (
+        "def test_x(site, monkeypatch, tmp_path):\n"
+        "    with pytest.MonkeyPatch.context() as w_patch:\n"
+        "        _w().FS_CASES[site](w_patch, tmp_path)\n"
+        "    native(site, monkeypatch)\n"
+    )
+    assert shared_monkeypatch_offenders(isolated) == []
+    leaks = {
+        "shared": isolated.replace("(w_patch, tmp_path)", "(monkeypatch, tmp_path)"),
+        "native inside": isolated.replace(
+            "    native(site, monkeypatch)\n", "        native(site, monkeypatch)\n"
+        ),
+        "kept after": isolated.replace("native(site, monkeypatch)", "native(site, w_patch)"),
+        "no context": isolated.replace(
+            "    with pytest.MonkeyPatch.context() as w_patch:\n        _w()",
+            "    w_patch = 1\n    _w()",
+        ),
+        "indirect": isolated.replace(
+            "        _w().FS_CASES[site](w_patch, tmp_path)\n",
+            "        case = _w().FS_CASES[site]\n        case(w_patch, tmp_path)\n",
+        ),
+    }
+    for label, planted in leaks.items():
+        assert shared_monkeypatch_offenders(planted) == ["test_x:3"], label

@@ -309,7 +309,9 @@ def test_macos_app_locations_and_isolation(
     """M-PATH: the Library roots from the real HOME resolution, in a child redirected to a
     disposable home; the injected Windows-side case natively; nothing created by resolving."""
     _path_native(site, tmp_path / "native")
-    _w().PATH_CASES[site](monkeypatch, tmp_path / "w")
+    (tmp_path / "w").mkdir()  # the W case lists its scratch folder at the end (A r2 item 3)
+    with pytest.MonkeyPatch.context() as w_patch:  # the W stubs end before the native half
+        _w().PATH_CASES[site](w_patch, tmp_path / "w")
     if site in ("X15", "X16"):  # the start-up tests' own redirection resolves under the sentinel
         from clearwater.config.paths import app_locations
 
@@ -477,7 +479,8 @@ def test_macos_cpu_without_cuda(site: str, monkeypatch: pytest.MonkeyPatch, tmp_
         "forced": "CPU: forced",
         "free": None,
     }
-    _w().DEVICE_CASES[site](monkeypatch, tmp_path)
+    with pytest.MonkeyPatch.context() as w_patch:  # the W stubs end before the native half
+        _w().DEVICE_CASES[site](w_patch, tmp_path)
     if site == "T42":
         argv = [
             sys.executable,
@@ -568,7 +571,8 @@ def test_macos_ffmpeg_text_and_redaction(
         redacted = he.Redactor([folder])(text)
         assert str(real) not in redacted and str(folder) not in redacted
     else:
-        _w().TEXT_CASES[site](monkeypatch, tmp_path)
+        with pytest.MonkeyPatch.context() as w_patch:  # the W stubs end before the native half
+            _w().TEXT_CASES[site](w_patch, tmp_path)
         if site == "X45":
             support = importlib.import_module("acceptance_support")
             with pytest.raises(AssertionError):
@@ -612,7 +616,8 @@ def test_macos_videotoolbox_capabilities(
         )
         assert report.frames_written == 15
     elif site in ("P55", "T33", "T34", "T35", "T37"):
-        _w().CODEC_CASES[site](monkeypatch, tmp_path)
+        with pytest.MonkeyPatch.context() as w_patch:  # the W stubs end before the native half
+            _w().CODEC_CASES[site](w_patch, tmp_path)
 
 
 # --- M-RATE ----------------------------------------------------------------------------------
@@ -818,7 +823,8 @@ def _fs_exfat_links(volumes: dict[str, Path]) -> None:
 
 
 def _fs_native_alias(site: str, tmp_path: Path) -> None:
-    """T17 / T26-T29: a symlink alias and a case alias of the footage root are refused natively."""
+    """T17 / T26-T29: a symlink alias, a case alias and a symlink-then-``..`` alias of the
+    footage root are refused natively, before any write."""
     footage_guard = importlib.import_module("footage_guard")
     root = tmp_path / "Dive" / "Footage"
     (root / "clips").mkdir(parents=True)
@@ -828,6 +834,16 @@ def _fs_native_alias(site: str, tmp_path: Path) -> None:
         assert footage_guard.is_inside(unsafe, root), unsafe
         assert _w()._guard_refusals(site, root, unsafe)
     assert not footage_guard.is_inside(tmp_path / "Dive" / "Footage-out", root)
+    # A r2 item 1, natively: a real symlink to a sub-folder, then ``..`` (the kernel's order).
+    folder = tmp_path / "dotdot"
+    linked, unsafe, links = _w().link_topology(folder)
+    for alias, target in links.items():
+        alias.symlink_to(target, target_is_directory=True)
+    assert os.path.realpath(unsafe) == str((linked / "output").resolve())
+    before = _w().tree(folder)
+    assert _w()._guard_refusals(site, linked, unsafe)
+    assert _w().tree(folder) == before  # refused before any write
+    assert footage_guard.is_inside(unsafe, linked)
 
 
 def _fs_finder_slash(tmp_path: Path) -> None:
@@ -924,7 +940,8 @@ def test_macos_filesystem_semantics(
     """M-FS: the Windows-side case on the native APFS volume, then the Mac-only check where the
     row has one (both APFS case modes, exFAT, the DR-34(a) corpus, Finder's ``:``)."""
     (tmp_path / "w").mkdir()
-    _w().FS_CASES[site](monkeypatch, tmp_path / "w")
+    with pytest.MonkeyPatch.context() as w_patch:  # the W stubs end before the native half
+        _w().FS_CASES[site](w_patch, tmp_path / "w")
     _fs_native(site, request, monkeypatch, tmp_path)
 
 
@@ -999,7 +1016,8 @@ def test_macos_footage_guard_and_helpers(
 ) -> None:
     """M-GUARD: TMPDIR / TEMP / TMP / basetemp, symlinks, hard links, loops and case aliases on
     the native volume; the Windows-only controls skip here and their guard check still holds."""
-    _w().GUARD_CASES[site](monkeypatch, tmp_path)
+    with pytest.MonkeyPatch.context() as w_patch:  # the W stubs end before the native half
+        _w().GUARD_CASES[site](w_patch, tmp_path)
     _guard_native(tmp_path / "native", monkeypatch)
 
 
