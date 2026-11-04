@@ -442,23 +442,31 @@ def process_export_jobs(
 ) -> ExportJobs:
     """Return the export engine whose video jobs run in a worker process (WP4.6, Q2).
 
-    Each video job spawns ``python -m clearwater.app.export_worker``, which builds
-    :func:`export_jobs` with its own scratch cache under ``cache_dir / "export"``; the job's
-    cache limit travels in the request's settings. A photo request is handed to
-    ``photo_exports`` in this process. Building spawns nothing and touches no folder.
+    Each video job spawns ``python -m clearwater.app.export_worker`` (in a frozen build, the
+    executable itself with ``--export-worker``, which ``clearwater.__main__`` dispatches), and
+    the worker builds :func:`export_jobs` with its own scratch cache under
+    ``cache_dir / "export"``; the job's cache limit travels in the request's settings. A photo
+    request is handed to ``photo_exports`` in this process. Building spawns nothing and touches
+    no folder.
 
     Args:
         photo_exports: The in-process engine for photo requests (the application's
             :func:`export_jobs` over its one cache).
         cache_dir: The application's cache folder (the caller's: ``Locations.cache_dir``).
         app_version: The version recorded in provenance (D91).
-        command: The worker's command line; ``[sys.executable, "-m",
-            "clearwater.app.export_worker"]`` when None (tests pass another worker).
+        command: The worker's command line. When None: ``[sys.executable, "--export-worker"]``
+            in a frozen build (``sys.frozen`` set; WP6.1, AD-34), else ``[sys.executable,
+            "-m", "clearwater.app.export_worker"]``. Tests pass another worker.
 
     Returns:
         The export engine (a :class:`~clearwater.jobs.export_process.ProcessExportJobs`).
     """
-    worker = [sys.executable, "-m", "clearwater.app.export_worker"] if command is None else command
+    if command is not None:
+        worker: Sequence[str] = command
+    elif getattr(sys, "frozen", False):
+        worker = [sys.executable, "--export-worker"]
+    else:
+        worker = [sys.executable, "-m", "clearwater.app.export_worker"]
     return ProcessExportJobs(
         photo_exports=photo_exports, cache_dir=cache_dir, app_version=app_version, command=worker
     )
