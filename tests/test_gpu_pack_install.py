@@ -12,6 +12,7 @@ import os
 import shutil
 import socket
 import stat
+import sys
 import threading
 import zipfile
 from collections import Counter
@@ -29,6 +30,88 @@ def _installer():
     from clearwater import gpu_pack_install
 
     return gpu_pack_install
+
+
+@pytest.fixture
+def headless_entry(monkeypatch, tmp_path):
+    # Reuse the fresh-import blocker without importing or constructing a GUI.
+    from test_frozen_entry import _fresh_entry
+
+    for variable in (
+        "APPDATA",
+        "LOCALAPPDATA",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+    ):
+        monkeypatch.setenv(variable, str(tmp_path / variable))
+    entry, blocker = _fresh_entry(monkeypatch)
+    monkeypatch.setattr(entry.gpu_pack, "activate", lambda: pytest.fail("pack activated"))
+    yield entry
+    assert blocker.attempts == []
+
+
+@pytest.mark.timeout(10)
+def test_headless_install_progress_and_noop(fake_index, headless_entry, capsys):
+    assert headless_entry.main(["clearwater", "--install-gpu-pack"]) == 0
+    lines = capsys.readouterr().err.splitlines()
+    assert len(lines) == 5
+    for line, distribution in zip(lines[:-1], fake_index.distributions, strict=True):
+        assert distribution.wheels[0][0] in line
+    assert lines[-1] == "GPU support is installed. Restart Clearwater to use it."
+    fake_index.requests.clear()
+    assert headless_entry.main(["clearwater", "--install-gpu-pack"]) == 0
+    assert capsys.readouterr().err.strip() == "GPU support is already installed"
+    assert fake_index.requests == []
+    assert headless_entry.main(["clearwater", "--remove-gpu-pack"]) == 0
+    assert "takes effect at the next start" in capsys.readouterr().err
+    assert not list(fake_index.root.iterdir())
+    assert headless_entry.main(["clearwater", "--remove-gpu-pack"]) == 0
+    assert capsys.readouterr().err.strip() == "no GPU pack is installed"
+
+
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("cancel", [False, True])
+def test_headless_failure_and_cancel(headless_entry, monkeypatch, capsys, cancel):
+    installer = _installer()
+    outcome = installer.PackResult(False, "cancelled" if cancel else "no network", cancelled=cancel)
+    monkeypatch.setattr(installer, "install", lambda progress: outcome)
+    assert headless_entry.main(["clearwater", "--install-gpu-pack"]) == 1
+    assert capsys.readouterr().err.strip() == outcome.message
+
+
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("operation", ["install", "remove"])
+def test_headless_rejects_extra_arguments(headless_entry, monkeypatch, operation):
+    monkeypatch.setattr(_installer(), operation, lambda *args: pytest.fail("installer called"))
+    assert headless_entry.main(["clearwater", f"--{operation}-gpu-pack", "extra"]) != 0
+
+
+@pytest.mark.timeout(10)
+def test_headless_remove_failure(headless_entry, monkeypatch, capsys):
+    installer = _installer()
+    monkeypatch.setattr(
+        installer, "remove", lambda: installer.PackResult(False, "folder is locked")
+    )
+    assert headless_entry.main(["clearwater", "--remove-gpu-pack"]) == 1
+    assert capsys.readouterr().err.strip() == "folder is locked"
+
+
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("operation", ["install", "remove"])
+def test_headless_windowed_without_stderr(headless_entry, monkeypatch, operation):
+    installer = _installer()
+
+    def run(*args):
+        if args:
+            args[0].report(1, 2, "wheel.whl")
+            assert not args[0].cancelled()
+        return installer.PackResult(True, "done")
+
+    monkeypatch.setattr(installer, operation, run)
+    monkeypatch.setattr(sys, "stderr", None)
+    assert headless_entry.main(["clearwater", f"--{operation}-gpu-pack"]) == 0
 
 
 class Progress:

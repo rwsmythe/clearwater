@@ -41,6 +41,27 @@ BLOCKED = ("PySide6", "shiboken6", "clearwater.gui", "clearwater.app.main")
 """Modules the worker branch must never import (AD-31: the worker is Qt-free)."""
 
 
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("frozen", [False, True])
+@pytest.mark.parametrize("operation", ["install", "remove"])
+def test_gpu_pack_command_dispatch_is_qt_free(monkeypatch, tmp_path, calls, frozen, operation):
+    from clearwater import gpu_pack_install
+
+    entry, blocker = _fresh_entry(monkeypatch)
+    monkeypatch.setattr(sys, "frozen", frozen, raising=False)
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "Clearwater.exe"))
+    monkeypatch.setattr(entry, "prepend_executable_folder", lambda: calls.append(("path", None)))
+
+    def run(*args):
+        calls.append((operation, len(args)))
+        return gpu_pack_install.PackResult(True, "done")
+
+    monkeypatch.setattr(gpu_pack_install, operation, run)
+    assert entry.main(["Clearwater", f"--{operation}-gpu-pack"]) == 0
+    assert calls == [("path", None), (operation, 1 if operation == "install" else 0)]
+    assert blocker.attempts == []
+
+
 class _Blocker(importlib.abc.MetaPathFinder):
     """Refuse, and record, every import of a :data:`BLOCKED` module."""
 

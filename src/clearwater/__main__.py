@@ -380,6 +380,37 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _refuse(MULTIPROCESSING_REFUSAL)
     frozen = getattr(sys, "frozen", False)
     prepend_executable_folder()
+    if arguments[1:2] in (["--install-gpu-pack"], ["--remove-gpu-pack"]):
+        if len(arguments) != 2:
+            return _refuse(f"{arguments[1]} takes no further arguments")
+        from clearwater import gpu_pack_install
+
+        class ConsoleProgress:
+            """Print one line per wheel without importing GUI or numerical modules."""
+
+            def __init__(self) -> None:
+                """Start with no reported wheel."""
+                self._wheel = ""
+
+            def report(self, done: int, total: int | None, message: str) -> None:
+                """Print the first byte report for each wheel to redirected stderr."""
+                if message != self._wheel:
+                    self._wheel = message
+                    if sys.stderr is not None:
+                        print(f"{message}: {done}/{total} bytes", file=sys.stderr, flush=True)
+
+            def cancelled(self) -> bool:
+                """Allow terminal interruption through the installer's KeyboardInterrupt path."""
+                return False
+
+        outcome = (
+            gpu_pack_install.install(ConsoleProgress())
+            if arguments[1] == "--install-gpu-pack"
+            else gpu_pack_install.remove()
+        )
+        if sys.stderr is not None:
+            print(outcome.message, file=sys.stderr, flush=True)
+        return 0 if outcome.ok else 1
     if frozen:
         if arguments[1:2] == [WORKER_FLAG]:  # frozen only: a source run is 1.0.0 (A r3 #1)
             # F-E: before the worker's first read and before anything that can spawn a child

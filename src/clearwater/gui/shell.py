@@ -25,10 +25,12 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QLabel,
     QMenu,
+    QMessageBox,
     QVBoxLayout,
     QWidget,
 )
 
+from clearwater import gpu_pack
 from clearwater.config import (
     Locations,
     PresetError,
@@ -42,6 +44,7 @@ from clearwater.config import (
 )
 from clearwater.interfaces import (
     FormatError,
+    JobResult,
     ParameterSet,
     Settings,
     UnsupportedFormatVersionError,
@@ -64,6 +67,7 @@ from .contract import (
     ShellWindow,
 )
 from .engines import default_engines
+from .gpu_pack_dialog import GpuPackDialog, _remove_job
 from .jobs import QtJobRunner
 from .messages import BannerWidget, DialogPresenter
 from .preview import PreviewController, PreviewWidget
@@ -329,6 +333,9 @@ class MainWindow(ShellWindow):
 
         self.presenter: MessagePresenter = presenter or DialogPresenter(self, self.banner)
         self.jobs = QtJobRunner()
+        self._gpu_pack_dialog: GpuPackDialog | None = None
+        self._gpu_remove_prompt: QMessageBox | None = None
+        self._gpu_busy = False
         self.shell_actions = self._build_actions()
         self._docks: dict[Area, list[QDockWidget]] = {Area.PARAMETERS: [], Area.JOBS: []}
         self._settings_factory: SettingsDialogFactory | None = None
@@ -487,7 +494,75 @@ class MainWindow(ShellWindow):
         }
         tools_menu = self.menuBar().addMenu("&Tools")
         tools_menu.addAction(settings)
+        self._gpu_install = tools_menu.addAction("Install GPU support...")
+        self._gpu_remove = tools_menu.addAction("Remove GPU support")
+        self._gpu_install.triggered.connect(self._open_gpu_pack)
+        self._gpu_remove.triggered.connect(self._confirm_gpu_remove)
+        tools_menu.aboutToShow.connect(self._update_gpu_actions)
+        self._update_gpu_actions()
         return ShellActions(open=open_action, export=export, settings=settings, quit=quit_action)
+
+    def _update_gpu_actions(self) -> None:
+        """Expose the platform's pack actions and refresh presence without loading a pack."""
+        root = gpu_pack.pack_root()
+        supported = root is not None
+        self._gpu_install.setVisible(supported)
+        self._gpu_remove.setVisible(supported)
+        self._gpu_install.setEnabled(supported and not self._gpu_busy)
+        present = root is not None and (root / gpu_pack.STAMP).is_dir()
+        self._gpu_remove.setEnabled(present and not self._gpu_busy)
+
+    def _gpu_busy_changed(self, busy: bool) -> None:
+        """Disable both actions during an install or removal and refresh after cleanup."""
+        self._gpu_busy = busy
+        self._update_gpu_actions()
+
+    def _open_gpu_pack(self) -> None:
+        """Retain and open the explicit install request without a nested event loop."""
+        if self._gpu_busy or gpu_pack.pack_root() is None:
+            return
+        if self._gpu_pack_dialog is not None and self._gpu_pack_dialog.isVisible():
+            self._gpu_pack_dialog.raise_()
+            return
+        dialog = GpuPackDialog(self.jobs, self)
+        self._gpu_pack_dialog = dialog
+        dialog.busy_changed.connect(self._gpu_busy_changed)
+        dialog.open()
+
+    def _confirm_gpu_remove(self) -> None:
+        """Ask before removal; the nonblocking prompt retains its own lifetime."""
+        if self._gpu_busy or gpu_pack.pack_root() is None:
+            return
+        prompt = QMessageBox(self)
+        prompt.setWindowTitle("Remove GPU support")
+        prompt.setText("Remove GPU support? This takes effect at the next start.")
+        prompt.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        prompt.setDefaultButton(QMessageBox.StandardButton.No)
+        prompt.setWindowModality(Qt.WindowModality.WindowModal)
+        self._gpu_remove_prompt = prompt
+        prompt.finished.connect(self._start_gpu_remove)
+        prompt.open()
+
+    def _start_gpu_remove(self, answer: int) -> None:
+        """Submit confirmed removal on the shared worker runner, never on the Qt thread."""
+        if answer != QMessageBox.StandardButton.Yes or self._gpu_busy:
+            return
+        self._gpu_busy_changed(True)
+        try:
+            self.jobs.run(_remove_job, on_done=self._gpu_removed)
+        except RuntimeError as error:
+            self._gpu_removed(JobResult(False, (), (), str(error), "unknown", 0))
+
+    def _gpu_removed(self, result: JobResult) -> None:
+        """Show removal's outcome and update the actions after filesystem work has ended."""
+        self._gpu_busy_changed(False)
+        if result.ok:
+            text = result.warnings[0] if result.warnings else "GPU support is removed"
+            self.statusBar().showMessage(messages.ascii_text(text))
+            self.presenter.clear(owner="gpu-pack")
+        else:
+            text = messages.ascii_text(result.failure or "GPU support removal failed")
+            self.presenter.present(Message("error", text, owner="gpu-pack"))
 
     def _view_action(
         self, menu: QMenu, text: str, shortcut: str, slot: Callable[[], None]
@@ -547,7 +622,13 @@ class MainWindow(ShellWindow):
         preview = self.session.preview_backend()
         if source is None:
             self.device_label.setText(f"Device: {self._idle_device}")
-            self.device_label.setToolTip("")
+            hint = (
+                "Tools > Install GPU support..."
+                if self._idle_device.startswith("CPU: CuPy not installed")
+                and gpu_pack.pack_root() is not None
+                else ""
+            )
+            self.device_label.setToolTip(hint)
             self.file_label.setText("")
             self.size_label.setText("")
         else:
