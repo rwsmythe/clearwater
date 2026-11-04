@@ -1,0 +1,786 @@
+# WP6.2 portability audit: macOS arm64 CPU path
+
+Date: 2026-11-04. Audited source: 5671a927, branch wp6.2.
+Status: full report for Reviewer A; acceptance and both review nets pending.
+Scope: src/clearwater, tools, and product tests. Scripts and tests/harness are
+excluded. This report changes no product, tool, test, interface, or dependency.
+
+## 1. Summary
+
+Class 1 means platform conditionals, platform identification, Windows APIs, or
+explicit Windows executable/path spellings. Class 2 means platform assumptions
+without those conditionals: encoder/device models, filesystem identity, native
+GUI behaviour, external-tool wording, and test coverage.
+
+The accepted round-0 searches produced these matching-line / matching-file
+counts. Comments and test data count; these are screening counts, not counts of
+executable branches. Searches overlap and must not be summed as unique sites.
+
+| Search | Class / purpose | src/clearwater | tools | tests excluding harness |
+|---|---|---:|---:|---:|
+| B | Class 1 baseline | 13 / 2 | 10 / 3 | 42 / 19 |
+| W | Class 1 broad widening | 103 / 31 | 166 / 30 | 286 / 62 |
+| R | Class 1 refined | 19 / 2 | 36 / 5 | 88 / 21 |
+| A0 | Class 2 initial screen | 211 / 36 | 438 / 43 | 1124 / 100 |
+| A | Class 2 refined screen | 94 / 25 | 183 / 27 | 481 / 79 |
+| S | Filesystem/process supplement | 77 / 31 | 153 / 30 | 1011 / 96 |
+| L | Literal two-backslash sweep | 8 / 4 | 35 / 10 | 95 / 29 |
+
+The semantic site table has the following row counts. These are mechanisms,
+not regex hits; they include already-portable mechanisms that need a Mac leg.
+
+| Tree | Class 1 rows | Class 2 rows | Total rows |
+|---|---:|---:|---:|
+| src/clearwater | 3 | 52 | 55 |
+| tools | 6 | 42 | 48 |
+| tests excluding harness | 26 | 19 | 45 |
+| Total | 35 | 113 | 148 |
+
+REASONED: the existing product has a usable CPU/x265 path and an automatic
+default decoder-pipe fallback. The missing commissioned leg is VideoToolbox;
+the current encoder registry cannot select it. Native Library folders, APFS
+identity cases, native GUI behaviour, and a self-contained arm64 bundle need
+follow-on implementation or validation. No Windows product defect was confirmed.
+
+This is a code audit with documentation research, not Mac execution evidence.
+Every current macOS assessment below is labelled REASONED or DOC. "Works" means
+the inspected portable mechanism is expected to work, not that it was run.
+"Untested" preserves uncertainty about a real build, filesystem, or native UI.
+Recommended changes and proposed tests are future work, not completed work.
+
+## 2. Grep record
+
+These are the accepted round-0 commands and counts; the complete scans were not
+repeated in turn 2. PowerShell was the shell. Each pattern below was assigned
+to $p and counted separately for each root by this exact loop:
+
+    foreach ($root in @('src/clearwater','tools','tests')) {
+        $a = @(rg -n -g '!**/harness/**' -e $p $root)
+        $f = @(rg -l -g '!**/harness/**' -e $p $root)
+        Write-Output ($root + ' | lines=' + $a.Count + ' | files=' + $f.Count)
+    }
+
+### B: requested Class 1 baseline
+
+    $p = 'sys\.platform|os\.name|platform\.system\(|CREATE_NO_WINDOW|msvcrt|windll|LOCALAPPDATA|APPDATA'
+
+Counts: src 13 / 2; tools 10 / 3; tests 42 / 19.
+The product's two files are config/paths.py and io/video/pipes.py. The 13 lines
+include documentation as well as code; they are not 13 distinct conditionals.
+
+### W: first widening
+
+    $p = 'startupinfo|creationflags|winreg|ctypes|\.exe\b|powershell|\bwhere(?:\.exe)?\s|cmd /c|[A-Za-z]:\\|\bnul\b|os\.startfile|WinDLL|SetNamedPipeHandleState|CreatePipe|PeekNamedPipe|GetLastError|O_BINARY|O_NOINHERIT|os\.uname|platform\.machine|fork|spawn|posix|darwin|win32|Windows|macOS|linux'
+
+Counts: src 103 / 31; tools 166 / 30; tests 286 / 62.
+W is an additional search, not B union W. It intentionally admits prose.
+Its drive-letter pattern also catches regex fragments such as n:\s.
+
+### R: refined Class 1
+
+    $p = 'sys\.platform|os\.name|platform\.system\(|CREATE_NO_WINDOW|msvcrt|windll|LOCALAPPDATA|APPDATA|startupinfo|creationflags|winreg|ctypes|\.exe\b|powershell|\x22where(?:\.exe)?\x22|\x27where(?:\.exe)?\x27|\x22cmd\x22|\x27cmd\x27|cmd /c|[\x22\x27][A-Za-z]:\\|os\.startfile|_winapi|WinDLL|O_BINARY|O_NOINHERIT'
+
+Counts: src 19 / 2; tools 36 / 5; tests 88 / 21.
+R adds launch keywords and explicit command/path literals while removing prose
+"where", generic platform prose, and unanchored drive-like regex fragments.
+Hexadecimal quote escapes avoid native PowerShell argument-quoting ambiguity.
+
+The predecessor's 109-file tools/tests result has no exact command in the
+dispatch, so it is not a reproducible identity target. W matched 92 files across
+those roots; R matched 26. Neither number includes the harness.
+Two exploratory literal-quote patterns were discarded after shell transport
+changed their meaning; their outputs do not support this report's counts.
+
+### A0: initial Class 2
+
+    $p = 'hevc_nvenc|libx265|nvidia-smi|memGetInfo|cuda|suffix|\.MP4|\.MOV|\.HEIC|normcase|casefold|lower\(|resolve\(|is_relative_to|commonpath|TMP|TEMP|tempfile|tempdir|split\(.*/|replace\(.*/|backslash|separator'
+
+Counts: src 211 / 36; tools 438 / 43; tests 1124 / 100.
+
+### A: refined Class 2
+
+    $p = 'hevc_nvenc|libx265|nvidia-smi|memGetInfo|free_device_bytes|CUDA_CONTEXT_BYTES|NVDEC_|NVENC_|suffix\.lower\(|normcase|casefold|splitdrive|is_junction|isjunction|samestat|samefile|TMPDIR|PYTEST_DEBUG_TEMPROOT|[\x22\x27](?:TMP|TEMP)[\x22\x27]|EXTENDED_PREFIXES|_FORBIDDEN|_DEVICE_NAMES|QT_QPA_PLATFORM|offscreen|devicePixelRatio|Ctrl\+|sys\.executable'
+
+Counts: src 94 / 25; tools 183 / 27; tests 481 / 79.
+A narrows generic CUDA, suffix, resolve, and lower-case prose to named mechanisms.
+
+### S: filesystem, process, names, fixtures
+
+    $p = 'backslash|separator|reserved|NUL|CONIN|CONOUT|\.MP4|\.mp4|\.MOV|\.HEIC|F_SETPIPE_SZ|fcntl|resource|SIGTERM|SIGKILL|SIGBREAK|killpg|setsid|start_new_session|shell=True|chmod|fchmod|fsync|os\.link|os\.replace|os\.rename|os\.environ.*(?:HOME|PATH)|gettempdir|tempfile'
+
+Counts: src 77 / 31; tools 153 / 30; tests 1011 / 96.
+S retains rejected-name tests, filesystem publication semantics, and historical
+instrument assumptions. NUL-byte, JSON-separator, and binary-format terminology
+is not itself a platform site.
+
+### L: literal backslash coverage
+
+    $p = '\\'
+
+The same per-root loop used rg -n -F and rg -l -F, retaining the harness exclusion.
+Counts: src 8 / 4; tools 35 / 10; tests 95 / 29.
+This is a literal two-backslash search, not a regex for every backslash.
+Regex escapes, newline escapes, and ASCII backslash-escaping of diagnostics were
+classified as data/format handling rather than Windows filesystem dependencies.
+
+Targeted rg reads then followed the actual mechanics at the file:line sites
+below: suffix routing, containment/identity, encoder options and stderr parsing,
+memory selection, native GUI entry points, and Windows-only test controls.
+No scripts were audited, no shell "where" or PowerShell command was executed,
+and no footage was opened.
+
+## 3. Site table and test references
+
+Paths in the first table are relative to src/clearwater; paths in the next two
+are relative to tools and tests respectively. A row identifies one mechanism;
+several lines belonging to that mechanism are cited together where necessary.
+Retain means preserve the portable behaviour and add the stated coverage.
+A named test reference W-... or M-... expands in section 8 to a proposed test
+function and parameter contract. The bracketed row ID is that test's site
+parameter, so every row has a specific Windows-side and Mac-side test target.
+M references all require the proposed macos marker. No named new test exists yet.
+
+### 3.1 Product
+
+| ID | File:line | Class | Assumption / mechanic | macOS today | Recommended change | Windows-side test | macos test |
+|---|---|---|---|---|---|---|---|
+| P01 | config/paths.py:115 | 1 | win32 uses APPDATA/LOCALAPPDATA; all else XDG | REASONED works via XDG, no Library branch | Add darwin locations from section 5; retain Windows/XDG | W-PATH[P01] | M-PATH[P01] |
+| P02 | io/video/pipes.py:56 | 1 | CREATE_NO_WINDOW only on win32 | REASONED works with zero flags | Retain guarded constant and FFREPORT removal | W-SPAWN[P02] | M-SPAWN[P02] |
+| P03 | io/video/pipes.py:67,85,122 | 1 | _winapi/msvcrt enlarged pipe; OSError caught | REASONED works via default-pipe fallback | Retain default pipe for darwin, Q2 | W-PIPE[P03] | M-PIPE[P03] |
+| P04 | io/video/decode.py:335,350 | 2 | Separate enlarged/default stdout paths | REASONED works by fallback; throughput untested | Retain both lifecycle paths; validate frames/PTS | W-PIPE[P04] | M-PIPE[P04] |
+| P05 | io/video/decode.py:152,246 | 2 | Actual CUDA trial enables hwaccel cuda | REASONED software decode available | Keep CPU path; no CUDA or Metal requirement on Mac | W-DEVICE[P05] | M-DEVICE[P05] |
+| P06 | io/video/decode.py:72 | 2 | Exact showinfo prefix, frame and time-base fields | REASONED untested on Mac FFmpeg | Validate pinned build text; change parser only for demonstrated difference | W-TEXT[P06] | M-TEXT[P06] |
+| P07 | io/video/capability.py:33 | 2 | Registry offers NVENC/x265 only | REASONED fails to offer VT; x265 available | Platform encoder roster: darwin VT then x265 | W-CODEC[P07] | M-CODEC[P07] |
+| P08 | io/video/capability.py:109 | 2 | Encoder-list flag/name parsing | REASONED untested against Mac build | Parse listing plus actual trial; include absent/failed VT cases | W-TEXT[P08] | M-TEXT[P08] |
+| P09 | io/video/capability.py:123 | 2 | Trial format/profile table knows two encoders | REASONED VT absent | Add independent 8/10-bit VT trials | W-CODEC[P09] | M-CODEC[P09] |
+| P10 | io/video/capability.py:172 | 2 | NVIDIA stderr fragments explain failures | REASONED generic failure path works; VT reason absent | Keep NVENC markers scoped to NVENC; preserve ASCII-safe VT diagnostic | W-TEXT[P10] | M-TEXT[P10] |
+| P11 | io/video/capability.py:249 | 2 | auto follows existing two-name tuple | REASONED selects x265, never VT | Platform preference with fallback; explicit selection still validated | W-CODEC[P11] | M-CODEC[P11] |
+| P12 | io/video/encode.py:107 | 2 | cq 22/26/30 and crf 21/26/30 are encoder-specific | REASONED x265 works; VT mapping absent | Separate VT controls; no numeric cq-to-qscale translation | W-RATE[P12] | M-RATE[P12] |
+| P13 | io/video/encode.py:256 | 2 | NVENC output pixel-rate/level ceiling | REASONED arithmetic portable; VT application absent | Reuse numeric rule through an approved internal helper; map VT separately | W-RATE[P13] | M-RATE[P13] |
+| P14 | io/video/encode.py:323 | 2 | non-NVENC branch emits x265 options | REASONED no VT command branch | Add explicit VT branch, never x265 params/preset/crf for VT | W-CODEC[P14] | M-CODEC[P14] |
+| P15 | io/video/encode.py:100,434,450 | 2 | gpmd allowlist, hvc1 and regenerated tmcd | REASONED platform-neutral arguments; Mac mux untested | Preserve container policy; run full V4 comparison | W-V4[P15] | M-V4[P15] |
+| P16 | io/video/probe.py:100 | 2 | shutil.which locates ffmpeg/ffprobe | REASONED source install works with PATH; bundle untested | Bundle-aware absolute tool lookup, source PATH fallback, WP6.5 | W-SPAWN[P16] | M-BUNDLE[P16] |
+| P17 | io/video/probe.py:74 | 2 | Transfer identifiers refuse HLG/PQ | REASONED works independently of encoder | Retain refusal before decode/encode; add VT selection control | W-V4[P17] | M-V4[P17] |
+| P18 | core/memory.py:50 | 2 | D111 formula bounds CUDA working arrays | REASONED portable arithmetic, not a Mac RAM admission rule | Retain formula; report CPU RAM separately | W-DEVICE[P18] | M-DEVICE[P18] |
+| P19 | core/memory.py:85 | 2 | CUDA/NVDEC/NVENC constants fitted on NVIDIA | REASONED inapplicable to Mac CPU jobs | Do not present these as unified-memory estimates | W-DEVICE[P19] | M-DEVICE[P19] |
+| P20 | core/backend.py:551 | 2 | CPU free_device_bytes is None | REASONED works | Retain; never compare None with D111 estimate | W-DEVICE[P20] | M-DEVICE[P20] |
+| P21 | core/backend.py:797 | 2 | CUDA free memory plus reusable CuPy pool | REASONED unused on CPU path | Keep CUDA-specific; no Apple GPU substitution | W-DEVICE[P21] | M-DEVICE[P21] |
+| P22 | core/backend.py:933 | 2 | Optional CuPy import/device/kernel probe | REASONED absent CuPy returns CPU reason | Retain graceful missing/unusable-CUDA paths | W-DEVICE[P22] | M-DEVICE[P22] |
+| P23 | core/backend.py:1027 | 2 | force_cpu/no CUDA returns before free-device query | REASONED works; Mac RSS unmeasured | Pin no-CUDA selection and distinguish RSS from GPU estimates | W-DEVICE[P23] | M-DEVICE[P23] |
+| P24 | app/composition.py:461 | 2 | Worker is sys.executable -m module | REASONED source launch works; frozen launch untested | WP6.5 frozen-worker dispatch preserving AD-31 protocol | W-SPAWN[P24] | M-BUNDLE[P24] |
+| P25 | app/main.py:270 | 2 | Journal receives Locations.config_dir | REASONED follows current XDG resolver | Keep injected folder; native darwin branch flows through | W-PATH[P25] | M-PATH[P25] |
+| P26 | app/startup.py:69 | 2 | write-journal.json resides in config_dir | REASONED works under XDG | Persist under Application Support, not cache or app bundle | W-PATH[P26] | M-PATH[P26] |
+| P27 | gui/sources.py:38 | 2 | Dialog filters enumerate lower-case suffix globs | REASONED native filter case behaviour untested | Validate mixed-case visibility; add upper-case globs only if needed | W-GUI[P27] | M-GUI[P27] |
+| P28 | gui/sources.py:57 | 2 | Route lower-cases suffix | REASONED works for upper/lower extensions | Retain case-insensitive routing | W-FS[P28] | M-FS[P28] |
+| P29 | gui/batch_panel.py:94 | 2 | normcase(abspath) is queue identity | REASONED APFS case-alias risk, DR candidate 1 | Existing-file identity plus conservative nonexistent fallback; preserve distinct files | W-FS[P29] | M-FS[P29] |
+| P30 | gui/batch_panel.py:107 | 2 | normcase identifies duplicate display names | REASONED case treatment differs on Darwin | Align label policy with queue identity; avoid blanket filesystem casefold | W-FS[P30] | M-FS[P30] |
+| P31 | gui/shell.py:472 | 2 | Qt controls menu bar placement | DOC native macOS menu handling [QT]; application untested | Retain native menu; validate Quit/Settings placement and actions | W-GUI[P31] | M-GUI[P31] |
+| P32 | gui/shell.py:480 | 2 | View shortcuts use Ctrl; Open/Quit StandardKey | DOC Qt maps Control to Command by default [QK] | Retain mapping; validate shortcuts, do not mechanically substitute Meta | W-GUI[P32] | M-GUI[P32] |
+| P33 | gui/shell.py:274 | 2 | Native single-file dialog | REASONED untested | Validate filters, cancellation, Unicode and paths with spaces | W-GUI[P33] | M-GUI[P33] |
+| P34 | gui/batch_panel.py:149 | 2 | Native multi-file dialog | REASONED untested | Validate multi-selection and mixed-case names | W-GUI[P34] | M-GUI[P34] |
+| P35 | gui/preset_panel.py:126 | 2 | Native import/save dialogs and custom overwrite confirmation | REASONED untested | Preserve confirmation and JSON extension; validate native flow | W-GUI[P35] | M-GUI[P35] |
+| P36 | gui/settings_dialog.py:160 | 2 | Native folder chooser | REASONED untested | Validate directory choice, cancellation and saved folder | W-GUI[P36] | M-GUI[P36] |
+| P37 | gui/settings_dialog.py:542 | 2 | Capability rows drive encoder UI | REASONED generic row mechanism portable, VT absent | Populate platform roster; preserve unavailable saved selection with reason | W-CODEC[P37] | M-GUI[P37] |
+| P38 | gui/preview.py:211,294,319,383 | 2 | Device-pixel ratio affects scale/render | REASONED implementation portable; native Retina untested | Retain 1:1 contract; validate DPR 1/2 and screen changes | W-GUI[P38] | M-GUI[P38] |
+| P39 | config/presets.py:70 | 2 | Windows forbidden/device names rejected everywhere | REASONED works conservatively | Retain portable naming policy | W-FS[P39] | M-FS[P39] |
+| P40 | config/presets.py:264 | 2 | NFC/casefold gives preset identity | REASONED conservative on case-sensitive volumes | Retain logical preset identity, distinct from arbitrary file identity | W-FS[P40] | M-FS[P40] |
+| P41 | gui/preset_panel.py:146 | 2 | UI uses matching NFC/casefold identity | REASONED works | Retain consistency with preset store | W-FS[P41] | M-FS[P41] |
+| P42 | jobs/naming.py:34 | 2 | Suffix rejects both separators/Windows punctuation | REASONED works conservatively | Retain portable fragment restrictions | W-FS[P42] | M-FS[P42] |
+| P43 | jobs/naming.py:116 | 2 | Temporary groups use casefolded final name | REASONED conservative collision grouping | Retain no-clobber grouping; document over-reservation | W-FS[P43] | M-FS[P43] |
+| P44 | jobs/naming.py:171 | 2 | Reservations/nonexistent fallback casefold paths | REASONED may over-reserve distinct case-sensitive names | Preserve safety; test both actual volume case modes | W-FS[P44] | M-FS[P44] |
+| P45 | jobs/naming.py:188 | 2 | Existing source/output guard uses samefile | REASONED portable identity mechanism | Retain identity comparison before lexical fallback | W-FS[P45] | M-FS[P45] |
+| P46 | jobs/naming.py:300 | 2 | MOV output rule lower-cases source suffix | REASONED works | Retain .MOV -> _corrected.mp4 collision handling | W-FS[P46] | M-FS[P46] |
+| P47 | jobs/export.py:111,725 | 2 | Reserved Windows device names refused | REASONED works conservatively | Retain cross-platform output safety policy | W-FS[P47] | M-FS[P47] |
+| P48 | jobs/safe_write.py:112 | 2 | Link promotion then rename fallback | DOC POSIX overwrite-race limit already described in module:13, DR-16 | Retain documented envelope; test APFS/external-volume paths, no new safety claim | W-FS[P48] | M-FS[P48] |
+| P49 | config/atomic.py:29 | 2 | Same-directory temp, fsync, replace | REASONED portable mechanism; real volume untested | Retain atomic replacement and failure cleanup | W-FS[P49] | M-FS[P49] |
+| P50 | cache/keys.py:106 | 2 | Symlink/junction exclusion | REASONED junction branch irrelevant off Windows | Retain portable Python predicate and symlink refusal | W-FS[P50] | M-FS[P50] |
+| P51 | cache/store.py:573 | 2 | Cache scan excludes links/junctions | REASONED portable mechanism | Validate cache reopen, pruning, link refusal on Mac | W-FS[P51] | M-FS[P51] |
+| P52 | io/video/inputs.py:54 | 2 | Sidecar suffix lower-cased | REASONED works | Retain | W-FS[P52] | M-FS[P52] |
+| P53 | io/photo/png.py:162 | 2 | PNG suffix lower-cased | REASONED works | Retain; verify 8/16-bit output on arm64 | W-FS[P53] | M-FS[P53] |
+| P54 | io/photo/reader.py:319 | 2 | DNG suffix lower-cased plus metadata detection | REASONED portable logic; native codec wheels untested | Retain refusal/detection and validate HEIC/JPEG/TIFF codec stack | W-FS[P54] | M-FS[P54] |
+| P55 | interfaces/settings.py:34,66 | 2 | Frozen-interface documentation names NVENC/x265 auto preference | REASONED stale for proposed VT roster | CHARC approves documentation disposition; preserve fields/signatures | W-CODEC[P55] | M-CODEC[P55] |
+
+### 3.2 Tools
+
+| ID | File:line | Class | Assumption / mechanic | macOS today | Recommended change | Windows-side test | macos test |
+|---|---|---|---|---|---|---|---|
+| T01 | environment_report.py:172 | 1 | platform.system/release/version identifies host | REASONED works | Retain; add architecture/backend/encoder facts, section 9 | W-TOOL[T01] | M-TOOL[T01] |
+| T02 | environment_report.py:171 | 2 | GPU fields derive solely from nvidia-smi | REASONED NVIDIA fields unavailable, Apple identity absent | Explicit CPU-only/arm64 facts; absent CUDA is normal, not an invented GPU figure | W-TOOL[T02] | M-TOOL[T02] |
+| T03 | prototype/bench.py:1157 | 1 | Guarded Windows power-plan APIs | REASONED null power fields elsewhere | Retain; label Windows-only telemetry | W-TOOL[T03] | M-TOOL[T03] |
+| T04 | prototype/bench.py:1467 | 1 | Windows CPU env versus cpuinfo/platform fallback | REASONED fallback exists; Apple model untested | Validate fallback; record unknown honestly | W-TOOL[T04] | M-TOOL[T04] |
+| T05 | prototype/bench.py:1479 | 1 | Guarded getwindowsversion | REASONED platform.platform fallback exists | Retain | W-TOOL[T05] | M-TOOL[T05] |
+| T06 | prototype/bench.py:156 | 2 | Watched-process names are Windows services | REASONED Mac ambient attribution incomplete | Keep historical instrument labelled NVIDIA/Windows; separate Mac telemetry if commissioned | W-TOOL[T06] | M-TOOL[T06] |
+| T07 | spike_io/transport.py:378 | 1 | Windows CreatePipe branch | REASONED alternate os.pipe path exists | Retain historical branch and explicit platform labels | W-PIPE[T07] | M-PIPE[T07] |
+| T08 | spike_io/transport.py:388 | 2 | Optional Linux F_SETPIPE_SZ | REASONED default pipe retained without setter | Do not request Linux pipe tuning on Mac | W-PIPE[T08] | M-PIPE[T08] |
+| T09 | spike_io/transport.py:948 | 1 | Guarded PowerShell GPU watcher | REASONED watcher omitted | Retain omission; no harness script port in this package | W-TOOL[T09] | M-TOOL[T09] |
+| T10 | spike_io/transport.py:116 | 2 | Windows ambient-process exclusions | REASONED Mac attribution incomplete | Label historical scope; new Mac instrument is separate work | W-TOOL[T10] | M-TOOL[T10] |
+| T11 | spike_io/licences.py:149 | 2 | Library evidence scans *.dll | REASONED misses Mach-O/dylib evidence | Candidate DR 3: platform binary discovery for bundled artefacts | W-TOOL[T11] | M-TOOL[T11] |
+| T12 | spike_io/licences.py:188 | 2 | Code suffixes include pyd/dll/exe | REASONED Mac binary coverage incomplete | Candidate DR 3: include Mac extension/library forms, retain Windows forms | W-TOOL[T12] | M-TOOL[T12] |
+| T13 | video_io_bench.py:118 | 2 | Sampler names accept bare and .exe | REASONED portable name set for existing sampler | Retain; label NVIDIA sampler | W-TOOL[T13] | M-TOOL[T13] |
+| T14 | inventory.py:828,832 | 2 | Lower-case suffix, POSIX report-relative paths | REASONED works on case-sensitive volume | Retain distinct discovered paths and stable slash serialization | W-FS[T14] | M-FS[T14] |
+| T15 | inventory.py:293,301 | 2 | LRV stem/name matching ignores case | REASONED works | Retain sidecar matching independently of volume case | W-FS[T15] | M-FS[T15] |
+| T16 | inventory.py:825 | 2 | Exclude comparison uses normcase | REASONED exclusion case treatment differs on Darwin | Make documented folder-name policy explicit; test exact and varied case | W-FS[T16] | M-FS[T16] |
+| T17 | inventory.py:1112,1155 | 2 | Resolved/normcased text guards footage | REASONED APFS alias risk, candidate DR 2 | Add existing-ancestor identity containment before any mkdir/write | W-FS[T17] | M-FS[T17] |
+| T18 | inventory.py:1094 | 2 | Link/exclusive-copy report publication | REASONED portable mechanism; real volume untested | Retain no-overwrite and partial-cleanup checks | W-FS[T18] | M-FS[T18] |
+| T19 | local_config.py:140 | 2 | Both separator forms rejected in bare stem | REASONED works conservatively | Retain | W-FS[T19] | M-FS[T19] |
+| T20 | local_config.py:196 | 2 | Lower-case suffix, casefold stem, ambiguity refusal | REASONED works on case-sensitive volume | Retain; test distinct same-stem matches | W-FS[T20] | M-FS[T20] |
+| T21 | headless_export.py:598 | 2 | Lower-case suffix routing | REASONED works | Retain | W-FS[T21] | M-FS[T21] |
+| T22 | headless_export.py:761 | 2 | Windows extended-prefix conversion | REASONED ordinary POSIX spelling unchanged | Retain Windows handling; no prefix surgery on POSIX names | W-FS[T22] | M-FS[T22] |
+| T23 | headless_export.py:790,801 | 2 | Text containment plus ancestor samestat | REASONED portable identity path exists | Validate APFS aliases and link refusal before writes | W-FS[T23] | M-FS[T23] |
+| T24 | headless_export.py:826,870 | 2 | Device/stream/drive/link-form refusal | REASONED conservative POSIX restrictions | Retain portable safe-name envelope | W-FS[T24] | M-FS[T24] |
+| T25 | headless_export.py:414 | 2 | Path redaction accepts slash/backslash/escaped forms | REASONED portable mechanism; Mac path corpus untested | Add POSIX, spaces, Unicode normalization and nested-root controls | W-TEXT[T25] | M-TEXT[T25] |
+| T26 | lookcheck/frames.py:161 | 2 | Resolved/normcased output containment | REASONED APFS alias risk | Candidate DR 2: identity-based guard, shared semantics not blanket casefold | W-FS[T26] | M-FS[T26] |
+| T27 | container_spike/compare.py:1877 | 2 | Same containment mechanic | REASONED APFS alias risk | Candidate DR 2: identity-based guard | W-FS[T27] | M-FS[T27] |
+| T28 | analysis_breakdown.py:984 | 2 | Lexical/realpath normcase containment | REASONED APFS alias risk | Candidate DR 2: identity-based guard | W-FS[T28] | M-FS[T28] |
+| T29 | export_oracle.py:645 | 2 | Lexical/realpath normcase containment | REASONED APFS alias risk | Candidate DR 2: identity-based guard | W-FS[T29] | M-FS[T29] |
+| T30 | halo_probe.py:2360 | 2 | Cache-conflict check uses normalized text | REASONED APFS case-alias risk | Validate identity of existing output/cache ancestors | W-FS[T30] | M-FS[T30] |
+| T31 | halo_probe.py:2373 | 2 | Portable stem/device-name refusal | REASONED works conservatively | Retain | W-FS[T31] | M-FS[T31] |
+| T32 | reviewpack/select.py:230 | 2 | Link pruning, casefold source matching | REASONED portable mechanism | Retain; duplicate matches must remain explicit | W-FS[T32] | M-FS[T32] |
+| T33 | reviewpack/build.py:875 | 2 | Pair encoder x265 if force_cpu, otherwise NVENC | REASONED CPU leg available, default VT absent | Keep historical defaults labelled; explicit Mac CPU/VT option only if WP6.4 needs tool | W-CODEC[T33] | M-CODEC[T33] |
+| T34 | prototype/clip.py:133 | 2 | Prototype encoding fixed to NVENC | REASONED fails without NVIDIA | Label historical Windows/NVIDIA instrument; do not silently port prototype algorithms | W-CODEC[T34] | M-CODEC[T34] |
+| T35 | container_spike/spike.py:78 | 2 | Two encoders and NVIDIA proof sampler | REASONED x265 possible; VT leg absent | Separate Mac leg if reused; retain historical proofs | W-CODEC[T35] | M-CODEC[T35] |
+| T36 | video_fidelity.py:377 | 2 | NVENC proof uses nvidia-smi pmon | REASONED x265 path available, VT proof absent | Add VT execution/V4 evidence without pretending NVIDIA sampler proves it | W-CODEC[T36] | M-V4[T36] |
+| T37 | video_io_bench.py:147 | 2 | Fixed NVENC/x265 benchmark plan | REASONED no Mac plan | New explicitly Mac plan in WP6.5, not a retiming of Windows results | W-CODEC[T37] | M-CODEC[T37] |
+| T38 | export_bench.py:580 | 2 | Every non-x265 leg gets NVIDIA sampler | REASONED VT would be misclassified | Dispatch telemetry by encoder/platform; no fake NVIDIA proof | W-TOOL[T38] | M-TOOL[T38] |
+| T39 | core_speed.py:350 | 2 | NVIDIA telemetry with unavailable fallback | REASONED CPU result possible; GPU fields unavailable | Retain honest absence; separate CPU RSS | W-TOOL[T39] | M-TOOL[T39] |
+| T40 | analysis_breakdown.py:848 | 2 | nvidia-smi occupancy sampler | REASONED occupancy unavailable | Retain unavailable reason; no Apple occupancy estimate | W-TOOL[T40] | M-TOOL[T40] |
+| T41 | photo_verify.py:1161 | 2 | NVIDIA memory query | REASONED unavailable | Retain absent GPU field and CPU verification | W-TOOL[T41] | M-TOOL[T41] |
+| T42 | device_hold.py:57 | 2 | Intentional CuPy allocation instrument | REASONED unavailable on CPU-only Mac | Label GPU-only; keep out of Mac required suite | W-DEVICE[T42] | M-DEVICE[T42] |
+| T43 | prototype/backend.py:197 | 2 | Optional CuPy with CPU fallback | REASONED CPU path available | Retain fallback, distinguish explicit GPU request refusal | W-DEVICE[T43] | M-DEVICE[T43] |
+| T44 | fixtures/video.py:317 | 2 | Synthetic HEVC generation needs x265 | REASONED works if supplied FFmpeg has x265 | Bundle/test x265 even when VT is preferred | W-CODEC[T44] | M-CODEC[T44] |
+| T45 | fixtures/files.py:36 | 2 | Upper-case GoPro placeholder suffixes | REASONED portable names | Retain; never treat placeholder bytes as video | W-FS[T45] | M-FS[T45] |
+| T46 | photo_check.py:68 | 2 | Lower-case photo suffix discovery | REASONED works | Retain | W-FS[T46] | M-FS[T46] |
+| T47 | photo_verify.py:332 | 2 | Casefold duplicate photo roster detection | REASONED conservative on case-sensitive volumes | Retain explicit ambiguity, document logical identity | W-FS[T47] | M-FS[T47] |
+| T48 | photo_memory.py:162 | 2 | Lower-case PNG suffix | REASONED works | Retain | W-FS[T48] | M-FS[T48] |
+
+### 3.3 Tests
+
+These rows describe test portability, not product defects. Keeping a Windows-only
+control skipped on Mac is legitimate when a separately named Mac control covers
+the relevant invariant. Meta-test proposals inspect fixtures/helpers with stubs
+on Windows; they do not launch Windows APIs under a fake Darwin platform.
+
+| ID | File:line | Class | Assumption / mechanic | macOS today | Recommended change | Windows-side test | macos test |
+|---|---|---|---|---|---|---|---|
+| X01 | conftest.py:111 | 1 | Strip extended prefix only on Windows | REASONED ordinary POSIX path retained | Retain conditional normalization | W-GUARD[X01] | M-GUARD[X01] |
+| X02 | conftest.py:215 | 1 | Windows versus POSIX default temp candidates | REASONED POSIX candidate list exists | Pin TMPDIR/TEMP/TMP/system/cwd precedence for both platforms | W-GUARD[X02] | M-GUARD[X02] |
+| X03 | conftest.py:134 | 2 | Existing-ancestor samefile containment | REASONED covers case aliases by identity; APFS untested | Keep identity fallback and prove both APFS case modes | W-GUARD[X03] | M-GUARD[X03] |
+| X04 | conftest.py:214 | 2 | Mirror tempfile temp-variable order | REASONED portable logic | Retain early no-write guard; isolate all temp env variables | W-GUARD[X04] | M-GUARD[X04] |
+| X05 | test_conftest_guard.py:82 | 1 | Test helper strips Windows prefix conditionally | REASONED portable alternate path | Retain; avoid claiming it canonicalizes APFS case | W-GUARD[X05] | M-GUARD[X05] |
+| X06 | test_conftest_guard.py:329 | 1 | Case-alias control Windows-only | REASONED Mac case-insensitive coverage absent | Keep Windows case; add real-volume case-aware Mac control | W-GUARD[X06] | M-GUARD[X06] |
+| X07 | test_conftest_guard.py:337 | 1 | Extended-length path control | REASONED correctly skipped | Retain Windows control; Mac ordinary-path counterpart | W-GUARD[X07] | M-GUARD[X07] |
+| X08 | test_conftest_guard.py:346 | 1 | GetShortPathNameW control | REASONED correctly skipped | Retain guard; Mac symlink/ancestor identity counterpart | W-GUARD[X08] | M-GUARD[X08] |
+| X09 | test_conftest_guard.py:381 | 1 | Junction versus symlink topology | REASONED symlink branch exists | Retain branch and explicit topology coverage | W-GUARD[X09] | M-GUARD[X09] |
+| X10 | test_conftest_guard.py:478 | 1 | Volume GUID API control | REASONED correctly skipped | Retain Windows API guard; Mac volume identity case | W-GUARD[X10] | M-GUARD[X10] |
+| X11 | test_conftest_guard.py:599 | 1 | Second Windows-only case-alias control | REASONED Mac coverage absent | Add matching Mac case-aware root control | W-GUARD[X11] | M-GUARD[X11] |
+| X12 | test_conftest_guard.py:670 | 1 | Second volume GUID control | REASONED correctly skipped | Retain; Mac existing-ancestor counterpart | W-GUARD[X12] | M-GUARD[X12] |
+| X13 | test_config_paths.py:44 | 2 | Darwin expected to use XDG | REASONED matches current resolver | Split darwin native roots from Linux XDG expectations | W-PATH[X13] | M-PATH[X13] |
+| X14 | test_config_isolation.py:31 | 2 | Scrub Windows/XDG/HOME variables | REASONED current stores isolated | Include injected Darwin home/location; retain no-real-store checks | W-PATH[X14] | M-PATH[X14] |
+| X15 | test_app_startup.py:178 | 2 | Child redirects Windows and XDG roots | REASONED isolated today, future Library root not redirected | Child HOME/location injection under tmp_path for Darwin | W-PATH[X15] | M-PATH[X15] |
+| X16 | test_gui_startup.py:206 | 2 | App-data environment isolation | REASONED future Library branch needs coverage | Redirect all platform roots including child HOME | W-PATH[X16] | M-PATH[X16] |
+| X17 | test_app_wiring.py:415 | 1 | Real NTFS ADS control | REASONED appropriately skipped | Retain; portable refused-name control remains required | W-GUARD[X17] | M-GUARD[X17] |
+| X18 | test_footage_locator.py:48 | 1 | Guarded cmd /c mklink junction creation | REASONED junction skipped; symlink leg available | Retain Windows junction plus Mac symlink traversal exclusion | W-GUARD[X18] | M-GUARD[X18] |
+| X19 | test_footage_locator.py:78 | 2 | Mixed-case stem/suffix fixture roster | REASONED portable coverage | Retain and add same-stem distinct-file ambiguity case | W-FS[X19] | M-FS[X19] |
+| X20 | test_inventory.py:81 | 2 | MP4/mp4/MOV/HEIC fixtures | REASONED portable discovery coverage | Run on case-sensitive volume too; preserve every distinct path | W-FS[X20] | M-FS[X20] |
+| X21 | test_headless_export.py:603 | 1 | Windows flag gates native-path cases | REASONED ordinary POSIX cases remain | Keep Windows controls; add POSIX aliases/Unicode cases | W-GUARD[X21] | M-GUARD[X21] |
+| X22 | test_headless_export.py:629 | 2 | C-drive strings exercise prefix conversion | REASONED string-level control, not a real POSIX drive | Use ntpath/PureWindowsPath for foreign syntax tests; no host Path fiction | W-FS[X22] | M-FS[X22] |
+| X23 | test_io_video_decode_lifecycle.py:407 | 1 | Real enlarged-pipe assertion Windows-only | REASONED appropriately skipped | Preserve; add default-pipe real lifecycle case | W-PIPE[X23] | M-PIPE[X23] |
+| X24 | test_io_video_decode_lifecycle.py:424 | 1 | Second enlarged-pipe assertion Windows-only | REASONED appropriately skipped | Preserve; add fallback cancellation/cleanup case | W-PIPE[X24] | M-PIPE[X24] |
+| X25 | test_io_video_decode_rules.py:97 | 2 | Scan pins approved OS-specific decode module | REASONED portable source-policy check | Update only after CHARC AD approval; keep planted violation control | W-TEXT[X25] | M-TEXT[X25] |
+| X26 | test_io_video_spawn.py:274,278 | 1 | Native flag expectation; Linux simulation | REASONED native zero-flag branch exists, explicit Darwin case absent | Parameterize win32/linux/darwin with stubbed Windows constant | W-SPAWN[X26] | M-SPAWN[X26] |
+| X27 | test_io_video_spawn.py:324 | 2 | Mock ffprobe/ffmpeg paths end .exe | REASONED mocks do not need Windows binaries | Retain foreign-name tests; include extensionless executable stub | W-SPAWN[X27] | M-SPAWN[X27] |
+| X28 | test_jobs_export_process.py:544 | 1 | Root spelling selected by platform | REASONED POSIX branch exists | Retain; add frozen-command protocol path in bundle smoke | W-SPAWN[X28] | M-BUNDLE[X28] |
+| X29 | test_jobs_naming.py:182 | 2 | Case-insensitive clash controls probe actual volume | REASONED skip on case-sensitive volume | Add distinct-case no-clobber case instead of treating skip as complete coverage | W-FS[X29] | M-FS[X29] |
+| X30 | test_jobs_naming.py:452 | 1 | Windows-only junction fallback after symlink attempt | REASONED symlink path exists | Retain; Mac source-alias refusal through symlink | W-GUARD[X30] | M-GUARD[X30] |
+| X31 | test_reviewpack.py:366 | 1 | Windows junction, symlink elsewhere | REASONED portable alternate control | Retain both topology legs | W-GUARD[X31] | M-GUARD[X31] |
+| X32 | test_wp42a_runner_hardening.py:99 | 1 | Drive-relative output reproduction | REASONED correctly skipped | Keep real Windows case; portable invalid-output test | W-GUARD[X32] | M-GUARD[X32] |
+| X33 | test_wp42a_runner_hardening.py:134 | 1 | NTFS one-letter carrier | REASONED correctly skipped | Retain native control; foreign syntax tested as data | W-GUARD[X33] | M-GUARD[X33] |
+| X34 | test_wp42a_runner_hardening.py:197 | 1 | PowerShell stream-enumeration helper | REASONED native ADS callers Windows-only, stub control portable | Assert no real PowerShell call off Windows | W-GUARD[X34] | M-GUARD[X34] |
+| X35 | test_wp42a_runner_hardening.py:234 | 1 | Real hard-link/ADS reproduction | REASONED correctly skipped | Retain Windows case; Mac hard-link output/footage identity control | W-GUARD[X35] | M-GUARD[X35] |
+| X36 | test_wp42a_runner_hardening.py:464 | 1 | Self-junction versus symlink-loop | REASONED junction skipped; symlink topology available | Retain bounded refusal for Mac symlink loop | W-GUARD[X36] | M-GUARD[X36] |
+| X37 | test_wp42b_naming_guard.py:29 | 1 | Real ADS source control | REASONED correctly skipped | Retain Windows guard; portable naming refusal counterpart | W-GUARD[X37] | M-GUARD[X37] |
+| X38 | test_wp42_runner_video.py:74 | 1 | Guarded cmd junction helper | REASONED junction cases skipped | Add Mac symlink/alias footage guard case before CPU video run | W-GUARD[X38] | M-GUARD[X38] |
+| X39 | gui_support.py:12 | 2 | QT_QPA_PLATFORM defaults to offscreen | REASONED plugin availability untested | Keep offscreen for unit suite; native cocoa smoke separately | W-GUI[X39] | M-GUI[X39] |
+| X40 | test_gui_preview.py:349 | 2 | Offscreen child sets QT_SCALE_FACTOR=2 | REASONED synthetic DPR control, not Retina evidence | Retain scale control plus native display test | W-GUI[X40] | M-GUI[X40] |
+| X41 | test_gui_settings_dialog.py:489 | 2 | Exact auto/NVENC/x265 row expectation | REASONED no VT roster coverage | Parameterize platform capabilities, unavailable/saved encoder cases | W-CODEC[X41] | M-GUI[X41] |
+| X42 | test_io_video_encode.py:77 | 2 | x265/NVENC encoder matrix | REASONED no VT encode/V4 leg | Add Mac VT 8/10-bit matrix; keep Windows NVENC coverage | W-CODEC[X42] | M-V4[X42] |
+| X43 | test_io_video_encode.py:1851 | 2 | Capability set pinned to two names | REASONED no platform roster expectation | Parameterize roster and auto resolution | W-CODEC[X43] | M-CODEC[X43] |
+| X44 | test_core_backend.py:35 | 2 | NumPy plus gpu-marked CuPy parameters | REASONED CPU leg available; GPU unavailable | Keep CUDA-specific tests separate from CPU Mac gate | W-DEVICE[X44] | M-DEVICE[X44] |
+| X45 | acceptance_support.py:73 | 2 | Privacy assertion normalizes separators and casefolds | REASONED conservative portable assertion | Retain; add native POSIX/Unicode path spellings | W-TEXT[X45] | M-TEXT[X45] |
+
+Screening-only Class 1 matches not requiring another product change include
+test_config_settings.py:461 malformed NUL paths, test_gui_deps.py:79 forbidden
+environment-access assertions, test_io_video_encode_bench.py:44 a Windows
+launcher comment, test_jobs_export_process.py:522/858 foreign path text, and
+test_reviewpack.py:2237/2589 Windows DLL diagnostic strings. They remain data,
+mocking, or policy controls. ASCII backslash escaping in io/photo/errors.py:30,
+io/video/inputs.py:42, gui/messages.py:48, jobs/disk_space.py:66,
+jobs/export_process.py:775 and app/export_worker.py:267 is deliberately
+platform-independent and should be retained, not changed to a path conversion.
+
+## 4. Encoder: the VideoToolbox leg
+
+### Current contract and proposed roster
+
+REASONED from capability.py:33,123,249 and encode.py:323: the application currently
+offers only hevc_nvenc and libx265. Actual trial success determines availability
+and depth; NVIDIA-specific stderr matching improves reasons, not the success
+predicate. The generic failure path already captures a bounded ASCII-safe tail.
+Listing an encoder alone is insufficient evidence that hardware can encode.
+
+Recommendation for WP6.4: on darwin offer hevc_videotoolbox as the preferred
+hardware encoder and libx265 as software fallback; preserve the Windows
+NVENC/x265 preference. Preserve explicit unavailable saved choices with a reason
+instead of silently changing them. Use the existing EncoderCapability shape,
+including independent bit_depths and hardware flag. CHARC must authorize any
+frozen-interface documentation correction (P55); no field/signature change is
+proposed. CPU correction and VideoToolbox hardware encoding are separate choices:
+force_cpu must not automatically force x265.
+
+Proposed Mac listing/help and 8-bit capability command, not executed here:
+
+    ffmpeg -hide_banner -encoders
+    ffmpeg -hide_banner -h encoder=hevc_videotoolbox
+    ffmpeg -nostdin -hide_banner -loglevel error -f lavfi -i color=c=black:s=256x256:r=25:d=0.04 -frames:v 1 -c:v hevc_videotoolbox -allow_sw 0 -pix_fmt yuv420p -profile:v main -f null -
+
+Repeat the trial with p010le and main10 for 10-bit. Use the resolved absolute
+FFmpeg path, shared spawn helper, timeout, captured stderr and process cache.
+Do not allow a VideoToolbox software fallback to masquerade as hardware success;
+libx265 is the explicit software fallback. Probe qscale and rate controls
+separately from this minimal availability trial. A failed depth is disabled
+without hiding a working 8-bit encoder.
+
+DOC [FF]: the n8.0 source gates qscale on Apple Silicon, maps q:v quality to a
+0..1 property through a 0..100 scale, and uses AverageBitRate without qscale.
+Its HEVC formats include yuv420p, nv12 and p010le, with Main/Main10 support.
+It maps maxrate to a one-second DataRateLimits request. A failed HEVC rate-limit
+property can be logged while initialization continues. These are upstream source
+facts, not proof of the future bundled build.
+
+Recommendation: use yuv420p/Main at 8-bit and p010le/Main10 at 10-bit for VT,
+retaining yuv420p10le/Main10 for x265. Keep CPU frame transport and correction
+unchanged; VT consumes the converted output, not a Metal correction backend.
+Each depth must pass a real encode and FFprobe decoded-format/profile check.
+A null-muxer trial alone does not validate MP4, timestamps or metadata.
+
+### Q1: two controls, no selection in this audit
+
+Candidate A is q:v Q_LEVEL, with High/Standard/Draft values measured in WP6.5.
+Candidate B is b:v R_LEVEL with maxrate R_LEVEL, using the same ceiling below.
+Candidate A may also request that ceiling, but must not claim it is effective
+without the Mac rate-control evidence. Do not copy cq 22/26/30 into q:v, copy
+NVENC-only presets/tune/rc/tier flags, or route VT through the x265 else branch.
+No Q_LEVEL values or final A/B preference are selected by this report.
+
+REASONED: WP6.5 must compare both candidates on busy and calm SDR clips, inspect
+stderr for rejected/ignored controls, record video bitrate and rolling-window
+rates, output profile/level/tier, visual quality, and repeatability on the actual
+Mac/FFmpeg/OS combination. Exit zero alone does not establish a bitrate ceiling.
+If a required control is unsupported, surface that fact and use the documented
+fallback policy; do not silently claim NVENC-equivalent control. The brief
+explicitly reserves this measurement and choice for WP6.5.
+
+### Rate-rule mapping from encode.py:256
+
+The existing nvenc_rate function is the exact numeric reference, not a loose
+"half the source bitrate" target:
+
+1. Reject nonpositive frame rate. Use output dimensions and source average fps
+   for VFR: H0 = floor((24/100) * width * height * fps).
+2. If a known HEVC source level is Main tier, H = min(H0, its Main-tier cap).
+   Otherwise H = H0. H.264, unknown level, and High-tier source do not supply
+   that source cap.
+3. For high/standard/draft, R0 = max(H // divisor, 1), divisor 1/2/4.
+4. Find Main-tier levels fitting luma picture size, dimension bound, and luma
+   sample rate. Refuse if none fits. Select the lowest fitting level whose
+   bitrate cap holds R0, or the highest fitting level if none holds it.
+   R = min(R0, that level's cap).
+5. Existing NVENC uses maxrate R, bufsize R and explicit Main tier/selected level.
+   Preserve this unchanged on Windows. For VT, map the numeric R to maxrate and
+   to b:v for candidate B. Treat level/tier enforcement and buffer behaviour as
+   encoder-specific: the NVENC flags are not a portable VT API.
+
+Recommendation: an internal rate helper can expose the existing calculation
+without altering frozen interfaces, subject to CHARC's AD row. Tests must pin
+rounding, source cap, VFR average, all three divisors, unsupported geometry and
+highest-fitting-level clamp against the current function. VT's observed
+level/tier still feeds the existing warning policy. macOS N6 is information,
+not the Windows NVIDIA timing acceptance threshold (spec N1/N6 v0.6.0).
+
+### Container and decoder invariants
+
+REASONED from encode.py:100,417-454, probe.py:74 and verify.py:525: the current
+MP4/FFprobe policy is platform-neutral, but the Mac build has not been exercised.
+Retain hvc1, explicit color primaries/transfer/matrix/range, SAR/orientation,
+copyts, passthrough fps mode, demux encoder time base, metadata mapping, and
+timecode regeneration. Only gpmd is the currently proved non-timecode MP4 data
+allowlist; mebx remains reported not carried, not newly advertised as preserved.
+
+The Mac V4 leg must compare source/output through both the product verifier and
+the established container_spike comparator, with MANDATORY and REQUIRED items
+unchanged: per-frame PTS/time base/start offset/edit-list presentation effect;
+video geometry, bit depth, color and display orientation; compressed audio
+packet identity/timing, or PCM sample format/count/channel layout and bytes;
+hvc1/HEVC profile/level/tier; timecode and gpmd best-effort fidelity; creation_time,
+other supported metadata and provenance. Keep the existing report's distinction
+between mandatory/required and best-effort results; never promote a tag merely
+because its name appears in FFprobe JSON. Product verify.py does not list data
+packet payloads, so it alone cannot prove gpmd/timecode payload fidelity.
+Use existing equivalences for orientation, unset square SAR and mono layout.
+
+REASONED: FFprobe's structured identifiers and container boxes do not depend on
+a Windows shell. The showinfo parser and diagnostic-reason fragments do depend
+on FFmpeg text/version and need pinned Mac-build samples. Do not redesign the
+container path merely because the binary was built for another OS.
+
+Retain the HLG/PQ refusal at probe.py:74 (arib-std-b67/smpte2084) before decoding
+or VT selection. Ten-bit output support does not authorize HDR processing.
+Tests must prove a VT-capable machine still refuses both transfers unchanged.
+
+## 5. Paths: config, cache, journal and filesystem identity
+
+Current behaviour is REASONED from config/paths.py:115: darwin takes the XDG
+branch, with ~/.config/clearwater and ~/.cache/clearwater fallbacks.
+Recommendation for the approved darwin branch, using the existing injectable
+home and Locations shape:
+
+| Purpose | Proposed darwin path | Existing filename/subfolder |
+|---|---|---|
+| Settings and persistent application state | ~/Library/Application Support/Clearwater | settings.json |
+| Presets | ~/Library/Application Support/Clearwater/presets | Existing preset format |
+| Log, preserving current Locations.log_dir contract | ~/Library/Application Support/Clearwater/logs | clearwater.log |
+| Export recovery journal | ~/Library/Application Support/Clearwater | write-journal.json |
+| Re-creatable proxy cache and worker scratch | ~/Library/Caches/Clearwater | Existing cache layout; export/uuid scratch |
+
+DOC [APPLE-FS]: macOS has user Library locations for application support and
+caches. The particular Clearwater subfolder and retained logs-under-config
+layout above are recommendations, not existing Mac behaviour. Keep journal and
+settings out of an evictable cache. A migration, if required for an earlier
+developer's XDG data, is an explicit CHARC item, not an automatic destructive move.
+Windows APPDATA/LOCALAPPDATA and Linux XDG behaviour remain separately tested.
+Do not make a bundled app use its current directory or installation directory
+as an app-data location.
+
+Both footage and working paths still come from local configuration; none of
+these conventions replaces those owner-supplied paths. No audit command reads
+them. Outputs remain in the configured/selected working destination and must
+pass footage containment checks before any mkdir or write.
+
+DOC [PY-PATH]: normcase folds case/separators on Windows and otherwise leaves
+path text unchanged; samefile uses file identity. REASONED: changing normcase to
+casefold everywhere would conflate genuinely distinct files on a case-sensitive
+volume. Compare existing objects and ancestors by identity; use explicit
+conservative fallback only for not-yet-existing names. Treat preset logical
+identity separately from arbitrary source-file identity. Add composed/decomposed
+Unicode names to the Mac corpus without assuming filesystem normalization.
+
+REASONED from gui/sources.py:57, inventory.py:828, local_config.py:196 and
+headless_export.py:598: suffix discovery already ignores case. On a case-sensitive
+volume, distinct upper/lower files remain discoverable; inventory emits both.
+The stem locator reports multiple matches as ambiguity. Native QFileDialog
+filter visibility is a separate test, not proved by suffix routing.
+Portable forbidden names, both separators, drive/stream refusal and Windows
+extended-prefix diagnostic handling should remain deliberate cross-platform
+policies rather than accidental host-Path parsing.
+
+## 6. Process: spawn flags, pipes and worker lifetime
+
+REASONED from pipes.py:56: CREATE_NO_WINDOW is evaluated only on win32; elsewhere
+creationflags is zero. Retain the shared helper at every product FFmpeg,
+FFprobe and export-worker launch, including removal of every case spelling of
+FFREPORT. Tests simulating win32 on Windows can use the real constant; tests on
+Mac must stub its value rather than access an absent subprocess attribute.
+This is ordinary subprocess spawning, not a request to port the harness.
+
+Q2 recommendation: use the existing OS-default decoder pipe on macOS for 1.2.0.
+_create_pipe raises internally off Windows, open_frame_pipe catches OSError and
+logs the fallback once, and decode.py uses subprocess.PIPE. No new pipe-sizing
+syscall, Linux F_SETPIPE_SZ assumption or throughput guarantee is proposed.
+The encoder already uses the default stdin pipe; it must not be described as
+having the decoder's 32 MiB buffer (AD-23 note, docs/decisions.md:32).
+
+DOC (repository): WP2.1S, docs/reports/wp2.1s-io-spike.md:234 and :236, measured
+55.87 ms/frame default pipe (W2) versus 16.11 ms/frame enlarged pipe (W4), software
+decode of GX011627, 681 frames at 3840x2160; byte hashes and PTS agreed.
+These are historical Windows results under that report's conditions, not new
+measurements or Mac forecasts. AD-23 expressly selects fallback for macOS.
+
+REASONED: a future full-clip Mac run would establish its actual default-pipe
+throughput, RSS, bytes/frame counts, exact PTS pairing and cancellation/EOF
+cleanup. A later pipe-tuning study would compare alternatives on that host.
+This package measures nothing and does not infer a Mac regression from Windows
+buffer figures.
+
+Retain AD-31's Qt-free worker protocol, stdin cancellation, stderr capture,
+bounded result handling and per-job scratch cache. WP6.5 must replace the source
+sys.executable -m launch in a frozen app with an explicit worker entry mode or
+dedicated bundled worker, without recursively opening another GUI. That adapter
+must preserve the protocol and resolve app paths in the parent. Native tests
+must cover cancellation, forced worker stop and leftover FFmpeg cleanup;
+Windows process-tree assumptions cannot serve as Mac lifetime evidence.
+
+## 7. GUI
+
+DOC [QT, QK]: Qt supplies native macOS menus and maps its Control modifier to
+Command by default. Recommendation: retain QKeySequence StandardKey and existing
+Ctrl sequences unless an actual native test shows a problem. Do not blindly
+rewrite Ctrl to Meta. Check Quit and Settings actions, menu roles, keyboard
+focus, native file/folder dialogs, and application activation in a cocoa session.
+
+REASONED: lower-case dialog globs do not prove native dialog visibility of upper
+suffixes. Open, batch-add, preset import/export and output-folder selection need
+native cancellation and mixed-case/Unicode/path-with-spaces checks. Preserve
+the preset overwrite confirmation and read-only footage rule.
+
+REASONED: devicePixelRatioF is already used by preview.py. The offscreen
+QT_SCALE_FACTOR=2 test is useful, but cannot establish native Retina rendering,
+moving between displays, or menu/dialog placement. Require a native DPR 1/2
+preview control with a known pixel pattern, fit and 1:1 views, zoom/split
+interaction, and export/preview consistency. Keep the GUI free of direct
+correction-backend imports and the export worker free of Qt.
+
+## 8. Tests: named platform parameters and Mac legs
+
+All following tests are proposed for WP6.4/WP6.5, not tests run by this audit.
+Suggested homes are tests/test_portability.py for stubbed platform cases and
+tests/test_macos_portability.py for native cases; a Mac timing instrument is
+separate WP6.5 work. The implementing brief must grant those files explicitly.
+The table references expand below. Each function accepts site, selecting the
+row's cited mechanic and expected outcome, so coverage is traceable by row ID.
+A Windows-side W test uses real Windows behaviour plus injected platform values,
+command builders, stubs, ntpath/posixpath/PureWindowsPath, or fake filesystem
+identity. It must never patch sys.platform to Darwin and then run a real Windows
+API as if that were a Mac. The corresponding M test uses actual native paths,
+subprocesses or UI as stated.
+
+| Reference | Proposed Windows-side function | Required platform parameters / meaningful control | Proposed macos-marked function |
+|---|---|---|---|
+| W-PATH / M-PATH | test_portability_app_locations | win32/darwin/linux; injected absolute home/env; missing/empty/relative env; settings/cache/log/journal roots; assert resolver creates nothing | test_macos_app_locations_and_isolation: native HOME redirection, stores/cache/journal under disposable home, no bundle/CWD writes |
+| W-SPAWN / M-SPAWN | test_portability_spawn_policy | win32/darwin/linux; stub Windows constant; zero other flags; FFREPORT variants removed; spaces/non-ASCII argv; explicit worker/tool command selection | test_macos_tool_and_worker_spawn: extensionless binaries, clean FFREPORT env, complete protocol/cancel/child cleanup |
+| W-PIPE / M-PIPE | test_portability_default_pipe | win32 large success/failure and darwin/linux fallback; force pipe-sizing OSError; bytes/PTS/EOF/cancel and descriptor ownership | test_macos_default_pipe_fidelity: real decoder default pipe, bytes/PTS match fixture, no descriptor/child leak on cancel |
+| W-DEVICE / M-DEVICE | test_portability_cpu_selection | force_cpu, no CuPy, failed CuPy import/kernel, fake CUDA success/free-memory failure; darwin CPU profile; never reinterpret NVIDIA constants as CPU RAM | test_macos_cpu_without_cuda: clean CPU-only environment, correction/export, reason/RSS reporting; GPU-only instrument explicitly unavailable |
+| W-CODEC / M-CODEC | test_portability_encoder_roster_and_commands | win32 NVENC/x265 and darwin VT/x265; listing absent/present; trial success/failure/8-only/10-bit; auto/explicit/saved-unavailable; no x265 options in VT | test_macos_videotoolbox_capabilities: actual VT/x265 trials, 8/10-bit outcome, unavailable fallback, explicit choice |
+| W-RATE / M-RATE | test_portability_encoder_rate_mapping | platform/encoder, high/standard/draft; Fraction fps, VFR average, source Main/High/unknown caps, geometry/rounding/clamp; both VT candidates; unchanged Windows arguments | test_macos_videotoolbox_quality_controls: both candidates on busy/calm SDR, stderr and output rate/quality/profile/level; WP6.5 exclusive measurement |
+| W-V4 / M-V4 | test_portability_container_contract | platform/encoder command snapshots plus structured FFprobe/container fixtures; preserve hvc1/color/SAR/timing/maps; HLG/PQ refusal even with VT available | test_macos_videotoolbox_v4: real 8/10-bit MP4, VFR/start/edit-list/orientation/audio/metadata/provenance fixtures; product verifier plus full comparator |
+| W-TEXT / M-TEXT | test_portability_tool_text_and_redaction | Windows/Mac FFmpeg text fixtures; unknown wording/generic reason; malformed/missing showinfo; escaped drive and POSIX paths; planted privacy leak | test_macos_ffmpeg_text_and_redaction: actual pinned build listing/showinfo/failure tails; native path corpus, no private roots in output |
+| W-FS / M-FS | test_portability_filesystem_semantics | win32/darwin/linux syntax independent of host; fake samefile identities, distinct-file control, case-sensitive/insensitive modes; suffix/names/normalization/link/publish failures | test_macos_filesystem_semantics: actual case-insensitive and case-sensitive volumes, same-object aliases versus distinct files, links, no-clobber, codec outputs |
+| W-GUARD / M-GUARD | test_portability_footage_guard_and_test_helpers | platform, temp origin, native-only API guard, alias topology; synthetic footage only; planted unsafe root must fail before writes, safe root must pass | test_macos_footage_guard_and_helpers: TMPDIR/TEMP/TMP/basetemp, ancestors/symlinks/hard links/loops/case aliases; snapshot synthetic footage unchanged |
+| W-GUI / M-GUI | test_portability_gui_contract | platform capability rows/dialog stubs/shortcuts/DPR 1,2; cancellation and saved paths; missing offscreen plugin produces explicit environment failure | test_macos_native_gui_contract: cocoa menus/Command keys/native dialogs/Retina; separate offscreen Qt unit-suite startup |
+| W-TOOL / M-TOOL | test_portability_tool_reporting | win32/darwin/Linux reports; missing NVIDIA tool, stderr, unknown CPU model, binary suffix corpus and unsupported historical instrument; no fake telemetry | test_macos_tool_reporting: native environment facts, bundled binary inventory and notices, CPU tools run without NVIDIA dependencies |
+| M-BUNDLE | W-SPAWN checks proposed source/frozen command construction; no Mac binary is run on Windows | source versus frozen; tool path and worker dispatch stubs; external PATH unavailable | test_macos_bundle_smoke: Finder/Terminal launch, no Python/FFmpeg on PATH, worker export/cancel, native Qt plugins and persistent paths |
+
+For a platform parameter that changes a source policy test, include a planted
+forbidden launch/OS dependency and prove the checker fails by name, retaining the
+existing positive controls. For a no-write guard, pair an unsafe synthetic root
+with a safe sibling and check both behaviour and snapshots. For identity tests,
+pair one object through two spellings with two genuinely distinct objects;
+a blanket casefold implementation must fail the latter control.
+
+Marker/dependency disposition, NOT owned by this package:
+
+- pyproject.toml:79 registers gpu/footage/gui/slow/fullclip, but no macos marker.
+  WP6.4 must register macos under strict markers and define selection/skip policy.
+  A macos marker alone does not skip on Windows; add an explicit platform skip.
+  Native cocoa tests also carry gui; timing/quality runs carry the appropriate
+  isolation marker. Ordinary stubbed W tests must not acquire GPU requirements.
+- pyproject.toml:46 includes cupy-cuda12x[ctk] in the default development group.
+  CHARC must commission a CPU-only Mac developer/test install group or platform
+  dependency markers and lock verification. This report adds no dependency and
+  assumes no Windows CUDA wheel can satisfy an arm64 Mac environment.
+- Product pytest, lint/type checks, and the Mac native leg belong to WP6.4's
+  implementation gate. The current read-only audit runs no pytest or build.
+- The brief requires one harness suite at the final package gate because this
+  report lives on the existing docs/reports instance surface. The dispatcher
+  owns that gate. No harness vocabulary registration or harness edit is proposed;
+  no harness suite was run by this cell in this turn.
+- Run Mac tests against synthetic fixtures unless a separately configured,
+  read-only footage set is explicitly supplied. Do not import the owner's
+  Windows drive paths into Mac tests.
+- Preserve Windows-only ADS, 8.3, volume-GUID and junction controls. Their skips
+  are expected on Mac; portable counterparts must cover the shared safety rule.
+  Existing gpu markers remain CUDA-specific, not a label for VT hardware encoding.
+
+## 9. Tools and follow-on scope
+
+Recommendation for environment_report.py: retain OS release/version, Python and
+executable, uv/FFmpeg/git versions, CPU model/cores and RAM. Add process/build
+architecture and explicit CPU correction backend; report VT/x265 availability
+and 8/10-bit capabilities from the same trial model as the product. REASONED:
+nvidia-smi absence is expected on the CPU-only target; keep its fields null with
+a precise unavailable/not-applicable reason rather than calling Apple unified
+memory "VRAM". Record the exact Mac model/OS/FFmpeg build for WP6.5 comparisons.
+Do not invent a GPU-utilization percentage or borrow Windows memory constants.
+
+Inventory and the headless runner already lower-case suffixes. Keep report paths
+serialized with forward slashes while using Path for local I/O. Candidate DR 2
+covers text-only footage containment in older tools; the headless runner already
+has an identity fallback and supplies a useful semantic reference, not blanket
+permission to copy its implementation without tests. The inventory folder
+exclusion policy also needs explicit case treatment.
+
+Historical prototype/spike instruments remain evidence of their original
+Windows/NVIDIA experiments. WP6.4 need not retrofit every historical benchmark
+to perform Apple hardware sampling. Its deliverable must explicitly label
+unsupported instruments and keep the CPU/source workflows useful; WP6.5
+commissions the new Mac measurement legs. Device-hold is deliberately CUDA-only.
+If a historical instrument is reused for the Mac gate, add its VT/CPU command
+and telemetry leg from the relevant table row before using its result.
+
+Tool licence evidence must inventory the binaries actually distributed on each
+platform, including Mach-O extensions and dylibs, rather than infer Mac notices
+from a Windows DLL scan. Candidate DR 3 names the existing scan sites.
+
+## 10. Packaging on macOS: information for WP6.5
+
+This section is a proposed handoff, not a build result or an artifact-shape
+decision. N14 requires one self-contained CPU-only Mac artifact; CP6a/WP6.1's
+shape decision and WP6.5's actual Mac evidence govern the final build.
+
+DOC [PYI-SPEC]: PyInstaller supports a BUNDLE target producing an .app and a
+generated Info.plist, with bundle_identifier/version and info_plist overrides.
+Recommendation: a native arm64 build should verify CFBundleName/identifier,
+CFBundleShortVersionString/CFBundleVersion and NSPrincipalClass=NSApplication,
+then validate Retina rendering. Record the minimum supported OS from the pinned
+Python/Qt/native-wheel/FFmpeg combination, not from this audit's Windows host.
+
+DOC [PYI-FEATURES]: target architecture must match the collected native modules;
+PyInstaller re-signs changed collected binaries ad hoc by default, including
+arm64. This is a technical build requirement, distinct from Developer ID signing
+and notarisation, which remain out of scope under N14. No signing identity,
+certificate purchase or notarisation workflow is proposed.
+
+WP6.5 build/validation checklist:
+
+1. Build on a Mac with arm64 Python and compatible NumPy/SciPy/Pillow/pillow-heif/
+   PySide6 native dependencies. Use the CPU profile; exclude CuPy/CUDA/NVIDIA
+   downloads. Confirm each collected extension and FFmpeg binary has the arm64
+   slice and usable library dependencies. A Windows artifact is not Mac evidence.
+2. Produce the selected .app layout with Info.plist and application resources.
+   Retain the permitted unsigned distribution workflow and notices for every
+   bundled binary. Do not decide onedir versus onefile here.
+3. Include FFmpeg and FFprobe with the required VideoToolbox and x265 capabilities,
+   dependent non-system dylibs, executable permissions, recorded versions/hashes
+   and notices. Invoke their absolute bundled paths, independent of Finder PATH.
+4. Use PyInstaller's PySide6 hooks, inspect the resulting Qt plugin search paths/
+   qt.conf where applicable, and include the cocoa platform plugin
+   (logical plugins/platforms/libqcocoa.dylib) and required image-format plugins.
+   REASONED: exact placement must follow the produced bundle/hook layout, not a
+   guessed Windows plugins directory. Prove no development-machine Qt is loaded.
+   Offscreen availability for tests is a separate leg.
+5. Provide a frozen worker entry mode or dedicated worker executable for P24.
+   Prove one video export starts a Qt-free worker, not another application
+   window; receives progress/result; cancels; and leaves no FFmpeg children.
+6. Launch from Finder and Terminal on a clean arm64 machine without installed
+   Python/FFmpeg/CUDA. Test first-run settings, journal cleanup, cache, one photo
+   and 8/10-bit video export, unavailable VT/x265 diagnostics, and native dialogs.
+   Restart and confirm persistent state lives under Library, never inside .app
+   or a onefile extraction directory.
+7. Exercise a downloaded/quarantined copy and publish the actual unsigned-app
+   opening steps for the tested macOS version. DOC [APPLE-OPEN]: Apple's supported
+   override is System Settings > Privacy & Security > Open Anyway, followed by
+   confirmation where offered. Do not tell users to disable system security.
+   REASONED: quarantine behaviour and the exact prompt still need the real
+   artifact test; no Mac opening procedure was executed here.
+8. Preserve app-bundle symlinks/executable modes in the release archive and test
+   extraction. Run V4 and the native GUI/worker/path tests on that extracted copy,
+   then record Mac timing/RSS as information with the required exclusive window.
+
+## 11. Metal: information only
+
+REASONED: a future Metal correction backend would require an approved IF-2
+implementation or adapter with float32 operations, pyramid/FFT or equivalent
+kernels, host/device transport and synchronization, separate unified-memory
+accounting, CPU parity tests against AD-11, numerical/preview/export fidelity,
+and new performance evidence. CuPy/CUDA buffers and NVIDIA memory/session
+constants cannot supply that implementation. VideoToolbox HEVC encoding alone
+does not add a Metal correction backend. Metal design, dependencies, kernels
+and interface changes are outside WP6.2/WP6.4's CPU-path envelope.
+
+## 12. Q1-Q3 disposition
+
+- Q1: retain both q:v quality control where supported and bitrate/ceiling control,
+  without choosing values or a winner. DOC [FF] supports conditional qscale and
+  warns that HEVC ceiling-setting failure need not fail initialization.
+  WP6.5 measures both on its pinned artifact. No owner decision is made here.
+- Q2: retain the automatic default-pipe strategy for macOS 1.2.0, per AD-23.
+  DOC (repository) WP2.1S figures are Windows-only; no Mac measurement is inferred.
+- Q3: REASONED from P28/T14/T20/T21: discovery/route/inventory already lower-case
+  suffixes. Distinct paths survive inventory; ambiguous stem matches are refused.
+  Native dialog visibility and real case-sensitive-volume coverage remain Mac
+  tests. No blanket casefold of all filesystem paths is recommended.
+
+## 13. Candidate DR list
+
+These are candidates for the dispatcher/CHARC, not newly assigned DR numbers.
+Severity is the potential consequence within the proposed Mac envelope.
+None is a confirmed Windows product defect or a new implementation by this
+package. No tool was run against real footage to reproduce a write risk.
+
+| Candidate | Severity / evidence | Sites and mechanism | Disposition / confirmation trigger |
+|---|---|---|---|
+| 1. APFS queue/file identity | Minor, REASONED; DOC basis [PY-PATH] | gui/batch_panel.py:94/:107 uses normcase text for queue identity/labels; case-insensitive Darwin aliases may become separate items | BANKED candidate to CHARC for WP6.4: on case-insensitive APFS add one existing file twice with varied case, then add two distinct files on a case-sensitive volume; assert dedup versus preservation |
+| 2. Older tool footage-containment aliases | Major, REASONED; DOC basis [PY-PATH] | inventory.py:1112/:1155, lookcheck/frames.py:161, container_spike/compare.py:1877, analysis_breakdown.py:984, export_oracle.py:645 use normalized lexical/realpath checks without existing-ancestor identity fallback; halo_probe.py:2360 has related cache-conflict exposure | BANKED candidate to CHARC for WP6.4: synthetic APFS footage root plus differently cased existing ancestor and output descendant; require refusal before mkdir/write and unchanged snapshots; safe sibling positive control |
+| 3. Mac binary licence evidence omitted | Minor, REASONED | spike_io/licences.py:149/:188 scans Windows DLL/binary forms; source logic omits dylib/Mach-O evidence | BANKED candidate to CHARC for WP6.5/N13: binary inventory against the actual Mac bundle plus per-binary notices; include extension modules, not only named dylibs |
+| 4. Startup isolation when Library resolver lands | Minor, REASONED, conditional future defect | test_app_startup.py:178 and test_gui_startup.py:206 redirect Windows/XDG variables; a new native HOME/Library resolver must remain redirected too | COMMISSIONED test-plan item for WP6.4 P01/X15/X16; presently not a defect because the existing Darwin resolver uses XDG; prove disposable-home-only writes when adding the branch |
+
+Candidate 4 preserves the accepted round-0 correction: the startup test does
+already redirect XDG_CONFIG_HOME and XDG_CACHE_HOME. It must not be described
+as Windows-only isolation or an existing user-home write defect.
+
+The safe-write POSIX no-hardlink rename race is already the documented DR-16
+single-owner limitation (safe_write.py:13-16), not a fifth candidate.
+Missing VT, native paths and bundle adapters are commissioned Phase 6 work,
+not findings to disguise as uncommissioned defects.
+
+## 14. Limits, sources and verification record
+
+No Mac, no Mac emulator, no footage reads, no native GUI run, no encoding,
+no throughput/RSS measurement, no pytest, no build and no instrument run.
+Only this Markdown report is authorized to change. All test names and commands
+above are proposals. Platform simulation on Windows cannot prove native Mac
+behaviour. The report's source line numbers refer to 5671a927.
+
+Source labels used in DOC assessments and recommendations:
+
+- [FF] [FFmpeg n8.0 VideoToolbox encoder source](https://raw.githubusercontent.com/FFmpeg/FFmpeg/n8.0/libavcodec/videotoolboxenc.c):
+  vtenc_qscale_enabled, vtenc_create_encoder, hevc_pix_fmts. A release-tagged
+  reference was used to ground round 0's upstream-master observation; the
+  selected bundled version must be checked again in WP6.5.
+- [PY-PATH] [Python 3.12 os.path documentation](https://docs.python.org/3.12/library/os.path.html):
+  normcase and samefile semantics.
+- [QT] [Qt macOS issues](https://doc.qt.io/qt-6/macos-issues.html):
+  native menus, platform keys and deployment structures.
+- [QK] [Qt ApplicationAttribute documentation](https://doc.qt.io/qt-6/qt.html#ApplicationAttribute-enum):
+  AA_MacDontSwapCtrlAndMeta and default Command mapping.
+- [APPLE-FS] [Apple File System Programming Guide](https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html):
+  user Library/application-support/cache roles; specific Clearwater paths are
+  recommendations in section 5, not a previously implemented convention.
+- [PYI-SPEC] [PyInstaller spec-file bundle options](https://pyinstaller.org/en/stable/spec-files.html#spec-file-options-for-a-macos-bundle):
+  BUNDLE and Info.plist.
+- [PYI-FEATURES] [PyInstaller macOS architecture/signing notes](https://pyinstaller.org/en/stable/feature-notes.html#macos-multi-arch-support):
+  architecture validation and ad-hoc signing.
+- [APPLE-OPEN] [Apple: safely open apps on your Mac](https://support.apple.com/en-ie/102445):
+  Privacy & Security override procedure.
+- Repository sources: docs/decisions.md AD-12/AD-23/AD-31; docs/architecture.md;
+  spec v0.6.0 N1/N14 and D75/D111; docs/reports/wp2.1s-io-spike.md:234/:236.
+  These establish intended policy and historical Windows measurements, not
+  executed Mac results.
+
+Verification loop at this report boundary:
+
+| Suspect / claim | Independent check used | Disposition |
+|---|---|---|
+| Non-Windows pipe-sizing raise prevents decoding | Followed pipes.open_frame_pipe catch and decode subprocess.PIPE branch | Rejected; fallback exists |
+| Startup subprocess isolation is Windows-only | Confirmed env.update also redirects XDG roots | Rejected as a current defect; conditional Library test item retained |
+| VT is already selectable through generic encoder strings | Read registry, resolver, trial format map and _encoder_options branch | Confirmed missing leg; explicit follow-on specified |
+| normcase establishes Mac case-insensitive identity | Python documentation versus queue/older-tool mechanics | Candidate risk retained, native reproduction not claimed |
+| Literal Ctrl shortcuts necessarily require Meta substitution | Qt modifier/ApplicationAttribute documentation | Rejected; default Command mapping documented |
+| VT exit zero proves its requested ceiling | Release-tagged FFmpeg rate-property error handling | Rejected; Mac test must inspect stderr and rates |
+| Full report claims Mac tests or measurements | Checked labels and proposed-test language | No Mac execution claim authorized |
+
+Reviewer A and Reviewer B have not yet reviewed this candidate. Their findings,
+adjudications and any cumulative ledger are handled by the dispatcher's next
+rounds; this report does not claim convergence or acceptance. CHARC owns the
+new AD rows, dependency-group disposition, candidate-DR disposition and WP6.4
+brief. WP6.5 owns native packaging and the deferred quality/performance choice.
+
