@@ -416,6 +416,29 @@
       }
     },
     {
+      "component": "AOM patent licence",
+      "provenance_kind": "git-tree",
+      "source_repository": "https://aomedia.googlesource.com/aom",
+      "source_commit": "03087864cf4bea6abb0d28f95cf7843511413d8f",
+      "source_path": "PATENTS",
+      "source_tag": "v3.14.1",
+      "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998",
+      "upstream_version": "1.0 (libaom 3.14.1)",
+      "spdx": "LicenseRef-AOM-Patent-License-1.0",
+      "text_file": "dr144-final-aom--PATENTS",
+      "text_sha256": "661fb8e504744e95587b556b94a58343448300606a41bea8c7a9b97125696e61",
+      "text_size_bytes": 5701,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "embedded_in": [
+        "_internal/PIL/_avif.cp312-win_amd64.pyd"
+      ],
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "Alliance for Open Media Patent License 1.0, exact PATENTS blob at the libaom 3.14.1 source pin established by Pillow binary and LocalAom.cmake."
+      }
+    },
+    {
       "component": "ARPACK (SciPy)",
       "provenance_kind": "git-tree",
       "source_repository": "https://github.com/scipy/scipy",
@@ -837,6 +860,41 @@
       ]
     },
     {
+      "component": "DCDFLIB original legalities",
+      "provenance_kind": "git-tree",
+      "source_repository": "https://github.com/scilab/scilab",
+      "source_commit": "fecb7c4cf24d8bf96d73a79e3f987ddfde4b4259",
+      "source_path": "scilab/modules/statistics/src/dcdflib/README",
+      "source_tag": "5.5.2",
+      "source_tag_object": "fcf231c4fb2afc6ea7053d0df2c69c33e0d6b3e3",
+      "text_kind": "excerpt",
+      "text_lines": {
+        "file": "dr144-final-cdflib--README",
+        "sha256": "3036069e7cba9b0d15f288bf3ace1c4f1b6d26f3e446f45ee477ce0d572411cc",
+        "size_bytes": 11950,
+        "git_blob_sha1": "8133163a51bff13826c9dc323ff0e5104ba1ba49",
+        "lines": [
+          168,
+          205
+        ]
+      },
+      "upstream_version": "1994 published README",
+      "spdx": "LicenseRef-DCDFLIB-Legalities",
+      "text_file": "dr144-final-cdflib--README-L168-205.txt",
+      "text_sha256": "d1afd8036f0b6c60b7fa8f912b91298e7e47cc350146ad30d1bad23577c8568c",
+      "text_size_bytes": 1978,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "embedded_in": [
+        "_internal/scipy/special/_ufuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/special/cython_special.cp312-win_amd64.pyd"
+      ],
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "Original DCDFLIB legalities, byte-identical in third-party Scilab git home. Authors publish https://netlib.org/random/dcdflib.f.tar.gz; SHA-256 93938e358d67eb4c4de78baaacea085c683fd183672a1092507229e513fe95aa; member dcdflib.f/README; seat fetch 2026-11-05. ACM Algorithms Policy condition (no copying for direct commercial advantage) is met on its face because Clearwater is distributed without fee; which routines are ACMs was not traced. Verbatim LEGALITIES excerpt; no substitute grant inferred."
+      }
+    },
+    {
       "component": "DIRECT (SciPy)",
       "provenance_kind": "git-tree",
       "source_repository": "https://github.com/scipy/scipy",
@@ -1234,6 +1292,97 @@
       }
     },
     {
+      "component": "ID 0.4 original notice",
+      "provenance_kind": "git-tree",
+      "source_repository": "https://github.com/scipy/scipy",
+      "source_commit": "92d2a8592782ee19a1161d0bf3fc2241ba78bb63",
+      "source_path": "scipy/linalg/src/id_dist/doc/doc.tex",
+      "source_tag": "v1.14.1",
+      "source_tag_object": "c80a360acf823e69d18b9ffa0b119ee09d99935a",
+      "text_kind": "excerpt",
+      "text_lines": {
+        "file": "dr144-final-id_dist--doc.tex",
+        "sha256": "f8251b674d41ae0f92006b08c4b6acdb56557e0e5b3bbf0a2f8381a354208d8f",
+        "size_bytes": 37261,
+        "git_blob_sha1": "8bcece8c4b69a0e6f5bf7a65122b1109ab2b0460",
+        "lines": [
+          31,
+          74
+        ]
+      },
+      "upstream_version": "0.4",
+      "spdx": "BSD-3-Clause",
+      "text_file": "dr144-final-id_dist--doc.tex-L31-74.txt",
+      "text_sha256": "d49f6f31635740cc9f3737dfa99833789dd9eb6c25d3e0bcb4f7234ea541d6e3",
+      "text_size_bytes": 1759,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "embedded_in": [
+        "_internal/scipy/linalg/_decomp_interpolative.cp312-win_amd64.pyd"
+      ],
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "Original ID 0.4 notice by Martinsson, Rokhlin, Shkolnisky and Tygert, carried as verbatim LaTeX source. Canonical https://tygert.com/id_dist.4.tar.gz; SHA-256 a6dde41ce9d52c9e574315cef90787d6eb5e3c6faa4f041990e1bbf6e6421f85; member id_dist/doc/doc.tex; byte-identical to SciPy v1.14.1; seat fetch 2026-11-05."
+      }
+    },
+    {
+      "component": "L-BFGS-B authors and citation",
+      "provenance_kind": "git-tree",
+      "source_repository": "https://github.com/scipy/scipy",
+      "source_commit": "92d2a8592782ee19a1161d0bf3fc2241ba78bb63",
+      "source_path": "scipy/optimize/lbfgsb_src/README",
+      "source_tag": "v1.14.1",
+      "source_tag_object": "c80a360acf823e69d18b9ffa0b119ee09d99935a",
+      "text_kind": "excerpt",
+      "text_lines": {
+        "file": "dr144-final-lbfgsb--README",
+        "sha256": "14285792eef6daed32a2e646854a1083b5730ead24389e8c0a88587124164ab8",
+        "size_bytes": 3221,
+        "git_blob_sha1": "a355e0c447f2d36275877225fcbddd42f14636dd",
+        "lines": [
+          15,
+          38
+        ]
+      },
+      "upstream_version": "3.0 authors README in SciPy v1.14.1",
+      "spdx": "BSD-3-Clause",
+      "text_file": "dr144-final-lbfgsb--README-L15-38.txt",
+      "text_sha256": "283efcb76166e067a3d17d1156f548456318cb7850f67409fa7d96f59a5dfe1d",
+      "text_size_bytes": 1192,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "embedded_in": [
+        "_internal/scipy/optimize/_lbfgsb.cp312-win_amd64.pyd"
+      ],
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "Original authors Zhu, Byrd, Nocedal, Morales and their citation condition, retained as published in SciPy v1.14.1 README. Published template licence is carried separately."
+      }
+    },
+    {
+      "component": "L-BFGS-B original licence",
+      "provenance_kind": "git-tree",
+      "source_repository": "https://github.com/jacobwilliams/lbfgsb",
+      "source_commit": "bcb0ddc71ae1afdf5715ededaf9453aa704c2384",
+      "source_path": "License.txt",
+      "source_tag": "1.0.0",
+      "source_tag_object": "3ec3a438f6295c5e991a0d95a3f78088b2255102",
+      "upstream_version": "3.0",
+      "spdx": "BSD-3-Clause",
+      "text_file": "dr144-final-lbfgsb--License.txt",
+      "text_sha256": "919e78c1c48cc7d179efe63075590cfb5942e6ae1da2bf373dd754fe795139b5",
+      "text_size_bytes": 4557,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "embedded_in": [
+        "_internal/scipy/optimize/_lbfgsb.cp312-win_amd64.pyd"
+      ],
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "Original L-BFGS-B 3.0 terms, byte-identical in the third-party git home. Authors publish https://users.iems.northwestern.edu/~nocedal/Software/Lbfgsb.3.0.tar.gz; SHA-256 f5b9a1c8c30ff6bcc8df9b5d5738145f4cbe4c7eadec629220e808dcf0e54720; member Lbfgsb.3.0/License.txt; seat fetch 2026-11-05. Published License.txt is an unfilled BSD-3 template naming no holder; Zhu, Byrd, Nocedal, Morales and the citation condition come from the separately carried authors README."
+      }
+    },
+    {
       "component": "LAPJVsp (SciPy)",
       "provenance_kind": "git-tree",
       "source_repository": "https://github.com/scipy/scipy",
@@ -1417,6 +1566,29 @@
       "version_evidence": {
         "method": "interpreter_build_record",
         "value": "Seat DR-144 wheel census (b)/(d), strukturag/libde265 at ba62bf4cfb3242f3bf0a45617ff09e35236e4d82; pinned build and binary evidence. Notice as the source header; no separate licence file in the pinned tree."
+      }
+    },
+    {
+      "component": "MINPACK original notice",
+      "provenance_kind": "git-tree",
+      "source_repository": "https://github.com/lofar-astron/PyBDSF",
+      "source_commit": "c8c53ad6a1fc4a524cc35f972fa5591255093eaf",
+      "source_path": "src/minpack/DISCLAIMER",
+      "source_tag": "v1.9.1",
+      "source_tag_object": "04df15420b6c0b2b86c79990a061cdeb5942b585",
+      "upstream_version": "1999 published notice",
+      "spdx": "Minpack",
+      "text_file": "dr144-final-minpack--DISCLAIMER",
+      "text_sha256": "f5b330efdad110cdd84d585ec61220b0650461fa599e36b13e1726c9346dcfb9",
+      "text_size_bytes": 2246,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "embedded_in": [
+        "_internal/scipy/optimize/_minpack.cp312-win_amd64.pyd"
+      ],
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "Original MINPACK terms, byte-identical in the third-party PyBDSF git home. Authors publish https://www.netlib.org/minpack/disclaimer; SHA-256 f5b330efdad110cdd84d585ec61220b0650461fa599e36b13e1726c9346dcfb9; seat fetch 2026-11-05. University of Chicago / Argonne acknowledgment retained verbatim, including CRLF."
       }
     },
     {
@@ -1999,6 +2171,74 @@
       "embedded_in": [
         "_internal/PySide6/Qt6Core.dll"
       ]
+    },
+    {
+      "component": "SLSQP ACM release statement",
+      "provenance_kind": "git-tree",
+      "source_repository": "https://github.com/scipy/scipy",
+      "source_commit": "e29dcb65a2040f04819b426a04b60d44a8f69c04",
+      "source_path": "scipy/optimize/slsqp/slsqp_optmz.f",
+      "source_tag": "v1.15.3",
+      "source_tag_object": "5720e3a40eff4d4df0317b0fd93182077fd88055",
+      "text_kind": "excerpt",
+      "text_lines": {
+        "file": "dr144-final-slsqp--slsqp_optmz.f",
+        "sha256": "bb1b489a87bc6137fee6132166c8a04cdb838d9042de809179d7f4f6ef9e43ae",
+        "size_bytes": 69943,
+        "git_blob_sha1": "b2e00a693e3be68026fefccba70e88e8100415f0",
+        "lines": [
+          1,
+          30
+        ]
+      },
+      "upstream_version": "TOMS 733; ACM 2007 release statement",
+      "spdx": "LicenseRef-SLSQP-ACM-BSD",
+      "text_file": "dr144-final-slsqp--slsqp_optmz.f-L1-30.txt",
+      "text_sha256": "f1d9aa03a6a8d5bafc0b6bd20b64a86ec622fe9b3cde2052fbf5ccdbda69e843",
+      "text_size_bytes": 1004,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "embedded_in": [
+        "_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd"
+      ],
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "ACM named the BSD licence in the email but never wrote the form; ACM is holder per the thread and Dieter Kraft per the source. Required attribution: D. Kraft, Algorithm 733: TOMP - Fortran modules for optimal control calculations, ACM Transactions on Mathematical Software 20(3), 1994, pp. 262-281, DOI 10.1145/192115.192124, https://www.netlib.org/toms/733."
+      }
+    },
+    {
+      "component": "SLSQP Dieter Kraft copyright",
+      "provenance_kind": "git-tree",
+      "source_repository": "https://github.com/scipy/scipy",
+      "source_commit": "e29dcb65a2040f04819b426a04b60d44a8f69c04",
+      "source_path": "scipy/optimize/slsqp/slsqp_optmz.f",
+      "source_tag": "v1.15.3",
+      "source_tag_object": "5720e3a40eff4d4df0317b0fd93182077fd88055",
+      "text_kind": "excerpt",
+      "text_lines": {
+        "file": "dr144-final-slsqp--slsqp_optmz.f",
+        "sha256": "bb1b489a87bc6137fee6132166c8a04cdb838d9042de809179d7f4f6ef9e43ae",
+        "size_bytes": 69943,
+        "git_blob_sha1": "b2e00a693e3be68026fefccba70e88e8100415f0",
+        "lines": [
+          215,
+          215
+        ]
+      },
+      "upstream_version": "1991 source copyright",
+      "spdx": "LicenseRef-SLSQP-ACM-BSD",
+      "text_file": "dr144-final-slsqp--slsqp_optmz.f-L215-215.txt",
+      "text_sha256": "98de00e1b3ce1545541a39e2b2e57d7edd0101e52b7ddfa6346943cff227b2d2",
+      "text_size_bytes": 73,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "embedded_in": [
+        "_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd"
+      ],
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "Verbatim Dieter Kraft source copyright; the separately carried ACM release statement names the BSD licence without a written form. No BSD text is invented."
+      }
     },
     {
       "component": "SipHash (Qt)",
@@ -2725,6 +2965,29 @@
       }
     },
     {
+      "component": "fastfeat (libaom)",
+      "provenance_kind": "git-tree",
+      "source_repository": "https://aomedia.googlesource.com/aom",
+      "source_commit": "03087864cf4bea6abb0d28f95cf7843511413d8f",
+      "source_path": "third_party/fastfeat/LICENSE",
+      "source_tag": "v3.14.1",
+      "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998",
+      "upstream_version": "libaom 3.14.1 copy; upstream 391d5e93",
+      "spdx": "BSD-3-Clause",
+      "text_file": "dr144-final-aom--third_party--fastfeat--LICENSE",
+      "text_sha256": "499041ddee5227b6f29ca06c17803e5fe24d60f243c69635cd76b7ba08d0ddd5",
+      "text_size_bytes": 1504,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "embedded_in": [
+        "_internal/PIL/_avif.cp312-win_amd64.pyd"
+      ],
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "Seat U-P1 encoder-build census at libaom v3.14.1; third_party/fastfeat/README.libaom names upstream https://github.com/edrosten/fast-C-src, revision 391d5e93 (abbreviated in seat record). Encoder sources directly listed by av1/av1.cmake; encoder-on premise from Pillow/libavif LocalAom.cmake."
+      }
+    },
+    {
       "component": "filereaderlp (SciPy)",
       "provenance_kind": "git-tree",
       "source_repository": "https://github.com/scipy/HiGHs",
@@ -3086,7 +3349,7 @@
       "spdx": "BSD-3-Clause",
       "version_evidence": {
         "method": "interpreter_build_record",
-        "value": "LocalLibyuv.cmake pin; Pillow aggregate carries libyuv terms in the libavif section; patent text unresolved U-P2."
+        "value": "LocalLibyuv.cmake pin; Pillow aggregate carries libyuv terms in the libavif section. Separate libyuv patent grant row carries PATENTS at the same pinned commit (U-P2 resolved)."
       },
       "embedded_in": [
         "_internal/PIL/_avif.cp312-win_amd64.pyd"
@@ -3099,6 +3362,27 @@
             "size_bytes": 78016
           }
         ]
+      }
+    },
+    {
+      "component": "libyuv patent grant",
+      "provenance_kind": "git-tree",
+      "source_repository": "https://chromium.googlesource.com/libyuv/libyuv",
+      "source_commit": "644251f252a84bf8ce91ff0aca86a9b16b069ab8",
+      "source_path": "PATENTS",
+      "upstream_version": "644251f252a84bf8ce91ff0aca86a9b16b069ab8",
+      "spdx": "LicenseRef-libyuv-Patents",
+      "text_file": "dr144-final-libyuv--PATENTS",
+      "text_sha256": "4da84211f947c6f9f7dd8fbce513e1522e01833407ae732b8c9a2bbb75fed495",
+      "text_size_bytes": 1387,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "embedded_in": [
+        "_internal/PIL/_avif.cp312-win_amd64.pyd"
+      ],
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "Additional IP Rights Grant (Patents), exact PATENTS at the LocalLibyuv.cmake commit; final byte retained without a trailing newline. Carried libyuv copyright terms remain in the separate reused Pillow row."
       }
     },
     {
@@ -3420,6 +3704,29 @@
       }
     },
     {
+      "component": "vector (libaom)",
+      "provenance_kind": "git-tree",
+      "source_repository": "https://aomedia.googlesource.com/aom",
+      "source_commit": "03087864cf4bea6abb0d28f95cf7843511413d8f",
+      "source_path": "third_party/vector/LICENSE",
+      "source_tag": "v3.14.1",
+      "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998",
+      "upstream_version": "libaom 3.14.1 copy; upstream 40efe82",
+      "spdx": "MIT",
+      "text_file": "dr144-final-aom--third_party--vector--LICENSE",
+      "text_sha256": "ff6c857ce2708e87701323078aef115c1872a1f80a9649f86dc899b48083bc60",
+      "text_size_bytes": 1084,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "embedded_in": [
+        "_internal/PIL/_avif.cp312-win_amd64.pyd"
+      ],
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "Seat U-P1 encoder-build census at libaom v3.14.1; third_party/vector/README.libaom names upstream https://github.com/goldsborough/vector, revision 40efe82 (abbreviated in seat record). Encoder sources directly listed by av1/av1.cmake; encoder-on premise from Pillow/libavif LocalAom.cmake."
+      }
+    },
+    {
       "component": "x86inc (dav1d)",
       "provenance_kind": "git-tree",
       "source_repository": "https://github.com/videolan/dav1d",
@@ -3449,6 +3756,29 @@
       "version_evidence": {
         "method": "interpreter_build_record",
         "value": "Census U-H2: Pillow installs NASM; assembly build not proved from the binary. Notice as the source header; no separate licence file in the pinned tree."
+      }
+    },
+    {
+      "component": "x86inc (libaom)",
+      "provenance_kind": "git-tree",
+      "source_repository": "https://aomedia.googlesource.com/aom",
+      "source_commit": "03087864cf4bea6abb0d28f95cf7843511413d8f",
+      "source_path": "third_party/x86inc/LICENSE",
+      "source_tag": "v3.14.1",
+      "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998",
+      "upstream_version": "libaom 3.14.1 copy; upstream 3e5aed95",
+      "spdx": "ISC",
+      "text_file": "dr144-final-aom--third_party--x86inc--LICENSE",
+      "text_sha256": "719d8fa235f2068e0ae6d6a7dceb0a7720d7840f0f0ebed29957989e6ded3cd8",
+      "text_size_bytes": 936,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "embedded_in": [
+        "_internal/PIL/_avif.cp312-win_amd64.pyd"
+      ],
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "Seat U-P1 encoder-build census at libaom v3.14.1; third_party/x86inc/README.libaom names upstream https://git.videolan.org/git/x264.git, revision 3e5aed95 (abbreviated in seat record). Inclusion inferred from aoms x86-64 assembler build and default SSE2; no Pillow build log or binary inclusion proof."
       }
     },
     {
@@ -3599,12 +3929,34 @@
       "sha256": "6731dce52baab0b96b0eeb3c664844b5b42c2168ea8668af2430e2fbdd2dfbd8",
       "components": [
         {
+          "component": "AOM patent licence",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://aomedia.googlesource.com/aom",
+            "source_commit": "03087864cf4bea6abb0d28f95cf7843511413d8f",
+            "source_path": "PATENTS",
+            "source_tag": "v3.14.1",
+            "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998"
+          }
+        },
+        {
           "component": "dav1d (Pillow)",
           "source": {
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/videolan/dav1d",
             "source_commit": "b546257f770768b2c88258c533da38b91a06f737",
             "source_path": "COPYING"
+          }
+        },
+        {
+          "component": "fastfeat (libaom)",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://aomedia.googlesource.com/aom",
+            "source_commit": "03087864cf4bea6abb0d28f95cf7843511413d8f",
+            "source_path": "third_party/fastfeat/LICENSE",
+            "source_tag": "v3.14.1",
+            "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998"
           }
         },
         {
@@ -3645,6 +3997,15 @@
           }
         },
         {
+          "component": "libyuv patent grant",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://chromium.googlesource.com/libyuv/libyuv",
+            "source_commit": "644251f252a84bf8ce91ff0aca86a9b16b069ab8",
+            "source_path": "PATENTS"
+          }
+        },
+        {
           "component": "pythoncapi_compat (Pillow)",
           "source": {
             "provenance_kind": "git-tree",
@@ -3665,6 +4026,17 @@
           }
         },
         {
+          "component": "vector (libaom)",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://aomedia.googlesource.com/aom",
+            "source_commit": "03087864cf4bea6abb0d28f95cf7843511413d8f",
+            "source_path": "third_party/vector/LICENSE",
+            "source_tag": "v3.14.1",
+            "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998"
+          }
+        },
+        {
           "component": "x86inc (dav1d)",
           "source": {
             "provenance_kind": "git-tree",
@@ -3682,6 +4054,17 @@
                 22
               ]
             }
+          }
+        },
+        {
+          "component": "x86inc (libaom)",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://aomedia.googlesource.com/aom",
+            "source_commit": "03087864cf4bea6abb0d28f95cf7843511413d8f",
+            "source_path": "third_party/x86inc/LICENSE",
+            "source_tag": "v3.14.1",
+            "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998"
           }
         }
       ]
@@ -6074,6 +6457,28 @@
           }
         },
         {
+          "component": "ID 0.4 original notice",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://github.com/scipy/scipy",
+            "source_commit": "92d2a8592782ee19a1161d0bf3fc2241ba78bb63",
+            "source_path": "scipy/linalg/src/id_dist/doc/doc.tex",
+            "source_tag": "v1.14.1",
+            "source_tag_object": "c80a360acf823e69d18b9ffa0b119ee09d99935a",
+            "text_kind": "excerpt",
+            "text_lines": {
+              "file": "dr144-final-id_dist--doc.tex",
+              "sha256": "f8251b674d41ae0f92006b08c4b6acdb56557e0e5b3bbf0a2f8381a354208d8f",
+              "size_bytes": 37261,
+              "git_blob_sha1": "8bcece8c4b69a0e6f5bf7a65122b1109ab2b0460",
+              "lines": [
+                31,
+                74
+              ]
+            }
+          }
+        },
+        {
           "component": "MinGW-w64 CRT and winpthreads (static wheels)",
           "source": {
             "carried_notice": {
@@ -7062,6 +7467,39 @@
           }
         },
         {
+          "component": "L-BFGS-B authors and citation",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://github.com/scipy/scipy",
+            "source_commit": "92d2a8592782ee19a1161d0bf3fc2241ba78bb63",
+            "source_path": "scipy/optimize/lbfgsb_src/README",
+            "source_tag": "v1.14.1",
+            "source_tag_object": "c80a360acf823e69d18b9ffa0b119ee09d99935a",
+            "text_kind": "excerpt",
+            "text_lines": {
+              "file": "dr144-final-lbfgsb--README",
+              "sha256": "14285792eef6daed32a2e646854a1083b5730ead24389e8c0a88587124164ab8",
+              "size_bytes": 3221,
+              "git_blob_sha1": "a355e0c447f2d36275877225fcbddd42f14636dd",
+              "lines": [
+                15,
+                38
+              ]
+            }
+          }
+        },
+        {
+          "component": "L-BFGS-B original licence",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://github.com/jacobwilliams/lbfgsb",
+            "source_commit": "bcb0ddc71ae1afdf5715ededaf9453aa704c2384",
+            "source_path": "License.txt",
+            "source_tag": "1.0.0",
+            "source_tag_object": "3ec3a438f6295c5e991a0d95a3f78088b2255102"
+          }
+        },
+        {
           "component": "MinGW-w64 CRT and winpthreads (static wheels)",
           "source": {
             "carried_notice": {
@@ -7199,6 +7637,17 @@
                 }
               ]
             }
+          }
+        },
+        {
+          "component": "MINPACK original notice",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://github.com/lofar-astron/PyBDSF",
+            "source_commit": "c8c53ad6a1fc4a524cc35f972fa5591255093eaf",
+            "source_path": "src/minpack/DISCLAIMER",
+            "source_tag": "v1.9.1",
+            "source_tag_object": "04df15420b6c0b2b86c79990a061cdeb5942b585"
           }
         },
         {
@@ -7384,6 +7833,50 @@
                   "sha256": "99a69660981156c21336fdb5661f89341b013c94e4bf9e1c7467b4745718397f",
                   "size_bytes": 2326
                 }
+              ]
+            }
+          }
+        },
+        {
+          "component": "SLSQP ACM release statement",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://github.com/scipy/scipy",
+            "source_commit": "e29dcb65a2040f04819b426a04b60d44a8f69c04",
+            "source_path": "scipy/optimize/slsqp/slsqp_optmz.f",
+            "source_tag": "v1.15.3",
+            "source_tag_object": "5720e3a40eff4d4df0317b0fd93182077fd88055",
+            "text_kind": "excerpt",
+            "text_lines": {
+              "file": "dr144-final-slsqp--slsqp_optmz.f",
+              "sha256": "bb1b489a87bc6137fee6132166c8a04cdb838d9042de809179d7f4f6ef9e43ae",
+              "size_bytes": 69943,
+              "git_blob_sha1": "b2e00a693e3be68026fefccba70e88e8100415f0",
+              "lines": [
+                1,
+                30
+              ]
+            }
+          }
+        },
+        {
+          "component": "SLSQP Dieter Kraft copyright",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://github.com/scipy/scipy",
+            "source_commit": "e29dcb65a2040f04819b426a04b60d44a8f69c04",
+            "source_path": "scipy/optimize/slsqp/slsqp_optmz.f",
+            "source_tag": "v1.15.3",
+            "source_tag_object": "5720e3a40eff4d4df0317b0fd93182077fd88055",
+            "text_kind": "excerpt",
+            "text_lines": {
+              "file": "dr144-final-slsqp--slsqp_optmz.f",
+              "sha256": "bb1b489a87bc6137fee6132166c8a04cdb838d9042de809179d7f4f6ef9e43ae",
+              "size_bytes": 69943,
+              "git_blob_sha1": "b2e00a693e3be68026fefccba70e88e8100415f0",
+              "lines": [
+                215,
+                215
               ]
             }
           }
@@ -9089,6 +9582,28 @@
           }
         },
         {
+          "component": "DCDFLIB original legalities",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://github.com/scilab/scilab",
+            "source_commit": "fecb7c4cf24d8bf96d73a79e3f987ddfde4b4259",
+            "source_path": "scilab/modules/statistics/src/dcdflib/README",
+            "source_tag": "5.5.2",
+            "source_tag_object": "fcf231c4fb2afc6ea7053d0df2c69c33e0d6b3e3",
+            "text_kind": "excerpt",
+            "text_lines": {
+              "file": "dr144-final-cdflib--README",
+              "sha256": "3036069e7cba9b0d15f288bf3ace1c4f1b6d26f3e446f45ee477ce0d572411cc",
+              "size_bytes": 11950,
+              "git_blob_sha1": "8133163a51bff13826c9dc323ff0e5104ba1ba49",
+              "lines": [
+                168,
+                205
+              ]
+            }
+          }
+        },
+        {
           "component": "Faddeeva (xsf)",
           "source": {
             "provenance_kind": "git-tree",
@@ -9411,6 +9926,28 @@
               "lines": [
                 3,
                 37
+              ]
+            }
+          }
+        },
+        {
+          "component": "DCDFLIB original legalities",
+          "source": {
+            "provenance_kind": "git-tree",
+            "source_repository": "https://github.com/scilab/scilab",
+            "source_commit": "fecb7c4cf24d8bf96d73a79e3f987ddfde4b4259",
+            "source_path": "scilab/modules/statistics/src/dcdflib/README",
+            "source_tag": "5.5.2",
+            "source_tag_object": "fcf231c4fb2afc6ea7053d0df2c69c33e0d6b3e3",
+            "text_kind": "excerpt",
+            "text_lines": {
+              "file": "dr144-final-cdflib--README",
+              "sha256": "3036069e7cba9b0d15f288bf3ace1c4f1b6d26f3e446f45ee477ce0d572411cc",
+              "size_bytes": 11950,
+              "git_blob_sha1": "8133163a51bff13826c9dc323ff0e5104ba1ba49",
+              "lines": [
+                168,
+                205
               ]
             }
           }

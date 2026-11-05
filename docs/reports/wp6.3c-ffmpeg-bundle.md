@@ -1,6 +1,6 @@
 # WP6.3c - FFmpeg bundle
 
-Status: turn 7 CPython / Qt production notices prepared, 2026-11-05. The dispatch records the seat's fork
+Status: turn 9 DR-144 commissioned loading complete, 2026-11-05; acceptance pending. The dispatch records the seat's fork
 commit/export and clean actionlint result; Dockerfile generation was refused by
 the seat's tool policy and a static proof recorded instead. The real asset,
 lock re-pin, remaining package work, review, package gate and release are pending.
@@ -1266,3 +1266,218 @@ The runner enforces `-p sandbox_mkdir_shim -p no:cacheprovider --timeout 300`
 and excludes `test_python_m_clearwater_starts_the_shell_and_exits_0`.
 No package gate, Reviewer A/B pass, fork run, real FFmpeg build, V4/GPU proof,
 release/version/tag step or network fetch was attempted in this turn.
+
+## Turn 9 - DR-144 final originals, patents and limits
+
+**Built.** Loaded 12 embedded rows and 16 new files (11 complete pinned source
+files, including seven whole rendered texts, plus five rendered excerpts).
+The manifest now has 125 records and retains all 110 exact host declarations.
+All prior source/host bindings remain; only the existing libyuv row's version
+evidence changes to replace its resolved U-P2 patent STOP with the new row.
+Pillow's original libaom row and bytes are unchanged. No notices.py schema or
+renderer change is needed: version evidence carries the required SLSQP citation
+and canonical-author-host evidence; the three provenance kinds are unchanged.
+
+`work/wp6.3c/turn9/load_records.py` is the seat-reviewable, deterministic loader.
+It checks the third record's 46,939 bytes / SHA-256
+`437aa040aad415fc5550d6e635ee9cecc288cced3a10a3fb9db588049a2cc97c`
+and census (c)'s SHA-256
+`c00de8a67b4222b927f1979112626f759863395c4f5cec510d6c6ff7563637cd`.
+Every copied source is checked against the record's byte count, SHA-256 and
+raw Git blob SHA-1 (`blob <length>\0<bytes>`, no filters). Each excerpt also
+matches its independently recorded byte count and SHA-256. Hosts' hash, size,
+parent and exact path come from census (c) and must match the retained
+declaration before a new binding is added. A row failure is recorded and left
+out; the other rows continue. None failed. Readme revisions for libaom's
+third-party rows use the upstream URLs/revision prefixes in the pinned seat
+record; README.libaom files are evidence only and are not copied or rendered.
+
+`audit_surface.py` independently checked repeated loading (all surface files
+byte-identical), all retained records/declarations, all five full-blob slices,
+seven whole rendered inputs and the original Pillow AOM bytes. The manifest
+SHA-256 is `04c3a1215ad0e5ad4ed084c00bcf45e4c7e743d43faab962c643382b1556c894`.
+The loader and audit are scratch instruments under the worktree, for seat
+inspection; they are not claimed committed product files.
+
+**Host -> component -> text table.** All hosts below have `_internal/` prefix
+and `.cp312-win_amd64.pyd` suffix; source commits, tags, tag objects, complete
+text hashes/sizes, raw blobs and excerpt ranges are in manifest.json.
+
+| Host | Component | Pinned text / SPDX |
+| --- | --- | --- |
+| `scipy/optimize/_lbfgsb` | L-BFGS-B original licence | jacobwilliams/lbfgsb 1.0.0 `License.txt`, whole; BSD-3-Clause |
+| `scipy/optimize/_lbfgsb` | L-BFGS-B authors and citation | SciPy v1.14.1 `scipy/optimize/lbfgsb_src/README` L15-38; BSD-3-Clause |
+| `scipy/optimize/_minpack` | MINPACK original notice | PyBDSF v1.9.1 `src/minpack/DISCLAIMER`, whole, 2,246 bytes CRLF; Minpack |
+| `scipy/optimize/_slsqplib` | SLSQP ACM release statement | SciPy v1.15.3 `scipy/optimize/slsqp/slsqp_optmz.f` L1-30; LicenseRef-SLSQP-ACM-BSD |
+| `scipy/optimize/_slsqplib` | SLSQP Dieter Kraft copyright | Same pinned source, L215-215; LicenseRef-SLSQP-ACM-BSD |
+| `scipy/linalg/_decomp_interpolative` | ID 0.4 original notice | SciPy v1.14.1 `scipy/linalg/src/id_dist/doc/doc.tex` L31-74; BSD-3-Clause |
+| `scipy/special/_ufuncs`, `scipy/special/cython_special` | DCDFLIB original legalities | Scilab 5.5.2 `scilab/modules/statistics/src/dcdflib/README` L168-205; LicenseRef-DCDFLIB-Legalities |
+| `PIL/_avif` | AOM patent licence | libaom v3.14.1 `PATENTS`, whole; LicenseRef-AOM-Patent-License-1.0 |
+| `PIL/_avif` | libyuv patent grant | libyuv 644251f252a84bf8ce91ff0aca86a9b16b069ab8 `PATENTS`, whole, no final newline; LicenseRef-libyuv-Patents |
+| `PIL/_avif` | fastfeat (libaom) | libaom v3.14.1 `third_party/fastfeat/LICENSE`, whole; BSD-3-Clause |
+| `PIL/_avif` | vector (libaom) | libaom v3.14.1 `third_party/vector/LICENSE`, whole; MIT |
+| `PIL/_avif` | x86inc (libaom) | libaom v3.14.1 `third_party/x86inc/LICENSE`, whole; ISC |
+
+The L-BFGS-B, MINPACK and DCDFLIB rows name the authors' canonical URLs and
+SHA-256s, plus archive members where applicable, in rendered version evidence.
+Their third-party Git homes hold the exact bytes verified by the seat; they
+are not described as authors' own repositories. SLSQP carries exactly one
+attribution sentence (in the ACM row):
+
+> D. Kraft, Algorithm 733: TOMP - Fortran modules for optimal control calculations, ACM Transactions on Mathematical Software 20(3), 1994, pp. 262-281, DOI 10.1145/192115.192124, https://www.netlib.org/toms/733.
+
+**STOPPED ROWS / DR-144 status.** NONE this turn. No STOPPED row from turns
+6-9 remains awaiting an input or ruling: turn 6's bzip2 source was supplied in
+turn 7; turn 8's U-S1 / U-P2 / U-P1 texts are now loaded or explicitly converted
+to limits under CHARC's rulings; U-T1 / U-N2 / U-S6 / U-S8 / U-S9 / U-H3 are
+limits below. The historical turn-8 STOP table records that turn's disposition;
+this status supersedes it. Existing material limits (notably COLAMD's absent
+referenced licence and inferred HiGHS subcomponent terms) remain disclosed in
+turn 8. DR-144's commissioned loading is complete; formal closure, independent
+reviews and the acceptance register changes remain the seat/CHARC's work.
+No 1.1.0 draft or N13 completion is asserted by the cell.
+
+**Limits lines.** The manifest has no limits-statement field, and the root
+THIRD_PARTY_NOTICES.md has no existing DR-144 limits paragraph. Accordingly
+the following lines live here only; no root-notices section is added this
+turn. Applicable carried-row caveats also appear in existing version evidence.
+
+- L-BFGS-B: published License.txt is a BSD-3 template with unfilled placeholders
+  and names no holder; Zhu, Byrd, Nocedal, Morales and the citation condition
+  come from the authors' separately carried README.
+- MINPACK: exact University of Chicago / Argonne acknowledgment and terms are
+  carried; its third-party Git home is byte-identical to the canonical netlib
+  disclaimer (R1), with original CRLF preserved.
+- SLSQP: the BSD licence was named in the ACM e-mail, never written; the holder
+  is ACM per the thread and Dieter Kraft per the source. No BSD text is invented.
+- NNLS (`scipy/optimize/_slsqplib`): SciPy's C translation of Lawson and Hanson's
+  NNLS (Solving Least Squares Problems, 1974; SIAM reprint 1995), distributed
+  by netlib at https://www.netlib.org/lawson-hanson/ with no licence or copyright
+  statement; no text is carried.
+- LSODA (`scipy/integrate/_odepack`): SciPy's C translation of LSODA from
+  ODEPACK (A. C. Hindmarsh and L. R. Petzold, Lawrence Livermore National
+  Laboratory), distributed at https://www.netlib.org/odepack/ and
+  https://computing.llnl.gov/projects/odepack/software with no licence or
+  copyright statement; no text is carried.
+- VODE / ZVODE (`scipy/integrate/_vode`): SciPy's C translations of VODE and
+  ZVODE (P. N. Brown, G. D. Byrne, A. C. Hindmarsh), distributed at
+  https://www.netlib.org/ode/ and
+  https://computing.llnl.gov/projects/odepack/software with no licence or
+  copyright statement; no text is carried.
+- FITPACK (`scipy/interpolate/_fitpack`, `scipy/interpolate/_dierckx`): SciPy's
+  C / C++ rewrites of Paul Dierckx's FITPACK (double-precision form by Pearu
+  Peterson), distributed at https://www.netlib.org/dierckx/ with no licence or
+  copyright statement; no text is carried.
+- ID 0.4: the carried notice is LaTeX source, not a rendered PDF.
+- DCDFLIB: the ACM Algorithms Policy condition (no copying for direct
+  commercial advantage) is met on its face because Clearwater is distributed
+  without fee; which DCDFLIB routines are ACM's was not traced. Per CHARC R4,
+  a record-only register row at accept is COMMISSIONED to CHARC (not a release
+  blocker): unchanged SciPy-wheel redistribution inherits SciPy's posture;
+  reconsider if SciPy changes its posture or a holder asserts the condition.
+- QUADPACK (`scipy/integrate/_quadpack`): SciPy's C rewrite of QUADPACK
+  (R. Piessens, E. de Doncker-Kapenga, C. W. Ueberhuber, D. K. Kahaner),
+  distributed at https://www.netlib.org/quadpack/ with no licence statement
+  (netlib's permission file reads "prehistoric"); no text is carried.
+- U-P1: x86inc inclusion is inferred from aom's x86-64 assembler build, not a
+  Pillow build log or binary inclusion read. fastfeat/vector follow the
+  encoder-on premise and direct CMake source lists. Third-party code within
+  aom's own files outside third_party was not surveyed by the seat addendum.
+- U-P3 replacement: aom LICENSE at v3.14.1, blob
+  `fc340c37643472ced912d5acc4ec21a722505e30`, 1,316 bytes, equals Pillow's
+  unchanged 1,315-byte AOM.txt plus one trailing newline. No second AOM
+  copyright-licence row is added.
+- U-T1 (`PIL/_imagingtk`): the Tcl/Tk header declaration carries no
+  copyrightable code into the binary (CHARC ruling); Tcl/Tk's terms are already
+  rendered through the Python row. No additional excerpt/text is carried.
+- U-N2: libquadmath presence in either OpenBLAS DLL and the applicable text
+  were not established; strings/import absence is not proof. No extra row.
+- U-S6: mdspan/Kokkos header instantiation and carried host were not established;
+  the fetched xsf text is only a pointer. No extra row.
+- U-S8: whether Cython utility code owes a notice and which text/hosts are
+  required were not established by the census. No extra row.
+- U-S9: the carried Sobol direction-number data copy and applicable notice
+  were not established by the native census. No extra row.
+- U-H3: Ryu/fast_float static inclusion in SciPy was not established; only
+  the previously proven pillow-heif libstdc++ hosts stay bound. No extra row.
+
+The U-P1 OUT list (highway, libyuv, libwebm, googletest; no SVT-AV1 directory)
+requires no additional libaom row. libyuv's separately proved libavif use
+retains its copyright row and now gains its patent row. No absence of
+licence statement is relabelled as a public-domain grant. These dispositions
+are CHARC's commissioned limits, not new cell licence rulings.
+
+**RED -> GREEN / verification loop.** All evidence is file-backed under
+`work/wp6.3c/turn9/`.
+
+| Suspected / confirmed / rejected / fixed | Evidence |
+| --- | --- |
+| Missing original terms, patent texts and host bindings: CONFIRMED, FIXED | `red.log`/`.xml`: 13 failed, 320 deselected against the pre-load manifest; `green3.log`/`.xml`: 13 passed, 320 deselected. Twelve parameter cases pin actual hosts and independently recorded text hashes/SPDX; one real synthetic-host plan/render checks every text, author-host URLs/hashes and exactly one SLSQP citation. |
+| MINPACK CRLF or libyuv EOF might be normalized: REJECTED | `surface-audit.json`, new rendering test and positive probe: MINPACK 2,246 bytes with 52 CRLF intact; libyuv stored without final newline. Renderer preserves input bytes and adds only the separator LF before its closing fence for a non-newline-terminated text. |
+| Regeneration or prior bindings might drift: REJECTED | `surface-audit.json`: repeated surface byte-identical, original host identities/source requirements retained, all original rows identical except resolved libyuv patent-status evidence. |
+| Changed host could fall back to wheel coverage: REJECTED | Fresh negative copy below refuses the altered `_slsqplib` by exact path and both identities, before replacing notices. |
+
+Two intermediate rendering runs exposed fixture assumptions, not product
+defects: the synthetic surface helper intentionally deletes production texts
+(the test now copies only its selected real inputs), and the published MINPACK
+acknowledgment wraps across CRLF (the literal assertion now reflects its exact
+bytes). `green.log` and `green2.log` retain those failures; `green3` is the first
+complete focused GREEN. No product-code change was needed. The final source,
+host, obligation, retention and output checks found no new in-envelope issue.
+Reviewer A is dispatcher-run after this yield; no review round is claimed.
+
+**Final validation.** All commands use `uv run --no-sync`; all exit codes are 0
+(`static-exits.json`, `pytest-exit.txt`).
+
+- `ruff-check.log`: `All checks passed!`.
+- `ruff-format.log`: `337 files already formatted`.
+- `mypy-win32.log`, `mypy-darwin.log`: each
+  `Success: no issues found in 166 source files`.
+- `pytest.log`/`.xml`, fresh `work/c63c-9`: **561 passed, 1 skipped**.
+
+| Module | Final result |
+| --- | --- |
+| `test_tools_package_build.py` | 126 passed |
+| `test_tools_package_ffmpeg.py` | 68 passed |
+| `test_tools_package_notices.py` | 333 passed |
+| `test_tools_package_smoke.py` | 34 passed, 1 skipped |
+
+The unchanged skip is `test_non_windows_containment_never_silently_skips`:
+`POSIX process-group native proof belongs to WP6.5`. The isolated runner
+launches with `PYTHONPATH=scripts`, removes that environment variable before
+pytest, loads `sandbox_mkdir_shim`, disables cacheprovider, sets timeout 300,
+and excludes `test_python_m_clearwater_starts_the_shell_and_exits_0`.
+The smoke source-entry child was inspected before execution: disposable
+APPDATA/LOCALAPPDATA/XDG roots, blocked PySide6/shiboken6 imports, GUI/worker
+stubs and 15-second timeout. No product entry point runs in the new tests.
+
+```text
+uv run --no-sync python work/wp6.3c/turn9/run_tests.py tests/test_tools_package_notices.py tests/test_tools_package_build.py tests/test_tools_package_smoke.py tests/test_tools_package_ffmpeg.py --basetemp=work/c63c-9 --junitxml=work/wp6.3c/turn9/pytest.xml -q -rs
+```
+
+**Fresh copy probes.** `probe.py`, `probe.log` and `probe-results.json`, under
+`work/c63c-9/probe-positive/` and `probe-negative/`, copy the commissioned
+seat folder; no original is written and no executable is run.
+
+- POSITIVE: **140 rows, 1536 entries, 115 embedded rows**;
+  all 110 declared hosts present and matching, all twelve new texts occur once.
+  Notices SHA-256 `e06211214c7edda2c38c3691d4710e764e677f680e706ef10195566372f257a7`.
+- Embedded rows by parent package: numpy: 1; pillow: 11; pillow-heif: 5; pyside6-essentials: 47; python: 13; scipy: 39; shiboken6: 1. Counts overlap for shared rows.
+- MINPACK's complete 2,246-byte text renders with all 52 CRLF intact.
+- NEGATIVE: one byte appended to a separate copy's
+  `_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd` causes:
+  `notices: embedded _internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd identity differs: expected SHA-256 a108ab846bccb35169dc86b37c14e25a2ec4162b0235ea5282ba28ea057ff011 size 48640; actual SHA-256 8a8a6c62165f8d623422d377c3fff6f007cd2c5d930f834ffd25b9bcfabfb7d6 size 48641; re-census required`. The copied old notices remain untouched on refusal.
+- Original notices SHA-256 before/after: `3afe913e26ecd6fe65765943fef798450687bebf7df926d1f720da9b8e999d8c` (unchanged).
+
+**Scope / remaining work.** Changed only the native-licences manifest/texts,
+notices tests and this report; no smoke row-count update was needed. No
+notices.py change, dependency, frozen interface, lock, build.py, workflow,
+root notices, external fetch, Git write, real build, frozen/GUI run, Docker,
+synthetic desktop input, footage/profile/source-build/evidence write, push,
+tag, GitHub action or mailbox post was performed. This turn bundles exactly
+the commissioned final DR-144 rows and limits. Q1, the fork-dependent re-pin,
+remaining package/release work, independent reviews and gate remain
+COMMISSIONED to the subsequent dispatches/seat. CHARC's R4 register record at
+accept remains COMMISSIONED to CHARC. No per-row input/ruling is left undone.
+Depth: `depth_input_tokens` is unavailable to this fresh cell; dispatcher read
+due at the turn boundary, with no estimate supplied.

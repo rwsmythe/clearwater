@@ -2768,3 +2768,184 @@ def test_production_tnc_retains_original_tnbc_attribution():
     assert row is not None
     assert b"STEPHEN G. NASH" in row.licence_input.path.read_bytes()
     assert row.embedded_in == ("_internal/scipy/optimize/_moduleTNC.cp312-win_amd64.pyd",)
+
+
+@pytest.mark.parametrize(
+    "component,stems,spdx,text_sha256",
+    [
+        (
+            "L-BFGS-B original licence",
+            ["scipy/optimize/_lbfgsb"],
+            "BSD-3-Clause",
+            "919e78c1c48cc7d179efe63075590cfb5942e6ae1da2bf373dd754fe795139b5",
+        ),
+        (
+            "L-BFGS-B authors and citation",
+            ["scipy/optimize/_lbfgsb"],
+            "BSD-3-Clause",
+            "283efcb76166e067a3d17d1156f548456318cb7850f67409fa7d96f59a5dfe1d",
+        ),
+        (
+            "MINPACK original notice",
+            ["scipy/optimize/_minpack"],
+            "Minpack",
+            "f5b330efdad110cdd84d585ec61220b0650461fa599e36b13e1726c9346dcfb9",
+        ),
+        (
+            "SLSQP ACM release statement",
+            ["scipy/optimize/_slsqplib"],
+            "LicenseRef-SLSQP-ACM-BSD",
+            "f1d9aa03a6a8d5bafc0b6bd20b64a86ec622fe9b3cde2052fbf5ccdbda69e843",
+        ),
+        (
+            "SLSQP Dieter Kraft copyright",
+            ["scipy/optimize/_slsqplib"],
+            "LicenseRef-SLSQP-ACM-BSD",
+            "98de00e1b3ce1545541a39e2b2e57d7edd0101e52b7ddfa6346943cff227b2d2",
+        ),
+        (
+            "ID 0.4 original notice",
+            ["scipy/linalg/_decomp_interpolative"],
+            "BSD-3-Clause",
+            "d49f6f31635740cc9f3737dfa99833789dd9eb6c25d3e0bcb4f7234ea541d6e3",
+        ),
+        (
+            "DCDFLIB original legalities",
+            ["scipy/special/_ufuncs", "scipy/special/cython_special"],
+            "LicenseRef-DCDFLIB-Legalities",
+            "d1afd8036f0b6c60b7fa8f912b91298e7e47cc350146ad30d1bad23577c8568c",
+        ),
+        (
+            "AOM patent licence",
+            ["PIL/_avif"],
+            "LicenseRef-AOM-Patent-License-1.0",
+            "661fb8e504744e95587b556b94a58343448300606a41bea8c7a9b97125696e61",
+        ),
+        (
+            "libyuv patent grant",
+            ["PIL/_avif"],
+            "LicenseRef-libyuv-Patents",
+            "4da84211f947c6f9f7dd8fbce513e1522e01833407ae732b8c9a2bbb75fed495",
+        ),
+        (
+            "fastfeat (libaom)",
+            ["PIL/_avif"],
+            "BSD-3-Clause",
+            "499041ddee5227b6f29ca06c17803e5fe24d60f243c69635cd76b7ba08d0ddd5",
+        ),
+        (
+            "vector (libaom)",
+            ["PIL/_avif"],
+            "MIT",
+            "ff6c857ce2708e87701323078aef115c1872a1f80a9649f86dc899b48083bc60",
+        ),
+        (
+            "x86inc (libaom)",
+            ["PIL/_avif"],
+            "ISC",
+            "719d8fa235f2068e0ae6d6a7dceb0a7720d7840f0f0ebed29957989e6ded3cd8",
+        ),
+    ],
+)
+def test_originals_and_patents_bind_verified_texts_to_carried_hosts(
+    component, stems, spdx, text_sha256
+):
+    """Omitting an original obligation or attaching it to a different host must fail."""
+    module = load_notices()
+    folder = ROOT / "tools/package/native-licences"
+    records = {row.component: row for row in module.load_native_licences(folder)}
+    assert component in records
+    row = records[component]
+    expected = {f"_internal/{stem}.cp312-win_amd64.pyd" for stem in stems}
+    assert set(row.embedded_in) == expected
+    assert row.spdx == spdx
+    assert hashlib.sha256(row.licence_input.path.read_bytes()).hexdigest() == text_sha256
+    document = json.loads((folder / "manifest.json").read_text())
+    hosts = {host.relpath: host for host in module._embedded_declarations(document)}
+    for path in expected:
+        assert component in {name for name, _source in hosts[path].components}
+
+
+def test_original_obligations_render_verbatim_with_canonical_sources_and_citation(release):
+    """A real plan must preserve CRLF, patent bytes and the required SLSQP citation."""
+    module = load_notices()
+    production = json.loads((ROOT / "tools/package/native-licences/manifest.json").read_text())
+    names = {
+        "L-BFGS-B original licence",
+        "L-BFGS-B authors and citation",
+        "MINPACK original notice",
+        "SLSQP ACM release statement",
+        "SLSQP Dieter Kraft copyright",
+        "ID 0.4 original notice",
+        "DCDFLIB original legalities",
+        "AOM patent licence",
+        "libyuv patent grant",
+        "fastfeat (libaom)",
+        "vector (libaom)",
+        "x86inc (libaom)",
+    }
+    selected = [copy.deepcopy(row) for row in production["components"] if row["component"] in names]
+    assert {row["component"] for row in selected} == names
+    # Use the real texts and provenance with a disposable synthetic host; the
+    # separate production test pins the actual census paths and declarations.
+    relative = "_internal/numpy/_core/test.pyd"
+    data = (release["folder"] / relative).read_bytes()
+    surface = release["native_surface"]
+    document = json.loads((surface / "manifest.json").read_text())
+    for row in selected:
+        filenames = [row["text_file"]]
+        if "text_lines" in row:
+            filenames.append(row["text_lines"]["file"])
+        for filename in filenames:
+            shutil.copyfile(ROOT / "tools/package/native-licences" / filename, surface / filename)
+        row["embedded_in"] = [relative]
+    document["components"].extend(selected)
+    document["embedded_hosts"] = [
+        {
+            "relpath": relative,
+            "parent": "numpy",
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "size_bytes": len(data),
+            "components": [
+                {
+                    "component": row["component"],
+                    "source": {
+                        key: value for key, value in row.items() if key in module._PROVENANCE_FIELDS
+                    },
+                }
+                for row in selected
+            ],
+        }
+    ]
+    save_embedded_fixture(release, document)
+    output = module.render_notices(plan(module, release))
+    for row in selected:
+        terms = (surface / row["text_file"]).read_bytes()
+        assert output.count(terms) == 1
+    minpack = next(row for row in selected if row["component"] == "MINPACK original notice")
+    terms = (surface / minpack["text_file"]).read_bytes()
+    assert len(terms) == 2246 and terms.count(b"\r\n") == 52
+    assert b"This product includes software developed by the\r\n   University of Chicago" in output
+    assert (
+        output.count(
+            b"D. Kraft, Algorithm 733: TOMP - Fortran modules for optimal control calculations, "
+            b"ACM Transactions on Mathematical Software 20(3), 1994, pp. 262-281, "
+            b"DOI 10.1145/192115.192124, https://www.netlib.org/toms/733."
+        )
+        == 1
+    )
+    for url, digest in [
+        (
+            b"https://users.iems.northwestern.edu/~nocedal/Software/Lbfgsb.3.0.tar.gz",
+            b"f5b9a1c8c30ff6bcc8df9b5d5738145f4cbe4c7eadec629220e808dcf0e54720",
+        ),
+        (
+            b"https://www.netlib.org/minpack/disclaimer",
+            b"f5b330efdad110cdd84d585ec61220b0650461fa599e36b13e1726c9346dcfb9",
+        ),
+        (
+            b"https://netlib.org/random/dcdflib.f.tar.gz",
+            b"93938e358d67eb4c4de78baaacea085c683fd183672a1092507229e513fe95aa",
+        ),
+    ]:
+        assert url in output and digest in output
