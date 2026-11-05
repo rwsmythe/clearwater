@@ -226,3 +226,18 @@ Verified at the seat: the stage-1 `PYZ-00.toc` carries `scipy._external.array_ap
 Not chosen: the aggregate `LICENSES_bundled.txt` as one text (not tied to bundled modules; the fail-closed rule would be lost).
 
 Then: t18 (FRESH): the libffi, MSVC, Mesa / LLVM rows, the vendored SciPy blocks, the namespace mapping -> clean rebuild -> notices -> smoke under UIA -> Reviewer A r3 (delta) -> Reviewer B -> gate -> accept. CHARC gen 16 rolls after this ruling; gen 17 continues from `docs/charc-state.md`.
+
+## Turn-18 ruling (CHARC gen 17, 2026-11-05 ~16:20Z; turn 18 `b6b1a286` report-only, session `01a1ac75` resumable; the provenance-fields STOP)
+
+The STOP is correct: the turn-9 schema admits only OpenSSL's release-archive shape, and eight of the nine remaining rows have a git tree as their as-built source while the MSVC runtime has no source at all. Fetching nine release archives (option (a)) adds a second identity next to the commit the build actually used and still leaves MSVC unrepresentable.
+
+**RULED: option (b), as THREE provenance kinds, each strict.** Every row carries a required `provenance_kind`; the validator checks exactly the fields of that kind, refuses a field of another kind on the same row, refuses an unknown kind, and keeps `version_evidence` (method + the value the seat read) required for every kind.
+1. `release-archive` = the turn-9 shape unchanged (`source_tag_object`, `source_archive_url`, 64-hex `source_archive_sha256`, positive `source_archive_size_bytes`). OpenSSL stays on it; no edit to that row.
+2. `git-tree`: `source_repository` (https URL), `source_commit` (40-hex), optional `source_tag` with its `source_tag_object` where a tag exists, and `source_path` (the in-tree path, required when the component is a sub-tree of a larger repository). Rows: libffi at `python/cpython-source-deps` `e7a5ad74`; array-api-compat `145bd7d3`, array-api-extra `02afc63f`, cobyqa `69b7177b` at their own repositories; pyprima and packaging.version at `scipy/scipy` `e4e854ea` (tag `v1.18.1`) with their in-tree paths; Mesa `mesa-11.2.2` -> `3a9f6283`; LLVM `llvmorg-3.6.2` -> `ee46064b`. Mesa and LLVM stay two rows on one hash via `co_licensed_with`. No archive field on a git-tree row.
+3. `proprietary-redistributable`: no source field at all; `text_source` (the interpreter `LICENSE.txt` excerpt, lines 283-320, by hash and byte count) and the URL lines required; the eleven files bound per path with their FileVersions as t17 ruled. The MSVC row is the only one.
+
+Tests (RED first): one accepted row per kind; one mixed-form refusal per kind pair; the unknown kind; a git-tree row with a 39-hex commit. The report states the three kinds and names the one proprietary row. The seat verifies every commit, tag object and path against its record before Reviewer A r3. AD-38 carries the three kinds at the accept.
+
+Not chosen: (a) archive fetches for all nine (a second identity, heavier, MSVC still unrepresentable); a single optional-everything form (a row could then carry no source identity and pass).
+
+Then, unchanged: resume `01a1ac75` with dispatch-18 plus this ruling -> clean rebuild from Git Bash's FULL PATH -> notices GREEN + `dll_origin.py` clean -> smoke under UIA -> notices read in full -> Reviewer A r3 (delta over `fa0fded4..`) -> Reviewer B -> gate -> accept.
