@@ -2753,3 +2753,103 @@ notices-versus-folder review, Reviewer A r3 delta, Reviewer B and gate. The
 WP6.3c FFmpeg/ZIP/release carve-out and CHARC's acceptance/register edits remain
 unchanged. The turn yields now with the finding, evidence and changed paths;
 no package completion or release readiness is asserted.
+
+## Turn 18: census-data provenance STOP before item 1
+
+Fresh dispatch 18 starts at `c3cf6f82`. The chat brief and all its rulings are
+the text of record. The dispatch protocol, APPLICATION.md, CLAUDE.md, prior
+report and the three named seat records were consulted. No implementation or
+real component data was changed. Depth is pending the dispatcher's reading;
+no estimate is supplied.
+
+### Finding and requested ruling
+
+**STOP (MAJOR, in-envelope input/schema mismatch): the seat records do not
+provide the source-archive provenance required by the current manifest.**
+`load_native_licences` requires nonempty `source_tag`, a full 40-hex
+`source_tag_object`, `source_archive_url`, a 64-hex
+`source_archive_sha256`, and positive `source_archive_size_bytes` for EVERY
+row. Its rendered provenance calls the archive hash "published SHA-256".
+The Turn-9 ruling requires the seat to fetch and verify every source hash;
+dispatch 18 requires values from the seat record, nothing invented. There
+is no grant to replace an archive hash with a licence-text hash, invent a
+published checksum, or waive those required fields.
+
+The supplied records establish exact licence-text hashes/sizes, binary
+hashes/sizes and component source commits. They supply no source-archive
+URL/hash/size for any of the nine new components. Full tag-object IDs are
+also absent (LLVM and SciPy give abbreviated objects); libffi's as-built
+source is a branch commit, and the MSVC input is an interpreter-LICENSE
+excerpt rather than a separately identified upstream archive. Thus the
+instruction that these records carry every value needed for this turn does
+not match the existing input contract.
+
+Requested dispatcher/CHARC response: either provide the seat-verified
+archive fields and full tag identities needed by the existing schema, or
+explicitly authorize a provenance schema for these commit-pinned sources
+and the interpreter excerpt that accurately labels what the seat verified.
+Any such schema needs to state which archive fields cease to be required
+and how source provenance is rendered; the cell has not selected that policy.
+This is an input/design STOP, not a request to fetch from the offline cell.
+
+### Cheap reproduction and RED state
+
+Evidence is file-backed under `work/c63b-18-evidence/`:
+
+- `provenance-probe.py` creates a scratch-only libffi input surface using
+  the supplied text, its verified SHA-256/size, the source commit, version
+  evidence and exact binary binding. It deliberately leaves unsupplied
+  provenance fields absent instead of inventing values.
+- `provenance-probe.log`: probe exit 0 (both expected refusals observed).
+  The record-only loader reports
+  `notices: native licence row has missing/invalid string fields`.
+- The same probe calls `plan_notices` read-only against the seat's clean
+  build. It still refuses the 13 census-native files and the two SciPy
+  namespace entries, exactly as turn 17 recorded. No `write_notices`,
+  writing CLI, bundled process or product entry point was invoked.
+
+Item 1 is RED, with no GREEN claimed. Items 2 and 3 were not started because
+the dispatch orders item 1 first and the protocol requires yielding on this
+unresolved input premise. No notices file was generated: row count and
+output SHA-256 are unavailable, and OpenSSL's successful final-artifact
+coverage is not newly claimed.
+
+### Independent input checks and validation
+
+`seat-text-check.log` records exit 0 and
+`SUMMARY: 9/9 source text hashes, sizes and LF bytes match the seat record`.
+Each of libffi, the MSVC excerpt, Mesa, LLVM, array-api-compat,
+array-api-extra, cobyqa, pyprima and packaging.version was independently
+hashed, sized and checked for zero CR bytes. The log records measured and
+seat SHA-256 side by side for all nine. These source texts are intact; the
+STOP is their missing source-archive metadata, not text corruption. Only
+libffi was copied, into the disposable probe surface, byte-exact. No new
+licence text was placed in the committed native-licences directory, so there
+are no committed-text hashes to report for this turn.
+
+`check-attr.log` records all nine proposed destination names as `text: unset`.
+The existing `.gitattributes` rule covers them without an edit. The fixture
+and product schemas were not relaxed. Ruff, format, either mypy target,
+the seven-module pytest validation and the module-alone installer run were
+not run: the turn stopped before any code, tests or manifest changes. No
+new passing-suite claim is made. The final report-only diff is checked with
+`git diff --check`; its log is `diff-check.log`.
+
+### Verification-loop / cumulative ledger continuation
+
+| Round / turn | Severity and envelope | NEW / REOPENED; reverts | Product-code / test-only fixes; state |
+| --- | --- | --- | --- |
+| Dispatch data / t18 | 1 MAJOR, in-envelope: required provenance missing from supplied seat data. | NEW input finding; 0 REOPENED, 0 reverts. | No product or test fixes; confirmed by record-only loader refusal; OPEN, yielded for ruling. |
+
+Suspected: missing required source metadata. Confirmed independently by
+reading the schema and exercising the loader with record-only libffi data.
+False positives rejected: none. Fixed: none; no unauthorized schema change.
+The unchanged clean-folder probe independently confirms the build remains
+fail-closed. No Reviewer A round was launched or convergence claimed.
+
+No network fetch, PyInstaller build, frozen run, GUI launch, desktop input,
+footage/profile/interpreter/seat-folder write, QUIT_SCRIPT run, Git write,
+push/tag, gh command or workflow dispatch occurred. The report is the only
+tracked change. The FFmpeg/ZIP/release carve-out remains WP6.3c's. This turn
+yields the MAJOR finding before implementation; the remaining dispatch-18
+work and all subsequent seat proofs/reviews/gates remain outstanding.
