@@ -29,6 +29,7 @@
 - **OWNER (verbatim): "color profile is unknown, likely whatever they were filmed at"** -> WP7.1 brief Q1 complete.
 - **OWNER (verbatim): "Best I can give is 'HDR video'"** = the Insta360 recording mode; the exports are SDR-tagged BT.709, so WP7.1 item 2 gains an SDR-behaviour check (spec 5.3 / D73 analogue).
 - **~18:50Z OWNER on WP6.5's Mac inputs (verbatim): "for any command-line tools needed, include installation instructions in the github readme.  assume output folders will be contained within the program folder tree"** -> WP6.5 brief amended (README.md owned for a macOS prerequisites section; Q4 answered: outputs under `<program folder>/wp6.5-mac/`, copied to `work/wp6.5/mac/`). Still needed before FINAL: the Mac's details (the one-line command's output). F5 + the darwin PATH list / Mach-O origin rule still to add.
+- **OWNER (verbatim): "That plan is fine.  I can use my google drive to copy between the  mac and the laptop"** = WP6.5 stage 2 by run sheet + Google Drive copy (SSH not chosen); brief Q4 amended.
 - (newest first; append here)
 
 ## GEN 16 HANDOVER (verified at gen 17's pickup; still the live plan)
