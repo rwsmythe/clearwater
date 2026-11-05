@@ -1,18 +1,14 @@
 # WP6.3b release workflow: implementation record
 
-Status: turn 8 yields a NEW MAJOR text-rule ambiguity to CHARC before implementation:
-the installed NumPy and SciPy aggregate licence files each contain the full
-GPL-3.0 text. Byte-copying both files conflicts with the dispatch's single-copy
-rule (and its FFmpeg provenance rule when bundled). The reproduction and proposed
-ruling are in the turn-8 section below. No generator/build/test code changed in
-turn 8. The following remains the verified turn-7 state: the new notices
-planner inventories an onedir artifact, maps its files/modules to audited locked
-rows, validates coverage/material availability, and applies the FFmpeg refusal.
-The 14 coverage cases and all 345 requested tests are green. No artifact notices
-writer or --notices build option exists yet. Full-text rendering/provenance tests,
-native-component details and build wiring remain for the continuation after the
-dispatcher's depth reading. CHARC's turn-6 provenance/MinGW/PyInstaller rulings
-are accepted; the separate zvbi redistribution HOLD remains unchanged.
+Status: turn 9 implements full-text rendering, native Qt/pillow-heif details,
+the notices writer/module CLI and build.py's --notices option. Ruff, format,
+both mypy platforms and all 408 requested tests pass. Dispatch 9 resolves the
+turn-8 GPL-3.0 wording question. A NEW MAJOR input gap remains: the interpreter
+carries OpenSSL DLLs, but neither its licence file nor the root audit supplies
+OpenSSL's redistributed licence/source material. Such a folder now fails closed;
+the seat must supply verified material and a ruling before the OpenSSL row can
+be completed. No real artifact notices, PyInstaller build or N13 acceptance is
+claimed. The separate FFmpeg zvbi redistribution HOLD remains unchanged.
 
 ## Round and turn ledger
 
@@ -29,6 +25,7 @@ Claude pass; no review verdict is claimed here. Context depth is dispatcher-read
 | Turn 6 / seat licence transfer, input STOP | All 103 licence slots transferred exactly; strict verified-licence validation GREEN and incompatible data retained. Generator not started: its mandatory wheel LGPL input is absent; exact MinGW source release is absent too. | No Reviewer A round. NEW MAJOR input/provenance STOP; MINOR pre-existing indirect-source limitation and root PyInstaller runtime-row discrepancy reported below. Existing zvbi STOP remains the owner's/CHARC's. | No review reopenings or reverts; no generator workaround. | Product: lock and shared validator. Tests: verified-only rejection and preservation of incompatible rows. | Dispatcher supplied about 134K at turn-5 end; turn-6 depth pending dispatcher reading, no estimate. |
 | Turn 7 / notices coverage-boundary yield | New onedir inventory and notice-plan API, source-audit/uv.lock/installed-RECORD matching, material checks, coverage closure and conditional FFmpeg rows/refusal. Rendering, provenance tests and build wiring not begun. | No Reviewer A round or new blocking finding; turn-6 input STOPs ruled by CHARC. | No review reopenings or reverts. Initial typing/lint errors corrected; no product-entry or real-binary execution. | New notices planning module and synthetic coverage test module; report. No existing build/lock/test file changed. | Dispatcher supplied 171K at turn-6 yield; current depth is pending dispatcher reading, not estimated. |
 | Turn 8 / input-rule STOP | Read dispatch 6 item 2, dispatch 7, the report and installed materials. Reproduced two complete GPL-3.0 copies under the required wheel-byte-copy rule; requested CHARC's rendering ruling. | No Reviewer A round. NEW MAJOR in-envelope ambiguity; existing zvbi HOLD unchanged. | 1 NEW, 0 REOPENED; no reverts. | Report only; no product or test change. | Fresh session; turn-end figure pending dispatcher reading, not estimated. |
+| Turn 9 / generator and input-gap handoff | Applied dispatch-9 clarification; rendered verified texts, native details and coverage; added atomic writer, CLI and --notices wiring. OpenSSL missing redistribution material confirmed; folders carrying it are refused. | No Reviewer A round. Turn-8 MAJOR closed by seat clarification; 1 NEW MAJOR in-envelope input gap, plus the unchanged zvbi HOLD. | 1 NEW, 0 REOPENED; no reverts. | Notices generator and build option; synthetic/provenance/wiring tests; report. | Dispatcher supplied about 104K at turn-8 yield; turn-9 end pending dispatcher reading, not estimated. |
 
 Turn 2 bundled the three changes explicitly commissioned by dispatch 2; the seat
 commits each turn. No git write was performed by the cell.
@@ -1082,3 +1079,215 @@ push, tag, gh invocation or workflow dispatch occurred. No files outside the
 owned report and ignored worktree evidence were changed. The next dispatch
 needs the rendering ruling before the four commissioned implementation items
 can continue. Depth is pending the dispatcher's reading; no estimate is offered.
+
+## Turn 9: rendering, writer, wiring and an OpenSSL input STOP (2026-11-05)
+
+GPL-3.0 'once' = one FFmpeg block; wheel aggregates keep their embedded copies verbatim (seat clarification, dispatch 9).
+
+### Built this turn
+
+- `render_notices` validates coverage, emits the component/source table and
+  supported entry labels, and renders referenced full-text blocks. Raw wheel
+  bytes, including CRLF and embedded GPL texts, are unchanged. Copied Markdown
+  uses a fence longer than any backtick run in its content.
+- Every reused upstream block (root texts 36-44) is checked against BOTH its
+  recorded SHA-256 and UTF-8/LF byte count before use. Provenance includes the
+  using component/version, true upstream URL/release and the exact words
+  "the 1.0.0 audit's upstream copy". Commercial Qt terms are excluded from
+  selection and rejected even if explicitly supplied to the renderer.
+- Qt/Shiboken rows name the installed 6.12.0 release's Qt/binding sources,
+  dynamic redistribution, replacement/relinking and debugging/reverse-engineering
+  rights. A wheel's actual LGPL text wins over upstream fallback. An upstream
+  source version that differs from the installed component fails generation.
+- Native pillow-heif rows come from the installed wheel manifest and only
+  appear for supported native file entries: libheif 1.23.6, libde265 1.1.3,
+  x265 4.3 and the unversioned MinGW runtime. Header/copyright and licence
+  blocks are retained; LGPL replacement rights and the accepted MinGW limit
+  are explicit. NumPy/SciPy/Pillow native aggregate texts are redistributed.
+- PyInstaller bootloader is GPL-2.0-or-later WITH Bootloader Exception;
+  run-time hooks are Apache-2.0. Both rows reference the installed COPYING.txt,
+  which is copied once in full, including the exception, per-kind sections
+  and full licence texts. Tests also compare the exception/hooks slices.
+- The header states Clearwater's GPL-2.0-or-later terms and corresponding-source
+  pointers. When FFmpeg is present it states the combined GPL-3.0 terms permitted
+  by the or-later grant. The existing incompatible-FFmpeg refusal is retained;
+  component patent-only notes are rendered from the lock's licence_note fields.
+- `write_notices` validates before changing output, includes the generated file
+  in Clearwater's coverage, and writes through a flushed/fsynced temporary file
+  outside the artifact folder, then os.replace. Existing notices survive a
+  validation/publication error; first-write reservations and temporary files
+  are cleaned on failure. Repeated successful writes have identical bytes.
+- `python -m tools.package.notices FOLDER` runs the generator; optional --audit,
+  --uv-lock and --ffmpeg-lock select local input records. Failures return 1 with
+  one ASCII-safe stderr line. Invalid CArchive input is normalized to that path.
+- `build.py --form onedir --notices` invokes the generator after the FFmpeg
+  step and bundle/hidden-import checks. A notices failure fails the build.
+  --notices with onefile or pack-only operations is refused at argument parsing.
+
+No new dependency, runtime/product entry change, frozen-interface change,
+network fetch or real build was needed. This turn bundles the four generator
+items explicitly commissioned together by dispatch 9.
+
+### Synthetic bundled-entry vs row table (both variants)
+
+The complete fixture uses synthetic DLL/PYD bytes and real PyInstaller archive
+writers for a non-executable CArchive/PYZ. It does not launch an executable.
+Installed NumPy/SciPy/Pillow texts and pillow-heif's manifest are the licence
+inputs; PyInstaller's installed COPYING is separately byte-tested. The fake
+FFmpeg variant uses the existing compatible one-component lock fixture, NOT the
+real locked zvbi-containing bundle.
+
+`work/c63b-9-final/test_complete_native_fixture_h0/` has 22 inventory entries,
+14 rows, 17 full-text blocks and a 262,154-byte generated document. The `h1/`
+variant has FFmpeg: 26 entries, 16 rows, 18 text blocks and 263,305 bytes. The
+documents are in each fixture's `release/THIRD_PARTY_NOTICES.md`; sibling
+`rendered-plan.json` records every row, entry, licence, version and source.
+An entry may support both a distribution row and its native-component row.
+The unions equal the complete inventory in both variants; no row claims an
+absent entry. Here `file:` and `_internal/` prefixes are omitted for readability:
+
+| Row | Supported entries (without FFmpeg) | With FFmpeg |
+| --- | --- | --- |
+| Clearwater | Clearwater.exe; THIRD_PARTY_NOTICES.md; archive:__main__; pyz:clearwater | Same |
+| Python 3.12.13 | python312.dll; pyz:json | Same |
+| numpy 2.5.4 | numpy/_core/test.pyd; pyz:numpy | Same |
+| scipy 1.18.1 | scipy/synthetic.pyd | Same |
+| pillow 12.3.0 | PIL/synthetic.pyd; pyz:PIL | Same |
+| pillow-heif 1.8.1 | The six native DLLs in the next four rows | Same |
+| pillow-heif / libheif 1.23.6 | libheif-abc.dll | Same |
+| pillow-heif / libde265 1.1.3 | libde265-0-abc.dll | Same |
+| pillow-heif / x265 4.3 | libx265-217-abc.dll | Same |
+| pillow-heif / MinGW runtime | libgcc_s_seh-1-abc.dll; libstdc++-6-abc.dll; libwinpthread-1-abc.dll | Same |
+| pyside6-essentials 6.12.0 | PySide6/Qt6Core.dll | Same |
+| shiboken6 6.12.0 | shiboken6/Qt6Core.dll (synthetic ownership fixture) | Same |
+| PyInstaller bootloader 6.22.3 | Clearwater.exe; archive:pyimod01_archive; archive:PYZ.pyz | Same |
+| PyInstaller run-time hooks 6.22.3 | archive:pyi_rth_inspect | Same |
+| FFmpeg / ffprobe | Absent; user-obtained statement | ffmpeg.exe; ffprobe.exe; ffmpeg-BUILD.txt; ffmpeg-LICENSE.txt |
+| FFmpeg component: x265 | Absent | Same four FFmpeg entries |
+
+Both variants state that the GPU pack is user-obtained, not redistributed.
+Without FFmpeg there are zero FFmpeg rows/blocks and its user-obtained statement;
+with it there is exactly one dedicated FFmpeg block shared by its two rows.
+
+### Per-text provenance
+
+`work/c63b-9-evidence/final-fixture-provenance.log` records every emitted label.
+Direct inputs are labelled `Build source: Clearwater 1.0.0; LICENSE`,
+`Build source: Python 3.12.13; LICENSE.txt`, or `Installed wheel: <component>
+<version>; <dist-info relative path>`. The wheel paths are NumPy LICENSE.txt,
+SciPy LICENSE.txt, Pillow LICENSE, pillow-heif LICENSE.txt and
+LICENSES_bundled.txt, and PyInstaller COPYING.txt. Tests on the REAL installed
+NumPy/SciPy/PyInstaller files require exact raw-byte inclusion, not normalized
+text. The fixture labels identify their fixture-wheel copies truthfully.
+
+Every fallback label contains "the 1.0.0 audit's upstream copy" and its true
+source URL. These are the root blocks used, each rendered once even if shared:
+
+| Root block | True upstream source/release |
+| --- | --- |
+| text-36 | qt/qtbase v6.12.0, LICENSES/LGPL-3.0-only.txt (shared LGPL text) |
+| text-37 | Multicorewareinc/x265 4.3, COPYING |
+| text-38 | Multicorewareinc/x265 4.3, source/x265.h copyright/source grant |
+| text-39 | strukturag/libheif v1.23.6, COPYING |
+| text-40 | strukturag/libde265 v1.1.3, COPYING |
+| text-41 | mingw-w64/mingw-w64 master, COPYING; explicitly unversioned |
+| text-42 | strukturag/libheif v1.23.6, libheif/api/libheif/heif.h |
+| text-43 | strukturag/libde265 v1.1.3, libde265/de265.h |
+| text-44 | mingw-w64/mingw-w64 master, mingw-w64-libraries/winpthreads/COPYING; explicitly unversioned |
+
+FFmpeg's additional label is `Bundled FFmpeg: <locked version>;
+ffmpeg-LICENSE.txt`, under the single heading `Bundled FFmpeg GPL-3.0`.
+No wheel licence file is cut or rewritten to remove embedded GPL text.
+
+MinGW limitation: **the wheel does not name the toolchain release** for
+libgcc_s_seh-1.dll, libstdc++-6.dll and libwinpthread-1.dll; terms are GPL-3.0
+with the GCC Runtime Library Exception for libgcc/libstdc++, MIT / BSD for
+winpthreads; source pointers remain explicitly unversioned. CHARC's accept-time
+tracking row remains due.
+
+### RED -> GREEN and final validation
+
+All runner output is in `work/c63b-9-evidence/`:
+
+| Item / log | Result |
+| --- | --- |
+| `red-render.log` | 42 failed, 14 passed: renderer absent; every new provenance/rendering control failed before implementation. |
+| `green-render.log` | 56 passed: nine reuse paths, each body/hash/size tamper, verbatim installed wheels, commercial exclusion, header, FFmpeg block and rendering determinism. |
+| `red-native.log` | 7 failed, 57 passed: native rows/Qt rights/wheel preference/source-version checks absent. |
+| `green-native-2.log` | 64 passed. First green attempt also exposed a fixture expectation using LF despite write_text producing CRLF; expectation corrected to actual input bytes. |
+| `red-writer.log` | 8 failed, 141 passed: writer/CLI/build flag absent. |
+| `green-writer-2.log` | 149 passed. Initial build stub only made onefile layout; replaced within the new test with a --distpath-driven synthetic archive writer. |
+| `red-openssl.log` | 1 failed, 68 deselected: a synthetic libcrypto DLL was incorrectly accepted under Python's PSF row. |
+| `red-archive.log` | 1 actual invalid-CArchive failure, plus 2 fixture assertions incorrectly counting duplicate provenance URL occurrences; assertions corrected to count actual LGPL text blocks. |
+| `green-archive.log` | 3 passed, 69 deselected: both complete native fixtures and malformed-archive refusal. |
+| `ruff-check-final.log` | Exit 0, All checks passed! |
+| `ruff-format-final.log` | Exit 0, 334 files already formatted. |
+| `mypy-final.log` | Exit 0, Success: no issues found in 165 source files. |
+| `mypy-darwin-final.log` | Exit 0, Success: no issues found in 165 source files. |
+| `pytest-validation-final.log` | Exit 0, 408 passed in 12.50 s (74 notices, 60 FFmpeg, 81 build, 193 frozen-entry). |
+| `cli-help.log` | Exit 0, actual `python -m tools.package.notices --help` invocation. |
+
+The final pytest command is dispatch 9's exact four-module selection with
+`PYTHONPATH=scripts`, `-p sandbox_mkdir_shim -p no:cacheprovider`, timeout 300
+and fresh basetemp `work/c63b-9-final`. The initial requested basetemp
+`work/c63b-9` run passed 403 before the final integration/error-path additions.
+**No sandbox-only residual** remains in this selection. Earlier uv logs retain
+the inherited VIRTUAL_ENV warning; final validation explicitly selects the
+worktree's .venv. Initial lint long lines/import ordering and one mypy tuple
+inference error were fixed before the final checks. Final source code was
+already in place for both mypy runs; subsequent edits only added/formatted tests
+and this report.
+
+### NEW MAJOR input STOP: OpenSSL redistribution material
+
+`work/c63b-9-evidence/openssl-materials.log` is a bounded, read-only stdlib probe:
+the build interpreter reports `OpenSSL 3.5.5 27 Jan 2026`; both
+`DLLs/libcrypto-3-x64.dll` and `DLLs/libssl-3-x64.dll` exist. At its root/DLLs
+there is only Python's LICENSE.txt, with ZERO OpenSSL/Apache License mentions.
+The root notices have no separate OpenSSL row or full-text heading. Their Python
+source-install row merely names the DLLs and points indirectly to
+python-build-standalone, explicitly disclaiming redistribution.
+
+The RED synthetic libcrypto case independently confirms the consequence:
+the previous planner assigned it Python's PSF terms and generated no OpenSSL
+row/text. The corrected guard refuses a folder with these interpreter OpenSSL
+DLLs with `OpenSSL missing redistributed licence/source material`; it cannot
+silently claim a binary audit is complete. This is an input failure covered by
+the commissioned missing-material refusal, not a new licence policy or network
+workaround. The synthetic fixtures that do not carry OpenSSL still succeed.
+
+**Ruling/material requested:** the seat supplies the verified OpenSSL 3.5.5
+copyright/licence text and exact source/build record and authorizes its input
+surface (for example the already commissioned per-binary audit data file, which
+is not owned by dispatch 9, or a specifically granted audited upstream block).
+Then the OpenSSL component row can be completed and the guard replaced by real
+material validation. No source URL, full text or exemption was invented.
+The real built-folder per-binary audit must also check Python/wheel platform
+runtimes against the source audit's stated MSVC/Mesa/other-native conditions;
+the synthetic fixture is not evidence that those obligations are closed.
+
+### Verification loop, limits and next handoff
+
+| Suspect / severity | Independent confirmation | Disposition |
+| --- | --- | --- |
+| MAJOR: upstream fallback could copy tampered text or claim wheel provenance | All nine real audited blocks; each independently altered body, digest and length; label checks | Fixed/green; both integrity fields checked, true upstream labels retained. |
+| MAJOR: wheel licence rewriting or commercial Qt leakage | Raw installed NumPy/SciPy/PyInstaller byte comparisons; two Qt-wheel branches plus direct commercial-input control | Fixed/green; wheel bytes unchanged, commercial material never copied. |
+| MAJOR: rows might assert absent native binaries or wrong source release | Native-free wrapper, manifest version mutation, full native variants with coverage union | Fixed/green; rows supported by entries, incompatible source versions refused. |
+| MAJOR: failed writer could damage prior notices or leave a phantom file | Unknown-file validation and injected os.replace failure, with/without previous output | Green; previous content retained and temporary/reservation files removed. |
+| MINOR: invalid archive bypasses CLI one-line failure | Actual invalid CArchive fixture, without launching it | Confirmed and fixed by normalizing reader RuntimeError to ValueError. |
+| MAJOR: Python's source-install terms hide redistributed OpenSSL | Interpreter material inventory and RED synthetic libcrypto control | Confirmed; fails closed, verified material/ruling still owed by seat. |
+| MINOR: repeated provenance URL implied duplicate text | Compared full shared LGPL block count independently | False positive; heading and Source label repeat the URL, actual text appears once. |
+
+The final pass over implemented rendering/writer/wiring requirements found no
+additional issue; the explicitly open OpenSSL item prevents claiming the full
+generator/native audit done. No Reviewer A pass occurred in this turn; the
+dispatcher owns that Claude review. The separate zvbi HOLD is unchanged.
+Real artifact generation, smoke/ZIP, workflow/checklist/guide/root-notices edits,
+actionlint and seat V4/encoder evidence have not run here and remain future work.
+
+All changes are in this turn's four owned code/test files and this report.
+No new dependency, network fetch, real FFmpeg archive access, PyInstaller build,
+frozen executable run, desktop GUI/input, footage/profile write, QUIT_SCRIPT test,
+git write, push, tag, gh invocation, workflow dispatch or mailbox post occurred.
+Depth remains dispatcher-read; the last supplied figure was about 104K, not a
+current estimate. The seat commits these five paths as one generator turn.

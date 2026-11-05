@@ -34,6 +34,10 @@ loader's start-up checks) and lists each problem.
 ``ffmpeg.lock.json`` and verifies the bytes, extracted inventory and both tools'
 version/configuration before accepting it. ``--with-ffmpeg`` is for local spikes,
 not release builds. See ``tools/package/README.md`` for the spike measurements.
+
+``--notices`` generates the onedir artifact's inventory-backed
+``THIRD_PARTY_NOTICES.md`` after the FFmpeg step. Missing material, uncovered
+entries or GPL-incompatible bundled FFmpeg components fail the build.
 """
 
 from __future__ import annotations
@@ -1786,6 +1790,31 @@ def clean_release_dir(out: Path, form: Form, version: str) -> Path:
     return root
 
 
+def write_artifact_notices(folder: Path) -> Path:
+    """Generate the onedir artifact's inventory-backed notices after bundling FFmpeg.
+
+    Args:
+        folder: The folder containing the built executable and its dependencies.
+
+    Returns:
+        The generated artifact notices path.
+
+    Raises:
+        ValueError: Inventory, source provenance or licence materials are invalid.
+        OSError: Inputs or the output cannot be read or written.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "_clearwater_artifact_notices", Path(__file__).with_name("notices.py")
+    )
+    if spec is None or spec.loader is None:
+        raise ValueError("cannot load the artifact notices generator")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return cast(Path, module.write_notices(folder))
+
+
 def build(
     form: Form,
     *,
@@ -1793,6 +1822,7 @@ def build(
     with_ffmpeg: bool = False,
     ffmpeg_from: str | None = None,
     ffmpeg_sha256: str | None = None,
+    notices: bool = False,
 ) -> int:
     """Build one form, check it, and print its summary.
 
@@ -1805,10 +1835,14 @@ def build(
         with_ffmpeg: Local spike PATH copy (not for release).
         ffmpeg_from: The pinned archive URL for a release bundle.
         ffmpeg_sha256: Its verified sha256, also checked against the lock.
+        notices: Generate the onedir artifact notices after the FFmpeg step.
 
     Returns:
         0 when the build succeeded and the bundle holds nothing forbidden, else 1.
     """
+    if notices and form != "onedir":
+        print("FAILED: --notices requires --form onedir")
+        return 1
     if with_ffmpeg and ffmpeg_from is not None:
         print("FAILED: --with-ffmpeg and --ffmpeg-from are mutually exclusive")
         return 1
@@ -1891,6 +1925,15 @@ def build(
     print(f"hidden-import check: PASS ({len(wanted)} modules, each in the bundle)")
     print("bundle check: PASS (no " + ", ".join(FORBIDDEN_TOP_LEVEL) + " at any depth or in")
     print("  any ZIP; no CUDA library; every module's top-level name allowed)")
+    if notices:
+        try:
+            print(f"wrote {write_artifact_notices(executable.parent)}")
+        except (OSError, ValueError, KeyError, zipfile.BadZipFile) as error:
+            message = (
+                " ".join(str(error).split()).encode("ascii", "backslashreplace").decode("ascii")
+            )
+            print(f"FAILED: artifact notices: {message}")
+            return 1
     return 0
 
 
@@ -1909,6 +1952,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     action.add_argument("--write-manifest", type=Path, metavar="PACK_FOLDER")
     action.add_argument("--verify", type=Path, metavar="PACK_FOLDER")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    parser.add_argument("--notices", action="store_true", help="generate onedir artifact notices")
     ffmpeg = parser.add_mutually_exclusive_group()
     ffmpeg.add_argument(
         "--with-ffmpeg", action="store_true", help="copy from PATH; not for release"
@@ -1916,6 +1960,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     ffmpeg.add_argument("--ffmpeg-from", metavar="URL", help="fetch the pinned release archive")
     parser.add_argument("--ffmpeg-sha256", metavar="HEX", help="the lock's verified archive sha256")
     options = parser.parse_args(argv)
+    if options.notices and options.form != "onedir":
+        parser.error("--notices requires --form onedir")
     if (options.ffmpeg_from is None) != (options.ffmpeg_sha256 is None):
         parser.error("--ffmpeg-from and --ffmpeg-sha256 must be provided together")
     if options.ffmpeg_sha256 is not None and not re.fullmatch(
@@ -1952,6 +1998,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         with_ffmpeg=options.with_ffmpeg,
         ffmpeg_from=options.ffmpeg_from,
         ffmpeg_sha256=options.ffmpeg_sha256,
+        notices=options.notices,
     )
 
 
