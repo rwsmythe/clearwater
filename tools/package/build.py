@@ -21,7 +21,6 @@ any of them is missing from the bundle (:func:`missing_hidden_imports`; CHARC's 
 Usage::
 
     uv run --no-sync python tools/package/build.py --form onedir
-    uv run --no-sync python tools/package/build.py --form onefile --with-ffmpeg
     uv run --no-sync python tools/package/build.py --write-manifest <pack root>/<stamp>
     uv run --no-sync python tools/package/build.py --verify <pack root>/<stamp>
 
@@ -32,8 +31,8 @@ loader's start-up checks) and lists each problem.
 
 ``--ffmpeg-from URL --ffmpeg-sha256 HEX`` fetches only the archive named in
 ``ffmpeg.lock.json`` and verifies the bytes, extracted inventory and both tools'
-version/configuration before accepting it. ``--with-ffmpeg`` is for local spikes,
-not release builds. See ``tools/package/README.md`` for the spike measurements.
+version/configuration before accepting it. Local spikes use the same pinned HTTPS
+fetch. See ``tools/package/README.md`` for the spike measurements.
 
 ``--notices`` generates the onedir artifact's inventory-backed
 ``THIRD_PARTY_NOTICES.md`` after the FFmpeg step. Missing material, uncovered
@@ -218,9 +217,6 @@ ALLOWED_TOP_LEVEL: frozenset[str] = frozenset(
     }
 )
 """The only non-standard-library top-level modules the frozen-module archive may hold."""
-
-FFMPEG_TOOLS: tuple[str, ...] = ("ffmpeg", "ffprobe")
-"""The FFmpeg command-line tools copied beside the executable by ``--with-ffmpeg``."""
 
 GPU_MODULE_NAMES: frozenset[str] = frozenset(n for n in FORBIDDEN_TOP_LEVEL if n != "tests")
 """Names (compared lower-case) that must not be ANY component of a bundled path or module."""
@@ -714,20 +710,6 @@ def size_by_top_level(executable: Path) -> list[tuple[str, int]]:
     return sorted(rows, key=lambda row: (-row[1], row[0]))
 
 
-def tool_file_name(tool: str, platform: str | None = None) -> str:
-    """Return a tool's canonical file name: ``ffmpeg.exe`` on Windows, ``ffmpeg`` elsewhere.
-
-    Args:
-        tool: The tool's name.
-        platform: A ``sys.platform`` value; the running one when None.
-
-    Returns:
-        The file name ``find_tool`` looks for beside the executable.
-    """
-    kind = sys.platform if platform is None else platform
-    return f"{tool}.exe" if kind == "win32" else tool
-
-
 class FFmpegSource(TypedDict):
     """An additional pinned repository, including whether this variant builds it."""
 
@@ -1152,67 +1134,6 @@ def bundle_ffmpeg(destination: Path, *, out: Path, url: str, sha256: str) -> lis
         (path, _pinned_ffmpeg_version(path, lock))
         for path in (destination / "ffmpeg.exe", destination / "ffprobe.exe")
     ]
-
-
-def tool_version(path: Path) -> str:
-    """Run a copied tool's ``-version`` from its own folder, with only that folder on PATH.
-
-    Args:
-        path: The copied tool.
-
-    Returns:
-        The first line of its output, for example ``ffmpeg version 9.0.2-full_build-...``.
-
-    Raises:
-        RuntimeError: The tool did not run, exited non-zero, or printed no ``version`` line.
-    """
-    env = {key: value for key, value in os.environ.items() if key.upper() != "PATH"}
-    env["PATH"] = str(path.parent)
-    try:
-        done = subprocess.run(
-            [str(path), "-version"],
-            cwd=path.parent,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=120,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise RuntimeError(f"{path.name} -version did not run: {error}") from error
-    first = done.stdout.splitlines()[0] if done.stdout else ""
-    if done.returncode != 0 or " version " not in f" {first} ":
-        raise RuntimeError(f"{path.name} -version failed (exit {done.returncode}): {first!r}")
-    return first
-
-
-def copy_ffmpeg(destination: Path, tools: Iterable[str] = FFMPEG_TOOLS) -> list[tuple[Path, str]]:
-    """Copy the FFmpeg tools found on this machine's PATH beside the executable, and check them.
-
-    Spike only: it proves the PATH-less run. The real bundle rule is WP6.3's. Each tool is
-    copied under its canonical name (:func:`tool_file_name`), whatever the PATH entry's target
-    is called, and must then run on its own (:func:`tool_version`; Reviewer A F7).
-
-    Args:
-        destination: The executable's folder.
-        tools: The tool names to copy.
-
-    Returns:
-        (the copied file, its version line) for each tool.
-
-    Raises:
-        FileNotFoundError: A tool is not on the PATH.
-        RuntimeError: A copied tool does not run from the destination folder.
-    """
-    copied: list[tuple[Path, str]] = []
-    for tool in tools:
-        found = shutil.which(tool)
-        if found is None:
-            raise FileNotFoundError(f"{tool} is not on the PATH")
-        target = destination / tool_file_name(tool)
-        shutil.copy2(Path(found).resolve(), target)
-        copied.append((target, tool_version(target)))
-    return copied
 
 
 def wheel_file_tags(filename: str) -> frozenset[str]:
@@ -2101,7 +2022,7 @@ def clean_release_dir(out: Path, form: Form, version: str) -> Path:
     """Delete the release folder of one form before it is built again (Reviewer A F6).
 
     Only the release folder under ``out`` is deleted, so nothing from an earlier build (such
-    as FFmpeg copied by ``--with-ffmpeg``) survives into the new one.
+    as previously bundled FFmpeg) survives into the new one.
 
     Args:
         out: The output folder.
@@ -2180,7 +2101,6 @@ def build(
     form: Form,
     *,
     out: Path,
-    with_ffmpeg: bool = False,
     ffmpeg_from: str | None = None,
     ffmpeg_sha256: str | None = None,
     notices: bool = False,
@@ -2194,7 +2114,6 @@ def build(
     Args:
         form: The PyInstaller form.
         out: The output folder.
-        with_ffmpeg: Local spike PATH copy (not for release).
         ffmpeg_from: The pinned archive URL for a release bundle.
         ffmpeg_sha256: Its verified sha256, also checked against the lock.
         notices: Generate the onedir artifact notices after the FFmpeg step.
@@ -2210,9 +2129,6 @@ def build(
         return 1
     if (notices or smoke) and form != "onedir":
         print("FAILED: --notices/--smoke require --form onedir")
-        return 1
-    if with_ffmpeg and ffmpeg_from is not None:
-        print("FAILED: --with-ffmpeg and --ffmpeg-from are mutually exclusive")
         return 1
     if (ffmpeg_from is None) != (ffmpeg_sha256 is None):
         print("FAILED: --ffmpeg-from and --ffmpeg-sha256 must be provided together")
@@ -2258,9 +2174,6 @@ def build(
         return 1
     wall = time.monotonic() - start
     executable = find_executable(root)
-    if with_ffmpeg:
-        for path, line in copy_ffmpeg(executable.parent):
-            print(f"copied {path}: {line}")
     if ffmpeg_from is not None and ffmpeg_sha256 is not None:
         try:
             for path, line in bundle_ffmpeg(
@@ -2346,11 +2259,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         metavar="FOLDER",
         help="headless checks after build, or check an existing folder without a build",
     )
-    ffmpeg = parser.add_mutually_exclusive_group()
-    ffmpeg.add_argument(
-        "--with-ffmpeg", action="store_true", help="copy from PATH; not for release"
-    )
-    ffmpeg.add_argument("--ffmpeg-from", metavar="URL", help="fetch the pinned release archive")
+    parser.add_argument("--ffmpeg-from", metavar="URL", help="fetch the pinned release archive")
     parser.add_argument("--ffmpeg-sha256", metavar="HEX", help="the lock's verified archive sha256")
     options = parser.parse_args(argv)
     standalone_smoke = isinstance(options.smoke, Path)
@@ -2376,7 +2285,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         r"[0-9a-f]{64}", options.ffmpeg_sha256
     ):
         parser.error("--ffmpeg-sha256 must be 64 lowercase hex digits")
-    if options.form is None and (options.with_ffmpeg or options.ffmpeg_from is not None):
+    if options.form is None and options.ffmpeg_from is not None:
         parser.error("FFmpeg options require --form")
     return options
 
@@ -2405,7 +2314,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     return build(
         cast(Form, options.form),
         out=out,
-        with_ffmpeg=options.with_ffmpeg,
         ffmpeg_from=options.ffmpeg_from,
         ffmpeg_sha256=options.ffmpeg_sha256,
         notices=options.notices,

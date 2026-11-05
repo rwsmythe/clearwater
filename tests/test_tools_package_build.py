@@ -31,6 +31,7 @@ from typing import Any
 import pytest
 
 import clearwater
+import test_tools_package_ffmpeg as ffmpeg_support
 from clearwater import gpu_pack, gpu_pack_install
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -51,6 +52,32 @@ def _load_build_script() -> ModuleType:
 
 
 build = _load_build_script()
+
+
+@pytest.fixture
+def verified_ffmpeg_archive(tmp_path, monkeypatch):
+    """Reuse the real archive/transport fixture with this module's build instance."""
+    real_run = build.subprocess.run
+    monkeypatch.setattr(ffmpeg_support, "build", build)
+    fixture = ffmpeg_support.synthetic_bundle.__wrapped__(tmp_path, monkeypatch)
+    launch_tool = build.subprocess.run
+
+    def launch(args, **kwargs):
+        # PyInstaller's archive writers may query the OS ("ver") before bundling.
+        if (
+            isinstance(args, (list, tuple))
+            and args
+            and Path(args[0]).name
+            in {
+                "ffmpeg.exe",
+                "ffprobe.exe",
+            }
+        ):
+            return launch_tool(args, **kwargs)
+        return real_run(args, **kwargs)
+
+    monkeypatch.setattr(build.subprocess, "run", launch)
+    return fixture
 
 
 @pytest.mark.parametrize("variable", ["PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE"])
@@ -297,9 +324,13 @@ def test_bootloader_identity_allows_resources_and_archive_but_refuses_code_chang
 
 
 @pytest.mark.parametrize("trusted", [False, True])
-def test_build_enforces_origin_after_all_native_copies(tmp_path, monkeypatch, capsys, trusted):
-    """A native introduced after analysis still goes through the origin gate."""
-    out = tmp_path / "out"
+def test_build_enforces_origin_after_all_native_copies(
+    tmp_path, monkeypatch, capsys, trusted, verified_ffmpeg_archive
+):
+    """Verified archive extraction still precedes the unchanged native origin gate."""
+    pin, _source, destination, _out, members, *_ = verified_ffmpeg_archive
+    out = destination.parent
+    monkeypatch.setattr(build, "release_dir", lambda *a: destination)
     monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
     monkeypatch.setattr(build, "pack_sources", lambda: [])
     check = build.native_origin_violations
@@ -308,22 +339,25 @@ def test_build_enforces_origin_after_all_native_copies(tmp_path, monkeypatch, ca
     monkeypatch.setattr(
         build,
         "_native_origin_hashes",
-        lambda: {hashlib.sha256(b"native copy").hexdigest()} if trusted else set(),
+        lambda: (
+            {hashlib.sha256(payload).hexdigest() for payload in members.values()}
+            if trusted
+            else set()
+        ),
     )
     monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
-    foreign = tree(tmp_path / "foreign", ["foreign.dll"], b"native copy")
+    foreign = tree(tmp_path / "foreign", ["ffmpeg.exe"])
     monkeypatch.setenv("PATH", str(foreign))
-
-    def copy_native(folder):
-        tree(folder, ["_internal/foreign.dll"], b"native copy")
-        return []
-
-    monkeypatch.setattr(build, "copy_ffmpeg", copy_native)
-    assert build.build("onefile", out=out, with_ffmpeg=True) == (0 if trusted else 1)
+    assert build.build(
+        "onefile", out=out, ffmpeg_from=pin["asset_url"], ffmpeg_sha256=pin["github_sha256"]
+    ) == (0 if trusted else 1)
+    assert (destination / "ffmpeg.exe").read_bytes() == members[
+        pin["archive_root"] + "/bin/ffmpeg.exe"
+    ]
     output = capsys.readouterr().out
     assert ("native origin check: PASS" in output) == trusted
     if not trusted:
-        assert str(foreign / "foreign.dll") in output
+        assert str(foreign / "ffmpeg.exe") in output
 
 
 def test_bootloader_rejects_a_changed_loader_import_directory(tmp_path):
@@ -642,7 +676,7 @@ def test_pyinstallers_cache_is_kept_under_the_output_folder(
 def test_a_rebuild_starts_from_an_empty_release_folder(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """F6: a stale ``ffmpeg.exe`` from an earlier ``--with-ffmpeg`` build is gone."""
+    """F6: a stale ``ffmpeg.exe`` from an earlier bundle is gone."""
     monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
     out = tmp_path / "out"
     release = build.release_dir(out, "onefile", build.app_version())
@@ -652,31 +686,6 @@ def test_a_rebuild_starts_from_an_empty_release_folder(
     _stopping_build(monkeypatch, out, seen)
     assert "ffmpeg.exe" not in seen["release"]
     assert (beside / "keep.txt").is_file()  # only the release folder is cleaned
-
-
-# F7: FFmpeg under its canonical name, and working.
-
-
-def test_ffmpeg_is_copied_under_its_canonical_name(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """F7: a PATH entry resolving to ``ffmpeg-9.0.2.exe`` lands as ``ffmpeg.exe``."""
-    source = tree(tmp_path / "bin", ["ffmpeg-9.0.2.exe"]) / "ffmpeg-9.0.2.exe"
-    monkeypatch.setattr(build.shutil, "which", lambda tool: str(source))
-    monkeypatch.setattr(build, "tool_version", lambda path: "ffmpeg version test", raising=False)
-    destination = tmp_path / "dist"
-    destination.mkdir()
-    build.copy_ffmpeg(destination, ["ffmpeg"])
-    expected = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
-    assert sorted(p.name for p in destination.iterdir()) == [expected]
-
-
-def test_a_copied_tool_that_does_not_run_as_ffmpeg_is_refused(tmp_path: Path) -> None:
-    """F7: ``tool_version`` needs a zero exit and a ``version`` line (Python fails ``-version``)."""
-    copy = tmp_path / Path(sys.executable).name
-    shutil.copy2(sys.executable, copy)
-    with pytest.raises(RuntimeError, match="-version"):
-        build.tool_version(copy)
 
 
 # F8 (and F10): the version without importing.
@@ -817,27 +826,6 @@ def test_an_extension_module_beside_the_executable_is_found(tmp_path: Path) -> N
     assert hits(found, "dist:av.pyd (unexpected-module)")
     assert hits(found, "dist:Clearwater/av.pyd (unexpected-module)")
     assert hits(found, "dist:Clearwater/yaml/__init__.pyc (unexpected-module)")
-
-
-def test_each_copied_tool_is_run_from_the_destination(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """#13: ``copy_ffmpeg`` runs ``tool_version`` on each copy and returns its line."""
-    tree(tmp_path / "bin", ["ffmpeg-9.exe", "ffprobe-9.exe"])
-    monkeypatch.setattr(build.shutil, "which", lambda tool: str(tmp_path / "bin" / f"{tool}-9.exe"))
-    ran: list[Path] = []
-
-    def version(path: Path) -> str:
-        ran.append(path)
-        return f"{path.stem} version test"
-
-    monkeypatch.setattr(build, "tool_version", version)
-    destination = tmp_path / "dist"
-    destination.mkdir()
-    copied = build.copy_ffmpeg(destination, ["ffmpeg", "ffprobe"])
-    expected = [destination / build.tool_file_name(t) for t in ("ffmpeg", "ffprobe")]
-    assert ran == expected
-    assert copied == [(expected[0], "ffmpeg version test"), (expected[1], "ffprobe version test")]
 
 
 # F-C2 (CHARC's ruling 1): the GPU pack's standard-library needs, scanned and checked.
@@ -1182,15 +1170,6 @@ def test_manifest_helpers_delegate_to_the_product_writer(tmp_path: Path, monkeyp
 @pytest.mark.parametrize(
     "args",
     [
-        [
-            "--form",
-            "onedir",
-            "--with-ffmpeg",
-            "--ffmpeg-from",
-            "file:///archive.zip",
-            "--ffmpeg-sha256",
-            "0" * 64,
-        ],
         ["--form", "onedir", "--ffmpeg-from", "file:///archive.zip"],
         ["--form", "onedir", "--ffmpeg-sha256", "0" * 64],
         ["--form", "onedir", "--ffmpeg-from", "file:///archive.zip", "--ffmpeg-sha256", "nope"],
@@ -1201,6 +1180,15 @@ def test_release_ffmpeg_options_refuse_conflicting_or_incomplete_requests(args):
     with pytest.raises(SystemExit) as caught:
         build.parse_args(args)
     assert caught.value.code == 2
+
+
+def test_retired_with_ffmpeg_option_is_unknown(monkeypatch, capsys):
+    """The retired PATH-copy option cannot select a build path."""
+    monkeypatch.setattr(build, "build", lambda *a, **kw: 0)
+    with pytest.raises(SystemExit) as caught:
+        build.main(["--form", "onedir", "--with-ffmpeg"])
+    assert caught.value.code == 2
+    assert "unrecognized arguments: --with-ffmpeg" in capsys.readouterr().err
 
 
 def test_release_ffmpeg_options_reach_the_build(monkeypatch, tmp_path):
@@ -1229,7 +1217,6 @@ def test_release_ffmpeg_options_reach_the_build(monkeypatch, tmp_path):
     assert seen == {
         "form": "onedir",
         "out": tmp_path,
-        "with_ffmpeg": False,
         "ffmpeg_from": "https://github.com/fixture/archive.zip",
         "ffmpeg_sha256": "a" * 64,
         "notices": False,
@@ -1289,12 +1276,15 @@ def test_notices_option_reaches_build_and_refuses_non_onedir(monkeypatch, tmp_pa
 
 @pytest.mark.parametrize("fails", [False, True])
 def test_notices_writing_follows_ffmpeg_and_fails_the_build_on_error(
-    monkeypatch, tmp_path, capsys, fails
+    monkeypatch, tmp_path, capsys, fails, verified_ffmpeg_archive
 ):
+    """Notices see the verified archive's material; a notice failure still refuses the build."""
+    pin, _source, destination, _out, members, *_ = verified_ffmpeg_archive
+    out = destination.parent
+    monkeypatch.setattr(build, "release_dir", lambda *a: destination)
     monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
     monkeypatch.setattr(build, "native_origin_violations", lambda *a, **kw: [])
     monkeypatch.setattr(build, "pack_sources", lambda: [])
-    out = tmp_path / "out"
 
     def build_folder(args):
         folder = Path(args[args.index("--distpath") + 1])
@@ -1304,21 +1294,26 @@ def test_notices_writing_follows_ffmpeg_and_fails_the_build_on_error(
 
     monkeypatch.setattr(build, "run_pyinstaller", build_folder)
 
-    def copy_tools(folder):
-        (folder / "ffmpeg-BUILD.txt").write_text("FFmpeg step completed")
-        return []
-
     def notices(folder):
-        assert (folder / "ffmpeg-BUILD.txt").read_text() == "FFmpeg step completed"
+        for tool in ("ffmpeg", "ffprobe"):
+            assert (folder / f"{tool}.exe").read_bytes() == members[
+                pin["archive_root"] + f"/bin/{tool}.exe"
+            ]
+        assert pin["github_sha256"] in (folder / "ffmpeg-BUILD.txt").read_text()
         if fails:
             raise ValueError("planted notice coverage failure")
         path = folder / "THIRD_PARTY_NOTICES.md"
         path.write_text("generated notices")
         return path
 
-    monkeypatch.setattr(build, "copy_ffmpeg", copy_tools)
     monkeypatch.setattr(build, "write_artifact_notices", notices, raising=False)
-    assert build.build("onedir", out=out, with_ffmpeg=True, notices=True) == int(fails)
+    assert build.build(
+        "onedir",
+        out=out,
+        ffmpeg_from=pin["asset_url"],
+        ffmpeg_sha256=pin["github_sha256"],
+        notices=True,
+    ) == int(fails)
     printed = capsys.readouterr().out
     if fails:
         assert "FAILED: artifact notices: planted notice coverage failure" in printed

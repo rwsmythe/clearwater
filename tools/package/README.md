@@ -16,13 +16,10 @@ From the repository (or worktree) root, with the synced `.venv`:
 
 ```
 uv run --no-sync python tools/package/build.py --form onedir
-uv run --no-sync python tools/package/build.py --form onefile --with-ffmpeg
 ```
 
 - `--out <folder>` changes the output folder (default `work/wp6.1/`, gitignored).
-- `--with-ffmpeg` copies the `ffmpeg` and `ffprobe` found on this machine's PATH beside the
-  executable. It is used for the spike's PATH-less proof only; the real bundle rule, with its
-  licence consequences, is WP6.3's.
+- The release path is `--ffmpeg-from <lock asset URL> --ffmpeg-sha256 <hex>` only; a local spike uses the same pinned HTTPS fetch.
 
 Check at least 25 GB free on the drive before a build (the brief's floor). Route the build's
 output to a file; it is long.
