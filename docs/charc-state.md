@@ -26,6 +26,7 @@
 - **~18:20Z OWNER: "copy done".** Verified read-only: `clearwater-footage\Insta360\` holds all 7 files, every size equal to `D:\insta360` (209 GB; C: 2.6 TB free). WP7.1 brief DRAFT written (`docs/briefs/wp7.1-brief.md`): Insta360 Studio exports validation (inventory refresh; probe table; ProRes-vs-HEVC decode agreement with a STOP on a range double-expansion or missing chroma upsample; exports of the 62 s clip from both sources + the 439 s HEVC, V4; EXCLUSIVE throughput vs N6 incl. the ProRes decode rate alone; the 37.7-min projection, the run only on the owner's word; the look pack; report). Codex lane, size S, both nets Claude. Slot: after WP6.3c's dispatch and the 1.1.0 release gate, parallel with WP6.5's Mac wait. Q1 for the owner: Studio's export settings (provenance only).
 - **~18:35Z OWNER on the Studio export settings (verbatim): "encoding was H.265, bitrate was ~71-73 (file dependent); ProRes did not offer bitrate."** Recorded in the WP7.1 brief (Q1 answered). The exports carry no Studio metadata beyond `Lavf/Lavc60.3.100` and creation times (CHARC read every tag and the `udta` / `meta` / `ilst` boxes read-only).
 - **OWNER (verbatim): "They all had stabilization on"** -> WP7.1 brief Q1 amended.
+- **OWNER (verbatim): "color profile is unknown, likely whatever they were filmed at"** -> WP7.1 brief Q1 complete.
 - (newest first; append here)
 
 ## GEN 16 HANDOVER (verified at gen 17's pickup; still the live plan)
