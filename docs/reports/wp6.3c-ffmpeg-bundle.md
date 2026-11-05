@@ -579,3 +579,93 @@ frozen/GUI launch, Docker, desktop input, original build/footage/profile write,
 GitHub action or mailbox post was performed.
 
 Depth: unavailable to the cell; the dispatcher supplies `depth_input_tokens`.
+
+## Turn 6 - STOP: bzip2 provenance input is incomplete
+
+**Status:** input read-back only; no production records, texts, schema or tests
+changed. The dispatch's instruction to stop on ambiguity applies before loading
+the bzip2 row. The dispatcher receives this finding at the turn boundary.
+
+**[MAJOR, input, in envelope]** The required `_internal/_bz2.pyd` row has a
+verified existing licence text, but the supplied facts do not fit either existing
+source-bearing provenance kind without inventing an upstream identity or deciding
+how build-recipe provenance may stand in for component-source provenance.
+
+Reproduction: `work/wp6.3c/turn6/provenance_probe.py`, executed as
+`uv run --no-sync python work/wp6.3c/turn6/provenance_probe.py`, with output in
+`work/wp6.3c/turn6/provenance-input.log` (exit 0). It reads only evidence, the
+interpreter licence and the notices module; no product entry point is called.
+
+- Census SHA-256 matches the commissioned
+  `0a39493dde36344348b9cfcc80175d9852b5eebd295078016757e386fabaca2c`.
+- The supplied texts directory currently contains 289 files (the dispatch named
+  240); none has a bzip-named path. The census has no bzip2 upstream tag-object /
+  commit / licence-file record. This count is an observation, not a claim that
+  the later files belong to the verified 240-file inventory.
+- PBS's supplied `pythonbuild/downloads.py`, lines 40-49, names bzip2 1.0.8,
+  archive size 810029, SHA-256
+  `ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269`,
+  SPDX `bzip2-1.0.6`, and `LICENSE.bzip2.txt`. It supplies no upstream commit or
+  tag object. The archive URL is
+  `https://astral-sh.github.io/mirror/files/bzip2-1.0.8.tar.gz`.
+- The actual build interpreter's `LICENSE.txt` is 25066 bytes, SHA-256
+  `886a0ead2d89030ee62dbff52b04e47ab91998341295bb9c56fb952b4e081c7a`,
+  matching census (f). Its line 362 names bzip2/libbzip2 1.0.8. Thus the existing
+  text is available and verified; its absence is not the finding.
+- Calling the existing `_provenance` validator with the supplied archive facts
+  refuses them with `notices: native provenance missing source fields`.
+  The `release-archive` form requires `source_tag`, `source_tag_object` and
+  `source_commit` as well as archive identity. The `git-tree` form requires a
+  source repository and commit. The known PBS commit pins a download recipe,
+  rather than the bzip2 source tree or this interpreter's assembled licence.
+
+**Ruling requested.** Recommended: the seat supplies bzip2's resolved upstream
+tag / tag-object / commit and byte-verified licence file, allowing an ordinary
+component row without broadening provenance. Alternatively, explicitly authorize
+the PBS download-recipe pin as the bzip2 row's source provenance and specify the
+binding to the existing interpreter text. The cell has not chosen that semantic
+extension or mislabeled bzip2 as a proprietary redistributable.
+
+**Host -> components -> texts read-back (all loading remains undone).** The
+table summarizes the commissioned census, not newly installed manifest records.
+Paths below are relative to `_internal/`; Qt host DLLs are under `PySide6/`.
+
+| Host | Components | Supplied / existing texts to bind |
+| --- | --- | --- |
+| `python312.dll` | zlib, HACL*, BLAKE2, Mersenne Twister, SipHash24, dtoa, cfuhash, Audioop | zlib LICENSE; HACL / BLAKE2 source headers; CPython `Doc/license.rst` sections |
+| `pyexpat.pyd`, `_elementtree.pyd` | expat | CPython expat COPYING / license.rst section |
+| `_decimal.pyd` | libmpdec | CPython license.rst section |
+| `_bz2.pyd` | bzip2 1.0.8 | Existing interpreter LICENSE.txt; source provenance awaits ruling above |
+| `_lzma.pyd` | liblzma 5.8.1 | XZ COPYING.0BSD |
+| `unicodedata.pyd`, `PySide6/Qt6Core.dll` | Unicode data | One shared Qt Unicode-3.0 text, as ruled |
+| `PySide6/Qt6Core.dll` | zlib, PCRE2 / SLJIT, double-conversion, BLAKE2, MD4, MD5, SHA-1, SHA-3 / brg_endian, RFC 6234, SipHash, easing, TinyCBOR, tl::expected, UCD / CLDR, Tika MIME data | Corresponding qtbase component files / LICENSES files in census (d) |
+| `PySide6/Qt6Gui.dll` | FreeType / BDF / PCF, grayraster, HarfBuzz, libpng, MD4C, Emoji Segmenter, D3D12MA, VMA, ICC profile, smooth scaling, X Server helper, AGLFN, XSVG, WebGradients, OpenGL headers, Vulkan registry, MiniEngine shader | Corresponding qtbase component files in census (d) |
+| `PySide6/Qt6Network.dll` | libpsl, Public Suffix List | LICENSE.chromium, PSL-LICENSE.txt |
+| `PySide6/Qt6Svg.dll` | XSVG-derived qsvghandler | HPND-sell-variant text and REUSE attribution |
+| `PySide6/plugins/imageformats/qjpeg.dll`, `qtiff.dll` | libjpeg-turbo | qtbase LICENSE and ijg-license.txt |
+| `PySide6/plugins/imageformats/qtiff.dll` | libtiff | qtimageformats COPYRIGHT |
+| `PySide6/plugins/imageformats/qwebp.dll` | libwebp | qtimageformats COPYING and PATENTS |
+| `PySide6/plugins/platforms/qwindows.dll`, `qdirect2d.dll` | Wintab | LicenseRef-Lcs-Telegraphics text and copyright attribution |
+| `shiboken6/shiboken6.abi3.dll` | Python 3.7.0 buffer protocol and signature code | One PSF-3.7.0 text, as ruled |
+
+**UNSURE dispositions.** U1: the PBS 5.8.1 pin and 0BSD ruling are available.
+U2: carry the shared Unicode text as ruled; `python312.dll`'s table remains a
+census inference. U3: dtoa / Audioop SPDX identification remains undone; use
+licence-per-header labels if evidence cannot establish an SPDX id. U4: carry
+one PSF 3.7.0 text for both uses as ruled. U5 / U6: carry tl::expected and
+double-conversion as ruled, retaining the template-instantiation / inferred-build
+limits. U7 / U9: retain attribution-version and inferred-configuration limits.
+U8 belongs to the later wheel census. U10: retain the unverified HAVE_KQUEUE
+guard limit. U11: pure-Python module census remains outside this turn. U12: the
+missing root pyside REUSE file remains a limit, not an invented input.
+
+**Validation / handoff.** RED and GREEN tests, both ruff commands, both mypy
+targets, the four-module pytest selection, and positive / negative copied-folder
+probes were not run: this is the binding input-ambiguity STOP before an
+implementation change. No line-range field has landed; its exact schema remains
+undone, together with every production row/text and the two root attribution
+sentences. Reviewer A remains dispatcher-owned. No external fetch, Git write,
+build, frozen/GUI run, Docker, desktop input or write to a protected source,
+profile, footage or evidence directory occurred.
+
+Depth: unavailable to the cell; the dispatcher supplies `depth_input_tokens`.
