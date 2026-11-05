@@ -104,6 +104,93 @@ def load_smoke():
     return module
 
 
+def test_safe_arguments_equal_the_eleven_headless_protocol_tuples():
+    """An added non-headless row must fail even when its name looks harmless."""
+    assert (
+        frozenset(
+            {
+                ("-c", "pass"),
+                ("-m", "http.server"),
+                ("--multiprocessing-fork",),
+                ("--multiprocessing-resource-tracker",),
+                ("-R", "-c", "pass"),
+                ("-t", "-m", "http.server"),
+                ("-Rt", "-c", "pass"),
+                ("--check-hash-based-pycs", "always", "-c", "pass"),
+                ("--check-hash-based-pycs", "never", "-m", "http.server"),
+                ("-m", "http.server", "--multiprocessing-fork"),
+                ("--export-worker",),
+            }
+        )
+        == load_smoke()._SAFE_ARGUMENTS
+    )
+
+
+def test_every_safe_argument_routes_to_refusal_or_worker_in_isolated_child(tmp_path):
+    """Execute frozen routing in source with all GUI and worker effects stubbed."""
+    arguments = sorted(load_smoke()._SAFE_ARGUMENTS)
+    code = r"""
+import importlib.abc, json, sys, types
+class BlockQt(importlib.abc.MetaPathFinder):
+    def find_spec(self, name, path=None, target=None):
+        if name.split('.')[0] in ('PySide6', 'shiboken6'):
+            raise AssertionError('Qt import attempted')
+sys.meta_path.insert(0, BlockQt())
+app = types.ModuleType('clearwater.app')
+app.__path__ = []
+gui = types.ModuleType('clearwater.app.main')
+def gui_main(*args):
+    raise AssertionError('GUI branch reached')
+gui.main = gui_main
+workers = []
+def worker_main(args):
+    workers.append(args)
+    return 2
+app.export_worker = types.SimpleNamespace(main=worker_main)
+sys.modules['clearwater.app'] = app
+sys.modules['clearwater.app.main'] = gui
+from clearwater import __main__ as entry, gpu_pack
+sys.frozen = True
+entry.prepend_executable_folder = lambda: False
+entry._configure_gpu_caches = lambda: None
+entry._start_logging = lambda: None
+entry._removal_pending = lambda **kwargs: False
+gpu_pack.activate = lambda: None
+gpu_pack.pending_removal_path = lambda: None
+gpu_pack.pack_root = lambda: None
+for arguments in json.loads(sys.argv[1]):
+    before = len(workers)
+    assert entry.main(['Clearwater.exe', *arguments]) == 2
+    assert len(workers) - before == int(arguments == ['--export-worker'])
+print('all headless tuples routed safely')
+"""
+    roots = (
+        "APPDATA",
+        "LOCALAPPDATA",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+        "HOME",
+        "USERPROFILE",
+    )
+    env = {
+        **os.environ,
+        **{key: str(tmp_path / key) for key in roots},
+        "QT_QPA_PLATFORM": "offscreen",
+    }
+    done = subprocess.run(
+        [sys.executable, "-c", code, json.dumps(arguments)],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    assert done.stdout == "all headless tuples routed safely\n"
+
+
 def snapshot(folder):
     return {
         p.relative_to(folder).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()

@@ -62,8 +62,15 @@ import urllib.error
 import urllib.request
 import zipfile
 from collections.abc import Iterable, Iterator, Sequence
+from http.client import HTTPMessage
 from pathlib import Path
-from typing import Literal, NamedTuple, Protocol, TypedDict, cast
+from typing import IO, Literal, NamedTuple, Protocol, TypedDict, cast
+from urllib.parse import urlsplit
+
+_TEST_ALLOW_FILE_URLS = False
+_FFMPEG_REDIRECT_HOSTS = frozenset(
+    {"github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"}
+)
 
 Form = Literal["onedir", "onefile"]
 """The two PyInstaller forms the spike measures."""
@@ -847,6 +854,7 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
         "extract_members",
     }:
         _ffmpeg_text(data[key], key)
+    _check_ffmpeg_asset_url(cast(str, data["asset_url"]))
     digest = cast(str, data["github_sha256"])
     if not re.fullmatch(r"[0-9a-f]{64}", digest) or digest != data["seat_sha256"]:
         raise ValueError("FFmpeg lock: sha256 readings differ or are not 64 hex digits")
@@ -974,9 +982,42 @@ def _ffmpeg_archive_members(
     return found
 
 
+def _check_ffmpeg_asset_url(url: str) -> None:
+    parsed = urlsplit(url)
+    if parsed.scheme == "file" and _TEST_ALLOW_FILE_URLS:
+        return
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError(f"FFmpeg asset URL must use HTTPS: {url}")
+
+
+class _FFmpegRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects outside the pinned provider's HTTPS asset hosts."""
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: HTTPMessage,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        parsed = urlsplit(newurl)
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname not in _FFMPEG_REDIRECT_HOSTS
+            or parsed.port not in {None, 443}
+            or parsed.username
+            or parsed.password
+        ):
+            raise ValueError(f"FFmpeg redirect refused: {newurl}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def _download_ffmpeg(url: str, sha256: str, out: Path, lock: FFmpegLock) -> Path:
     if url != lock["asset_url"]:
         raise ValueError("FFmpeg URL differs from the pinned asset URL")
+    _check_ffmpeg_asset_url(url)
     if not re.fullmatch(r"[0-9a-f]{64}", sha256) or sha256 != lock["github_sha256"]:
         raise ValueError("FFmpeg sha256 argument differs from the lock")
     folder = out / "ffmpeg"
@@ -989,7 +1030,8 @@ def _download_ffmpeg(url: str, sha256: str, out: Path, lock: FFmpegLock) -> Path
     size = 0
     start = time.monotonic()
     try:
-        with urllib.request.urlopen(url, timeout=60) as response, partial.open("wb") as stream:
+        opener = urllib.request.build_opener(_FFmpegRedirectHandler())
+        with opener.open(url, timeout=60) as response, partial.open("wb") as stream:
             while chunk := response.read(1024 * 1024):
                 size += len(chunk)
                 if size > lock["size_bytes"]:
@@ -2019,6 +2061,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         parser.error("--notices requires --form onedir")
     if (options.ffmpeg_from is None) != (options.ffmpeg_sha256 is None):
         parser.error("--ffmpeg-from and --ffmpeg-sha256 must be provided together")
+    if options.ffmpeg_from is not None:
+        parsed = urlsplit(options.ffmpeg_from)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+            parser.error("--ffmpeg-from requires an HTTPS URL")
     if options.ffmpeg_sha256 is not None and not re.fullmatch(
         r"[0-9a-f]{64}", options.ffmpeg_sha256
     ):

@@ -12,6 +12,7 @@ import importlib.util
 import json
 import re
 import shlex
+import subprocess
 import sys
 import textwrap
 from pathlib import Path
@@ -72,6 +73,67 @@ def test_setup_uv_pins_the_audited_uv_release(workflow):
     assert len(versions) == 1, "setup-uv must pin its version input"
     assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", versions[0])
     assert versions[0] == "0.10.9", "uv must match the audited laptop build input"
+
+
+def test_windows_job_uses_frozen_unsynced_managed_python(workflow):
+    windows = workflow.split("\n  windows:\n", 1)[1].split("\n  release:\n", 1)[0]
+    assert re.search(
+        r'    env:\n      UV_FROZEN: "1"\n      UV_NO_SYNC: "1"\n'
+        r"      UV_PYTHON_PREFERENCE: only-managed\n",
+        windows,
+    )
+    assert "uv sync --frozen --no-default-groups --group dev --extra gpu" in script(
+        workflow, "Sync build environment"
+    )
+
+
+def test_windows_job_budget_is_two_hours(workflow):
+    windows = workflow.split("\n  windows:\n", 1)[1].split("\n  release:\n", 1)[0]
+    assert "    timeout-minutes: 120\n" in windows
+
+
+@pytest.mark.parametrize(
+    "status, stdout, stderr, allowed",
+    [
+        (0, '{"isDraft": true}', "", True),
+        (0, '{"isDraft": false}', "", False),
+        (1, "", "release not found\n", True),
+        (1, "", "HTTP 403: denied", False),
+        (0, "not JSON", "", False),
+        (0, "{}", "", False),
+        (0, '{"isDraft": "true"}', "", False),
+    ],
+)
+def test_release_guard_refuses_published_or_unverifiable_tag(
+    workflow, monkeypatch, status, stdout, stderr, allowed
+):
+    guard = step(workflow, "Refuse a published release")
+    assert "shell: python {0}" in guard
+    assert "GH_TOKEN: ${{ github.token }}" in guard
+    assert "TAG: ${{ github.ref_name }}" in guard
+    names = re.findall(r"^      - name: (.+)", workflow, re.MULTILINE)
+    assert names.index("Refuse a published release") < names.index("Create draft release")
+    body = script(workflow, "Refuse a published release")
+    assert "${{" not in body
+    tag = "v1.1.0; literal tag argument"
+    monkeypatch.setenv("TAG", tag)
+    calls = []
+
+    def view(args, **kwargs):
+        assert kwargs == {"capture_output": True, "text": True, "timeout": 60, "check": False}
+        calls.append(args)
+        return subprocess.CompletedProcess(args, status, stdout, stderr)
+
+    monkeypatch.setattr(subprocess, "run", view)
+    code = compile(body, "release-draft-guard", "exec")
+    if allowed:
+        exec(code, {})
+    else:
+        with pytest.raises((SystemExit, ValueError)):
+            exec(code, {})
+    assert calls == [["gh", "release", "view", tag, "--json", "isDraft"]]
+    checklist = (ROOT / "docs/release-checklist.md").read_text(encoding="utf-8")
+    assert "never re-run the release job after publication" in checklist
 
 
 def test_triggers_permissions_concurrency_and_release_are_bounded(workflow):
@@ -277,6 +339,12 @@ def test_checklist_requires_uv_agreement_and_native_reverification():
     assert "uv --version" in build_inputs and "0.10.9" in build_inputs
     assert "agree before the tag" in build_inputs
     assert "uv change requires native-licences re-verification" in build_inputs
+
+
+def test_checklist_requires_native_text_checkout_guard():
+    text = (ROOT / "docs/release-checklist.md").read_text(encoding="utf-8")
+    assert "git add --renormalize tools/package/native-licences" in text
+    assert "working-tree byte guard is green" in text
 
 
 def test_readme_gpu_recipe_names_split_streams_and_matches_guide_commands():

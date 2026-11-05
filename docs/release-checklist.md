@@ -39,6 +39,8 @@ while either remains open; workflow presence is not release readiness.
    `tools/package/native-licences/` (manifest, texts, bundled versions) whenever
    uv's managed Python changes; the generator fails closed on mismatched inputs.
    The workflow's uv pin (`0.10.9`) and laptop's `uv --version` must agree before the tag; any uv change requires native-licences re-verification.
+   Before the release build, run `git add --renormalize tools/package/native-licences`
+   or re-check-out that folder, and confirm its working-tree byte guard is green.
    Read the FFmpeg URL/hash from `tools/package/ffmpeg.lock.json`, verify every
    linked component's source/licence evidence and re-pin the FFmpeg asset before
    the retention expiry (about **2028-10**). Re-pinning requires repeating the
@@ -95,6 +97,8 @@ while either remains open; workflow presence is not release readiness.
    to a **DRAFT** release; notes come from `docs/release-notes-1.1.0.md` if present.
    **STOP** for a failed/incomplete job, wrong commit/version, missing asset or
    non-draft release. Do not publish to work around a workflow failure.
+   **STOP:** never re-run the release job after publication; its guard refuses
+   an existing non-draft release before any asset attachment.
 10. Download the three assets from the draft release. Compare the downloaded
     zip's SHA-256 against the sidecar (PowerShell `Get-FileHash -Algorithm SHA256`),
     list its single top-level folder and compare the attached notices with the

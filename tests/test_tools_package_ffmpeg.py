@@ -5,7 +5,11 @@ from __future__ import annotations
 import copy
 import hashlib
 import importlib.util
+import io
 import json
+import re
+import urllib.request
+from email.message import Message
 from pathlib import Path
 
 import pytest
@@ -165,6 +169,7 @@ def synthetic_bundle(tmp_path, monkeypatch):
         return real_run([sys.executable, *args], **kwargs)
 
     monkeypatch.setattr(build, "FFMPEG_LOCK_PATH", pin, raising=False)
+    monkeypatch.setattr(build, "_TEST_ALLOW_FILE_URLS", True, raising=False)
     monkeypatch.setattr(build.subprocess, "run", launch)
     write()
     return data, source, destination, out, members, write, pin
@@ -377,3 +382,111 @@ def test_lock_accepts_incompatibility_as_data_for_the_release_refusal():
             source["gpl3_compatible"] = "no"
             source["licence_note"] = "synthetic incompatible licence"
     assert build.validate_ffmpeg_lock(data)["components"][0]["gpl3_compatible"] == "no"
+
+
+def test_lock_refuses_http_asset_url():
+    data = lock_data()
+    data["asset_url"] = data["asset_url"].replace("https:", "http:", 1)
+    with pytest.raises(ValueError, match="HTTPS"):
+        build.validate_ffmpeg_lock(data)
+
+
+def test_local_file_transport_needs_explicit_test_hook(synthetic_bundle, monkeypatch):
+    monkeypatch.setattr(build, "_TEST_ALLOW_FILE_URLS", False, raising=False)
+    with pytest.raises(ValueError, match="HTTPS"):
+        bundle(synthetic_bundle)
+
+
+def test_cli_refuses_file_url_even_when_test_hook_enabled(monkeypatch):
+    monkeypatch.setattr(build, "_TEST_ALLOW_FILE_URLS", True, raising=False)
+    with pytest.raises(SystemExit) as caught:
+        build.parse_args(
+            [
+                "--form",
+                "onedir",
+                "--ffmpeg-from",
+                "file:///fixture.zip",
+                "--ffmpeg-sha256",
+                "a" * 64,
+            ]
+        )
+    assert caught.value.code == 2
+
+
+def _scripted_transport(monkeypatch, redirects):
+    """Drive urllib's real redirect machinery entirely in-process, without sockets."""
+    from urllib.response import addinfourl
+
+    payload = b"scripted hash-verified archive"
+    requests = []
+    real_build_opener = urllib.request.build_opener
+
+    class Scripted(urllib.request.BaseHandler):
+        handler_order = 100
+
+        def https_open(self, request):
+            url = request.full_url
+            requests.append(url)
+            headers = Message()
+            if url in redirects:
+                headers["Location"] = redirects[url]
+                response = addinfourl(io.BytesIO(b""), headers, url, 302)
+                response.msg = "Found"
+            else:
+                response = addinfourl(io.BytesIO(payload), headers, url, 200)
+                response.msg = "OK"
+            return response
+
+        http_open = https_open
+
+    monkeypatch.setattr(
+        build.urllib.request,
+        "build_opener",
+        lambda *handlers: real_build_opener(Scripted(), *handlers),
+    )
+    # HEAD's urlopen path is also intercepted, so the RED never contacts a host.
+    monkeypatch.setattr(
+        build.urllib.request,
+        "urlopen",
+        lambda url, **kwargs: real_build_opener(Scripted()).open(url, **kwargs),
+    )
+    pin = lock_data()
+    pin["size_bytes"] = len(payload)
+    pin["github_sha256"] = pin["seat_sha256"] = hashlib.sha256(payload).hexdigest()
+    return pin, payload, requests
+
+
+@pytest.mark.parametrize(
+    "destination",
+    [
+        "https://elsewhere.invalid/archive.zip",
+        "http://github.com/archive.zip",
+        "https://github.com:444/archive.zip",
+    ],
+)
+def test_download_refuses_redirect_host_or_scheme(monkeypatch, tmp_path, destination):
+    start = lock_data()["asset_url"]
+    pin, _payload, requests = _scripted_transport(monkeypatch, {start: destination})
+    with pytest.raises(ValueError, match="redirect.*" + re.escape(destination)):
+        build._download_ffmpeg(start, pin["github_sha256"], tmp_path, pin)
+    assert requests == [start]
+    assert not list(tmp_path.rglob("*.part"))
+
+
+def test_download_accepts_https_github_asset_redirect_chain(monkeypatch, tmp_path):
+    start = lock_data()["asset_url"]
+    middle = "https://objects.githubusercontent.com/fixture"
+    end = "https://release-assets.githubusercontent.com/fixture.zip"
+    pin, payload, requests = _scripted_transport(monkeypatch, {start: middle, middle: end})
+    result = build._download_ffmpeg(start, pin["github_sha256"], tmp_path, pin)
+    assert result.read_bytes() == payload
+    assert requests == [start, middle, end]
+
+
+def test_loopback_redirect_to_another_origin_is_refused_in_process():
+    """The handler sees a loopback 302 without opening a socket or following it."""
+    request = urllib.request.Request("http://127.0.0.1:54321/archive.zip")
+    with pytest.raises(ValueError, match=r"redirect.*https://elsewhere.invalid"):
+        build._FFmpegRedirectHandler().redirect_request(
+            request, None, 302, "Found", Message(), "https://elsewhere.invalid/archive.zip"
+        )

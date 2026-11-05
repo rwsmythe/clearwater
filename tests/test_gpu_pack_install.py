@@ -58,7 +58,9 @@ def headless_entry(monkeypatch, tmp_path):
         monkeypatch.setenv(variable, str(tmp_path / variable))
     QApplication.instance()  # No application or window is constructed.
     entry, blocker = _fresh_entry(monkeypatch)
-    monkeypatch.setattr(entry.gpu_pack, "activate", lambda: pytest.fail("pack activated"))
+    monkeypatch.setattr(gpu_pack, "activate", lambda: pytest.fail("pack activated"))
+    monkeypatch.setattr(sys, "excepthook", sys.excepthook)
+    monkeypatch.setattr(threading, "excepthook", threading.excepthook)
     yield entry
     assert blocker.attempts == []
 

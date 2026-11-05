@@ -1,6 +1,12 @@
 # WP6.3b release workflow: implementation record
 
-Status: turn 15 remediates Reviewer A round 1's notices MAJOR M2 and binding
+Status: turn 16 remediates the remaining Reviewer A round-1 findings C1, M1 and
+m2-m6 under CHARC's ruling. The GUI-entry exposure is removed from the hook
+tests; transport, smoke-allowlist, checkout and workflow safeguards are in place.
+The installer fixture's twelve errors are fixed; its native taskkill test still
+requires the seat re-run outside the sandbox. See turn 16 for current evidence.
+
+Historical turn-15 status: turn 15 remediates Reviewer A round 1's notices MAJOR M2 and binding
 MINOR m1 with restricted PSF coverage, native identities and verified flattened
 wheel matching. Real notices generation is expected to refuse unrecorded
 native DLLs for the seat's census; no new real-component rows were added.
@@ -41,6 +47,7 @@ Claude pass; no review verdict is claimed here. Context depth is dispatcher-read
 | Turn 12 / ruled containment remediation | Replaced PPID supervision with one kill-on-close, non-breakaway Windows job per process; atomic assignment at process creation, retained thread resume, job census, bounded pipe cleanup and tests. | Turn 11's MAJOR implemented under CHARC's option (b); closes on the seat re-run. No new blocking finding or scope question. | The carried finding is being remediated, not a reopened review item. No product revert. Before-record source swaps restored byte-exactly. | Smoke tool, its synthetic tests and this report only; build wiring and runtime untouched. | Dispatcher supplied 155,874 at turn-11 end; turn-12 figure awaits dispatcher reading, never estimated. |
 | Turn 13 / workflow and release documents | Pinned two-job workflow, offline contracts/executed version gate, checklist v2, guide sections and limited root-notices update. Dispatch 13 supplies the seat's clean turn-12 re-run. | No Reviewer A round or new blocking finding. One MINOR out-of-turn README residual confirmed below. Existing zvbi HOLD and unimplemented --zip remain explicit release blockers. | 0 NEW review findings, 0 REOPENED; no product revert. Three workflow mutants and the checklist before-record restored byte-exactly. | Workflow/configuration and prose plus one new test module; no runtime/tool implementation edit. | Fresh session after prior session retired at dispatcher-read 222,977; this turn's depth awaits dispatcher reading, never estimated. |
 | Turn 15 / Reviewer A round 1 notices subset | M2 and binding m1 confirmed and remediated: narrow PSF fallback, explicit separately licensed native names, flattened RECORD SHA-256 checks, generic native-file bindings and OpenSSL byte identities. Other round-1 findings remain dispatched separately; this is not a round-convergence claim. | Adjudicated subset: 0 critical, 1 MAJOR, 1 MINOR; both in-envelope. No finding rejected as false positive. | 2 NEW in this subset, 0 REOPENED; no product reverts. Two temporary HEAD before-record swaps restored byte-exactly. | Product: notices matching/schema and measured OpenSSL manifest bindings. Tests: regression cases and independent synthetic manifests; report. | Fresh session; turn-end depth awaits dispatcher reading, never estimated. |
+| Turn 16 / Reviewer A round 1 remaining findings | C1, M1 and m2-m6 confirmed and code-remediated. Native taskkill validation remains the known sandbox residual for the seat; Reviewer A delta/convergence is not claimed. | This turn: 1 CRITICAL by rule, 1 MAJOR, 5 MINOR, all in-envelope. Cumulative r1 assigned findings: 1 CRITICAL, 2 MAJOR, 6 MINOR, all adjudicated; none rejected. | This turn 7 NEW, cumulative 9 NEW, 0 REOPENED; no product reverts. Smoke/photo and stale-checkout mutants were in memory only and restored. | Product: presenter-wiring extraction and transport restriction. Tests: fixture/guards/routing. Workflow/checklist: uv settings, published-release refusal, timeout and STOPs. | Dispatcher supplied 123,751 at turn-15 end; current turn-end figure awaits dispatcher reading, not estimated. |
 
 Turn 2 bundled the three changes explicitly commissioned by dispatch 2; the seat
 commits each turn. No git write was performed by the cell.
@@ -2258,3 +2265,245 @@ with a fresh basetemp. Final inspection found no further issue within (a)-(d).
 Zero findings were rejected as false positives; no production revert remains.
 Both assigned review findings are code-remediated, with real census/data and
 Reviewer A confirmation still owed at the seat. This turn now yields as directed.
+
+
+## Turn 16: Reviewer A round 1 C1, M1 and m2-m6
+
+Dispatch 16 resumes turn 15 at `b103acbc4241e09c806bbe98c04989f727fe8d15`.
+The dispatch supplies the seat's outside-sandbox turn-15 proof: 538 passed,
+1 skipped; Ruff, format and both mypy targets clean; OpenSSL binary identities
+re-measured equal. CHARC's Reviewer A r1 rulings were read with the authorized
+read-only `git show main:docs/briefs/wp6.3b-brief.md` query, saved under
+`work/c63b-16-rulings.txt`. All seven findings in this turn are confirmed and
+in-envelope; no false-positive rejection or reopened finding is claimed.
+
+### C1 (CRITICAL by rule): helper-only offscreen presentation tests
+
+`app/main.py` extracts the existing one-line presenter assignment into
+`_enable_exception_dialog(app, reporter)` and calls it at the same startup
+point. The only other source edit is its type-checking-only reporter import.
+The direct/threaded tests now invoke that helper with an offscreen QApplication;
+they never call real `app.main`. They retain once-only presentation, Qt-thread,
+log-path-only text and presentation-before-exit assertions. No event loop or
+real message box is entered by these tests.
+
+A module AST guard detects the actual unsafe alias/call form (the alias returned
+by importing `clearwater.app.main`, followed by its `.main(...)` call) outside
+child source strings. It failed before the unsafe call was removed. Startup
+coverage runs in a bounded Qt-blocked child: it compiles the production `main`
+and helper definitions from the source AST with QApplication, dialog and build
+pieces stubbed, and proves the presenter is attached before build construction.
+It executes the production startup definitions rather than a copied algorithm;
+no GUI module is imported, and the event-loop stub fails if reached. Its RED
+identified the missing helper; its GREEN checks the order. All profile roots
+are inherited from the disposable autouse fixture, with a 12-second child bound.
+No new exception to the Entry-point isolation rule was used or requested.
+
+### M1 (MAJOR): fixture-only repair and missing validation restored
+
+Only `headless_entry` changed: it patches the imported `clearwater.gpu_pack`
+directly, and registers both current interpreter exception hooks with monkeypatch
+before entry execution so teardown restores them. No installer test body or
+installer product code changed. Module-alone RED reproduced all twelve
+`entry.gpu_pack` AttributeErrors; after the fix those twelve cases pass.
+
+**Process finding:** the module-alone run of `tests/test_gpu_pack_install.py`
+was left out of every validation since turn 3. From this turn it is explicitly
+in the validation list and the final commands. The native no-PID taskkill case
+remains enabled; it is not weakened, skipped or treated as green in this sandbox.
+The seat must repeat the module-alone run outside the restricted token.
+
+### m2 (MINOR): pinned HTTPS transport and explicit test-only file access
+
+The lock validator and downloader require an HTTPS asset URL. Local `file:`
+transport is available only under the private module-level
+`_TEST_ALLOW_FILE_URLS = True` hook, set by the synthetic archive fixture.
+The CLI never sets that hook and independently requires HTTPS even if a test
+has enabled it. `_FFmpegRedirectHandler` is installed in the downloader's
+opener; it permits only HTTPS to `github.com`, `objects.githubusercontent.com`
+and `release-assets.githubusercontent.com`, with no credentials or nonstandard
+port. Rejected redirect diagnostics name the target. Existing archive hash,
+byte-count, extraction and version/configuration checks remain in place.
+
+The HTTP-lock, default file-path and CLI file-path tests all failed on the old
+code. Three redirect tests drive urllib's real redirect machinery with a
+scripted handler that serves responses entirely in-process: foreign host,
+HTTP downgrade and nonstandard port all must be refused before a second request.
+The same harness accepts a GitHub -> objects -> release-assets HTTPS chain and
+checks the downloaded bytes. A loopback-origin 302 is passed directly through
+the handler with a foreign destination; it opens no socket. HEAD's urlopen was
+also intercepted in the RED, so no external address was contacted. The existing
+local ZIP test is still the positive file-hook control. The prior CLI forwarding
+success fixture now uses HTTPS; conflicting/incomplete request tests remain.
+
+### m3 (MINOR): exact smoke allowlist and actual frozen routing
+
+The test pins `_SAFE_ARGUMENTS` EQUAL to the eleven literal tuples, including
+the single worker tuple. A second test routes every actual allowlisted tuple
+through source `clearwater.__main__.main` with `sys.frozen = True`, disposable
+APPDATA/LOCALAPPDATA/XDG/HOME/USERPROFILE, Qt imports blocked and `app.main`
+stubbed. Only pack activation, logging/cache effects and the worker boundary
+are stubbed; the interpreter/refusal routing is real. Each tuple must return 2,
+and only `--export-worker` may reach the worker. The child has a 15-second bound.
+This is source routing, not a frozen executable run or a real pack activation.
+
+For RED, a temporary pytest plugin added `('photo.heic',)` to the loaded smoke
+module's allowlist in memory. BOTH tests failed: literal equality and the child
+GUI-branch sentinel. Teardown restored the loader; no unowned smoke product
+file was edited. The unmutated pair then passed.
+
+### m4 (MINOR): stale working-tree licence guard
+
+The existing committed-blob guard now additionally reads each working-tree
+licence text, checking BOTH `text_size_bytes` and `text_sha256`. The RED injected
+CRLF bytes only into that read via a temporary in-memory monkeypatch; the new
+guard failed while the committed blob stayed correct. No licence file was
+written. The genuine checkout passes. The checklist now requires
+`git add --renormalize tools/package/native-licences` or a folder re-checkout
+and a green working-tree byte guard before a release build. Its missing-line
+check failed before the documentation edit and passes afterward. No Git write
+or checkout was performed by the cell.
+
+### m5, m6 (MINOR) and a7: workflow safeguards
+
+The Windows job has `UV_FROZEN: "1"`, `UV_NO_SYNC: "1"` and
+`UV_PYTHON_PREFERENCE: only-managed` at job scope. The explicit
+`uv sync --frozen --no-default-groups --group dev --extra gpu` command is retained.
+An offline `--dry-run` of that command with all three environment values set
+exited 0 and printed `Would use project environment at: .venv` and
+`Would uninstall 24 packages`. That proves the sync command executes under
+these variables, rather than being suppressed by UV_NO_SYNC; the proposed
+removals are non-dev harness extras. Dry-run changed no environment or lock,
+resolved nothing from the network, and neither installed nor removed a package.
+The workflow contract test asserts all three job-level values.
+
+Before downloading/attaching assets, the release job runs `gh release view`
+with `--json isDraft`, a 60-second bound, `GH_TOKEN: ${{ github.token }}` and
+the tag supplied through `env: TAG`. The Python run body has no GitHub expression
+interpolation and passes the tag as one subprocess argument. An existing release
+must return boolean `isDraft: true`; published, missing-field, malformed JSON,
+string-valued and lookup-error responses fail the job. Only an explicit
+`release not found` response permits creating a new draft. The seven executable
+script tests replace only the subprocess boundary; no gh process was launched.
+The checklist STOP says never re-run the release job after publication.
+
+The Windows timeout is 120 minutes (a7), with its own regression assertion.
+The action pins, tag/source check, release conditions and draft-only action
+configuration are unchanged. Actionlint and the real workflow run remain seat/
+release evidence, not claims of this offline cell turn.
+
+### Advisory dispositions (report-only except a7)
+
+- **a1, ADVISORY:** CHARC's seat measurement says importing `config.paths` loads
+  188 modules, including NumPy and ctypes, with no CuPy, CUDA, SciPy or Qt.
+  The GUI branch already imported config before activation. This is disclosed,
+  not an additional module-loading change in this turn.
+- **a5, ruled design:** a Qt slot or thread exception now ends the GUI through
+  `os._exit(1)` after its fatal report/presentation; 1.0.0 survived slot exceptions.
+  The helper extraction preserves the ruled behavior. CHARC records the AD-38
+  line at accept; no AD/register file is owned or edited by this turn.
+- **a3:** a tool `-version` failure leaves the already hash-verified extracted
+  binaries in the failed output folder. The build still fails; their presence
+  does not establish a successful release artifact.
+- **a4:** an `IncompleteRead` may still escape as a traceback, but fails closed:
+  the partial archive is removed by the downloader's finally, and unverified
+  bytes do not reach extraction. No recovery claim or transport broadening.
+- **a6:** ADV-1 has tiny asynchronous-exception windows during its recovery
+  checks/handling and success-result construction. A repeated KeyboardInterrupt
+  there can escape the protected post-rename recovery and change the reported
+  result while the published pack stays kept. The commissioned fault cases are
+  covered; universal interruption immunity is not claimed. No installer product
+  change was authorized in this fixture-only turn.
+- **a7:** the workflow timeout changed from 60 to 120 minutes, as ruled.
+
+### RED/GREEN evidence and scope
+
+All runner logs are under `work/c63b-16-evidence/`. Every pytest invocation used
+PYTHONPATH=scripts, the sandbox mkdir shim, no cache provider, a fresh basetemp
+and a 300-second default timeout (individual existing tests retain their tighter
+bounds). The two in-memory mutation runs used pytest.main with that same plugin
+and basetemp setup. No unsafe C1 test body was executed before its repair:
+the initial scan ran only the AST guard, and the helper-missing probe was Qt-blocked.
+
+| Item / logs | RED observed | GREEN observed before final validation |
+| --- | --- | --- |
+| C1: c1-red.log, c1-wiring-red.log, c1-green.log | 1 guard failure; 1 missing-helper child failure. | 18 hook tests pass, including both presenter parameterizations and startup wiring. |
+| M1: m1-red.log, m1-green.log | 12 setup errors, 100 passed, 1 native cleanup failure. | 112 passed; the same native taskkill denial remains the sole failure, with no setup errors. |
+| m2: m2-red.log, m2-green.log | 7 failed, 1 positive-chain control passed, 60 deselected. | All 151 FFmpeg/build tests pass. |
+| m3: m3-red.log, m3-green.log | 2 failed with the added photo tuple. | 2 pass without the mutant; 32 deselected. |
+| m4: m4-red.log, m4-green.log | 2 failed: stale-byte injection and missing checklist line. | Both guards pass on real bytes and updated checklist. |
+| m5, m6, a7: workflow-red.log, workflow-green.log | 9 failed: missing job env, budget and seven guard cases. | All 31 workflow/doc tests pass. |
+| m5: uv-sync-env-dry-run.log | Not a behavior change to uv; no artificial RED claimed. | Exit 0; the explicit sync executes under all three job env values, offline/dry-run only. |
+
+Initial Ruff import ordering and a raw child-source line length were corrected
+inside owned files. Initial mypy found the redirect override's broad Message
+annotation incompatible with urllib's HTTPMessage parameter at the super call;
+the annotation/import was corrected, with no runtime behavior change. The final
+static results below supersede those intermediate failures.
+
+Only the dispatch-16 file grants were used; `gpu_pack_install.py`, `__main__.py`,
+`smoke.py`, licence data and frozen interfaces are unchanged. No external network
+fetch, PyInstaller build, frozen run, desktop GUI launch, synthetic input,
+footage/owner-profile write, QUIT_SCRIPT, Git write, push/tag, actual gh process,
+workflow dispatch, mailbox message or dependency change occurred. Installer
+loopback-only fixture requests and in-process scripted redirects are the only
+transport tests. FFmpeg/ZIP release work remains carved out to WP6.3c. The real
+stage-1 build/native census and Reviewer A r2 remain with the seat.
+
+
+### Final validation and verification-loop result
+
+| Log | Observed final result |
+| --- | --- |
+| ruff-check.log | Exit 0; All checks passed! |
+| ruff-format.log | Exit 0; 337 files already formatted. |
+| mypy.log | Exit 0; Success: no issues found in 166 source files. |
+| mypy-darwin.log | Exit 0; Success: no issues found in 166 source files. |
+| pytest-validation.log | Exit 0; 576 passed, 1 skipped in 37.03s; basetemp work/c63b-16. |
+| pytest-gpi-final.log | Exit 1; 1 failed, 112 passed in 13.82s; basetemp work/c63b-16-gpi. No setup/teardown errors. |
+| diff-check.log | Exit 0; no whitespace defect; existing LF-to-CRLF checkout warnings only. |
+
+The combined run covers all seven requested modules: 33 smoke passes with one
+existing POSIX native-proof skip on Windows, 150 notices, 68 FFmpeg-tool,
+83 build, 193 isolated frozen-entry, 31 workflow/doc and 18 exception-hook cases.
+No new skip was introduced. Module-alone installer validation has no remaining
+AttributeError: all twelve repaired headless cases pass.
+
+**Sole sandbox-only residual:**
+`tests/test_gpu_pack_install.py::test_mapped_child_without_a_pid_is_killed_with_its_descendants[native]`
+fails its descendant-survival assertion because `taskkill /T /F /PID` reports
+`ERROR: Access denied` under the restricted token. The final run's diagnostic is
+`work/c63b-16-gpi/test_mapped_child_without_a_pi0/tree-kill.log`. This is the same
+native-command residual recorded in turn 2 and independently present in this
+turn's RED, GREEN and final module-alone runs. The controlled case passes; the
+independent finalizer cleans up the captured children even when the assertion
+fails, with no teardown error. This is NOT reported as a fully green installer
+module or proof of native taskkill. The seat must re-run it outside the sandbox
+and confirm the module-alone result before review/gate closure. No native-test
+body was changed by this turn's fixture grant.
+
+The inherited VIRTUAL_ENV warning still points at the main checkout; uv ignores
+it in favor of this worktree's .venv. PowerShell wraps the warning as
+NativeCommandError output even on exit 0. It is not another test residual.
+No code/test edit followed final validation; only this report was completed.
+
+Verification loop: C1 guard and helper-missing probes independently confirmed
+the unsafe test and missing seam; helper/direct/thread/startup tests passed.
+M1 module-alone reproduced all twelve fixture failures; the fixture-only fix
+removed them, leaving only the established native-command denial. Transport
+RED distinguished unsupported-scheme/redirect acceptance; all transport/archive
+controls passed after the restriction. The photo-argument mutant was caught by
+both exact allowlist and actual frozen routing, with GUI stubbed. The stale-byte
+mutant was caught without a licence-file write. Workflow environment/budget and
+published-release cases failed before implementation and passed afterward; an
+offline dry-run confirmed explicit sync under the three environment variables.
+Final owned-diff inspection found no new issue; zero findings were rejected as
+false positives. Temporary mutations were in-memory only and restored. This
+turn bundles exactly the dispatch's related r1 remediation items into one seat
+commit; it does not claim Reviewer A convergence or package acceptance.
+
+Remaining: the native module-alone seat re-run, Reviewer A r2 delta, the stage-1
+real build/native census and its seat-fetched data turn, actionlint/Reviewer B/
+gate evidence, and the separately commissioned WP6.3c FFmpeg/ZIP/release work.
+AD-38 and advisory/register acceptance records remain CHARC's edits. The cell
+now yields with the full seven-finding disposition and cumulative round ledger.

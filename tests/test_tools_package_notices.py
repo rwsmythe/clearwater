@@ -46,6 +46,9 @@ def test_native_licence_manifest_hash_matches_committed_blob():
             timeout=30,
         )
         assert hashlib.sha256(result.stdout).hexdigest() == row["text_sha256"]
+        working_bytes = (folder / row["text_file"]).read_bytes()
+        assert len(working_bytes) == row["text_size_bytes"], relative
+        assert hashlib.sha256(working_bytes).hexdigest() == row["text_sha256"], relative
 
 
 def load_notices():

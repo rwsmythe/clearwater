@@ -930,7 +930,7 @@ def test_release_ffmpeg_options_reach_the_build(monkeypatch, tmp_path):
                 "--out",
                 str(tmp_path),
                 "--ffmpeg-from",
-                "file:///archive.zip",
+                "https://github.com/fixture/archive.zip",
                 "--ffmpeg-sha256",
                 "a" * 64,
             ]
@@ -941,7 +941,7 @@ def test_release_ffmpeg_options_reach_the_build(monkeypatch, tmp_path):
         "form": "onedir",
         "out": tmp_path,
         "with_ffmpeg": False,
-        "ffmpeg_from": "file:///archive.zip",
+        "ffmpeg_from": "https://github.com/fixture/archive.zip",
         "ffmpeg_sha256": "a" * 64,
         "notices": False,
         "smoke": False,

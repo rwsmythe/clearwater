@@ -6,6 +6,7 @@ the message presenter and process queued events without entering an event loop.
 
 from __future__ import annotations
 
+import ast
 import importlib
 import io
 import logging
@@ -14,6 +15,7 @@ import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -21,6 +23,34 @@ from clearwater.config import log as config_log
 from clearwater.config.paths import app_locations
 
 pytestmark = pytest.mark.timeout(20)
+
+
+def test_hook_tests_never_call_gui_entry_in_process():
+    """The offscreen presenter tests must not invoke an importable real GUI entry."""
+    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    aliases = {
+        node.targets[0].id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and isinstance(node.targets[0], ast.Name)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Attribute)
+        and node.value.func.attr == "import_module"
+        and node.value.args
+        and isinstance(node.value.args[0], ast.Constant)
+        and node.value.args[0].value == "clearwater.app.main"
+    }
+    unsafe = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id in aliases
+        and node.func.attr == "main"
+    ]
+    assert not unsafe, f"real app.main called in-process at lines {unsafe}"
+
 
 _ROOTS = (
     "APPDATA",
@@ -180,7 +210,7 @@ def test_fatal_record_keeps_the_existing_log_rotation(monkeypatch, capsys):
 
 @pytest.mark.parametrize("threaded", [False, True])
 def test_post_qt_failure_presents_once_on_qt_thread_before_exit(monkeypatch, threaded):
-    """The GUI enables its plain log-path box before build_application can fail."""
+    """Presenter wiring marshals the plain box to Qt before the reporter exits."""
     from PySide6.QtCore import QThread
     from PySide6.QtWidgets import QApplication
 
@@ -196,12 +226,7 @@ def test_post_qt_failure_presents_once_on_qt_thread_before_exit(monkeypatch, thr
 
     monkeypatch.setattr(gui, "_present_exception", present, raising=False)
 
-    def fail(_locations):
-        raise RuntimeError("post-Qt planted failure")
-
-    monkeypatch.setattr(gui, "build_application", fail)
-    with pytest.raises(RuntimeError, match="post-Qt planted"):
-        gui.main(["clearwater"])
+    gui._enable_exception_dialog(app, reporter)
     info = _failure()
     if threaded:
         thread = threading.Thread(
@@ -253,6 +278,58 @@ def _child(tmp_path, body):
         check=False,
         env=dict(os.environ),
     )
+
+
+def test_startup_wiring_enables_presenter_before_build_in_qt_blocked_child(tmp_path):
+    """Run the production startup functions with Qt pieces stubbed and imports blocked."""
+    done = _child(
+        tmp_path,
+        r"""
+import ast
+from pathlib import Path
+import clearwater
+source = Path(clearwater.__file__).parent / 'app/main.py'
+tree = ast.parse(source.read_text(encoding='utf-8'))
+names = {'main', '_enable_exception_dialog'}
+functions = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
+assert {node.name for node in functions} == names, 'presenter helper is missing'
+events = []
+class App:
+    @staticmethod
+    def instance():
+        return app
+    def exec(self):
+        raise AssertionError('event loop entered')
+app = App()
+class Dialog:
+    def __init__(self, owner):
+        assert owner is app
+        events.append('dialog')
+    def present(self, text):
+        pass
+def build(locations):
+    assert callable(sys.excepthook.presenter)
+    events.append('build')
+    raise RuntimeError('build boundary')
+namespace = {'QApplication': App, '_ExceptionDialog': Dialog, 'sys': sys,
+             'build_application': build, 'app_locations': lambda: None}
+future = ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0)
+module = ast.Module(body=[future, *functions], type_ignores=[])
+exec(compile(ast.fix_missing_locations(module), str(source), 'exec'), namespace)
+try:
+    namespace['main'](['clearwater'])
+except RuntimeError as error:
+    assert str(error) == 'build boundary'
+else:
+    raise AssertionError('build did not run')
+assert events == ['dialog', 'build'], events
+assert not any(name.split('.')[0] in ('PySide6', 'shiboken6') for name in sys.modules)
+print('startup helper wired before build')
+""",
+    )
+    assert done.returncode == 0, done.stderr
+    assert done.stdout == "startup helper wired before build\n"
+    assert done.stderr == ""
 
 
 @pytest.mark.parametrize("blocked_root", ["clearwater.config", "numpy"])

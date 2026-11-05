@@ -30,6 +30,10 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from threading import Event
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from clearwater.__main__ import _ExceptionReporter
 
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 from PySide6.QtGui import QCloseEvent
@@ -357,6 +361,11 @@ class _ExceptionDialog(QObject):
             done.wait(30)
 
 
+def _enable_exception_dialog(app: QApplication, reporter: _ExceptionReporter) -> None:
+    """Enable the plain fatal-error presenter after Qt owns the GUI thread."""
+    reporter.presenter = _ExceptionDialog(app).present
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run Clearwater until its window closes (``python -m clearwater``).
 
@@ -374,6 +383,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         existing if existing is not None else QApplication(list(sys.argv if argv is None else argv))
     )
     assert isinstance(app, QApplication)
-    reporter.presenter = _ExceptionDialog(app).present
+    _enable_exception_dialog(app, reporter)
     _running = build_application(app_locations())  # held: the window lives while this does
     return int(app.exec())

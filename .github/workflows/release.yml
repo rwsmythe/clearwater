@@ -20,7 +20,11 @@ concurrency:
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
+    env:
+      UV_FROZEN: "1"
+      UV_NO_SYNC: "1"
+      UV_PYTHON_PREFERENCE: only-managed
     outputs:
       version: ${{ steps.version.outputs.version }}
     defaults:
@@ -119,6 +123,26 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+
+      - name: Refuse a published release
+        shell: python {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          import json
+          import os
+          import subprocess
+
+          checked = subprocess.run(
+              ["gh", "release", "view", os.environ["TAG"], "--json", "isDraft"],
+              capture_output=True, text=True, timeout=60, check=False,
+          )
+          if checked.returncode == 0:
+              if json.loads(checked.stdout).get("isDraft") is not True:
+                  raise SystemExit("Refusing to update an existing non-draft release")
+          elif checked.stderr.strip() != "release not found":
+              raise SystemExit("Cannot verify release state: " + checked.stderr.strip())
 
       - name: Download release assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
