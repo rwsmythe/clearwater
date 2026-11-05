@@ -1,15 +1,16 @@
 # WP6.3b release workflow: implementation record
 
-Status: turn 12 implements CHARC's Windows Job Object containment ruling for
-every smoke process, including FFmpeg rows. Final cell validation: 479 passed,
-1 POSIX native-proof skip; Ruff, format and both mypy targets pass. Turn 11's
-OPEN MAJOR **closes on the seat re-run**, not on this cell's result alone.
-The generator, native input
-surface, --notices and --smoke build/standalone paths are implemented. The real
-built-folder census, additional native inputs if needed, real smoke/UIA watch,
-ZIP and subsequent release work remain the seat's/next dispatch's. No real
-artifact notices, PyInstaller build or N13 acceptance is claimed. The separate
-FFmpeg zvbi HOLD remains unchanged; ZIP was not started.
+Status: turn 13 adds the pinned-action release workflow, checklist v2, Windows
+artifact installation guide and limited Python/PyInstaller root-notices update.
+Cell validation: 497 passed, 1 POSIX native-proof skip; Ruff, format and both
+mypy targets pass. Dispatch 13 records the seat's turn-12 outside-sandbox
+479-pass / 1-skip re-run, closing the carried containment MAJOR under CHARC's
+ruling. The generator, native input surface, --notices and --smoke paths were
+already implemented. The workflow deliberately carries the ONE pending flag
+--zip; ZIP was not implemented, and the owner's FFmpeg zvbi HOLD is unchanged.
+Real artifact census/notices/build/smoke/UIA/V4, actionlint, review nets and the
+seat gate remain owed. The real workflow run belongs to the release step;
+no package, release or N13 acceptance is claimed.
 
 ## Round and turn ledger
 
@@ -30,6 +31,7 @@ Claude pass; no review verdict is claimed here. Context depth is dispatcher-read
 | Turn 10 / native input surface and OpenSSL row | Copied the seat's exact text; added manifest schema/integrity/file-coverage validation, runtime/build matching and conditional OpenSSL rendering. Turn-9 input STOP closed under CHARC's ruling. | No Reviewer A round; no new blocking finding. The zvbi HOLD remains with the owner. | 0 NEW, 0 REOPENED; no reverts. Initial patch-placement slip fixed before GREEN. | Native manifest/text data, notices loader/row, tests and report only. | Dispatcher supplied about 167K at turn-9 end; turn-10 end pending dispatcher reading, not estimated. |
 | Turn 11 / checkout defect and headless smoke | One -text attribute rule, two Git-backed guards, isolated allowlisted smoke rows, artifact rechecks, disposable planted-failure copy, process cleanup and build/CLI wiring. | No Reviewer A round. Seat MAJOR checkout defect fixed; direct-child race and minor environment/platform issues fixed. MAJOR process-ancestry limit remains OPEN for seat/CHARC disposition below. | All new observations, 0 REOPENED; no product revert. Temporary missing-smoke-call mutant rejected and byte-restored. | Build/smoke tools, attribute rule, synthetic tool tests and report. No product-runtime file changed. | Fresh session after previous session retired at 199,050; this turn's depth awaits dispatcher reading, never estimated. |
 | Turn 12 / ruled containment remediation | Replaced PPID supervision with one kill-on-close, non-breakaway Windows job per process; atomic assignment at process creation, retained thread resume, job census, bounded pipe cleanup and tests. | Turn 11's MAJOR implemented under CHARC's option (b); closes on the seat re-run. No new blocking finding or scope question. | The carried finding is being remediated, not a reopened review item. No product revert. Before-record source swaps restored byte-exactly. | Smoke tool, its synthetic tests and this report only; build wiring and runtime untouched. | Dispatcher supplied 155,874 at turn-11 end; turn-12 figure awaits dispatcher reading, never estimated. |
+| Turn 13 / workflow and release documents | Pinned two-job workflow, offline contracts/executed version gate, checklist v2, guide sections and limited root-notices update. Dispatch 13 supplies the seat's clean turn-12 re-run. | No Reviewer A round or new blocking finding. One MINOR out-of-turn README residual confirmed below. Existing zvbi HOLD and unimplemented --zip remain explicit release blockers. | 0 NEW review findings, 0 REOPENED; no product revert. Three workflow mutants and the checklist before-record restored byte-exactly. | Workflow/configuration and prose plus one new test module; no runtime/tool implementation edit. | Fresh session after prior session retired at dispatcher-read 222,977; this turn's depth awaits dispatcher reading, never estimated. |
 
 Turn 2 bundled the three changes explicitly commissioned by dispatch 2; the seat
 commits each turn. No git write was performed by the cell.
@@ -1765,3 +1767,193 @@ build, product GUI/desktop input, footage or real-profile write, QUIT_SCRIPT,
 Git write, push/tag/gh/workflow dispatch occurred. Only smoke.py, its tests
 and this report changed, plus ignored worktree evidence. The authoritative
 depth remains the dispatcher's reading (last supplied 155,874), not an estimate.
+
+## Turn 13: release workflow, checklist v2, guide and root-notices scope (2026-11-05)
+
+This is dispatch 13's build-group yield, not package acceptance or a Reviewer A
+round. The dispatch supplies the seat's turn-12 outside-sandbox 479-pass / 1-skip
+result and clean Ruff/format/native-and-Darwin mypy. The cell did not repeat the
+real containment proof or run any real artifact. The owner's zvbi HOLD is still
+open. **--zip remains unimplemented**, deliberately present in the workflow as
+the ONE pending parser flag; the workflow cannot complete a release build yet.
+
+### Workflow and action inputs
+
+`.github/workflows/release.yml` triggers on `v*` tag pushes and manual dispatch
+with a required version. Manual dispatch must select an existing version tag;
+the embedded Python gate requires `refs/tags/vMAJOR.MINOR.PATCH`, exact source
+version equality and, on dispatch, exact input equality. Branch refs, an empty
+dispatch input, malformed tags and source mismatches fail before the build.
+The input is passed through an environment variable, not interpolated into code.
+
+`windows` checks out the triggering ref without persisted credentials, sets up
+uv with CPython 3.12.13, syncs frozen dev + gpu (Q2), prints sync elapsed seconds,
+checks version, unsets PYTEST_ADDOPTS and runs the exact parallel marker leg.
+The GPU extra supplies the real distribution RECORDs; no additional analysis
+exclusion was added (Q3). The native-licence generator still enforces the exact
+python-build-standalone build record; a runner resolving a different interpreter
+build fails closed, rather than shipping notices for another build.
+
+**Lock-reading choice:** a small PowerShell build step reads `asset_url` and
+`seat_sha256` with ConvertFrom-Json and passes their values to the existing
+paired options. No new build.py option or tool implementation change is needed.
+The workflow contains neither the provider name nor the real URL/hash.
+The build has `--form onedir --notices --smoke --zip --out work/release`.
+Native-command failures are explicitly propagated. Asset staging requires the
+versioned zip, `.zip.sha256` and the notices beside Clearwater.exe under
+`work/release/dist-onedir/<release-name>/Clearwater/`; it copies ONLY those three
+files to `work/release-assets`, excluding the downloaded archive/build scratch.
+The ZIP turn must honor this now-explicit output-path contract.
+
+`release` needs `windows`, runs only for a tag PUSH and alone receives
+`contents: write` (top-level is read). It checks out the same ref for notes,
+downloads the named workflow artifact and attaches the three files with
+`draft: true` and unmatched-file failure. Its optional body is
+`docs/release-notes-<version>.md` when present; otherwise the body-path output is
+empty. Dispatch builds upload workflow artifacts but never create a release.
+Concurrency serializes each ref. No push, tag, workflow dispatch or non-draft
+publish command is present; GITHUB_TOKEN is the only secret reference.
+
+| Action | Exact seat-supplied commit | Tag comment |
+| --- | --- | --- |
+| actions/checkout (both jobs) | `11bd71901bbe5b1630ceea73d27597364c9af683` | v4.2.2 |
+| astral-sh/setup-uv | `6b9c6063abd6010835644d4c2e1bef4cf5cd0fca` | v6.0.1 |
+| actions/upload-artifact | `ea165f8d65b6e75b540449e92b4886f43607fa02` | v4.6.2 |
+| actions/download-artifact | `d3f86a106a0bac45b974a628896c90dbdf5c8093` | v4.3.0 |
+| softprops/action-gh-release | `72f2c25fcb47643c292f7107632f7a47c1df5cd8` | v2.3.2 |
+
+Selected inputs are the known action API: checkout `persist-credentials`,
+setup-uv `python-version`, upload `name/path/if-no-files-found`, download
+`name/path`, gh-release `token/tag_name/draft/body_path/fail_on_unmatched_files/files`.
+No input-name uncertainty was identified, but the exact pinned action.yml files
+were NOT fetched/read by this offline cell. Their verification and actionlint
+remain the seat's checks, not a claim made by these text/structure tests.
+
+### Provider and bundling conditional lines
+
+No BtbN-specific URL, hash or provider name was added to the workflow or guide.
+These are the precise conditional surfaces to revisit after the owner's ruling:
+
+| Surface / line text | Dependency on the ruling |
+| --- | --- |
+| Workflow build: `--ffmpeg-from $lock.asset_url --ffmpeg-sha256 $lock.seat_sha256` | Survives a compatible self-build re-pin with the same lock schema; remove/rework for user-obtained FFmpeg. |
+| Checklist current HOLD; step 4's FFmpeg source/configuration audit and retention expiry about 2028-10 | HOLD closes only on the ruling; the old provider's retention date must be reconciled if the replacement has different retention. |
+| Checklist step 5's locked bundle build, BUNDLED V4 and encoder proof; step 11's clean account with no FFmpeg | Bundling-dependent acceptance/proof steps; rework if FFmpeg becomes user-obtained. |
+| Guide section 2: `This one-folder application includes Python and FFmpeg; neither needs a separate install.` | Assumes a compatible bundled FFmpeg; revise for user-obtained fallback. |
+| Guide section 2 developer paragraph: `The packaged application uses its adjacent bundled tools first.` | Same bundle assumption, independent of provider identity. |
+| Guide section 6: `The bundled FFmpeg and ffprobe sit beside Clearwater.exe; if you moved it, put it back` and the following PATH fallback | Bundle assumption; keep only the applicable fallback under option (c). |
+| Guide section 8: `bundled FFmpeg runs as a separate process and requires GPL-3.0 terms for the combined artifact` | Assumes a compatible GPL-3.0 bundle; revise with the final redistribution arrangement. |
+
+The root FFmpeg row is **unchanged**, with no marker comment added. Its source
+audit wording is not an artifact verdict. None of these conditional documents
+overrides the generator's incompatible-component refusal or resolves zvbi.
+
+### Document changes and preserved boundaries
+
+- **Checklist v2:** retains review convergence, disk floor, local gate order,
+  collection identity, evidence/hashes, reviewed merge/tag identity and owner's
+  tag authority from 1.0.0. The 1.1.0 sequence adds the version-bump commit,
+  pinned interpreter/native-input re-audit, retention re-pin, local artifact
+  proof/actionlint, owner's push, workflow archive, downloaded hash/notices,
+  clean-account hand/UIA check, CHARC release record and owner's Publish click.
+  Each of its 13 steps has an explicit STOP. The local three legs plus harness,
+  Darwin mypy and installer-alone check stay before tagging. No version was
+  bumped, new release record created or final accept decision written here.
+- **Guide section 2:** artifact download/link, optional SHA-256, whole-folder
+  extraction, Clearwater.exe, writable location/app-data paths, unsigned
+  SmartScreen step, GPU pack/EULA/size/restart and driver requirement. Source/uv
+  and instrument configuration move to the final developer subsection. The
+  cmd forms keep the same meaning. PowerShell explicitly names install.log
+  versus install.err (outcome in install.err), and adds the removal form with
+  remove.log/remove.err. This preserves/finishes ADV-2 on the rewritten surface.
+- **Guide section 3:** ONLY its launch paragraph changes, leading with the
+  unpacked executable and keeping both source commands. Steps/fixture walkthrough
+  are unchanged. Section 6 gains the adjacent-tools/PATH fallback paragraph;
+  section 7 already had no "no packaged executable" sentence and is unchanged;
+  section 8 names the artifact notices and the bundle/optional-NVIDIA terms.
+  Title and sections 1, 4, 5 and 7 are byte-equal after UTF-8/LF normalization.
+- **Root notices:** adds the artifact notice-of-record pointer; Python's existing
+  row distinguishes source 1.0.0 from 1.1.0 REDISTRIBUTION and names the audited
+  build input. Only the pyinstaller row gains the separate GPL-2.0-or-later
+  bootloader/Bootloader Exception and Apache-2.0 run-time hooks/additional modules
+  terms, grounded in installed COPYING.txt. No other audit row changes.
+  Every full-text input from `## Full licence texts and copyright notices` onward
+  is unchanged (UTF-8/LF sha256
+  `9e269debe465e2496557906119b74e3f963a493201e1a2db45b0dd2eea0fca84`).
+
+No new file under docs/ or the root was created, so no new instance-surface
+registration is requested. The two additions are under .github/ and tests/;
+the seat still owns the harness gate and any registration it identifies.
+
+### RED, GREEN and validation evidence
+
+All runner output is file-backed under `work/c63b-13-evidence/` in this worktree.
+Every pytest invocation uses PYTHONPATH=scripts, the sandbox mkdir shim, no cache
+provider, a 300-second test timeout and a fresh worktree basetemp. No product
+entry point is invoked by the new tests: the version script gets a stand-in
+clearwater version module, and only the packaging parser is imported. Existing
+frozen-entry tests retain redirected roots, blocked/stubbed GUI and bounds.
+QUIT_SCRIPT is not collected or run.
+
+| Item / log | Observed result |
+| --- | --- |
+| Workflow RED, `red-workflow-2.log` | 15 failed: workflow absent; all requested contracts missing. Initial `red-workflow.log` had 14 fixture errors for that same absence, replaced by assertion-based test failures before implementation. |
+| Workflow GREEN, `green-workflow-2.log` | 15 passed. Initial green had 1 failure because the test's flag regexp omitted digits in sha256; corrected to accept option-name digits. |
+| Checklist RED, `red-checklist.log` | 1 failed / 17 deselected on the exact HEAD checklist, using a read-only git-show before-record; current bytes restored in finally and hash-verified (`checklist-restore.log`). |
+| Guide/root RED, `red-docs.log` | 2 failed / 1 passed / 15 deselected: guide still source-first and root rows lacked revised terms; checklist already passed in that run. |
+| Document/workflow GREEN, `green-docs.log` | 18 passed after the three document changes. |
+| `red-mutant-draft.log` | 1 failed / 17 deselected for draft false. |
+| `red-mutant-second-flag.log` | 1 failed / 17 deselected for a second unknown CLI flag beyond zip. |
+| `red-mutant-source-version.log` | 1 failed / 7 passed / 10 deselected when source-version equality was disabled. |
+| `mutants-restore.log` | All three rejected; workflow restored byte-exactly, sha256 `c3d6df6ab2ca4f74f174fe08aa42332bc6860c526d79e42325e81974f9a73372`. |
+| `doc-boundaries.log` | Untouched guide regions and section-3 walkthrough equal; all root full-text licence bytes equal after LF normalization; only Python/pyinstaller rows changed; FFmpeg row unchanged. |
+| `ruff-check.log` | Exit 0; All checks passed! |
+| `ruff-format.log` | Exit 0; 337 files already formatted. |
+| `mypy.log` | Exit 0; Success: no issues found in 166 source files. |
+| `mypy-darwin.log` | Exit 0; Success: no issues found in 166 source files. |
+| `pytest-validation.log` | Exit 0; 497 passed, 1 skipped in 29.33 s. |
+| `pytest-final.log` | Exit 0; 497 passed, 1 skipped in 29.05 s after byte-restoring all workflow negative controls and finishing the prose. Fresh basetemp work/c63b-13-final. |
+| `ruff-check-final.log`, `ruff-format-final.log` | Exit 0; All checks passed! / 337 files already formatted. |
+| `doc-boundaries-final.log`, `diff-check-final.log` | Exit 0; preserved guide/licence boundaries reconfirmed; no whitespace errors. |
+
+The required six-module run uses fresh basetemp `work/c63b-13`: 31 smoke passes
+plus one existing POSIX proof skip, 112 notices, 60 FFmpeg, 83 build, 193 frozen
+entry and 18 new workflow/document checks. Grep of tests/ for the root notices
+and guide found only already-selected product modules (and harness registration
+references); no additional product test module is owed. The skip is the explicit
+non-Windows containment proof assigned to WP6.5, not a sandbox residual.
+No sandbox-only residual occurred. Git's existing LF/CRLF checkout warnings are
+retained in diff-check.log; the whitespace check exits 0 and the licensed text
+comparison above proves no licence-input change. Ruff's initial two long test
+lines were formatted before the final checks.
+The final six-module re-run has identical outcomes on `work/c63b-13-final`; only
+this report's evidence rows were appended afterward. Static source files were
+unchanged between the native/Darwin mypy checks and the final state.
+
+### Verification-loop dispositions and handoff
+
+| Severity / suspected issue | Independent confirmation | Disposition |
+| --- | --- | --- |
+| MAJOR: tag/input mismatch or unsafe ref could reach release | Execute the embedded Python with success/mismatch/branch/empty/malformed cases; disable only source equality as a negative control | Rejected in restored workflow; all eight version cases pass. |
+| MAJOR: a second unsupported CLI flag could be hidden by the zip allowance | Inspect actual argparse registrations, parse all implemented build flags, then inject an unknown option | Rejected; zip is named as the sole pending flag; no zip implementation is implied. |
+| MAJOR: release might cease to be draft-only | Pin/gate/permission tests and draft-false mutation | Rejected on restored workflow; no real GitHub operation performed. |
+| MINOR: prose edits could corrupt licence inputs or exceed guide scope | Read-only HEAD comparison of whole preserved licence suffix, row-by-row audit comparison, guide section/paragraph comparisons | Rejected; exact preserved boundaries recorded in doc-boundaries.log. |
+| MINOR: PowerShell split streams could conceal installer outcome | Compare rewritten instructions to installer CLI stdout/stderr contract; new guide contract requires outcome and both files/removal form | Fixed on the owned section-2 surface; no real installer run. |
+| MINOR, out of this turn's envelope: ADV-2's README recipe was described as already done but is still incomplete | `tools/package/README.md:156` still gives only the split-stream install command, immediately followed by source requests; it does not name the outcome stream or give the PowerShell removal form. `__main__.py:480,496` writes progress/outcome to stderr; installer `gpu_pack_install.py:664` writes N13 to stdout. | Confirmed; guide fixed here. README is excluded from dispatch 13's owned list, so no edit made. Carry its recipe-only fix to a later grant/turn before package acceptance. |
+| MINOR: workflow marker expression could drift from the local leg | Extract CLAUDE.md's actual parallel expression and compare tokenized command | Rejected; exact marker, workers, timeout and basetemp match dispatch. |
+
+Final inspection found no new in-envelope blocking issue. This turn bundles the
+five commissioned items as one logical release-path change. Remaining: owner's
+zvbi ruling; zip and final FFmpeg/root-row changes; seat pinned-action-input and
+actionlint checks; real artifact/native census/notices/ZIP/smoke/UIA/V4/GPU proof;
+the remaining ADV-2 README recipe-only fix (not owned this turn); Reviewer A
+convergence, Reviewer B and final gate. Real workflow execution is
+still the release step after the owner's push, not a condition claimed met here.
+The clean-account check and SmartScreen behavior remain owner/seat proof; no
+signing or reputation is promised.
+
+No dependency, runtime source, build.py, frozen interface or harness-list edit
+was made. No network fetch, real FFmpeg archive access, frozen run, PyInstaller
+build, desktop GUI/input, footage/profile write, QUIT_SCRIPT run, git write,
+push, tag, gh/workflow dispatch or mailbox post occurred. All evidence is inside
+the worktree. Depth is pending the dispatcher's reading, never estimated here.

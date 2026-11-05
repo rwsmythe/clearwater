@@ -15,136 +15,113 @@ for future clips. See [accepted inputs and refusals](underwater-correction-spec.
 
 ## 2. Install on Windows 11
 
-There is no Clearwater installer or packaged executable. You install this
-repository and start it with uv. Python need not already be installed: uv
-downloads the project's Python 3.12 when needed. Allow space for the source,
-dependencies, output files and video cache; the optional graphics-card libraries
-are a large download.
+Download **Clearwater-1.1.0-windows-onedir.zip** from the
+[Clearwater release page](https://github.com/rwsmythe/clearwater/releases).
+This one-folder application includes Python and FFmpeg; neither needs a separate
+install. Allow space for the unpacked folder, output files and video cache.
 
-Install [Git for Windows](https://git-scm.com/downloads/win) and
-[uv](https://docs.astral.sh/uv/getting-started/installation/). You can install uv
-from PowerShell with WinGet:
+Optionally download the matching `.zip.sha256` file and compare its hash with:
 
 ```powershell
-winget install --id=astral-sh.uv -e
+Get-FileHash -Algorithm SHA256 .\Clearwater-1.1.0-windows-onedir.zip
 ```
 
-Open a new PowerShell window after installing. Replace the repository placeholder
-with the clone URL supplied with your copy of Clearwater. If the repository is
-private, Git will ask you to sign in.
+The hash must match the sidecar's 64 hexadecimal characters. If it differs, do
+not run that download; download the assets again from the same release.
 
-```powershell
-git clone "<repository-url>" clearwater
-Set-Location clearwater
-```
+Unzip the whole archive anywhere you can write, such as a folder under your user
+account, and open the extracted folder. Keep its files and `_internal` folder
+together. Double-click **Clearwater.exe**. Do not run it from inside the zip.
+Program Files is unnecessary; choose it only if you intend to manage its permissions.
+Clearwater stores settings, presets and logs under **%APPDATA%\Clearwater** and
+cache/GPU support under **%LOCALAPPDATA%\Clearwater**; exported photos and videos
+go to the output folder you choose in Settings.
 
-For a **lean application install**, without development tools or CUDA:
+If Windows SmartScreen shows an unknown publisher, choose **More info** >
+**Run anyway** after checking that you obtained this release from Clearwater's
+release page. This happens because the application is unsigned (N14).
 
-```powershell
-uv sync --no-default-groups
-```
-
-For an NVIDIA graphics card, install the optional GPU extra instead:
-
-```powershell
-uv sync --no-default-groups --extra gpu
-```
+For GPU processing, choose **Tools > Install GPU support...**, review the wheels,
+sizes, destination and NVIDIA licence statement, then press **Download and install**.
+The pack is a large download (roughly 2.4 GB); the dialog calculates the exact
+locked download size and installed-space estimate. Installing obtains the
+optional NVIDIA components separately under NVIDIA's EULA; the release zip
+contains no CUDA libraries. Wait for completion and restart Clearwater to use
+the pack. **Tools > Remove GPU support** asks for confirmation and takes effect
+at the next start. If a running Clearwater is using the pack, removal is deferred
+until the next GUI start; close other Clearwater windows if removal remains pending.
 
 GPU processing needs a CUDA-capable NVIDIA card and a driver supporting CUDA 12.
 The locked runtime is CUDA 12.9; use a current NVIDIA driver (the CUDA 12.9
 Update 1 Windows driver baseline is 576.57 in
 [NVIDIA's release notes](https://docs.nvidia.com/cuda/archive/12.9.1/cuda-toolkit-release-notes/index.html)).
-The CuPy extra supplies runtime libraries through its ctk wheels; a separate
-CUDA toolkit install is normally unnecessary. Without a suitable card or usable
-GPU libraries, Clearwater uses the CPU and tells you why. Hardware video encoding
-is a separate capability from GPU colour processing.
+A separate CUDA toolkit install is normally unnecessary. Without a suitable card
+or usable GPU libraries, Clearwater uses the CPU and tells you why. Hardware
+video encoding is a separate capability from GPU colour processing.
 
-In the one-folder application, choose **Tools > Install GPU support...**, review
-the wheels, sizes, destination and NVIDIA licence statement, then press
-**Download and install**. The dialog calculates the download size from the locked
-wheels and shows the installed-space estimate; allow that space before starting.
-Wait for completion and restart Clearwater to use the pack. **Tools > Remove GPU
-support** asks for confirmation and takes effect at the next start. If a running
-Clearwater is using the pack, removal is deferred until the next GUI start; close
-other Clearwater windows if removal remains pending. For a terminal
-or script in cmd.exe, use `start /wait "" Clearwater.exe --install-gpu-pack > install.log 2>&1` or
-`start /wait "" Clearwater.exe --remove-gpu-pack > remove.log 2>&1`. This waits for the
-windowed executable to finish; it prints only when its output is redirected.
-In **PowerShell**, use `Start-Process -Wait -FilePath .\Clearwater.exe -ArgumentList '--install-gpu-pack' -RedirectStandardOutput install.log -RedirectStandardError install.err`.
-The same requests in source are
-`python -m clearwater --install-gpu-pack` and `python -m clearwater --remove-gpu-pack`;
-source runs use their environment's GPU extra, while the downloaded pack is loaded
-by the frozen application at its next start.
-
-For people developing Clearwater, the ordinary command is:
+For a terminal or script in **cmd.exe**, use
+`start /wait "" Clearwater.exe --install-gpu-pack > install.log 2>&1` or
+`start /wait "" Clearwater.exe --remove-gpu-pack > remove.log 2>&1`. This waits for
+the windowed executable to finish; it prints only when its output is redirected.
+In **PowerShell**, the streams are separate:
 
 ```powershell
-uv sync
+Start-Process -Wait -FilePath .\Clearwater.exe -ArgumentList '--install-gpu-pack' -RedirectStandardOutput install.log -RedirectStandardError install.err
+Start-Process -Wait -FilePath .\Clearwater.exe -ArgumentList '--remove-gpu-pack' -RedirectStandardOutput remove.log -RedirectStandardError remove.err
 ```
 
-That installs the default **dev and comms** groups, including CuPy/CUDA even
-without the gpu flag. It is a much larger install. The launch commands below use
-the environment you selected without adding those default groups again:
+The N13 licence notice is in `install.log`; progress and the installation outcome
+are in `install.err`. For removal, read both `remove.log` and `remove.err`; the
+outcome is in `remove.err`. Run only the operation you need.
+
+### Developer/source install with uv
+
+Install [Git for Windows](https://git-scm.com/downloads/win) and
+[uv](https://docs.astral.sh/uv/getting-started/installation/), then open a new
+PowerShell window. Python need not already be installed: uv obtains Python 3.12.
 
 ```powershell
+git clone https://github.com/rwsmythe/clearwater.git clearwater
+Set-Location clearwater
+uv sync --no-default-groups
 uv run --no-sync python -m clearwater
 ```
 
-### Install FFmpeg and check the environment
+For source GPU support, use `uv sync --no-default-groups --extra gpu` instead.
+The ordinary development command `uv sync` installs both **dev and comms** groups,
+including CuPy/CUDA, and is larger. Source runs use their environment's GPU extra;
+the downloaded pack is loaded by the frozen application at its next start.
+Source terminal requests are `python -m clearwater --install-gpu-pack` and
+`python -m clearwater --remove-gpu-pack` in that environment.
 
-Download FFmpeg from the [Gyan Windows builds](https://www.gyan.dev/ffmpeg/builds/).
-The tested build is **9.0.2-full_build-www.gyan.dev**, built with GCC 16.2.0.
-Extract it to a permanent folder of your choice. In Windows' environment-variable
-settings, add its **bin** folder to your user **Path**, then open a new terminal.
-Both ffmpeg and ffprobe must be on PATH; Clearwater finds them there, not through
-a Clearwater configuration key. A substitute build needs an HEVC encoder such
-as libx265 or hevc_nvenc; only the named full build was exercised for this release.
+A source install also needs FFmpeg and ffprobe on PATH; obtain a build with
+`libx265` and, for NVIDIA encoding, `hevc_nvenc`. See
+[FFmpeg's download page](https://ffmpeg.org/download.html). Add its **bin** folder
+to your user **Path**, open a new terminal and check `ffmpeg -version` and
+`ffprobe -version`. The packaged application uses its adjacent bundled tools first.
 
-Run the environment check from the repository folder:
+For developer/instrument folder configuration, copy `clearwater.local.example.toml`
+to `clearwater.local.toml` and replace its placeholders with absolute paths:
+`footage_path` is your read-only source collection, and `working_path` a separate
+writable folder for tool outputs, caches and reports. Follow the template's Windows
+quoting examples. This Git-ignored file has no FFmpeg setting and does not choose
+GUI output/cache folders; use **Tools > Settings** for those. An optional machine
+diagnostic, from the repository folder, is:
 
 ```powershell
 uv run --no-sync --with "psutil>=6,<8" --with "py-cpuinfo>=9,<10" python tools/environment_report.py --out work/environment
 ```
 
-This diagnostic temporarily supplies its two hardware-reporting tools without
-changing your lean install. It prints the path to a dated JSON report under
-work/environment/reports. Open that file: Python should be 3.12, the CPU/RAM
-fields should be populated, and ffmpeg_version should name your FFmpeg build.
-GPU model/driver fields may be unavailable on a computer without NVIDIA hardware;
-the report explains failed probes under unavailable. This report checks the
-machine and FFmpeg; the graphics-card state inside Clearwater confirms whether
-GPU processing actually works. To check ffprobe separately:
-
-```powershell
-ffprobe -version
-```
-
-Developer/instrument configuration is separate from GUI settings. If you run
-tools that use the local folder configuration, copy the supplied template:
-
-```powershell
-Copy-Item clearwater.local.example.toml clearwater.local.toml
-```
-
-Edit the copy's two placeholders to absolute paths: footage_path is your read-only
-source collection, and working_path is a separate writable folder for tool
-outputs, caches and reports. Follow the template's Windows path-quoting examples.
-This private file is ignored by Git. It has no FFmpeg setting and does not choose
-the GUI's output/cache folders; use **Tools > Settings** for those.
+It prints a dated JSON path under work/environment/reports and explains unavailable
+hardware probes. Clearwater's own graphics-card state confirms GPU processing.
 
 ## 3. First run: open, compare, adjust and export
 
-Start from the repository folder:
+Run **Clearwater.exe** from the unpacked release folder.
 
-```powershell
-uv run --no-sync python -m clearwater
-```
-
-With the full developer environment, the usual equivalent is:
-
-```powershell
-uv run python -m clearwater
-```
+For a developer/source install, start from the repository folder with
+`uv run --no-sync python -m clearwater`. With the full developer environment,
+the usual equivalent is `uv run python -m clearwater`.
 
 1. Choose **File > Open** and select one photo or clip. Start with a short clip
    or a copy of a photo. Read the source and graphics-card information shown by
@@ -267,6 +244,11 @@ and [the EXIF verification report](reports/wp4.5-exif-bytes.md).
 
 ## 6. When something goes wrong
 
+The bundled FFmpeg and ffprobe sit beside `Clearwater.exe`; if you moved it, put it back
+with the rest of the extracted folder. For a source install, or as a fallback when
+the adjacent tools are absent, both tools must be on PATH; open a new terminal
+after changing PATH. Keep the bundled versions together rather than mixing builds.
+
 The startup console warning "UserWarning: CUDA path could not be detected. Set
 CUDA_PATH ..." from CuPy is harmless and expected without a separate CUDA toolkit
 because the ctk wheels carry the runtime; the graphics-card state Clearwater
@@ -339,6 +321,10 @@ longer need them.
 
 Clearwater is free software under **GPL-2.0-or-later**, meaning GPL version 2 or
 any later version; see [LICENSE](../LICENSE) and
-[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) for component terms and
-conditions. Qt uses LGPLv3 dynamic linking, FFmpeg is separately installed and
-invoked as a process, and optional NVIDIA CUDA components retain NVIDIA's EULA.
+[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) for the source-install audit.
+The release artifact carries its own generated **THIRD_PARTY_NOTICES.md** beside
+`Clearwater.exe`; that file gives the redistributed component terms, full licence
+texts and corresponding-source pointers for that artifact. Qt uses LGPLv3 dynamic
+linking; bundled FFmpeg runs as a separate process and requires GPL-3.0 terms for
+the combined artifact under Clearwater's or-later grant. Optional, user-obtained
+NVIDIA CUDA components retain NVIDIA's EULA.
