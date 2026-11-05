@@ -1492,7 +1492,7 @@ dialog = QFileDialog()
 print(json.dumps({
     "platform": QGuiApplication.platformName(),
     "menus": menus,
-    "tools": [a.text() for a in tools.actions()],
+    "tools": [a.text() for a in tools.actions() if a.isVisible()],
     "zoom": window.view_actions["zoom_in"].shortcut().toString(
         QKeySequence.SequenceFormat.NativeText),
     "dpr": window.devicePixelRatioF(),

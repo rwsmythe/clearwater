@@ -2794,7 +2794,7 @@ def _gui_p27(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
 
 
 def _gui_p31(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """P31: File / View / Tools; Settings is Tools' sole VISIBLE action off win32/Linux.
+    """P31: File / View / Tools; Settings is Tools' sole VISIBLE action when no pack root exists.
 
     On darwin no GPU pack root exists, so a Cocoa merge may empty Tools. WP6.3a's two GPU
     actions follow Settings where a pack root exists and are hidden when
