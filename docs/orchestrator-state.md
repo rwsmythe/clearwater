@@ -5,7 +5,8 @@
 
 ### Generation
 
-- **Generation 48** (session `clearwater-orchestrator-20261104-1821`). LIVE 2026-11-05 04:21Z; PAUSED 04:25-10:35Z for the owner's NVMe migration; ROLLED at the 400K cap at ~13:15Z. The roll is clean: nothing it started is running (no pytest, no codex turn, no fetch; the only Codex processes are the owner's desktop app).
+- **Generation 49** (session `clearwater-orchestrator-20261105-0315`). LIVE 2026-11-05 13:16Z. Seat folder `work/orch-g49/` (`gate.sh`, `watch2.sh`, `crcheck.py`, `assemble.py` = the dispatch assembler: `uv run --no-sync python work/orch-g49/assemble.py <body> <cell>\dispatch-N.md`).
+- (Gen 48 `clearwater-orchestrator-20261104-1821` rolled clean at ~13:15Z; its seat folder `work/orch-g48/` holds the licence scripts.)
 - CHARC is **gen 16, `clearwater-charc-20261104-0738`**. Re-verify both names in `comms/.launch-sessions.json` before every cue.
 - Seat folder `work/orch-g48/`:
   - `gate.sh`, `watch2.sh`, `crcheck.py`;
@@ -48,7 +49,7 @@
 
 ### Live board (RESUME HERE)
 
-**Nothing running.** WP6.3b branch `wp6.3b` is at **`efe88629`** (turn 11 committed; the seat re-run outside the sandbox was 470 passed, exit 0). The worktree is clean.
+**RUNNING at 13:45Z: WP6.3b turn 13** (FRESH Codex session, dispatch `cell\dispatch-13.md`: release.yml with the seat-resolved SHAs `seatction-shas.md`, FFmpeg params read from the lock, `--zip` the one pending flag; checklist v2; guide s.2/3/6/7/8; limited root notices WITHOUT the FFmpeg row). Branch `wp6.3b` at **`52754527`** (turn 12). If this generation dies mid-turn, the successor waits for / inspects `turn-13.driver.stdout` and `return-13.md` before anything else.
 
 1. **WP6.3b: the release workflow, bundled FFmpeg, notices, smoke and zip, checklist v2, guide.**
    - Brief `docs/briefs/wp6.3b-brief.md`, rulings tails Round-0 / Turn-3 / Turn-6 / Turn-9 (CHARC commits `e209734e`, `5fb828ba`, `2258e5ab`, `f7250307`).
@@ -65,9 +66,10 @@
    | t8 | `4a2d2782` | report-only STOP on the seat's GPL-3.0 "once" wording; seat-clarified, CHARC concurred | `01a1ab9b` |
    | t9 | `3e97ae00` | the generator finished (rendering, provenance, writer, CLI, `build.py --notices`) | `01a1ab9b` |
    | t10 | `df1cd2e2` | `tools/package/native-licences/` (manifest + OpenSSL 3.5.5 Apache-2.0 text, sha256 `7d5450cb...`) | `01a1ab9b`, retired at 199,050 |
-   | t11 | `efe88629` | `.gitattributes` `tools/package/native-licences/** -text` + 2 guard tests; the headless smoke (`tools/package/smoke.py`, `build.py --smoke`) | FRESH `01a1abc1-ffbe-7203-9291-e43fb62f4c74`, **155,874 at turn end; RESUMABLE** |
+   | t11 | `efe88629` | `.gitattributes` `tools/package/native-licences/** -text` + 2 guard tests; the headless smoke (`tools/package/smoke.py`, `build.py --smoke`) | FRESH `01a1abc1-ffbe-7203-9291-e43fb62f4c74`, 155,874 |
+   | t12 | `52754527` | every smoke row under a Windows Job Object (own CreateProcessW, suspended + PROC_THREAD_ATTRIBUTE_JOB_LIST, IsProcessInJob before resume; census = job process list; darwin fail-closed pending WP6.5); seat 479 passed / 1 skipped | `01a1abc1`, retired at 222,977 |
 
-   **OPEN, for the successor to route to CHARC (turn 11's OPEN MAJOR, not yet posted):** the smoke's no-survivor check uses observed ancestry plus a final PPID snapshot. A descendant whose intermediate parent exits before ANY observation can escape it; the cell reproduced this with the venv-redirector launcher. The final fixture models the onedir's direct native child; the full text is in the report, the turn-11 "OPEN MAJOR" paragraph. **Recommend to CHARC:** either (a) a ruled narrower envelope (the onedir's own children only, proved at the seat build, with the limit in the report), or (b) OS containment: a Windows Job Object with KILL_ON_JOB_CLOSE around each smoke row (more code, but no escape). Gen 48's lean is (b), if it fits one resumed turn on `01a1abc1`.
+   **Turn 11's OPEN MAJOR: RULED (b) by CHARC (`1a8beb0d`), fixed in turn 12, CLOSED on the seat re-run (`work/orch-g49/seat63b-t12.log`).** WP6.5's brief must carry the native darwin containment (the branch refuses to run until then).
 
    **HELD (owner): the zvbi licence STOP.**
    - BtbN's win64-gpl-9.0 `ffmpeg.exe` carries zvbi's GPL-2.0-ONLY `src/pdc.*` / `src/packet-830.*` in a GPL-3.0 (`--enable-version3`) binary. Record `seat\licences-5031c6f1.md` section 3.
@@ -82,8 +84,8 @@
    The data folders are `work\wp6.3b-seat\licences\` (per-component licence files), `licence-headers\`, `zvbi-hdr\`, `zvbi.git`, `native-licences\` and `btbn-5031c6f1\` (the unpacked build-scripts archive).
 
    **Remaining WP6.3b work, in order:**
-   1. Route turn 11's OPEN MAJOR to CHARC; then a remediation turn on `01a1abc1` if the ruling needs code.
-   2. **The workflow / checklist v2 / guide / limited root-notices turn.** Its content:
+   1. DONE (turn 12).
+   2. **RUNNING as turn 13** (provider-agnostic; the root FFmpeg row and `--zip` wait on zvbi). Then the seat: `actionlint` on release.yml, check each action input against its pinned `action.yml`, register any new harness path. Its content:
       - `release.yml` with pinned action SHAs: round-0 candidates checkout v4.2.2, setup-uv v6.0.1, upload-artifact v4.6.2, download-artifact v4.3.0 and action-gh-release v2.3.2. **The SEAT resolves each to an immutable SHA by `gh api`**; the cell is offline.
       - The checklist items: the FFmpeg re-pin before about 2028-10; re-verify the native-licences manifest when uv's Python changes; the python-build-standalone `20260303` pin as a build input.
       - The root notices: the Python row (1.1.0 redistributes the interpreter natives) and the PyInstaller per-kind wording (run-time hooks Apache-2.0).
