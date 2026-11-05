@@ -337,9 +337,8 @@ def test_timeout_and_surviving_child_fail_and_are_reaped(
     synthetic, tmp_path, monkeypatch, mode, message
 ):
     smoke, release, prepare, config = synthetic
-    if mode != "hang":
-        config["startup_delay"] = 1.25
-        _bound_from_readiness(smoke, monkeypatch, Path(config["pid"]))
+    config["startup_delay"] = 1.25
+    _bound_from_readiness(smoke, monkeypatch, Path(config["pid"]))
     prepare(mode)
     with pytest.raises(smoke.SmokeError, match="refuse-command.*" + message):
         smoke.run_smoke(
@@ -655,9 +654,8 @@ def test_job_census_catches_vanished_intermediate_and_bounds_pipe_holder(job_cas
     except smoke.SmokeError as caught:
         error = caught
     pid = int(Path(config["pid"]).read_text())
-    if error is None:
-        assert psutil.pid_exists(pid), "escape stimulus died before the census assertion"
-    assert error is not None, "row passed with a live unobserved grandchild"
+    # pid.txt proves readiness even if job close already killed the grandchild.
+    assert error is not None, "row passed after the grandchild reported readiness"
     message = str(error)
     if mode == "pipe-holder":
         assert json.loads(Path(config["pipes"]).read_text()) == [3, 3], (

@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -106,6 +107,14 @@ def test_release_requires_annotated_tag_at_the_built_commit(
     if allowed:
         exec(code, {})
         assert calls == [
+            [
+                "git",
+                "fetch",
+                "--force",
+                "--no-tags",
+                "origin",
+                "+refs/tags/v1.1.0:refs/tags/v1.1.0",
+            ],
             ["git", "cat-file", "-t", "refs/tags/v1.1.0"],
             ["git", "rev-parse", "refs/tags/v1.1.0^{commit}"],
         ]
@@ -113,6 +122,100 @@ def test_release_requires_annotated_tag_at_the_built_commit(
         with pytest.raises(SystemExit):
             exec(code, {})
     assert "fetch-depth: 0" in step(workflow, "Checkout tagged source")
+
+
+@pytest.mark.parametrize("case", ["annotated", "lightweight", "wrong-commit"])
+def test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags(
+    workflow, tmp_path, case
+):
+    """Run the actual gate after checkout's forced tag-to-commit refspec."""
+    env = {
+        key: value for key, value in os.environ.items() if not key.startswith(("GIT_", "PYTHON"))
+    }
+    empty_config = tmp_path / "empty-config"
+    empty_config.touch()
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    env.update(
+        GIT_CONFIG_GLOBAL=str(empty_config),
+        GIT_CONFIG_SYSTEM=str(empty_config),
+        GIT_CONFIG_NOSYSTEM="1",
+        GIT_TEMPLATE_DIR=str(templates),
+        GIT_TERMINAL_PROMPT="0",
+        GIT_AUTHOR_NAME="Release test",
+        GIT_AUTHOR_EMAIL="release-test@example.invalid",
+        GIT_COMMITTER_NAME="Release test",
+        GIT_COMMITTER_EMAIL="release-test@example.invalid",
+        GIT_ALLOW_PROTOCOL="file",
+    )
+
+    def git(cwd, *args):
+        return subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+        ).stdout.strip()
+
+    origin = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    clone = tmp_path / "clone"
+    git(tmp_path, "init", "--bare", str(origin))
+    git(tmp_path, "init", str(seed))
+    git(seed, "commit", "--allow-empty", "-m", "first")
+    target = git(seed, "rev-parse", "HEAD")
+    git(seed, "tag", "-a", "v1.1.0", "-m", "Release 1.1.0")
+    git(seed, "tag", "v1.1.1")
+    git(seed, "commit", "--allow-empty", "-m", "second")
+    other = git(seed, "rev-parse", "HEAD")
+    git(seed, "remote", "add", "origin", str(origin))
+    git(seed, "push", "origin", "HEAD:refs/heads/main", "--tags")
+    git(tmp_path, "clone", "--branch", "main", str(origin), str(clone))
+    ref = "refs/tags/v1.1.1" if case == "lightweight" else "refs/tags/v1.1.0"
+    if case != "lightweight":
+        assert git(clone, "cat-file", "-t", ref) == "tag"
+    # Reproduce actions/checkout's overwrite, not an approximation of the gate.
+    git(clone, "fetch", "origin", f"+{target}:{ref}")
+    assert git(clone, "cat-file", "-t", ref) == "commit"
+    git(clone, "checkout", "--detach", target)
+    gate = clone / "version-gate.py"
+    gate.write_text(script(workflow, "Check release version"), encoding="utf-8")
+    # Only supply the package version: this never imports a product entry point.
+    (clone / "clearwater.py").write_text('__version__ = "1.1.0"\n', encoding="utf-8")
+    output = tmp_path / "output"
+    env.update(
+        GITHUB_REF=ref,
+        GITHUB_SHA=other if case == "wrong-commit" else target,
+        GITHUB_EVENT_NAME="push",
+        REQUESTED_VERSION="",
+        GITHUB_OUTPUT=str(output),
+    )
+    result = subprocess.run(
+        [sys.executable, str(gate)],
+        cwd=clone,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=45,
+        check=False,
+    )
+    if case == "annotated":
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert output.read_text() == "version=1.1.0\n"
+        assert git(clone, "cat-file", "-t", ref) == "tag"
+        assert git(clone, "rev-parse", ref + "^{commit}") == target
+    else:
+        assert result.returncode != 0
+        expected = (
+            "Release requires an ANNOTATED tag"
+            if case == "lightweight"
+            else "Annotated tag does not peel to the built commit"
+        )
+        assert expected in result.stderr
+        assert not output.exists()
 
 
 def test_sidecar_and_draft_body_record_the_built_commit(workflow):

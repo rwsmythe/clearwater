@@ -70,6 +70,8 @@ jobs:
               return subprocess.run(
                   ["git", *args], capture_output=True, text=True, check=True, timeout=30,
               ).stdout.strip()
+          # checkout can replace an annotated tag with the triggering commit.
+          git("fetch", "--force", "--no-tags", "origin", f"+{ref}:{ref}")
           if git("cat-file", "-t", ref) != "tag":
               raise SystemExit("Release requires an ANNOTATED tag")
           if git("rev-parse", ref + "^{commit}") != os.environ["GITHUB_SHA"]:

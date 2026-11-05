@@ -1,11 +1,12 @@
 # WP6.3b release workflow: implementation record
 
-Status: turn 22 implements the assigned Reviewer B r1 remediation (items 2-14)
-under CHARC's latest ruling. Reviewer A converged at r3; Reviewer B r2 delta,
-the seat rebuild/notices reading and the gate remain pending. Embedded
+Status: turn 23 implements the assigned Reviewer B r2 remediation under CHARC's
+latest ruling. Reviewer A converged at r3; the real-git RED/GREEN proof is BLOCKED
+by the cell sandbox's Git-for-Windows shell failure and requires the seat.
+Reviewer B r3 delta and the gate remain pending. Embedded
 third-party components compiled into carried natives are NOT yet covered by
 the artifact notices (B r1 MAJOR 1, carved to WP6.3c, closed before the 1.1.0
-draft). FFmpeg/ZIP/release remain WP6.3c's. See turn 22 for current validation;
+draft). FFmpeg/ZIP/release remain WP6.3c's. See turn 23 for current validation;
 no artifact, N13, package acceptance or release readiness is asserted.
 
 Historical turn-15 status: turn 15 remediates Reviewer A round 1's notices MAJOR M2 and binding
@@ -3394,8 +3395,10 @@ digest validation; M5 removes only executable-.rsrc refusal; M12 keeps PYTHON*
 variables; M16 calls done.wait() without a timeout. M18 inserts an unbounded
 worker join after root exit, before census; the real held pipes make the
 watchdog reject it and rescue its sleeper. M17 removes the row's job census;
-the live escape/pipe stimulus is still rejected by the required SURVIVORS
-assertions. No mutant was counted from a stimulus-died error.
+pipe-holder is KILLED by the required SURVIVORS assertion. The escape case
+fails earlier at the stimulus-died guard after job close kills the sleeper;
+that escape failure is NOT evidence of reaching the SURVIVORS assertion.
+Turn 23 tightens this test and records the new intended-failure assertion.
 
 The first M5 run exposed a TEST fixture error: rewriting a PE while pefile
 still mapped it caused Windows EINVAL before the guard assertion. That run
@@ -3475,3 +3478,125 @@ push/tag, gh/workflow dispatch or role-mailbox message occurs. Installer tests
 retain their existing loopback fixtures. Remaining with the seat: QA/rebuild
 and full notices reading, Reviewer B r2 delta and the complete gate. WP6.3c
 retains FFmpeg, ZIP, native embedded-component coverage and the 1.1.0 draft.
+
+## Turn 23: Reviewer B r2 remediation (2026-11-05)
+
+Fresh dispatch 23 starts at `4e848bf2`; the chat brief's latest B r2 ruling
+governs this turn over the older branch brief. The seat confirmed checkout's
+forced tag-to-commit overwrite at its pinned action source. This cell implements
+the ruled fix, but **the REQUIRED real-git RED/GREEN proof is NOT complete**:
+Git for Windows' MSYS shell cannot start the local transport in this sandbox.
+No gate pass, package acceptance or release readiness is claimed. Final depth
+is pending the dispatcher's reading, not estimated here.
+
+### Dispositions and verification loop
+
+- **1, MAJOR, in-envelope, seat-confirmed; fix implemented, proof pending:**
+  the embedded version gate re-fetches exactly its regex-validated ref with
+  `git fetch --force --no-tags origin +refs/tags/<tag>:refs/tags/<tag>` before
+  the unchanged annotation and peeled-commit checks. The existing bounded
+  argv-list git helper is reused. A failed fetch fails the gate. Checklist
+  step 9 names the restoration; its existing STOP conditions remain applicable.
+- The new three-case real-git test creates only disposable repositories. It
+  creates annotated/lightweight tags, clones a local bare origin, reproduces
+  checkout's exact `+<commit>:refs/tags/<tag>` fetch, then runs the script
+  extracted from release.yml in a child with runner ref/SHA/output variables.
+  The annotated case requires success and the restored tag object; lightweight
+  and wrong-commit cases require their specific refusal and no version output.
+  Global/system Git config and templates are isolated, inherited GIT/PYTHON
+  overrides removed, only the file protocol allowed, and every child bounded.
+  A local version-only clearwater stub avoids product imports/entry points.
+  No subprocess call in this test is mocked. Existing mocked gate unit tests
+  stay, with the added fetch expectation; they cannot observe checkout's ref
+  rewriting or local transport and are NOT proof of this MAJOR's correction.
+- **2, MINOR, in-envelope, confirmed/fixed:** turn 22's M17 claim above is
+  corrected: escape was killed by the stimulus-died guard, pipe-holder by the
+  SURVIVORS assertion. The optional tightening is implemented: a PID readiness
+  file plus a clean row is an immediate failure regardless of whether job
+  close already killed that PID. On a census-removal mutant in an ignored
+  COPY of smoke.py, escape now fails at `row passed after the grandchild
+  reported readiness`; pipe-holder fails at the SURVIVORS assertion (its error
+  is pipe EOF timeout). Both current-code cases pass. No tracked product file
+  was mutated or edited for this proof.
+- **3, ADVISORY, in-envelope, confirmed/fixed:** hang uses the readiness clock
+  too, retaining a ONE-second row bound after readiness and the existing
+  ten-second startup ceiling. Its fixture now deliberately delays startup
+  1.25 seconds, reproducing the old missing-pid.txt failure. Leftover modes
+  retain their ten-second bounds. All three delayed cases pass after the fix.
+- **7, ADVISORY, in-envelope, fixed:** section 3's launch paragraph now says
+  from 1.1.0; checklist step 10's continuation indentation is corrected. The
+  dispatch supplies the origin v1.0.0 tag verification; no remote check or
+  CLAUDE.md edit was made by this cell.
+- **4/5, ADVISORY, deferred by ruling:** the notices skip refinement belongs
+  to WP6.5; the sidecar LF contract and force-moved/re-pushed-tag note belong
+  to WP6.3c. No edits to either deferred surface occurred here.
+- **6, ADVISORY, out of envelope, disclosed:** a broken venv dist-info with
+  no METADATA can still raise TypeError in name normalization and display a
+  traceback in the build/notices CLI. This pre-existing path fails closed;
+  its repair is outside this turn's ownership.
+
+The verification pass found no additional product defect. No review finding
+was rejected as a false positive. The real-git validation blockage is retained
+as an open proof obligation, not counted as a successful regression run.
+
+### RED, GREEN and sandbox reproduction
+
+All runner outputs are under `work/c63b-23-evidence/`. Pytest is invoked through
+`uv run --no-sync python -c` with a bootstrap inserting `scripts` on sys.path,
+then `pytest.main`, loading `-p sandbox_mkdir_shim -p no:cacheprovider` and
+`--timeout 300`. PYTHONPATH is not set: production trust checks correctly
+refuse it. Fresh basetemps are named below. uv ignores the inherited main-tree
+VIRTUAL_ENV and uses this worktree's .venv. The PowerShell logs are UTF-16.
+
+| Item / log | RED evidence | GREEN / remaining obligation |
+| --- | --- | --- |
+| MAJOR 1, red.log | All three real-git cases stop during local-origin setup at git push, BEFORE executing the old gate. This is NOT the required gate RED. | The same three setup failures remain in pytest-validation.log. No real-git gate GREEN; seat must run against old and fixed gate scripts. |
+| Sandbox probe, native-shell-probe.log | Local git transport reports sh.exe CreateFileMapping, Win32 error 5, then exit 128. A shell-path environment probe did not remove the failure. | No network/transport mock or skip added. The repositories are under work/c63b-23-red only. |
+| ADVISORY 3, red.log | Delayed hang fails reading missing pid.txt after the old one-second startup-inclusive timeout. Other two delayed modes pass. | green-focused.log: all three delayed cases and both census cases pass, 5 passed in 46.40s. |
+| MINOR 2, census-mutant.log | Both census-removal cases KILLED in 10.74s: escape at readiness/clean-row assertion; pipe-holder at SURVIVORS assertion. | green-focused.log passes both current-code cases; final two-module run passes them too. |
+
+The required real-git test cannot yet establish any of its three gate outcomes
+in this cell. The failure is independent of annotation logic: the first local
+push reports `sh.exe: fatal error - CreateFileMapping ... Win32 error 5` and
+`fatal: Could not read from remote repository`. It occurs on all cases both
+before and after the workflow edit. The shim fixes pytest's mkdir permissions,
+not this MSYS process-start restriction. No transport failure is asserted to
+be the intended gate refusal. Seat action is an outside-sandbox real-git run,
+including the annotated test's before-record against the old gate, then all
+three cases with the restored remote-ref fetch.
+
+### Required validation and handoff
+
+| Final log | Observed result |
+| --- | --- |
+| ruff-check.log | Exit 0; All checks passed! |
+| ruff-format.log | Exit 0; 337 files already formatted. |
+| mypy.log | Exit 0; Success: no issues found in 166 source files. |
+| mypy-darwin.log | Exit 0; Success: no issues found in 166 source files. |
+| pytest-validation.log | Exit 1; 3 failed, 70 passed, 1 skipped in 68.59s; fresh work/c63b-23. All failures are the real-git setup cases named above. |
+| green-focused.log | Exit 0; 5 passed in 46.40s; fresh work/c63b-23-green-focused. |
+| census-mutant.log | Expected exit 1; 2 failed at the intended assertions; fresh work/c63b-23-census-mutant. |
+| final-verification.log / diff-check.log | Six owned changed files, zero CR bytes, diff check exit 0; every reported validation summary independently matched to its saved log. |
+
+The initial RED basetemp is work/c63b-23-red. The one skip is the existing
+POSIX containment proof on Windows. No test/marker was removed or newly skipped.
+The entry-routing child was inspected before the two-module run: disposable
+APPDATA/LOCALAPPDATA/XDG/HOME/USERPROFILE, Qt imports blocked, app.main stubbed,
+GPU activation stubbed, bounded child. No QUIT_SCRIPT or GUI start was run.
+
+| Round / turn | Severity / envelope | NEW / REOPENED; reverts | Product-code / test-only fixes; state |
+| --- | --- | --- | --- |
+| A r3 (inherited) | Converged; final minor remediation t20. | No reopened finding reported. | Supplied seat evidence retained above. |
+| B r1 / t22 (inherited) | 1 MAJOR carved to WP6.3c; other items closed by B r2 except item 8. | No retained revert. | B r2 disposition supplied by dispatch. |
+| B r2 / t23 | 1 MAJOR, 1 MINOR in-envelope; 5 advisories (2 fixed, 2 deferred, 1 out of envelope). | NEW B r2 findings; 0 REOPENED; no retained revert. | Workflow gate fix + test/doc repairs; product src untouched. MAJOR real-git proof BLOCKED at cell, seat QA/B r3/gate pending. |
+
+This is one logical remediation commit for the seat. Exactly the six owned
+tracked files change. There is no runtime dependency, frozen-interface change,
+build/smoke product edit, licence input edit or installer change. All writes
+stay inside this worktree, including Git writes ONLY inside the test's disposable
+repositories. The footage, original seat build and owner's profile are untouched.
+No network fetch, real build, frozen run, GUI launch, synthetic desktop input,
+real-repository Git write/push/tag, gh/workflow dispatch or mailbox post occurred.
+No rebuild is required by this diff's surfaces; the seat confirms that decision.
+Remaining: the seat's real-git RED/GREEN proof and QA, B r3 delta and the gate.
+FFmpeg/ZIP/embedded-native notices/release remain WP6.3c's. Yield to dispatcher.

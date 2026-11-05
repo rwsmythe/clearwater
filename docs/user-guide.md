@@ -123,7 +123,7 @@ hardware probes. Clearwater's own graphics-card state confirms GPU processing.
 
 ## 3. First run: open, compare, adjust and export
 
-Run **Clearwater.exe** from the unpacked release folder.
+From 1.1.0, run **Clearwater.exe** from the unpacked release folder.
 
 For a developer/source install, start from the repository folder with
 `uv run --no-sync python -m clearwater`. With the full developer environment,
