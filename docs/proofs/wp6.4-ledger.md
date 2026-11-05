@@ -10,7 +10,7 @@ dispatcher fills the depth figures.
 |---|---|---|---|---|---|---|---|---|---|
 | 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | - | 247,937 (cell1, at return) |
 | A r2 (group B; folded turn 5) | Reviewer A, Codex | 0 / 6 | 2 minor, 3 advisory | 11 / 0 | 11 NEW / 0 REOPENED | 0 | tool 1 (item 1, `tools/footage_guard.py`) / tests-only 8 (items 2-6, 9-11); item 7 REJECTED, item 8 a report sentence | Codex review; cell5 fold | 314,460 at the turn-5 yield (cell5) |
-| A r3 (delta on turns 4 + 5; folded turn 6) | Reviewer A, Codex: NO_NEW_CRITICAL_MAJOR (A converged) | 0 / 0 | 2 minor, 2 advisory | 4 / 0 | 4 NEW / 0 REOPENED | 0 | product 0 / tests-only 4 (plus one verification-loop fix to #1) | Codex review; cell6 fold | DISPATCHER TO FILL (cell6) |
+| A r3 (delta on turns 4 + 5; folded turn 6) | Reviewer A, Codex: NO_NEW_CRITICAL_MAJOR (A converged) | 0 / 0 | 2 minor, 2 advisory | 4 / 0 | 4 NEW / 0 REOPENED | 0 | product 0 / tests-only 4 (plus one verification-loop fix to #1) | Codex review; cell6 fold | 168,651 at the turn-6 yield (cell6) |
 
 ## Round 0
 
@@ -1085,6 +1085,6 @@ chain; the agent's shell resets its cwd between calls); every later call used ab
 -C` or a subshell. Two heredoc scripts (a probe edit, a diagnosis script) collapsed a `\n` escape
 (the known heredoc trap) and failed at once; both were redone with the Write / Edit tool.
 
-Depth at point 1 (`c6ae9a19`): DISPATCHER TO FILL
-Depth at point 2 (`688163fc`): DISPATCHER TO FILL
-Depth at turn-6 yield: DISPATCHER TO FILL
+Depth at point 1 (`c6ae9a19`): not read at the seat
+Depth at point 2 (`688163fc`): not read at the seat
+Depth at turn-6 yield: 168,651 (cell_depth.py --live, read at the seat ~00:23Z after the return; 85 turns). Under the 250K yield point. cell6 retired; Reviewer B's fold goes to a fresh cell (multi-finding, product).
