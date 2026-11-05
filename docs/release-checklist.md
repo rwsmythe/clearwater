@@ -39,8 +39,10 @@ while either remains open; workflow presence is not release readiness.
    `tools/package/native-licences/` (manifest, texts, bundled versions) whenever
    uv's managed Python changes; the generator fails closed on mismatched inputs.
    The workflow's uv pin (`0.10.9`) and laptop's `uv --version` must agree before the tag; any uv change requires native-licences re-verification.
-   Before the release build, run `git add --renormalize tools/package/native-licences`
-   or re-check-out that folder, and confirm its working-tree byte guard is green.
+   Before the release build, run `git checkout -- tools/package/native-licences`,
+   then confirm its working-tree byte guard is green.
+   The build sanitizes PATH and its native origin check must pass; investigate
+   any named PATH source on failure, never allow it into the artifact.
    Read the FFmpeg URL/hash from `tools/package/ffmpeg.lock.json`, verify every
    linked component's source/licence evidence and re-pin the FFmpeg asset before
    the retention expiry (about **2028-10**). Re-pinning requires repeating the

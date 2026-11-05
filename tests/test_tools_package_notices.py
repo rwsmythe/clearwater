@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
 import importlib.metadata
 import importlib.util
@@ -11,6 +12,7 @@ import marshal
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -110,7 +112,7 @@ def release(tmp_path):
     internal = folder / "_internal"
     (internal / "numpy/_core").mkdir(parents=True)
     (internal / "numpy/_core/test.pyd").write_bytes(b"synthetic native extension")
-    (internal / "python312.dll").write_bytes(b"synthetic interpreter")
+    shutil.copyfile(Path(sys.base_prefix) / "python312.dll", internal / "python312.dll")
     make_executable(folder, ["clearwater", "json", "numpy", "numpy.linalg"])
     site = tmp_path / "site"
     distributions = {
@@ -232,6 +234,7 @@ def test_inventory_selects_only_bundled_rows_and_maps_each_entry(release):
         "GPU pack" in statement and "user-obtained" in statement
         for statement in result.user_obtained
     )
+
     (release["folder"].parent / "coverage-plan.json").write_text(
         json.dumps(
             {
@@ -251,6 +254,29 @@ def test_inventory_selects_only_bundled_rows_and_maps_each_entry(release):
         ),
         encoding="utf-8",
     )
+
+
+def test_pyi_runtime_support_requires_explicit_record_module(release):
+    """Runtime support owns only modules named by PyInstaller's fake-module RECORD."""
+    module = load_notices()
+    dist = release["distributions"]["pyinstaller"]
+    record = dist._path / "RECORD"
+    for relative in (
+        "PyInstaller/fake-modules/_pyi_rth_utils/__init__.py",
+        "PyInstaller/fake-modules/_pyi_rth_utils/qt.py",
+    ):
+        path = release["site"] / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("")
+        with record.open("a") as stream:
+            stream.write(relative + ",,\n")
+    make_executable(release["folder"], ["_pyi_rth_utils", "_pyi_rth_utils.qt"])
+    row = next(r for r in plan(module, release).rows if r.name == "PyInstaller run-time hooks")
+    assert {"pyz:_pyi_rth_utils", "pyz:_pyi_rth_utils.qt"} <= set(row.entries)
+    assert row.licence == "Apache-2.0"
+    make_executable(release["folder"], ["_pyi_rogue"])
+    with pytest.raises(ValueError, match="pyz:_pyi_rogue"):
+        plan(module, release)
 
 
 @pytest.mark.parametrize("kind", ["data", "binary", "module"])
@@ -1038,11 +1064,175 @@ def synthetic_native_binding(
     return document
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        {},
+        {"method": "invented", "value": "1"},
+        {"method": "embedded_string", "value": ""},
+        {"method": "embedded_string", "value": "1", "extra": "x"},
+    ],
+)
+def test_version_evidence_is_required_and_structured(native_surface, value):
+    """Absent, empty or invented version evidence cannot enter a native row."""
+    document = synthetic_native_binding(native_surface)
+    row = document["components"][0]
+    if value is None:
+        row.pop("version_evidence", None)
+    else:
+        row["version_evidence"] = value
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="version_evidence"):
+        load_notices().load_native_licences(native_surface)
+
+
+def co_licensed_surface(surface):
+    """Two synthetic components share bytes only through explicit mutual links."""
+    document = synthetic_native_binding(surface)
+    row = document["components"][0]
+    row["version_evidence"] = {"method": "embedded_string", "value": "fixture 3.5.5"}
+    row["co_licensed_with"] = ["Other fixture"]
+    other = {
+        **copy.deepcopy(row),
+        "component": "Other fixture",
+        "co_licensed_with": [row["component"]],
+    }
+    document["components"].append(other)
+    return document
+
+
+@pytest.mark.parametrize("damage", ["asymmetric", "dangling", "missing-link", "missing-binding"])
+def test_co_licence_links_require_symmetric_complete_claims(native_surface, damage):
+    """A shared identity needs complete, mutual links to every component owner."""
+    document = co_licensed_surface(native_surface)
+    first, second = document["components"]
+    if damage == "asymmetric":
+        second.pop("co_licensed_with")
+    elif damage == "dangling":
+        first["co_licensed_with"] = ["Missing fixture"]
+    elif damage == "missing-link":
+        first.pop("co_licensed_with")
+        second.pop("co_licensed_with")
+    else:
+        second["bundled_files"][0] = {**second["bundled_files"][0], "sha256": "a" * 64}
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match=r"native.*(co.licens|duplicate file claim)"):
+        load_notices().load_native_licences(native_surface)
+
+
+def test_co_licensed_file_renders_all_required_rows(release, native_surface):
+    """Every owner of carried co-licensed bytes must appear in rendered notices."""
+    module = load_notices()
+    document = co_licensed_surface(native_surface)
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    (release["folder"] / "_internal/fixture.dll").write_bytes(b"native bytes")
+    result = plan(module, release, native_licences_path=native_surface)
+    label = "file:_internal/fixture.dll"
+    assert {r.name for r in result.rows if label in r.entries} == {
+        "Fixture native",
+        "Other fixture",
+    }
+    output = module.render_notices(result)
+    assert b"| Fixture native |" in output and b"| Other fixture |" in output
+    assert b"embedded_string: fixture 3.5.5" in output
+    # A selector can match several copies; linked components remain required
+    # even when one selector would otherwise miss the carried copy.
+    document["components"][1]["bundled_files"][0].pop("name")
+    document["components"][1]["bundled_files"][0]["relpath_glob"] = "absent/fixture.dll"
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match=r"co.licens"):
+        plan(module, release, native_licences_path=native_surface)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [None, {}, {"file": "LICENSE.txt", "lines": [0, 4]}, {"file": "LICENSE.txt", "lines": [8, 4]}],
+)
+def test_excerpt_requires_source_file_and_valid_line_range(native_surface, source):
+    """An excerpt must name its audited source file and positive ordered line range."""
+    document = synthetic_native_binding(native_surface)
+    row = document["components"][0]
+    row["text_kind"] = "excerpt"
+    if source is not None:
+        row["text_source"] = source
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="text_source"):
+        load_notices().load_native_licences(native_surface)
+
+
+def test_excerpt_provenance_is_rendered(release, native_surface):
+    """Copying an excerpt retains the exact source-file and line attribution."""
+    document = synthetic_native_binding(native_surface)
+    row = document["components"][0]
+    row["text_kind"] = "excerpt"
+    row["text_source"] = {"file": "build interpreter LICENSE.txt", "lines": [286, 318]}
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    (release["folder"] / "_internal/fixture.dll").write_bytes(b"native bytes")
+    module = load_notices()
+    output = module.render_notices(plan(module, release, native_licences_path=native_surface))
+    assert b"build interpreter LICENSE.txt, lines 286-318" in output
+
+
+@pytest.mark.parametrize(
+    "filename",
+    ["dataclasses.pyd", "python3999.dll", "python3_d.dll", "_ctypes.pyd", "python312.dll"],
+)
+def test_python_native_fallback_refuses_unverified_bytes(release, filename):
+    """A Python-like filename never substitutes for the interpreter's exact bytes."""
+    module = load_notices()
+    (release["folder"] / "_internal" / filename).write_bytes(b"unverified PSF bytes")
+    with pytest.raises(ValueError, match=re.escape(filename)):
+        plan(module, release)
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "vcomp140.dll",
+        "vccorlib140.dll",
+        "vcamp140.dll",
+        "msvcr120.dll",
+        "mfc140u.dll",
+        "d3dcompiler_47.dll",
+    ],
+)
+def test_additional_wheel_runtimes_need_native_rows(release, filename):
+    """A wheel RECORD alone cannot license the additional Windows runtime families."""
+    module = load_notices()
+    relative = "numpy/_core/" + filename
+    (release["site"] / relative).write_bytes(b"wheel bytes")
+    record = release["distributions"]["numpy"]._path / "RECORD"
+    with record.open("a") as stream:
+        stream.write(relative + ",,\n")
+    (release["folder"] / "_internal" / relative).write_bytes(b"wheel bytes")
+    with pytest.raises(ValueError, match="missing native licence row.*" + re.escape(filename)):
+        plan(module, release)
+
+
+@pytest.mark.parametrize(
+    "selector",
+    [
+        {"name": "libcrypto-3-x64.dll"},
+        {"relpath_glob": "_internal/libssl-*.dll"},
+        {"relpath_glob": "_internal/*.dll"},
+    ],
+)
+def test_openssl_files_cannot_be_claimed_by_another_native(release, native_surface, selector):
+    """Neither literal nor broad selectors may reassign OpenSSL to another native."""
+    module = load_notices()
+    synthetic_native_binding(
+        native_surface, selector=selector, body=b"synthetic interpreter native"
+    )
+    add_openssl(release)
+    with pytest.raises(ValueError, match="OpenSSL"):
+        plan(module, release, native_licences_path=native_surface)
+
+
 @pytest.mark.parametrize("filename", ["libffi-8.dll", "sqlite3.dll", "tcl86t.dll", "tk86t.dll"])
 def test_interpreter_non_psf_dll_needs_its_own_native_row(release, monkeypatch, filename):
     """Interpreter membership alone must never grant PSF terms to native DLLs."""
     module = load_notices()
-    monkeypatch.setattr(module, "_python_file_names", lambda: {filename, "python312.dll"})
     (release["folder"] / "_internal" / filename).write_bytes(b"interpreter DLL")
     with pytest.raises(ValueError, match=re.escape(filename)):
         plan(module, release)
@@ -1131,7 +1321,9 @@ def test_correctly_hashed_flattened_wheel_native_is_accepted(release):
 
 def test_stdlib_extension_and_python_dll_keep_psf_row(release):
     module = load_notices()
-    (release["folder"] / "_internal/_ctypes.pyd").write_bytes(b"stdlib module")
+    shutil.copyfile(
+        Path(sys.base_prefix) / "DLLs/_ctypes.pyd", release["folder"] / "_internal/_ctypes.pyd"
+    )
     row = next(row for row in plan(module, release).rows if row.name == "Python")
     assert {"file:_internal/_ctypes.pyd", "file:_internal/python312.dll"} <= set(row.entries)
 

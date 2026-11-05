@@ -343,7 +343,7 @@ def test_checklist_requires_uv_agreement_and_native_reverification():
 
 def test_checklist_requires_native_text_checkout_guard():
     text = (ROOT / "docs/release-checklist.md").read_text(encoding="utf-8")
-    assert "git add --renormalize tools/package/native-licences" in text
+    assert "git checkout -- tools/package/native-licences" in text
     assert "working-tree byte guard is green" in text
 
 

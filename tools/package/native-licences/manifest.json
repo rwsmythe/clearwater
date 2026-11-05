@@ -9,6 +9,10 @@
     {
       "component": "OpenSSL",
       "bundled_version_source": "ssl.OPENSSL_VERSION",
+      "version_evidence": {
+        "method": "ssl.OPENSSL_VERSION",
+        "value": "OpenSSL 3.5.5 27 Jan 2026"
+      },
       "upstream_version": "3.5.5",
       "upstream_repository": "https://github.com/openssl/openssl",
       "source_tag": "openssl-3.5.5",

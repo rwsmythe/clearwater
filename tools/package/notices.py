@@ -40,6 +40,12 @@ GPU_NAMES = frozenset({"cuda-pathfinder", "cuda-toolkit", "cupy-cuda12x"})
 THIRD_PARTY_NATIVE_PATTERNS = (
     "vcruntime140*.dll",
     "msvcp140*.dll",
+    "vcomp140*.dll",
+    "vccorlib140*.dll",
+    "vcamp140*.dll",
+    "msvcr*.dll",
+    "mfc140*.dll",
+    "d3dcompiler_*.dll",
     "concrt140.dll",
     "ucrtbase.dll",
     "api-ms-win-*.dll",
@@ -88,6 +94,8 @@ class NativeLicence(NamedTuple):
     interpreter_release: str
     python_version: str
     bundled_files: tuple[NativeFile, ...]
+    version_evidence: tuple[str, str]
+    co_licensed_with: tuple[str, ...]
 
 
 class NoticeRow(NamedTuple):
@@ -160,8 +168,11 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     manifest needs a component reference. Symlinks, unsafe paths, duplicate
     components, unknown keys and unsupported version-source bindings fail closed.
     A row needs a supported version source or bundled_files identities. Each
-    identity has exactly one name or relpath_glob (relative to the release
-    folder), a SHA-256 and a positive byte count; matching is case-insensitive.
+    identity has exactly one name or relpath_glob, a SHA-256 and a positive byte
+    count; matching is case-insensitive. Globs are relative to the executable's
+    folder, and fnmatch's ``*`` crosses ``/``. Use relpath_glob when binding
+    several copies of one basename. Co-licensed shared hashes require mutual
+    links, with every linked row present for each carried file.
     Version sources alone never claim bundled files. OpenSSL additionally
     checks the build interpreter's OpenSSL, CPython and build-release versions.
 
@@ -220,7 +231,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     result: list[NativeLicence] = []
     components: set[str] = set()
     files = {"manifest.json"}
-    claims: dict[str, str] = {}
+    claims: dict[str, set[str]] = defaultdict(set)
     for row in document["components"]:
         if not isinstance(row, dict) or any(
             not isinstance(row.get(key), str) or not row[key] or row[key] != row[key].strip()
@@ -233,9 +244,58 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
             "source_archive_size_bytes",
             "bundled_version_source",
             "bundled_files",
+            "version_evidence",
+            "co_licensed_with",
+            "text_kind",
+            "text_source",
         }
         if set(row) - allowed:
             raise ValueError("notices: native licence row has unknown keys")
+        evidence = row.get("version_evidence")
+        if (
+            not isinstance(evidence, dict)
+            or set(evidence) != {"method", "value"}
+            or not isinstance(evidence.get("method"), str)
+            or evidence.get("method")
+            not in {
+                "pe_file_version",
+                "interpreter_build_record",
+                "embedded_string",
+                "ssl.OPENSSL_VERSION",
+            }
+            or not isinstance(evidence.get("value"), str)
+            or not evidence["value"].strip()
+            or evidence["value"] != evidence["value"].strip()
+        ):
+            raise ValueError("notices: native version_evidence is missing/invalid")
+        links = row.get("co_licensed_with", [])
+        if (
+            not isinstance(links, list)
+            or any(
+                not isinstance(link, str)
+                or not link.strip()
+                or link != link.strip()
+                or link == row["component"]
+                for link in links
+            )
+            or len(set(links)) != len(links)
+        ):
+            raise ValueError("notices: native co_licensed_with is invalid")
+        kind = row.get("text_kind", "full")
+        source = row.get("text_source")
+        if not isinstance(kind, str) or kind not in {"full", "excerpt"}:
+            raise ValueError("notices: native text_kind is invalid")
+        if (kind == "excerpt" or source is not None) and (
+            not isinstance(source, dict)
+            or set(source) != {"file", "lines"}
+            or not isinstance(source.get("file"), str)
+            or not source["file"].strip()
+            or not isinstance(source.get("lines"), list)
+            or len(source["lines"]) != 2
+            or any(type(line) is not int for line in source["lines"])
+            or not 1 <= source["lines"][0] <= source["lines"][1]
+        ):
+            raise ValueError("notices: native excerpt text_source is missing/invalid")
         version_source = row.get("bundled_version_source", "")
         if "bundled_version_source" in row and (
             row["component"] != "OpenSSL" or version_source != "ssl.OPENSSL_VERSION"
@@ -299,6 +359,11 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
             f"published SHA-256 {row['source_archive_sha256']}; "
             f"fetched by seat on {row['fetch_date']}"
         )
+        if source is not None:
+            provenance += (
+                f"; verbatim {kind} from {source['file']}, "
+                f"lines {source['lines'][0]}-{source['lines'][1]}"
+            )
         result.append(
             NativeLicence(
                 row["component"],
@@ -319,8 +384,26 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
                 build["release"],
                 build["python_version"],
                 bindings,
+                (evidence["method"], evidence["value"]),
+                tuple(links),
             )
         )
+    by_name = {record.component: record for record in result}
+    for record in result:
+        for link in record.co_licensed_with:
+            if link not in by_name or record.component not in by_name[link].co_licensed_with:
+                raise ValueError("notices: native co_licensed_with has dangling/asymmetric link")
+            if {(b.sha256, b.size_bytes) for b in record.bundled_files} != {
+                (b.sha256, b.size_bytes) for b in by_name[link].bundled_files
+            }:
+                raise ValueError("notices: native co-licensed rows must bind the same file hashes")
+    for owners in claims.values():
+        if len(owners) > 1 and any(
+            owners != {owner, *by_name[owner].co_licensed_with} for owner in owners
+        ):
+            raise ValueError(
+                "notices: native manifest has duplicate file claim without co-licensing"
+            )
     actual = {path.name for path in folder.iterdir()}
     if actual != files:
         raise ValueError(
@@ -330,7 +413,9 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     return tuple(result)
 
 
-def _native_file_bindings(row: dict[str, Any], claims: dict[str, str]) -> tuple[NativeFile, ...]:
+def _native_file_bindings(
+    row: dict[str, Any], claims: dict[str, set[str]]
+) -> tuple[NativeFile, ...]:
     if "bundled_files" not in row:
         return ()
     files = row["bundled_files"]
@@ -360,11 +445,13 @@ def _native_file_bindings(row: dict[str, Any], claims: dict[str, str]) -> tuple[
             raise ValueError("notices: native file binding has invalid sha256")
         if type(size) is not int or size <= 0:
             raise ValueError("notices: native file binding has invalid size_bytes")
-        # Refuse identical selectors or byte identities claimed by different rows.
+        if row["component"] != "OpenSSL" and any(
+            token in selector.casefold() for token in ("libcrypto-", "libssl-")
+        ):
+            raise ValueError("notices: native OpenSSL bindings require the OpenSSL row")
+        # Record overlaps; cross-row validation requires explicit co-licensing.
         for key in ("selector:" + selector.casefold(), "hash:" + sha256):
-            if key in claims and claims[key] != row["component"]:
-                raise ValueError("notices: native manifest has duplicate file claim across rows")
-            claims[key] = row["component"]
+            claims[key].add(row["component"])
         binding = NativeFile(item.get("name", ""), item.get("relpath_glob", ""), sha256, size)
         if binding in result:
             raise ValueError("notices: native manifest has duplicate file binding")
@@ -484,19 +571,27 @@ def _licence_inputs(
     return tuple(sorted(set(found)))
 
 
-def _python_file_names() -> set[str]:
+def _python_file_names() -> dict[str, str]:
     # Only standard-library extension modules and CPython's own DLLs have PSF
     # coverage here. Being shipped in the interpreter's DLLs folder is not a licence.
-    return {name.casefold() for name in sys.stdlib_module_names}
+    base = Path(sys.base_prefix)
+    paths = [
+        *base.joinpath("DLLs").glob("*.pyd"),
+        base / "python3.dll",
+        base / f"python3{sys.version_info.minor}.dll",
+    ]
+    return {
+        path.name.casefold(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in paths
+        if path.is_file()
+    }
 
 
-def _is_python_binary(relative: str, stdlib: set[str]) -> bool:
+def _is_python_binary(relative: str, stdlib: dict[str, str], path: Path) -> bool:
     if "/" in relative:
         return False
     filename = relative.casefold()
-    return bool(re.fullmatch(r"python3[0-9]*(?:_d)?\.dll", filename)) or (
-        filename.endswith(".pyd") and filename.split(".", 1)[0] in stdlib
-    )
+    return filename in stdlib and hashlib.sha256(path.read_bytes()).hexdigest() == stdlib[filename]
 
 
 def _ffmpeg_rows(home: Path, lock_path: Path) -> list[NoticeRow]:
@@ -681,6 +776,16 @@ def plan_notices(
                 modules[module].add(name)
                 if name in {"pyinstaller", "pyinstaller-hooks-contrib"}:
                     modules[Path(relative).stem].add(name)
+                if (
+                    name == "pyinstaller"
+                    and relative.startswith("PyInstaller/fake-modules/")
+                    and (
+                        runtime_module := _module_name(
+                            relative.removeprefix("PyInstaller/fake-modules/")
+                        )
+                    )
+                ):
+                    modules[runtime_module].add(name)
     selected: dict[str, list[str]] = defaultdict(list)
     ffmpeg_labels = {entry for row in ffmpeg for entry in row.entries}
     python_names = _python_file_names()
@@ -732,7 +837,7 @@ def plan_notices(
             if (
                 not owners
                 and name.startswith("_internal/")
-                and _is_python_binary(relative, python_names)
+                and _is_python_binary(relative, python_names, home / name)
             ):
                 selected["python"].append(entry.label)
                 continue
@@ -836,6 +941,7 @@ def _native_rows(
 ) -> list[NoticeRow]:
     selected: dict[str, list[tuple[str, str]]] = defaultdict(list)
     errors: list[str] = []
+    by_name = {record.component: record for record in records}
     for entry in entries:
         if entry.kind != "file" or not entry.label.startswith("file:"):
             continue
@@ -851,6 +957,11 @@ def _native_rows(
         ]
         if not matches:
             continue
+        if Path(entry.name).name.casefold().startswith(("libcrypto-", "libssl-")) and any(
+            record.component != "OpenSSL" for record, _binding in matches
+        ):
+            errors.append(f"OpenSSL native binding claimed by another component: {entry.label}")
+            continue
         data = (home / entry.name).read_bytes()
         sha256 = hashlib.sha256(data).hexdigest()
         if any(
@@ -860,10 +971,13 @@ def _native_rows(
             errors.append(f"native file identity hash/size differs: {entry.label}")
             continue
         owners = {record.component for record, _binding in matches}
-        if len(owners) != 1:
-            errors.append(f"native file has duplicate component claims: {entry.label}")
+        if any(owners != {owner, *by_name[owner].co_licensed_with} for owner in owners):
+            errors.append(
+                f"native file has incomplete/duplicate co-licensed component claims: {entry.label}"
+            )
             continue
-        selected[next(iter(owners))].append((entry.label, sha256))
+        for owner in owners:
+            selected[owner].append((entry.label, sha256))
     if errors:
         raise ValueError("notices: " + "; ".join(errors))
     result = []
@@ -881,7 +995,12 @@ def _native_rows(
                 "the recorded upstream version."
             ),
             "Published source archive SHA-256: " + record.source_archive_sha256,
+            "Version evidence: " + ": ".join(record.version_evidence),
         ]
+        if record.co_licensed_with:
+            notes.append(
+                "Co-licensed with (all rows required): " + ", ".join(record.co_licensed_with)
+            )
         if record.bundled_version_source:
             notes.append(
                 "Build input: python-build-standalone "
@@ -912,6 +1031,8 @@ def _native_rows(
 def _check_openssl_version(record: NativeLicence) -> None:
     if record.bundled_version_source != "ssl.OPENSSL_VERSION":
         raise ValueError("notices: OpenSSL missing ssl.OPENSSL_VERSION binding")
+    if record.version_evidence != ("ssl.OPENSSL_VERSION", ssl.OPENSSL_VERSION):
+        raise ValueError("notices: OpenSSL version_evidence differs from build interpreter")
     reading = re.match(r"^OpenSSL ([0-9]+\.[0-9]+\.[0-9]+[a-z]?)(?:\s|$)", ssl.OPENSSL_VERSION)
     if reading is None or reading[1] != record.upstream_version:
         raise ValueError("notices: OpenSSL bundled version differs from native licence manifest")

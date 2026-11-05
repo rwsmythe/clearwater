@@ -2507,3 +2507,249 @@ real build/native census and its seat-fetched data turn, actionlint/Reviewer B/
 gate evidence, and the separately commissioned WP6.3c FFmpeg/ZIP/release work.
 AD-38 and advisory/register acceptance records remain CHARC's edits. The cell
 now yields with the full seven-finding disposition and cumulative round ledger.
+
+
+## Turn 17: stage-1 native origins, census schema and Reviewer A r2 carry
+
+Dispatch 17 starts a fresh cell at `fa0fded4`. The chat brief and its complete
+ruling tails are the text of record; the older branch brief was not used to
+replace them. The dispatch reports Reviewer A r2 as NO_NEW_CRITICAL_MAJOR
+(3 MINORs, 4 advisories). This turn implements the three named minors N1-N3
+and three assigned advisories A1-A3; it makes no disposition claim about an
+untransmitted fourth advisory. Current depth is pending the dispatcher's read;
+no estimate is supplied.
+
+### Disposition ledger (cumulative continuation)
+
+| Round / turn | Severity and envelope | NEW / REOPENED; reverts | Product-code / test-only fixes; state |
+| --- | --- | --- | --- |
+| A r1, through t16 (inherited) | 1 CRITICAL, 2 MAJOR, 6 MINOR; authorized fixes described above. | NEW r1 findings; no reopened finding or retained revert reported. | Product hook/presenter, native matching, transport and workflow plus fixture/guard fixes; seat reports A r2 converged on critical/major. |
+| A r2 / t17 | 3 MINOR (N1-N3), assigned A1-A3 advisory; all confirmed, in-envelope. | 3 NEW minor, 3 assigned advisories; 0 REOPENED, 0 reverts. | N1/N2/A1 native-notices code; N3 checklist + its string assertion; A2 docstring; A3 test-only guard. Fixed, subject to seat review. |
+| Seat stage-1 / t17 | 1 MAJOR: build-PATH contamination; 2 module-coverage gaps; schema grants. In-envelope. | NEW seat findings; 0 REOPENED, 0 reverts. | Build isolation/origin code and tests; PyInstaller module mapping; native schema and synthetic tests. SciPy half of coverage item STOPPED as required below. |
+
+No reviewer was launched by the cell: Reviewer A is the dispatcher's Claude
+pass. No additional review round or acceptance is claimed by this turn.
+
+### Item 1: sanitized analysis and post-build native origin check
+
+`run_pyinstaller` saves PATH, sets the Windows analysis PATH to exactly the
+build interpreter root, its DLLs directory, the venv Scripts directory,
+SystemRoot/System32 and SystemRoot, then restores the original value in a
+finally (including an originally absent value). The setting encloses both
+PyInstaller import and analysis in this process. The non-Windows branch states
+that loader/rpath policy and native macOS proof remain WP6.5's.
+
+After analysis AND optional native-copy steps, `build` now gates every bundled
+native (.dll/.pyd/.exe/.so/.dylib) on byte origin before the existing bundle,
+hidden-import, notices and smoke checks. It walks all depths and nested ZIPs,
+including ZIP data in the CArchive. Accepted complete-file identities are the
+build interpreter's recursive native files and installed files whose wheel
+name/version is in uv.lock and whose SHA-256 AND size equal their RECORD.
+An altered installed wheel native fails closed too. An unknown output names
+its relative file/archive member and the first original-PATH directory holding
+a same-named file, when present. New build diagnostics are ASCII-escaped.
+
+Clearwater.exe has a separate, narrowly defined bootloader rule: identify
+PyInstaller's platform runw.exe through its locked distribution's RECORD and
+verify that source's whole-file SHA-256/size first. Compare the output PE's
+non-resource section bytes (SHA-256), sizes, names, flags and virtual addresses;
+normalize debug timestamps and allow the unchanged .reloc section to move
+when Windows inserts .rsrc. Check execution-critical headers and data
+directories too, allowing resource/certificate directory changes and the
+relocation directory's move. Resource sections may not be executable. The
+appended CArchive and replaceable PE resources are intentionally outside the
+whole-file byte comparison. Tests accept real resource insertion plus an
+appended synthetic archive and refuse changed code or import-directory data.
+The read-only seat probe accepts the real clean-build executable as well.
+No other executable gets that bootloader exception. The non-Windows fallback
+only accepts an unchanged bootloader prefix; transformed Mach-O/ELF proof is
+not claimed here.
+
+There is NO current FFmpeg exemption. WP6.3c must provide verified archive
+member identities for its new bundled binaries; neither the held BtbN archive
+nor a PATH FFmpeg copy is silently authorized by this origin check.
+
+The turn-15 OpenSSL hash/size binding is what caught the seat's Git-for-Windows
+OpenSSL contamination. The dispatch also records JDK ucrtbase/forwarders and
+that WP6.1's unreleased spike builds carried the same contamination. CHARC's
+opened-and-closed register record remains an acceptance edit, outside this cell.
+The checklist now says the sanitized build's origin check must pass and a
+named PATH source must be investigated, never allowed into the artifact.
+
+### Item 2: PyInstaller mapping fixed; SciPy licence provenance STOP
+
+PyInstaller's installed `PyInstaller/fake-modules/...` RECORD paths now map to
+their actual top-level runtime module names. `_pyi_rth_utils` and
+`_pyi_rth_utils.qt` select the Apache-2.0 runtime-support row; `_pyi_rogue`
+without a matching RECORD entry remains refused. No `_pyi_*` blanket owner
+rule was added.
+
+**STOP (MAJOR, in-envelope licence/source material): SciPy's packaging mapping
+is deliberately not implemented.** Read-only evidence
+`work/c63b-17-evidence/scipy-stop.log` finds exactly two files in the installed
+SciPy 1.18.1 wheel's packaging_version tree:
+
+| RECORD path | Bytes | SHA-256 |
+| --- | --- | --- |
+| scipy/_external/packaging_version/_structures.py | 1492 | aaba2b13631f75f01d17826a74a0fe68b808a37b111026a586996313c01c731b |
+| scipy/_external/packaging_version/version.py | 17258 | 42902fc00708fa1b1ed168c418b60a35d25095fec7effa2efb29ee44cd97b65f |
+
+Both headers say the file is dual licensed under Apache 2.0 and BSD, and refer
+to the root LICENSE for complete details. Neither contains a __version__
+assignment or a release identity in its header. The wheel's only licence paths
+are its dist-info LICENSE.txt, _lib/_uarray/LICENSE, fft/_duccfft/LICENSE.md,
+integrate/LICENSE_DOP and spatial/qhull_src/COPYING_QHULL.txt. None is a
+packaging-specific licence; the aggregate has neither Python Packaging
+Authority nor Donald Stufft attribution. The cell cannot honestly name a
+vendored packaging release from these bytes. The upstream surface requiring
+seat verification is `pypa/packaging`'s root LICENSE and its referenced
+LICENSE.APACHE / LICENSE.BSD, at the release/commit the seat identifies against
+these file hashes (or SciPy's exact vendoring record). No release guess or
+cell-typed licence text was added. The seat must identify that revision, fetch
+and verify the missing text, and grant its labelled input before these two
+namespace gaps can be licensed. This is the dispatch's explicit item-2 STOP;
+independent items 3 and 4 were completed without bypassing it.
+
+### Item 3: census input schema, with no new real component rows
+
+Every native row now requires version_evidence = {method, value}, with exactly
+those keys and a nonempty value. The method set is pe_file_version,
+interpreter_build_record, embedded_string and ssl.OPENSSL_VERSION. The existing
+OpenSSL row alone receives its evidence: `OpenSSL 3.5.5 27 Jan 2026`, read from
+this build interpreter. A carried OpenSSL row also compares that evidence to
+the actual reading, besides the existing upstream/Python/PBS identity checks.
+
+`co_licensed_with` is an explicit mutual set of other component names. Dangling,
+asymmetric, self or duplicate links are refused. Linked rows must bind the
+same SHA-256/size identities. A shared selector/hash without a complete mutual
+link is still refused. At inventory time every carried co-licensed file must
+match every required linked owner; selecting only one row fails closed. The
+rendered notices include each owner and its co-licensing note. Synthetic tests
+cover schema rejection, both required rendered rows and a linked selector that
+would miss the carried file.
+
+A text_kind=excerpt row requires text_source = {file, lines}, with exactly those
+keys, a nonempty file label and a positive ordered inclusive two-integer line
+range. Its existing text hash/size checks remain mandatory, and rendering
+attributes the verbatim excerpt to that source and range. All new excerpt and
+co-licensing rows/texts in tests are synthetic. No libffi/MSVC/Mesa/LLVM data
+row or real licence text was created or changed this turn.
+
+### Item 4: Reviewer A r2 N1-N3 and A1-A3
+
+- N1 confirmed: the PSF native fallback now builds its allowlist from actual
+  interpreter DLLs/*.pyd plus only python3.dll and python3<minor>.dll, with
+  SHA-256 equality required against the carried file. Pure-Python stdlib-like
+  .pyd names, invented Python DLL versions and changed bytes fail. Fixture
+  success cases copy the actual interpreter DLL/extension; they no longer rely
+  on invented bytes passing by filename.
+- N2 confirmed: vcomp140*, vccorlib140*, vcamp140*, msvcr*, mfc140* and
+  d3dcompiler_* DLLs require independent native rows even inside a wheel RECORD.
+- N3 confirmed: checklist wording is now `git checkout -- tools/package/native-licences`,
+  then the green working-tree byte guard. The renormalize alternative is removed;
+  only the authorized string assertion changed in test_release_workflow.py.
+- A1 confirmed: literal OpenSSL selectors cannot belong to another component.
+  Inventory also rejects a broad glob that would claim a carried libcrypto-*/
+  libssl-* file for another component. Tests cover literal and broad selectors.
+- A2 confirmed: the loader docstring now says relpath_glob binds repeated copies,
+  globs are relative to the executable folder and fnmatch's * crosses /.
+- A3 confirmed: the existing C1 AST guard now also detects ImportFrom aliases
+  for main and direct getattr(entry, 'main')() calls. Its synthetic negative
+  examples are parsed strings, never executed; no entry-point test body changed.
+
+### RED/GREEN and verification record
+
+Every runner output is file-backed under `work/c63b-17-evidence/`. Every pytest
+run uses PYTHONPATH=scripts, sandbox_mkdir_shim, no cacheprovider, --timeout 300
+and a fresh basetemp. No real PyInstaller analysis/build or frozen launch ran.
+
+| Item / log | RED | GREEN |
+| --- | --- | --- |
+| 1, item1-red.log / item1-green.log | 5 failed: original PATH retained and origin/bootloader APIs absent. | 5 focused cases passed after implementation. |
+| 1 resolver verification, resolver-head-red.log | 1 failed against read-only HEAD build source: synthetic resolution found the planted foreign DLL. | Final suite passes with sanitized PATH and restoration after analysis failure. |
+| 1 late-copy gate, item1-copy-red.log | 1 failed / 1 positive control passed: native copied after analysis escaped the early check. | Both integration cases pass with the check after copy steps. |
+| 2/3, item23-red.log | 16 failed: missing runtime mapping and schema validation/rendering. | Final suite passes the PyInstaller mapping and all schema cases; SciPy is the declared STOP, not a green mapping claim. |
+| 4 N1/N2, item4-red.log | 11 N1/N2 failures showed unverified names and missing fail-closed families. | Final suite passes all eleven cases. |
+| 4 A1, a1-head-red.log | 3 failed against HEAD notices source, including the broad selector. | Final suite passes all three. |
+| 4 N3, n3-red.log | 1 failed on the old checklist command. | Updated command assertion passes. |
+| 4 A3, a3-red.log | 2 failed / 1 control passed: ImportFrom and getattr were invisible to the guard. | Both parsed negatives and the real-file guard pass. |
+
+Initial tests exposed a test-only open PE mapping that prevented rewriting its
+temporary executable; closing it before the write fixed the test. Actual
+resource insertion showed the valid .reloc address move, which the bootloader
+identity rule now explicitly permits without changing section-byte checks.
+An intermediate full test run overlapped edits to the exception-hook test file,
+so one traceback-source-line assertion saw stale line numbers; a stable rerun
+passed it. Subsequent validation ran without concurrent source edits.
+
+Verification also caught that shutil.which is unsuitable for a .dll resolver
+control on Windows: it returned None even on the old PATH. The check now uses
+an explicit synthetic DLL PATH resolver, and its read-only HEAD RED confirms
+the foreign DLL is selected before the fix. The exact PATH equality assertion
+had already failed in the first RED. No DLL was ever collected by a real build.
+
+The owned diff was inspected against the dispatch, comments were reconciled
+with the co-licensing rule, and the origin check was moved after native copies
+once its new integration case confirmed the early-check gap. No commissioned
+finding is rejected as a false positive; the SciPy STOP remains unresolved.
+
+
+### Final validation, probe and handoff
+
+| Log | Observed result on final code/tests |
+| --- | --- |
+| ruff-check.log | Exit 0; All checks passed! |
+| ruff-format.log | Exit 0; 337 files already formatted. |
+| mypy.log | Exit 0; Success: no issues found in 166 source files. |
+| mypy-darwin.log | Exit 0; Success: no issues found in 166 source files. |
+| pytest-validation-final.log | Exit 0; 616 passed, 1 skipped in 44.66s; basetemp work/c63b-17-final. |
+| pytest-gpi.log | Exit 1; 112 passed, 1 failed in 15.12s; basetemp work/c63b-17-gpi. |
+| diff-check.log | Exit 0; no whitespace defects; existing LF-to-CRLF checkout warnings only. |
+
+The one seven-module skip is the existing POSIX native-proof skip on Windows.
+No new skip or marker was introduced. The initial required basetemp run
+(work/c63b-17, pytest-validation.log) also passed 616 / 1 in 44.61s. After
+verification strengthened the synthetic DLL resolver and ASCII diagnostics,
+the full seven-module run was repeated at the fresh final basetemp above.
+
+The module-alone installer residual is exactly
+`test_mapped_child_without_a_pid_is_killed_with_its_descendants[native]`.
+Its native taskkill log,
+`work/c63b-17-gpi/test_mapped_child_without_a_pi0/tree-kill.log`, says
+`ERROR: Access denied` under the sandbox token. The controlled cleanup case
+passes; the independent finally cleanup ran with no teardown failure. This is
+the prior turn's known sandbox limitation, not a fully green installer module.
+No installer product or test file was edited. Seat rerun outside the sandbox
+is still required; the cell does not weaken or skip this check.
+
+The final read-only probe calls plan_notices directly against
+`C:/Users/rwsmy/clearwater/work/wp6.3b-stage1-cleanpath/dist-onedir/Clearwater-1.0.0-windows-onedir/Clearwater`.
+It does not call write_notices or the writing CLI and writes no file there.
+`seat-clean-probe.log` records `Bootloader identity: True` and this exact refusal:
+
+```text
+REFUSAL: notices: missing native licence row/material: file:_internal/libffi-8.dll; missing native licence row/material: file:_internal/numpy.libs/msvcp140-a4c2229bdc2a2a630acdc095b4d86008.dll; missing native licence row/material: file:_internal/PySide6/MSVCP140.dll; missing native licence row/material: file:_internal/PySide6/MSVCP140_1.dll; missing native licence row/material: file:_internal/PySide6/MSVCP140_2.dll; missing native licence row/material: file:_internal/PySide6/opengl32sw.dll; missing native licence row/material: file:_internal/PySide6/VCRUNTIME140.dll; missing native licence row/material: file:_internal/PySide6/VCRUNTIME140_1.dll; missing native licence row/material: file:_internal/shiboken6/MSVCP140.dll; missing native licence row/material: file:_internal/shiboken6/VCRUNTIME140.dll; missing native licence row/material: file:_internal/shiboken6/VCRUNTIME140_1.dll; missing native licence row/material: file:_internal/VCRUNTIME140.dll; missing native licence row/material: file:_internal/VCRUNTIME140_1.dll; unknown or ambiguous bundled entry pyz:scipy._external; unknown or ambiguous bundled entry pyz:scipy._external.packaging_version
+```
+
+Thus the 13 expected census-native files (libffi, eleven MSVC copies and
+opengl32sw) remain pending seat data. There is no OpenSSL mismatch, unknown
+stdlib extension or PyInstaller support gap. The two extra SciPy namespace
+refusals are the declared licence-provenance STOP; the dispatch's expected
+"ONLY the census natives" outcome cannot be claimed before that STOP is ruled.
+
+No network fetch, real PyInstaller build, frozen execution, visible GUI launch,
+synthetic desktop input, footage write, owner-profile write, uv-interpreter
+write or seat-build write occurred. Tests use only their isolated roots;
+existing installer transport fixtures use loopback only. No QUIT_SCRIPT,
+Git write, push/tag, gh command, workflow dispatch, dependency change or
+mailbox message occurred. Read-only HEAD probes loaded tools code only, never
+a product entry point. Owned changes comprise exactly the dispatch's nine
+paths. New real component data and text are left to the seat and next turn.
+
+This turn bundles the dispatched stage-1 origin/schema work and r2 carry in
+one logical seat commit. Outstanding: the SciPy version/text ruling and data,
+the next-turn native data rows, clean seat rebuild and its job/UIA smoke,
+notices-versus-folder review, Reviewer A r3 delta, Reviewer B and gate. The
+WP6.3c FFmpeg/ZIP/release carve-out and CHARC's acceptance/register edits remain
+unchanged. The turn yields now with the finding, evidence and changed paths;
+no package completion or release readiness is asserted.

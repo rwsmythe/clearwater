@@ -47,8 +47,10 @@ from __future__ import annotations
 
 import argparse
 import ast
+import base64
 import hashlib
 import importlib
+import importlib.metadata
 import io
 import json
 import os
@@ -1788,14 +1790,234 @@ def write_hidden_import_report(
 def run_pyinstaller(args: Sequence[str]) -> None:
     """Run PyInstaller in this process: ``PyInstaller.__main__.run(args)``.
 
+    Windows analysis sees only the interpreter root/DLLs, venv Scripts and
+    Windows System32/root. PATH is restored even if importing/running analysis
+    fails. POSIX loader paths/rpaths are unchanged; WP6.5 owns their native proof.
+
     Args:
         args: The command line (:func:`pyinstaller_args`).
 
     Raises:
         SystemExit: PyInstaller's own exit on a failed build (non-zero status).
     """
-    main = importlib.import_module("PyInstaller.__main__")
-    main.run(list(args))
+    original = os.environ.get("PATH")
+    try:
+        if sys.platform == "win32":
+            windows = Path(os.environ["SYSTEMROOT"])
+            base = Path(sys.base_prefix)
+            os.environ["PATH"] = os.pathsep.join(
+                str(path)
+                for path in (
+                    base,
+                    base / "DLLs",
+                    Path(sys.prefix) / "Scripts",
+                    windows / "System32",
+                    windows,
+                )
+            )
+        else:
+            # POSIX dependency resolution uses loader paths/rpaths; this Windows
+            # release fix does not change those. Native macOS proof is WP6.5's.
+            pass
+        main = importlib.import_module("PyInstaller.__main__")
+        main.run(list(args))
+    finally:
+        if original is None:
+            os.environ.pop("PATH", None)
+        else:
+            os.environ["PATH"] = original
+
+
+def _is_native(name: str) -> bool:
+    return Path(name).suffix.casefold() in {".dll", ".pyd", ".exe", ".so", ".dylib"}
+
+
+def _locked_native_distributions() -> list[importlib.metadata.Distribution]:
+    import tomllib
+
+    lock = tomllib.loads((REPO_ROOT / "uv.lock").read_text(encoding="utf-8"))
+    versions: dict[str, set[str]] = {}
+    for row in lock["package"]:
+        versions.setdefault(re.sub(r"[-_.]+", "-", row["name"]).lower(), set()).add(row["version"])
+    result = []
+    for dist in importlib.metadata.distributions():
+        name = re.sub(r"[-_.]+", "-", dist.metadata["Name"]).lower()
+        if name in versions and dist.version in versions[name]:
+            result.append(dist)
+    return result
+
+
+def _record_native_hash(
+    dist: importlib.metadata.Distribution, entry: importlib.metadata.PackagePath
+) -> str:
+    path = Path(str(dist.locate_file(entry)))
+    with path.open("rb") as stream:
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()
+    recorded = entry.hash
+    encoded = base64.urlsafe_b64encode(bytes.fromhex(digest)).decode("ascii").rstrip("=")
+    if (
+        recorded is None
+        or recorded.mode != "sha256"
+        or recorded.value != encoded
+        or entry.size != path.stat().st_size
+    ):
+        raise ValueError(f"native origin: installed file differs from locked wheel RECORD: {entry}")
+    return digest
+
+
+def _native_origin_hashes() -> set[str]:
+    hashes = set()
+    for path in Path(sys.base_prefix).rglob("*"):
+        if path.is_file() and _is_native(path.name):
+            with path.open("rb") as stream:
+                hashes.add(hashlib.file_digest(stream, "sha256").hexdigest())
+    for dist in _locked_native_distributions():
+        for entry in dist.files or ():
+            if _is_native(str(entry)):
+                hashes.add(_record_native_hash(dist, entry))
+    return hashes
+
+
+def _locked_bootloader() -> Path:
+    pyinstaller = importlib.import_module("PyInstaller")
+    if sys.platform == "win32":
+        basename = "runw.exe"
+    elif sys.platform == "darwin":
+        basename = "runw"
+    else:
+        basename = "run"
+    relative = f"PyInstaller/bootloader/{pyinstaller.PLATFORM}/{basename}"
+    for dist in _locked_native_distributions():
+        if re.sub(r"[-_.]+", "-", dist.metadata["Name"]).lower() != "pyinstaller":
+            continue
+        for entry in dist.files or ():
+            if str(entry).replace("\\", "/") == relative:
+                _record_native_hash(dist, entry)
+                return Path(str(dist.locate_file(entry)))
+    raise ValueError("native origin: windowed bootloader missing from locked PyInstaller RECORD")
+
+
+def _is_clearwater_bootloader(executable: Path) -> bool:
+    # PE resources, timestamps, checksum and appended CArchive change at build
+    # time. Compare all non-resource sections (including imports/relocations),
+    # their addresses/flags and execution-critical headers; normalize ONLY debug
+    # timestamps inside those sections. Resources can move the unchanged .reloc
+    # section, so its address may change too. No other executable gets this exception.
+    source = _locked_bootloader()
+    if sys.platform == "win32":
+        pefile = importlib.import_module("pefile")
+
+        def identity(path: Path) -> object:
+            with pefile.PE(str(path), fast_load=False) as pe:
+                for entry in getattr(pe, "DIRECTORY_ENTRY_DEBUG", []):
+                    entry.struct.TimeDateStamp = 0
+                data = pe.write()
+                sections = []
+                for section in pe.sections:
+                    if section.Name.rstrip(b"\0") == b".rsrc":
+                        # Resource replacement is allowed, executable resources aren't.
+                        if section.Characteristics & 0x20000000:
+                            return None
+                        continue
+                    offset = section.PointerToRawData
+                    sections.append(
+                        (
+                            section.Name,
+                            0
+                            if section.Name.rstrip(b"\0") == b".reloc"
+                            else section.VirtualAddress,
+                            section.Misc_VirtualSize,
+                            section.SizeOfRawData,
+                            section.Characteristics,
+                            hashlib.sha256(
+                                data[offset : offset + section.SizeOfRawData]
+                            ).hexdigest(),
+                        )
+                    )
+                headers = (
+                    pe.FILE_HEADER.Machine,
+                    pe.FILE_HEADER.Characteristics,
+                    pe.OPTIONAL_HEADER.AddressOfEntryPoint,
+                    pe.OPTIONAL_HEADER.ImageBase,
+                    pe.OPTIONAL_HEADER.Subsystem,
+                    pe.OPTIONAL_HEADER.DllCharacteristics,
+                )
+                directories = [
+                    (i, 0 if i == 5 else item.VirtualAddress, item.Size)
+                    for i, item in enumerate(pe.OPTIONAL_HEADER.DATA_DIRECTORY)
+                    if i not in {2, 4}  # resource and certificate directories
+                ]
+                return headers, directories, sections
+
+        try:
+            expected = identity(source)
+            return expected is not None and identity(executable) == expected
+        except (ValueError, pefile.PEFormatError):
+            return False
+    else:
+        # Refuse transformed Mach-O/ELF builds until WP6.5 proves their native
+        # identity rule. A byte-identical bootloader prefix is accepted here.
+        return executable.read_bytes().startswith(source.read_bytes())
+
+
+def native_origin_violations(executable: Path, *, original_path: str) -> list[str]:
+    """Check every native against interpreter/locked RECORD bytes and the bootloader.
+
+    The main Windows executable is compared to the RECORD-verified runw.exe's
+    immutable PE sections, allowing resources, debug timestamps and an appended
+    archive. Every other native must match a complete file hash. ZIPs (including
+    nested ZIPs and CArchive members) are inspected without executing contents.
+    FFmpeg has no exemption: WP6.3c must supply verified archive-member hashes.
+
+    Args:
+        executable: Built Clearwater executable, whose folder is inventoried.
+        original_path: Caller PATH before analysis, used only for diagnostics.
+
+    Returns:
+        Named violations, with the first same-named original-PATH file if found.
+
+    Raises:
+        ValueError: A locked installed native differs from its RECORD.
+        OSError: An input cannot be read.
+        zipfile.BadZipFile: An archive is corrupt.
+    """
+    hashes = _native_origin_hashes()
+    errors = []
+
+    def inspect(label: str, name: str, data: bytes) -> None:
+        if _is_native(name) and hashlib.sha256(data).hexdigest() not in hashes:
+            likely = next(
+                (
+                    Path(part) / Path(name).name
+                    for part in original_path.split(os.pathsep)
+                    if part and (Path(part) / Path(name).name).is_file()
+                ),
+                None,
+            )
+            suffix = f"; likely PATH source: {likely}" if likely else ""
+            errors.append(f"native origin unknown: {label}{suffix}")
+        if name.lower().endswith(".zip") or data.startswith(b"PK\x03\x04"):
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                for member in archive.infolist():
+                    if not member.is_dir():
+                        inspect(
+                            label + "!" + member.filename, member.filename, archive.read(member)
+                        )
+
+    if not _is_clearwater_bootloader(executable):
+        errors.append(
+            f"native origin: {executable.name} differs from locked PyInstaller bootloader"
+        )
+    for path in sorted(executable.parent.rglob("*")):
+        if path.is_symlink():
+            errors.append(f"native origin: linked file {path}")
+        elif path.is_file() and path != executable:
+            inspect(path.relative_to(executable.parent).as_posix(), path.name, path.read_bytes())
+    package = read_package(executable)
+    for name, entry in package.toc.items():
+        if entry[-1] not in {"o", "z"}:
+            inspect("pkg:" + name, name, package.extract(name))
+    return errors
 
 
 def pyinstaller_config_dir(out: Path) -> Path:
@@ -1958,6 +2180,7 @@ def build(
     print(f"build {form}: PYINSTALLER_CONFIG_DIR={os.environ['PYINSTALLER_CONFIG_DIR']}")
     print(f"build {form}: PyInstaller {' '.join(args)}", flush=True)
     start = time.monotonic()
+    original_path = os.environ.get("PATH", "")
     run_pyinstaller(args)
     wall = time.monotonic() - start
     executable = find_executable(root)
@@ -1979,6 +2202,16 @@ def build(
         ) as error:
             print(f"FAILED: FFmpeg bundle: {error}")
             return 1
+    try:
+        origin_errors = native_origin_violations(executable, original_path=original_path)
+    except (OSError, ValueError, zipfile.BadZipFile) as error:
+        print(f"FAILED: native origin: {error}".encode("ascii", "backslashreplace").decode("ascii"))
+        return 1
+    if origin_errors:
+        for error_line in origin_errors:
+            print(f"FAILED: {error_line}".encode("ascii", "backslashreplace").decode("ascii"))
+        return 1
+    print("native origin check: PASS (interpreter, locked wheel RECORDs and bootloader)")
     check_start = time.monotonic()
     bad = forbidden_paths(root) + forbidden_entries(executable)
     missing = missing_hidden_imports(executable, wanted)

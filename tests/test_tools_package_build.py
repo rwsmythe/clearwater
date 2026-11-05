@@ -12,6 +12,8 @@ tested.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import importlib.metadata
 import importlib.util
 import io
@@ -49,6 +51,164 @@ def _load_build_script() -> ModuleType:
 
 
 build = _load_build_script()
+
+
+def test_analysis_uses_only_sanitized_path_and_restores_it(tmp_path, monkeypatch):
+    """A foreign resolver candidate must disappear even when analysis fails."""
+    foreign = tree(tmp_path / "foreign", ["foreign.dll"])
+    base = tree(tmp_path / "python", ["DLLs/trusted.dll"])
+    venv = tmp_path / "venv"
+    windows = tmp_path / "Windows"
+    original = str(foreign)
+    monkeypatch.setenv("PATH", original)
+    monkeypatch.setenv("SystemRoot", str(windows))
+    monkeypatch.setattr(build.sys, "base_prefix", str(base))
+    monkeypatch.setattr(build.sys, "prefix", str(venv))
+    monkeypatch.setattr(build.sys, "platform", "win32")
+    seen = []
+
+    def analysis(args):
+        seen.append(os.environ["PATH"].split(os.pathsep))
+        resolved = next(
+            (
+                Path(part) / "foreign.dll"
+                for part in os.environ["PATH"].split(os.pathsep)
+                if (Path(part) / "foreign.dll").is_file()
+            ),
+            None,
+        )
+        assert resolved is None
+        raise RuntimeError("analysis failed")
+
+    real_import = build.importlib.import_module
+    monkeypatch.setattr(
+        build.importlib,
+        "import_module",
+        lambda name: (
+            SimpleNamespace(run=analysis) if name == "PyInstaller.__main__" else real_import(name)
+        ),
+    )
+    with pytest.raises(RuntimeError, match="analysis failed"):
+        build.run_pyinstaller([])
+    assert seen == [
+        [
+            str(base),
+            str(base / "DLLs"),
+            str(venv / "Scripts"),
+            str(windows / "System32"),
+            str(windows),
+        ]
+    ]
+    assert os.environ["PATH"] == original
+
+
+@pytest.mark.parametrize("archived", [False, True])
+def test_native_origin_refuses_foreign_bytes_and_names_original_path(
+    tmp_path, monkeypatch, archived
+):
+    """Unknown natives at any depth, including nested ZIPs, fail closed."""
+    home = tree(tmp_path / "dist", ["Clearwater.exe"])
+    foreign = tree(tmp_path / "foreign", ["foreign.dll"], b"foreign")
+    if archived:
+        tree(
+            home,
+            ["_internal/nested.zip"],
+            zip_bytes({"inner.zip": zip_bytes({"pkg/foreign.dll": b"foreign"})}),
+        )
+    else:
+        tree(home, ["_internal/pkg/foreign.dll"], b"foreign")
+    monkeypatch.setattr(build, "_native_origin_hashes", lambda: set(), raising=False)
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True, raising=False)
+    monkeypatch.setattr(build, "read_package", lambda _: SimpleNamespace(toc={}))
+    found = build.native_origin_violations(home / "Clearwater.exe", original_path=str(foreign))
+    assert len(found) == 1
+    assert "foreign.dll" in found[0] and str(foreign / "foreign.dll") in found[0]
+
+
+def test_native_origin_accepts_interpreter_and_hash_verified_locked_record(tmp_path, monkeypatch):
+    """Interpreter bytes and a locked wheel's verified RECORD are independent origins."""
+    base = tree(tmp_path / "python", ["DLLs/python312.dll"], b"interpreter")
+    site = tree(tmp_path / "site", ["fixture/native.dll"], b"wheel")
+    info = site / "fixture-1.0.dist-info"
+    info.mkdir()
+    (info / "METADATA").write_text("Name: fixture\nVersion: 1.0\n")
+    digest = base64.urlsafe_b64encode(hashlib.sha256(b"wheel").digest()).decode().rstrip("=")
+    (info / "RECORD").write_text(f"fixture/native.dll,sha256={digest},5\n")
+    dist = importlib.metadata.PathDistribution(info)
+    monkeypatch.setattr(build.sys, "base_prefix", str(base))
+    monkeypatch.setattr(build, "_locked_native_distributions", lambda: [dist], raising=False)
+    home = tree(tmp_path / "dist", ["Clearwater.exe"])
+    tree(home, ["_internal/python312.dll"], b"interpreter")
+    tree(home, ["_internal/nested/native.dll"], b"wheel")
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True, raising=False)
+    monkeypatch.setattr(build, "read_package", lambda _: SimpleNamespace(toc={}))
+    assert build.native_origin_violations(home / "Clearwater.exe", original_path="") == []
+    (site / "fixture/native.dll").write_bytes(b"modified wheel")
+    with pytest.raises(ValueError, match="RECORD"):
+        build.native_origin_violations(home / "Clearwater.exe", original_path="")
+
+
+def test_bootloader_identity_allows_resources_and_archive_but_refuses_code_changes(tmp_path):
+    """Verify immutable PE sections from the locked windowed bootloader, never a name."""
+    import pefile
+
+    source = build._locked_bootloader()
+    target = tmp_path / "Clearwater.exe"
+    target.write_bytes(source.read_bytes() + b"synthetic appended archive")
+    assert build._is_clearwater_bootloader(target)
+    from PyInstaller.utils.win32 import winmanifest
+
+    winmanifest.write_manifest_to_executable(str(target), winmanifest.create_application_manifest())
+    assert build._is_clearwater_bootloader(target)
+    with pefile.PE(str(target)) as pe:
+        code = next(s for s in pe.sections if s.Name.rstrip(b"\0") == b".text")
+        data = bytearray(target.read_bytes())
+        data[code.PointerToRawData + 20] ^= 1
+    target.write_bytes(data)
+    assert not build._is_clearwater_bootloader(target)
+
+
+@pytest.mark.parametrize("trusted", [False, True])
+def test_build_enforces_origin_after_all_native_copies(tmp_path, monkeypatch, capsys, trusted):
+    """A native introduced after analysis still goes through the origin gate."""
+    out = tmp_path / "out"
+    monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setattr(build, "pack_sources", lambda: [])
+    check = build.native_origin_violations
+    _fake_pyinstaller(monkeypatch, out, ["graphlib"], {})
+    monkeypatch.setattr(build, "native_origin_violations", check)
+    monkeypatch.setattr(
+        build,
+        "_native_origin_hashes",
+        lambda: {hashlib.sha256(b"native copy").hexdigest()} if trusted else set(),
+    )
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
+    foreign = tree(tmp_path / "foreign", ["foreign.dll"], b"native copy")
+    monkeypatch.setenv("PATH", str(foreign))
+
+    def copy_native(folder):
+        tree(folder, ["_internal/foreign.dll"], b"native copy")
+        return []
+
+    monkeypatch.setattr(build, "copy_ffmpeg", copy_native)
+    assert build.build("onefile", out=out, with_ffmpeg=True) == (0 if trusted else 1)
+    output = capsys.readouterr().out
+    assert ("native origin check: PASS" in output) == trusted
+    if not trusted:
+        assert str(foreign / "foreign.dll") in output
+
+
+def test_bootloader_rejects_a_changed_loader_import_directory(tmp_path):
+    """Identical code bytes do not excuse an executable with redirected imports."""
+    import pefile
+
+    target = tmp_path / "Clearwater.exe"
+    target.write_bytes(build._locked_bootloader().read_bytes())
+    with pefile.PE(str(target)) as pe:
+        pe.OPTIONAL_HEADER.DATA_DIRECTORY[1].VirtualAddress += 1
+        data = pe.write()
+    target.write_bytes(data)
+    assert not build._is_clearwater_bootloader(target)
 
 
 def tree(root: Path, names: list[str], data: bytes = b"x") -> Path:
@@ -742,6 +902,7 @@ def _fake_pyinstaller(
         shutil.rmtree(tmp)
 
     monkeypatch.setattr(build, "run_pyinstaller", stand_in)
+    monkeypatch.setattr(build, "native_origin_violations", lambda *a, **kw: [])
 
 
 @pytest.mark.parametrize(("bundle_has", "status"), [(["graphlib", "json"], 0), (["json"], 1)])
@@ -1003,6 +1164,7 @@ def test_notices_writing_follows_ffmpeg_and_fails_the_build_on_error(
     monkeypatch, tmp_path, capsys, fails
 ):
     monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setattr(build, "native_origin_violations", lambda *a, **kw: [])
     monkeypatch.setattr(build, "pack_sources", lambda: [])
     out = tmp_path / "out"
 
@@ -1040,6 +1202,7 @@ def test_notices_writing_follows_ffmpeg_and_fails_the_build_on_error(
 def test_smoke_follows_notices_and_propagates_failure(monkeypatch, tmp_path, status):
     """Dropping --smoke or ignoring its result must not produce a successful build."""
     monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setattr(build, "native_origin_violations", lambda *a, **kw: [])
     monkeypatch.setattr(build, "pack_sources", lambda: [])
     out = tmp_path / "out"
 

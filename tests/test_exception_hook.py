@@ -25,9 +25,17 @@ from clearwater.config.paths import app_locations
 pytestmark = pytest.mark.timeout(20)
 
 
-def test_hook_tests_never_call_gui_entry_in_process():
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        (None, []),
+        ("from clearwater.app.main import main as launch\nlaunch()", [2]),
+        ("entry = importlib.import_module('clearwater.app.main')\ngetattr(entry, 'main')()", [2]),
+    ],
+)
+def test_hook_tests_never_call_gui_entry_in_process(source, expected):
     """The offscreen presenter tests must not invoke an importable real GUI entry."""
-    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    tree = ast.parse(source if source is not None else Path(__file__).read_text(encoding="utf-8"))
     aliases = {
         node.targets[0].id
         for node in ast.walk(tree)
@@ -40,16 +48,38 @@ def test_hook_tests_never_call_gui_entry_in_process():
         and isinstance(node.value.args[0], ast.Constant)
         and node.value.args[0].value == "clearwater.app.main"
     }
+    direct = {
+        name.asname or name.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module == "clearwater.app.main"
+        for name in node.names
+        if name.name == "main"
+    }
     unsafe = [
         node.lineno
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and isinstance(node.func.value, ast.Name)
-        and node.func.value.id in aliases
-        and node.func.attr == "main"
+        and (
+            (
+                isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id in aliases
+                and node.func.attr == "main"
+            )
+            or (isinstance(node.func, ast.Name) and node.func.id in direct)
+            or (
+                isinstance(node.func, ast.Call)
+                and isinstance(node.func.func, ast.Name)
+                and node.func.func.id == "getattr"
+                and len(node.func.args) >= 2
+                and isinstance(node.func.args[0], ast.Name)
+                and node.func.args[0].id in aliases
+                and isinstance(node.func.args[1], ast.Constant)
+                and node.func.args[1].value == "main"
+            )
+        )
     ]
-    assert not unsafe, f"real app.main called in-process at lines {unsafe}"
+    assert unsafe == expected, f"real app.main called in-process at lines {unsafe}"
 
 
 _ROOTS = (
