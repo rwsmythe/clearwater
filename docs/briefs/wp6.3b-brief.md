@@ -279,3 +279,17 @@ Then: seat QA -> REBUILD + notices (k2 and F4 change the artifact notices; the s
 - 13, 14: report lines.
 
 **(C) Then:** seat QA; one REBUILD + notices read (turn 22 touches `build.py`'s trust set); Reviewer B r2 as a DELTA over the remediation; the gate; the accept. Nothing else to rule.
+
+## Reviewer B r2 rulings (CHARC gen 17, 2026-11-05 ~18:55Z; B r2 DELTA over `91f90c8f..4e848bf2`: NEW_CRITICAL_MAJOR_FOUND, 1 MAJOR (seat-confirmed), 1 MINOR, 5 adv; `wp6.3b/B/r2/review.txt`)
+
+Items 2-7 and 9-12 of B r1 CLOSED on B r2's executed probes: CONCURRED.
+
+**MAJOR (item 8's annotated-tag gate refuses every real release) RULED: the RECOMMENDED fix.** `actions/checkout` at the pinned `11bd7190` force-overwrites the local tag with a lightweight ref to `github.sha` (`ref-helper.ts:99-100` `+${commit}:${ref}` after `testRef` fails on an annotated tag), so the gate's local `cat-file -t` can never see `tag`. Fix in turn 23 (FRESH Codex): after checkout, `git fetch --force --no-tags origin "+refs/tags/<tag>:refs/tags/<tag>"`, then the existing checks unchanged (`cat-file -t` = `tag`; `rev-parse <tag>^{commit}` = `GITHUB_SHA`). The alternative (`ls-remote` with the peeled line) is acceptable if the cell shows the fetch form fails on the runner for a reason it names. **The proof is a REAL-git test** (no `subprocess.run` mock): a local bare origin with an annotated tag; a clone in which the test REPRODUCES checkout's overwrite (`git fetch origin +<commit>:refs/tags/<tag>`); the gate script FAILS before the fix and PASSES after; a lightweight tag and a tag peeling to another commit still FAIL. The checklist's STOP text corrected if it names the old behaviour. The unit tests that mock `subprocess.run` stay but the report says what they cannot see (this class).
+- MINOR 2: the report line corrected (M17 killed by the stimulus-died guard on `escape`, by SURVIVORS on `pipe-holder`); the optional tightening ("row passed while the stimulus pid file exists" fails) GRANTED.
+- Adv 3: `hang` tolerates a missing `pid.txt` or bounds from the readiness marker (cell's call, one test).
+- Adv 7: section 3's "from 1.1.0" marking; the checklist indentation. **The `v1.0.0` tag IS on origin, annotated, peeling to `40d2ce04`** (CHARC verified `git ls-remote` 2026-11-05 18:55Z): the guide's pointers resolve; CLAUDE.md's "annotated, not pushed" line is STALE and is corrected at the accept (CHARC).
+- Adv 4 -> WP6.5 brief note (written now): the module-level win32 skip on the notices tests drops about 22 platform-neutral tests off Windows; WP6.5 moves the skip onto the `release` fixture and the native-reading tests.
+- Adv 5 -> WP6.3c brief note (written now): the sidecar ends with LF and the `# source-commit` line starts on its own line (test); a force-moved re-pushed tag passes the gate and is caught by checklist step 10's comparison (stated).
+- Adv 6: a report line (out of envelope; fails closed).
+
+**Then:** seat QA; NO rebuild (turn 23 touches the workflow, tests and docs only: the seat confirms from the diff); Reviewer B r3 as a DELTA scoped to turn 23; the gate; the accept. Nothing else to rule.
