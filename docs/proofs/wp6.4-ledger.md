@@ -10,6 +10,7 @@ dispatcher fills the depth figures.
 |---|---|---|---|---|---|---|---|---|---|
 | 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | - | 247,937 (cell1, at return) |
 | A r2 (group B; folded turn 5) | Reviewer A, Codex | 0 / 6 | 2 minor, 3 advisory | 11 / 0 | 11 NEW / 0 REOPENED | 0 | tool 1 (item 1, `tools/footage_guard.py`) / tests-only 8 (items 2-6, 9-11); item 7 REJECTED, item 8 a report sentence | Codex review; cell5 fold | 314,460 at the turn-5 yield (cell5) |
+| A r3 (delta on turns 4 + 5; folded turn 6) | Reviewer A, Codex: NO_NEW_CRITICAL_MAJOR (A converged) | 0 / 0 | 2 minor, 2 advisory | 4 / 0 | 4 NEW / 0 REOPENED | 0 | product 0 / tests-only 4 (plus one verification-loop fix to #1) | Codex review; cell6 fold | DISPATCHER TO FILL (cell6) |
 
 ## Round 0
 
@@ -994,3 +995,96 @@ Depth at point 1 (`36651814`): not read at the seat
 Depth at point 2 (`f1175b92`): 243,632 (the seat read it at ~23:29Z, after this commit, before `a9dc9adb`)
 Depth at point 3 (`a9dc9adb`): not read at the seat
 Depth at turn-5 yield: 314,460 (cell_depth.py --live, read at the seat ~23:46Z after the return; 126 turns). DEVIATION: dispatch-5 said to yield at about 250K with what remained; the cell was at 243,632 after point 2 and built point 3 and the report past it. It stayed under the 400K cap. Recorded; no rework. cell5 retired.
+
+## Reviewer A r3 fold-in (turn 6)
+
+Cell `wp64-cell6` (implementer-opus-high, FRESH), dispatch-6, base `d55573f1`. Reviewer A r3
+(Codex, delta `107e6c77..d55573f1`): NO_NEW_CRITICAL_MAJOR, so Reviewer A has CONVERGED; 2 MINOR and
+2 ADVISORY, all in the W module's helper instruments (`clearwater-review-evidence\wp6.4\A\r3\
+review.txt`). Reviewer B (Codex) reviews `d55573f1` in parallel; this turn is tests-only, so B's
+view of the product stands. Evidence in `work\wp6.4\`: `t6_guard_probes.py`, `t6_borrow_probes.py`,
+`t6_link_probes.py`, `t6_with_variant.py`, `t6_x36.py` / `t6_x36_why.py` (diagnosis),
+`t6_borrow_survey.py`, `t6_yield.sh`, `t6_counts.py`, `t6-*.log`, the pre-fold blob
+`t6-old-w-d55573f1.py` (read by the probes by AST, never imported as a test).
+
+### T6.1 Commits
+
+| Commit | What |
+|---|---|
+| `c6ae9a19` | r3 #1 and #4: W-GUARD ends a path only on every off-Windows branch, nested scopes run nothing, launch-operation stubs only; comment tokens blanked before matching |
+| `688163fc` | r3 #2 and #3: the borrowed-case pin classifies every registry and `_w()` use and covers import-time and fixture patches; the link model is the stdlib's `posixpath.realpath` over virtual seams; the model's agreement test |
+| `a9e59e13` | r3 #1, verification loop: a `with` never ends a path; the "swallowed skip" planted case |
+| (this commit) | docs: the report's turn-6 section, the counts; this section |
+
+All by pathspec with `-c core.autocrlf=false` and the Co-Authored-By line; blob check 0 CR and 0
+non-ASCII byte in every committed file. Only `tests/test_portability.py`, the report and this
+ledger changed.
+
+### T6.2 The fold (r3 numbering)
+
+The report's section 1 "Turn 6" table carries finding -> change -> test -> probe. In short:
+
+- **#1 MINOR DONE.** r3's three probes `[]` -> `['p:5']`, `['p:5']`, `['p:3']`; the 20 real sites
+  0 -> 0. The guards of X09 / X18 renamed to a non-platform name: 1 / 2 offenders before and
+  after; X36 so renamed: 0 -> 1 (the old instrument took an earlier test function's
+  `monkeypatch.setattr(subprocess, "run", ...)` as a module-level stop: traced in
+  `t6_x36_why.py`, `controlled` true at depth 0 with neither the exit rule nor the helper rule
+  firing, leaving the stub rule, whose only earlier occurrence is that function's line 222).
+- **#2 MINOR DONE.** Whole-M mutants (raw count 7 each): helper alias, module-level
+  `MonkeyPatch`, fixture `setitem` on `subprocess.__dict__`: `[]` -> caught (lines in the
+  report); the real M `[]`. The survey (`t6-borrow-survey.log`) first: no fixture use before any
+  of the seven borrowed `with`s, no module-level patch, `_w()` used for the seven registries and
+  six instruments only (`W_HELPERS`).
+- **#3 ADVISORY DONE.** The model drives a PRIVATE copy of `posixpath` (the imported module is
+  never patched). r3's table now agrees with `posixpath.realpath` (`/review/Footage/output`,
+  `/review/loop/x`), plus four more rows agreeing; the old model RecursionError on both loops. The
+  OLD `_absolute` under the new model: 6 of 6 FAIL (`t6-m3-old-absolute.log`), clean 6 pass
+  (`t6-m3-clean.log`).
+- **#4 ADVISORY DONE.** r3's probe `['p:2']` -> `[]`; "a comment" guard probe still 1.
+
+### T6.3 Static and counts at `a9e59e13` (from the worktree root)
+
+    uv run --no-sync ruff check .                  All checks passed!
+    uv run --no-sync ruff format --check .         326 files already formatted
+    uv run --no-sync mypy                          Success: no issues found in 162 source files
+    uv run --no-sync mypy --platform darwin        Success: no issues found in 162 source files
+
+| Module | Parallel leg, `-n 4` (collected / passed / skipped) | Serial leg (collected / passed / skipped) | Fullclip |
+|---|---|---|---|
+| `test_portability` | 168 / 168 / 0 | 17 / 17 / 0 | 0 |
+| `test_macos_portability` | 205 / 0 / 205 | 19 / 0 / 19 | 0 |
+| the two together | 373 / 168 / 205 | 36 / 17 / 19 | 0 |
+
+`--collect-only` over the two: 409 = 373 + 36 + 0. Every skip reads "macOS native leg (WP6.5)"
+(`t6-counts.log`). W gains four cases (the A r3 #3 model test).
+
+### T6.4 Verification loop (suspected / confirmed / rejected / fixed)
+
+- Suspected: the stricter path rule breaks real sites that rely on an `except` skip (X09's
+  `_make_dir_link`). Rejected by the run: a `try` whose body returns and whose handler skips off
+  Windows ends every path; all 20 sites 0.
+- Suspected: a `with` body's skip counted as ending the path though `pytest.raises` swallows it.
+  Confirmed (`t6_with_variant.py`: head `[]`, variant `['p:5']`; the variant keeps all 20 sites
+  at 0); fixed in `a9e59e13`, planted case added.
+- Suspected: the link model misses a relative INPUT (posixpath passes relative names to `lstat`).
+  Confirmed by the first probe run (both the model and the mocked reference returned
+  `/review/deep/output`); fixed before commit: both look a relative name up from the working
+  folder.
+- Suspected: the stricter pin flags M's own `_w()` instrument calls. Confirmed by the survey (six
+  instrument names); classified in `W_HELPERS`, the real M `[]`.
+- A second pass (ruff, format, both mypy runs, CR / ASCII, both modules on both legs, the probe
+  scripts re-run at the head) found nothing new.
+
+### T6.5 Discipline record
+
+No stash, no mailbox post, no edit outside the owned files, no file under `src/` or `tools/`, no
+real FFmpeg / ffprobe / encoder / `nvidia-smi` from a W test or probe (the probes call only the
+instrument functions on text), every test run offscreen with `PYTEST_ADDOPTS` unset. One slip:
+the cell's second Bash call began with a bare `cd` into the worktree (a read-only `wc` / `grep`
+chain; the agent's shell resets its cwd between calls); every later call used absolute paths, `git
+-C` or a subshell. Two heredoc scripts (a probe edit, a diagnosis script) collapsed a `\n` escape
+(the known heredoc trap) and failed at once; both were redone with the Write / Edit tool.
+
+Depth at point 1 (`c6ae9a19`): DISPATCHER TO FILL
+Depth at point 2 (`688163fc`): DISPATCHER TO FILL
+Depth at turn-6 yield: DISPATCHER TO FILL

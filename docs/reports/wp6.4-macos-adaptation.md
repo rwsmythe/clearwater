@@ -14,11 +14,14 @@ group-B yield rulings).
   default) and the M-TOOL monkeypatch fix (section 10).
 - `wp64-cell5` ran the Reviewer A r2 fold-in (turn 5): the footage guard's symlink-then-`..`
   fix and the folded M and W instruments (section 1, "Turn 5").
+- `wp64-cell6` ran the Reviewer A r3 fold-in (turn 6): four test-only folds in the W helper
+  instruments (section 1, "Turn 6").
 
 The ledger is `docs/proofs/wp6.4-ledger.md`, branch `wp6.4`. **No Mac was run.** Every M test is
-written to run natively and is UNEXECUTED until WP6.5. The counts below are the turn-5 cell's own
-runs at `c5b2608a`. Reviewer A (Codex) r2 on group B returned NEW_CRITICAL_MAJOR_FOUND and was
-folded in turn 5; the Codex delta / r3 on turns 4 + 5 and the package gate follow.
+written to run natively and is UNEXECUTED until WP6.5. The counts below are the turn-6 cell's own
+runs at `a9e59e13`. Reviewer A (Codex) r2 on group B returned NEW_CRITICAL_MAJOR_FOUND and was
+folded in turn 5; Reviewer A r3 (the delta on turns 4 + 5) returned NO_NEW_CRITICAL_MAJOR (2 MINOR,
+2 ADVISORY), folded in turn 6. Reviewer B and the package gate follow.
 
 ## 1. What was built
 
@@ -197,6 +200,32 @@ encoder before FFmpeg starts (M-V4[P15, X42]). Reading "start offset, negative C
   bundle. Closure: WP6.5, on its own `Clearwater.app`.
 - M-GUI: the application-menu merge, native dialog behaviour and Retina pixel mapping. Closure:
   WP6.5's native checks on the Mac, plus the owner's hand checks.
+
+### Turn 6: the Reviewer A r3 fold-in
+
+Reviewer A r3 (Codex, the delta `107e6c77..d55573f1`) returned NO_NEW_CRITICAL_MAJOR: Reviewer A
+has converged. Its 2 MINOR and 2 ADVISORY findings, all in the W module's helper instruments, are
+folded by `wp64-cell6` in TEST code only: `c6ae9a19` (#1, #4), `688163fc` (#2, #3), `a9e59e13`
+(the verification loop's `with` rule). No file under `src/` or `tools/` changed, so Reviewer B's
+view of the product at `d55573f1` stands.
+
+The probes load ONLY the instrument definitions from the file (by AST), at this head and at the
+pre-fold blob `d55573f1`, and feed them in-memory sources (no pytest collection, no entry point,
+no process): `work\wp6.4\t6_guard_probes.py`, `t6_borrow_probes.py`, `t6_link_probes.py`,
+`t6_with_variant.py`; logs `t6-*.log`.
+
+| A r3 finding | Change | Test | Probe: `d55573f1` -> this head |
+|---|---|---|---|
+| 1 MINOR: W-GUARD's `exits()` takes any descendant exit | An earlier statement controls a marker only when it ends EVERY off-Windows path: `stops` / `stops_block` follow each branch the host can take (an off-Windows `if` body, an on-Windows `if`'s `else`, both branches of any other test); a `try` ends when its `finally` does, or its body and every handler do; a loop and a `with` never end a path (a loop may run zero times; `pytest.raises` / `suppress` swallow the exit); nested function and class scopes run nothing. A helper ends the caller's path only when its every path raises or skips (a `return` there reaches the caller). A stub counts only as a statement of its own, `monkeypatch.setattr` of `subprocess.` one of `LAUNCH_OPERATIONS` (`run`, `Popen`, `call`, `check_call`, `check_output`), either spelling | W-GUARD X05-X38; `GUARD_PROBES` 8 -> 15 (the three r3 forms 1 each, the swallowed skip 1, the two controls "every branch exits" and "launch stub" 0) | conditional return `[]` -> `['p:5']`; uncalled nested return `[]` -> `['p:5']`; `setattr(subprocess, 'PIPE', None)` `[]` -> `['p:3']`; `with pytest.raises` around the skip: `[]` -> `['p:5']`. The 20 real sites: 0 -> 0. The real offenders it found before still found: X09 and X18 with their guards renamed to a non-platform name 1 and 2 -> 1 and 2; X36 so renamed 0 -> 1 (`d55573f1` counted an earlier TEST function's `monkeypatch.setattr(subprocess, "run", ...)` as a module-level stop: the r3 #1 class) |
+| 2 MINOR: the borrowed-case pin misses aliases and import-time patches | `shared_monkeypatch_offenders` classifies every reference: a `_CASES` attribute only in the isolated direct form (and with the fixture `monkeypatch` unused before its `with`), else an offender, whatever its root; a `_CASES` name, `getattr` text or import; `_w` other than `_w().ATTRIBUTE` with the attribute a registry or one of `W_HELPERS` (the six W instruments M calls natively); the W module named outside `_w`; a `MonkeyPatch` built other than as a `with` item's `.context()`; outside every function body, any `PATCH_OPERATIONS` call or assignment to an attribute or subscript | The pin: the seven real sites `[]`; the six planted leaks (`getattr` text new) `["test_x:3"]`; r3's three surviving forms planted, each caught with its lines | Whole-M mutants (the real M source, raw count still 7): helper alias `[]` -> `['borrow_fs:1583', 'borrow_fs:1584']`; an unclosed module-level `MonkeyPatch` replacing `subprocess.run` `[]` -> `['<module>:2', '<module>:3']`; a fixture `setitem(subprocess.__dict__, 'run', ...)` before the isolated M-FS call `[]` -> `['test_macos_filesystem_semantics:1298']`; the real M `[]` -> `[]` |
+| 3 ADVISORY: the POSIX link model | `posix_link_model` now runs the stdlib's own `posixpath.realpath` from a private copy of `posixpath` whose `os` is a virtual file system (`lstat`, `readlink`, `stat` = ELOOP, `getcwd`; a relative name looked up from the working folder; a drive path runs as `/C:/x` and returns in host syntax); an optional `cwd` | NEW `test_portability_posix_link_model_agrees_with_posixpath` (4 cases: relative target, self loop non-strict and strict ELOOP, absolute target, traversal above the target); the five callers and D3 parity unchanged | Against `posixpath.realpath` with `os.lstat` / `os.readlink` / `os.getcwd` mocked to the same tables, cwd `/review`: `deep/alias -> ../Footage/sub`, `deep/alias/../output`: `/Footage/output` -> `/review/Footage/output` (agrees); `loop -> /review/loop`, `loop/x`: RecursionError -> `/review/loop/x` (agrees); a two-link loop RecursionError -> agrees; absolute target, traversal above it, no link: agree on both. The OLD `_absolute` (`t5_mutants.py old-absolute`) under the new model: 6 of 6 FAIL (T17, T26-T29, D3 parity); clean 6 pass |
+| 4 ADVISORY: comment-only markers counted as code | `platform_guard_offenders` blanks every `tokenize` COMMENT token in place before matching (line and column positions kept; string literals, docstrings and skip reasons kept) | `GUARD_PROBES` "comment only" 0; "a comment" (a guard written as a comment) still 1 | `def f():` / `# mklink ...` / `pass`: `['p:2']` -> `[]`; the 20 real sites 0 -> 0 |
+
+**Limits of the instruments (kept as such, not findings):** W-GUARD reads one module; a helper
+reached through an attribute (`mod.helper()`) or a `match` statement is not followed (it then
+counts as no stop, the strict side). The borrowed-case pin knows the fixture by its name
+`monkeypatch`; a patch made through another fixture's object (`request.getfixturevalue`) is not
+modelled. The link model is a virtual tree in which every non-link name is a folder.
 
 ### Notable tests
 
@@ -484,24 +513,28 @@ Source: ledger A.4 and `uv-lock.record.txt`.
 
 ## 7. The W and M test counts per gate leg
 
-Re-taken by the turn-5 cell at `c5b2608a` (`-p no:cacheprovider --timeout 600`,
-`QT_QPA_PLATFORM=offscreen`, `PYTEST_ADDOPTS` unset; the parallel expression with `-n 4`, the
-serial expression without):
+Re-taken by the turn-6 cell at `a9e59e13` for the W and M modules (`-p no:cacheprovider
+--timeout 600`, `QT_QPA_PLATFORM=offscreen`, `PYTEST_ADDOPTS` unset; the parallel expression with
+`-n 4`, the serial expression without; `work\wp6.4\t6_yield.sh`, `t6-counts.log`):
 
 | Module | Parallel leg (collected / passed / skipped) | Serial leg (collected / passed / skipped) | Fullclip |
 |---|---|---|---|
-| `test_portability` (181) | 164 / 164 / 0 | 17 / 17 / 0 (14 `gui`, 3 `slow`) | 0 |
+| `test_portability` (185) | 168 / 168 / 0 | 17 / 17 / 0 (14 `gui`, 3 `slow`) | 0 |
 | `test_macos_portability` (224) | 205 / 0 / 205 | 19 / 0 / 19 (`macos` + `gui`: M-GUI 15, M-BUNDLE 4) | 0 |
-| `test_environment_report` (19) | 19 / 19 / 0 | 0 | 0 |
+| `test_environment_report` (19, turn 5's run; unchanged since) | 19 / 19 / 0 | 0 | 0 |
 
-The three modules together: parallel 183 passed, 205 skipped; serial 17 passed, 19 skipped. The
-W module gains one case (the item-2 pin); the M module gains 46 (the M-V4 corpus), all on the
-parallel leg and all skipped off darwin. No case moved between legs.
+The W and M modules together at `a9e59e13`: parallel 373 collected, 168 passed, 205 skipped;
+serial 36 collected, 17 passed, 19 skipped; fullclip 0; `--collect-only` 409 = 373 + 36. Turn 6
+adds four W cases (the A r3 #3 model test), on the parallel leg; turn 5 added one W case (the
+item-2 pin) and 46 M cases (the M-V4 corpus), all on the parallel leg and all skipped off darwin.
+No case moved between legs.
 
-The footage guard's callers' modules, the same run (all passed, none skipped): `test_inventory`,
+The footage guard's callers' modules, turn 5's run at `c5b2608a` (all passed, none skipped; their
+files and the guard are unchanged since): `test_inventory`,
 `test_export_oracle`, `test_lookcheck`, `test_lookcheck_deep`, `test_container_spike`,
 `test_container_spike_compare_equivalences`, `test_analysis_breakdown`. All ten modules together:
-parallel 826 collected, 621 passed, 205 skipped; serial 44 collected, 25 passed, 19 skipped.
+parallel 826 collected, 621 passed, 205 skipped; serial 44 collected, 25 passed, 19 skipped (W at
+164 parallel then; four more now).
 
 On Windows every M case is collected and skipped with "macOS native leg (WP6.5)"; no other skip
 reason appears. The gate's two marker expressions are unchanged, and the collection identity
