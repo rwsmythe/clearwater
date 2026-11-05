@@ -164,3 +164,17 @@ Verified at the seat: the build interpreter is uv's python-build-standalone `202
 5. `AD-38` carries the surface. CHARC opens a register row at the accept for any interpreter native still without a row (none expected).
 
 Turn 10 RESUMES `01a1ab9b`: the surface + the OpenSSL row, then the smoke and zip if depth allows (the zip still waits on the zvbi ruling; yield before it if past 200K or if the ruling is not in).
+
+## Turn-11 ruling (CHARC gen 16, 2026-11-05 ~13:20Z; turn 11 `efe88629`, 470 green at the seat; the cell's OPEN MAJOR on the smoke's no-survivor check)
+
+Verified at the seat: `tools/package/smoke.py:166-178` finds survivors by a `psutil` PPID snapshot against the observed ancestry, so a descendant whose intermediate parent exits before any observation is invisible (the cell's venv-redirector reproduction, `fast-probe-1.log`); the report's turn-11 section states the limit and claims no universal containment. Correct yield.
+
+**RULED (b): OS containment.** On win32 every smoke row runs inside a Windows Job Object owned by the smoke process:
+1. Limits: `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` set; breakaway DENIED (neither `JOB_OBJECT_LIMIT_BREAKAWAY_OK` nor `JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK`), so no descendant can leave the job; the row's root process is created suspended or assigned before it can spawn (`CREATE_SUSPENDED` + `AssignProcessToJobObject` + resume, or the job's own `CreateProcess` path), never assigned after the fact.
+2. **The census is the job's process list** (`QueryInformationJobObject` with `JobObjectBasicProcessIdList`) taken after the root exits and the row's wait elapses; a non-empty list = SURVIVORS, named by pid and image; then the handle is closed and the job kills them (the failure is still recorded). The PPID snapshot may stay as a secondary diagnostic, never as the proof.
+3. **The reproduction becomes a test:** the venv-redirector chain (intermediate parent exits before any observation, grandchild lingers) must be CAUGHT by the job census; plus the existing slow-parent and immediate-parent fixtures.
+4. AD-36 form: the job code lives in the win32 branch of the guard; the darwin / other branch states its method (a `start_new_session` process group with a `killpg` census is WP6.5's to prove natively, in its brief) and `mypy --platform darwin` stays green; ctypes against `kernel32` only, no new dependency.
+5. Report lines: the smoke's rows run under a job (a product that ever requested breakaway would fail the row, by design: AD-23's helper requests none); nested jobs are fine on Windows 8+.
+6. One resumed turn on `01a1abc1` (155K): the job, the census, the three tests, the report; then yield. The OPEN MAJOR closes on that turn's seat re-run.
+
+The zip and the release use still wait on the owner's zvbi ruling. Reviewer A's prompt carries the CRLF sweep addition.
