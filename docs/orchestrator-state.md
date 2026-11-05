@@ -49,7 +49,7 @@
 
 ### Live board (RESUME HERE)
 
-**RUNNING at 13:45Z: WP6.3b turn 13** (FRESH Codex session, dispatch `cell\dispatch-13.md`: release.yml with the seat-resolved SHAs `seatction-shas.md`, FFmpeg params read from the lock, `--zip` the one pending flag; checklist v2; guide s.2/3/6/7/8; limited root notices WITHOUT the FFmpeg row). Branch `wp6.3b` at **`52754527`** (turn 12). If this generation dies mid-turn, the successor waits for / inspects `turn-13.driver.stdout` and `return-13.md` before anything else.
+**RUNNING at 13:45Z: WP6.3b turn 13** (FRESH Codex session, dispatch `cell\dispatch-13.md`: release.yml with the seat-resolved SHAs `seat\action-shas.md`, FFmpeg params read from the lock, `--zip` the one pending flag; checklist v2; guide s.2/3/6/7/8; limited root notices WITHOUT the FFmpeg row). Branch `wp6.3b` at **`52754527`** (turn 12). If this generation dies mid-turn, the successor waits for / inspects `turn-13.driver.stdout` and `return-13.md` before anything else.
 
 1. **WP6.3b: the release workflow, bundled FFmpeg, notices, smoke and zip, checklist v2, guide.**
    - Brief `docs/briefs/wp6.3b-brief.md`, rulings tails Round-0 / Turn-3 / Turn-6 / Turn-9 (CHARC commits `e209734e`, `5fb828ba`, `2258e5ab`, `f7250307`).
