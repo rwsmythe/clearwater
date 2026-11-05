@@ -552,7 +552,7 @@ def job_case(tmp_path, monkeypatch):
     monkeypatch.setattr(smoke, "_live", lambda *a: [], raising=False)
     monkeypatch.setattr(smoke, "_cleanup", lambda *a: None, raising=False)
 
-    def run(mode="order", bound=1):
+    def run(mode="order", bound=10):
         config["mode"] = mode
         config_path.write_text(json.dumps(config))
         return smoke.run_row(
