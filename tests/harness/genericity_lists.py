@@ -249,6 +249,9 @@ INSTANCE_SURFACE_RELPATHS: tuple[str, ...] = (
     "THIRD_PARTY_NOTICES.md",
     "docs/user-guide.md",
     "docs/release-checklist.md",
+    # the application's release workflow (WP6.3b, 2026-11-05): it builds and
+    # checks the packaged application, so it names the application toolchain.
+    ".github/workflows/release.yml",
 ) + INSTANCE_STUB_RELPATHS
 INSTANCE_SURFACE_PREFIXES: tuple[str, ...] = (
     "docs/briefs/",
