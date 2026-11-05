@@ -1,6 +1,6 @@
 # WP6.3c - FFmpeg bundle
 
-Status: turn 3 edits prepared, 2026-11-05. The dispatch records the seat's fork
+Status: turn 4 edits prepared, 2026-11-05. The dispatch records the seat's fork
 commit/export and clean actionlint result; Dockerfile generation was refused by
 the seat's tool policy and a static proof recorded instead. The real asset,
 lock re-pin, remaining package work, review, package gate and release are pending.
@@ -295,5 +295,108 @@ fetch, Git write to the Clearwater/fork repositories, real PyInstaller build,
 frozen/GUI launch, Docker, desktop input, footage/profile write, GitHub action or
 mailbox post was performed. The commissioned real-Git tests create only their
 own temporary fixture repositories before the sandbox refuses the local push.
+
+Depth: unavailable to the cell; the dispatcher supplies `depth_input_tokens`.
+
+## Turn 4 - Release tag gate hardening
+
+**Built.** Changed only the inline `Check release version` step, its tests and
+this report. The re-fetch now runs:
+
+```text
+git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=20 fetch --force --no-tags origin +refs/tags/v1.1.0:refs/tags/v1.1.0
+```
+
+The tag argument is derived from the validated `GITHUB_REF`; the example shows
+the test's literal value. The existing 30-second subprocess timeout remains.
+The HTTP settings also bound stalled/low-speed remote helpers, rather than
+depending only on terminating their parent process. The execution test pins
+the complete argv, single refspec and subprocess options.
+
+After verifying the fetched ref's object type, the gate reads `git cat-file tag
+<ref>` and requires exactly one `tag` header, equal to the short ref name. It
+parses only the header block before the blank line; a matching line in the tag
+message cannot satisfy the check. Missing, duplicate and mismatched headers are
+refused. The annotated requirement, peel-to-`GITHUB_SHA`, package/requested
+version checks, checkout-overwrite restoration and version output remain.
+
+Every Git invocation supplies an operation-specific failure label to the shared
+wrapper. `CalledProcessError`, `TimeoutExpired` and `OSError` become named
+`SystemExit` messages, with exception chaining suppressed (`from None`). A fetch
+failure says `Release tag v1.1.0 could not be fetched from origin (missing or
+unavailable)` followed by its failure category. This deliberately does not
+misidentify every transport/access failure as a missing tag. Twelve injected
+failure cases exercise all four operations and three failure categories; each
+requires the named refusal, suppressed context and no version-output file.
+
+**Real-Git fixture / seat RED checklist.** All cases use file-only temporary
+repositories, bounded subprocesses and a `clearwater.py` version stub; no
+product entry point is imported. After cloning, origin force-moves an unrelated
+tag from the first commit to the second. The checkout-overwrite fetch explicitly
+uses `--no-tags` and its one refspec. After the gate, every case requires the
+unrelated local tag to remain at its original object. All refusals require no
+`Traceback` or `CalledProcessError` text and no output file.
+
+| Item / test | Expected RED against `cbb25494` with these tests |
+|---|---|
+| Transport argv: `test_release_requires_annotated_tag_at_the_built_commit` (allowed case) | Exact call list differs: old fetch lacks both HTTP `-c` settings; old gate also omits the object-content read. |
+| Object name: three `test_tag_gate_refuses_wrong_or_missing_object_name` cases | Old gate accepts the object; `pytest.raises(SystemExit)` fails. |
+| Git failures: twelve `test_tag_gate_git_failures_are_named_refusals` cases | Existing operations leak process/timeout/OS exceptions; the new object-read operation is never reached, so its expected refusal is absent. |
+| Real-Git `mismatched-name` | Origin's `v1.1.0` points to an annotated object created as `v1.0.9`, peeling to the correct commit. Old gate exits zero, so the nonzero-exit assertion fails. New gate must emit the object-name refusal. |
+| Real-Git `deleted-origin` | Origin deletes the requested tag after checkout. Old gate exits with a process traceback; the named-fetch-message assertion fails. New gate must emit the named fetch refusal without a traceback. |
+| Real-Git `annotated`, `lightweight`, `wrong-commit`; unrelated-tag assertion in every case | Existing-behavior controls: expected GREEN on both revisions. `cbb25494` already has `--no-tags` and the single-tag refspec. The unrelated-tag control catches a broadened forced fetch, while the exact-argv test also pins `--no-tags`. No baseline RED is claimed for behavior already correct. |
+
+The seat runs the real-Git RED with the old workflow text and these tests, then
+GREEN with this workflow, outside the sandbox. No real-Git success or observed
+seat RED is claimed by this cell.
+
+**Observed RED -> GREEN.** All logs/XML are under `work/wp6.3c/turn4/`.
+The test-first focused run (`red.log` / `.xml`, fresh `work/c63c-4-red`) reports
+`16 failed, 2 passed, 38 deselected in 0.45s`. The same selection after the gate
+change (`green.log` / `.xml`, fresh `work/c63c-4-green`) reports
+`18 passed, 38 deselected in 0.17s`. This selection covers the exact argv,
+annotation/peeling controls, header cases and all twelve Git-failure cases.
+
+**Final validation.** Used the turn-3 isolated runner's exact implementation,
+copied to `work/wp6.3c/turn4/run_tests.py`: launch with `PYTHONPATH=scripts`,
+remove that variable before `pytest.main`, and retain the sandbox mkdir shim,
+disabled cache provider, 300-second timeout and QUIT_SCRIPT exclusion. Command:
+
+```text
+uv run --no-sync python work/wp6.3c/turn4/run_tests.py tests/test_release_workflow.py tests/test_tools_package_build.py --basetemp=work/c63c-4 --junitxml=work/wp6.3c/turn4/pytest.xml -q
+```
+
+- `ruff-check-final.log`: `All checks passed!`.
+- `ruff-format-final.log`: `337 files already formatted`.
+- `mypy-win32.log` and `mypy-darwin.log`: each reports
+  `Success: no issues found in 166 source files`.
+- `pytest.log` / `.xml`: `5 failed, 177 passed in 10.31s`.
+  `module-counts.txt`, independently summarized from JUnit XML: build module
+  126 passed; workflow module 51 passed / 5 failed.
+- `diff-check.log`: read-only `git diff --check` exit 0.
+
+All five pytest failures are fixture setup's local Git push (exit 128): Git's
+`sh.exe` reports fatal `CreateFileMapping` and cannot read the temporary local
+remote. They precede gate execution and affect exactly
+`test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags` with
+`annotated`, `lightweight`, `wrong-commit`, `mismatched-name`, `deleted-origin`.
+The commissioned seat rerun is still required. The uv commands report that the
+inherited main-tree `VIRTUAL_ENV` is ignored in favor of this project's `.venv`.
+
+**Verification loop / handoff.** Confirmed the absent transport settings,
+unvalidated object name and escaping Git errors with the focused baseline
+failures; implemented their fixes and reran to green. Rejected a supposed
+baseline unrelated-tag defect: the accepted gate already narrows the fetch, so
+its new real-Git assertion is a preservation control. Corrected the initial
+lint complaint about an unescaped regex match; final static checks are clean.
+The final owned-diff/requirements pass found no further issue. No Reviewer A
+round occurs inside this turn; the dispatcher runs it after this yield.
+
+Seat real-Git execution and its before/after proof remain undone. All other
+package rungs, Q1 and release work remain outside this turn. No external fetch,
+repository Git write, build, frozen/GUI launch, Docker, desktop input,
+footage/profile write, dependency/frozen-interface change, GitHub action or
+mailbox post was performed. Git writes occurred only in pytest's disposable
+fixture repositories under the commissioned basetemp.
 
 Depth: unavailable to the cell; the dispatcher supplies `depth_input_tokens`.

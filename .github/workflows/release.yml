@@ -66,15 +66,33 @@ jobs:
           ref = os.environ["GITHUB_REF"]
           if not re.fullmatch(r"refs/tags/v[0-9]+\.[0-9]+\.[0-9]+", ref):
               raise SystemExit("Release requires an existing vMAJOR.MINOR.PATCH tag")
-          def git(*args):
-              return subprocess.run(
-                  ["git", *args], capture_output=True, text=True, check=True, timeout=30,
-              ).stdout.strip()
+          tag = ref.removeprefix("refs/tags/")
+          def git(*args, failure):
+              """Run a bounded Git command, refusing with its named diagnostic."""
+              try:
+                  return subprocess.run(
+                      ["git", *args], capture_output=True, text=True, check=True, timeout=30,
+                  ).stdout.strip()
+              except subprocess.CalledProcessError as error:
+                  raise SystemExit(f"{failure}: git exited with status {error.returncode}") from None
+              except subprocess.TimeoutExpired:
+                  raise SystemExit(f"{failure}: git exceeded the 30-second timeout") from None
+              except OSError:
+                  raise SystemExit(f"{failure}: git could not be started") from None
           # checkout can replace an annotated tag with the triggering commit.
-          git("fetch", "--force", "--no-tags", "origin", f"+{ref}:{ref}")
-          if git("cat-file", "-t", ref) != "tag":
+          # Bound HTTP helpers as well as the parent process, and refresh only this tag.
+          git(
+              "-c", "http.lowSpeedLimit=1", "-c", "http.lowSpeedTime=20",
+              "fetch", "--force", "--no-tags", "origin", f"+{ref}:{ref}",
+              failure=f"Release tag {tag} could not be fetched from origin (missing or unavailable)",
+          )
+          if git("cat-file", "-t", ref, failure=f"Cannot determine object type for release tag {tag}") != "tag":
               raise SystemExit("Release requires an ANNOTATED tag")
-          if git("rev-parse", ref + "^{commit}") != os.environ["GITHUB_SHA"]:
+          tag_object = git("cat-file", "tag", ref, failure=f"Cannot read annotated object for release tag {tag}")
+          headers = tag_object.split("\n\n", 1)[0].splitlines()
+          if [line.removeprefix("tag ") for line in headers if line.startswith("tag ")] != [tag]:
+              raise SystemExit(f"Annotated tag object's name does not match release tag {tag}")
+          if git("rev-parse", ref + "^{commit}", failure=f"Cannot peel release tag {tag} to a commit") != os.environ["GITHUB_SHA"]:
               raise SystemExit("Annotated tag does not peel to the built commit")
           version = ref.removeprefix("refs/tags/v")
           if clearwater.__version__ != version:

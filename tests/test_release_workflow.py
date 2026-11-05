@@ -82,6 +82,21 @@ def test_setup_uv_disables_cache_and_verifies_the_seat_fetched_checksum(workflow
     assert "checksum: f58dc40896000229db7c52b8bdd931394040ef2ad59abd1eda841f6d70b13d7a" in setup
 
 
+def _git_stdout(args, tag_type="tag", peeled="a" * 40):
+    """Supply Git output without importing Clearwater or contacting a remote."""
+    if args[1:3] == ["cat-file", "-t"]:
+        return tag_type
+    if args[1:3] == ["cat-file", "tag"]:
+        return (
+            f"object {peeled}\ntype commit\ntag v1.1.0\n"
+            "tagger Release test <release-test@example.invalid> 1700000000 +0000\n"
+            "\nRelease 1.1.0\n"
+        )
+    if args[1] == "rev-parse":
+        return peeled
+    return ""
+
+
 @pytest.mark.parametrize(
     "tag_type, peeled, allowed",
     [("tag", "a" * 40, True), ("commit", "a" * 40, False), ("tag", "b" * 40, False)],
@@ -97,10 +112,9 @@ def test_release_requires_annotated_tag_at_the_built_commit(
     calls = []
 
     def git(args, **kwargs):
+        assert kwargs == {"capture_output": True, "text": True, "check": True, "timeout": 30}
         calls.append(args)
-        return subprocess.CompletedProcess(
-            args, 0, tag_type if args[1] == "cat-file" else peeled, ""
-        )
+        return subprocess.CompletedProcess(args, 0, _git_stdout(args, tag_type, peeled), "")
 
     monkeypatch.setattr(subprocess, "run", git)
     code = compile(script(workflow, "Check release version"), "release-tag-gate", "exec")
@@ -109,6 +123,10 @@ def test_release_requires_annotated_tag_at_the_built_commit(
         assert calls == [
             [
                 "git",
+                "-c",
+                "http.lowSpeedLimit=1",
+                "-c",
+                "http.lowSpeedTime=20",
                 "fetch",
                 "--force",
                 "--no-tags",
@@ -116,6 +134,7 @@ def test_release_requires_annotated_tag_at_the_built_commit(
                 "+refs/tags/v1.1.0:refs/tags/v1.1.0",
             ],
             ["git", "cat-file", "-t", "refs/tags/v1.1.0"],
+            ["git", "cat-file", "tag", "refs/tags/v1.1.0"],
             ["git", "rev-parse", "refs/tags/v1.1.0^{commit}"],
         ]
     else:
@@ -124,7 +143,92 @@ def test_release_requires_annotated_tag_at_the_built_commit(
     assert "fetch-depth: 0" in step(workflow, "Checkout tagged source")
 
 
-@pytest.mark.parametrize("case", ["annotated", "lightweight", "wrong-commit"])
+@pytest.mark.parametrize("tag_headers", ["tag v1.0.9", "", "tag v1.1.0\ntag v1.0.9"])
+def test_tag_gate_refuses_wrong_or_missing_object_name(
+    workflow, tmp_path, monkeypatch, tag_headers
+):
+    """A matching name in the message cannot substitute for the object's header."""
+    output = tmp_path / "output"
+    monkeypatch.setenv("GITHUB_REF", "refs/tags/v1.1.0")
+    monkeypatch.setenv("GITHUB_SHA", "a" * 40)
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    monkeypatch.setitem(sys.modules, "clearwater", SimpleNamespace(__version__="1.1.0"))
+
+    def git(args, **kwargs):
+        stdout = _git_stdout(args)
+        if args[1:3] == ["cat-file", "tag"]:
+            stdout = (
+                f"object {'a' * 40}\ntype commit\n{tag_headers}\n"
+                "tagger Release test <release-test@example.invalid> 1700000000 +0000\n"
+                "\ntag v1.1.0\n"
+            )
+        return subprocess.CompletedProcess(args, 0, stdout, "")
+
+    monkeypatch.setattr(subprocess, "run", git)
+    code = compile(script(workflow, "Check release version"), "release-tag-name", "exec")
+    with pytest.raises(
+        SystemExit, match=re.escape("Annotated tag object's name does not match release tag v1.1.0")
+    ):
+        exec(code, {})
+    assert not output.exists()
+
+
+@pytest.mark.parametrize(
+    "command,failure",
+    [
+        (
+            ["fetch", "--force", "--no-tags", "origin", "+refs/tags/v1.1.0:refs/tags/v1.1.0"],
+            "Release tag v1.1.0 could not be fetched from origin (missing or unavailable)",
+        ),
+        (
+            ["cat-file", "-t", "refs/tags/v1.1.0"],
+            "Cannot determine object type for release tag v1.1.0",
+        ),
+        (
+            ["cat-file", "tag", "refs/tags/v1.1.0"],
+            "Cannot read annotated object for release tag v1.1.0",
+        ),
+        (["rev-parse", "refs/tags/v1.1.0^{commit}"], "Cannot peel release tag v1.1.0 to a commit"),
+    ],
+    ids=["fetch", "object-type", "tag-object", "peel"],
+)
+@pytest.mark.parametrize("error", ["exit", "timeout", "os-error"])
+def test_tag_gate_git_failures_are_named_refusals(
+    workflow, tmp_path, monkeypatch, command, failure, error
+):
+    """Each Git failure path must stop publication without a process traceback."""
+    output = tmp_path / "output"
+    monkeypatch.setenv("GITHUB_REF", "refs/tags/v1.1.0")
+    monkeypatch.setenv("GITHUB_SHA", "a" * 40)
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    monkeypatch.setitem(sys.modules, "clearwater", SimpleNamespace(__version__="1.1.0"))
+    reached = []
+
+    def git(args, **kwargs):
+        if args[-len(command) :] == command:
+            reached.append(True)
+            if error == "exit":
+                raise subprocess.CalledProcessError(128, args, stderr="fatal: planted failure")
+            if error == "timeout":
+                raise subprocess.TimeoutExpired(args, 30)
+            raise OSError("planted launch failure")
+        return subprocess.CompletedProcess(args, 0, _git_stdout(args), "")
+
+    monkeypatch.setattr(subprocess, "run", git)
+    code = compile(script(workflow, "Check release version"), "release-git-failure", "exec")
+    with pytest.raises(SystemExit) as refused:
+        exec(code, {})
+    assert reached == [True]
+    assert str(refused.value).startswith(failure)
+    assert refused.value.__suppress_context__
+    assert not output.exists()
+
+
+@pytest.mark.parametrize(
+    "case", ["annotated", "lightweight", "wrong-commit", "mismatched-name", "deleted-origin"]
+)
 def test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags(
     workflow, tmp_path, case
 ):
@@ -169,18 +273,32 @@ def test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags(
     target = git(seed, "rev-parse", "HEAD")
     git(seed, "tag", "-a", "v1.1.0", "-m", "Release 1.1.0")
     git(seed, "tag", "v1.1.1")
+    git(seed, "tag", "unrelated")
     git(seed, "commit", "--allow-empty", "-m", "second")
     other = git(seed, "rev-parse", "HEAD")
     git(seed, "remote", "add", "origin", str(origin))
     git(seed, "push", "origin", "HEAD:refs/heads/main", "--tags")
     git(tmp_path, "clone", "--branch", "main", str(origin), str(clone))
+    unrelated_before = git(clone, "rev-parse", "refs/tags/unrelated")
+    assert unrelated_before == target
+    # The gate may refresh only its requested tag, never another release's ref.
+    git(seed, "tag", "--force", "unrelated", other)
+    git(seed, "push", "--force", "origin", "refs/tags/unrelated")
+    assert git(origin, "rev-parse", "refs/tags/unrelated") == other
     ref = "refs/tags/v1.1.1" if case == "lightweight" else "refs/tags/v1.1.0"
     if case != "lightweight":
         assert git(clone, "cat-file", "-t", ref) == "tag"
     # Reproduce actions/checkout's overwrite, not an approximation of the gate.
-    git(clone, "fetch", "origin", f"+{target}:{ref}")
+    git(clone, "fetch", "--no-tags", "origin", f"+{target}:{ref}")
     assert git(clone, "cat-file", "-t", ref) == "commit"
     git(clone, "checkout", "--detach", target)
+    if case == "mismatched-name":
+        git(seed, "tag", "-a", "v1.0.9", target, "-m", "Another release")
+        wrong_name = git(seed, "rev-parse", "refs/tags/v1.0.9")
+        git(seed, "update-ref", ref, wrong_name)
+        git(seed, "push", "--force", "origin", ref)
+    elif case == "deleted-origin":
+        git(seed, "push", "origin", f":{ref}")
     gate = clone / "version-gate.py"
     gate.write_text(script(workflow, "Check release version"), encoding="utf-8")
     # Only supply the package version: this never imports a product entry point.
@@ -209,13 +327,19 @@ def test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags(
         assert git(clone, "rev-parse", ref + "^{commit}") == target
     else:
         assert result.returncode != 0
-        expected = (
-            "Release requires an ANNOTATED tag"
-            if case == "lightweight"
-            else "Annotated tag does not peel to the built commit"
-        )
+        expected = {
+            "lightweight": "Release requires an ANNOTATED tag",
+            "wrong-commit": "Annotated tag does not peel to the built commit",
+            "mismatched-name": "Annotated tag object's name does not match release tag v1.1.0",
+            "deleted-origin": (
+                "Release tag v1.1.0 could not be fetched from origin (missing or unavailable)"
+            ),
+        }[case]
         assert expected in result.stderr
         assert not output.exists()
+    assert "Traceback" not in result.stderr
+    assert "CalledProcessError" not in result.stderr
+    assert git(clone, "rev-parse", "refs/tags/unrelated") == unrelated_before
 
 
 def test_sidecar_and_draft_body_record_the_built_commit(workflow):
@@ -442,9 +566,7 @@ def test_embedded_version_gate_executes_and_fails_closed(
     monkeypatch.setattr(
         subprocess,
         "run",
-        lambda args, **kwargs: subprocess.CompletedProcess(
-            args, 0, "tag" if args[1] == "cat-file" else "a" * 40, ""
-        ),
+        lambda args, **kwargs: subprocess.CompletedProcess(args, 0, _git_stdout(args), ""),
     )
     monkeypatch.setenv("GITHUB_EVENT_NAME", event)
     monkeypatch.setenv("REQUESTED_VERSION", requested)
