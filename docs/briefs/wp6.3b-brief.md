@@ -241,3 +241,21 @@ Tests (RED first): one accepted row per kind; one mixed-form refusal per kind pa
 Not chosen: (a) archive fetches for all nine (a second identity, heavier, MSVC still unrepresentable); a single optional-everything form (a row could then carry no source identity and pass).
 
 Then, unchanged: resume `01a1ac75` with dispatch-18 plus this ruling -> clean rebuild from Git Bash's FULL PATH -> notices GREEN + `dll_origin.py` clean -> smoke under UIA -> notices read in full -> Reviewer A r3 (delta over `fa0fded4..`) -> Reviewer B -> gate -> accept.
+
+## Reviewer A r3 ruling (CHARC gen 17, 2026-11-05 ~17:00Z; r3 delta `fa0fded4..65784337` NO_NEW_CRITICAL_MAJOR; 5 MINOR, 4 advisories; `wp6.3b/A/r3/review.txt`)
+
+Reviewer A CONVERGED at r3. **RULED: the recommended plan. ONE remediation turn in a FRESH Codex session, then Reviewer B (FULL pass, covering the remediation diff), NO A r4.** The turn carries, each RED first where a test is named:
+- k1: `version_evidence.method` for pyprima and packaging.version = `vendored_in_tree_path`, values unchanged.
+- k2: as ruled 16:50Z (LF-normalise the project's OWN licence text, hash over the normalised bytes, one CRLF-input test).
+- F1: `text_source` / `text_kind: excerpt` are PROPRIETARY-kind-only; refused on git-tree and release-archive rows (one test per kind).
+- F2: a vendored-components declaration also covers FILE entries under the path's directory in `_internal/` (`.py` / `.pyd` / any); such a file is claimed by the block or fails closed (one test with a planted file).
+- F3: `co_licensed_with` refused on a row whose `bundled_files` is empty (test).
+- F4: LLVM gets `source_path: "llvm"` (seat-confirmed fetch URL `.../llvm-project/llvmorg-3.6.2/llvm/LICENSE.TXT`); Mesa none (root text); a report line: the sub-tree rule is code-enforced for vendored rows and otherwise seat-verified data.
+- A1: native detection by MAGIC BYTES (`MZ`, ELF, Mach-O) beside the extension test; a renamed PE is detected (test).
+- A3: an unset `SYSTEMROOT` yields a `FAILED:` line, not a traceback (test).
+- A4: four tests, one per mutant, each shown RED against its mutant in the turn's record.
+- A2: a report line (shape-only at build time; the hash binding and the seat record carry the truth).
+
+**F5 DEFERRED to WP6.5** (out of envelope: the darwin PATH list is `else: pass`; PyInstaller re-signs Mach-O files so the whole-file-hash origin check will refuse every macOS build, fail-closed today). A report limits line; at WP6.3b's accept a register-row NOTE; WP6.5's brief gains the owned item (its own sanitized-PATH list for darwin; a Mach-O-aware origin rule, e.g. hash over the unsigned segments or re-sign-then-compare) before FINAL.
+
+Then: seat QA -> REBUILD + notices (k2 and F4 change the artifact notices; the smoke need not re-run unless `build.py`'s smoke path changed, the orchestrator decides from the diff) -> Reviewer B -> gate -> accept. Nothing else to rule.
