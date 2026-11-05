@@ -53,6 +53,35 @@ def _load_build_script() -> ModuleType:
 build = _load_build_script()
 
 
+@pytest.mark.parametrize("variable", ["PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE"])
+def test_build_refuses_python_environment_overrides(tmp_path, monkeypatch, capsys, variable):
+    """Untrusted Python search paths fail before any pack scan or analysis."""
+    monkeypatch.setenv(variable, "foreign")
+    monkeypatch.setattr(build, "pack_sources", lambda: pytest.fail("scan reached"))
+    assert build.build("onedir", out=tmp_path) == 1
+    assert f"FAILED: build environment: {variable} is set" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("duplicate", [False, True])
+def test_origin_trust_refuses_foreign_locked_distribution(tmp_path, monkeypatch, duplicate):
+    """A matching lock version and self-authored RECORD do not establish venv origin."""
+    site = tmp_path / "foreign"
+    info = site / "numpy-2.5.4.dist-info"
+    info.mkdir(parents=True)
+    (info / "METADATA").write_text("Name: numpy\nVersion: 2.5.4\n")
+    (info / "RECORD").write_text("numpy/foreign.dll,,\n")
+    monkeypatch.syspath_prepend(str(site))
+    if not duplicate:
+        original = build.importlib.metadata.distributions
+        monkeypatch.setattr(
+            build.importlib.metadata,
+            "distributions",
+            lambda **kwargs: original(path=[str(site)]),
+        )
+    with pytest.raises(ValueError, match=r"(outside.*venv|resolves more than once)"):
+        build._locked_native_distributions()
+
+
 def test_analysis_uses_only_sanitized_path_and_restores_it(tmp_path, monkeypatch):
     """A foreign resolver candidate must disappear even when analysis fails."""
     foreign = tree(tmp_path / "foreign", ["foreign.dll"])
@@ -119,6 +148,19 @@ def test_missing_systemroot_is_a_named_build_failure(tmp_path, monkeypatch, caps
     assert build.build("onedir", out=tmp_path / "out") == 1
     assert "FAILED: PyInstaller: SYSTEMROOT is unset" in capsys.readouterr().out
     assert os.environ["PATH"] == "unchanged path"
+
+
+def test_pyinstaller_hook_valueerror_keeps_its_traceback(tmp_path, monkeypatch):
+    """Only the explicit build-environment error becomes a one-line failure."""
+    monkeypatch.setattr(build, "pack_sources", lambda: [])
+    monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "config"))
+
+    def broken_hook(args):
+        raise ValueError("real hook failure")
+
+    monkeypatch.setattr(build, "run_pyinstaller", broken_hook)
+    with pytest.raises(ValueError, match="real hook failure"):
+        build.build("onedir", out=tmp_path / "out")
 
 
 @pytest.mark.parametrize(
@@ -202,6 +244,36 @@ def test_native_origin_accepts_interpreter_and_hash_verified_locked_record(tmp_p
     (site / "fixture/native.dll").write_bytes(b"modified wheel")
     with pytest.raises(ValueError, match="RECORD"):
         build.native_origin_violations(home / "Clearwater.exe", original_path="")
+
+
+def test_record_native_hash_refuses_correct_digest_with_wrong_record_size(tmp_path):
+    """M3: the RECORD's size must match independently of a correct SHA-256."""
+    site = tree(tmp_path / "site", ["fixture/native.dll"], b"wheel")
+    info = site / "fixture-1.0.dist-info"
+    info.mkdir()
+    digest = base64.urlsafe_b64encode(hashlib.sha256(b"wheel").digest()).decode().rstrip("=")
+    (info / "RECORD").write_text(f"fixture/native.dll,sha256={digest},4\n")
+    dist = importlib.metadata.PathDistribution(info)
+    with pytest.raises(ValueError, match="differs from locked wheel RECORD"):
+        build._record_native_hash(dist, dist.files[0])
+
+
+def test_bootloader_refuses_executable_resource_section(tmp_path):
+    """M5: replaceable resources must never introduce executable code."""
+    import pefile
+    from PyInstaller.utils.win32 import winmanifest
+
+    target = tmp_path / "Clearwater.exe"
+    target.write_bytes(build._locked_bootloader().read_bytes())
+    winmanifest.write_manifest_to_executable(str(target), winmanifest.create_application_manifest())
+    with pefile.PE(str(target)) as pe:
+        resource = next(
+            section for section in pe.sections if section.Name.rstrip(b"\0") == b".rsrc"
+        )
+        resource.Characteristics |= 0x20000000
+        changed = pe.write()
+    target.write_bytes(changed)
+    assert not build._is_clearwater_bootloader(target)
 
 
 def test_bootloader_identity_allows_resources_and_archive_but_refuses_code_changes(tmp_path):

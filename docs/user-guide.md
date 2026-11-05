@@ -1,4 +1,4 @@
-# Clearwater 1.0.0 user guide
+# Clearwater user guide
 
 ## 1. What Clearwater does
 
@@ -13,12 +13,18 @@ Clearwater does not support. Record in standard (SDR) mode instead." PQ shows
 "PQ (HDR10)" in place of "HLG". Use your camera's standard/SDR recording mode
 for future clips. See [accepted inputs and refusals](underwater-correction-spec.md).
 
-## 2. Install on Windows 11
+## 2. Install on Windows 11 (from 1.1.0)
+
+These instructions describe the planned 1.1.0 artifact, which is not released yet.
+For the current source release, follow the
+[v1.0.0 installation instructions](https://github.com/rwsmythe/clearwater/blob/v1.0.0/docs/user-guide.md).
+FFmpeg distribution remains pending WP6.3c; follow the completed release's
+instructions and artifact notices for its FFmpeg requirements.
 
 Download **Clearwater-1.1.0-windows-onedir.zip** from the
 [Clearwater release page](https://github.com/rwsmythe/clearwater/releases).
-This one-folder application includes Python and FFmpeg; neither needs a separate
-install. Allow space for the unpacked folder, output files and video cache.
+This one-folder application includes Python, so Python needs no separate install.
+Allow space for the unpacked folder, output files and video cache.
 
 Optionally download the matching `.zip.sha256` file and compare its hash with:
 
@@ -242,9 +248,12 @@ it does not copy arbitrary incompatible camera metadata blindly. Keep the source
 as your original. See [D22/D53 and the photo rules](underwater-correction-spec.md)
 and [the EXIF verification report](reports/wp4.5-exif-bytes.md).
 
-## 6. When something goes wrong
+## 6. When something goes wrong (from 1.1.0)
 
-The bundled FFmpeg and ffprobe sit beside `Clearwater.exe`; if you moved it, put it back
+Until 1.1.0 is released, use the tested FFmpeg setup and troubleshooting in the
+[v1.0.0 guide](https://github.com/rwsmythe/clearwater/blob/v1.0.0/docs/user-guide.md).
+
+For an artifact with bundled FFmpeg, FFmpeg and ffprobe sit beside `Clearwater.exe`; if you moved it, put it back
 with the rest of the extracted folder. For a source install, or as a fallback when
 the adjacent tools are absent, both tools must be on PATH; open a new terminal
 after changing PATH. Keep the bundled versions together rather than mixing builds.
@@ -317,7 +326,11 @@ to keep from `~/.config/clearwater/presets` into the new `presets` folder (or
 use Import... in the Presets panel), and remove the old folders when you no
 longer need them.
 
-## 8. Licence
+## 8. Licence (from 1.1.0)
+
+The 1.1.0 artifact and its notices are pending. The
+[v1.0.0 guide](https://github.com/rwsmythe/clearwater/blob/v1.0.0/docs/user-guide.md)
+describes the current source release's licence material.
 
 Clearwater is free software under **GPL-2.0-or-later**, meaning GPL version 2 or
 any later version; see [LICENSE](../LICENSE) and
@@ -325,6 +338,6 @@ any later version; see [LICENSE](../LICENSE) and
 The release artifact carries its own generated **THIRD_PARTY_NOTICES.md** beside
 `Clearwater.exe`; that file gives the redistributed component terms, full licence
 texts and corresponding-source pointers for that artifact. Qt uses LGPLv3 dynamic
-linking; bundled FFmpeg runs as a separate process and requires GPL-3.0 terms for
+linking; when bundled, FFmpeg runs as a separate process and requires GPL-3.0 terms for
 the combined artifact under Clearwater's or-later grant. Optional, user-obtained
 NVIDIA CUDA components retain NVIDIA's EULA.

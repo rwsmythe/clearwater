@@ -59,6 +59,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import sysconfig
 import time
 import urllib.error
 import urllib.request
@@ -1787,6 +1788,10 @@ def write_hidden_import_report(
     return path
 
 
+class BuildEnvironmentError(ValueError):
+    """The analysis environment cannot be constructed safely."""
+
+
 def run_pyinstaller(args: Sequence[str]) -> None:
     """Run PyInstaller in this process: ``PyInstaller.__main__.run(args)``.
 
@@ -1798,7 +1803,7 @@ def run_pyinstaller(args: Sequence[str]) -> None:
         args: The command line (:func:`pyinstaller_args`).
 
     Raises:
-        ValueError: Windows SYSTEMROOT is unset, so a safe PATH cannot be formed.
+        BuildEnvironmentError: Windows SYSTEMROOT is unset; no safe PATH can be formed.
         SystemExit: PyInstaller's own exit on a failed build (non-zero status).
     """
     original = os.environ.get("PATH")
@@ -1806,7 +1811,9 @@ def run_pyinstaller(args: Sequence[str]) -> None:
         if sys.platform == "win32":
             system_root = os.environ.get("SYSTEMROOT")
             if not system_root:
-                raise ValueError("SYSTEMROOT is unset; cannot sanitize the analysis PATH")
+                raise BuildEnvironmentError(
+                    "SYSTEMROOT is unset; cannot sanitize the analysis PATH"
+                )
             windows = Path(system_root)
             base = Path(sys.base_prefix)
             os.environ["PATH"] = os.pathsep.join(
@@ -1856,11 +1863,52 @@ def _locked_native_distributions() -> list[importlib.metadata.Distribution]:
     versions: dict[str, set[str]] = {}
     for row in lock["package"]:
         versions.setdefault(re.sub(r"[-_.]+", "-", row["name"]).lower(), set()).add(row["version"])
-    result = []
+    return list(trusted_distributions(versions).values())
+
+
+def check_build_environment() -> None:
+    """Refuse Python search overrides before reading build inputs.
+
+    Raises:
+        ValueError: A Python environment override is present, including an empty one.
+    """
+    for name in ("PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE"):
+        if name in os.environ:
+            raise ValueError(f"build environment: {name} is set")
+
+
+def trusted_distributions(
+    versions: dict[str, set[str]],
+) -> dict[str, importlib.metadata.Distribution]:
+    """Resolve locked distributions uniquely inside the build venv only.
+
+    Args:
+        versions: Normalized locked names and allowed versions.
+
+    Returns:
+        The installed locked distributions from purelib or platlib.
+
+    Raises:
+        ValueError: Python overrides, duplicate names, foreign roots or versions exist.
+    """
+    check_build_environment()
+    paths = sysconfig.get_paths()
+    roots = {Path(paths[key]).resolve() for key in ("purelib", "platlib")}
+    candidates: dict[str, list[importlib.metadata.Distribution]] = {}
     for dist in importlib.metadata.distributions():
         name = re.sub(r"[-_.]+", "-", dist.metadata["Name"]).lower()
-        if name in versions and dist.version in versions[name]:
-            result.append(dist)
+        if name in versions:
+            candidates.setdefault(name, []).append(dist)
+    result = {}
+    for name, matches in candidates.items():
+        if len(matches) != 1:
+            raise ValueError(f"build environment: locked name {name} resolves more than once")
+        dist = matches[0]
+        if Path(str(dist.locate_file(""))).resolve() not in roots:
+            raise ValueError(f"build environment: {name} is outside the build venv purelib/platlib")
+        if dist.version not in versions[name]:
+            raise ValueError(f"build environment: {name} version differs from uv.lock")
+        result[name] = dist
     return result
 
 
@@ -2155,6 +2203,11 @@ def build(
     Returns:
         0 when the build succeeded and the bundle holds nothing forbidden, else 1.
     """
+    try:
+        check_build_environment()
+    except ValueError as error:
+        print(f"FAILED: {error}")
+        return 1
     if (notices or smoke) and form != "onedir":
         print("FAILED: --notices/--smoke require --form onedir")
         return 1
@@ -2200,7 +2253,7 @@ def build(
     original_path = os.environ.get("PATH", "")
     try:
         run_pyinstaller(args)
-    except ValueError as error:
+    except BuildEnvironmentError as error:
         print(f"FAILED: PyInstaller: {error}".encode("ascii", "backslashreplace").decode("ascii"))
         return 1
     wall = time.monotonic() - start

@@ -1,7 +1,7 @@
 """Fatal exception reporting, with disposable profiles and no desktop windows.
 
-Children block Qt and have bounded lifetimes. GUI checks use offscreen Qt, replace
-the message presenter and process queued events without entering an event loop.
+Entry-point children block Qt or stub the GUI entry and have bounded lifetimes.
+Presenter checks use offscreen Qt and test doubles without calling the GUI entry.
 """
 
 from __future__ import annotations
@@ -255,6 +255,7 @@ def test_post_qt_failure_presents_once_on_qt_thread_before_exit(monkeypatch, thr
         presented.append(text)
 
     monkeypatch.setattr(gui, "_present_exception", present, raising=False)
+    monkeypatch.setattr(gui.QApplication, "platformName", lambda *args: "windows")
 
     gui._enable_exception_dialog(app, reporter)
     info = _failure()
@@ -277,6 +278,123 @@ def test_post_qt_failure_presents_once_on_qt_thread_before_exit(monkeypatch, thr
     assert "Traceback" not in presented[0]
     assert "RuntimeError" not in presented[0]
     assert exits == [1]
+
+
+@pytest.mark.parametrize("platform", ["offscreen", "minimal"])
+def test_headless_fatal_presenter_skipped_and_process_exits(tmp_path, platform):
+    """A headless fatal report must reach os._exit instead of a hidden modal box."""
+    body = r"""
+import importlib
+from PySide6.QtWidgets import QApplication
+from clearwater import gpu_pack
+gpu_pack.activate = lambda: None
+gui = importlib.import_module('clearwater.app.main')
+gui.main = lambda *args: (_ for _ in ()).throw(AssertionError('GUI entry reached'))
+from clearwater.__main__ import install_exception_hooks
+app = QApplication([])
+reporter = install_exception_hooks()
+gui._enable_exception_dialog(app, reporter)
+raise RuntimeError('planted headless GUI failure')
+"""
+    done = subprocess.run(
+        [sys.executable, "-c", body],
+        capture_output=True,
+        text=True,
+        timeout=12,
+        env={**os.environ, "QT_QPA_PLATFORM": platform},
+    )
+    assert done.returncode == 1, done.stderr
+    assert len(done.stderr.splitlines()) == 1, done.stderr
+    assert done.stderr.count("Clearwater: unexpected error;") == 1
+    assert "planted headless GUI failure" in app_locations().log_file.read_text()
+
+
+def test_gui_thread_exception_box_has_a_thirty_second_auto_close(monkeypatch):
+    """Even the synchronous GUI-thread box schedules a single bounded close."""
+    from PySide6.QtWidgets import QApplication
+
+    gui = importlib.import_module("clearwater.app.main")
+    app = QApplication.instance() or QApplication([])
+    timers = []
+
+    class Timer:
+        def __init__(self, owner):
+            self.timeout = type(
+                "Signal", (), {"connect": lambda _, callback: setattr(self, "close", callback)}
+            )()
+            self.single = False
+            self.stopped = False
+            timers.append(self)
+
+        def setSingleShot(self, value):  # noqa: N802 - Qt test double
+            self.single = value
+
+        def start(self, interval):
+            self.interval = interval
+
+        def stop(self):
+            self.stopped = True
+
+    class Box:
+        Icon = gui.QMessageBox.Icon
+        StandardButton = gui.QMessageBox.StandardButton
+
+        def __init__(self, *args):
+            self.closed = False
+
+        def setTextFormat(self, value):  # noqa: N802 - Qt test double
+            pass
+
+        def reject(self):
+            self.closed = True
+
+        def exec(self):
+            assert len(timers) == 1, "synchronous presenter has no auto-close"
+            assert timers[0].interval == 30_000 and timers[0].single
+            timers[0].close()
+            assert self.closed
+
+    monkeypatch.setattr(gui, "QTimer", Timer, raising=False)
+    monkeypatch.setattr(gui, "QMessageBox", Box)
+    gui._present_exception("See log")
+    assert timers[0].stopped
+    assert app is not None
+
+
+def test_cross_thread_presenter_wait_is_bounded_at_thirty_seconds(monkeypatch):
+    """M16: even a stalled Qt thread cannot make the reporting thread wait forever."""
+    from PySide6.QtWidgets import QApplication
+
+    gui = importlib.import_module("clearwater.app.main")
+    app = QApplication.instance() or QApplication([])
+    waits, errors = [], []
+
+    class Bound:
+        def wait(self, timeout=None):
+            waits.append(timeout)
+            assert timeout == 30, "fatal presenter has an unbounded wait"
+            return False
+
+        def set(self):
+            pass
+
+    monkeypatch.setattr(gui, "Event", Bound)
+    monkeypatch.setattr(gui, "_present_exception", lambda text: None)
+    dialog = gui._ExceptionDialog(app)
+
+    def present():
+        try:
+            dialog.present("See log")
+        except BaseException as error:
+            errors.append(error)
+
+    thread = threading.Thread(target=present)
+    thread.start()
+    thread.join(1)
+    app.processEvents()  # drain the queued stub presenter before restoring it
+    assert not thread.is_alive()
+    assert not errors, errors
+    assert waits == [30]
 
 
 _CHILD_PREFIX = r"""
@@ -330,6 +448,8 @@ class App:
         return app
     def exec(self):
         raise AssertionError('event loop entered')
+    def platformName(self):
+        return 'windows'
 app = App()
 class Dialog:
     def __init__(self, owner):

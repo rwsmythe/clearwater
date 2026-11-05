@@ -75,6 +75,55 @@ def test_setup_uv_pins_the_audited_uv_release(workflow):
     assert versions[0] == "0.10.9", "uv must match the audited laptop build input"
 
 
+def test_setup_uv_disables_cache_and_verifies_the_seat_fetched_checksum(workflow):
+    setup = step(workflow, "Set up uv")
+    assert "enable-cache: false" in setup
+    assert "checksum: f58dc40896000229db7c52b8bdd931394040ef2ad59abd1eda841f6d70b13d7a" in setup
+
+
+@pytest.mark.parametrize(
+    "tag_type, peeled, allowed",
+    [("tag", "a" * 40, True), ("commit", "a" * 40, False), ("tag", "b" * 40, False)],
+)
+def test_release_requires_annotated_tag_at_the_built_commit(
+    workflow, tmp_path, monkeypatch, tag_type, peeled, allowed
+):
+    monkeypatch.setenv("GITHUB_REF", "refs/tags/v1.1.0")
+    monkeypatch.setenv("GITHUB_SHA", "a" * 40)
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "output"))
+    monkeypatch.setitem(sys.modules, "clearwater", SimpleNamespace(__version__="1.1.0"))
+    calls = []
+
+    def git(args, **kwargs):
+        calls.append(args)
+        return subprocess.CompletedProcess(
+            args, 0, tag_type if args[1] == "cat-file" else peeled, ""
+        )
+
+    monkeypatch.setattr(subprocess, "run", git)
+    code = compile(script(workflow, "Check release version"), "release-tag-gate", "exec")
+    if allowed:
+        exec(code, {})
+        assert calls == [
+            ["git", "cat-file", "-t", "refs/tags/v1.1.0"],
+            ["git", "rev-parse", "refs/tags/v1.1.0^{commit}"],
+        ]
+    else:
+        with pytest.raises(SystemExit):
+            exec(code, {})
+    assert "fetch-depth: 0" in step(workflow, "Checkout tagged source")
+
+
+def test_sidecar_and_draft_body_record_the_built_commit(workflow):
+    stage = script(workflow, "Stage release assets")
+    assert 'Add-Content -LiteralPath "work/release/$name.zip.sha256"' in stage
+    assert '"# source-commit: $env:GITHUB_SHA"' in stage
+    notes = step(workflow, "Select release notes")
+    assert "BUILT_COMMIT: ${{ github.sha }}" in notes
+    assert "Source commit:" in script(workflow, "Select release notes")
+
+
 def test_windows_job_uses_frozen_unsynced_managed_python(workflow):
     windows = workflow.split("\n  windows:\n", 1)[1].split("\n  release:\n", 1)[0]
     assert re.search(
@@ -286,6 +335,14 @@ def test_embedded_version_gate_executes_and_fails_closed(
     assert "REQUESTED_VERSION: ${{ inputs.version }}" in gate
     output = tmp_path / "output"
     monkeypatch.setenv("GITHUB_REF", ref)
+    monkeypatch.setenv("GITHUB_SHA", "a" * 40)
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda args, **kwargs: subprocess.CompletedProcess(
+            args, 0, "tag" if args[1] == "cat-file" else "a" * 40, ""
+        ),
+    )
     monkeypatch.setenv("GITHUB_EVENT_NAME", event)
     monkeypatch.setenv("REQUESTED_VERSION", requested)
     monkeypatch.setenv("GITHUB_OUTPUT", str(output))
@@ -309,6 +366,7 @@ def test_release_notes_body_is_optional_and_version_specific(
     assert "RELEASE_VERSION: ${{ needs.windows.outputs.version }}" in body
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("RELEASE_VERSION", "1.1.0")
+    monkeypatch.setenv("BUILT_COMMIT", "a" * 40)
     output = tmp_path / "output"
     monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     notes = tmp_path / "docs/release-notes-1.1.0.md"
@@ -316,7 +374,10 @@ def test_release_notes_body_is_optional_and_version_specific(
         notes.parent.mkdir()
         notes.write_text("release body")
     exec(compile(script(workflow, "Select release notes"), "release-body", "exec"), {})
-    assert output.read_text() == f"body_path={'docs/release-notes-1.1.0.md' if present else ''}\n"
+    assert output.read_text() == "body_path=work/release-body.md\n"
+    rendered = (tmp_path / "work/release-body.md").read_text()
+    assert "a" * 40 in rendered and "Source commit:" in rendered
+    assert ("release body" in rendered) == present
     assert "body_path: ${{ steps.notes.outputs.body_path }}" in workflow
 
 
@@ -367,7 +428,7 @@ def test_readme_gpu_recipe_names_split_streams_and_matches_guide_commands():
 
 def test_guide_leads_with_artifact_and_retains_gpu_terminal_outcomes():
     text = (ROOT / "docs/user-guide.md").read_text(encoding="utf-8")
-    install = text.split("## 2. Install on Windows 11\n", 1)[1].split("\n## 3.", 1)[0]
+    install = text.split("## 2. Install on Windows 11 (from 1.1.0)\n", 1)[1].split("\n## 3.", 1)[0]
     assert "Clearwater-1.1.0-windows-onedir.zip" in install
     assert install.index("Clearwater.exe") < install.index("uv sync")
     assert "Get-FileHash" in install and "More info" in install and "Run anyway" in install

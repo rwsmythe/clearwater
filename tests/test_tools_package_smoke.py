@@ -9,9 +9,11 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 import psutil
 import pytest
@@ -51,6 +53,7 @@ args = sys.argv[1:]
 with Path(config['calls']).open('a') as stream:
     stream.write(json.dumps({'args': args, 'cwd': os.getcwd(), 'env': dict(os.environ)}) + '\n')
 mode = config.get('mode', '')
+time.sleep(config.get('startup_delay', 0))
 if mode == 'hang':
     Path(config['pid']).write_text(str(os.getpid()))
     time.sleep(120)
@@ -102,6 +105,15 @@ def load_smoke():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_smoke_environment_strips_all_python_overrides(tmp_path, monkeypatch):
+    """M12: no inherited Python search/configuration override reaches a frozen row."""
+    variables = ("PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE", "PYTHONHASHSEED")
+    for key in variables:
+        monkeypatch.setenv(key, "foreign")
+    env = load_smoke()._environment(tmp_path / "profile")
+    assert not any(key.startswith("PYTHON") for key in env)
 
 
 def test_safe_arguments_equal_the_eleven_headless_protocol_tuples():
@@ -197,6 +209,21 @@ def snapshot(folder):
         for p in folder.rglob("*")
         if p.is_file()
     }
+
+
+def _bound_from_readiness(smoke, monkeypatch, marker):
+    """Pause this fixture's row clock until ready, with a ten-second startup ceiling."""
+    baseline = time.monotonic()
+    ready = None
+
+    def now():
+        nonlocal ready
+        current = time.monotonic()
+        if ready is None and marker.exists():
+            ready = current
+        return baseline + (max(0, current - baseline - 10) if ready is None else current - ready)
+
+    monkeypatch.setattr(smoke, "time", SimpleNamespace(monotonic=now, sleep=time.sleep))
 
 
 @pytest.fixture
@@ -306,11 +333,18 @@ def test_refusal_status_and_extra_stderr_fail_by_row_name(synthetic, tmp_path, m
     "mode, message",
     [("hang", "timeout"), ("leftover", "process left"), ("fast-leftover", "process left")],
 )
-def test_timeout_and_surviving_child_fail_and_are_reaped(synthetic, tmp_path, mode, message):
+def test_timeout_and_surviving_child_fail_and_are_reaped(
+    synthetic, tmp_path, monkeypatch, mode, message
+):
     smoke, release, prepare, config = synthetic
+    if mode != "hang":
+        config["startup_delay"] = 1.25
+        _bound_from_readiness(smoke, monkeypatch, Path(config["pid"]))
     prepare(mode)
     with pytest.raises(smoke.SmokeError, match="refuse-command.*" + message):
-        smoke.run_smoke(release["folder"], out=tmp_path / "out", timeout=1)
+        smoke.run_smoke(
+            release["folder"], out=tmp_path / "out", timeout=1 if mode == "hang" else 10
+        )
     pid = int(Path(config["pid"]).read_text())
     assert not psutil.pid_exists(pid)
 
@@ -476,9 +510,10 @@ mode = config['mode']
 if mode in {'escape', 'pipe-holder'}:
     # The intermediate and venv redirector both disappear before census. The
     # grandchild records its own native PID, avoiding the redirector's PID.
-    sleeper = 'import os,time,ctypes; from ctypes import wintypes as w; from pathlib import Path; '
+    sleeper = ('import os,time,ctypes,json; from ctypes import wintypes as w; '
+               'from pathlib import Path; ')
     if rescue_name:
-        # RED's sleeper joins the test-owned rescue before it reports its PID.
+        # Every sleeper joins the test-owned rescue before it reports its PID.
         # The root/intermediate remain unchanged, preserving the escape chain.
         sleeper += ('a=ctypes.WinDLL("kernel32",use_last_error=True); '
                     'a.OpenJobObjectW.argtypes=[w.DWORD,w.BOOL,w.LPCWSTR]; '
@@ -488,17 +523,25 @@ if mode in {'escape', 'pipe-holder'}:
                     'h=a.OpenJobObjectW(1,False,' + repr(rescue_name) + '); '
                     'assert h; assert a.AssignProcessToJobObject(h,a.GetCurrentProcess()); '
                     'a.CloseHandle.argtypes=[w.HANDLE]; a.CloseHandle(h); ')
-    sleeper += ('Path(' + repr(config['pid']) + ').write_text(str(os.getpid())); '
+    sleeper += ('k=ctypes.WinDLL("kernel32",use_last_error=True); '
+                'k.GetStdHandle.argtypes=[w.DWORD]; k.GetStdHandle.restype=w.HANDLE; '
+                'k.GetFileType.argtypes=[w.HANDLE]; '
+                'Path(' + repr(config['pipes']) + ').write_text(json.dumps('
+                '[k.GetFileType(k.GetStdHandle(n)) for n in (-11,-12)])); '
+                'Path(' + repr(config['pid']) + ').write_text(str(os.getpid())); '
                 'time.sleep(120)')
     middle = ('import subprocess,sys; subprocess.Popen([sys.executable,"-c",'
-              + repr(sleeper) + ']' + ('' if mode == 'pipe-holder' else
+              + repr(sleeper) + ']' + (
+                ',stdout=sys.stdout,stderr=sys.stderr' if mode == 'pipe-holder' else
                 ',stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL') +
+                ',close_fds=' + repr(mode != 'pipe-holder') +
                 ',creationflags=subprocess.CREATE_NO_WINDOW)')
     subprocess.run([sys.executable, '-c', middle], check=True,
-                   stdout=None if mode == 'pipe-holder' else subprocess.DEVNULL,
-                   stderr=None if mode == 'pipe-holder' else subprocess.DEVNULL,
+                   stdout=sys.stdout if mode == 'pipe-holder' else subprocess.DEVNULL,
+                   stderr=sys.stderr if mode == 'pipe-holder' else subprocess.DEVNULL,
+                   close_fds=mode != 'pipe-holder',
                    creationflags=subprocess.CREATE_NO_WINDOW)
-    deadline = time.monotonic() + 5
+    deadline = time.monotonic() + 10
     while not Path(config['pid']).exists():
         assert time.monotonic() < deadline
         time.sleep(.01)
@@ -527,9 +570,10 @@ def job_case(tmp_path, monkeypatch):
     rescue = RescueJob()
     config = {
         "mode": "order",
-        "rescue": None if hasattr(smoke, "_kernel32") else rescue.name,
+        "rescue": rescue.name,
         "started": str(tmp_path / "started.json"),
         "pid": str(tmp_path / "pid.txt"),
+        "pipes": str(tmp_path / "pipes.json"),
         "breakaway": str(tmp_path / "breakaway.txt"),
     }
     script = tmp_path / "job-stub.py"
@@ -555,12 +599,40 @@ def job_case(tmp_path, monkeypatch):
     def run(mode="order", bound=10):
         config["mode"] = mode
         config_path.write_text(json.dumps(config))
-        return smoke.run_row(
-            tmp_path / "Clearwater.exe",
-            smoke.SmokeRow("job-" + mode, ("-c", "pass"), "", 2, "Clearwater: -c is not supported"),
-            root=tmp_path / "profile",
-            timeout=bound,
-        )
+        marker = Path(config["pid"] if mode in {"escape", "pipe-holder"} else config["started"])
+        _bound_from_readiness(smoke, monkeypatch, marker)
+        results, errors = [], []
+
+        def invoke():
+            try:
+                results.append(
+                    smoke.run_row(
+                        tmp_path / "Clearwater.exe",
+                        smoke.SmokeRow(
+                            "job-" + mode, ("-c", "pass"), "", 2, "Clearwater: -c is not supported"
+                        ),
+                        root=tmp_path / "profile",
+                        timeout=bound,
+                    )
+                )
+            except BaseException as error:
+                errors.append(error)
+
+        worker = threading.Thread(target=invoke, daemon=True)
+        worker.start()
+        startup_deadline = time.monotonic() + 10
+        while worker.is_alive() and not marker.exists() and time.monotonic() < startup_deadline:
+            time.sleep(0.01)
+        worker.join(bound + 2)
+        exceeded = worker.is_alive()
+        if exceeded:
+            rescue.close()  # also releases a mutant's unbounded pipe join
+            worker.join(5)
+        assert not worker.is_alive(), "row thread survived rescue job close"
+        assert not exceeded, "row exceeded its bound while a grandchild held the pipes"
+        if errors:
+            raise errors[0]
+        return results[0]
 
     try:
         yield smoke, config, run
@@ -587,6 +659,10 @@ def test_job_census_catches_vanished_intermediate_and_bounds_pipe_holder(job_cas
         assert psutil.pid_exists(pid), "escape stimulus died before the census assertion"
     assert error is not None, "row passed with a live unobserved grandchild"
     message = str(error)
+    if mode == "pipe-holder":
+        assert json.loads(Path(config["pipes"]).read_text()) == [3, 3], (
+            "grandchild did not inherit both pipes"
+        )
     assert "job-" + mode in message and "SURVIVORS" in message
     assert f"pid={pid}" in message and "image=" in message
     assert "python" in message.lower()

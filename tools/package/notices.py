@@ -1052,9 +1052,7 @@ def plan_notices(
     uv_lock_path: Path = ROOT / "uv.lock",
     ffmpeg_lock_path: Path = ROOT / "tools/package/ffmpeg.lock.json",
     native_licences_path: Path = ROOT / "tools/package/native-licences",
-    distribution: Callable[
-        [str], importlib.metadata.Distribution
-    ] = importlib.metadata.distribution,
+    distribution: Callable[[str], importlib.metadata.Distribution] | None = None,
 ) -> NoticePlan:
     """Inventory an onedir folder and select only the rows supported by its contents.
 
@@ -1072,7 +1070,7 @@ def plan_notices(
         uv_lock_path: The build's locked distribution versions.
         ffmpeg_lock_path: The FFmpeg identity and verified source/licence rows.
         native_licences_path: The committed seat-verified native licence inputs.
-        distribution: Installed-metadata resolver, also usable with fixture wheels.
+        distribution: Explicit fixture resolver; None uses unique build-venv metadata.
 
     Returns:
         Validated coverage rows and explicitly user-obtained component statements.
@@ -1082,10 +1080,17 @@ def plan_notices(
             bundled FFmpeg repository is GPL-3.0-incompatible.
         OSError: Required files cannot be read.
     """
+    _build_tool().check_build_environment()
     entries, home = _inventory(folder)
     ffmpeg = _ffmpeg_rows(home, ffmpeg_lock_path)
     audit = _audit_rows(audit_path)
     versions = _locked_versions(uv_lock_path)
+    if distribution is None:
+        trusted = cast(
+            dict[str, importlib.metadata.Distribution],
+            _build_tool().trusted_distributions(versions),
+        )
+        distribution = trusted.__getitem__
     native_records = load_native_licences(native_licences_path)
     declarations = _vendored_declarations(
         json.loads((native_licences_path / "manifest.json").read_text(encoding="utf-8"))
@@ -1121,7 +1126,17 @@ def plan_notices(
                 basenames[Path(relative).name.casefold()].append((name, sha256))
             if module := _module_name(relative):
                 modules[module].add(name)
-                if name in {"pyinstaller", "pyinstaller-hooks-contrib"}:
+                if name in {"pyinstaller", "pyinstaller-hooks-contrib"} and (
+                    (
+                        parts[:-1] == ["PyInstaller", "loader"]
+                        and Path(relative).stem.startswith(("pyimod", "pyiboot"))
+                    )
+                    or (
+                        len(parts) >= 2
+                        and parts[-2] == "rthooks"
+                        and Path(relative).stem.startswith("pyi_rth_")
+                    )
+                ):
                     modules[Path(relative).stem].add(name)
                 if (
                     name == "pyinstaller"
@@ -1758,9 +1773,7 @@ def write_notices(
     uv_lock_path: Path = ROOT / "uv.lock",
     ffmpeg_lock_path: Path = ROOT / "tools/package/ffmpeg.lock.json",
     native_licences_path: Path = ROOT / "tools/package/native-licences",
-    distribution: Callable[
-        [str], importlib.metadata.Distribution
-    ] = importlib.metadata.distribution,
+    distribution: Callable[[str], importlib.metadata.Distribution] | None = None,
 ) -> Path:
     """Validate and atomically write the release folder's complete artifact notices.
 
@@ -1775,7 +1788,7 @@ def write_notices(
         uv_lock_path: The locked distribution versions.
         ffmpeg_lock_path: The FFmpeg provenance and licence lock.
         native_licences_path: The committed seat-verified native licence inputs.
-        distribution: Installed wheel metadata resolver.
+        distribution: Explicit fixture resolver; None uses unique build-venv metadata.
 
     Returns:
         The written ``THIRD_PARTY_NOTICES.md`` beside Clearwater's executable.
@@ -1846,7 +1859,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             audit_path=options.audit,
             uv_lock_path=options.uv_lock,
             ffmpeg_lock_path=options.ffmpeg_lock,
-            distribution=importlib.metadata.distribution,
         )
     except (OSError, ValueError, KeyError, zipfile.BadZipFile) as error:
         message = " ".join(str(error).split()).encode("ascii", "backslashreplace").decode("ascii")

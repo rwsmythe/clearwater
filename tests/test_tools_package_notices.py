@@ -18,6 +18,50 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="Windows native/interpreter fixtures; WP6.5 supplies native fixtures",
+)
+
+
+@pytest.mark.parametrize("variable", ["PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE"])
+def test_notices_refuses_python_environment_overrides(release, monkeypatch, variable):
+    """The fixture resolver must not bypass rejection of inherited search overrides."""
+    monkeypatch.setenv(variable, "foreign")
+    with pytest.raises(ValueError, match=f"build environment: {variable} is set"):
+        plan(load_notices(), release)
+
+
+def test_notices_default_resolver_refuses_duplicate_locked_name(release, monkeypatch):
+    """A foreign matching numpy dist-info on sys.path must fail before resolution."""
+    foreign = release["folder"].parent / "foreign"
+    installed(foreign, "numpy", "2.5.4", {"numpy/foreign.dll": "foreign"})
+    monkeypatch.syspath_prepend(str(foreign))
+    module = load_notices()
+    kwargs = writer_kwargs(release)
+    kwargs.pop("distribution")
+    with pytest.raises(ValueError, match="resolves more than once"):
+        module.write_notices(release["folder"], **kwargs)
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "PyInstaller/utils.py",
+        "PyInstaller/loader/pyimod_fake/utils.py",
+        "PyInstaller/hooks/rthooks/pyi_rth_fake/utils.py",
+    ],
+)
+def test_pyinstaller_ordinary_stems_cannot_claim_top_level_modules(release, relative):
+    """A hook utility's basename must not license an unrelated bundled utils module."""
+    utility = release["site"] / relative
+    utility.parent.mkdir(parents=True, exist_ok=True)
+    utility.write_text("")
+    record = release["site"] / "pyinstaller-6.22.3.dist-info/RECORD"
+    record.write_text(record.read_text() + f"{relative},,\n")
+    make_executable(release["folder"], ["clearwater", "utils"])
+    with pytest.raises(ValueError, match=r"unknown.*utils"):
+        plan(load_notices(), release)
 
 
 def test_native_licence_text_is_exempt_from_checkout_normalization():
@@ -672,7 +716,7 @@ def test_writer_validation_failure_preserves_previous_notice_bytes(release):
 def test_cli_writes_notices_or_returns_one_line_failure(release, monkeypatch, capsys, fails):
     module = load_notices()
     monkeypatch.setattr(
-        module.importlib.metadata, "distribution", release["distributions"].__getitem__
+        module._build_tool(), "trusted_distributions", lambda versions: release["distributions"]
     )
     if fails:
         (release["folder"] / "_internal/mystery.dll").write_bytes(b"unknown")

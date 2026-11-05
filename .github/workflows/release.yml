@@ -35,12 +35,15 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Set up uv
         uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca # v6.0.1
         with:
           version: "0.10.9"
           python-version: "3.12.13"
+          enable-cache: false
+          checksum: f58dc40896000229db7c52b8bdd931394040ef2ad59abd1eda841f6d70b13d7a
 
       - name: Sync build environment
         run: |
@@ -57,11 +60,20 @@ jobs:
         run: |
           import os
           import re
+          import subprocess
           import clearwater
 
           ref = os.environ["GITHUB_REF"]
           if not re.fullmatch(r"refs/tags/v[0-9]+\.[0-9]+\.[0-9]+", ref):
               raise SystemExit("Release requires an existing vMAJOR.MINOR.PATCH tag")
+          def git(*args):
+              return subprocess.run(
+                  ["git", *args], capture_output=True, text=True, check=True, timeout=30,
+              ).stdout.strip()
+          if git("cat-file", "-t", ref) != "tag":
+              raise SystemExit("Release requires an ANNOTATED tag")
+          if git("rev-parse", ref + "^{commit}") != os.environ["GITHUB_SHA"]:
+              raise SystemExit("Annotated tag does not peel to the built commit")
           version = ref.removeprefix("refs/tags/v")
           if clearwater.__version__ != version:
               raise SystemExit("Tag version differs from clearwater.__version__")
@@ -99,6 +111,7 @@ jobs:
               throw "Missing release asset: $file"
             }
           }
+          Add-Content -LiteralPath "work/release/$name.zip.sha256" -Value "# source-commit: $env:GITHUB_SHA" -Encoding ascii
           New-Item -ItemType Directory -Path "work/release-assets" | Out-Null
           foreach ($file in $files) {
             Copy-Item -LiteralPath $file -Destination "work/release-assets"
@@ -155,13 +168,18 @@ jobs:
         shell: python {0}
         env:
           RELEASE_VERSION: ${{ needs.windows.outputs.version }}
+          BUILT_COMMIT: ${{ github.sha }}
         run: |
           import os
           from pathlib import Path
 
           notes = Path("docs") / f"release-notes-{os.environ['RELEASE_VERSION']}.md"
+          body = Path("work/release-body.md")
+          body.parent.mkdir(parents=True, exist_ok=True)
+          text = notes.read_text(encoding="utf-8") if notes.is_file() else ""
+          body.write_text(text + f"\n\nSource commit: `{os.environ['BUILT_COMMIT']}`\n", encoding="utf-8")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"body_path={notes.as_posix() if notes.is_file() else ''}\n")
+              output.write(f"body_path={body.as_posix()}\n")
 
       - name: Create draft release
         uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2

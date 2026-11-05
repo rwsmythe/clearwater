@@ -1,10 +1,12 @@
 # WP6.3b release workflow: implementation record
 
-Status: turn 16 remediates the remaining Reviewer A round-1 findings C1, M1 and
-m2-m6 under CHARC's ruling. The GUI-entry exposure is removed from the hook
-tests; transport, smoke-allowlist, checkout and workflow safeguards are in place.
-The installer fixture's twelve errors are fixed; its native taskkill test still
-requires the seat re-run outside the sandbox. See turn 16 for current evidence.
+Status: turn 22 implements the assigned Reviewer B r1 remediation (items 2-14)
+under CHARC's latest ruling. Reviewer A converged at r3; Reviewer B r2 delta,
+the seat rebuild/notices reading and the gate remain pending. Embedded
+third-party components compiled into carried natives are NOT yet covered by
+the artifact notices (B r1 MAJOR 1, carved to WP6.3c, closed before the 1.1.0
+draft). FFmpeg/ZIP/release remain WP6.3c's. See turn 22 for current validation;
+no artifact, N13, package acceptance or release readiness is asserted.
 
 Historical turn-15 status: turn 15 remediates Reviewer A round 1's notices MAJOR M2 and binding
 MINOR m1 with restricted PSF coverage, native identities and verified flattened
@@ -3272,3 +3274,204 @@ FULL Reviewer B, and the gate including the outside-sandbox installer run.
 CHARC owns the acceptance, AD-38/register edits and F5's WP6.5 brief update.
 The FFmpeg bundle/ZIP/release carve-out remains WP6.3c's. No package acceptance,
 gate completion or release readiness is claimed. Yield to the dispatcher.
+
+## Turn 21: bounded job-fixture wait (seat record, 2026-11-05)
+
+Dispatch 22 supplies turn 21's commit `91f90c8f` and its seat QA. The job_case
+row bound changed from 1 to 10 seconds. Seat before-record figures were
+RED 1.09 / 1.08 seconds, GREEN 10.04 / 10.05 seconds; the census mutant was
+KILLED. The seven modules at that head were 686 passed / 1 skipped, and the
+module-alone installer run was 113 passed. These are dispatcher-supplied
+seat results, not measurements made by this fresh cell. B r1 subsequently
+confirmed that the pipe-holder did not inherit its pipes; turn 22 repairs
+that stimulus rather than treating turn 21 as pipe-EOF proof.
+
+## Turn 22: Reviewer B r1 remediation (2026-11-05)
+
+Fresh dispatch 22 starts at `91f90c8f`. The chat brief and all ruling tails,
+especially Reviewer B r1's ruling, are the record over the older branch brief.
+Reviewer A converged at r3; B r1 found 1 MAJOR, 8 MINORs and 5 advisories.
+MAJOR 1 is explicitly carved to WP6.3c: **artifact notices do not yet cover
+third-party components compiled into carried natives.** No embedded-host
+rule, Python/Qt attribution row, licence input or native manifest was edited
+this turn. CHARC owns the corresponding register/AD-38 acceptance entries.
+Final depth is pending the dispatcher's reading, never estimated by the cell.
+
+### Dispositions and behavior
+
+- **2, MINOR, confirmed/fixed:** the build origin scan and default notices
+  resolver share `trusted_distributions`. Locked names must resolve exactly
+  once, at the locked version, directly in this interpreter's sysconfig
+  purelib/platlib roots. A foreign matching numpy dist-info on sys.path is
+  refused, including when its RECORD hashes are self-consistent. A sole
+  foreign distribution also fails the root check. Build/notices reject the
+  presence of PYTHONPATH, PYTHONHOME or PYTHONUSERBASE, even an empty value,
+  with a named build-environment diagnostic. The explicit synthetic notices
+  resolver remains a fixture input; production CLI uses the trusted default.
+- **3, MINOR, confirmed/fixed:** PyInstaller stem aliases are restricted to
+  loader pyimod/pyiboot modules and pyi_rth files directly under rthooks.
+  Ordinary hook utilities cannot claim an unrelated top-level utils module.
+- **4, MINOR, confirmed/fixed:** the synchronous message box owns a single-shot
+  QTimer, closing it after 30,000 ms and stopping the timer on early dismissal.
+  Offscreen/minimal platforms skip the presenter, allowing the real reporter
+  to reach os._exit(1). Tests stub the GUI entry and GPU activation in bounded
+  children with disposable roots, or exercise only the presenter helper.
+- **5, MINOR, confirmed/fixed:** the pipe-holder now passes stdout/stderr
+  explicitly with close_fds=False at BOTH hops. The native grandchild records
+  GetFileType == FILE_TYPE_PIPE (3) for both standard handles before readiness.
+  A test-thread watchdog bounds a mutant's unbounded join and closes the
+  test-owned rescue job, so the mutant cannot leave a 120-second sleeper.
+- **6, MINOR, confirmed/fixed:** leftover/fast-leftover use 10-second row
+  bounds, starting from the PID-readiness marker through the fixture's clock;
+  the hang case retains 1 second. A deliberate 1.25-second interpreter-start
+  delay reproduces the old incorrect root-timeout path. The job stub and
+  readiness watcher allow 10 seconds for readiness, with bounded rescue.
+- **7, MINOR, confirmed/fixed:** the Windows-native notices test module has a
+  platform skip with its WP6.5 fixture explanation. No product platform branch
+  changed. On this Windows seat the notices cases run normally.
+- **8, MINOR, confirmed/fixed:** checkout fetches full tag history. The version
+  gate requires git cat-file -t == tag and refs/tags/$TAG^{commit} == GITHUB_SHA
+  before tests/build. The staged checksum sidecar has a source-commit comment;
+  the draft body always includes that same built commit, with optional release
+  notes preceding it. The checklist compares those identities with the gated
+  commit and stops on disagreement. Lightweight/moved-tag cases fail closed.
+- **9, MINOR, confirmed/fixed:** guide sections 2/6/8 say from 1.1.0, state the
+  artifact is not released, link the v1.0.0 instructions and make FFmpeg claims
+  conditional on WP6.3c's completed release. The stale status is replaced, and
+  turn 21's supplied evidence is recorded above.
+- **10, ADVISORY, confirmed/fixed:** independent tests catch RECORD-size removal
+  (M3), executable-resource acceptance (M5), inherited PYTHON* variables (M12)
+  and an unbounded cross-thread presenter wait (M16). Mutation evidence below.
+- **11, ADVISORY, confirmed/fixed:** BuildEnvironmentError is the dedicated
+  SYSTEMROOT failure. build catches only that class around run_pyinstaller;
+  a genuine hook ValueError propagates with its traceback.
+- **12, ADVISORY, confirmed/fixed:** setup-uv disables its cache and pins the
+  Windows uv 0.10.9 archive checksum to
+  `f58dc40896000229db7c52b8bdd931394040ef2ad59abd1eda841f6d70b13d7a`.
+  The cell read the seat's uv-0.10.9-checksum.md; no fetch or gh call occurred.
+- **13, ADVISORY:** all job-stub sleepers now join the fixture's rescue job,
+  including on current product code. The bounded watchdog exercises that rescue
+  in M18; a kill-on-close regression cannot rely solely on the product's job.
+  This is test cleanup, not a second product containment mechanism.
+- **14, ADVISORY, accepted behavior limits:** source Ctrl+C is still reported
+  as unexpected error / exit 1. Concurrent processes may contend on Windows
+  log rotation and emit log unavailable. No entry/reporter/logging code outside
+  the owned presenter was changed to address these notes.
+
+`tools/package/smoke.py` has no retained edit: the pipe/readiness changes are
+test-instrument repairs, and M12 already had the correct product guard.
+
+### RED, GREEN and mutation evidence
+
+All runners write under `work/c63b-22-evidence/`. The required shim is loaded
+via a Python bootstrap that inserts scripts on sys.path, then calls pytest with
+`-p sandbox_mkdir_shim -p no:cacheprovider`. PYTHONPATH is NEVER set by this
+runner: the dispatch's old environment form would correctly trip item 2.
+Every invocation uses a fresh basetemp; no environment refusal was weakened.
+uv warns that the inherited main-tree VIRTUAL_ENV differs, ignores it and
+runs this worktree's .venv. No active-main environment was requested.
+
+| Item / logs | RED evidence | GREEN evidence |
+| --- | --- | --- |
+| 2, i2-red / i2-green | 9 failing override/foreign/duplicate cases. | 11 passed including CLI controls. |
+| 3, i3-red2 / i34-green2 | Ordinary utils is accepted (DID NOT RAISE). Initial fixture's unrelated missing-lock failure was corrected before this RED. | Unknown utils is refused; loader/runtime support controls pass. |
+| 3 verification, i3-nested-red / i3-nested-green | Two nested paths under pyimod_fake/pyi_rth_fake incorrectly claim utils. | 4 passed after requiring the file's exact parent directory; guide-heading contract updated too. |
+| 4, i4-red / i34-green2 | Both headless children time out; synchronous presenter lacks a timer. | 7 focused tests pass (headless exits, timer, marshalling, startup wiring and stem refusal). |
+| 5, i5-red / i5-green2 | Grandchild has character handles, not pipes. close_fds=False alone remained insufficient; explicit handles at both hops fixes it. | Both census cases pass; pipe handles independently equal [3, 3]. |
+| 6, i6-red / i56-green | Both leftover modes hit the old 1-second root timeout before readiness. | Hang and both 10-second readiness-based cases pass; the intermediate pipe failure in i56-green is superseded by i5-green2. |
+| 7 | Code inspection: no module skip on Windows-native fixture module. | Module skip added; Windows validation runs its cases, format/mypy check the portable source. |
+| 8, i812-red / i8-green | Annotated/moved-tag, commit-sidecar/body and revised notes tests fail. | 35 workflow cases pass, excluding the then-pending item-12 input. |
+| 9 | Documentation inspection confirms the stale current-release claims/status. | Guide/checklist/report edits; validation includes existing document contracts. |
+| 10, M3/M5/M12/M16-red | All four guard-removal mutants fail at their intended assertion. | Restored-code tests and final seven-module run below. |
+| 11, i11-red | Real hook ValueError is swallowed into FAILED, so expected propagation fails. | Dedicated-class and missing-SYSTEMROOT cases pass on restored code. |
+| 12, i812-red | Cache/checksum inputs absent. | Workflow cache/checksum case and final workflow module pass. |
+| 13/14 | Reviewer behavior/cleanup observations accepted. | Cleanup improvement under item 5; the two behavior limits retained and disclosed. |
+
+Mutation scripts edit one working file, execute only the relevant test(s), then
+restore the exact saved bytes in finally and record a read-only git diff in
+`M*-restored.diff`. No Git write or mutant remains. M3 removes only size, not
+digest validation; M5 removes only executable-.rsrc refusal; M12 keeps PYTHON*
+variables; M16 calls done.wait() without a timeout. M18 inserts an unbounded
+worker join after root exit, before census; the real held pipes make the
+watchdog reject it and rescue its sleeper. M17 removes the row's job census;
+the live escape/pipe stimulus is still rejected by the required SURVIVORS
+assertions. No mutant was counted from a stimulus-died error.
+
+The first M5 run exposed a TEST fixture error: rewriting a PE while pefile
+still mapped it caused Windows EINVAL before the guard assertion. That run
+is preserved as M5-fixture-error.log and is NOT mutation proof. The corrected
+test closes pefile before writing. Its re-run (M5-red.log) fails because the
+mutant returns True for executable resources, which is the intended proof.
+Initial lint found Qt-double method names, raw regexes and line lengths; they
+were corrected before final validation.
+
+### Final validation and copied-folder probe
+
+The real stage1c seat folder stayed read-only. probe-copy.log records its 302
+files copied to `work/c63b-22/probe/Clearwater`. notices-probe.log records CLI
+exit 0 and the notices written ONLY in that copy. No binary was executed.
+probe-summary.log confirms 1,536 inventory entries, 25 component rows and
+1,536 covered entries. Notices SHA-256:
+`3afe913e26ecd6fe65765943fef798450687bebf7df926d1f720da9b8e999d8c`.
+It is byte-identical both to turn 20 and the latest seat copy: this turn
+changes trust/alias checks, not the real folder's coverage or licence inputs.
+This coverage result retains the explicitly carved embedded-component limit.
+
+| Final log | Observed result |
+| --- | --- |
+| ruff-check-final.log | Exit 0; All checks passed! |
+| ruff-format-final.log | Exit 0; 337 files already formatted. |
+| mypy-final.log | Exit 0; Success: no issues found in 166 source files. |
+| mypy-darwin-final.log | Exit 0; Success: no issues found in 166 source files. |
+| pytest-validation-final.log | Exit 0; 711 passed, 1 skipped in 104.37s; fresh work/c63b-22-final. |
+| pytest-gpi.log | Exit 1; 112 passed, 1 failed in 13.51s; work/c63b-22-gpi. |
+| notices-probe.log / probe-summary.log | Exit 0; complete 1,536-entry / 25-row coverage; unchanged SHA-256 above. |
+| scope-cr-check.log | Exactly 12 owned changed paths; zero CR bytes; smoke.py byte-restored with no retained diff. |
+| diff-check-final.log | Exit 0; no whitespace defects. |
+
+The skip is the existing POSIX native-proof skip on Windows. The notices-module
+platform mark adds no skip on this platform. The first seven-module run
+(pytest-validation.log) was 708 passed / 1 skipped / 1 failed: the guide test
+still split on its old heading. Its assertion now follows the commissioned
+from-1.1.0 heading; the final complete run above is green. The subsequent
+nested-stem verification added two cases before that final run.
+
+The standalone installer's sole failure is the KNOWN sandbox residual
+`test_mapped_child_without_a_pid_is_killed_with_its_descendants[native]`.
+Its own tree-kill.log says `ERROR: Access denied`; the controlled-tree case
+passes. The assertion observes remaining processes in the deliberately failed
+native taskkill path. The test's independent final teardown has no failure;
+gpi-cleanup-check.log confirms both reported PIDs are absent afterward.
+No installer file was changed or test weakened. The outside-sandbox seat
+module-alone rerun remains owed on this head; dispatch 22's inherited
+113-pass result was on turn 21, not newly claimed for turn 22.
+
+PowerShell runner logs are UTF-16; verified-summary.log decodes them explicitly
+and records the exact final summary lines. The mutation child logs are plain
+text. All six mutants were KILLED and restored; M5's corrected intended-failure
+record supersedes its initial fixture error. The final M17 run uses the final
+handle-inheritance fixture and still kills both census-removal cases.
+
+### Verification loop and cumulative handoff
+
+The ruled findings were checked against current code and independently reproduced.
+Confirmed/fixed: items 2-12; the fixtures' missing handles, readiness bounds and
+M5 file-sharing error were corrected in envelope. No review finding was rejected
+as a false positive. Item 1 stays carved; item 14's behavior limits stay explicit.
+No additional reviewer was launched by this cell.
+
+| Round / turn | Severity / envelope | NEW / REOPENED; reverts | Product-code / test-only fixes; state |
+| --- | --- | --- | --- |
+| A r3 (inherited) | NO_NEW_CRITICAL_MAJOR, converged; final minor remediation t20. | No reopened finding reported. | Seat QA/rebuild supplied by dispatch. |
+| B r1 / t22 | 1 MAJOR carved to WP6.3c; 8 MINOR, 5 advisory in envelope. | NEW B findings, 0 REOPENED, no retained revert. | Build/notices trust, stem mapping, presenter bounds, workflow/docs and regression fixtures; assigned remediation complete, B r2/gate pending. |
+
+This turn bundles the assigned B r1 remediation as one logical seat commit.
+No dependency, frozen interface, licence text/manifest, Python/Qt embedded
+attribution rule or installer product/test file was changed. All writes stay
+inside this worktree. The original seat build, footage, owner's real profile
+and uv Python are read-only. No external fetch, real PyInstaller build,
+frozen execution, visible GUI launch, desktop input, QUIT_SCRIPT, Git write,
+push/tag, gh/workflow dispatch or role-mailbox message occurs. Installer tests
+retain their existing loopback fixtures. Remaining with the seat: QA/rebuild
+and full notices reading, Reviewer B r2 delta and the complete gate. WP6.3c
+retains FFmpeg, ZIP, native embedded-component coverage and the 1.1.0 draft.

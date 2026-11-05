@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from clearwater.__main__ import _ExceptionReporter
 
-from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -326,10 +326,17 @@ def build_application(
 
 
 def _present_exception(text: str) -> None:
-    """Show one plain log-path message, without exposing a traceback in the dialog."""
+    """Show a plain log-path message for at most 30 seconds, without traceback text."""
     box = QMessageBox(QMessageBox.Icon.Critical, "Clearwater", text, QMessageBox.StandardButton.Ok)
     box.setTextFormat(Qt.TextFormat.PlainText)
-    box.exec()
+    timer = QTimer(box)
+    timer.setSingleShot(True)
+    timer.timeout.connect(box.reject)
+    timer.start(30_000)
+    try:
+        box.exec()
+    finally:
+        timer.stop()
 
 
 class _ExceptionDialog(QObject):
@@ -362,7 +369,9 @@ class _ExceptionDialog(QObject):
 
 
 def _enable_exception_dialog(app: QApplication, reporter: _ExceptionReporter) -> None:
-    """Enable the plain fatal-error presenter after Qt owns the GUI thread."""
+    """Enable the plain fatal-error presenter on desktop Qt platforms."""
+    if app.platformName() in {"offscreen", "minimal"}:
+        return
     reporter.presenter = _ExceptionDialog(app).present
 
 

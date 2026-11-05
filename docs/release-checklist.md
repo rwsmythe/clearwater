@@ -93,7 +93,8 @@ while either remains open; workflow presence is not release readiness.
    **STOP** without the owner's push, or if the remote tag targets another commit.
 9. Watch the real workflow and archive its run URL, resolved commit, job logs and
    artifacts. `windows` syncs the locked GPU extra for analysis, checks tag/source
-   equality, runs ONLY the parallel leg, then builds, checks and zips. This does
+   equality and an ANNOTATED tag peeling to the built commit, runs ONLY the
+   parallel leg, then builds, checks and zips. This does
    not replace step 6's local gate. `release` runs only on a tag push, with
    `contents: write`, and attaches the zip, its `.sha256` and generated notices
    to a **DRAFT** release; notes come from `docs/release-notes-1.1.0.md` if present.
@@ -104,7 +105,9 @@ while either remains open; workflow presence is not release readiness.
 10. Download the three assets from the draft release. Compare the downloaded
     zip's SHA-256 against the sidecar (PowerShell `Get-FileHash -Algorithm SHA256`),
     list its single top-level folder and compare the attached notices with the
-    copy inside. **STOP** on hash/content/layout disagreement; preserve the
+   copy inside. Compare the sidecar's source-commit comment and the draft body's
+   Source commit with the gated commit and workflow github.sha.
+   **STOP** on commit/hash/content/layout disagreement; preserve the
     downloaded evidence rather than substituting the local build.
 11. Test that DOWNLOADED artifact in a CLEAN Windows user account on this laptop:
     no Python, no FFmpeg and no added PATH entries. By the OWNER's hand or UIA
