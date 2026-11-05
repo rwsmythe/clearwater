@@ -5,9 +5,10 @@
 
 ### Generation
 
-- **Generation 49** (session `clearwater-orchestrator-20261105-0315`). LIVE 2026-11-05 13:16Z; ROLLED at the 400K cap at ~16:25Z. The roll is clean: nothing it started is running (no pytest, no codex turn, no build, no review). Check with `tasklist | grep -i -E 'pytest|pyinstaller'`; the only `codex.exe` processes are the owner's desktop app.
+- **Generation 50** (session `clearwater-orchestrator-20261105-0611`). LIVE 2026-11-05 16:11Z. Gen 49 (`clearwater-orchestrator-20261105-0315`) rolled clean at the 400K cap.
 - **CHARC is gen 17, `clearwater-charc-20261105-0602`** (it went online 16:03Z after gen 16 `clearwater-charc-20261104-0738` rolled). Re-verify the name in `comms/.launch-sessions.json` before every cue.
-- **Seat folder `work/orch-g49/`:**
+- **Seat folder `work/orch-g50/`:** `gate.sh`, `watch2.sh` (re-pointed from g49), `crcheck.py`, `assemble.py`, the drains, posts and `dispatch-19-body.md`. The g49 tools (`smoke_uia.py`, `dll_origin.py`, `census_measure.py`) stay in `work/orch-g49/` and are used from there (copies for any run).
+- **Gen 49's seat folder `work/orch-g49/`:**
   - `gate.sh`, `watch2.sh`, `crcheck.py`;
   - `assemble.py`, the dispatch assembler: `uv run --no-sync python work/orch-g49/assemble.py <body.md> <cell>\dispatch-N.md`. It joins the two CLAUDE.md rule lines from HEAD at `@@RULES@@` and asserts no CR / VT;
   - `smoke_uia.py`, the stage-1 smoke-under-UIA driver, written and NOT yet run. Run it from an md5-checked COPY; it has already been grepped clean for synthetic input;
@@ -16,8 +17,8 @@
 
   Copy `gate.sh` / `watch2.sh` with `sed 's#orch-g49#orch-g50#g'`.
 - **FRESH prompt** = `.claude/agents/implementer-codex-sol-high.md` + `docs/briefs/wp6.3b-brief.md` at HEAD + `dispatch-N.md`, joined, with `tr -d '\r'`. A **RESUMED prompt** is `dispatch-N.md` alone.
-- **State worktree:** `.worktrees/orch-state-g49`. The successor removes it and adds its own.
-- **Bash gauge at bring-up:** 40 ms.
+- **State worktree:** `.worktrees/orch-state-g50`. The successor removes it and adds its own.
+- **Bash gauge at bring-up:** 25 ms (gen 50). C: 2.8 T free (the 4 TB NVMe migration is done; repo root unchanged).
 - **Paces at 13:15Z:** Codex 7 % / 0.433, Claude 61 % / 1.362, so the lane is Codex. Re-read both at the next commission.
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
@@ -50,7 +51,9 @@
 
 ### Live board (RESUME HERE)
 
-**Nothing running. **OPEN: turn 18's STOP (MAJOR, provenance inputs) is ROUTED to CHARC in gen 49's rollover post; act on CHARC's ruling first.**** WP6.3b branch `wp6.3b` is at **`b6b1a286`** (turn 18, the data turn). The review copy `.worktrees/wp6.3b-rA` is at `fa0fded4`, has its own `.venv`, and its native-licences text is LF.
+**GEN 50, 16:17Z: WP6.3b TURN 19 RUNNING** (background task at the gen-50 seat): RESUMED session `01a1ac75` (99K at its t18 yield) with `cell\dispatch-19.md` = dispatch 18's body unchanged + CHARC's **Turn-18 ruling** (main `5dd307d5`, option (b): THREE STRICT provenance kinds `release-archive` / `git-tree` / `proprietary-redistributable`) verbatim + item 0 (the schema, RED first). The seat VERIFIED every commit, tag object and in-tree path BEFORE the turn (read-only `gh api` / GitLab API) and wrote `seat\native-licences-provenance.md`, the cell's provenance input. Seat application, posted to CHARC (`f7aabe25`): tag + tag object are a PAIR, given only for ANNOTATED tags; array-api-extra `v0.10.1` is lightweight, so no tag fields. If gen 50 dies with the turn running, the turn dies too: re-run dispatch 19 resumed on `01a1ac75` (check `git -C .worktrees/wp6.3b status` first). The history below is gen 49's board, still the plan.
+
+(Gen 49's line: turn 18's STOP was routed to CHARC; now RULED.) WP6.3b branch `wp6.3b` is at **`b6b1a286`** (turn 18, the data turn). The review copy `.worktrees/wp6.3b-rA` is at `fa0fded4`, has its own `.venv`, and its native-licences text is LF.
 
 1. **WP6.3b: the Windows release path, minus the FFmpeg bundle.**
    - Brief `docs/briefs/wp6.3b-brief.md`, with EVERY rulings tail (CHARC):
