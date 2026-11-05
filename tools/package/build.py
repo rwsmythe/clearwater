@@ -1,4 +1,4 @@
-r"""Build Clearwater with PyInstaller in the one-folder or the one-file form (WP6.1 spike).
+r"""Build Clearwater with PyInstaller and optionally bundle the pinned release FFmpeg.
 
 One argument list (:func:`pyinstaller_args`) serves both forms; they differ only in
 ``--onedir`` / ``--onefile``. The build runs in this process through
@@ -30,26 +30,33 @@ layout, :mod:`clearwater.gpu_pack`); the WP6.3 downloader will write the same fi
 ``--verify`` runs the FULL check on such a pack (every listed file's sha256 and size, plus the
 loader's start-up checks) and lists each problem.
 
-This is spike tooling (evidence, not product): see ``tools/package/README.md``.
+``--ffmpeg-from URL --ffmpeg-sha256 HEX`` fetches only the archive named in
+``ffmpeg.lock.json`` and verifies the bytes, extracted inventory and both tools'
+version/configuration before accepting it. ``--with-ffmpeg`` is for local spikes,
+not release builds. See ``tools/package/README.md`` for the spike measurements.
 """
 
 from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import importlib
 import io
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 import zipfile
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
-from typing import Literal, NamedTuple, Protocol, cast
+from typing import Literal, NamedTuple, Protocol, TypedDict, cast
 
 Form = Literal["onedir", "onefile"]
 """The two PyInstaller forms the spike measures."""
@@ -702,6 +709,394 @@ def tool_file_name(tool: str, platform: str | None = None) -> str:
     """
     kind = sys.platform if platform is None else platform
     return f"{tool}.exe" if kind == "win32" else tool
+
+
+class FFmpegSource(TypedDict):
+    """An additional pinned repository, including whether this variant builds it."""
+
+    repository: str
+    pin: str
+    pin_kind: str
+    status: str
+    licence: str | None
+    licence_basis: str
+
+
+class FFmpegComponent(TypedDict):
+    """One source-pinned build stage; multiple configure flags belong to one stage."""
+
+    stage: str
+    name: str
+    repository: str
+    pin: str
+    pin_kind: str
+    extra_repositories: list[FFmpegSource]
+    configure_flag: list[str] | None
+    licence: str | None
+    licence_basis: str
+
+
+class FFmpegExcluded(TypedDict):
+    """An unbuilt or source-free stage, retained to explain source-table omissions."""
+
+    stage: str
+    status: str
+    reason: str
+
+
+class FFmpegLock(TypedDict):
+    """The verified archive identity and per-stage corresponding-source record."""
+
+    schema_version: int
+    provider: str
+    release_tag: str
+    build_repository_commit: str
+    asset_name: str
+    asset_url: str
+    size_bytes: int
+    github_sha256: str
+    seat_sha256: str
+    ffmpeg_commit: str
+    ffmpeg_repository: str
+    version: str
+    configure_line: str
+    licence: str
+    archive_root: str
+    extract_members: list[str]
+    source_record_url: str
+    retention_note: str
+    components: list[FFmpegComponent]
+    excluded: list[FFmpegExcluded]
+
+
+FFMPEG_LOCK_PATH = Path(__file__).with_name("ffmpeg.lock.json")
+"""The release pin; local PATH copies never substitute for this record."""
+
+
+def _ffmpeg_fields(value: object, fields: set[str], context: str) -> dict[str, object]:
+    if not isinstance(value, dict) or set(value) != fields:
+        raise ValueError(f"FFmpeg lock: invalid {context} fields")
+    return cast(dict[str, object], value)
+
+
+def _ffmpeg_text(value: object, context: str) -> str:
+    if not isinstance(value, str) or not value or any(c in value for c in "\r\n\x00"):
+        raise ValueError(f"FFmpeg lock: invalid {context}")
+    return value
+
+
+def _ffmpeg_source(value: dict[str, object]) -> None:
+    repository = _ffmpeg_text(value["repository"], "source repository")
+    if not repository.startswith("https://"):
+        raise ValueError("FFmpeg lock: source repository must use HTTPS")
+    pin = _ffmpeg_text(value["pin"], "source pin")
+    kind = value["pin_kind"]
+    if not isinstance(kind, str) or kind not in {"commit", "tag", "svn-rev"}:
+        raise ValueError("FFmpeg lock: invalid source pin kind")
+    if kind == "commit" and not re.fullmatch(r"[0-9a-f]{40}", pin):
+        raise ValueError("FFmpeg lock: invalid source commit")
+    if kind == "svn-rev" and not re.fullmatch(r"[0-9]+", pin):
+        raise ValueError("FFmpeg lock: invalid svn revision")
+    licence = value["licence"]
+    if licence is None:
+        if value["licence_basis"] != "UNVERIFIED":
+            raise ValueError("FFmpeg lock: absent licence must be UNVERIFIED")
+    else:
+        _ffmpeg_text(licence, "licence")
+        if value["licence_basis"] != "cell-read":
+            raise ValueError("FFmpeg lock: licence must name its read basis")
+
+
+def validate_ffmpeg_lock(value: object) -> FFmpegLock:
+    """Validate archive identity, source rows and two-way configure-flag coverage.
+
+    Licence identities are offline readings, not an N13 acceptance: unknown
+    licences must remain explicitly UNVERIFIED until the seat audits the pins.
+    ``configure_flag`` is null for dependencies or a list, since some stages
+    contribute several switches (for example both opencore-amr codecs).
+
+    Args:
+        value: The decoded lock document.
+
+    Returns:
+        The same document, with its complete schema validated.
+
+    Raises:
+        ValueError: The schema, pin, hashes or configure coverage is inconsistent.
+    """
+    data = _ffmpeg_fields(value, set(FFmpegLock.__annotations__), "document")
+    if type(data["schema_version"]) is not int or data["schema_version"] != 1:
+        raise ValueError("FFmpeg lock: unsupported schema_version")
+    if type(data["size_bytes"]) is not int or data["size_bytes"] <= 0:
+        raise ValueError("FFmpeg lock: invalid size_bytes")
+    for key in set(FFmpegLock.__annotations__) - {
+        "schema_version",
+        "size_bytes",
+        "components",
+        "excluded",
+        "extract_members",
+    }:
+        _ffmpeg_text(data[key], key)
+    digest = cast(str, data["github_sha256"])
+    if not re.fullmatch(r"[0-9a-f]{64}", digest) or digest != data["seat_sha256"]:
+        raise ValueError("FFmpeg lock: sha256 readings differ or are not 64 hex digits")
+    if not re.fullmatch(r"[0-9a-f]{40}", cast(str, data["build_repository_commit"])):
+        raise ValueError("FFmpeg lock: invalid build repository commit")
+    if not re.fullmatch(r"[0-9a-f]{10,40}", cast(str, data["ffmpeg_commit"])):
+        raise ValueError("FFmpeg lock: invalid FFmpeg commit")
+    if not re.match(r"n9\.", cast(str, data["version"])):
+        raise ValueError("FFmpeg lock: FFmpeg major must be 9")
+    if data["licence"] != "GPL-3.0-or-later":
+        raise ValueError("FFmpeg lock: combined build must be GPL-3.0-or-later")
+    if data["extract_members"] != ["bin/ffmpeg.exe", "bin/ffprobe.exe", "LICENSE.txt"]:
+        raise ValueError("FFmpeg lock: extract_members must name only the two tools and licence")
+    root = cast(str, data["archive_root"])
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", root) or root in {".", ".."}:
+        raise ValueError("FFmpeg lock: invalid archive_root")
+    if data["asset_name"] != root + ".zip":
+        raise ValueError("FFmpeg lock: asset name must match archive_root")
+    config = cast(str, data["configure_line"])
+    if not config.startswith("configuration: "):
+        raise ValueError("FFmpeg lock: configure_line must include its printed prefix")
+    tokens = set(config.split()[1:])
+    if not {"--enable-gpl", "--enable-version3", "--enable-libx265"} <= tokens:
+        raise ValueError("FFmpeg lock: GPL, version3 and libx265 are required")
+    if {"--enable-nonfree", "--enable-libfdk-aac"} & tokens:
+        raise ValueError("FFmpeg lock: nonfree or libfdk-aac is forbidden")
+    components = data["components"]
+    excluded = data["excluded"]
+    if not isinstance(components, list) or not components or not isinstance(excluded, list):
+        raise ValueError("FFmpeg lock: components/excluded must be lists")
+    stages: set[str] = set()
+    names: set[str] = set()
+    covered: set[str] = set()
+    for item in components:
+        component = _ffmpeg_fields(item, set(FFmpegComponent.__annotations__), "component")
+        _ffmpeg_source(component)
+        stage = _ffmpeg_text(component["stage"], "component stage")
+        name = _ffmpeg_text(component["name"], "component name")
+        if stage in stages or name in names:
+            raise ValueError("FFmpeg lock: duplicate component stage or name")
+        stages.add(stage)
+        names.add(name)
+        flags = component["configure_flag"]
+        if flags is not None:
+            if not isinstance(flags, list) or not flags:
+                raise ValueError("FFmpeg lock: configure_flag must be null or a nonempty list")
+            for flag in flags:
+                if not isinstance(flag, str) or not re.fullmatch(r"--enable-[a-z0-9-]+", flag):
+                    raise ValueError("FFmpeg lock: invalid component configure flag")
+                covered.add(flag)
+        extras = component["extra_repositories"]
+        if not isinstance(extras, list):
+            raise ValueError("FFmpeg lock: extra_repositories must be a list")
+        for extra in extras:
+            source = _ffmpeg_fields(extra, set(FFmpegSource.__annotations__), "extra source")
+            _ffmpeg_source(source)
+            if not isinstance(source["status"], str) or source["status"] not in {
+                "built",
+                "downloaded-not-built",
+            }:
+                raise ValueError("FFmpeg lock: invalid extra source status")
+    for item in excluded:
+        row = _ffmpeg_fields(item, set(FFmpegExcluded.__annotations__), "excluded stage")
+        for key in row:
+            _ffmpeg_text(row[key], f"excluded {key}")
+        stage = cast(str, row["stage"])
+        if stage in stages:
+            raise ValueError("FFmpeg lock: duplicate or built excluded stage")
+        stages.add(stage)
+    # These three switches select licence/system facilities, not source-pinned libraries.
+    enabled = {token for token in tokens if token.startswith("--enable-")}
+    external = enabled - {"--enable-gpl", "--enable-version3", "--enable-schannel"}
+    if external != covered:
+        raise ValueError(
+            f"FFmpeg lock: configure coverage differs; unmapped={sorted(external - covered)}, "
+            f"absent={sorted(covered - external)}"
+        )
+    return cast(FFmpegLock, data)
+
+
+def load_ffmpeg_lock() -> FFmpegLock:
+    """Read and validate the committed release pin.
+
+    Returns:
+        The verified-schema lock document.
+
+    Raises:
+        ValueError: The document is invalid.
+        OSError: The document cannot be read.
+    """
+    return validate_ffmpeg_lock(json.loads(FFMPEG_LOCK_PATH.read_text(encoding="utf-8")))
+
+
+def _ffmpeg_archive_members(
+    archive: zipfile.ZipFile, lock: FFmpegLock
+) -> dict[str, zipfile.ZipInfo]:
+    seen: set[str] = set()
+    found: dict[str, zipfile.ZipInfo] = {}
+    wanted = {f"{lock['archive_root']}/{name}": name for name in lock["extract_members"]}
+    for info in archive.infolist():
+        name = info.orig_filename
+        parts = name.rstrip("/").split("/")
+        mode = info.external_attr >> 16
+        if (
+            not name
+            or any(c in name for c in "\\:\x00")
+            or name.startswith("/")
+            or any(p in {"", ".", ".."} or p.endswith((" ", ".")) for p in parts)
+            or any(ord(c) < 32 for c in name)
+            or stat.S_ISLNK(mode)
+            or stat.S_IFMT(mode) not in {0, stat.S_IFREG, stat.S_IFDIR}
+        ):
+            raise ValueError(f"FFmpeg archive: unsafe member {name!r}")
+        normalized = name.rstrip("/").casefold()
+        if normalized in seen:
+            raise ValueError(f"FFmpeg archive: duplicate member {name!r}")
+        seen.add(normalized)
+        if name in wanted:
+            if info.is_dir() or stat.S_ISDIR(mode):
+                raise ValueError(f"FFmpeg archive: missing file (directory at {name!r})")
+            found[wanted[name]] = info
+    missing = set(lock["extract_members"]) - set(found)
+    if missing:
+        raise ValueError(f"FFmpeg archive: missing members {sorted(missing)}")
+    return found
+
+
+def _download_ffmpeg(url: str, sha256: str, out: Path, lock: FFmpegLock) -> Path:
+    if url != lock["asset_url"]:
+        raise ValueError("FFmpeg URL differs from the pinned asset URL")
+    if not re.fullmatch(r"[0-9a-f]{64}", sha256) or sha256 != lock["github_sha256"]:
+        raise ValueError("FFmpeg sha256 argument differs from the lock")
+    folder = out / "ffmpeg"
+    folder.mkdir(parents=True, exist_ok=True)
+    target = folder / lock["asset_name"]
+    partial = target.with_suffix(".zip.part")
+    if target.is_symlink() or partial.is_symlink():
+        raise ValueError("FFmpeg download: unsafe output link")
+    digest = hashlib.sha256()
+    size = 0
+    start = time.monotonic()
+    try:
+        with urllib.request.urlopen(url, timeout=60) as response, partial.open("wb") as stream:
+            while chunk := response.read(1024 * 1024):
+                size += len(chunk)
+                if size > lock["size_bytes"]:
+                    raise ValueError("FFmpeg download size exceeds lock (sha256 not accepted)")
+                if time.monotonic() - start > 600:
+                    raise RuntimeError("FFmpeg download exceeded 600 seconds")
+                digest.update(chunk)
+                stream.write(chunk)
+        if digest.hexdigest() != sha256 or digest.hexdigest() != lock["seat_sha256"]:
+            raise ValueError("FFmpeg download sha256 mismatch; archive was not opened")
+        if size != lock["size_bytes"]:
+            raise ValueError("FFmpeg download size differs from lock")
+        partial.replace(target)
+    finally:
+        partial.unlink(missing_ok=True)
+    return target
+
+
+def _pinned_ffmpeg_version(path: Path, lock: FFmpegLock) -> str:
+    env = {key: value for key, value in os.environ.items() if key.upper() != "PATH"}
+    env["PATH"] = str(path.parent)
+    flags = 0
+    if sys.platform == "win32":
+        flags = subprocess.CREATE_NO_WINDOW
+    try:
+        done = subprocess.run(
+            [str(path), "-version"],
+            cwd=path.parent,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+            creationflags=flags,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError(f"{path.name} -version did not run: {error}") from error
+    lines = done.stdout.splitlines()
+    tool = path.stem
+    first = lines[0] if lines else ""
+    if done.returncode != 0:
+        raise RuntimeError(f"{path.name} -version failed (exit {done.returncode})")
+    fields = first.split()
+    if len(fields) < 3 or fields[:3] != [tool, "version", lock["version"]]:
+        raise RuntimeError(f"{path.name}: version differs from the lock: {first!r}")
+    configs = [line for line in lines if line.startswith("configuration:")]
+    if configs != [lock["configure_line"]]:
+        raise RuntimeError(f"{path.name}: configuration differs from the lock")
+    return first
+
+
+def bundle_ffmpeg(destination: Path, *, out: Path, url: str, sha256: str) -> list[tuple[Path, str]]:
+    """Fetch the pinned archive, verify before opening, then copy and check its tools.
+
+    Every archive member is inspected for unsafe paths, links and duplicates,
+    including members that will not be extracted. Only the two tools and the
+    GPL text are copied. The output contains a build/source provenance record.
+
+    Args:
+        destination: The built Clearwater executable's folder.
+        out: The build output root; the archive is retained under ``ffmpeg/``.
+        url: Must equal the committed lock's asset URL.
+        sha256: Must equal both verified hash readings in the lock.
+
+    Returns:
+        The two executable paths and their checked version lines.
+
+    Raises:
+        ValueError: The pin, download or ZIP inventory is unsafe or inconsistent.
+        RuntimeError: Either tool fails its bounded version/configuration check.
+        OSError: A download, extraction or provenance write fails.
+        zipfile.BadZipFile: The verified bytes are not a valid ZIP.
+    """
+    lock = load_ffmpeg_lock()
+    destination = destination.resolve()
+    archive_path = _download_ffmpeg(url, sha256, out.resolve(), lock)
+    with zipfile.ZipFile(archive_path) as archive:
+        members = _ffmpeg_archive_members(archive, lock)
+        targets = {
+            "bin/ffmpeg.exe": destination / "ffmpeg.exe",
+            "bin/ffprobe.exe": destination / "ffprobe.exe",
+            "LICENSE.txt": destination / "ffmpeg-LICENSE.txt",
+        }
+        if any(path.is_symlink() for path in targets.values()):
+            raise ValueError("FFmpeg extraction: unsafe output link")
+        for name, path in targets.items():
+            with archive.open(members[name]) as source, path.open("wb") as output:
+                shutil.copyfileobj(source, output)
+    provenance = destination / "ffmpeg-BUILD.txt"
+    if provenance.is_symlink():
+        raise ValueError("FFmpeg build record: unsafe output link")
+    provenance.write_text(
+        "\n".join(
+            [
+                f"Provider: {lock['provider']}",
+                f"Release tag: {lock['release_tag']}",
+                f"Asset: {lock['asset_name']}",
+                f"SHA256: {lock['github_sha256']}",
+                f"FFmpeg version: {lock['version']}",
+                f"FFmpeg commit: {lock['ffmpeg_commit']}",
+                f"Build repository commit: {lock['build_repository_commit']}",
+                f"Per-component source recipes: {lock['source_record_url']}",
+                "Per-component pins and licence readings: "
+                "tools/package/ffmpeg.lock.json in Clearwater source",
+                lock["configure_line"],
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return [
+        (path, _pinned_ffmpeg_version(path, lock))
+        for path in (destination / "ffmpeg.exe", destination / "ffprobe.exe")
+    ]
 
 
 def tool_version(path: Path) -> str:
@@ -1388,7 +1783,14 @@ def clean_release_dir(out: Path, form: Form, version: str) -> Path:
     return root
 
 
-def build(form: Form, *, out: Path, with_ffmpeg: bool = False) -> int:
+def build(
+    form: Form,
+    *,
+    out: Path,
+    with_ffmpeg: bool = False,
+    ffmpeg_from: str | None = None,
+    ffmpeg_sha256: str | None = None,
+) -> int:
     """Build one form, check it, and print its summary.
 
     PyInstaller's cache is kept under ``out`` (``PYINSTALLER_CONFIG_DIR``), so ``--clean``
@@ -1397,11 +1799,27 @@ def build(form: Form, *, out: Path, with_ffmpeg: bool = False) -> int:
     Args:
         form: The PyInstaller form.
         out: The output folder.
-        with_ffmpeg: Copy FFmpeg and ffprobe beside the executable after the build.
+        with_ffmpeg: Local spike PATH copy (not for release).
+        ffmpeg_from: The pinned archive URL for a release bundle.
+        ffmpeg_sha256: Its verified sha256, also checked against the lock.
 
     Returns:
         0 when the build succeeded and the bundle holds nothing forbidden, else 1.
     """
+    if with_ffmpeg and ffmpeg_from is not None:
+        print("FAILED: --with-ffmpeg and --ffmpeg-from are mutually exclusive")
+        return 1
+    if (ffmpeg_from is None) != (ffmpeg_sha256 is None):
+        print("FAILED: --ffmpeg-from and --ffmpeg-sha256 must be provided together")
+        return 1
+    if ffmpeg_from is not None:
+        try:
+            lock = load_ffmpeg_lock()
+            if ffmpeg_from != lock["asset_url"] or ffmpeg_sha256 != lock["github_sha256"]:
+                raise ValueError("FFmpeg URL/sha256 differ from the lock")
+        except (OSError, ValueError) as error:
+            print(f"FAILED: {error}")
+            return 1
     version = app_version()
     try:
         sources = pack_sources()
@@ -1433,6 +1851,21 @@ def build(form: Form, *, out: Path, with_ffmpeg: bool = False) -> int:
     if with_ffmpeg:
         for path, line in copy_ffmpeg(executable.parent):
             print(f"copied {path}: {line}")
+    if ffmpeg_from is not None and ffmpeg_sha256 is not None:
+        try:
+            for path, line in bundle_ffmpeg(
+                executable.parent, out=out, url=ffmpeg_from, sha256=ffmpeg_sha256
+            ):
+                print(f"bundled {path}: {line}")
+        except (
+            OSError,
+            ValueError,
+            RuntimeError,
+            zipfile.BadZipFile,
+            urllib.error.URLError,
+        ) as error:
+            print(f"FAILED: FFmpeg bundle: {error}")
+            return 1
     check_start = time.monotonic()
     bad = forbidden_paths(root) + forbidden_entries(executable)
     missing = missing_hidden_imports(executable, wanted)
@@ -1465,8 +1898,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         argv: The arguments; ``sys.argv[1:]`` when None.
 
     Returns:
-        The parsed namespace (``form``, ``out``, ``with_ffmpeg``, ``write_manifest``,
-        ``verify``).
+        The parsed namespace, including the paired release FFmpeg URL/hash options.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     action = parser.add_mutually_exclusive_group(required=True)
@@ -1474,8 +1906,22 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     action.add_argument("--write-manifest", type=Path, metavar="PACK_FOLDER")
     action.add_argument("--verify", type=Path, metavar="PACK_FOLDER")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    parser.add_argument("--with-ffmpeg", action="store_true")
-    return parser.parse_args(argv)
+    ffmpeg = parser.add_mutually_exclusive_group()
+    ffmpeg.add_argument(
+        "--with-ffmpeg", action="store_true", help="copy from PATH; not for release"
+    )
+    ffmpeg.add_argument("--ffmpeg-from", metavar="URL", help="fetch the pinned release archive")
+    parser.add_argument("--ffmpeg-sha256", metavar="HEX", help="the lock's verified archive sha256")
+    options = parser.parse_args(argv)
+    if (options.ffmpeg_from is None) != (options.ffmpeg_sha256 is None):
+        parser.error("--ffmpeg-from and --ffmpeg-sha256 must be provided together")
+    if options.ffmpeg_sha256 is not None and not re.fullmatch(
+        r"[0-9a-f]{64}", options.ffmpeg_sha256
+    ):
+        parser.error("--ffmpeg-sha256 must be 64 lowercase hex digits")
+    if options.form is None and (options.with_ffmpeg or options.ffmpeg_from is not None):
+        parser.error("FFmpeg options require --form")
+    return options
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1497,7 +1943,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.dont_write_bytecode = True
         return verify(Path(os.path.abspath(options.verify)))
     out = Path(os.path.abspath(options.out))
-    return build(cast(Form, options.form), out=out, with_ffmpeg=options.with_ffmpeg)
+    return build(
+        cast(Form, options.form),
+        out=out,
+        with_ffmpeg=options.with_ffmpeg,
+        ffmpeg_from=options.ffmpeg_from,
+        ffmpeg_sha256=options.ffmpeg_sha256,
+    )
 
 
 if __name__ == "__main__":

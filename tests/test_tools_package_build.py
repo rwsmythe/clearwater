@@ -888,3 +888,93 @@ def test_manifest_helpers_delegate_to_the_product_writer(tmp_path: Path, monkeyp
     )
     assert build.manifest_document(folder) is document
     assert build.write_manifest(folder) == path
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        [
+            "--form",
+            "onedir",
+            "--with-ffmpeg",
+            "--ffmpeg-from",
+            "file:///archive.zip",
+            "--ffmpeg-sha256",
+            "0" * 64,
+        ],
+        ["--form", "onedir", "--ffmpeg-from", "file:///archive.zip"],
+        ["--form", "onedir", "--ffmpeg-sha256", "0" * 64],
+        ["--form", "onedir", "--ffmpeg-from", "file:///archive.zip", "--ffmpeg-sha256", "nope"],
+        ["--verify", "pack", "--ffmpeg-from", "file:///archive.zip", "--ffmpeg-sha256", "0" * 64],
+    ],
+)
+def test_release_ffmpeg_options_refuse_conflicting_or_incomplete_requests(args):
+    with pytest.raises(SystemExit) as caught:
+        build.parse_args(args)
+    assert caught.value.code == 2
+
+
+def test_release_ffmpeg_options_reach_the_build(monkeypatch, tmp_path):
+    seen = {}
+
+    def run(form, **kwargs):
+        seen.update(form=form, **kwargs)
+        return 7
+
+    monkeypatch.setattr(build, "build", run)
+    assert (
+        build.main(
+            [
+                "--form",
+                "onedir",
+                "--out",
+                str(tmp_path),
+                "--ffmpeg-from",
+                "file:///archive.zip",
+                "--ffmpeg-sha256",
+                "a" * 64,
+            ]
+        )
+        == 7
+    )
+    assert seen == {
+        "form": "onedir",
+        "out": tmp_path,
+        "with_ffmpeg": False,
+        "ffmpeg_from": "file:///archive.zip",
+        "ffmpeg_sha256": "a" * 64,
+    }
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_release_bundle_is_checked_in_the_built_executable_folder(
+    monkeypatch, tmp_path, capsys, fail
+):
+    """Removing the bundle call, or ignoring its failure, must fail this contract."""
+    pin = json.loads((REPO_ROOT / "tools/package/ffmpeg.lock.json").read_text(encoding="utf-8"))
+    monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setattr(build, "pack_sources", lambda: [])
+    out = tmp_path / "out"
+    _fake_pyinstaller(monkeypatch, out, ["graphlib"], {})
+    folder = build.release_dir(out, "onefile", build.app_version())
+
+    def fetched(destination, *, out, url, sha256):
+        assert (destination / "Clearwater.exe").is_file()
+        if fail:
+            raise RuntimeError("planted FFmpeg configuration mismatch")
+        (destination / "ffmpeg-BUILD.txt").write_text(f"{out}\n{url}\n{sha256}", encoding="utf-8")
+        return []
+
+    monkeypatch.setattr(build, "bundle_ffmpeg", fetched)
+    status = build.build(
+        "onefile", out=out, ffmpeg_from=pin["asset_url"], ffmpeg_sha256=pin["github_sha256"]
+    )
+    printed = capsys.readouterr().out
+    assert status == (1 if fail else 0)
+    if fail:
+        assert "FAILED: FFmpeg bundle: planted FFmpeg configuration mismatch" in printed
+        assert "bundle check: PASS" not in printed
+    else:
+        assert (folder / "ffmpeg-BUILD.txt").read_text(encoding="utf-8") == (
+            f"{out}\n{pin['asset_url']}\n{pin['github_sha256']}"
+        )

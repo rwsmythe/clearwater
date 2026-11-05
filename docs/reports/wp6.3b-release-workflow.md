@@ -1,9 +1,10 @@
 # WP6.3b release workflow: implementation record
 
-Status: build part 1 implemented; native cleanup verification has one restricted-token
-residual. This is an incremental report, not the package acceptance or an N13 verdict.
-The workflow, FFmpeg lock/notices, exception hooks, cache variables, smoke, ZIP and
-release-document changes are still pending their later dispatched turns.
+Status: build turns 2-5 implemented through the verified FFmpeg lock and offline
+fetch/verify/extract path. Turn 5's requested validation is green. This remains an
+incremental report, not package acceptance or an N13 verdict. The notices generator,
+smoke, ZIP, workflow and release-document changes await later dispatched turns;
+real-binary, V4, actionlint and release-run evidence belong to the seat/release.
 
 ## Round and turn ledger
 
@@ -16,9 +17,10 @@ Claude pass; no review verdict is claimed here. Context depth is dispatcher-read
 | Turn 2 / build part 1 | ADV-1 publication outcome, ADV-3 no-PID fallback coverage/mutant, D4(d) statement guard. One native `taskkill` residual remains for the seat. | No Reviewer A findings yet; native process-control denial disclosed below. | No review reopenings. Temporary test-only kill-removal mutant restored. | Product: publication block and executable-finder guard. Tests: local wheel, fault injection, live child tree and layout/platform cases. | Turn-end figure pending dispatcher reading. |
 | Turn 3 / build part 2, Group A yield | Fatal reporter, GUI notification, source-worker hook site and isolated tests. Both STOPs now settled by CHARC's turn-3 rulings; Group B was not started in turn 3. | No Reviewer A round. Self-check: 1 MAJOR scope STOP and 1 MINOR validation-rule question, both closed; worker residual confirmed sandbox-only by the seat. | All new observations, no review reopenings or product reverts. Rotation and the regression fixture's logging stub corrected in-envelope. | Product: entry reporter, interpreter catch, GUI callback and the single granted worker site. Tests: new hook suite and frozen-entry regression. | About 157K at the Group A yield, supplied in dispatch 4. |
 | Turn 4 / Group A finish and Group B yield | Closed the ruled bootstrap/QUIT_SCRIPT rows; proved lazy blocked-import behavior; added the bootloader flag and cache variables before all three activations. | No Reviewer A round; no new blocking finding. The known sandbox-only worker witness remains the sole validation failure. | No review reopenings. Temporary eager-import mutant caught twice and restored before Group B; no mutant remains. | Product: PyInstaller argument and frozen cache setup only. Tests: blocked-config/NumPy cases, argument-list cases, activation-boundary cases and environment restoration. | Turn-end figure pending dispatcher reading; no cell estimate. |
+| Turn 5 / FFmpeg lock and bundle path | Pinned archive/source record, lock validation, release fetch/hash/selective extraction/version checks and CLI/build wiring. | No Reviewer A round; no new blocking issue. Eleven primary licences and five extra-source licences are explicitly UNVERIFIED for the seat audit. | No review reopenings. Build-call deletion mutant rejected and byte-restored; schema type error and raw-ZIP fixture corrected. | Product: build tool plus lock; tests: offline ZIP/file transport, real Python tool stubs, schema mutations and build integration. | Fresh session; turn-end depth pending dispatcher reading, no estimate. |
 
-This turn bundles the three changes explicitly commissioned by dispatch 2; the seat
-commits them. No git write was performed by the cell.
+Turn 2 bundled the three changes explicitly commissioned by dispatch 2; the seat
+commits each turn. No git write was performed by the cell.
 
 ## Build part 1 changes
 
@@ -392,3 +394,286 @@ input, footage/profile write, git write, tag, push, gh command or workflow
 dispatch was performed. No dependency, frozen interface, app/main code or
 export-worker code changed this turn. Depth at this Group B yield is for the
 dispatcher to read and fill; the cell supplies no estimate.
+
+## Turn 5: FFmpeg lock and offline fetch/verify/extract path
+
+Dispatch 5's two items are implemented. The only changed files are the lock,
+`tools/package/build.py`, the existing build tests, the new FFmpeg tool tests
+and this report. No optional helper module was needed. This turn intentionally
+bundles the lock/validator and their build consumer, as the dispatch commissions.
+No Reviewer A round has run; the dispatcher commits and then owns that review.
+
+### Pin and source record
+
+The lock records BtbN/FFmpeg-Builds tag `autobuild-2026-10-31-12-59`, build
+repository commit `5031c6f1082414e53688d39e521849905071070d`, asset
+`ffmpeg-n9.0.2-39-g7adfbe40dc-win64-gpl-9.0.zip` (195,110,184 bytes), FFmpeg
+commit `7adfbe40dc`, printed version `n9.0.2-39-g7adfbe40dc-20261031`, the
+verbatim printed configure line (including its `configuration:` prefix),
+GPL-3.0-or-later combined terms, and both independently supplied sha256 readings:
+`693f3e224bc184b40524a62ca47526cfebaf2504414021b92fe75f677ad868b9`.
+The archive URL is the exact dated GitHub release asset URL. These are facts
+from the seat's `ffmpeg-fetch.md`, `version.txt`, `ffprobe-version.txt`,
+`listing.txt` and `checksums.sha256`; the cell performed no live verification.
+
+There is one component row per source-pinned BUILT stage: **98 rows**, comprising
+92 commit pins, four tag pins and two SVN revision pins. Names distinguish the
+two FreeType stages. Five extra repositories are recorded: gnulib, the OpenCL
+ICD loader, Vulkan-Headers and two alternate nv-codec-headers commits. Only the
+first nv-codec-headers commit is built at FFVER 900; both alternates are marked
+`downloaded-not-built`. The exclusions block has 36 rows: five BUILT
+SCRIPT_SKIP stages, one ENTRY and 30 not-built stages (23 directory-gated,
+six disabled and one unreachable). No excluded stage becomes a component row.
+
+The source facts come from the seat's `scriptsd-5031c6f1.md` and TSV, together
+with read-only inspection of configure functions in the already-unpacked build
+source tree. No source script was executed. A separate cross-check reconstructs
+the source/exclusion sets from the TSV, compares every primary/extra repository
+and pin and the binary identity/configuration against the seat records, and
+passes (`work/c63b-5-logs/source-crosscheck.log`). Lock file sha256:
+`bda8597304d2d7202a378f46815df5c30eb4073c04b1679f7df70c01e930682b`.
+
+`validate_ffmpeg_lock` validates the complete schema, equal 64-hex hashes,
+required GPL/version3/x265 flags, forbidden nonfree/fdk flags, exact extraction
+list, unique stages/names, source pin kinds and two-way configure coverage.
+`configure_flag` is null for a dependency or a list because a stage may contribute
+multiple switches (opencore-amr contributes two; ffnvcodec contributes its own
+switch plus cuda-llvm). All enabled switches except gpl/version3/schannel map to
+source stages; those three select licence/system facilities. Every mapped
+switch must also be present in the printed configuration. A licence without a
+confident reading is null with basis UNVERIFIED; other readings have basis
+`cell-read`. This is not a seat-verified licence verdict.
+
+**Retention limit:** this month-end asset is retained about two years. Re-pin
+before about **2028-10**; the checklist step is commissioned for turn 8 and
+CHARC's dated register row remains an accept-time action. Mutable upstream tag
+pins, the static source-stage reconstruction and the accepted 9.0-branch
+provenance remain the seat record's caveats. The bundled-binary V4 and NVENC
+proof remain pending the seat build.
+
+### Offline licence read, by component
+
+The SPDX expressions below are the cell's offline readings, not retrievals of
+licence files at these future pins. The seat must verify EVERY row at its pin
+before accept, including rows already marked cell-read and any subcomponent
+terms. No known GPL-3.0-incompatible component was identified. For an OR
+expression, compatibility means the compatible option can be selected. Unknown
+aggregate or pin terms remain unverified; none was guessed into the lock.
+
+| Component / build stage name | SPDX reading | GPL-3.0-compatible |
+| --- | --- | --- |
+| mingw-std-threads | BSD-2-Clause | yes |
+| mingw | UNVERIFIED (null) | unverified |
+| libiconv | LGPL-2.1-or-later | yes |
+| zlib | Zlib | yes |
+| fftw3 | GPL-2.0-or-later | yes |
+| fribidi | LGPL-2.1-or-later | yes |
+| gmp | LGPL-3.0-or-later OR GPL-2.0-or-later | yes |
+| libogg | BSD-3-Clause | yes |
+| libpng | Libpng-2.0 | yes |
+| libxml2 | MIT | yes |
+| openssl | Apache-2.0 | yes |
+| xz | UNVERIFIED (null) | unverified |
+| brotli | MIT | yes |
+| freetype-bootstrap | UNVERIFIED (null) | unverified |
+| fontconfig | MIT | yes |
+| harfbuzz | MIT | yes |
+| freetype | UNVERIFIED (null) | unverified |
+| lcms2 | MIT | yes |
+| libffi | MIT | yes |
+| libsamplerate | BSD-2-Clause | yes |
+| libudfread | LGPL-2.1-or-later | yes |
+| libunibreak | Zlib | yes |
+| libvorbis | BSD-3-Clause | yes |
+| opencl | Apache-2.0 | yes |
+| pcre2 | BSD-3-Clause | yes |
+| pixman | MIT | yes |
+| vmaf | BSD-2-Clause-Patent | yes |
+| xxhash | BSD-2-Clause | yes |
+| vulkan-headers | Apache-2.0 | yes |
+| vulkan-loader | UNVERIFIED (null) | unverified |
+| shaderc | Apache-2.0 | yes |
+| spirv-cross | Apache-2.0 | yes |
+| spirv-headers | MIT | yes |
+| amf | MIT | yes |
+| aom | UNVERIFIED (null) | unverified |
+| avisynth | GPL-2.0-or-later | yes |
+| chromaprint | LGPL-2.1-or-later | yes |
+| dav1d | BSD-2-Clause | yes |
+| davs2 | GPL-2.0-or-later | yes |
+| libdvdcss | GPL-2.0-or-later | yes |
+| libdvdread | GPL-2.0-or-later | yes |
+| libdvdnav | GPL-2.0-or-later | yes |
+| ffnvcodec | MIT | yes |
+| frei0r | GPL-2.0-or-later | yes |
+| gme | LGPL-2.1-or-later | yes |
+| kvazaar | BSD-3-Clause | yes |
+| lcevcdec | UNVERIFIED (null) | unverified |
+| libaribb24 | LGPL-3.0-or-later | yes |
+| libaribcaption | ISC | yes |
+| libass | ISC | yes |
+| libbluray | LGPL-2.1-or-later | yes |
+| libjxl | UNVERIFIED (null) | unverified |
+| libmp3lame | LGPL-2.0-or-later | yes |
+| libopus | BSD-3-Clause | yes |
+| libplacebo | LGPL-2.1-or-later | yes |
+| mbedtls | Apache-2.0 OR GPL-2.0-or-later | yes |
+| librist | BSD-2-Clause | yes |
+| glib | LGPL-2.1-or-later | yes |
+| cairo | LGPL-2.1-only OR MPL-1.1 | yes |
+| pango | LGPL-2.1-or-later | yes |
+| librsvg | LGPL-2.1-or-later | yes |
+| libssh | LGPL-2.1-or-later | yes |
+| libtheora | BSD-3-Clause | yes |
+| libvpx | BSD-3-Clause | yes |
+| libwebp | BSD-3-Clause | yes |
+| libzmq | UNVERIFIED (null) | unverified |
+| lv2 | ISC | yes |
+| serd | ISC | yes |
+| zix | ISC | yes |
+| sord | ISC | yes |
+| sratom | ISC | yes |
+| lilv | ISC | yes |
+| onevpl | MIT | yes |
+| openal | LGPL-2.0-or-later | yes |
+| openapv | BSD-3-Clause | yes |
+| opencore-amr | Apache-2.0 | yes |
+| openh264 | BSD-2-Clause | yes |
+| openjpeg | BSD-2-Clause | yes |
+| openmpt | BSD-3-Clause | yes |
+| rav1e | BSD-2-Clause | yes |
+| rubberband | GPL-2.0-or-later | yes |
+| sdl | Zlib | yes |
+| snappy | BSD-3-Clause | yes |
+| soxr | LGPL-2.1-or-later | yes |
+| srt | MPL-2.0 | yes |
+| svtav1 | UNVERIFIED (null) | unverified |
+| twolame | LGPL-2.1-or-later | yes |
+| uavs3d | BSD-3-Clause | yes |
+| libva | MIT | yes |
+| vapoursynth | LGPL-2.1-or-later | yes |
+| vidstab | GPL-2.0-or-later | yes |
+| vvenc | UNVERIFIED (null) | unverified |
+| x264 | GPL-2.0-or-later | yes |
+| x265 | GPL-2.0-or-later | yes |
+| xavs2 | GPL-2.0-or-later | yes |
+| xvid | GPL-2.0-or-later | yes |
+| zimg | WTFPL | yes |
+| zvbi | LGPL-2.1-or-later | yes |
+
+Extra repositories have their own uncertainty recorded, including the two
+alternates that are downloaded but not built:
+
+| Stage / extra repository | Pin | Build use | SPDX / compatibility |
+| --- | --- | --- | --- |
+| libiconv / https://git.savannah.gnu.org/git/gnulib.git | `5df606bbd0ef54a8f150c3303c870b9381a661f0` | built | UNVERIFIED / unverified |
+| opencl / https://github.com/KhronosGroup/OpenCL-ICD-Loader.git | `5192c84f8059e5f703e5452929b613f9487f6e4c` | built | UNVERIFIED / unverified |
+| vulkan-loader / https://github.com/KhronosGroup/Vulkan-Headers.git | `v1.4.366` | built | UNVERIFIED / unverified |
+| ffnvcodec / https://github.com/FFmpeg/nv-codec-headers.git | `ced4f8eba3ba5dd431932cba17928f0dffdaeb2b` | downloaded-not-built | UNVERIFIED / unverified |
+| ffnvcodec / https://github.com/FFmpeg/nv-codec-headers.git | `833faee5f7b8d3f56444347c587f4aed11ee213f` | downloaded-not-built | UNVERIFIED / unverified |
+
+Primary UNVERIFIED list: **mingw, xz, freetype-bootstrap, freetype,
+vulkan-loader, aom, lcevcdec, libjxl, libzmq, svtav1, vvenc**. All five extra
+repository licence fields are also UNVERIFIED: gnulib, OpenCL-ICD-Loader,
+Vulkan-Headers and the two downloaded-not-built nv-codec-headers alternatives.
+The existing GPL-3.0-or-later combined FFmpeg licence is the seat's verified
+archive/configuration fact, distinct from these per-component readings.
+
+### Bundle path and offline tests
+
+The paired `--ffmpeg-from` / `--ffmpeg-sha256` arguments reach `build` and are
+mutually exclusive with `--with-ffmpeg`, whose help says "not for release".
+Unpaired/ill-formed values and FFmpeg options without `--form` fail parsing.
+The build rejects an unpinned URL/hash before scanning or running PyInstaller.
+
+`bundle_ffmpeg` loads/validates the lock, downloads to `<out>/ffmpeg/` through a
+partial file, bounds bytes by the locked size, checks the argument against the
+lock and the computed hash against both readings, then publishes the checked
+archive. It inspects every ZIP member before extracting any: absolute, traversal,
+drive/ADS, backslash/control-character, trailing-dot/space, link/special-file,
+missing and case-insensitive duplicate members fail closed. Only `bin/ffmpeg.exe`,
+`bin/ffprobe.exe` and `LICENSE.txt` under the exact archive root are copied, as
+`ffmpeg.exe`, `ffprobe.exe` and `ffmpeg-LICENSE.txt` beside Clearwater.exe.
+`ffmpeg-BUILD.txt` records provider, tag, asset, hash, version, FFmpeg/build
+commits, source-record pointer and the verbatim configure line.
+
+Each copied tool runs with `-version`, its own folder as cwd and the sole PATH
+entry, stdin closed, a 120-second bound and CREATE_NO_WINDOW on Windows. Both
+printed versions and the single configure line must exactly match the lock.
+Any extraction/download/check failure returns a failed build before the bundle
+success summary. The PATH-copy spike remains available.
+
+All fetch tests use small synthetic ZIPs through `file://` and a disposable
+synthetic lock. The transport, ZIP inspection, hashing and extraction are real.
+The text .exe stubs run as real Python child scripts; the native-loader adapter
+only prefixes the absolute current Python executable (Windows cannot execute a
+text .exe). The scripts write observed cwd/PATH/arguments; the test checks the
+resulting files and provenance. No socket, real FFmpeg, product entry point or
+PyInstaller build is used by these new tests. Existing synthetic CArchive writers
+and stand-in PyInstaller calls test build integration. The existing frozen-entry
+module retains its redirected profile/XDG roots, Qt blockers/stubs and bounds;
+QUIT_SCRIPT is neither selected nor run.
+
+### RED, GREEN and final validation
+
+All pytest runs use `PYTHONPATH=scripts`, the sandbox mkdir shim,
+`-p no:cacheprovider`, a 300-second runner timeout and fresh worktree-local
+basetemps. Runner output is file-backed under `work/c63b-5-logs/`.
+
+| Evidence file | Observed result |
+| --- | --- |
+| `red-lock.log` | Exit 1: 19 failed; the new lock was absent. |
+| `red-validator.log` | Exit 1: 19 failed after writing the lock; the validator API was absent. |
+| `green-lock.log` | Exit 0: 19 passed. |
+| `red-fetch.log` | Exit 5: 118 deselected by an overbroad selection; no test ran. Corrected immediately in the next run. |
+| `red-fetch2.log` | Exit 1: 24 failed, 24 passed; bundle API and CLI routing absent. Five parser-rejection controls and the 19 lock cases already passed. |
+| `green-fetch.log` | Exit 1: 1 failed, 117 passed; Windows ZIP writer normalized the backslash fixture before the reader saw it. |
+| `green-fetch2.log` | Exit 0: 118 passed after preserving the raw member name in the synthetic ZIP. |
+| `red-types.log` | Exit 1: 1 failed, 4 passed; a list-valued pin kind leaked TypeError instead of ValueError. |
+| `green-types.log` | Exit 0: 5 passed after explicit type validation. |
+| `red-build-wiring-mutant.log` | Exit 1: 2 failed; deleting only the release bundle call loses the provenance file and wrongly reports success after a planted rejection. |
+| `wiring-mutant2.log` | Mutant returned 1 and original bytes were restored, sha256 `c2fbea1284247f427626b98ab3f39c64b3ee6968a3a48131819f6e689d6b51d1`. The first script attempt failed before mutation on CRLF matching; the normalized-text attempt supplied this RED. |
+| `green-wiring2.log` | Exit 0: 2 passed after byte restoration. |
+| `ruff-check-final.log` | Exit 0: All checks passed! |
+| `ruff-format-final.log` | Exit 0: 332 files already formatted. |
+| `mypy-final.log` | Exit 0: Success: no issues found in 164 source files. |
+| `mypy-darwin-final.log` | Exit 0: Success: no issues found in 164 source files. |
+| `pytest-validation.log` | Exit 0: 321 passed in 10.36 s. |
+| `source-crosscheck.log` | All 98 main pins, five extra pins, 36 exclusions, archive identity and binary version/configuration match the seat records. |
+| `diff-check.log` | Exit 0, no whitespace errors; Git's LF/CRLF warnings retained where present. |
+
+The requested final pytest command is exactly the three commissioned modules:
+`tests/test_tools_package_build.py tests/test_frozen_entry.py
+tests/test_tools_package_ffmpeg.py`, with basetemp `work/c63b-5` and
+`QT_QPA_PLATFORM=offscreen`. The 321 cases comprise 78 build, 193 frozen-entry
+and 50 FFmpeg cases (also confirmed by `collection.log`). There is **no sandbox-only residual in this turn's requested
+set**. The inherited VIRTUAL_ENV warning says uv selects the worktree .venv;
+it is retained in the logs. Initial lint formatting findings and a redundant
+mypy cast were corrected before the final checks. The seat's broader gate,
+standalone installer run and real-artifact proof remain separate work.
+
+### Verification loop and handoff
+
+| Severity / suspected issue | Independent check | Disposition |
+| --- | --- | --- |
+| MINOR: source-stage omissions, mistaken pin kinds or lost extra repositories. | Separate TSV-set reconstruction and field-by-field cross-check, plus committed-lock validation. | Rejected: 98 primary pins, all five extras and exclusions match the seat. No source script or archive binary was executed. |
+| MINOR: a backslash unsafe-path case might test normalized input. | The initial GREEN attempt failed that case; inspecting ZipInfo's writer boundary explained normalization. | Test-only fix preserves the raw name; the real archive reader rejects it before any release file is written. |
+| MINOR: malformed source types could escape the validation error contract. | Five-case type RED; list-valued pin kind raised TypeError. | Fixed with explicit type checks (also for extra-source status); all type cases pass. |
+| MAJOR: a correct helper might never be called by the build, or rejection might be ignored. | Temporary deletion of only the integration block; both provenance/failure cases fail. | Rejected on restored code: both pass. Original bytes verified before continuing; no mutant remains. |
+| MAJOR: wrong archive/tool could be accepted despite safe extraction. | Argument/lock/download hash failures, wrong versions/configurations for each tool, non-zero exit, OSError and timeout controls, all through the real bundle consumer. | Rejected by the offline checks; final test set green. Real-binary equivalence remains the seat's V4/NVENC proof. |
+| N13 audit uncertainty at future pins. | Offline confidence assessment, null/basis validation and explicit table above. | Eleven primary and five extra-source readings stay UNVERIFIED for the seat; no incompatible component confirmed, no N13 acceptance claimed. |
+
+The final code/data inspection found no new in-envelope issue. The only data
+representation choice is list-valued `configure_flag` to preserve multi-switch
+stages; no frozen product interface changed. No new dependency or unowned file
+was changed. No network fetch, opening/extraction/execution of the real FFmpeg
+archive, frozen run, PyInstaller build, desktop GUI launch, synthetic input,
+footage/profile write, git write, push, tag, gh command or workflow dispatch
+was performed. All observed writes and runner outputs are inside the worktree.
+
+Next commissioned turns: notices generator/audit data (turn 6), smoke and ZIP
+(turn 7), workflow/checklist/guide (turn 8). The seat owns verification of every
+licence at its pin, the actual build and bundled-binary checks, actionlint and
+Reviewer A/B. The real workflow run remains the release step. No new ruling is
+requested by this build-group return. Depth is for the dispatcher to read;
+none is estimated here.
