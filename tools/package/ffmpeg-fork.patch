@@ -1,4 +1,4 @@
-From 9e8207b37658fdb4a15908c18c9b51d68d57c027 Mon Sep 17 00:00:00 2001
+From 92d0b6a63034510ce553ae88ec13228ee766ddd3 Mon Sep 17 00:00:00 2001
 From: Reid Smythe <rwsmythe@gmail.com>
 Date: Thu, 5 Nov 2026 10:50:43 -1000
 Subject: [PATCH] feat(wp6.3c): build win64 GPL FFmpeg n9.0.2 without zvbi
@@ -12,13 +12,13 @@ Clearwater WP6.3c (docs/briefs/wp6.3c-brief.md in rwsmythe/clearwater):
   for this fork; win64 / gpl 9.0 only; release tagged
   ffmpeg-n9.0.2-nozvbi-<commit>; no Latest / Wiki / Prune / ghcr cleanup.
 ---
- .github/workflows/build.yml | 146 ++++--------------------------------
+ .github/workflows/build.yml | 150 +++++-------------------------------
  addins/9.0.sh               |   2 +-
  scripts.d/50-zvbi.sh        |   2 +-
- 3 files changed, 16 insertions(+), 134 deletions(-)
+ 3 files changed, 20 insertions(+), 134 deletions(-)
 
 diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
-index 49cb761..a97a867 100644
+index 49cb761..de2ae18 100644
 --- a/.github/workflows/build.yml
 +++ b/.github/workflows/build.yml
 @@ -1,10 +1,6 @@
@@ -32,16 +32,20 @@ index 49cb761..a97a867 100644
    workflow_dispatch:
      inputs:
        doRelease:
-@@ -17,8 +13,6 @@ on:
+@@ -17,8 +13,10 @@ on:
          type: boolean
          default: false
          required: false
 -  schedule:
 -    - cron: '0 12 * * *'
++
++permissions:
++  contents: write
++  packages: write
  
  env:
    DOCKER_BUILDKIT: 1
-@@ -26,22 +20,12 @@ env:
+@@ -26,22 +24,12 @@ env:
  jobs:
    pre_check:
      name: Pre Checks
@@ -66,7 +70,7 @@ index 49cb761..a97a867 100644
              exit 1
            fi
            exit 0
-@@ -55,8 +39,6 @@ jobs:
+@@ -55,8 +43,6 @@ jobs:
          include:
            - runner: ubuntu-latest
              tag_suffix: ''
@@ -75,7 +79,7 @@ index 49cb761..a97a867 100644
      runs-on: ${{ matrix.runner }}
      steps:
        - name: Checkout
-@@ -119,16 +101,6 @@ jobs:
+@@ -119,16 +105,6 @@ jobs:
            name: download-cache
            overwrite: true
            path: .cache/cache.tar.gz
@@ -92,7 +96,7 @@ index 49cb761..a97a867 100644
    build_target_bases:
      name: Build target base image
      if: ${{ github.event.inputs.buildOnly != 'true' }}
-@@ -138,23 +110,8 @@ jobs:
+@@ -138,23 +114,8 @@ jobs:
        fail-fast: false
        matrix:
          runner: [ubuntu-latest]
@@ -118,7 +122,7 @@ index 49cb761..a97a867 100644
      steps:
        - name: Checkout
          uses: actions/checkout@v7
-@@ -193,16 +150,6 @@ jobs:
+@@ -193,16 +154,6 @@ jobs:
            build-args: |
              GH_REPO=ghcr.io/${{ steps.imagename.outputs.gh_repo }}
              BASE_TAG_SUFFIX=${{ matrix.tag_suffix || '' }}
@@ -135,7 +139,7 @@ index 49cb761..a97a867 100644
    build_targets:
      name: Build target-variant image
      if: ${{ github.event.inputs.buildOnly != 'true' }}
-@@ -212,40 +159,9 @@ jobs:
+@@ -212,40 +163,9 @@ jobs:
        fail-fast: false
        matrix:
          runner: [ubuntu-latest]
@@ -179,7 +183,7 @@ index 49cb761..a97a867 100644
      steps:
        - name: Checkout
          uses: actions/checkout@v7
-@@ -292,26 +208,16 @@ jobs:
+@@ -292,26 +212,16 @@ jobs:
            tags: ${{ steps.imagename.outputs.name }}:latest${{ matrix.tag_suffix || '' }}
            cache-to: type=registry,mode=max,ref=${{ steps.imagename.outputs.name }}:cache${{ matrix.tag_suffix || '' }}
            cache-from: type=registry,ref=${{ steps.imagename.outputs.name }}:cache${{ matrix.tag_suffix || '' }}
@@ -210,7 +214,7 @@ index 49cb761..a97a867 100644
      steps:
        - name: Checkout
          uses: actions/checkout@v7
-@@ -340,7 +246,7 @@ jobs:
+@@ -340,7 +250,7 @@ jobs:
            path: artifacts/*
    publish_release:
      name: Publish release
@@ -219,7 +223,7 @@ index 49cb761..a97a867 100644
      needs: build_ffmpeg
      runs-on: ubuntu-latest
      steps:
-@@ -363,35 +269,11 @@ jobs:
+@@ -363,35 +273,11 @@ jobs:
            shopt -s nullglob
            RELDATE="$(date +'%Y-%m-%d %H:%M')"
            NAME="Auto-Build $RELDATE"
