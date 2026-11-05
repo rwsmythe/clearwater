@@ -259,3 +259,23 @@ Reviewer A CONVERGED at r3. **RULED: the recommended plan. ONE remediation turn 
 **F5 DEFERRED to WP6.5** (out of envelope: the darwin PATH list is `else: pass`; PyInstaller re-signs Mach-O files so the whole-file-hash origin check will refuse every macOS build, fail-closed today). A report limits line; at WP6.3b's accept a register-row NOTE; WP6.5's brief gains the owned item (its own sanitized-PATH list for darwin; a Mach-O-aware origin rule, e.g. hash over the unsigned segments or re-sign-then-compare) before FINAL.
 
 Then: seat QA -> REBUILD + notices (k2 and F4 change the artifact notices; the smoke need not re-run unless `build.py`'s smoke path changed, the orchestrator decides from the diff) -> Reviewer B -> gate -> accept. Nothing else to rule.
+
+## Reviewer B r1 rulings (CHARC gen 17, 2026-11-05 ~18:10Z; B FULL over `50a25b3b..91f90c8f`: NEW_CRITICAL_MAJOR_FOUND, 1 MAJOR, 8 MINOR, 5 adv; `wp6.3b/B/r1/review.txt`)
+
+**MAJOR 1 (embedded third-party code in carried natives: HACL*, expat, libmpdec in CPython's natives; FreeType, HarfBuzz, libpng, PCRE2, libjpeg in Qt's) RULED (A): CARVED to WP6.3c**, because WP6.3b releases no artifact, WP6.3c already owns N13 for 1.1.0 and the draft release, and the fix is the same census-plus-data shape as turns 17-19 which 6.3c re-runs once FFmpeg lands. Binding consequences: (1) a register row (next free number) opened at 6.3b's accept, OWNED by WP6.3c and CLOSED before the 1.1.0 draft; (2) the accept record and AD-38 say in words that the artifact notices do not yet cover components compiled into carried natives; (3) WP6.3c's brief gains the owned item (written now, below in its brief): the embedded-component rule extended to carried natives, keyed by host hash in the Mesa / LLVM `co_licensed_with` form, fail-closed for a DECLARED host list (every CPython `.pyd` / DLL and every Qt DLL / plugin the bundle carries), the seat census of those hosts, the texts at CPython `v3.12.13` `Doc/license.rst` sections and qtbase `v6.12.0` `src/3rdparty` attributions at their pinned commits (git-tree kind with `source_path`), the Python and PySide6 rows gaining the attribution sentences.
+
+**MINORs 2-9 and advisories 10-12 RULED (B): ONE remediation turn in a FRESH Codex session**, RED first where a test is named:
+- 2: the origin check and the notices resolver trust ONLY the venv's purelib / platlib; refuse when `PYTHONPATH`, `PYTHONHOME` or `PYTHONUSERBASE` is set or a locked name resolves twice (the planted `numpy-2.5.4.dist-info` test).
+- 3: the PyInstaller stem rule limited to `pyimod*`, `pyiboot*` and `*/rthooks/pyi_rth_*`; a bundled top-level `utils` fails closed (test).
+- 4: the fatal-error presenter is BOUNDED on every path: a `QTimer` auto-close at 30 s on the GUI-thread `exec()` too, and the presenter skipped on the `offscreen` / `minimal` platforms; the offscreen child then reaches `os._exit(1)` (test).
+- 5: the pipe-holder stimulus really holds the pipe (handles inherited at both hops); the row ends within the bound with the pipe open; mutant M18 killed.
+- 6: the leftover modes' bounds to 10 s from a readiness marker (`hang` keeps 1 s); the stub's readiness wait likewise.
+- 7: module-level `skipif(sys.platform != "win32")` with a reason on the notices tests that read Windows natives (WP6.5 lifts it with its own fixtures).
+- 8: `release.yml` fails unless `refs/tags/$TAG` is an ANNOTATED tag (`git cat-file -t` = `tag`) peeling to `github.sha`; the sha written into the `.sha256` sidecar and the draft body.
+- 9: the guide's 1.1.0 sections marked "from 1.1.0" with a pointer to the v1.0.0 instructions; the report's status header and a turn-21 / turn-22 section.
+- 10: a test per surviving guard (M3, M5, M12, M16).
+- 11: a dedicated exception class for the `run_pyinstaller` failure path, `ValueError` no longer caught broadly.
+- 12: `setup-uv` with `enable-cache: false` and `checksum:` = the seat-fetched sha256 of the uv 0.10.9 release asset (read-only `gh api`; recorded in `wp6.3b/seat/`).
+- 13, 14: report lines.
+
+**(C) Then:** seat QA; one REBUILD + notices read (turn 22 touches `build.py`'s trust set); Reviewer B r2 as a DELTA over the remediation; the gate; the accept. Nothing else to rule.
