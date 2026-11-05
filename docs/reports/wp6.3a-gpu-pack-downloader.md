@@ -11,6 +11,10 @@ seat proof, Reviewer B and release gate were next at that handoff. The delta
 review of `9c2bdded` also returned NO_NEW_CRITICAL_MAJOR, with two new MINOR
 findings. Dispatch 8 folds both into merged HEAD `c606a895`; the seat proof,
 Reviewer B (including this delta) and release gate remain with the orchestrator.
+The seat subsequently recorded run 1 at `273636db`. Reviewer B r1 on that
+head found one MAJOR, one MINOR and seven ADVISORY findings. Dispatch 9 folds
+the ruled changes into merged HEAD `b78ed9ce`; the short delta review,
+fsync-enabled seat re-run and gate remain with the orchestrator.
 
 ## Design as built
 
@@ -50,11 +54,14 @@ preserved; no INSTALLER, REQUESTED, direct_url.json or bytecode is generated.
 
 Publication order is:
 
-1. Build an in-memory manifest from the installed metadata.
+1. Flush and fsync each extracted file before closing it, then build an
+   in-memory manifest from the installed metadata.
 2. Run the loader's full checker with that in-memory document (S1).
-3. Write the manifest inside staging.
+3. Write, flush and fsync the manifest inside staging.
 4. Run the cheap check against the manifest on disk.
-5. Rename staging to the final stamp folder with `os.replace`.
+5. Rename staging to the final stamp folder with `os.replace`; off win32,
+   fsync that renamed staging directory and then its root directory. Windows
+   has no directory fsync; the rename uses NTFS journaling.
 
 Failure or cancellation removes staging; a cleanup failure is logged and
 disclosed in the result. The product result carries success/failure text,
@@ -315,6 +322,18 @@ The leg's own claims hold:
 A later seat kit that maps a pack from a source child adds `-B` (or sets
 `PYTHONDONTWRITEBYTECODE`).
 
+### Re-run after the B r1 fold
+
+SEAT TO FILL
+
+The seat measures the fsync-enabled install wall time and its delta against
+run 1's **248.1 s** (about 248 s). Expected Windows file-fsync count:
+**2,680** (2,679 installed files plus the manifest). New wall time:
+**SEAT TO FILL**; delta: **SEAT TO FILL**. Rebuild from the new candidate,
+retain run 1's appdata/evidence as directed, and re-run the seat proof with
+the source mapping child using `-B`. These are orchestrator actions; the
+cell has not measured real-pack fsync performance or written a seat script.
+
 ## Limits and remaining handoff
 
 There is no resume across sessions; retry means a fresh transaction. Proxy
@@ -481,6 +500,7 @@ cell's footprint. Depth is supplied by the dispatcher's driver, not estimated.
 | A r2, adjudicated and folded in | 0 / 1 / 2 / 2 | 5 / 0 | 4 / 1 (#2) | 0 | 3 / 2 / 0 finding groups | No new banked finding | Turn-6 end: 229,611, supplied at dispatch 7 |
 | A r3, CONVERGED; all five cleanup findings folded in | 0 / 0 / 2 / 3 | 4 / 1 (R3-5, expressly granted) | 5 / 0 | 0 | 4 / 1 / 0 finding groups; R3-3 integration corrected by delta F1 | None of r3's five left open after delta F1 | Turn-7 end: 109,576 / 475,000, supplied at dispatch 8 |
 | A delta, NO_NEW_CRITICAL_MAJOR; two MINORs folded in | 0 / 0 / 2 / 1 | 3 / 0 | 3 / 0 | 0 | 2 / 0 / 0 finding groups; A1 equivalent, no change | None | Turn-8 end 137,204 / 475,000 |
+| B r1, NEW_CRITICAL_MAJOR_FOUND; ruled folds complete | 0 / 1 / 1 / 7 | 7 / 2 (F5/F9 granted folds; rest banked) | 9 reported / 0 reopened; F8 follows prior rulings | 0 | 4 / 3 / 1 finding groups; F8 banked | F8 and remaining F9 notes to CHARC | DISPATCHER TO FILL |
 
 The r1 turn bundled its ruled remediation groups in one logical review
 fold-in. At that handoff Reviewer A r2 and the real-download seat proof were
@@ -791,3 +811,112 @@ entry tests in `tests/test_frozen_entry.py` and no change to
 `-m` branch changed. No real fetch, GPU activation, frozen executable/build,
 desktop input, git write, footage/profile write or seat/download script was
 performed or created.
+
+## Reviewer B r1 fold-in (dispatch 9)
+
+Reviewer B r1 (`B/r1/review.txt` at the dispatcher evidence root) returned
+NEW_CRITICAL_MAJOR_FOUND: one MAJOR, one MINOR and seven ADVISORY findings.
+All commissioned folds are built under CHARC's complete ruling packet.
+F8 and the remaining F9 notes stay with CHARC for the register/accept record.
+The loader and its cheap/full acceptance rules are unchanged this turn.
+
+| Finding | Change | Test | Mutant / historical discrimination |
+| --- | --- | --- | --- |
+| F1 MAJOR | Flush+fsync every extracted file and the staged manifest before close; off win32, sync the renamed staging directory then root after publication, closing both descriptors. A directory-sync failure uses the existing cleanup path against the published candidate | `test_every_extracted_file_and_manifest_are_flushed_before_publication` records all 20 synthetic installed files plus manifest before replace, checking flushed sizes. `test_posix_publication_syncs_renamed_staging_then_root` exercises directory order/closure with descriptor doubles. Two `test_fsync_failure_removes_staging_without_publishing` cases cover payload/manifest ENOSPC | All four cases fail exact turn 8; removing file-fsync calls fails the recording test. No physical power cut performed |
+| F2 MINOR + F4 ADVISORY | Wrap `response.read()` alone, converting any OSError to transport URLError; retain three attempts and wheel-named errors. Disk write errors retain their separate path | Read-phase TimeoutError and plain OSError each make three real fake-index requests, name the wheel and clean staging. Write-phase ENOSPC makes one request | Plain read error fails turn 8; timeout already passed there but kills M3 on that original code. A widened write-error retry mutant fails the ENOSPC control |
+| F3 ADVISORY | Synthetic wheel RECORD omits nested `lib.dll` while keeping listed `__init__.py`; the package still has top-level ownership | Improved `test_unlisted_nested_file_fails_full_verification` tests the install outcome through the full nested-file walk | M4 (staging full check downgraded to cheap) now fails this behavioral test |
+| F5 ADVISORY, originally out of envelope, granted | Guard `_removal_pending` and GUI marker/root/glob probes: OSError means pending, no activation, one log line. Guard shell construction and menu-refresh probes; preserve pending CPU text and suppress repeat logs for persistent failure | Six isolated entry cases cover GUI path/exists/is_dir/glob, worker path and frozen-module path. Two offscreen shell cases cover construction and later menu refresh; each asserts one pending log | All eight fail exact turn-8 code and pass fixed code |
+| F6 ADVISORY | Only section 2's GPU paragraph and README's normal-install paragraph change: cmd.exe install/remove recipes use `start /wait "" Clearwater.exe ... > ... 2>&1` and explain waiting | Documentation diff / paragraph footprint audit | No frozen run; documentation correction |
+| F7 ADVISORY | Child atomically publishes its interpreter PID using `os.getpid()`; timeout cleanup sends SIGTERM to that PID, never `child.kill()` on the uv launcher. Eight-second child deadline remains | Both existing nested DLL/`.pyd` child tests pass; parent waits remain bounded | Test harness corrected; forced-timeout kill branch inspected, not forced this turn |
+| F8 ADVISORY, already ruled | No code; later child loads stay on CPU after a removal request, and the export status/off-win32 lazy-load notes go to CHARC | Existing behavior follows prior removal rulings | Banked for register/accept |
+| F9 ADVISORY | Add direct tests of NTFS `:` stream and same-host redirect user-info refusals. Emit the dialog's identical one-line N13 statement from the installer before requests, on stdout when available | `test_ntfs_stream_member_is_refused_by_the_member_validator`, `test_redirect_user_info_is_refused_before_a_request`, isolated `test_headless_n13_notice_precedes_the_first_request`; existing offscreen plan test asserts installer/dialog notice equality | M1 and M15 fail their new tests. Security rules already pass correct turn 8; N13 output assertion fails turn 8 |
+
+N13 uses the verbatim dialog text already reproduced in this report.
+`gpu_pack_install.install` emits it, preserving the F5-only `__main__` grant
+and keeping Qt out of headless imports. It can also appear for a GUI request
+when stdout exists; a windowed process with no stdout remains silent there.
+The notice constants are kept equal by the offscreen assertion; the dialog
+module is unchanged. No automatic request/download was added.
+
+F9's remaining uppercase top-level `.DATA` note stays with CHARC. Extra
+arguments exit **2**, correctly following AD-34's refusal status; requested
+success/no-op is 0 and failure/cancel is 1. F8 and those remaining F9 notes
+have no new code here. The cheap startup check is unchanged, and repair of a
+pack that fails the full check remains remove/reinstall.
+
+### B r1 validation
+
+All logs below are under `work/wp6.3a/`. Pytest commands set
+`PYTHONPATH=scripts` and `QT_QPA_PLATFORM=offscreen`, load
+`-p sandbox_mkdir_shim -p no:cacheprovider`, and use bounded timeouts and
+disposable worktree basetemps. The GUI command includes the binding shim.
+The actual fake index and its exact-loopback network guard remain unchanged.
+
+| Command | Result / evidence |
+| --- | --- |
+| `uv run --no-sync ruff check .` | All checks passed, exit 0; `b1-ruff-final.log` |
+| `uv run --no-sync ruff format --check .` | 327 files formatted, exit 0; `b1-format-final.log` |
+| `uv run --no-sync mypy` | No issues in 163 source files, exit 0; `b1-mypy.log` |
+| `uv run --no-sync mypy --platform darwin` | Exactly 4 accepted errors in 3 files / 163 checked, exit 1; `b1-darwin.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_gpu_pack.py tests/test_gpu_pack_install.py tests/test_tools_package_build.py tests/test_frozen_entry.py --basetemp=work/c63a-9 --junitxml=work/wp6.3a/b1-tests.xml --durations=0` | **452 passed in 24.31 s**, exit 0; `b1-tests.log` / XML |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_gpu_pack_install.py --basetemp=work/c63a-9m` | **101 passed in 8.86 s**, exit 0; `b1-module-alone.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 600 tests/test_gui_gpu_pack_dialog.py --basetemp=work/c63a-9gui --junitxml=work/wp6.3a/b1-gui.xml` | **24 passed in 1.04 s**, exit 0; `b1-gui.log` / XML |
+| `uv run --no-sync python work/wp6.3a/b1-probes.py turn8` | Exact turn-8 installer/entry/shell loaded in memory: **15 expected failures / 4 passing controls / 281 deselected in 2.19 s**, exit 1; `b1-turn8.log` |
+| `uv run --no-sync python work/wp6.3a/b1-probes.py M1` | One expected NTFS-stream failure, 0.19 s, exit 1; `b1-M1.log` |
+| Same command, `M15` | One expected user-info failure, 0.17 s, exit 1; `b1-M15.log` |
+| Same command, `M4` | One expected nested-unlisted failure, 0.44 s, exit 1; `b1-M4.log` |
+| Same command, `no-fsync` | One expected fsync-coverage failure, 0.36 s, exit 1; `b1-no-fsync.log` |
+| Same command, `wide-write-retry` | One expected write-side retry-count failure, 0.23 s, exit 1; `b1-wide-write-retry.log` |
+| Same command, `M3-turn8` | One expected timeout failure on turn-8 code with TimeoutError removed, 0.24 s, exit 1; `b1-M3-turn8.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_gpu_pack_install.py tests/test_frozen_entry.py tests/test_gui_gpu_pack_dialog.py -k 'every_extracted or posix_publication or fsync_failure or read_phase or write_phase or ntfs_stream or redirect_user_info or n13_notice or unreadable_removal_probes or unreadable_marker_keeps or menu_opens_explicit or unlisted_nested or child_mapped' --basetemp=work/c63a-9restored` | Fresh normal process after all probes: **22 passed / 278 deselected in 2.12 s**, exit 0; `b1-restored.log` |
+| `uv run --no-sync python work/wp6.3a/b1-audit.py` | Exactly 9 owned files, F5-only entry changes, guide paragraph-only edit, loader unchanged, 0 CR bytes, clean diff check, preserved run 1 plus re-run placeholder; `b1-audit.log` |
+
+Darwin errors are exactly `src/clearwater/io/video/pipes.py:56`,
+`tools/prototype/bench.py:1159`, `tools/prototype/bench.py:1480` and
+`tools/spike_io/transport.py:950`. No new error, skip or sandbox residual
+occurred. The POSIX directory-sync test uses descriptor doubles on Windows;
+it is not a real POSIX durability proof. The seat measures real-pack cost
+against 248.1 s; the delta remains **SEAT TO FILL** (2,680 expected Windows
+file fsyncs).
+The final XML records all 101 installer cases below ten seconds (maximum
+2.048 s). The packaging README's inherited CRLF endings were normalized to
+LF; its text diff remains confined to the allowed request paragraph.
+
+Historical probes use read-only `git show a76a7723:<path>` and an in-memory
+source loader, never a tracked-file revert. Four controls already pass turn
+8: read TimeoutError, write ENOSPC, NTFS-stream refusal and redirect-user-info
+refusal. Their purpose is to catch broken mutants, so claiming that they
+fail correct old code would be false. The improved nested-file test also
+passes correct turn 8 and now fails M4. With the new wrapper, read TimeoutError
+becomes URLError; removing only the outer TimeoutError arm no longer breaks
+read-timeout retries. M3-turn8 therefore exercises the review's original
+mutation on its original code.
+
+### B r1 verification loop and handoff
+
+| Suspected issue | Independent confirmation / rejection | Disposition |
+| --- | --- | --- |
+| No durable writes before publication | Exact turn-8 coverage/failure tests fail; no-fsync mutant fails | Confirmed, fixed; payload/manifest failure cleanup tested |
+| Directory-sync order/descriptor leak | Off-win32 branch observes destination then root, with matching closes | Order/closure hold; real POSIX durability unmeasured |
+| Read error bypass or write-error retry | Turn-8 plain-read failure; wide-write-retry mutant fails one-request control | Fixed at the read boundary only |
+| Nested-unlisted coverage is cheap-only | Listed sibling retained; M4 now fails the actual install outcome | Confirmed coverage gap fixed |
+| Startup OSError escapes or logs twice | Eight guarded entry/shell cases fail turn 8 and pass fixed code, asserting one pending log | Confirmed and fixed |
+| Timeout cleanup targets launcher | Atomic interpreter PID reporting and PID-based SIGTERM; normal child cases pass | Harness corrected; forced timeout branch inspected |
+| Missing security tests / headless notice | M1/M15 fail; N13 pre-request and dialog-equality assertions pass | Coverage and notice fixed |
+| New lint slip | Initial lint flagged SIM105 in timeout cleanup | Fixed using `contextlib.suppress`; final lint clean |
+| Final in-envelope pass | Required checks, 452 / 101 / 24 tests, restored probes and footprint audit | No further in-envelope finding |
+
+Ledger: 0 critical / 1 major / 1 minor / 7 advisory, nine reported findings,
+no reopened finding or revert; four product-code / three test-only / one
+documentation finding groups, F8 banked. F5/F9 listed folds are expressly
+granted despite their original envelope classification. Prior depth:
+137,204 / 475,000 (dispatch 9); this turn: DISPATCHER TO FILL. No stopped item,
+open question or unapproved deviation remains. Prior-correct controls are
+disclosed above rather than falsely claiming all new tests fail old code.
+
+Ready for the short Claude delta review, seat re-run and gate. Run-1 evidence
+is preserved; the new measurement is not claimed. No new dependency, loader
+edit, frozen-interface change, real fetch, GPU activation, frozen run/build,
+desktop input, git write or footage/real-profile write occurred. Scratch
+probes and synthetic artifacts stay under ignored `work/`; none is a
+download/seat script.

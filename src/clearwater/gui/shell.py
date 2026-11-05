@@ -307,8 +307,14 @@ class MainWindow(ShellWindow):
         self._save_at_close = startup.save_at_close
         self._choose = choose_file or _choose_file
         self._closed = False
-        marker = gpu_pack.pending_removal_path()
-        self._gpu_removal_pending = marker is not None and marker.exists()
+        self._gpu_probe_error_logged = False
+        try:
+            marker = gpu_pack.pending_removal_path()
+            self._gpu_removal_pending = marker is not None and marker.exists()
+        except OSError as error:
+            _LOG.warning("GPU pack removal pending: %s", error)
+            self._gpu_probe_error_logged = True
+            self._gpu_removal_pending = True
         self._idle_device = "CPU: GPU pack removal pending" if self._gpu_removal_pending else "-"
         self.session = ShellSession(
             engines,
@@ -506,18 +512,32 @@ class MainWindow(ShellWindow):
 
     def _update_gpu_actions(self) -> None:
         """Expose the platform's pack actions and refresh presence without loading a pack."""
-        root = gpu_pack.pack_root()
-        marker = gpu_pack.pending_removal_path()
-        if self._gpu_removal_pending and (marker is None or not marker.exists()):
-            self._gpu_removal_pending = False
-            self._idle_device = "CPU: GPU support changes take effect at the next start"
+        root = None
+        try:
+            root = gpu_pack.pack_root()
+            marker = gpu_pack.pending_removal_path()
+            pending = marker is not None and marker.exists()
+            present = root is not None and (root / gpu_pack.STAMP).is_dir()
+        except OSError as error:
+            if not self._gpu_probe_error_logged:
+                _LOG.warning("GPU pack removal pending: %s", error)
+                self._gpu_probe_error_logged = True
+            pending, present = True, False
+        else:
+            self._gpu_probe_error_logged = False
+        if pending != self._gpu_removal_pending:
+            self._gpu_removal_pending = pending
+            self._idle_device = (
+                "CPU: GPU pack removal pending"
+                if pending
+                else "CPU: GPU support changes take effect at the next start"
+            )
             if hasattr(self, "device_label"):
                 self._update_status()
         supported = root is not None
         self._gpu_install.setVisible(supported)
         self._gpu_remove.setVisible(supported)
         self._gpu_install.setEnabled(supported and not self._gpu_busy)
-        present = root is not None and (root / gpu_pack.STAMP).is_dir()
         self._gpu_remove.setEnabled(present and not self._gpu_busy)
 
     def _gpu_busy_changed(self, busy: bool) -> None:

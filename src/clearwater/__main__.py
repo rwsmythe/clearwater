@@ -286,8 +286,12 @@ def run_interpreter_option(arguments: Sequence[str]) -> int:
 
 def _removal_pending(*, log: bool = True) -> bool:
     """Read the shared marker without installer side effects on worker/child branches."""
-    marker = gpu_pack.pending_removal_path()
-    pending = marker is not None and marker.exists()
+    try:
+        marker = gpu_pack.pending_removal_path()
+        pending = marker is not None and marker.exists()
+    except OSError as error:
+        logging.getLogger(__name__).warning("GPU pack removal pending: %s", error)
+        return True
     if pending and log:
         logging.getLogger(__name__).info("GPU pack removal pending")
     return pending
@@ -354,17 +358,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         if reentry is not None:
             return run_interpreter_option([arguments[0], *reentry])
         _start_logging()
-    marker = gpu_pack.pending_removal_path()
-    root = gpu_pack.pack_root()
-    if (marker is not None and marker.exists()) or (
-        root is not None
-        and root.is_dir()
-        and next(root.glob(f"{gpu_pack.STAMP}.partial-*"), None) is not None
-    ):
-        from clearwater import gpu_pack_install
+    try:
+        marker = gpu_pack.pending_removal_path()
+        root = gpu_pack.pack_root()
+        cleanup = (marker is not None and marker.exists()) or (
+            root is not None
+            and root.is_dir()
+            and next(root.glob(f"{gpu_pack.STAMP}.partial-*"), None) is not None
+        )
+    except OSError as error:
+        logging.getLogger(__name__).warning("GPU pack removal pending: %s", error)
+        pending = True
+    else:
+        if cleanup:
+            from clearwater import gpu_pack_install
 
-        gpu_pack_install.apply_pending_removal()
-    if not _removal_pending(log=False):
+            gpu_pack_install.apply_pending_removal()
+        pending = _removal_pending(log=False)
+    if not pending:
         gpu_pack.activate()
     from clearwater.app.main import main as gui_main
 

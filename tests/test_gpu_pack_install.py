@@ -12,6 +12,7 @@ import io
 import json
 import os
 import shutil
+import signal
 import socket
 import stat
 import subprocess
@@ -20,6 +21,7 @@ import threading
 import time
 import zipfile
 from collections import Counter
+from contextlib import suppress
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
@@ -167,6 +169,7 @@ def _wheel(name, *, hostile=None, omitted=False, nested_data=False):
     metadata = f"{name}-1.0.dist-info"
     files = {
         f"{name}/__init__.py": b"# synthetic package\n" * 100,
+        f"{name}/lib.dll": b"synthetic image payload\n",
         f"{metadata}/METADATA": f"Metadata-Version: 2.1\nName: {name}\nVersion: 1.0\n".encode(),
         f"{metadata}/WHEEL": b"Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
     }
@@ -175,7 +178,7 @@ def _wheel(name, *, hostile=None, omitted=False, nested_data=False):
     buffer = io.StringIO(newline="")
     writer = csv.writer(buffer, lineterminator="\n")
     for path, data in files.items():
-        if omitted and path.endswith("__init__.py"):
+        if omitted and path.endswith("lib.dll"):
             continue
         digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=")
         writer.writerow((path, "sha256=" + digest.decode(), len(data)))
@@ -470,7 +473,7 @@ def test_disk_space_refuses_before_network(fake_index, monkeypatch):
 
 def test_disk_budget_needs_only_the_largest_archive(fake_index, monkeypatch):
     monkeypatch.setattr(_installer(), "_INSTALLED_SIZE", 10_000)
-    # Four 2,955-byte wheels: 15,000 permits installed + largest + 10%, not their sum.
+    # 15,000 permits the synthetic installed estimate + largest wheel + 10%, not their sum.
     monkeypatch.setattr(shutil, "disk_usage", lambda _: SimpleNamespace(free=15_000))
     result = _installer().install(Progress())
     assert result.ok, result.message
@@ -524,6 +527,195 @@ def test_unlisted_nested_file_fails_full_verification(fake_index):
     result = _installer().install(Progress())
     assert not result.ok and "unlisted" in result.message
     assert list(fake_index.root.iterdir()) == []
+
+
+def test_every_extracted_file_and_manifest_are_flushed_before_publication(fake_index, monkeypatch):
+    installer = _installer()
+    opened = {}
+    synced = []
+    directories = []
+    original_open, replace = Path.open, os.replace
+
+    def track_open(path, mode="r", *args, **kwargs):
+        handle = original_open(path, mode, *args, **kwargs)
+        if "w" in mode:
+            opened[handle.fileno()] = Path(path)
+        return handle
+
+    def sync(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            directories.append(os.fstat(fd).st_ino)
+            return
+        path = opened[fd]
+        assert os.fstat(fd).st_size > 0, f"buffer was not flushed: {path}"
+        synced.append(path)
+
+    def publish(source, target):
+        if Path(target).name == gpu_pack.STAMP:
+            folder = Path(source)
+            expected = {p for p in folder.rglob("*") if p.is_file()}
+            assert folder / "manifest.json" in expected
+            assert Counter(synced) == Counter(expected), "not every staged file was fsynced"
+        return replace(source, target)
+
+    monkeypatch.setattr(Path, "open", track_open)
+    monkeypatch.setattr(os, "fsync", sync)
+    monkeypatch.setattr(os, "replace", publish)
+    result = installer.install(Progress())
+    assert result.ok, result.message
+    assert len(synced) == 21  # Five files per synthetic distribution plus the manifest.
+    if sys.platform != "win32":
+        assert directories == [result.path.stat().st_ino, fake_index.root.stat().st_ino]
+
+
+def test_posix_publication_syncs_renamed_staging_then_root(fake_index, monkeypatch):
+    installer = _installer()
+    original_open, original_sync, original_close = os.open, os.fsync, os.close
+    destination = fake_index.root / gpu_pack.STAMP
+    handles, opened, synced, closed = {}, [], [], []
+
+    def open_directory(path, flags, *args, **kwargs):
+        if Path(path) in (destination, fake_index.root):
+            assert flags == os.O_RDONLY and destination.is_dir()
+            descriptor = 1_000_000 + len(opened)
+            handles[descriptor] = Path(path)
+            opened.append(Path(path))
+            return descriptor
+        return original_open(path, flags, *args, **kwargs)
+
+    def sync(descriptor):
+        if descriptor in handles:
+            synced.append(handles[descriptor])
+        else:
+            original_sync(descriptor)
+
+    def close(descriptor):
+        if descriptor in handles:
+            closed.append(handles[descriptor])
+        else:
+            original_close(descriptor)
+
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(os, "open", open_directory)
+    monkeypatch.setattr(os, "fsync", sync)
+    monkeypatch.setattr(os, "close", close)
+    # The caller normally owns the platform-specific operation lock; exercise publication only.
+    assert installer._install_locked(fake_index.root, Progress()).ok
+    assert opened == synced == closed == [destination, fake_index.root]
+
+
+@pytest.mark.parametrize("failure", ["lib.dll", "manifest.json"])
+def test_fsync_failure_removes_staging_without_publishing(fake_index, monkeypatch, failure):
+    opened = {}
+    original_open, original_sync, original_replace = Path.open, os.fsync, os.replace
+
+    def track_open(path, mode="r", *args, **kwargs):
+        handle = original_open(path, mode, *args, **kwargs)
+        if "w" in mode:
+            opened[handle.fileno()] = Path(path)
+        return handle
+
+    def failed_sync(fd):
+        if opened[fd].name == failure:
+            raise OSError(errno.ENOSPC, "durability flush failed")
+        original_sync(fd)
+
+    def never_publish(source, target):
+        assert Path(target).name != gpu_pack.STAMP, "published before successful fsync"
+        return original_replace(source, target)
+
+    monkeypatch.setattr(Path, "open", track_open)
+    monkeypatch.setattr(os, "fsync", failed_sync)
+    monkeypatch.setattr(os, "replace", never_publish)
+    result = _installer().install(Progress())
+    assert not result.ok and "durability flush failed" in result.message
+    assert list(fake_index.root.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "error", [TimeoutError("read stalled"), OSError(errno.ENETUNREACH, "read network changed")]
+)
+def test_read_phase_errors_are_retried_and_name_the_wheel(fake_index, monkeypatch, error):
+    installer = _installer()
+
+    def failed_read(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(installer.http.client.HTTPResponse, "read", failed_read)
+    result = installer.install(Progress())
+    assert not result.ok and "synthetic0-1.0-py3-none-any.whl" in result.message
+    assert len(fake_index.requests) == 3
+    assert list(fake_index.root.iterdir()) == []
+
+
+def test_write_phase_disk_full_is_not_retried(fake_index, monkeypatch):
+    original_open = Path.open
+
+    def open_full(path, mode="r", *args, **kwargs):
+        handle = original_open(path, mode, *args, **kwargs)
+        if path.suffix != ".part":
+            return handle
+
+        class FullWriter:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return handle.__exit__(*exc)
+
+            def write(self, block):
+                raise OSError(errno.ENOSPC, "disk full during write")
+
+        return FullWriter()
+
+    monkeypatch.setattr(Path, "open", open_full)
+    result = _installer().install(Progress())
+    assert not result.ok and "disk full during write" in result.message
+    assert len(fake_index.requests) == 1
+    assert list(fake_index.root.iterdir()) == []
+
+
+def test_ntfs_stream_member_is_refused_by_the_member_validator(tmp_path):
+    installer = _installer()
+    with pytest.raises(installer._InstallError, match="wheel member not allowed"):
+        installer._member_path(tmp_path / "site", zipfile.ZipInfo("pkg/file.dll:stream"))
+
+
+def test_redirect_user_info_is_refused_before_a_request():
+    installer = _installer()
+    request = installer.urllib.request.Request("https://files.pythonhosted.org/original")
+    with pytest.raises(installer._InstallError, match="redirect refused"):
+        installer._LockedRedirect().redirect_request(
+            request,
+            io.BytesIO(),
+            302,
+            "Found",
+            installer.http.client.HTTPMessage(),
+            "https://user:password@files.pythonhosted.org/redirected",
+        )
+
+
+def test_headless_n13_notice_precedes_the_first_request(
+    fake_index, headless_entry, monkeypatch, capsys
+):
+    installer = _installer()
+    download = installer._download
+    notices = []
+
+    def observed_download(*args):
+        if not notices:
+            assert fake_index.requests == []
+            notices.append(capsys.readouterr().out)
+        return download(*args)
+
+    monkeypatch.setattr(installer, "_download", observed_download)
+    assert headless_entry.main(["Clearwater", "--install-gpu-pack"]) == 0
+    assert notices == [
+        "GPU support downloads CuPy and NVIDIA's CUDA runtime libraries from PyPI into your user "
+        "folder. The NVIDIA libraries are provided by NVIDIA under the NVIDIA Software License "
+        "Agreement (the file `License.txt` inside each nvidia package after the install); CuPy is "
+        "MIT. Clearwater does not redistribute them.\n"
+    ]
 
 
 def test_removal_deletes_pack_and_partial_but_refuses_an_outside_path(fake_index, tmp_path):
@@ -1195,7 +1387,7 @@ def test_child_mapped_image_keeps_pack_intact_until_exit(empty_plan, tmp_path, k
         environment[key] = str(tmp_path / key)
     environment["QT_QPA_PLATFORM"] = "offscreen"
     code = r"""
-import importlib.abc, importlib.util, sys, time
+import importlib.abc, importlib.util, os, sys, time
 from pathlib import Path
 class NoQt(importlib.abc.MetaPathFinder):
     def find_spec(self, name, path=None, target=None):
@@ -1210,7 +1402,9 @@ else:
     spec = importlib.util.spec_from_file_location('_queue', image)
     mapped = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mapped)
-Path(ready).touch()
+pid_file = Path(ready).with_suffix('.pid')
+pid_file.write_text(str(os.getpid()), encoding='ascii')
+pid_file.replace(ready)
 deadline = time.monotonic() + 8
 while not Path(release).exists():
     if time.monotonic() > deadline:
@@ -1250,8 +1444,10 @@ while not Path(release).exists():
             try:
                 child.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                child.kill()
-                child.wait(timeout=2)
+                if ready.exists():
+                    with suppress(ProcessLookupError):
+                        os.kill(int(ready.read_text(encoding="ascii")), signal.SIGTERM)
+                child.wait(timeout=10)  # The interpreter also retains its own 8 s deadline.
         assert child.returncode == 0
     assert installer.apply_pending_removal().ok
     assert list(root.iterdir()) == []

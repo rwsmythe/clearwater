@@ -225,6 +225,62 @@ def test_gui_start_sweeps_markerless_partial_without_creating_absent_root(
 
 
 @pytest.mark.timeout(10)
+@pytest.mark.parametrize(
+    "branch, probe",
+    [
+        ("gui", "path"),
+        ("gui", "exists"),
+        ("gui", "is_dir"),
+        ("gui", "glob"),
+        ("worker", "path"),
+        ("module", "path"),
+    ],
+)
+def test_unreadable_removal_probes_skip_activation(
+    monkeypatch, tmp_path, calls, caplog, branch, probe
+):
+    """Unreadable marker/root probes fail closed on every entry branch, without cleanup."""
+    from clearwater import gpu_pack_install
+
+    _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    root = tmp_path / "packs"
+    root.mkdir()
+    marker = root / (gpu_pack.STAMP + ".remove")
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: root)
+    if probe == "path":
+
+        def denied_path():
+            raise PermissionError("synthetic marker probe denied")
+
+        monkeypatch.setattr(gpu_pack, "pending_removal_path", denied_path)
+    else:
+        method = {"exists": Path.exists, "is_dir": Path.is_dir, "glob": Path.glob}[probe]
+
+        def denied(path, *args, **kwargs):
+            if path == (marker if probe == "exists" else root):
+                raise PermissionError("synthetic marker probe denied")
+            return method(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, probe, denied)
+    monkeypatch.setattr(
+        gpu_pack_install, "apply_pending_removal", lambda: pytest.fail("unreadable cleanup")
+    )
+    entry, blocker = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+    with caplog.at_level(logging.INFO):
+        if branch == "gui":
+            assert entry.main(["Clearwater"]) == 3
+        elif branch == "worker":
+            assert entry.main(["Clearwater", "--export-worker"]) == 7
+        else:
+            assert entry.main(["Clearwater", "-m", "cuda.pathfinder"]) == 2
+    assert not any(name == "activate" for name, _ in calls)
+    assert len([r for r in caplog.records if "GPU pack removal pending" in r.message]) == 1
+    assert blocker.attempts == []
+
+
+@pytest.mark.timeout(10)
 def test_gui_start_locked_pack_keeps_marker_and_skips_activation(
     monkeypatch,
     tmp_path,

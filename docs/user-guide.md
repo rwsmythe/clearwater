@@ -67,9 +67,10 @@ Wait for completion and restart Clearwater to use the pack. **Tools > Remove GPU
 support** asks for confirmation and takes effect at the next start. If a running
 Clearwater is using the pack, removal is deferred until the next GUI start; close
 other Clearwater windows if removal remains pending. For a terminal
-or script, use `Clearwater.exe --install-gpu-pack > install.log 2>&1` or
-`Clearwater.exe --remove-gpu-pack > remove.log 2>&1`: this windowed executable
-prints only when its output is redirected. The same requests in source are
+or script in cmd.exe, use `start /wait "" Clearwater.exe --install-gpu-pack > install.log 2>&1` or
+`start /wait "" Clearwater.exe --remove-gpu-pack > remove.log 2>&1`. This waits for the
+windowed executable to finish; it prints only when its output is redirected.
+The same requests in source are
 `python -m clearwater --install-gpu-pack` and `python -m clearwater --remove-gpu-pack`;
 source runs use their environment's GPU extra, while the downloaded pack is loaded
 by the frozen application at its next start.

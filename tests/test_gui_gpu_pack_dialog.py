@@ -113,6 +113,7 @@ def test_menu_opens_explicit_request_with_computed_plan(make_window, monkeypatch
     assert f"{plan.installed_size:,} bytes" in text
     assert str(isolated_pack / plan.stamp) in text
     assert dialog.license_text.text() == LICENSE
+    assert gpu_pack_install.LICENSE_TEXT == module.LICENSE_TEXT
     assert dialog.install_button.text() == "Download and install"
     dialog.reject()
     assert not dialog.isVisible()
@@ -357,6 +358,23 @@ def test_marker_vanishing_during_construction_resets_without_a_status_bar(
     assert window.device_label.toolTip() == ""
     window.set_idle_device("CPU: CuPy not installed")
     assert window.device_label.text() == "Device: CPU: CuPy not installed"
+
+
+@pytest.mark.parametrize("stage", ["construction", "menu"])
+def test_unreadable_marker_keeps_pending_cpu_reason(make_window, monkeypatch, caplog, stage):
+    window = make_window() if stage == "menu" else None
+
+    def denied():
+        raise PermissionError("synthetic marker probe denied")
+
+    monkeypatch.setattr(gpu_pack, "pending_removal_path", denied)
+    if window is None:
+        window = make_window()
+    else:
+        window._update_gpu_actions()
+    assert window.device_label.text() == "Device: CPU: GPU pack removal pending"
+    assert window.device_label.toolTip() == ""
+    assert len([r for r in caplog.records if "GPU pack removal pending" in r.message]) == 1
 
 
 def test_this_process_loaded_remove_only_writes_marker(make_window, monkeypatch, isolated_pack):

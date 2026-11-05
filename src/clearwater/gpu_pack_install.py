@@ -41,6 +41,13 @@ _BUSY = "another GPU pack operation is in progress"
 _PENDING = "GPU support will be removed at the next start"
 REPLACE_TEXT = "An existing GPU pack is not usable and will be replaced"
 """The notice shown before replacing a pack rejected by the cheap check."""
+LICENSE_TEXT = (
+    "GPU support downloads CuPy and NVIDIA's CUDA runtime libraries from PyPI into your user "
+    "folder. The NVIDIA libraries are provided by NVIDIA under the NVIDIA Software License "
+    "Agreement (the file `License.txt` inside each nvidia package after the install); CuPy is "
+    "MIT. Clearwater does not redistribute them."
+)
+"""The same one-line N13 notice as the dialog, printed before an install request."""
 
 
 class Progress(Protocol):
@@ -230,7 +237,10 @@ def write_staging_manifest(folder: Path, document: dict[str, object]) -> Path:
         OSError: The manifest could not be written.
     """
     path = folder / gpu_pack.MANIFEST_NAME
-    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
+    with path.open("w", encoding="utf-8", newline="\n") as output:
+        output.write(json.dumps(document, indent=2) + "\n")
+        output.flush()
+        os.fsync(output.fileno())
     return path
 
 
@@ -330,7 +340,10 @@ def _download(wheel: Wheel, downloads: Path, reporter: _Reporter, completed: int
                 expected = int(length) if length is not None else None
                 while True:
                     _cancel(reporter.progress)
-                    block = response.read(_CHUNK_SIZE)
+                    try:
+                        block = response.read(_CHUNK_SIZE)
+                    except OSError as error:
+                        raise urllib.error.URLError(error) from error
                     if not block:
                         if expected is not None and received < expected:
                             raise http.client.IncompleteRead(b"", expected - received)
@@ -408,6 +421,8 @@ def _unpack(archive: Path, site: Path, reporter: _Reporter, completed: int) -> N
                 while block := source.read(_CHUNK_SIZE):
                     _cancel(reporter.progress)
                     output.write(block)
+                output.flush()
+                os.fsync(output.fileno())
             reporter.report(completed, f"Unpacking {archive.name}: {member.orig_filename}")
 
 
@@ -644,6 +659,8 @@ def install(progress: Progress) -> PackResult:
         Success with the installed path, or one readable failure/cancellation message.
         Cleanup errors are logged and disclosed in the result rather than raised.
     """
+    if sys.stdout is not None:
+        print(LICENSE_TEXT, file=sys.stdout, flush=True)
     root = gpu_pack.pack_root()
     if root is None:
         return PackResult(False, "GPU support is not available on this platform")
@@ -716,6 +733,14 @@ def _install_locked(root: Path, progress: Progress) -> PackResult:
             raise _InstallError(problem)
         _cancel(progress)
         os.replace(staging, destination)
+        staging = destination
+        if sys.platform != "win32":
+            for folder in (destination, root):
+                descriptor = os.open(folder, os.O_RDONLY)
+                try:
+                    os.fsync(descriptor)
+                finally:
+                    os.close(descriptor)
         return PackResult(
             True, "GPU support is installed. Restart Clearwater to use it.", destination
         )
