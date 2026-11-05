@@ -18,9 +18,11 @@ import ast
 import errno
 import hashlib
 import importlib
+import io
 import logging
 import os
 import sys
+import tokenize
 from collections.abc import Sequence
 from dataclasses import replace
 from fractions import Fraction
@@ -3230,21 +3232,36 @@ def platform_polarity(test: ast.expr) -> str | None:
     return None
 
 
+LAUNCH_OPERATIONS = ("run", "Popen", "call", "check_call", "check_output")
+"""The ``subprocess`` attributes whose stub keeps a later command from launching (A r3 #1)."""
+
+
 def platform_guard_offenders(source: str, markers: Sequence[str], name: str) -> list[str]:
     """Return ``name:line`` for each marker that a Windows-only path does not control.
 
-    The source is parsed (comments never count) and each marker's smallest node is walked up
-    to the module. It is controlled when an enclosing branch is taken only on Windows (an
-    ``if`` body, an ``else`` of an off-Windows test, a later ``and`` operand), when its function
-    carries ``skipif`` with an off-Windows condition, or when an earlier statement of an
-    enclosing block skips, raises or returns off Windows (itself, inside a helper it calls, or
-    a ``monkeypatch.setattr(subprocess, ...)`` stub). Each test's POLARITY is evaluated
+    The source is parsed and its comment tokens are blanked in place (``tokenize``; line and
+    column positions kept, string literals kept), so a marker in a comment is never code. Each
+    marker's smallest node is walked up to the module. It is controlled when an enclosing
+    branch is taken only on Windows (an ``if`` body, an ``else`` of an off-Windows test, a
+    later ``and`` operand), when its function carries ``skipif`` with an off-Windows
+    condition, or when an earlier statement of an enclosing block ends EVERY path off Windows
+    (A r3 #1: a skip, raise or return on each branch the host can take, a call of a helper
+    whose every path skips or raises, a ``try`` whose body and every handler end; nested
+    function and class scopes run nothing), or is a ``monkeypatch.setattr`` of a
+    :data:`LAUNCH_OPERATIONS` attribute of ``subprocess``. Each test's POLARITY is evaluated
     (:func:`platform_polarity`): an inverted guard controls nothing. A marker in the skip of
     an off-Windows guard is that guard's own text; a constant assigned to a name is
     controlled when every later use is; a function without its own control is controlled
     when every call of it is.
     """
     tree = ast.parse(source)
+    lines = io.StringIO(source).readlines()  # split as tokenize reads it (newlines only)
+    for token in tokenize.generate_tokens(io.StringIO(source).readline):
+        if token.type == tokenize.COMMENT:  # one line each; blank it, keep every position
+            (row, start), (_, end) = token.start, token.end
+            text = lines[row - 1]
+            lines[row - 1] = text[:start] + " " * (end - start) + text[end:]
+    code = "".join(lines)
     parents: dict[ast.AST, ast.AST] = {}
     for parent in ast.walk(tree):
         for child in ast.iter_child_nodes(parent):
@@ -3254,37 +3271,99 @@ def platform_guard_offenders(source: str, markers: Sequence[str], name: str) -> 
     def is_skip(node: ast.AST) -> bool:
         return isinstance(node, ast.Call) and ast.unparse(node.func) in ("pytest.skip", "skip")
 
-    def exits(body: Sequence[ast.stmt]) -> bool:
-        return any(
-            isinstance(n, ast.Raise | ast.Return) or is_skip(n) for s in body for n in ast.walk(s)
-        )
+    def own_nodes(node: ast.AST) -> list[ast.AST]:
+        """Every descendant of ``node`` outside a nested function, class or lambda scope."""
+        found, stack = [], list(ast.iter_child_nodes(node))
+        while stack:
+            current = stack.pop()
+            if isinstance(current, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+                continue  # defined here, not run here
+            if isinstance(current, ast.Lambda):
+                continue
+            found.append(current)
+            stack.extend(ast.iter_child_nodes(current))
+        return found
 
-    def exits_off_windows(statement: ast.AST) -> bool:
-        return any(
-            isinstance(n, ast.If) and platform_polarity(n.test) == OFF_WINDOWS and exits(n.body)
-            for n in ast.walk(statement)
-        )
+    visiting: set[str] = set()
 
     def skipper(function: ast.FunctionDef) -> bool:
-        return any(
-            isinstance(s, ast.If) and platform_polarity(s.test) == OFF_WINDOWS and exits(s.body)
-            for s in function.body
+        """A helper whose every path off Windows raises or skips (a return reaches the caller)."""
+        if function.name in visiting:
+            return False
+        visiting.add(function.name)
+        try:
+            return stops_block(function.body, returns=False)
+        finally:
+            visiting.discard(function.name)
+
+    def stops_block(body: Sequence[ast.stmt], *, returns: bool) -> bool:
+        """True when every path off Windows through ``body`` ends inside it.
+
+        Statements run in order: the block ends when one of them ends every path. Without
+        ``returns`` (a helper's body) a ``return`` before that statement is an escape.
+        """
+        for statement in body:
+            if stops(statement, returns=returns):
+                return True
+            if not returns and any(
+                isinstance(n, ast.Return) for n in [statement, *own_nodes(statement)]
+            ):
+                return False
+        return False
+
+    def stops(statement: ast.stmt, *, returns: bool) -> bool:
+        """True when ``statement``, run off Windows, ends every path through it."""
+        if isinstance(statement, ast.Raise) or (returns and isinstance(statement, ast.Return)):
+            return True
+        if isinstance(statement, ast.Expr | ast.Assign) and isinstance(statement.value, ast.Call):
+            call = statement.value
+            if is_skip(call):
+                return True
+            return (
+                isinstance(call.func, ast.Name)
+                and call.func.id in functions
+                and skipper(functions[call.func.id])
+            )
+        if isinstance(statement, ast.If):
+            polarity = platform_polarity(statement.test)
+            taken = (
+                [statement.body]
+                if polarity == OFF_WINDOWS
+                else [statement.orelse]
+                if polarity == ON_WINDOWS
+                else [statement.body, statement.orelse]
+            )
+            return all(stops_block(block, returns=returns) for block in taken)
+        if isinstance(statement, ast.With):
+            return stops_block(statement.body, returns=returns)
+        if isinstance(statement, ast.Try):
+            if stops_block(statement.finalbody, returns=returns):
+                return True
+            return stops_block(statement.body, returns=returns) and all(
+                stops_block(handler.body, returns=returns) for handler in statement.handlers
+            )
+        return False  # a loop may run zero times; a nested def or class runs nothing here
+
+    def stubs_launch(statement: ast.stmt) -> bool:
+        """``monkeypatch.setattr`` of a process-launch operation, as a statement of its own."""
+        if not (isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Call)):
+            return False
+        call = statement.value
+        if ast.unparse(call.func) != "monkeypatch.setattr" or not call.args:
+            return False
+        first = call.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):  # "subprocess.run"
+            module, _, attribute = first.value.rpartition(".")
+            return module == "subprocess" and attribute in LAUNCH_OPERATIONS
+        second = call.args[1] if len(call.args) > 1 else None
+        return (
+            ast.unparse(first) == "subprocess"
+            and isinstance(second, ast.Constant)
+            and second.value in LAUNCH_OPERATIONS
         )
 
     def stops_off_windows(statement: ast.stmt) -> bool:
-        if exits_off_windows(statement):
-            return True
-        for call in (n for n in ast.walk(statement) if isinstance(n, ast.Call)):
-            text = ast.unparse(call.func)
-            if (
-                text == "monkeypatch.setattr"
-                and call.args
-                and ast.unparse(call.args[0]) == "subprocess"
-            ):
-                return True
-            if text in functions and skipper(functions[text]):
-                return True
-        return False
+        return stops(statement, returns=True) or stubs_launch(statement)
 
     def skipif_off_windows(function: ast.FunctionDef) -> bool:
         for decorator in function.decorator_list:
@@ -3373,7 +3452,7 @@ def platform_guard_offenders(source: str, markers: Sequence[str], name: str) -> 
         return bool(calls) and all(controlled(c, depth + 1) for c in calls)
 
     offenders = []
-    for number, line in enumerate(source.splitlines(), start=1):
+    for number, line in enumerate(lines, start=1):
         if not any(m in line for m in markers):
             continue
         spanning = [
@@ -3381,11 +3460,11 @@ def platform_guard_offenders(source: str, markers: Sequence[str], name: str) -> 
             for n in ast.walk(tree)
             if isinstance(n, ast.expr | ast.stmt)
             and n.lineno <= number <= (n.end_lineno or n.lineno)
-            and any(m in (ast.get_source_segment(source, n) or "") for m in markers)
+            and any(m in (ast.get_source_segment(code, n) or "") for m in markers)
         ]
-        if not spanning:  # a comment or a docstring line: no code to control
+        if not spanning:  # no node's code carries it: nothing to control
             continue
-        smallest = min(spanning, key=lambda n: len(ast.get_source_segment(source, n) or ""))
+        smallest = min(spanning, key=lambda n: len(ast.get_source_segment(code, n) or ""))
         if not controlled(smallest):
             offenders.append(f"{name}:{number}")
     return offenders
@@ -3428,8 +3507,38 @@ GUARD_PROBES = {
         "def test_x(p):\n    subprocess.run(['cmd', '/c', 'mklink', '/J', p, p])\n",
         0,
     ),
+    "conditional return": (  # A r3 #1: one off-Windows path (flag false) reaches the command
+        "def f(flag):\n    if sys.platform != 'win32':\n        if flag:\n            return\n"
+        "    subprocess.run(['mklink'])\n",
+        1,
+    ),
+    "uncalled nested return": (  # A r3 #1: a nested scope's return runs nothing here
+        "def f():\n    def g():\n        if sys.platform != 'win32':\n            return\n"
+        "    subprocess.run(['mklink'])\n",
+        1,
+    ),
+    "unrelated stub": (  # A r3 #1: PIPE is not a launch operation
+        "def test_x(monkeypatch):\n    monkeypatch.setattr(subprocess, 'PIPE', None)\n"
+        "    subprocess.run(['mklink'])\n",
+        1,
+    ),
+    "every branch exits": (  # the control: each off-Windows path ends before the command
+        "def f(flag):\n    if sys.platform != 'win32':\n        if flag:\n            return\n"
+        "        pytest.skip('x')\n    subprocess.run(['mklink'])\n",
+        0,
+    ),
+    "launch stub": (  # the control: the launch operation itself is stubbed
+        "def test_x(monkeypatch):\n    monkeypatch.setattr(subprocess, 'run', print)\n"
+        "    subprocess.run(['mklink'])\n",
+        0,
+    ),
+    "comment only": (  # A r3 #4: a comment is not code
+        "def f():\n    # mklink is mentioned only in this comment\n    pass\n",
+        0,
+    ),
 }
-"""Planted sources for the instrument and how many offenders each must give (A r2 item 9)."""
+"""Planted sources for the instrument and how many offenders each must give (A r2 item 9,
+A r3 #1 and #4)."""
 GUARD_SITES = {
     "X05": ("test_conftest_guard.py", ('"\\\\\\\\?\\\\"',)),
     "X06": ("test_conftest_guard.py", ("letter case matters only",)),
