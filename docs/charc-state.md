@@ -27,6 +27,7 @@
 - **~18:35Z OWNER on the Studio export settings (verbatim): "encoding was H.265, bitrate was ~71-73 (file dependent); ProRes did not offer bitrate."** Recorded in the WP7.1 brief (Q1 answered). The exports carry no Studio metadata beyond `Lavf/Lavc60.3.100` and creation times (CHARC read every tag and the `udta` / `meta` / `ilst` boxes read-only).
 - **OWNER (verbatim): "They all had stabilization on"** -> WP7.1 brief Q1 amended.
 - **OWNER (verbatim): "color profile is unknown, likely whatever they were filmed at"** -> WP7.1 brief Q1 complete.
+- **OWNER (verbatim): "Best I can give is 'HDR video'"** = the Insta360 recording mode; the exports are SDR-tagged BT.709, so WP7.1 item 2 gains an SDR-behaviour check (spec 5.3 / D73 analogue).
 - (newest first; append here)
 
 ## GEN 16 HANDOVER (verified at gen 17's pickup; still the live plan)
