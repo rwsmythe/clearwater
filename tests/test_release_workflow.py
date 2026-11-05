@@ -66,6 +66,14 @@ def test_every_action_is_one_of_the_seat_verified_sha_pins(workflow):
     assert set(re.findall(r"secrets\.([\w]+)", workflow)) <= {"GITHUB_TOKEN"}
 
 
+def test_setup_uv_pins_the_audited_uv_release(workflow):
+    setup = step(workflow, "Set up uv")
+    versions = re.findall(r'^          version: "([^"]+)"$', setup, re.MULTILINE)
+    assert len(versions) == 1, "setup-uv must pin its version input"
+    assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", versions[0])
+    assert versions[0] == "0.10.9", "uv must match the audited laptop build input"
+
+
 def test_triggers_permissions_concurrency_and_release_are_bounded(workflow):
     assert 'tags: ["v*"]' in workflow
     assert "  workflow_dispatch:\n    inputs:\n      version:" in workflow
@@ -261,6 +269,32 @@ def test_checklist_names_release_authority_build_inputs_and_stop_boundaries():
     assert len(numbered) >= 10
     assert all("**STOP**" in item for item in numbered)
     assert "BEFORE the tag" in text
+
+
+def test_checklist_requires_uv_agreement_and_native_reverification():
+    text = (ROOT / "docs/release-checklist.md").read_text(encoding="utf-8")
+    build_inputs = text.split("4. Verify build inputs", 1)[1].split("\n5.", 1)[0]
+    assert "uv --version" in build_inputs and "0.10.9" in build_inputs
+    assert "agree before the tag" in build_inputs
+    assert "uv change requires native-licences re-verification" in build_inputs
+
+
+def test_readme_gpu_recipe_names_split_streams_and_matches_guide_commands():
+    readme = (ROOT / "tools/package/README.md").read_text(encoding="utf-8")
+    recipe = readme.split("The normal path is", 1)[1].split("For the spike", 1)[0]
+    guide = (ROOT / "docs/user-guide.md").read_text(encoding="utf-8")
+    for operation in ("install", "remove"):
+        command = (
+            f"Start-Process -Wait -FilePath .\\Clearwater.exe "
+            f"-ArgumentList '--{operation}-gpu-pack' "
+            f"-RedirectStandardOutput {operation}.log -RedirectStandardError {operation}.err"
+        )
+        assert command in recipe and command in guide
+        cmd_command = f'start /wait "" Clearwater.exe --{operation}-gpu-pack > {operation}.log 2>&1'
+        assert cmd_command in recipe and cmd_command in guide
+    assert "N13 licence notice is in `install.log`" in recipe
+    assert "progress and the installation outcome are in `install.err`" in recipe
+    assert "outcome is in `remove.err`" in recipe
 
 
 def test_guide_leads_with_artifact_and_retains_gpu_terminal_outcomes():

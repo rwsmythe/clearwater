@@ -38,6 +38,7 @@ while either remains open; workflow presence is not release readiness.
    a pinned BUILD INPUT; a change is a notices re-audit**. Re-verify
    `tools/package/native-licences/` (manifest, texts, bundled versions) whenever
    uv's managed Python changes; the generator fails closed on mismatched inputs.
+   The workflow's uv pin (`0.10.9`) and laptop's `uv --version` must agree before the tag; any uv change requires native-licences re-verification.
    Read the FFmpeg URL/hash from `tools/package/ffmpeg.lock.json`, verify every
    linked component's source/licence evidence and re-pin the FFmpeg asset before
    the retention expiry (about **2028-10**). Re-pinning requires repeating the

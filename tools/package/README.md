@@ -154,6 +154,11 @@ requests in cmd.exe use `start /wait "" Clearwater.exe --install-gpu-pack > inst
 or `start /wait "" Clearwater.exe --remove-gpu-pack > remove.log 2>&1`. `start /wait` waits for
 this windowed executable to finish, with output redirected to the log. In **PowerShell**, use
 `Start-Process -Wait -FilePath .\Clearwater.exe -ArgumentList '--install-gpu-pack' -RedirectStandardOutput install.log -RedirectStandardError install.err`.
+For removal, use
+`Start-Process -Wait -FilePath .\Clearwater.exe -ArgumentList '--remove-gpu-pack' -RedirectStandardOutput remove.log -RedirectStandardError remove.err`.
+The N13 licence notice is in `install.log`; progress and the installation outcome are in `install.err`.
+For removal, read both `remove.log` and `remove.err`; the outcome is in `remove.err`.
+Run only the operation you need.
 Source requests use
 `uv run --no-sync python -m clearwater --install-gpu-pack` or `--remove-gpu-pack`; the pack
 loader still acts only in frozen builds.

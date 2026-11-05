@@ -1957,3 +1957,101 @@ was made. No network fetch, real FFmpeg archive access, frozen run, PyInstaller
 build, desktop GUI/input, footage/profile write, QUIT_SCRIPT run, git write,
 push, tag, gh/workflow dispatch or mailbox post occurred. All evidence is inside
 the worktree. Depth is pending the dispatcher's reading, never estimated here.
+
+## Turn 14: pin uv and close the carried ADV-2 README recipe (2026-11-05)
+
+Dispatch 14 records turn 13 committed as `b9a991e0`: the seat re-ran 497 tests
+with one skip, both mypy targets, Ruff/format, 423 harness tests and actionlint
+1.7.12 (zero errors). The seat also verified every used input against all five
+actions' pinned action.yml files. Those are supplied seat results, not new cell
+runs. This turn fixes its two findings and yields before Reviewer A.
+
+| Turn / disposition | Severity / envelope | NEW / REOPENED; reverts | Changes / depth |
+| --- | --- | --- | --- |
+| Turn 14: uv version pin and README recipe | 1 MAJOR new seat finding, 1 MINOR carried ADV-2 finding; both now in-envelope and fixed. No Reviewer A round. | 1 NEW, 1 carried, 0 REOPENED; no reverts. | Workflow configuration + checklist/README prose; three test cases, no runtime/tool implementation. Dispatcher-read turn-13 depth 149,793; current figure pending the seat, never estimated. |
+
+### Confirmed findings and fixes
+
+**MAJOR, uv was floating:** setup-uv's action SHA pinned the action, but its
+missing `version` input still selected the latest uv. The new test failed on
+the unchanged `b9a991e0` workflow because that input was absent. The ONLY workflow
+edit is `version: "0.10.9"`, matching the local read-only result
+`uv 0.10.9 (f675560f3 2026-03-06)`. The test requires exactly one X.Y.Z value
+and the audited 0.10.9, excluding latest/ranges. One physical checklist line
+beside the PBS input requires laptop/workflow uv agreement before the tag and
+native-licences re-verification for any uv change. Its new text check also
+failed before that line was added. No Python setup option was changed.
+
+**MINOR, ADV-2 recipe:** tests/ had no existing README reader, so the new doc
+check lives in test_release_workflow.py. The existing PowerShell install form
+is retained; the recipe now names install.log (N13 notice) and install.err
+(progress and OUTCOME), adds the PowerShell removal form and names its two
+streams/outcome. The test compares both PowerShell commands and both unchanged
+cmd commands with guide section 2. Only five lines were added inside the granted
+recipe; all other README content and the guide are untouched. This closes the
+turn-13 out-of-envelope README residual under dispatch 14's explicit grant.
+
+### Read-only PBS selection finding (no implementation)
+
+**No independent PBS-date selector was found in the current repository's
+configuration or uv 0.10.9's documented request formats under these constraints.**
+The existing .python-version says 3.12, and the action separately requests 3.12.13.
+However, the pinned uv's embedded Windows x64 3.12.13 download record ALREADY
+selects PBS 20260303. The offline, list-only command
+`uv python list --offline --only-downloads --all-versions --show-urls 3.12.13`
+returned this exact record without fetching or installing anything:
+
+```text
+cpython-3.12.13-windows-x86_64-none
+https://releases.astral.sh/github/python-build-standalone/releases/download/20260303/cpython-3.12.13%2B20260303-x86_64-pc-windows-msvc-install_only_stripped.tar.gz
+```
+
+Local `uv help python` lists implementation/version/variant/OS/arch/libc and
+existing-path requests, with no PBS date field. The read-only date-suffixed
+list query `3.12.13+20260303` returned zero records (exit 0, not a parse error).
+`uv help python install` documents --mirror as replacing the download URL's
+BASE, retaining its release-date/filename suffix; it is not an independent
+build-date selector. `python-downloads` allows/disallows downloading rather
+than selecting a build. --python-downloads-json-url accepts a separate custom
+catalogue; this repository has no such input, so using it needs another
+catalogue/file or retrieval, outside this turn's constraints. No mirror,
+catalogue, Python pin or setup change was implemented; the seat rules any next
+step. The existing native-licence build/version fail-closed check remains.
+
+Evidence: uv-version.log, uv-python-help.log, uv-python-install-full-help.log,
+uv-python-list-help.log, uv-python-download-record.log and uv-date-request.log
+under `work/c63b-14-evidence/`. All non-help list probes used --offline and
+--only-downloads. No interpreter was downloaded, installed or executed by them.
+
+### RED, GREEN and final validation
+
+Every runner's output is file-backed under `work/c63b-14-evidence/`. Every pytest
+run used PYTHONPATH=scripts, the sandbox mkdir shim, no cache provider, a
+300-second per-test timeout and a fresh worktree basetemp.
+
+| Log | Observed result |
+| --- | --- |
+| red.log | 3 failed, 18 deselected: missing uv input, missing checklist agreement/re-audit line, missing README removal/stream explanation, all on the original owned surfaces. |
+| green.log | 21 passed: all workflow/doc cases, including the three new tests. |
+| ruff-check.log | Exit 0; All checks passed! |
+| ruff-format.log | Exit 0; 337 files already formatted. Initial check requested formatting of the new tests; format-edit.log records the fix before final validation. |
+| mypy.log | Exit 0; Success: no issues found in 166 source files. |
+| mypy-darwin.log | Exit 0; Success: no issues found in 166 source files. |
+| pytest-validation.log | Exit 0; 500 passed, 1 skipped in 29.40 s. |
+| diff-check.log / scope.diff | Exit 0 whitespace check; workflow +1 line, checklist +1 line, README recipe +5 lines. Existing LF/CRLF checkout warnings retained. |
+
+The required six-module run uses basetemp `work/c63b-14`: 31 smoke passes plus
+one existing POSIX native-proof skip, 112 notices, 60 FFmpeg, 83 build, 193
+frozen-entry and 21 workflow/doc checks. The new tests invoke no product entry
+point; existing entry tests retain their isolation. No sandbox-only residual
+occurred, and no test was weakened/skipped for the sandbox. No implementation
+or test edit followed the final run; only this report section was appended.
+
+Verification loop: both seat findings independently reproduced by the three
+RED assertions; both fixed in-envelope; all requested checks GREEN; final scope
+inspection found no further issue. The floating-uv MAJOR and carried README
+MINOR are fixed, pending Reviewer A at the seat. The zvbi HOLD, missing --zip
+and deferred FFmpeg row remain unchanged. No real build/artifact/release or new
+N13 acceptance is claimed. No network, frozen/PyInstaller/GUI run, synthetic
+desktop input, footage/real-profile write, QUIT_SCRIPT, Git write, push/tag,
+workflow dispatch, mailbox post, dependency or unowned-file edit occurred.
