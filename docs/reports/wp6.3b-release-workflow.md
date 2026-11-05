@@ -1,10 +1,12 @@
 # WP6.3b release workflow: implementation record
 
-Status: build turns 2-5 implemented through the verified FFmpeg lock and offline
-fetch/verify/extract path. Turn 5's requested validation is green. This remains an
-incremental report, not package acceptance or an N13 verdict. The notices generator,
-smoke, ZIP, workflow and release-document changes await later dispatched turns;
-real-binary, V4, actionlint and release-run evidence belong to the seat/release.
+Status: turns 2-5 implemented; turn 6 item 1 (seat-verified licences and strict
+lock validation) is green. Turn 6 item 2 has NOT been started: the required LGPL
+full texts are absent from the installed Qt/Shiboken/pillow-heif wheel licence
+files, and the pillow-heif manifest gives no MinGW/libstdc++ source version.
+This is a reproduced input/provenance STOP to CHARC, alongside the independently
+pending zvbi redistribution STOP. No artifact notices, release refusal, smoke,
+ZIP, workflow or release-document changes are claimed complete.
 
 ## Round and turn ledger
 
@@ -18,6 +20,7 @@ Claude pass; no review verdict is claimed here. Context depth is dispatcher-read
 | Turn 3 / build part 2, Group A yield | Fatal reporter, GUI notification, source-worker hook site and isolated tests. Both STOPs now settled by CHARC's turn-3 rulings; Group B was not started in turn 3. | No Reviewer A round. Self-check: 1 MAJOR scope STOP and 1 MINOR validation-rule question, both closed; worker residual confirmed sandbox-only by the seat. | All new observations, no review reopenings or product reverts. Rotation and the regression fixture's logging stub corrected in-envelope. | Product: entry reporter, interpreter catch, GUI callback and the single granted worker site. Tests: new hook suite and frozen-entry regression. | About 157K at the Group A yield, supplied in dispatch 4. |
 | Turn 4 / Group A finish and Group B yield | Closed the ruled bootstrap/QUIT_SCRIPT rows; proved lazy blocked-import behavior; added the bootloader flag and cache variables before all three activations. | No Reviewer A round; no new blocking finding. The known sandbox-only worker witness remains the sole validation failure. | No review reopenings. Temporary eager-import mutant caught twice and restored before Group B; no mutant remains. | Product: PyInstaller argument and frozen cache setup only. Tests: blocked-config/NumPy cases, argument-list cases, activation-boundary cases and environment restoration. | Turn-end figure pending dispatcher reading; no cell estimate. |
 | Turn 5 / FFmpeg lock and bundle path | Pinned archive/source record, lock validation, release fetch/hash/selective extraction/version checks and CLI/build wiring. | No Reviewer A round; no new blocking issue. Eleven primary licences and five extra-source licences are explicitly UNVERIFIED for the seat audit. | No review reopenings. Build-call deletion mutant rejected and byte-restored; schema type error and raw-ZIP fixture corrected. | Product: build tool plus lock; tests: offline ZIP/file transport, real Python tool stubs, schema mutations and build integration. | Fresh session; turn-end depth pending dispatcher reading, no estimate. |
+| Turn 6 / seat licence transfer, input STOP | All 103 licence slots transferred exactly; strict verified-licence validation GREEN and incompatible data retained. Generator not started: its mandatory wheel LGPL input is absent; exact MinGW source release is absent too. | No Reviewer A round. NEW MAJOR input/provenance STOP; MINOR pre-existing indirect-source limitation and root PyInstaller runtime-row discrepancy reported below. Existing zvbi STOP remains the owner's/CHARC's. | No review reopenings or reverts; no generator workaround. | Product: lock and shared validator. Tests: verified-only rejection and preservation of incompatible rows. | Dispatcher supplied about 134K at turn-5 end; turn-6 depth pending dispatcher reading, no estimate. |
 
 Turn 2 bundled the three changes explicitly commissioned by dispatch 2; the seat
 commits each turn. No git write was performed by the cell.
@@ -677,3 +680,156 @@ licence at its pin, the actual build and bundled-binary checks, actionlint and
 Reviewer A/B. The real workflow run remains the release step. No new ruling is
 requested by this build-group return. Depth is for the dispatcher to read;
 none is estimated here.
+
+## Turn 6: verified licence lock GREEN; generator input/provenance STOP
+
+This is an item-1 build-group return with a reproduced STOP before item 2,
+not a completed notices generator or acceptance. Dispatch 6 reports the seat's
+outside-sandbox turn-5 result: 321 passed, exit 0, at `30cb8460`.
+
+### Item 1: every source slot is seat-verified
+
+All 98 primary components and five extra repositories now have the seat table's
+`licence`, `licence_basis: "seat-verified"`, `gpl3_compatible` (yes/no) and
+`licence_note`. Notes were copied without shortening or changing meaning.
+There are no null, UNVERIFIED or cell-read licence rows left in the current lock.
+The prior turn-5 table documents the historical offline reads; the verified
+lock and corrections below are the current facts. The table transfer matches
+`licences-5031c6f1.tsv` on all 103 SPDX/compatibility/note triples, independently
+cross-checked in `work/c63b-6-logs/licence-crosscheck.log`. Totals from the seat:
+80 same, 16 filled, seven corrected.
+
+`FFmpegComponent` / `FFmpegSource` and `_ffmpeg_source` in build.py now require
+a nonempty seat-verified licence, explicit yes/no compatibility and a nonempty
+note. Null/UNVERIFIED/cell-read or missing compatibility is rejected for primary
+AND extra source rows. **A no row is accepted as data.** The generator/release
+refusal is a separate consumer and has NOT been built at this STOP. No bypass or
+other resolution of the zvbi issue was added. The shared validator edit is the
+one explicitly required by dispatch 6 item 1; no other build/notices wiring was
+changed.
+
+#### The seven corrected offline readings
+
+| Component | Turn-5 reading | Seat-verified reading | Seat reason |
+| --- | --- | --- | --- |
+| harfbuzz | MIT | MIT-Modern-Variant | COPYING: 'Old MIT' licence (cell read MIT: corrected identifier) |
+| vulkan-headers | Apache-2.0 | Apache-2.0 OR MIT | LICENSE.md + every header SPDX 'Apache-2.0 OR MIT' (cell read Apache-2.0) |
+| chromaprint | LGPL-2.1-or-later | MIT AND LGPL-2.1-or-later | LICENSE.md: own code MIT, includes FFmpeg LGPL-2.1 parts; 'as a whole LGPL 2.1' |
+| libaribcaption | ISC | MIT | LICENSE: MIT (cell read ISC: CORRECTED) |
+| pango | LGPL-2.1-or-later | LGPL-2.0-or-later | COPYING is the GNU Library GPL 2 text (cell read LGPL-2.1-or-later; sources not sampled; either is GPL-3.0-compatible) |
+| vidstab | GPL-2.0-or-later | LGPL-2.1-or-later | LICENSE at the pin: relicensed to LGPL-2.1-or-later after v1.1.2 (cell read GPL-2.0-or-later: CORRECTED) |
+| zvbi | LGPL-2.1-or-later | GPL-2.0-or-later AND LGPL-2.0-or-later AND LGPL-2.1-or-later AND GPL-2.0-only AND MIT AND BSD-2-Clause | COPYING.md: src/* LGPL-2+, BUT src/pdc.* and src/packet-830.* 'GPL-2' = GPL-2.0-only (their headers: 'GNU General Public License version 2 as published'); both in libzvbi_la_SOURCES; packet.c calls into packet-830.c; see the STOP section |
+
+The zvbi row remains **no**; the other 102 repository slots are yes. This is
+CHARC/the owner's existing redistribution STOP, not a policy decision by the
+cell. The lock truthfully records it; the new regression explicitly accepts
+incompatible rows with verified provenance.
+
+### STOP: the generator's mandatory licence inputs do not exist in the wheels
+
+**[MAJOR, in-envelope input/provenance STOP]** Dispatch 6 item 2(d) requires
+"the LGPL-3 text from the wheel" and its full-text rule says the full texts are
+copied from installed wheel licence files and the folder's FFmpeg licence.
+Read-only installed RECORD/licence-file inspection proves:
+
+| Installed distribution | Licence files in its RECORD | Result |
+| --- | --- | --- |
+| pyside6-essentials 6.12.0 | `pyside6_essentials-6.12.0.dist-info/licenses/LicenseRef-Qt-Commercial.txt` | Only commercial Qt terms; no LGPL text. |
+| shiboken6 6.12.0 | `shiboken6-6.12.0.dist-info/licenses/LicenseRef-Qt-Commercial.txt` | Only commercial Qt terms; no LGPL text. |
+| pillow-heif 1.8.1 | `pillow_heif-1.8.1.dist-info/licenses/LICENSE.txt`, `LICENSES_bundled.txt` | BSD wrapper text and a component manifest with upstream links; no full LGPL text. |
+
+The cheap reproduction is `work/c63b-6-logs/wheel-input-probe.py`, its summary
+`wheel-input-probe.log`, and `wheel-inputs.json` (paths, exact byte counts,
+sha256 values, commercial/full-LGPL text checks and the MinGW manifest section).
+The read-only script imports only standard library metadata/path/hash/json
+modules, reads the installed licence inputs and writes evidence under work/.
+It confirms one / one / two licence files respectively and no full LGPL-3 text
+in any of them. No product, GUI, binary or source repository code is executed.
+`LICENSES_bundled.txt` links libheif v1.23.6, libde265 v1.1.3 and x265 4.3,
+but contains only their licence labels and links, not their full texts.
+
+The already-audited root notices preserve an LGPL-3 text as text-36, from
+`https://raw.githubusercontent.com/qt/qtbase/v6.12.0/LICENSES/LGPL-3.0-only.txt`,
+sha256 `da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768`,
+7,651 UTF-8/LF bytes. The root also preserves x265/libheif/libde265 and MinGW
+texts/headers as texts 37-44. Those are explicitly audited UPSTREAM texts, not
+wheel files. Copying them under a claim of wheel provenance would be false;
+no such fallback was implemented without a ruling.
+
+**Proposed ruling:** permit the generator to reuse those audited root full-text
+blocks when the installed wheel contains only a manifest/commercial text. Require
+the generator to verify each stored SHA-256/byte count, retain the original source
+URL/version and identify the input as the root's audited upstream copy. Continue
+to copy actual wheel licence files whenever present; do not rely on or reproduce
+the commercial Qt licence. This needs CHARC's explicit provenance-rule amendment,
+so the cell yields under the binding dispatch protocol instead of guessing.
+
+**[MINOR, existing indirect-source limitation]** Item 2(e)'s exact source-release
+read is also unavailable for pillow-heif's MinGW/libstdc++ runtime: the manifest
+names `libgcc_s_seh-1.dll`, `libstdc++-6.dll` and `libwinpthread-1.dll` but no
+MinGW-w64/compiler version. Its source pointer is unversioned
+`https://sourceforge.net/p/mingw-w64/mingw-w64/ci/master/tree/COPYING`.
+This was already disclosed in the root audit and turn-5 context. The cell cannot
+turn it into an exact source-release claim. CHARC must either supply exact
+matching source provenance or explicitly carry the brief's indirect-source debt
+and prescribe the artifact wording. No version was invented.
+
+**[MINOR, unowned root-audit discrepancy]** The installed PyInstaller 6.22.3
+`COPYING.txt` distinguishes the GPL-2.0-or-later bootloader/Bootloader Exception
+from **Apache-2.0 Run-time Hooks and Additional Run-time Modules**. The root
+PyInstaller row groups bootloader and embedded run-time hooks under its GPL /
+exception licence. The generator must use the installed COPYING terms for each
+kind. No root notice edit is made: this turn does not own that file. Route the
+wording disposition to CHARC for the later limited root-notices update or a
+narrow grant if required. The Bootloader Exception bytes themselves are available
+in the installed COPYING and are not an input blocker.
+
+### RED, GREEN and validation at this STOP
+
+| File under `work/c63b-6-logs/` | Observed result |
+| --- | --- |
+| `red-licences.log` | Exit 1: 8 failed, 2 passed, 50 deselected against the old lock/validator. Old licence bases were accepted or the new verified schema rejected; preservation and rejection cases discriminate. |
+| `green-lock.log` | Exit 0: 60 passed after the lock and validator update. |
+| `licence-crosscheck.log` | All 103 SPDX/compatibility/note triples match the seat table; only zvbi is no. |
+| `wheel-input-probe.log`, `wheel-inputs.json` | No full LGPL-3 wheel text; MinGW source release absent. Reproduces the STOP without network or product entry points. |
+| `ruff-check.log` | Exit 0: All checks passed! |
+| `ruff-format.log` | Exit 0: 332 files already formatted. |
+| `mypy.log` | Exit 0: Success: no issues found in 164 source files. |
+| `mypy-darwin.log` | Exit 0: Success: no issues found in 164 source files. |
+| `pytest-lock-validation.log` | Exit 0: 331 passed in 10.73 s. |
+| `diff-check.log` | Exit 0: no whitespace errors. |
+
+The final pytest run uses `PYTHONPATH=scripts`, `-p sandbox_mkdir_shim`,
+`-p no:cacheprovider`, `--timeout 300`, offscreen Qt and the fresh basetemp
+`work/c63b-6-lock`. It selects the three existing commissioned test modules:
+FFmpeg (60), build (78) and frozen entry (193). **The dispatch's four-module
+command is not claimed:** `tests/test_tools_package_notices.py` does not exist
+because the generator has not been started. No source startup/QUIT_SCRIPT test
+is selected. Existing frozen-entry redirection/blockers remain in place.
+No sandbox-only residual occurs in this set. uv's inherited VIRTUAL_ENV warning
+remains in logs and explicitly selects this worktree's environment.
+
+### Verification loop and remaining work
+
+| Suspected issue / severity | Independent evidence | Disposition |
+| --- | --- | --- |
+| MAJOR: incompatible source truth might be rejected or silently normalized. | New no-row acceptance case and the current real zvbi lock row, plus source-table cross-check. | Rejected: no is preserved and accepted; release policy was not weakened or implemented early. |
+| MINOR: extra repositories might retain old uncertainty or drop notes. | Primary/extra rejection cases and all-103 triple comparison against the seat TSV. | Fixed: every source slot has the exact verified licence, compatibility and note. |
+| MAJOR: mandated LGPL wheel text might be missing. | Installed metadata/RECORD inventory and direct file contents; machine-readable probe records hashes. | Confirmed STOP; no root-text substitution or fabricated provenance. |
+| MINOR: wheel manifest might identify a MinGW/libstdc++ source release. | Exact manifest section in wheel-inputs.json; only an unversioned COPYING pointer. | Confirmed existing limitation; ruling/input requested. |
+| MINOR: run-time hooks might share the bootloader's licence. | Installed COPYING's explicit Run-time Hooks/Additional Run-time Modules sections. | Rejected; Apache-2.0 is explicit. Root wording is unowned and reported, not changed. |
+
+No generator, notices test module, `--notices` option or synthetic coverage row
+table exists yet; all of item 2 remains for the resumed turn after the ruling.
+The requested synthetic row table is therefore **not available**, rather than
+an empty table misrepresented as coverage. Full-text provenance tests have not
+run. The two firm depth yield points remain applicable to resumed work; depth
+at this STOP is dispatcher-read, not estimated by the cell.
+
+The only edits are the FFmpeg lock, the shared validator in build.py, its FFmpeg
+tests and this report. No network fetch, real FFmpeg archive access, frozen run,
+PyInstaller build, desktop GUI launch, synthetic input, footage/profile write,
+git write, push, tag, gh command or workflow dispatch occurred. The seat commits.
+No release refusal, N13 acceptance or resolution of the owner's zvbi STOP is
+claimed. Next action: CHARC rules the input/provenance question, then the cell
+resumes item 2 with RED coverage tests followed by the prescribed yield.

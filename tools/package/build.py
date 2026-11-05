@@ -718,8 +718,10 @@ class FFmpegSource(TypedDict):
     pin: str
     pin_kind: str
     status: str
-    licence: str | None
+    licence: str
     licence_basis: str
+    gpl3_compatible: str
+    licence_note: str
 
 
 class FFmpegComponent(TypedDict):
@@ -732,8 +734,10 @@ class FFmpegComponent(TypedDict):
     pin_kind: str
     extra_repositories: list[FFmpegSource]
     configure_flag: list[str] | None
-    licence: str | None
+    licence: str
     licence_basis: str
+    gpl3_compatible: str
+    licence_note: str
 
 
 class FFmpegExcluded(TypedDict):
@@ -797,21 +801,20 @@ def _ffmpeg_source(value: dict[str, object]) -> None:
         raise ValueError("FFmpeg lock: invalid source commit")
     if kind == "svn-rev" and not re.fullmatch(r"[0-9]+", pin):
         raise ValueError("FFmpeg lock: invalid svn revision")
-    licence = value["licence"]
-    if licence is None:
-        if value["licence_basis"] != "UNVERIFIED":
-            raise ValueError("FFmpeg lock: absent licence must be UNVERIFIED")
-    else:
-        _ffmpeg_text(licence, "licence")
-        if value["licence_basis"] != "cell-read":
-            raise ValueError("FFmpeg lock: licence must name its read basis")
+    licence = _ffmpeg_text(value["licence"], "licence")
+    if licence == "UNVERIFIED" or value["licence_basis"] != "seat-verified":
+        raise ValueError("FFmpeg lock: every licence must be seat-verified")
+    compatible = value["gpl3_compatible"]
+    if not isinstance(compatible, str) or compatible not in {"yes", "no"}:
+        raise ValueError("FFmpeg lock: gpl3_compatible must be yes or no")
+    _ffmpeg_text(value["licence_note"], "licence note")
 
 
 def validate_ffmpeg_lock(value: object) -> FFmpegLock:
     """Validate archive identity, source rows and two-way configure-flag coverage.
 
-    Licence identities are offline readings, not an N13 acceptance: unknown
-    licences must remain explicitly UNVERIFIED until the seat audits the pins.
+    Every licence identity must be seat-verified. Incompatibility remains data:
+    a "no" row is accepted here and refused by artifact notices when bundled.
     ``configure_flag`` is null for dependencies or a list, since some stages
     contribute several switches (for example both opencore-amr codecs).
 

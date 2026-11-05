@@ -334,3 +334,46 @@ def test_short_archive_is_rejected_without_extraction(synthetic_bundle):
     with pytest.raises(ValueError, match="sha256"):
         bundle(synthetic_bundle)
     assert list(destination.iterdir()) == []
+
+
+def test_lock_records_seat_verified_licences_and_preserves_the_zvbi_stop():
+    data = build.validate_ffmpeg_lock(lock_data())
+    sources = [source for c in data["components"] for source in (c, *c["extra_repositories"])]
+    assert len(sources) == 103
+    for source in sources:
+        assert source["licence"]
+        assert source["licence_basis"] == "seat-verified"
+        assert source["gpl3_compatible"] in {"yes", "no"}
+        assert source["licence_note"]
+    bad = [c["name"] for c in data["components"] if c["gpl3_compatible"] == "no"]
+    assert bad == ["zvbi"]
+
+
+@pytest.mark.parametrize("slot", ["primary", "extra"])
+@pytest.mark.parametrize("change", ["null", "unverified", "cell-read", "missing-compatible"])
+def test_lock_refuses_unverified_licences_even_on_extra_repositories(slot, change):
+    data = lock_data()
+    row = (
+        data["components"][0]
+        if slot == "primary"
+        else next(c["extra_repositories"][0] for c in data["components"] if c["extra_repositories"])
+    )
+    if change == "null":
+        row["licence"] = None
+        row["licence_basis"] = "UNVERIFIED"
+    elif change in {"unverified", "cell-read"}:
+        row["licence_basis"] = "UNVERIFIED" if change == "unverified" else change
+    else:
+        row.pop("gpl3_compatible", None)
+    with pytest.raises(ValueError):
+        build.validate_ffmpeg_lock(data)
+
+
+def test_lock_accepts_incompatibility_as_data_for_the_release_refusal():
+    data = lock_data()
+    for component in data["components"]:
+        for source in (component, *component["extra_repositories"]):
+            source["licence_basis"] = "seat-verified"
+            source["gpl3_compatible"] = "no"
+            source["licence_note"] = "synthetic incompatible licence"
+    assert build.validate_ffmpeg_lock(data)["components"][0]["gpl3_compatible"] == "no"

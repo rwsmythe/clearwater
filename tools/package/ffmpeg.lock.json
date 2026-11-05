@@ -31,7 +31,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "BSD-2-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/10-mingw.sh",
@@ -43,8 +45,10 @@
       "configure_flag": [
         "--enable-pthreads"
       ],
-      "licence": null,
-      "licence_basis": "UNVERIFIED"
+      "licence": "ZPL-2.1 AND LicenseRef-mingw-w64-public-domain AND BSD-3-Clause AND LGPL-2.1-or-later",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "COPYING.MinGW-w64-runtime: ZPL 2.1 except parts marked PD/BSD/LGPL; FSF: ZPL-2.1 GPL-compatible"
     },
     {
       "stage": "scripts.d/20-libiconv.sh",
@@ -58,15 +62,19 @@
           "pin": "5df606bbd0ef54a8f150c3303c870b9381a661f0",
           "pin_kind": "commit",
           "status": "built",
-          "licence": null,
-          "licence_basis": "UNVERIFIED"
+          "licence": "LicenseRef-gnulib-per-file (GPL-3.0-or-later / LGPL-2.1-or-later / permissive)",
+          "licence_basis": "seat-verified",
+          "gpl3_compatible": "yes",
+          "licence_note": "gnulib README: licence stated per file/module; build infrastructure for libiconv"
         }
       ],
       "configure_flag": [
         "--enable-iconv"
       ],
       "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/20-zlib.sh",
@@ -79,7 +87,9 @@
         "--enable-zlib"
       ],
       "licence": "Zlib",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/25-fftw3.sh",
@@ -90,7 +100,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/25-fribidi.sh",
@@ -103,7 +115,9 @@
         "--enable-libfribidi"
       ],
       "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/25-gmp.sh",
@@ -116,7 +130,9 @@
         "--enable-gmp"
       ],
       "licence": "LGPL-3.0-or-later OR GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/25-libogg.sh",
@@ -127,7 +143,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "BSD-3-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/25-libpng.sh",
@@ -138,7 +156,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "Libpng-2.0",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/25-libxml2.sh",
@@ -151,7 +171,9 @@
         "--enable-libxml2"
       ],
       "licence": "MIT",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/25-openssl.sh",
@@ -162,7 +184,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "Apache-2.0",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/25-xz.sh",
@@ -174,8 +198,10 @@
       "configure_flag": [
         "--enable-lzma"
       ],
-      "licence": null,
-      "licence_basis": "UNVERIFIED"
+      "licence": "0BSD",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "COPYING: liblzma is 0BSD (the GPL/LGPL files are the CLI tools and getopt, not linked)"
     },
     {
       "stage": "scripts.d/45-brotli.sh",
@@ -186,7 +212,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "MIT",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/45-fonts/25-freetype.sh",
@@ -196,8 +224,10 @@
       "pin_kind": "commit",
       "extra_repositories": [],
       "configure_flag": null,
-      "licence": null,
-      "licence_basis": "UNVERIFIED"
+      "licence": "FTL OR GPL-2.0-or-later",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "LICENSE.TXT: two mutually exclusive licences; GPL-2.0-or-later chosen"
     },
     {
       "stage": "scripts.d/45-fonts/35-fontconfig.sh",
@@ -210,7 +240,9 @@
         "--enable-fontconfig"
       ],
       "licence": "MIT",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/45-fonts/45-harfbuzz.sh",
@@ -222,8 +254,10 @@
       "configure_flag": [
         "--enable-libharfbuzz"
       ],
-      "licence": "MIT",
-      "licence_basis": "cell-read"
+      "licence": "MIT-Modern-Variant",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "COPYING: 'Old MIT' licence (cell read MIT: corrected identifier)"
     },
     {
       "stage": "scripts.d/45-fonts/50-freetype.sh",
@@ -235,8 +269,10 @@
       "configure_flag": [
         "--enable-libfreetype"
       ],
-      "licence": null,
-      "licence_basis": "UNVERIFIED"
+      "licence": "FTL OR GPL-2.0-or-later",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "as 25-freetype (same pin)"
     },
     {
       "stage": "scripts.d/45-lcms2.sh",
@@ -249,7 +285,9 @@
         "--enable-lcms2"
       ],
       "licence": "MIT",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/45-libffi.sh",
@@ -260,7 +298,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "MIT",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/45-libsamplerate.sh",
@@ -271,7 +311,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "BSD-2-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/45-libudfread.sh",
@@ -282,7 +324,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/45-libunibreak.sh",
@@ -293,7 +337,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "Zlib",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/45-libvorbis.sh",
@@ -306,7 +352,9 @@
         "--enable-libvorbis"
       ],
       "licence": "BSD-3-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/45-opencl.sh",
@@ -320,15 +368,19 @@
           "pin": "5192c84f8059e5f703e5452929b613f9487f6e4c",
           "pin_kind": "commit",
           "status": "built",
-          "licence": null,
-          "licence_basis": "UNVERIFIED"
+          "licence": "Apache-2.0",
+          "licence_basis": "seat-verified",
+          "gpl3_compatible": "yes",
+          "licence_note": "LICENSE Apache-2.0"
         }
       ],
       "configure_flag": [
         "--enable-opencl"
       ],
       "licence": "Apache-2.0",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/45-pcre2.sh",
@@ -339,7 +391,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "BSD-3-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/45-pixman.sh",
@@ -350,7 +404,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "MIT",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/45-vmaf.sh",
@@ -363,7 +419,9 @@
         "--enable-libvmaf"
       ],
       "licence": "BSD-2-Clause-Patent",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/45-xxhash.sh",
@@ -374,7 +432,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "BSD-2-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/47-vulkan/40-vulkan-headers.sh",
@@ -384,8 +444,10 @@
       "pin_kind": "tag",
       "extra_repositories": [],
       "configure_flag": null,
-      "licence": "Apache-2.0",
-      "licence_basis": "cell-read"
+      "licence": "Apache-2.0 OR MIT",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "LICENSE.md + every header SPDX 'Apache-2.0 OR MIT' (cell read Apache-2.0)"
     },
     {
       "stage": "scripts.d/47-vulkan/45-vulkan-loader.sh",
@@ -399,15 +461,19 @@
           "pin": "v1.4.366",
           "pin_kind": "tag",
           "status": "built",
-          "licence": null,
-          "licence_basis": "UNVERIFIED"
+          "licence": "Apache-2.0 OR MIT",
+          "licence_basis": "seat-verified",
+          "gpl3_compatible": "yes",
+          "licence_note": "same repository/tag as 40-vulkan-headers"
         }
       ],
       "configure_flag": [
         "--enable-vulkan"
       ],
-      "licence": null,
-      "licence_basis": "UNVERIFIED"
+      "licence": "MIT",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "BtbN Vulkan-Shim-Loader LICENSE: MIT"
     },
     {
       "stage": "scripts.d/47-vulkan/50-shaderc.sh",
@@ -418,7 +484,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "Apache-2.0",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/47-vulkan/55-spirv-cross.sh",
@@ -429,7 +497,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "Apache-2.0",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/47-vulkan/60-spirv-headers.sh",
@@ -440,7 +510,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "MIT",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-amf.sh",
@@ -453,7 +525,9 @@
         "--enable-amf"
       ],
       "licence": "MIT",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-aom.sh",
@@ -465,8 +539,10 @@
       "configure_flag": [
         "--enable-libaom"
       ],
-      "licence": null,
-      "licence_basis": "UNVERIFIED"
+      "licence": "BSD-2-Clause",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "LICENSE BSD-2-Clause; separate PATENTS = AOM Patent License 1.0 (patent grant, not a copyright term)"
     },
     {
       "stage": "scripts.d/50-avisynth.sh",
@@ -479,7 +555,9 @@
         "--enable-avisynth"
       ],
       "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-chromaprint.sh",
@@ -491,8 +569,10 @@
       "configure_flag": [
         "--enable-chromaprint"
       ],
-      "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence": "MIT AND LGPL-2.1-or-later",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "LICENSE.md: own code MIT, includes FFmpeg LGPL-2.1 parts; 'as a whole LGPL 2.1'"
     },
     {
       "stage": "scripts.d/50-dav1d.sh",
@@ -505,7 +585,9 @@
         "--enable-libdav1d"
       ],
       "licence": "BSD-2-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-davs2.sh",
@@ -518,7 +600,9 @@
         "--enable-libdavs2"
       ],
       "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-dvd/30-libdvdcss.sh",
@@ -529,7 +613,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-dvd/40-libdvdread.sh",
@@ -542,7 +628,9 @@
         "--enable-libdvdread"
       ],
       "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-dvd/50-libdvdnav.sh",
@@ -555,7 +643,9 @@
         "--enable-libdvdnav"
       ],
       "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-ffnvcodec.sh",
@@ -569,16 +659,20 @@
           "pin": "ced4f8eba3ba5dd431932cba17928f0dffdaeb2b",
           "pin_kind": "commit",
           "status": "downloaded-not-built",
-          "licence": null,
-          "licence_basis": "UNVERIFIED"
+          "licence": "MIT",
+          "licence_basis": "seat-verified",
+          "gpl3_compatible": "yes",
+          "licence_note": "downloaded, not built at FFVER 900; headers MIT"
         },
         {
           "repository": "https://github.com/FFmpeg/nv-codec-headers.git",
           "pin": "833faee5f7b8d3f56444347c587f4aed11ee213f",
           "pin_kind": "commit",
           "status": "downloaded-not-built",
-          "licence": null,
-          "licence_basis": "UNVERIFIED"
+          "licence": "MIT",
+          "licence_basis": "seat-verified",
+          "gpl3_compatible": "yes",
+          "licence_note": "downloaded, not built at FFVER 900; headers MIT"
         }
       ],
       "configure_flag": [
@@ -586,7 +680,9 @@
         "--enable-ffnvcodec"
       ],
       "licence": "MIT",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-frei0r.sh",
@@ -599,7 +695,9 @@
         "--enable-frei0r"
       ],
       "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-gme.sh",
@@ -612,7 +710,9 @@
         "--enable-libgme"
       ],
       "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-kvazaar.sh",
@@ -625,7 +725,9 @@
         "--enable-libkvazaar"
       ],
       "licence": "BSD-3-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-lcevcdec.sh",
@@ -637,8 +739,10 @@
       "configure_flag": [
         "--enable-liblcevc-dec"
       ],
-      "licence": null,
-      "licence_basis": "UNVERIFIED"
+      "licence": "BSD-3-Clause-Clear",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "LICENSE.md: The Clear BSD License; expressly grants NO patent rights (LCEVC is patented: a patent-only note)"
     },
     {
       "stage": "scripts.d/50-libaribb24.sh",
@@ -651,7 +755,9 @@
         "--enable-libaribb24"
       ],
       "licence": "LGPL-3.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-libaribcaption.sh",
@@ -663,8 +769,10 @@
       "configure_flag": [
         "--enable-libaribcaption"
       ],
-      "licence": "ISC",
-      "licence_basis": "cell-read"
+      "licence": "MIT",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "LICENSE: MIT (cell read ISC: CORRECTED)"
     },
     {
       "stage": "scripts.d/50-libass.sh",
@@ -677,7 +785,9 @@
         "--enable-libass"
       ],
       "licence": "ISC",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-libbluray.sh",
@@ -690,7 +800,9 @@
         "--enable-libbluray"
       ],
       "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-libjxl/50-libjxl.sh",
@@ -702,8 +814,10 @@
       "configure_flag": [
         "--enable-libjxl"
       ],
-      "licence": null,
-      "licence_basis": "UNVERIFIED"
+      "licence": "BSD-3-Clause",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "LICENSE BSD-3-Clause; separate PATENTS grant"
     },
     {
       "stage": "scripts.d/50-libmp3lame.sh",
@@ -716,7 +830,9 @@
         "--enable-libmp3lame"
       ],
       "licence": "LGPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-libopus.sh",
@@ -729,7 +845,9 @@
         "--enable-libopus"
       ],
       "licence": "BSD-3-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-libplacebo.sh",
@@ -742,7 +860,9 @@
         "--enable-libplacebo"
       ],
       "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-librist/40-mbedtls.sh",
@@ -753,7 +873,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "Apache-2.0 OR GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-librist/50-librist.sh",
@@ -766,7 +888,9 @@
         "--enable-librist"
       ],
       "licence": "BSD-2-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-librsvg/10-glib.sh",
@@ -777,7 +901,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-librsvg/20-cairo.sh",
@@ -788,7 +914,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "LGPL-2.1-only OR MPL-1.1",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-librsvg/30-pango.sh",
@@ -798,8 +926,10 @@
       "pin_kind": "commit",
       "extra_repositories": [],
       "configure_flag": null,
-      "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence": "LGPL-2.0-or-later",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "COPYING is the GNU Library GPL 2 text (cell read LGPL-2.1-or-later; sources not sampled; either is GPL-3.0-compatible)"
     },
     {
       "stage": "scripts.d/50-librsvg/99-librsvg.sh",
@@ -812,7 +942,9 @@
         "--enable-librsvg"
       ],
       "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-libssh.sh",
@@ -825,7 +957,9 @@
         "--enable-libssh"
       ],
       "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-libtheora.sh",
@@ -838,7 +972,9 @@
         "--enable-libtheora"
       ],
       "licence": "BSD-3-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-libvpx.sh",
@@ -851,7 +987,9 @@
         "--enable-libvpx"
       ],
       "licence": "BSD-3-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-libwebp.sh",
@@ -864,7 +1002,9 @@
         "--enable-libwebp"
       ],
       "licence": "BSD-3-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-libzmq.sh",
@@ -876,8 +1016,10 @@
       "configure_flag": [
         "--enable-libzmq"
       ],
-      "licence": null,
-      "licence_basis": "UNVERIFIED"
+      "licence": "MPL-2.0",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "LICENSE = MPL-2.0 text; sampled sources SPDX MPL-2.0, no Exhibit B 'Incompatible With Secondary Licenses' notice"
     },
     {
       "stage": "scripts.d/50-lilv/96-lv2.sh",
@@ -888,7 +1030,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "ISC",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-lilv/96-serd.sh",
@@ -899,7 +1043,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "ISC",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-lilv/96-zix.sh",
@@ -910,7 +1056,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "ISC",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-lilv/97-sord.sh",
@@ -921,7 +1069,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "ISC",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-lilv/98-sratom.sh",
@@ -932,7 +1082,9 @@
       "extra_repositories": [],
       "configure_flag": null,
       "licence": "ISC",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-lilv/99-lilv.sh",
@@ -945,7 +1097,9 @@
         "--enable-lv2"
       ],
       "licence": "ISC",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-onevpl.sh",
@@ -958,7 +1112,9 @@
         "--enable-libvpl"
       ],
       "licence": "MIT",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-openal.sh",
@@ -971,7 +1127,9 @@
         "--enable-openal"
       ],
       "licence": "LGPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-openapv.sh",
@@ -984,7 +1142,9 @@
         "--enable-liboapv"
       ],
       "licence": "BSD-3-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-opencore-amr.sh",
@@ -998,7 +1158,9 @@
         "--enable-libopencore-amrwb"
       ],
       "licence": "Apache-2.0",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-openh264.sh",
@@ -1011,7 +1173,9 @@
         "--enable-libopenh264"
       ],
       "licence": "BSD-2-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-openjpeg.sh",
@@ -1024,7 +1188,9 @@
         "--enable-libopenjpeg"
       ],
       "licence": "BSD-2-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-openmpt.sh",
@@ -1037,7 +1203,9 @@
         "--enable-libopenmpt"
       ],
       "licence": "BSD-3-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-rav1e.sh",
@@ -1050,7 +1218,9 @@
         "--enable-librav1e"
       ],
       "licence": "BSD-2-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-rubberband.sh",
@@ -1063,7 +1233,9 @@
         "--enable-librubberband"
       ],
       "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-sdl.sh",
@@ -1076,7 +1248,9 @@
         "--enable-sdl2"
       ],
       "licence": "Zlib",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-snappy.sh",
@@ -1089,7 +1263,9 @@
         "--enable-libsnappy"
       ],
       "licence": "BSD-3-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-soxr.sh",
@@ -1102,7 +1278,9 @@
         "--enable-libsoxr"
       ],
       "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-srt.sh",
@@ -1115,7 +1293,9 @@
         "--enable-libsrt"
       ],
       "licence": "MPL-2.0",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-svtav1.sh",
@@ -1127,8 +1307,10 @@
       "configure_flag": [
         "--enable-libsvtav1"
       ],
-      "licence": null,
-      "licence_basis": "UNVERIFIED"
+      "licence": "BSD-3-Clause-Clear AND BSD-2-Clause",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "LICENSE.md Clear BSD + LICENSE-BSD2.md for older files; PATENTS.md AOM patent licence"
     },
     {
       "stage": "scripts.d/50-twolame.sh",
@@ -1141,7 +1323,9 @@
         "--enable-libtwolame"
       ],
       "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-uavs3d.sh",
@@ -1154,7 +1338,9 @@
         "--enable-libuavs3d"
       ],
       "licence": "BSD-3-Clause",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-vaapi/50-libva.sh",
@@ -1167,7 +1353,9 @@
         "--enable-vaapi"
       ],
       "licence": "MIT",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-vapoursynth.sh",
@@ -1180,7 +1368,9 @@
         "--enable-vapoursynth"
       ],
       "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-vidstab.sh",
@@ -1192,8 +1382,10 @@
       "configure_flag": [
         "--enable-libvidstab"
       ],
-      "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence": "LGPL-2.1-or-later",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "LICENSE at the pin: relicensed to LGPL-2.1-or-later after v1.1.2 (cell read GPL-2.0-or-later: CORRECTED)"
     },
     {
       "stage": "scripts.d/50-vvenc.sh",
@@ -1205,8 +1397,10 @@
       "configure_flag": [
         "--enable-libvvenc"
       ],
-      "licence": null,
-      "licence_basis": "UNVERIFIED"
+      "licence": "BSD-3-Clause-Clear",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "LICENSE.txt: The Clear BSD License"
     },
     {
       "stage": "scripts.d/50-x264.sh",
@@ -1219,7 +1413,9 @@
         "--enable-libx264"
       ],
       "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-x265.sh",
@@ -1232,7 +1428,9 @@
         "--enable-libx265"
       ],
       "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-xavs2.sh",
@@ -1245,7 +1443,9 @@
         "--enable-libxavs2"
       ],
       "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-xvid.sh",
@@ -1258,7 +1458,9 @@
         "--enable-libxvid"
       ],
       "licence": "GPL-2.0-or-later",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-zimg.sh",
@@ -1271,7 +1473,9 @@
         "--enable-libzimg"
       ],
       "licence": "WTFPL",
-      "licence_basis": "cell-read"
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "seat licence file(s) at the pin agree with the cell read"
     },
     {
       "stage": "scripts.d/50-zvbi.sh",
@@ -1283,8 +1487,10 @@
       "configure_flag": [
         "--enable-libzvbi"
       ],
-      "licence": "LGPL-2.1-or-later",
-      "licence_basis": "cell-read"
+      "licence": "GPL-2.0-or-later AND LGPL-2.0-or-later AND LGPL-2.1-or-later AND GPL-2.0-only AND MIT AND BSD-2-Clause",
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "no",
+      "licence_note": "COPYING.md: src/* LGPL-2+, BUT src/pdc.* and src/packet-830.* 'GPL-2' = GPL-2.0-only (their headers: 'GNU General Public License version 2 as published'); both in libzvbi_la_SOURCES; packet.c calls into packet-830.c; see the STOP section"
     }
   ],
   "excluded": [
