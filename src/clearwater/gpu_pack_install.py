@@ -660,7 +660,8 @@ def install(progress: Progress) -> PackResult:
         Cleanup errors are logged and disclosed in the result rather than raised.
     """
     if sys.stdout is not None:
-        print(LICENSE_TEXT, file=sys.stdout, flush=True)
+        with suppress(OSError, ValueError):
+            print(LICENSE_TEXT, file=sys.stdout, flush=True)
     root = gpu_pack.pack_root()
     if root is None:
         return PackResult(False, "GPU support is not available on this platform")
@@ -733,14 +734,19 @@ def _install_locked(root: Path, progress: Progress) -> PackResult:
             raise _InstallError(problem)
         _cancel(progress)
         os.replace(staging, destination)
-        staging = destination
+        staging = None  # Publication is complete; cleanup must never delete the installed pack.
         if sys.platform != "win32":
-            for folder in (destination, root):
-                descriptor = os.open(folder, os.O_RDONLY)
-                try:
-                    os.fsync(descriptor)
-                finally:
-                    os.close(descriptor)
+            try:
+                for folder in (destination, root):
+                    descriptor = os.open(folder, os.O_RDONLY)
+                    try:
+                        os.fsync(descriptor)
+                    finally:
+                        os.close(descriptor)
+            except OSError as error:
+                _LOG.warning(
+                    "GPU pack directory fsync failed; installed pack kept: %s", _ascii(error)
+                )
         return PackResult(
             True, "GPU support is installed. Restart Clearwater to use it.", destination
         )

@@ -152,7 +152,9 @@ downloads only after **Download and install** is pressed. Restart Clearwater aft
 **Tools > Remove GPU support** removes the pack, taking effect at the next start. Headless
 requests in cmd.exe use `start /wait "" Clearwater.exe --install-gpu-pack > install.log 2>&1`
 or `start /wait "" Clearwater.exe --remove-gpu-pack > remove.log 2>&1`. `start /wait` waits for
-this windowed executable to finish, with output redirected to the log. Source requests use
+this windowed executable to finish, with output redirected to the log. In **PowerShell**, use
+`Start-Process -Wait -FilePath .\Clearwater.exe -ArgumentList '--install-gpu-pack' -RedirectStandardOutput install.log -RedirectStandardError install.err`.
+Source requests use
 `uv run --no-sync python -m clearwater --install-gpu-pack` or `--remove-gpu-pack`; the pack
 loader still acts only in frozen builds.
 

@@ -501,6 +501,7 @@ cell's footprint. Depth is supplied by the dispatcher's driver, not estimated.
 | A r3, CONVERGED; all five cleanup findings folded in | 0 / 0 / 2 / 3 | 4 / 1 (R3-5, expressly granted) | 5 / 0 | 0 | 4 / 1 / 0 finding groups; R3-3 integration corrected by delta F1 | None of r3's five left open after delta F1 | Turn-7 end: 109,576 / 475,000, supplied at dispatch 8 |
 | A delta, NO_NEW_CRITICAL_MAJOR; two MINORs folded in | 0 / 0 / 2 / 1 | 3 / 0 | 3 / 0 | 0 | 2 / 0 / 0 finding groups; A1 equivalent, no change | None | Turn-8 end 137,204 / 475,000 |
 | B r1, NEW_CRITICAL_MAJOR_FOUND; ruled folds complete | 0 / 1 / 1 / 7 | 7 / 2 (F5/F9 granted folds; rest banked) | 9 reported / 0 reopened; F8 follows prior rulings | 0 | 4 / 3 / 1 finding groups; F8 banked | F8 and remaining F9 notes to CHARC | DISPATCHER TO FILL |
+| B-fold delta, NO_NEW_CRITICAL_MAJOR; four advisory folds | 0 / 0 / 0 / 6 | 6 / 0 | 6 reported / 0 reopened | 0 | 2 / 1 / 1 finding groups | A2/A4 to seat and CHARC; no code | Prior turn end: 198,141 / 475,000; current DISPATCHER TO FILL |
 
 The r1 turn bundled its ruled remediation groups in one logical review
 fold-in. At that handoff Reviewer A r2 and the real-download seat proof were
@@ -879,8 +880,10 @@ it is not a real POSIX durability proof. The seat measures real-pack cost
 against 248.1 s; the delta remains **SEAT TO FILL** (2,680 expected Windows
 file fsyncs).
 The final XML records all 101 installer cases below ten seconds (maximum
-2.048 s). The packaging README's inherited CRLF endings were normalized to
-LF; its text diff remains confined to the allowed request paragraph.
+2.048 s). The packaging README repository blobs contained zero CR bytes both
+before and after turn 9. The earlier normalization claim described working
+checkout line endings, not a change in blob history; its text diff was confined
+to the allowed request paragraph.
 
 Historical probes use read-only `git show a76a7723:<path>` and an in-memory
 source loader, never a tracked-file revert. Four controls already pass turn
@@ -920,3 +923,58 @@ edit, frozen-interface change, real fetch, GPU activation, frozen run/build,
 desktop input, git write or footage/real-profile write occurred. Scratch
 probes and synthetic artifacts stay under ignored `work/`; none is a
 download/seat script.
+
+## Delta (B r1 fold) advisories
+
+The turn-9 delta review (`B/delta/review.txt`) returned
+NO_NEW_CRITICAL_MAJOR, with all eight ruled folds holding and 10/10 mutants
+killed. Four of its six ADVISORIES are folded here; A2/A4 remain seat/CHARC
+register and owner items, with no code. The B r1 table's directory-fsync
+cleanup description above is historical and is superseded by A1 here.
+
+| Advisory | Change | Verification |
+| --- | --- | --- |
+| A1 | After publication, clear the staging cleanup reference. Any OSError in the off-win32 directory-sync block logs one warning and retains the complete pack. Keep the existing `if sys.platform != "win32"` statement form: only this branch uses directory descriptors, consistent with the already accepted guard | Extended POSIX publication test simulates EINVAL: success, original destination present, full check clean, one warning and descriptor closed. Normal directory-sync order control still passes |
+| A3 | Suppress OSError/ValueError from the N13 print; retain its position before requests | New broken-stdout tests for both exceptions complete an actual fake-index installation. Existing pre-request notice and dialog-text equality tests remain green |
+| A5 | If no PID was reported, attempt Windows `taskkill /T /F /PID <launcher pid>` while the tree root is still identifiable, then `child.kill()` as fallback and bounded wait. Retain the reported-interpreter-PID path and eight-second child deadline | Normal DLL/extension child cases pass; fallback inspected for bounded `taskkill` (5 s), suppressed cleanup errors and final bounded wait (10 s). The never-reporting branch was not forced this turn |
+| A6 | Add the labelled PowerShell `Start-Process -Wait` recipe beside the cmd.exe recipe in the two allowed paragraphs; correct the README CR history statement above | Paragraph-only diff audit; repository README blobs before/after turn 9 both have 0 CR bytes |
+
+A2's cross-process marker/status observation belongs with F8's register row;
+A4's precise NVIDIA `.dist-info` licence location is for the owner at accept.
+No licence wording or shell behavior changes in this turn. The seat re-run
+section and its **SEAT TO FILL** figure remain untouched.
+
+All command output is under `work/wp6.3a/`. Every pytest command set
+`PYTHONPATH=scripts`, `QT_QPA_PLATFORM=offscreen`, loaded the sandbox shim and
+disabled cacheprovider, with bounded timeouts and disposable basetemps.
+
+| Command | Result / evidence |
+| --- | --- |
+| `uv run --no-sync ruff check .` | All checks passed, exit 0; `bdelta-ruff.log` |
+| `uv run --no-sync ruff format --check .` | 327 files formatted, exit 0; `bdelta-format.log` |
+| `uv run --no-sync mypy` | No issues in 163 source files, exit 0; `bdelta-mypy.log` |
+| `uv run --no-sync mypy --platform darwin` | Exactly 4 accepted errors in 3 files / 163 checked, exit 1; `bdelta-darwin.log` |
+| `uv run --no-sync python work/wp6.3a/bdelta-turn9.py` | Exact turn-9 installer loaded in memory: **3 expected failures / 1 passing control / 100 deselected in 0.59 s**, exit 1; `bdelta-turn9.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_gpu_pack_install.py -k 'posix_publication or broken_stdout' --basetemp=work/c63a-10green` | Fixed normal code: **4 passed / 100 deselected in 0.79 s**, exit 0; `bdelta-green.log` |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_gpu_pack.py tests/test_gpu_pack_install.py tests/test_tools_package_build.py tests/test_frozen_entry.py --basetemp=work/c63a-10 --junitxml=work/wp6.3a/bdelta-tests.xml` | **455 passed in 25.37 s**, exit 0; `bdelta-tests.log` / XML |
+| `uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 600 tests/test_gui_gpu_pack_dialog.py --basetemp=work/c63a-10gui --junitxml=work/wp6.3a/bdelta-gui.xml` | **24 passed in 1.17 s**, exit 0; `bdelta-gui.log` / XML |
+| `uv run --no-sync python work/wp6.3a/bdelta-audit.py` | Five owned files, 0 CR bytes, clean diff check, paragraph-only guide/README edits, unchanged seat section and 0-CR historical README blobs; `bdelta-audit.log` |
+
+The exact Darwin errors remain `src/clearwater/io/video/pipes.py:56`,
+`tools/prototype/bench.py:1159`, `tools/prototype/bench.py:1480` and
+`tools/spike_io/transport.py:950`. No new error, skip or sandbox residual
+occurred. The old-code probe compiles `git show f55175b4` in memory, never
+reverts a tracked file. It fails the EINVAL case and both stdout cases;
+the normal directory-sync control already passes turn 9. The initial
+test-first run also recorded three failures/one pass (`bdelta-red.log`).
+
+Verification loop: confirmed A1 via simulated EINVAL and a missing pack;
+confirmed A3 via both escaping stdout exception classes; fixed both and
+re-ran all requested tests/static checks. The final owned-file audit finds
+no further in-envelope issue. POSIX fsync behavior is simulated on this
+Windows host; the real-pack install-time delta remains for the seat.
+No new dependency, unowned edit, real network fetch, GPU activation, frozen
+run/build, desktop input, git write or real-profile/footage write occurred.
+Prior depth is 198,141 / 475,000 (dispatch 10); current depth is DISPATCHER
+TO FILL. Four commissioned advisory folds are complete; A2/A4 remain banked
+as directed, with no open implementation question.

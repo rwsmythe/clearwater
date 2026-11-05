@@ -70,6 +70,7 @@ other Clearwater windows if removal remains pending. For a terminal
 or script in cmd.exe, use `start /wait "" Clearwater.exe --install-gpu-pack > install.log 2>&1` or
 `start /wait "" Clearwater.exe --remove-gpu-pack > remove.log 2>&1`. This waits for the
 windowed executable to finish; it prints only when its output is redirected.
+In **PowerShell**, use `Start-Process -Wait -FilePath .\Clearwater.exe -ArgumentList '--install-gpu-pack' -RedirectStandardOutput install.log -RedirectStandardError install.err`.
 The same requests in source are
 `python -m clearwater --install-gpu-pack` and `python -m clearwater --remove-gpu-pack`;
 source runs use their environment's GPU extra, while the downloaded pack is loaded

@@ -568,7 +568,10 @@ def test_every_extracted_file_and_manifest_are_flushed_before_publication(fake_i
         assert directories == [result.path.stat().st_ino, fake_index.root.stat().st_ino]
 
 
-def test_posix_publication_syncs_renamed_staging_then_root(fake_index, monkeypatch):
+@pytest.mark.parametrize("failure", [False, True])
+def test_posix_publication_syncs_renamed_staging_then_root(
+    fake_index, monkeypatch, caplog, failure
+):
     installer = _installer()
     original_open, original_sync, original_close = os.open, os.fsync, os.close
     destination = fake_index.root / gpu_pack.STAMP
@@ -586,6 +589,8 @@ def test_posix_publication_syncs_renamed_staging_then_root(fake_index, monkeypat
     def sync(descriptor):
         if descriptor in handles:
             synced.append(handles[descriptor])
+            if failure:
+                raise OSError(errno.EINVAL, "directory fsync unsupported")
         else:
             original_sync(descriptor)
 
@@ -600,8 +605,33 @@ def test_posix_publication_syncs_renamed_staging_then_root(fake_index, monkeypat
     monkeypatch.setattr(os, "fsync", sync)
     monkeypatch.setattr(os, "close", close)
     # The caller normally owns the platform-specific operation lock; exercise publication only.
-    assert installer._install_locked(fake_index.root, Progress()).ok
-    assert opened == synced == closed == [destination, fake_index.root]
+    result = installer._install_locked(fake_index.root, Progress())
+    assert result.ok, result.message
+    assert result.path == destination and destination.is_dir()
+    assert list(gpu_pack.pack_problems(destination, full=True)) == []
+    assert (
+        opened == synced == closed == ([destination] if failure else [destination, fake_index.root])
+    )
+    assert len(caplog.records) == (1 if failure else 0)
+    if failure:
+        assert "directory fsync" in caplog.text
+
+
+@pytest.mark.parametrize("error", [OSError, ValueError])
+def test_broken_stdout_does_not_prevent_installation(fake_index, monkeypatch, error):
+    class BrokenOutput:
+        def write(self, text):
+            raise error("stdout is closed")
+
+        def flush(self):
+            raise error("stdout is closed")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(sys, "stdout", BrokenOutput())
+        result = _installer().install(Progress())
+    assert result.ok, result.message
+    assert gpu_pack.check_pack(result.path) is None
+    assert fake_index.requests
 
 
 @pytest.mark.parametrize("failure", ["lib.dll", "manifest.json"])
@@ -1447,6 +1477,20 @@ while not Path(release).exists():
                 if ready.exists():
                     with suppress(ProcessLookupError):
                         os.kill(int(ready.read_text(encoding="ascii")), signal.SIGTERM)
+                else:
+                    if sys.platform == "win32":
+                        # Kill the tree while the launcher PID still identifies its children.
+                        with suppress(OSError, subprocess.TimeoutExpired):
+                            subprocess.run(
+                                ["taskkill", "/T", "/F", "/PID", str(child.pid)],
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                timeout=5,
+                                check=False,
+                            )
+                    with suppress(OSError):
+                        child.kill()
                 child.wait(timeout=10)  # The interpreter also retains its own 8 s deadline.
         assert child.returncode == 0
     assert installer.apply_pending_removal().ok
