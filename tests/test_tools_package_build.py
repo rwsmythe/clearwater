@@ -21,6 +21,8 @@ import json
 import marshal
 import os
 import shutil
+import stat
+import subprocess
 import sys
 import zipfile
 from collections.abc import Sequence
@@ -323,11 +325,11 @@ def test_bootloader_identity_allows_resources_and_archive_but_refuses_code_chang
     assert not build._is_clearwater_bootloader(target)
 
 
-@pytest.mark.parametrize("trusted", [False, True])
+@pytest.mark.parametrize("tampered", [False, True])
 def test_build_enforces_origin_after_all_native_copies(
-    tmp_path, monkeypatch, capsys, trusted, verified_ffmpeg_archive
+    tmp_path, monkeypatch, capsys, tampered, verified_ffmpeg_archive
 ):
-    """Verified archive extraction still precedes the unchanged native origin gate."""
+    """Verified tool bytes pass, but a post-extraction change fails the real gate."""
     pin, _source, destination, _out, members, *_ = verified_ffmpeg_archive
     out = destination.parent
     monkeypatch.setattr(build, "release_dir", lambda *a: destination)
@@ -336,27 +338,29 @@ def test_build_enforces_origin_after_all_native_copies(
     check = build.native_origin_violations
     _fake_pyinstaller(monkeypatch, out, ["graphlib"], {})
     monkeypatch.setattr(build, "native_origin_violations", check)
-    monkeypatch.setattr(
-        build,
-        "_native_origin_hashes",
-        lambda: (
-            {hashlib.sha256(payload).hexdigest() for payload in members.values()}
-            if trusted
-            else set()
-        ),
-    )
+    monkeypatch.setattr(build, "_native_origin_hashes", lambda: set())
     monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
+    real_bundle = build.bundle_ffmpeg
+
+    def bundle(*args, **kwargs):
+        result = real_bundle(*args, **kwargs)
+        if tampered:
+            (destination / "ffmpeg.exe").write_bytes(b"changed after extraction")
+        return result
+
+    monkeypatch.setattr(build, "bundle_ffmpeg", bundle)
     foreign = tree(tmp_path / "foreign", ["ffmpeg.exe"])
     monkeypatch.setenv("PATH", str(foreign))
     assert build.build(
         "onefile", out=out, ffmpeg_from=pin["asset_url"], ffmpeg_sha256=pin["github_sha256"]
-    ) == (0 if trusted else 1)
-    assert (destination / "ffmpeg.exe").read_bytes() == members[
-        pin["archive_root"] + "/bin/ffmpeg.exe"
-    ]
+    ) == int(tampered)
+    if not tampered:
+        assert (destination / "ffmpeg.exe").read_bytes() == members[
+            pin["archive_root"] + "/bin/ffmpeg.exe"
+        ]
     output = capsys.readouterr().out
-    assert ("native origin check: PASS" in output) == trusted
-    if not trusted:
+    assert ("native origin check: PASS" in output) == (not tampered)
+    if tampered:
         assert str(foreign / "ffmpeg.exe") in output
 
 
@@ -1221,6 +1225,7 @@ def test_release_ffmpeg_options_reach_the_build(monkeypatch, tmp_path):
         "ffmpeg_sha256": "a" * 64,
         "notices": False,
         "smoke": False,
+        "zip_release": False,
     }
 
 
@@ -1236,7 +1241,7 @@ def test_release_bundle_is_checked_in_the_built_executable_folder(
     _fake_pyinstaller(monkeypatch, out, ["graphlib"], {})
     folder = build.release_dir(out, "onefile", build.app_version())
 
-    def fetched(destination, *, out, url, sha256):
+    def fetched(destination, *, out, url, sha256, verified_hashes):
         assert (destination / "Clearwater.exe").is_file()
         if fail:
             raise RuntimeError("planted FFmpeg configuration mismatch")
@@ -1353,3 +1358,266 @@ def test_smoke_follows_notices_and_propagates_failure(monkeypatch, tmp_path, sta
     monkeypatch.setattr(build, "smoke_artifact", smoke)
     assert build.main(["--form", "onedir", "--notices", "--smoke", "--out", str(out)]) == status
     assert len(called) == 1
+
+
+def test_zip_option_selects_only_a_checked_onedir_build(monkeypatch, tmp_path):
+    """The workflow's --zip must parse and reach the release build."""
+    seen = {}
+
+    def run(form, **kwargs):
+        seen.update(form=form, **kwargs)
+        return 7
+
+    monkeypatch.setattr(build, "build", run)
+    assert (
+        build.main(["--form", "onedir", "--notices", "--smoke", "--zip", "--out", str(tmp_path)])
+        == 7
+    )
+    assert seen["zip_release"] is True
+    for args in (
+        ["--form", "onefile", "--zip"],
+        ["--verify", "pack", "--zip"],
+        ["--smoke", "folder", "--zip"],
+        ["--form", "onedir", "--zip"],
+        ["--form", "onedir", "--zip", "--notices"],
+        ["--form", "onedir", "--zip", "--smoke"],
+    ):
+        with pytest.raises(SystemExit) as caught:
+            build.parse_args(args)
+        assert caught.value.code == 2
+
+
+def test_release_zip_is_deterministic_and_has_fixed_metadata(tmp_path):
+    """Neither creation order, file mode nor filesystem mtime may alter release bytes."""
+    payloads = {
+        "Clearwater/Clearwater.exe": b"synthetic executable",
+        "Clearwater/_internal/native.dll": b"synthetic native",
+        "Clearwater/THIRD_PARTY_NOTICES.md": b"synthetic notices\n",
+    }
+    snapshots = []
+    for index, names in enumerate((list(payloads), list(reversed(payloads)))):
+        root = tmp_path / str(index) / "Clearwater-1.1.0-windows-onedir"
+        for name in names:
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payloads[name])
+            os.utime(path, (946684800 + index * 10000, 946684800 + index * 10000))
+            path.chmod(0o666 if index else 0o444)
+        archive = build.write_release_zip(root, out=root.parent, source_epoch=1793908801)
+        snapshots.append(archive.read_bytes())
+        assert archive == root.parent / (root.name + ".zip")
+        with zipfile.ZipFile(archive) as packed:
+            assert packed.namelist() == sorted(root.name + "/" + name for name in payloads)
+            assert len(packed.infolist()) == sum(p.is_file() for p in root.rglob("*")) == 3
+            assert packed.testzip() is None
+            for info in packed.infolist():
+                assert info.date_time == (2026, 11, 5, 20, 0, 0)
+                assert info.create_system == 3
+                assert info.external_attr == (stat.S_IFREG | 0o644) << 16
+                assert info.compress_type == zipfile.ZIP_DEFLATED
+                assert info.extra == info.comment == b""
+                assert info.internal_attr == 0
+                assert packed.read(info) == payloads[info.filename.removeprefix(root.name + "/")]
+        sidecar = archive.with_suffix(".zip.sha256")
+        expected = (
+            hashlib.sha256(snapshots[-1]).hexdigest().encode() + b"  " + archive.name.encode()
+        )
+        assert sidecar.read_bytes() == expected + b"\n"
+        # Add-Content -Encoding ascii appends its value and a platform newline.
+        with sidecar.open("ab") as stream:
+            stream.write(b"# source-commit: " + b"a" * 40 + b"\r\n")
+        assert sidecar.read_bytes().splitlines() == [expected, b"# source-commit: " + b"a" * 40]
+        for path in root.rglob("*"):
+            if path.is_file():
+                path.chmod(0o666)
+    assert snapshots[0] == snapshots[1]
+
+
+@pytest.mark.parametrize("epoch", [0, 4354819200])
+def test_release_zip_refuses_unrepresentable_commit_time(tmp_path, epoch):
+    """Out-of-range source dates fail before publishing instead of inheriting today's date."""
+    root = tree(tmp_path / "release", ["Clearwater/Clearwater.exe"])
+    with pytest.raises(ValueError, match=r"ZIP.*(time|date)"):
+        build.write_release_zip(root, out=tmp_path, source_epoch=epoch)
+    assert not list(tmp_path.glob("*.zip*"))
+
+
+def test_source_commit_epoch_uses_a_bounded_read_only_git_query(monkeypatch):
+    """Build timestamps come from the checked-out commit, never filesystem metadata."""
+
+    def git(args, **kwargs):
+        assert args == ["git", "log", "-1", "--format=%ct", "HEAD"]
+        assert kwargs["cwd"] == build.REPO_ROOT
+        assert kwargs["timeout"] <= 30
+        assert kwargs["check"] is True
+        return subprocess.CompletedProcess(args, 0, "1793908801\n", "")
+
+    monkeypatch.setattr(build.subprocess, "run", git)
+    assert build.source_commit_epoch() == 1793908801
+
+
+@pytest.mark.parametrize("failure", ["none", "notices", "smoke", "timestamp"])
+def test_zip_is_published_only_after_successful_notices_and_smoke(
+    tmp_path, monkeypatch, capsys, failure
+):
+    """The smoke early return must fall through to zip only on success."""
+    out = tmp_path / "out"
+    monkeypatch.setattr(build, "pack_sources", lambda: [])
+    _fake_pyinstaller(monkeypatch, out, ["graphlib"], {})
+    root = build.release_dir(out, "onedir", build.app_version())
+    monkeypatch.setattr(build, "release_dir", lambda *a: root)
+    order = []
+
+    def notices(folder):
+        order.append("notices")
+        if failure == "notices":
+            raise ValueError("planted notices failure")
+        path = folder / "THIRD_PARTY_NOTICES.md"
+        path.write_text("synthetic notices\n")
+        return path
+
+    def smoke(folder, *, out):
+        assert (folder / "THIRD_PARTY_NOTICES.md").is_file()
+        order.append("smoke")
+        return int(failure == "smoke")
+
+    def epoch():
+        assert order == ["notices", "smoke"]
+        if failure == "timestamp":
+            raise ValueError("planted source timestamp failure")
+        return 1793908801
+
+    monkeypatch.setattr(build, "write_artifact_notices", notices)
+    monkeypatch.setattr(build, "smoke_artifact", smoke)
+    monkeypatch.setattr(build, "source_commit_epoch", epoch, raising=False)
+    status = build.build("onedir", out=out, notices=True, smoke=True, zip_release=True)
+    assert status == int(failure != "none")
+    assert order == (["notices"] if failure == "notices" else ["notices", "smoke"])
+    archive = out / (root.name + ".zip")
+    assert archive.exists() == archive.with_suffix(".zip.sha256").exists() == (failure == "none")
+    if failure == "none":
+        with zipfile.ZipFile(archive) as packed:
+            assert root.name + "/THIRD_PARTY_NOTICES.md" in packed.namelist()
+    if failure == "timestamp":
+        assert "FAILED: release zip: planted source timestamp failure" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("mutation", ["none", "changed-tool", "unknown", "unextracted"])
+def test_verified_archive_origin_accepts_only_extracted_tool_bytes(
+    monkeypatch, verified_ffmpeg_archive, mutation
+):
+    """Hashing all archive entries or the destination files would grant false trust."""
+    pin, _source, destination, out, members, *_ = verified_ffmpeg_archive
+    hashes = set()
+    build.bundle_ffmpeg(
+        destination,
+        out=out,
+        url=pin["asset_url"],
+        sha256=pin["github_sha256"],
+        verified_hashes=hashes,
+    )
+    assert hashes == {
+        hashlib.sha256(members[pin["archive_root"] + "/bin/" + tool + ".exe"]).hexdigest()
+        for tool in ("ffmpeg", "ffprobe")
+    }
+    if mutation == "changed-tool":
+        (destination / "ffmpeg.exe").write_bytes(b"changed bytes")
+    elif mutation == "unknown":
+        (destination / "unknown.dll").write_bytes(b"unknown native")
+    elif mutation == "unextracted":
+        (destination / "renamed.dll").write_bytes(members[pin["archive_root"] + "/bin/ffplay.exe"])
+    monkeypatch.setattr(build, "_native_origin_hashes", lambda: set())
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
+    monkeypatch.setattr(build, "read_package", lambda _: SimpleNamespace(toc={}))
+    errors = build.native_origin_violations(
+        destination / "Clearwater.exe", original_path="", ffmpeg_hashes=hashes
+    )
+    if mutation == "none":
+        assert errors == []
+    else:
+        label = {
+            "changed-tool": "ffmpeg.exe",
+            "unknown": "unknown.dll",
+            "unextracted": "renamed.dll",
+        }[mutation]
+        assert len(errors) == 1 and label in errors[0]
+
+
+@pytest.mark.parametrize("failure", ["digest", "download", "inventory", "version"])
+def test_unverified_or_rejected_archive_never_publishes_origin_hashes(
+    monkeypatch, verified_ffmpeg_archive, failure
+):
+    """Neither a failed archive check nor a partial tool check can bless native bytes."""
+    pin, source, destination, out, _members, write, *_ = verified_ffmpeg_archive
+    if failure == "download":
+        payload = bytearray(source.read_bytes())
+        payload[-1] ^= 1
+        source.write_bytes(payload)
+    elif failure == "inventory":
+        write(extra=[("../escape.dll", b"unsafe")])
+    elif failure == "version":
+
+        def refuse(*args):
+            raise RuntimeError("planted tool version failure")
+
+        monkeypatch.setattr(build, "_pinned_ffmpeg_version", refuse)
+    hashes = set()
+    with pytest.raises((ValueError, RuntimeError)):
+        build.bundle_ffmpeg(
+            destination,
+            out=out,
+            url=pin["asset_url"],
+            sha256="0" * 64 if failure == "digest" else pin["github_sha256"],
+            verified_hashes=hashes,
+        )
+    assert hashes == set()
+    (destination / "ffmpeg.exe").write_bytes(b"unverified tool")
+    monkeypatch.setattr(build, "_native_origin_hashes", lambda: set())
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
+    monkeypatch.setattr(build, "read_package", lambda _: SimpleNamespace(toc={}))
+    assert any(
+        "ffmpeg.exe" in error
+        for error in build.native_origin_violations(
+            destination / "Clearwater.exe", original_path="", ffmpeg_hashes=hashes
+        )
+    )
+
+
+def test_verified_member_hashes_come_from_archive_streams_not_destination_files(
+    monkeypatch, verified_ffmpeg_archive
+):
+    """A corrupted extraction write must not be promoted into a trusted identity."""
+    from contextlib import contextmanager
+
+    pin, _source, destination, out, members, *_ = verified_ffmpeg_archive
+    real_open = Path.open
+
+    @contextmanager
+    def opened(path, mode="r", *args, **kwargs):
+        with real_open(path, mode, *args, **kwargs) as stream:
+            if path == destination / "ffmpeg.exe" and mode == "wb":
+
+                class CorruptingOutput:
+                    def write(self, data):
+                        return stream.write(b"MZ" + data[2:])
+
+                yield CorruptingOutput()
+            else:
+                yield stream
+
+    monkeypatch.setattr(Path, "open", opened)
+    # Isolate identity collection from the native execution boundary. The other
+    # fixture tests run the real bounded version/configuration checks.
+    monkeypatch.setattr(build, "_pinned_ffmpeg_version", lambda path, lock: "version stub")
+    hashes = set()
+    build.bundle_ffmpeg(
+        destination,
+        out=out,
+        url=pin["asset_url"],
+        sha256=pin["github_sha256"],
+        verified_hashes=hashes,
+    )
+    archive_bytes = members[pin["archive_root"] + "/bin/ffmpeg.exe"]
+    assert (destination / "ffmpeg.exe").read_bytes() != archive_bytes
+    assert hashlib.sha256(archive_bytes).hexdigest() in hashes
+    assert hashlib.sha256((destination / "ffmpeg.exe").read_bytes()).hexdigest() not in hashes

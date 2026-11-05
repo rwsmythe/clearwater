@@ -1,8 +1,9 @@
 # WP6.3c - FFmpeg bundle
 
-Status: turn 2 edits prepared, 2026-11-05. Fork commit/export, actionlint and
-Dockerfile generation belong to the seat. The real asset, lock re-pin, remaining
-build work, review, package gate and release are pending.
+Status: turn 3 edits prepared, 2026-11-05. The dispatch records the seat's fork
+commit/export and clean actionlint result; Dockerfile generation was refused by
+the seat's tool policy and a static proof recorded instead. The real asset,
+lock re-pin, remaining package work, review, package gate and release are pending.
 
 ## Turn 2 - Fork preparation and PATH-copy retirement
 
@@ -139,5 +140,160 @@ commissioned by subsequent turns. The lock, lock policy, release workflow and
 three unowned test modules were not edited. No dependency or frozen interface change,
 footage/profile write, real PyInstaller build, frozen/GUI launch, Docker action,
 external fetch, direct Git write, GitHub action or mailbox post was performed.
+
+Depth: unavailable to the cell; the dispatcher supplies `depth_input_tokens`.
+
+## Turn 3 - Deterministic release zip and verified FFmpeg origin
+
+**Built (A).** Added onedir-only `--zip`, requiring `--notices --smoke` so neither
+check can be omitted before publication. A successful smoke status now falls
+through to zip creation; failures still return without writing a new archive or
+sidecar. The build queries the checked-out source/tag commit with the read-only
+`git log -1 --format=%ct HEAD` (20-second subprocess bound), then passes that
+integer explicitly as `source_epoch` to `write_release_zip`. Writer tests supply
+the integer directly without Git; the query test uses a bounded subprocess stub.
+
+The writer takes the release wrapper, giving a single top-level
+`Clearwater-<version>-<platform>-onedir/` folder and sorted relative file members.
+It publishes `<wrapper name>.zip` and `<wrapper name>.zip.sha256` directly under
+`--out`, matching the existing workflow. Only physical files count as members;
+empty directories do not add members. Linked/special files, empty trees, outputs
+inside the tree and dates outside ZIP's 1980..2107 range are refused. Every
+member uses the commit's UTC date, seconds rounded down to DOS precision, fixed
+Unix regular-file mode 0644, fixed creator/extractor versions and empty extra/
+comment/internal attributes. Compression is explicitly DEFLATE level 9 per file.
+No file mtime/mode is copied. The writer reads one file at a time, writes temporary
+outputs and replaces the final paths after completing the archive and checksum.
+The ASCII checksum line ends with literal LF. The workflow's existing append
+form therefore places `# source-commit` on a separate line (including with CRLF
+for that appended line). The release-workflow test's sole pending-flag assertion
+now requires an empty set; no workflow code was edited this turn.
+
+**Built (B).** `bundle_ffmpeg` retains its existing list return and accepts an
+optional `verified_hashes` output set. After download size/sha256 verification and
+the complete ZIP inventory check, it hashes the archive streams while extracting.
+Only `bin/ffmpeg.exe` and `bin/ffprobe.exe` contribute identities. Both bounded
+version/configuration checks must succeed before the set is updated. The build
+starts a fresh set for each invocation and carries it directly into
+`native_origin_violations(ffmpeg_hashes=...)`. That gate combines these complete
+file hashes with the existing interpreter/locked-RECORD sources; the bootloader
+check and recursive native/archive inspection remain active. Neither names nor
+destination files nor `ffmpeg-BUILD.txt` supply trusted identities.
+
+The extracted `ffmpeg-LICENSE.txt` (archive `LICENSE.txt`) and generated
+`ffmpeg-BUILD.txt` are ordinary text, with neither a native suffix nor native
+magic. They therefore need no native origin. They grant no trust to another
+file, and native magic in a `.txt` would still trigger the existing content check.
+Unextracted archive members, including `ffplay.exe`, contribute no hashes.
+
+**Built (C).** Added only `tools/package/ffmpeg-fork.patch -text` to
+`.gitattributes`. RED: read-only `git check-attr --source=HEAD text --
+tools/package/ffmpeg-fork.patch` reports `text: unspecified`. GREEN: the same
+working-tree query without `--source=HEAD` reports `text: unset`, preventing
+checkout newline conversion of the mail patch (`patch-attribute-red.log` and
+`patch-attribute-green.log`). The patch itself was not edited.
+
+**RED -> GREEN.** Logs are under `work/wp6.3c/turn3/`.
+
+- `red.log`: 17 failed, 6 passed, 101 deselected. The new CLI test reports
+  `unrecognized arguments: --zip`; the writer/build cases expose missing APIs.
+  Most importantly, the existing real origin gate rejects both verified tools
+  with `native origin unknown` when no test-supplied hash exemption is present.
+- `naive-red.log`: the separate `zipfile.write` baseline raises
+  `AssertionError: naive ZIP bytes vary with filesystem mtimes` for identical
+  content and changed filesystem times. This control does not call the new writer.
+- `green.log`: the same focused selection reports
+  `23 passed, 101 deselected`. Two writes of identical content are byte-equal
+  despite reversed creation order, different mtimes and different file modes.
+  Tests check layout, UTC/DOS timestamps, attributes, physical-file count, content,
+  digest and final LF, plus the two-line checksum/comment append. Build tests
+  refuse publication after notice, smoke or timestamp failure and cover success.
+- `hash-mutant-red.log`: one failed, 125 deselected. A scratch copy of the build
+  module is deliberately changed to hash destination files. A test corrupts an
+  extraction write and rejects that implementation: the destination's altered
+  digest must never replace the archive-stream identity. No product file was
+  changed for this control. The final selection runs the unmodified stream reader.
+- Origin controls cover post-extraction tool changes, an unknown native, a
+  non-extracted archive member smuggled under another native name, a wrong digest
+  argument, downloaded bytes differing from their pinned digest, unsafe inventory
+  and failed version checks. Rejected bundles never populate the trusted set.
+
+**Runner.** The exact isolated runner is
+`work/wp6.3c/turn3/run_tests.py`:
+
+```python
+import os
+import sys
+import pytest
+
+os.environ.pop('PYTHONPATH', None)
+raise SystemExit(pytest.main([
+    '-p', 'sandbox_mkdir_shim', '-p', 'no:cacheprovider', '--timeout', '300',
+    '-k', 'not test_python_m_clearwater_starts_the_shell_and_exits_0',
+    *sys.argv[1:]
+]))
+```
+
+It is launched from PowerShell with `$env:PYTHONPATH='scripts'`, then:
+
+```text
+uv run --no-sync python work/wp6.3c/turn3/run_tests.py tests/test_tools_package_build.py tests/test_tools_package_ffmpeg.py tests/test_tools_package_notices.py tests/test_tools_package_smoke.py tests/test_release_workflow.py --basetemp=work/c63c-3-final --junitxml=work/wp6.3c/turn3/pytest-final.xml -q
+```
+
+The initial full selection uses `--basetemp=work/c63c-3`, `pytest.xml` and
+`pytest.log`; it reports `3 failed, 507 passed, 1 skipped in 98.49s (0:01:38)`.
+The final selection adds the downloaded-byte and corrupted-extraction controls
+and reruns the final per-file compression implementation with a fresh basetemp.
+
+**Final validation.**
+
+- `ruff-check-final.log`: `All checks passed!`.
+- `ruff-format-final.log`: `337 files already formatted`.
+- `mypy-win32-final.log` and `mypy-darwin-final.log`: each reports
+  `Success: no issues found in 166 source files`.
+- `pytest-final.log` / `.xml`:
+  `3 failed, 509 passed, 1 skipped in 98.33s (0:01:38)`.
+- `module-counts.txt` (independently summarized from the final JUnit XML):
+
+| Module | Final result |
+|---|---|
+| `test_tools_package_build.py` | 126 passed |
+| `test_tools_package_ffmpeg.py` | 68 passed |
+| `test_tools_package_notices.py` | 245 passed |
+| `test_tools_package_smoke.py` | 34 passed, 1 skipped |
+| `test_release_workflow.py` | 36 passed, 3 failed (sandbox Git fixture setup) |
+
+Read-only `git diff --check` is clean. The final full selection found no new
+product/test failure beyond the three named fixture limitations below. The
+smoke module's source-entry routing child was checked before execution: it
+redirects APPDATA, LOCALAPPDATA and XDG roots, blocks Qt imports, stubs GUI/worker
+effects and has a 15-second timeout. No QUIT_SCRIPT integration test was run.
+
+**Verification loop / handoff.**
+
+- [MAJOR, identity control] Independently confirmed that destination-derived
+  trust accepts the wrong identity using the deliberately broken scratch module;
+  the test rejects it. The product hashes the verified archive streams instead.
+- [MINOR, deterministic zip] Confirmed filesystem metadata makes the naive
+  archive vary; the fixed-metadata writer passes byte-equality and independent
+  metadata/digest expectations.
+- [MINOR, portability] The first darwin mypy run rejected a Windows subprocess
+  constant inside a conditional expression. Moved it into the existing explicit
+  `sys.platform == "win32"` guard style and reran both platforms.
+- [MINOR, sandbox] The initial full selection's only failures are the three
+  pre-existing real-Git cases (`annotated`, `lightweight`, `wrong-commit`), during
+  fixture setup's local Git push. Git's `sh.exe` reports fatal `CreateFileMapping`
+  and cannot read the local remote. Those cases need the commissioned seat rerun;
+  no passing real-Git claim is made here. The skip is the unchanged non-Windows
+  containment proof deferred to WP6.5.
+
+This turn bundles exactly the three commissioned items. Reviewer A remains the
+dispatcher's pass after this yield. Q1, the real asset/re-pin, embedded-native
+notices, later tag-gate work and the release remain later/seat work. No lock,
+notices/smoke module, dependency or frozen interface was changed. No external
+fetch, Git write to the Clearwater/fork repositories, real PyInstaller build,
+frozen/GUI launch, Docker, desktop input, footage/profile write, GitHub action or
+mailbox post was performed. The commissioned real-Git tests create only their
+own temporary fixture repositories before the sandbox refuses the local push.
 
 Depth: unavailable to the cell; the dispatcher supplies `depth_input_tokens`.

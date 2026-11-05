@@ -372,8 +372,8 @@ def test_order_parallel_marker_and_build_flags_match_local_contract(workflow):
         and isinstance(arg.value, str)
         and arg.value.startswith("--")
     }
-    # ONE explicit pending flag under the owner's zvbi HOLD; any second one fails.
-    assert flags - supported == {"--zip"}
+    # Every release flag is implemented; no pending flags remain.
+    assert flags - supported == set()
     options = module.parse_args(
         [
             "--form",

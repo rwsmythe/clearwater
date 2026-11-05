@@ -40,6 +40,10 @@ entries or GPL-incompatible bundled FFmpeg components fail the build.
 
 ``--smoke`` runs the headless onedir checks after a build; ``--smoke FOLDER``
 checks an existing artifact without rebuilding. It requires generated notices.
+
+``--zip`` publishes a deterministic onedir ZIP and LF-terminated sha256 sidecar
+under ``--out`` after successful ``--notices --smoke``. Metadata uses the checked-out
+source commit's UTC time, rounded down to the ZIP format's two-second precision.
 """
 
 from __future__ import annotations
@@ -64,6 +68,7 @@ import urllib.error
 import urllib.request
 import zipfile
 from collections.abc import Iterable, Iterator, Sequence
+from datetime import UTC, datetime
 from http.client import HTTPMessage
 from pathlib import Path
 from typing import IO, Literal, NamedTuple, Protocol, TypedDict, cast
@@ -1071,7 +1076,14 @@ def _pinned_ffmpeg_version(path: Path, lock: FFmpegLock) -> str:
     return first
 
 
-def bundle_ffmpeg(destination: Path, *, out: Path, url: str, sha256: str) -> list[tuple[Path, str]]:
+def bundle_ffmpeg(
+    destination: Path,
+    *,
+    out: Path,
+    url: str,
+    sha256: str,
+    verified_hashes: set[str] | None = None,
+) -> list[tuple[Path, str]]:
     """Fetch the pinned archive, verify before opening, then copy and check its tools.
 
     Every archive member is inspected for unsafe paths, links and duplicates,
@@ -1083,6 +1095,9 @@ def bundle_ffmpeg(destination: Path, *, out: Path, url: str, sha256: str) -> lis
         out: The build output root; the archive is retained under ``ffmpeg/``.
         url: Must equal the committed lock's asset URL.
         sha256: Must equal both verified hash readings in the lock.
+        verified_hashes: Optional in-memory output for extracted tool hashes, read
+            from the verified archive streams. Updated only after both tools pass.
+            Unextracted members and the non-native licence/build texts grant no trust.
 
     Returns:
         The two executable paths and their checked version lines.
@@ -1096,6 +1111,7 @@ def bundle_ffmpeg(destination: Path, *, out: Path, url: str, sha256: str) -> lis
     lock = load_ffmpeg_lock()
     destination = destination.resolve()
     archive_path = _download_ffmpeg(url, sha256, out.resolve(), lock)
+    tool_hashes: set[str] = set()
     with zipfile.ZipFile(archive_path) as archive:
         members = _ffmpeg_archive_members(archive, lock)
         targets = {
@@ -1106,8 +1122,13 @@ def bundle_ffmpeg(destination: Path, *, out: Path, url: str, sha256: str) -> lis
         if any(path.is_symlink() for path in targets.values()):
             raise ValueError("FFmpeg extraction: unsafe output link")
         for name, path in targets.items():
+            digest = hashlib.sha256()
             with archive.open(members[name]) as source, path.open("wb") as output:
-                shutil.copyfileobj(source, output)
+                while chunk := source.read(1024 * 1024):
+                    digest.update(chunk)
+                    output.write(chunk)
+            if name in {"bin/ffmpeg.exe", "bin/ffprobe.exe"}:
+                tool_hashes.add(digest.hexdigest())
     provenance = destination / "ffmpeg-BUILD.txt"
     if provenance.is_symlink():
         raise ValueError("FFmpeg build record: unsafe output link")
@@ -1130,10 +1151,13 @@ def bundle_ffmpeg(destination: Path, *, out: Path, url: str, sha256: str) -> lis
         ),
         encoding="utf-8",
     )
-    return [
+    result = [
         (path, _pinned_ffmpeg_version(path, lock))
         for path in (destination / "ffmpeg.exe", destination / "ffprobe.exe")
     ]
+    if verified_hashes is not None:
+        verified_hashes.update(tool_hashes)
+    return result
 
 
 def wheel_file_tags(filename: str) -> frozenset[str]:
@@ -1946,18 +1970,23 @@ def _is_clearwater_bootloader(executable: Path) -> bool:
         return executable.read_bytes().startswith(source.read_bytes())
 
 
-def native_origin_violations(executable: Path, *, original_path: str) -> list[str]:
+def native_origin_violations(
+    executable: Path, *, original_path: str, ffmpeg_hashes: Iterable[str] = ()
+) -> list[str]:
     """Check every native against interpreter/locked RECORD bytes and the bootloader.
 
     The main Windows executable is compared to the RECORD-verified runw.exe's
     immutable PE sections, allowing resources, debug timestamps and an appended
     archive. Every other native must match a complete file hash. ZIPs (including
     nested ZIPs and CArchive members) are inspected without executing contents.
-    FFmpeg has no exemption: WP6.3c must supply verified archive-member hashes.
+    Extracted FFmpeg tools additionally match hashes supplied in memory by the
+    verified archive reader. Names and on-disk build records grant no exemption.
 
     Args:
         executable: Built Clearwater executable, whose folder is inventoried.
         original_path: Caller PATH before analysis, used only for diagnostics.
+        ffmpeg_hashes: Trusted extracted tool identities from ``bundle_ffmpeg``;
+            never hashes calculated from destination files or provenance texts.
 
     Returns:
         Named violations, with the first same-named original-PATH file if found.
@@ -1967,7 +1996,7 @@ def native_origin_violations(executable: Path, *, original_path: str) -> list[st
         OSError: An input cannot be read.
         zipfile.BadZipFile: An archive is corrupt.
     """
-    hashes = _native_origin_hashes()
+    hashes = _native_origin_hashes() | set(ffmpeg_hashes)
     errors = []
 
     def inspect(label: str, name: str, data: bytes) -> None:
@@ -2097,6 +2126,110 @@ def smoke_artifact(folder: Path, *, out: Path) -> int:
     return 0
 
 
+def source_commit_epoch() -> int:
+    """Read the checked-out source commit's UTC Unix time with a bounded Git query.
+
+    Returns:
+        The commit timestamp as whole seconds since the Unix epoch.
+
+    Raises:
+        ValueError: Git fails, times out or returns an invalid timestamp.
+    """
+    flags = 0
+    if sys.platform == "win32":
+        flags = subprocess.CREATE_NO_WINDOW
+    try:
+        result = subprocess.run(
+            ["git", "log", "-1", "--format=%ct", "HEAD"],
+            cwd=REPO_ROOT,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="ascii",
+            timeout=20,
+            check=True,
+            creationflags=flags,
+        )
+        if not re.fullmatch(r"[0-9]+", result.stdout.strip()):
+            raise ValueError("invalid commit timestamp")
+        return int(result.stdout.strip())
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        raise ValueError(f"cannot read source commit time: {error}") from error
+
+
+def write_release_zip(folder: Path, *, out: Path, source_epoch: int) -> Path:
+    """Archive a release wrapper with sorted files and fixed source-commit metadata.
+
+    Only file members are emitted, under the wrapper's single top-level folder.
+    Every member has a UTC DOS timestamp (two-second precision), Unix regular-file
+    mode 0644 and no extra/comment metadata. File mtimes and modes are ignored.
+
+    Args:
+        folder: The onedir release wrapper, containing ``Clearwater/``.
+        out: Output root for ``<folder name>.zip`` and its sha256 sidecar.
+        source_epoch: Source/tag commit time in Unix seconds; explicit for testing.
+
+    Returns:
+        The ZIP path. Its ``.zip.sha256`` sidecar ends with LF.
+
+    Raises:
+        ValueError: The date is outside ZIP's range or the tree/output is unsafe.
+        OSError: A file cannot be read or the output cannot be written.
+    """
+    # Check bounds before datetime conversion (including on Windows).
+    if not 315532800 <= source_epoch < 4354819200:
+        raise ValueError("ZIP date must be in 1980..2107 UTC")
+    stamp = datetime.fromtimestamp(source_epoch, UTC)
+    date_time = (
+        stamp.year,
+        stamp.month,
+        stamp.day,
+        stamp.hour,
+        stamp.minute,
+        stamp.second // 2 * 2,
+    )
+    if folder.is_symlink() or not folder.is_dir():
+        raise ValueError("release ZIP requires a physical release folder")
+    paths = sorted(folder.rglob("*"), key=lambda path: path.relative_to(folder).as_posix())
+    if any(path.is_symlink() or not (path.is_file() or path.is_dir()) for path in paths):
+        raise ValueError("release ZIP refuses linked or special files")
+    files = [path for path in paths if path.is_file()]
+    if not files:
+        raise ValueError("release ZIP requires a nonempty release folder")
+    target = out / (folder.name + ".zip")
+    sidecar = target.with_suffix(".zip.sha256")
+    partial = target.with_suffix(".zip.part")
+    partial_sidecar = sidecar.with_suffix(".sha256.part")
+    outputs = (target, sidecar, partial, partial_sidecar)
+    if any(
+        path.is_symlink() or path.resolve().is_relative_to(folder.resolve()) for path in outputs
+    ):
+        raise ValueError("release ZIP output must be outside the release folder without links")
+    out.mkdir(parents=True, exist_ok=True)
+    try:
+        with zipfile.ZipFile(partial, "w") as archive:
+            for path in files:
+                member = folder.name + "/" + path.relative_to(folder).as_posix()
+                info = zipfile.ZipInfo(member, date_time=date_time)
+                info.create_system = 3
+                info.create_version = info.extract_version = 20
+                info.external_attr = (stat.S_IFREG | 0o644) << 16
+                info.internal_attr = 0
+                info.extra = info.comment = b""
+                archive.writestr(
+                    info, path.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9
+                )
+        with partial.open("rb") as stream:
+            digest = hashlib.file_digest(stream, "sha256").hexdigest()
+        partial_sidecar.write_bytes(f"{digest}  {target.name}\n".encode("ascii"))
+        partial.replace(target)
+        partial_sidecar.replace(sidecar)
+    finally:
+        partial.unlink(missing_ok=True)
+        partial_sidecar.unlink(missing_ok=True)
+    return target
+
+
 def build(
     form: Form,
     *,
@@ -2105,6 +2238,7 @@ def build(
     ffmpeg_sha256: str | None = None,
     notices: bool = False,
     smoke: bool = False,
+    zip_release: bool = False,
 ) -> int:
     """Build one form, check it, and print its summary.
 
@@ -2118,6 +2252,7 @@ def build(
         ffmpeg_sha256: Its verified sha256, also checked against the lock.
         notices: Generate the onedir artifact notices after the FFmpeg step.
         smoke: Run headless checks after notices, failing the build on a bad row.
+        zip_release: Publish the onedir zip/sidecar only after notices and smoke pass.
 
     Returns:
         0 when the build succeeded and the bundle holds nothing forbidden, else 1.
@@ -2127,8 +2262,11 @@ def build(
     except ValueError as error:
         print(f"FAILED: {error}")
         return 1
-    if (notices or smoke) and form != "onedir":
-        print("FAILED: --notices/--smoke require --form onedir")
+    if (notices or smoke or zip_release) and form != "onedir":
+        print("FAILED: --notices/--smoke/--zip require --form onedir")
+        return 1
+    if zip_release and not (notices and smoke):
+        print("FAILED: --zip requires --notices and --smoke")
         return 1
     if (ffmpeg_from is None) != (ffmpeg_sha256 is None):
         print("FAILED: --ffmpeg-from and --ffmpeg-sha256 must be provided together")
@@ -2174,10 +2312,15 @@ def build(
         return 1
     wall = time.monotonic() - start
     executable = find_executable(root)
+    ffmpeg_hashes: set[str] = set()
     if ffmpeg_from is not None and ffmpeg_sha256 is not None:
         try:
             for path, line in bundle_ffmpeg(
-                executable.parent, out=out, url=ffmpeg_from, sha256=ffmpeg_sha256
+                executable.parent,
+                out=out,
+                url=ffmpeg_from,
+                sha256=ffmpeg_sha256,
+                verified_hashes=ffmpeg_hashes,
             ):
                 print(f"bundled {path}: {line}")
         except (
@@ -2190,7 +2333,9 @@ def build(
             print(f"FAILED: FFmpeg bundle: {error}")
             return 1
     try:
-        origin_errors = native_origin_violations(executable, original_path=original_path)
+        origin_errors = native_origin_violations(
+            executable, original_path=original_path, ffmpeg_hashes=ffmpeg_hashes
+        )
     except (OSError, ValueError, zipfile.BadZipFile) as error:
         print(f"FAILED: native origin: {error}".encode("ascii", "backslashreplace").decode("ascii"))
         return 1
@@ -2198,7 +2343,10 @@ def build(
         for error_line in origin_errors:
             print(f"FAILED: {error_line}".encode("ascii", "backslashreplace").decode("ascii"))
         return 1
-    print("native origin check: PASS (interpreter, locked wheel RECORDs and bootloader)")
+    print(
+        "native origin check: PASS (interpreter, locked wheel RECORDs, "
+        "verified FFmpeg and bootloader)"
+    )
     check_start = time.monotonic()
     bad = forbidden_paths(root) + forbidden_entries(executable)
     missing = missing_hidden_imports(executable, wanted)
@@ -2231,7 +2379,18 @@ def build(
             print(f"FAILED: artifact notices: {message}")
             return 1
     if smoke:
-        return smoke_artifact(executable.parent, out=out)
+        status = smoke_artifact(executable.parent, out=out)
+        if status:
+            return status
+    if zip_release:
+        try:
+            print(f"wrote {write_release_zip(root, out=out, source_epoch=source_commit_epoch())}")
+        except (OSError, ValueError, zipfile.BadZipFile, zipfile.LargeZipFile) as error:
+            message = (
+                " ".join(str(error).split()).encode("ascii", "backslashreplace").decode("ascii")
+            )
+            print(f"FAILED: release zip: {message}")
+            return 1
     return 0
 
 
@@ -2251,6 +2410,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     action.add_argument("--verify", type=Path, metavar="PACK_FOLDER")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--notices", action="store_true", help="generate onedir artifact notices")
+    parser.add_argument(
+        "--zip", dest="zip_release", action="store_true", help="zip a checked onedir release"
+    )
     parser.add_argument(
         "--smoke",
         nargs="?",
@@ -2275,6 +2437,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         parser.error("choose --form, --write-manifest, --verify or --smoke FOLDER")
     if options.notices and options.form != "onedir":
         parser.error("--notices requires --form onedir")
+    if options.zip_release and options.form != "onedir":
+        parser.error("--zip requires --form onedir")
+    if options.zip_release and not (options.notices and options.smoke is True):
+        parser.error("--zip requires --notices and --smoke")
     if (options.ffmpeg_from is None) != (options.ffmpeg_sha256 is None):
         parser.error("--ffmpeg-from and --ffmpeg-sha256 must be provided together")
     if options.ffmpeg_from is not None:
@@ -2318,6 +2484,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ffmpeg_sha256=options.ffmpeg_sha256,
         notices=options.notices,
         smoke=options.smoke is True,
+        zip_release=options.zip_release,
     )
 
 
