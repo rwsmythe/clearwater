@@ -5,20 +5,18 @@
 
 ### Generation
 
-- **Generation 50** (session `clearwater-orchestrator-20261105-0611`). LIVE 2026-11-05 16:11Z; ROLLED at the 400K cap at ~19:35Z. **The roll is clean: nothing it started is running.** Gate `p63b` was ABORTED at 19:30Z (see the board); its `gate.sh` / `watch2.sh` / pytest trees were killed with `taskkill /T` and confirmed gone. Re-check with `tasklist | grep -i -E 'pytest|pyinstaller'`; the only `codex.exe` processes are the owner's desktop app.
+- **Generation 51** (session `clearwater-orchestrator-20261105-0932`). LIVE 2026-11-05 19:32Z. This file is a mid-generation CHECKPOINT unless the line below says ROLLED.
 - **CHARC is gen 17, `clearwater-charc-20261105-0602`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
-- **Seat folder `work/orch-g50/`:**
-  - `gate.sh`, `watch2.sh`, `crcheck.py`, `assemble.py`;
-  - `notices_cover.py`: the read-only notices coverage check (files, PYZ, both ways). Usage: `<venv python> -I work/orch-g50/notices_cover.py <Clearwater folder> <build-onedir/Clearwater>`;
-  - the drains, the posts, `rollstate.py`, and `dispatch-19..23-body.md` / `-filled.md`;
-  - **`wp6.3b-accept-draft.md`: the accept record, DRAFTED.** Fill `@@FOOTPRINT@@`, `@@GATE@@` and `@@MERGE@@`.
+- **Seat folder `work/orch-g51/`:**
+  - `gate.sh`, `watch2.sh` (gen-50 copies with the seat path changed);
+  - `fill.py` (the 6.3b accept fill), `fill63c.py`, `rollstate.py`, `state-board.md`;
+  - the drains and the posts.
 
-  The g49 tools (`smoke_uia.py`, `dll_origin.py`, `census_measure.py`) stay in `work/orch-g49/`. Copy `gate.sh` / `watch2.sh` with `sed 's#orch-g50#orch-g51#g'`.
-- **FRESH prompt** = `.claude/agents/implementer-codex-sol-high.md` + the brief at HEAD + `dispatch-N.md`, joined, with `tr -d '\r'`. A **RESUMED prompt** is `dispatch-N.md` alone.
-- **State worktree:** `.worktrees/orch-state-g50`. The successor removes it and adds its own.
-- **Bash gauge at bring-up:** 25 ms (gen 50). C: about 2.6 T free.
-- **Paces:** last read by gen 49 at 13:15Z (Codex 0.433 / Claude 1.362). Re-read both at the next commission (WP6.3c).
-- **Host load:** the owner was running World of Warcraft during gen 50 (CPU about 34 %; suites about 2x slower). That is why t21 and t22 widened the smoke-test bounds.
+  The g50 tools (`notices_cover.py`, `crcheck.py`, `assemble.py`) stay in `work/orch-g50/`; the g49 tools (`smoke_uia.py`, `dll_origin.py`, `census_measure.py`) stay in `work/orch-g49/`. Copy `gate.sh` / `watch2.sh` with `sed 's#orch-g51#orch-g52#g'`.
+- **FRESH prompt** = `.claude/agents/implementer-codex-sol-high.md` + the brief at the worktree's HEAD + `dispatch-N.md`, joined, with `tr -d '\r'`. A **RESUMED prompt** is `dispatch-N.md` alone.
+- **State worktree:** `.worktrees/orch-state-g51`. The successor removes it and adds its own.
+- **Bash gauge at bring-up:** 40 ms. C: about 2.6 T free.
+- **Paces** (20:23Z): Codex 10 % / 0.49; Claude 66 % / 1.346.
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
 
@@ -50,62 +48,54 @@
 
 ### Live board (RESUME HERE)
 
-**WP6.3b: BOTH NETS CONVERGED; THE GATE IS OWED.**
-- **Head `260c63ae`** (turn 23), branch `wp6.3b`, clean. Review copy `.worktrees/wp6.3b-rA` is detached at `260c63ae`.
-- **Gate `p63b` was ABORTED:** the parallel leg had 12 failures (10 failed + 2 errors), ALL `LocalConfigError: .worktrees/wp6.3b/clearwater.local.toml: file not found`. Every earlier package worktree (wp-dr125, wp6.1, wp6.3a, wp6.4) had a copy of the uncommitted root `clearwater.local.toml`; wp6.3b never got one. That is an environment gap, NOT code. The serial leg was killed at its start. Summary: `work/orch-g50/gate-p63b/summary.txt`.
+**WP6.3b ACCEPTED: main `34965dc5`** (record `docs/proofs/wp6.3b-accept.md`; gate `p63b2` green: parallel 7,936 / 207, serial 1,318 / 19, harness 423 after the seat's `dc088f60` registration of `.github/workflows/release.yml`). CHARC wrote AD-38 and DR-141..DR-147 at `c54b6f80`.
 
-**GEN 51, DO THIS FIRST, in order:**
-1. **Copy the local config:** `cp clearwater.local.toml .worktrees/wp6.3b/clearwater.local.toml` (it is gitignored and uncommitted; never commit it). Confirm `git -C .worktrees/wp6.3b status --short` is still empty.
-2. **The gate, run alone:** `bash work/orch-g51/gate.sh wp6.3b p63b2 static collect parallel serial harness` (background), plus a Monitor on `watch2.sh p63b2 0`; re-arm it at 30 min.
-   - Afterwards: `( cd .worktrees/wp6.3b && uv run --no-sync mypy --platform darwin )` and the module-alone `tests/test_gpu_pack_install.py` (both green at the seat on `260c63ae`: 166 files clean; 113 passed).
-   - **The QUIT_SCRIPT test runs in the serial leg** (the seat exception).
-   - Expect the parallel leg at about 8,143 tests (p63b had 7,921 passed + 210 skipped + the 12 config failures). The serial leg has 1,337 tests.
-   - Collection identity was already green in p63b: 9,487 = 8,143 + 1,337 + 7, 0 duplicates.
-3. **The accept:**
-   - Fill `work/orch-g50/wp6.3b-accept-draft.md`:
-     - `@@FOOTPRINT@@` = `git -C .worktrees/wp6.3b diff --name-only 50a25b3b..260c63ae` (34 paths);
-     - `@@GATE@@` = the p63b2 figures (and one line on p63b's abort);
-     - `@@MERGE@@`.
-   - Write it as `docs/proofs/wp6.3b-accept.md` IN THE WORKTREE, after merging main into `wp6.3b` (main has only CHARC / orchestrator docs since `50a25b3b`; check with `git diff --stat 50a25b3b..main -- src tests tools`).
-   - Run the harness gate there (`docs/proofs/` is an instance-surface prefix; no registration needed).
-   - Commit; blob-check 0 CR; `git merge --ff-only wp6.3b` on main.
-   - Copy `work/orch-g51/gate-p63b2/` to `C:\Users\rwsmy\clearwater-review-evidence\wp6.3b\gate\`.
-4. **The accept post to CHARC** with the main hash. CHARC writes AD-38 and the register rows on it (list in the draft's Dispositions; CHARC ruled all of them already), and corrects CLAUDE.md's stale "v1.0.0 not pushed" line. Cue `clearwater-charc-20261105-0602`.
-5. **Then WP6.3c** (brief DRAFT `a86e3c24` + CHARC's notes: MAJOR 1's embedded-components item; B r3 adv 1 / 2 / 3 / 5; B r2 adv 5).
-   - Fill Q1-Q4 when you reach it. Q3 = any pending `--zip` / origin-source branch in 6.3b's accepted code, by file:line: grep `build.py` for `--zip`, `with_ffmpeg`, `ffmpeg_from`, `pending`.
-   - Read both paces at commission.
-
-**Gen-50 ledger (WP6.3b, all committed on `wp6.3b`; evidence `C:\Users\rwsmy\clearwater-review-evidence\wp6.3b\`):**
+**WP6.3c IN FLIGHT (Codex lane, both nets Claude).**
+- Brief `docs/briefs/wp6.3c-brief.md`: FINAL `b1a53c06` + Round-0 rulings `f395a0b1`.
+- Worktree `.worktrees/wp6.3c`, branch `wp6.3c`. It has the local toml copied in and `uv sync --frozen --extra gpu` done.
+- Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp6.3c\` (`cell\`, `seat\`, `A\`, `B\`, `gate\`).
+- **Fork clone (gitignored, INSIDE the worktree so the sandbox can write it):** `.worktrees/wp6.3c/work/wp6.3c/FFmpeg-Builds`, `core.autocrlf false`. Base BtbN `5031c6f1`; the seat's fork commit is `9e8207b`. (A second clone `work/wp6.3c/FFmpeg-Builds` in the main tree is unused: a prune item.)
+- **Q1 (fork name; whose clicks) is WITH THE OWNER via CHARC.** CHARC posts the answer. The fork run, real asset, re-pin and seat build wait on it.
 
 | Turn | Commit | Content | Session, depth at yield |
 | --- | --- | --- | --- |
-| t19 | `65784337` | the data turn under the Turn-18 ruling: THREE strict provenance kinds; libffi, MSVC (11 files), Mesa + LLVM, the five SciPy blocks, the namespace mapping; the seat provenance record `seat\native-licences-provenance.md` | RESUMED `01a1ac75`, 170,321, retired |
-| t20 | `8938edd3` | the A r3 remediation: k1, k2 (the project LICENSE LF-normalised), F1-F4, A1 (magic bytes), A3, A4 | FRESH `01a1aca5`, 174,245 |
-| t21 | `91f90c8f` | `job_case` bound 1 -> 10 s (the load flake) | FRESH `01a1acc4`, 91,904 |
-| t22 | `4e848bf2` | the B r1 remediation, items 2-12: venv-only trust + the `PYTHON*` refusal; the stem rule; the presenter bounded on every path; real pipe holding; bounds; the win32 skip; the tag gate; the guide's "from 1.1.0" sections; mutant tests; `BuildEnvironmentError`; `setup-uv` cache off + checksum | FRESH `01a1ace3`, 180,046 |
-| t23 | `260c63ae` | the B r2 remediation: re-fetch the annotated tag after checkout; the real-git test (the seat ran it OUTSIDE the sandbox: RED at `4e848bf2`, GREEN 3 of 3, `seat\t23-real-git-proof.md`); MINOR 2, adv 3, adv 7 | FRESH `01a1ad0c`, 111,793 |
+| t1 round 0 | none | read-back; 4 STOP points, all ruled as recommended (`f395a0b1`) | `01a1ad64`, 202,602 |
+| t2 | `1fe53812` | `--with-ffmpeg` retired; the fork's 3 files (seat-committed `9e8207b`, patch `713d89b0`) | `01a1ad6c`, 148,454 |
+| t3 | (running at this write) | `--zip` + the verified-archive FFmpeg origin source + `.gitattributes` `ffmpeg-fork.patch -text` (seat-noted; CHARC may strike) | fresh |
 
-**Nets:**
-- A r3 `65784337` NO_NEW (k1, k2, F1-F5, A1-A4);
-- B r1 FULL `91f90c8f` NEW_MAJOR (MAJOR 1 embedded components -> CARVED to WP6.3c; 8 MINOR);
-- B r2 delta `4e848bf2` NEW_MAJOR (the checkout tag overwrite, seat-confirmed from `actions/checkout@11bd7190` source);
-- **B r3 delta `260c63ae` NO_NEW_CRITICAL_MAJOR** (6 adv: 1, 2, 3, 5 to 6.3c; 4 a record line; 6 corrected in the accept record).
+**Remaining split (the cell's round-0 plan, CHARC-confirmed):**
+- t4: the tag-gate hardening, B r3 adv 1 / 2 / 3 / 5 + real-git cases; the seat runs RED / GREEN outside the sandbox.
+- t5: the DR-144 synthetic mechanism.
+- t6: the DR-144 production records (needs the seat census).
+- t7: the real re-pin + notices / docs (needs Q1 + the fork run).
+- t8: convergence, then Reviewer A (Claude, `codex_cell.py review` on a detached `.worktrees/wp6.3c-rA`), then the seat proofs (real build `--notices --smoke --zip`, V4, `hevc_nvenc`, notices read), Reviewer B, the gate (static + darwin mypy, collect, parallel, serial, harness; no fullclip).
 
-**Seat proofs:**
-- rebuilds `work/wp6.3b-stage1b` / `1c` / `1d` from the FULL Git Bash PATH: origin PASS, `dll_origin` 0 foreign;
-- notices `3afe913e...` (1c = 1d), coverage exact (1,536 entries / 25 rows);
-- smoke under UIA `seat\smoke-uia\run1` (`windows_seen` []).
+**Seat state:**
+- t2 seat QA: 494 passed / 1 skipped outside the sandbox (real-git included); ruff, format, mypy x2 clean. Record `seat\t2-fork-checks.md`.
+- `actionlint` on the fork workflow: clean.
+- **`generate.sh` was REFUSED by the auto-mode classifier** (Code from External); a static proof is recorded instead. The owner may run it by hand.
+- **DR-144 census subagent** (Claude, background, read-only) writes `seat\dr144-census.md` and `seat\dr144-texts\`. CHECK ITS RECORD before feeding t5 / t6. If this generation rolls before it returns, it dies with the pane: re-launch it from the same brief (`work/orch-g51/` has none; the brief is in this generation's transcript only, so re-brief from the CHARC addition in the WP6.3c brief).
 
-**Seat QA at `260c63ae`:** seven modules 714 passed + 1 skipped; installer alone 113; ruff, format, mypy win32 + darwin clean; 0 CR.
+**Dispatch notes:**
+- Every WP6.3c turn so far is a FRESH session (each turn adds about 150-200K).
+- The cell's pytest runner: start with `PYTHONPATH=scripts`, import pytest, REMOVE `PYTHONPATH`, then `pytest.main(-p sandbox_mkdir_shim -p no:cacheprovider ...)`. The plain `PYTHONPATH=scripts uv run pytest` form trips WP6.3b's `PYTHON*` refusal.
+- The seat re-runs the modules outside the sandbox with `-n 4`, from `( cd .worktrees/wp6.3c && ... )`.
 
 **Other standing items:**
-- **WP6.5** brief DRAFT `fea43245` (+ CHARC's notes: A r3 F5 darwin PATH / Mach-O origin rule; B r2 adv 4 notices skip; the darwin smoke containment).
-- **Push:** main is ahead of `origin/main`; CHARC batches the owner's push.
-- **Worktrees:** main, `orch-state-g50` (remove it), `wp6.3b` (live), `wp6.3b-rA` (review copy), `wp-dr125`, `wp6.1`, `wp6.2`, `wp6.3a`, `wp6.4` (kept for the prunes).
+- WP6.5 brief DRAFT `fea43245` (Mac inputs ruled).
+- WP7.1 (Insta360 validation) brief is on main; CHARC commissions it after WP6.3c + 1.1.0.
+- Push: CHARC batches the owner's push.
+- Worktrees: main, `orch-state-g51` (yours to remove at rollover), `wp6.3c` (live), `wp6.3b`, `wp6.3b-rA`, `wp-dr125`, `wp6.1`, `wp6.2`, `wp6.3a`, `wp6.4` (kept for the prunes).
 - **Prunes owed (the owner's word only; CHARC batches):**
-  - gen 47 / 48 lists (in `git show e453d30b:docs/orchestrator-state.md`);
-  - gen 49's (`work/seat63b-t12..t17*`, `work/seat63b-m1`, `work/wp6.3b-stage1`, `work/wp6.3b-stage1-cleanpath`);
-  - gen 50's (`work/wp6.3b-stage1b`, `1c`, `1d` and their `.log`s, `work/seat63b-t19..t23`, `work/orch-g50/gate-p63b`, `work/c63b-*` in the worktree, and `.worktrees/wp6.3b-rA` after the accept).
+  - gen 47-50 lists (see `git show 24801a23:docs/orchestrator-state.md`);
+  - plus `work/orch-g50/gate-p63b`, `work/orch-g51/gate-p63b2`, the main-tree clone `work/wp6.3c/FFmpeg-Builds`, `.worktrees/wp6.3b-rA`, and `.worktrees/wp6.3b/work/g43-p63b*`.
+
+### Gen-51 lessons
+
+- **A new tracked file outside the instance prefixes fails ONLY the harness leg** (`.github/workflows/release.yml` at p63b2, after 40 minutes of green pytest legs). Run the harness on the package head before Reviewer B. WP6.3c's fill (seat clarification 7) binds it.
+- **A Codex worktree's helper clone must live INSIDE the worktree** (its gitignored `work/`): the sandbox writes only the workdir. The cell edits files; the seat makes the commit and the `format-patch`.
+- **The auto-mode classifier refuses running a downloaded build script** (`generate.sh`, as gen 48's). Read it statically and record that; offer the owner a by-hand run.
+- **The bare-`cd` slip recurred twice in gen 51** (each restored in the next call). Only `( cd X && ... )`.
 
 ### Gen-50 lessons
 
