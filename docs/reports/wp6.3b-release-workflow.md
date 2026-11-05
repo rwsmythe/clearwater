@@ -3085,3 +3085,190 @@ Reviewer A r3 delta, Reviewer B and the gate (including the outside-sandbox
 module-alone run). CHARC's acceptance/register/AD-38 edits remain its own.
 WP6.3c still owns the held FFmpeg bundle, ZIP and release work. No package
 acceptance, gate completion or release readiness is asserted. Yield now.
+
+
+## Turn 20: Reviewer A r3 remediation (2026-11-05)
+
+Fresh dispatch 20 starts at `65784337`. The chat brief, all its ruling tails
+and the quoted Reviewer A r3 report are the text of record. Reviewer A
+CONVERGED at r3 (NO_NEW_CRITICAL_MAJOR); this is the single authorized
+remediation turn before the seat's FULL Reviewer B, with no A r4. Depth is
+pending the dispatcher's footer reading; no estimate is supplied.
+
+### Findings adjudicated and implemented
+
+- **k1, MINOR, confirmed/fixed:** pyprima and packaging.version now use
+  `vendored_in_tree_path`; their evidence values are unchanged. The validator
+  accepts that method for vendored blocks alongside real submodule evidence.
+- **k2, MINOR, confirmed/fixed:** only Clearwater's OWN licence input is
+  LF-normalized before rendering and SHA-256/size calculation. Third-party
+  wheel, upstream-audit and native text bytes retain their existing rules.
+- **F1, MINOR, confirmed/fixed:** `text_source` and `text_kind: excerpt`
+  require proprietary-redistributable provenance. Source-bearing rows refuse
+  them at the provenance gate. The positive excerpt test now uses a hashed,
+  measured excerpt of the actual interpreter LICENSE, with matching lines.
+- **F2, MINOR, confirmed/fixed:** every FILE below a declared vendored module's
+  `_internal/<module directory>/` must have its declared component's file
+  binding. Missing blocks/bindings fail before parent RECORD fallback. The
+  existing native-row path checks hash/size, assigns the file once and checks
+  the parent wheel version. Existing positive file-only tests remain green.
+- **F3, MINOR, confirmed/fixed:** the presence of `co_licensed_with` requires
+  nonempty file bindings, including an explicitly empty link list. Two empty
+  binding sets can no longer establish a co-licensing claim.
+- **F4, MINOR, confirmed/fixed:** LLVM now has `source_path: llvm`; Mesa stays
+  at its repository root. The subtree requirement is code-enforced for vendored
+  rows and otherwise seat-verified data. The manifest byte check proves ONLY
+  the two k1 method labels and this one LLVM field changed; all pins, hashes,
+  byte counts, licence texts and other manifest bytes are unchanged.
+- **A1, ADVISORY, confirmed/fixed:** origin inspection also detects PE (`MZ`),
+  ELF and both endian forms of 32/64-bit Mach-O and fat Mach-O magic bytes.
+  Renamed natives, including archive members visited by the same inspector,
+  cannot evade the check through a changed suffix. Extension matching remains
+  case-insensitive; trusted byte origins and bootloader checks are unchanged.
+- **A3, ADVISORY, confirmed/fixed:** missing/empty SYSTEMROOT raises a named
+  ValueError before PyInstaller is imported; `build` returns 1 with `FAILED:
+  PyInstaller: SYSTEMROOT is unset...`. PATH restoration remains in finally.
+- **A4, ADVISORY, confirmed/fixed:** four new regression tests catch all four
+  named mutants, as detailed below. The symmetry test requires the dedicated
+  dangling/asymmetric-link diagnostic, so a later duplicate-claim refusal
+  cannot mask removal of the back-link check.
+
+**A2, ADVISORY, accepted limit:** git-tree repositories/commits/tags/tag objects,
+version-evidence values and per-file PE FileVersions are shape-checked at build
+time. The exact binary hash/size binding and the seat's verified provenance
+record carry their truth; the generator does not read PE FileVersions or fetch
+repositories to independently establish those values. Existing OpenSSL,
+interpreter-excerpt and installed/locked/audited wheel checks still apply.
+
+**F5 DEFERRED to WP6.5**, MINOR, out of envelope: the darwin PATH list remains
+`else: pass`; PyInstaller re-signs Mach-O files, so the whole-file-hash origin
+check will refuse transformed macOS binaries, fail-closed today. At WP6.3b's
+accept CHARC adds the register-row NOTE; WP6.5's brief needs its own sanitized
+PATH list and a Mach-O-aware origin rule (unsigned-segment comparison or
+re-sign-then-compare) before FINAL. No macOS implementation changed this turn.
+
+### RED, GREEN and mutant evidence
+
+All logs below are under `work/c63b-20-evidence/`. Every pytest invocation
+uses `PYTHONPATH=scripts`, `sandbox_mkdir_shim`, no cacheprovider, --timeout
+300 and its own fresh basetemp. Tool tests use synthetic files/archives and
+never run real PyInstaller analysis. The unchanged entry-point tests were
+inspected for redirected roots, blocked/stubbed GUI paths and bounded waits.
+No old product entry point or QUIT_SCRIPT was run.
+
+| Item | RED evidence | GREEN evidence |
+| --- | --- | --- |
+| k1 | remediation-red.log: old in-tree evidence label fails the new assertion. | remediation-green2.log and mutants-and-f4-green.log. |
+| k2 | remediation-red.log: CRLF project text changes rendered bytes/hash. | LF and CRLF render byte-identically in remediation-green2.log. |
+| F1 | remediation-red.log: invented hashed text_source is accepted on both source-bearing kinds; excerpt-only inputs reach the later excerpt check instead of the strict-kind gate. | All four strict-kind cases pass in remediation-green2.log. |
+| F2 | f2-red.log: all three file variants (.py, .pyd, .bin) are accepted when the new declaration check is removed. | All three pass in remediation-green2.log; positive bound-file/hash/version controls pass in tools-green.log. |
+| F3 | remediation-red.log: mutually linked file-free rows accepted; f3-empty-red.log: explicit empty links also accepted (1 failed, 1 passed). | f3-empty-green.log: 2 passed. |
+| F4 | f4-red.log: removing ONLY LLVM's subtree field fails its assertion, with k1 already correct. | mutants-and-f4-green.log: the restored field passes. |
+| A1 | remediation-red.log: all ten renamed-native magic cases pass origin inspection incorrectly. | All ten refused in remediation-green2.log. |
+| A3 | remediation-red.log: missing SYSTEMROOT escapes as KeyError. | Named FAILED line/status 1 and restored PATH in remediation-green2.log. |
+| A4 claim 1 | mutant-source-path-red.log: deleting the source_path safety block gives 9 failures (unsafe paths admitted). | mutants-and-f4-green.log. |
+| A4 claim 2 | mutant-vendored-prefix-red.log: broad startswith(prefix) gives 1 failure (cobyqa_evil wrongly enters cobyqa's declaration). | mutants-and-f4-green.log. |
+| A4 claim 3 | mutant-co-licence-backlink-red.log: removing the mutual back-link check gives 1 failure (duplicate-claim diagnostic instead of the dedicated symmetry failure). | mutants-and-f4-green.log. |
+| A4 claim 4 | mutant-native-casefold-red.log: dropping extension casefold gives 1 failure (foreign .DlL admitted). | mutants-and-f4-green.log. |
+
+`mutant-summary.log` records each RED exit 1 and restoration after each mutant:
+source bytes AND `git diff` equal their saved pre-mutant state. Each restored
+diff is retained as `mutant-<name>-restored.diff`. No mutant remains on disk.
+The F4 data probe also restores its manifest bytes exactly in finally.
+`mutants-and-f4-green.log` reports 13 passed after all restorations.
+
+The initial combined RED had three fixture errors: the new file-only cases
+tried to install the synthetic SciPy distribution twice. The fixture now
+accepts explicit files/modules in a single install; f2-red.log then established
+all three actual pre-fix failures. The final verification pass also confirmed
+the empty-link-list variant of F3; it was tested RED, fixed, then tested GREEN.
+No finding was rejected as a false positive. All owned code is LF on disk;
+the manifest preserves its original LF convention. No third-party text changed.
+
+### Copied real-folder notices probe
+
+The seat's stage1b folder remained read-only. Its 302 on-disk files were copied
+to `work/c63b-20/probe/Clearwater`; only the copy received generated notices.
+The copy was temporarily moved within this worktree while pytest recreated
+its prescribed basetemp, then returned to the same probe path. No executable
+from either folder was launched. `notices-probe-final.log` records exit 0:
+
+```text
+wrote work\c63b-20\probe\Clearwater\THIRD_PARTY_NOTICES.md
+Inventory: 1536 entries; 25 component rows.
+```
+
+The writer's coverage validation succeeds both ways. Final notices SHA-256:
+`3afe913e26ecd6fe65765943fef798450687bebf7df926d1f720da9b8e999d8c`.
+The copied input's previous SHA-256 was
+`509555ccbe64e7bf871a48db21986c3c365ba2e20d5d1de3d65c5a2c182b3ba6`.
+`probe-summary.log` and `notices-changes.diff` identify every changed line:
+LLVM's table URL gains `/llvm`, its heading/provenance gain `in-tree path
+llvm`, the two in-tree evidence method lines change, and Clearwater's OWN
+licence body loses its CRLF bytes. Its rendered licence SHA-256 changes from
+`498d32907f132c2cd7d3ae269f304aed87156293f63e724b83d9f62ed787d55a`
+(18,322 bytes) to
+`edaef632cbb643e4e7a221717a6c441a4c1a7c918e6e4d56debc3d8739b233f6`
+(17,984 bytes). No third-party licence body changes. Stage 1 carries no FFmpeg.
+
+### Validation and cumulative handoff
+
+| Log | Observed result on final code/tests |
+| --- | --- |
+| ruff-check-final.log | Exit 0; All checks passed! |
+| ruff-format-final.log | Exit 0; 337 files already formatted. |
+| mypy-final.log | Exit 0; Success: no issues found in 166 source files. |
+| mypy-darwin-final.log | Exit 0; Success: no issues found in 166 source files. |
+| pytest-validation-final2.log | Exit 0; 686 passed, 1 skipped in 169.79s; fresh basetemp work/c63b-20-final2. |
+| pytest-gpi.log | Exit 1; 112 passed, 1 failed in 29.58s; basetemp work/c63b-20-gpi; known native taskkill sandbox case below. |
+| mutants-and-f4-green.log | Exit 0; 13 passed after all four mutants and the temporary LLVM-field omission were restored. |
+| notices-probe-final.log / probe-summary.log | Exit 0; copied real-folder notices succeed, 1,536 entries / 25 rows; SHA-256 above. |
+| input-and-scope.log | Manifest bytes equal HEAD plus exactly the two method labels and one LLVM field. |
+| final-scope-and-materials.log | Exactly six owned changed paths, zero CR bytes; all ten native text hashes/sizes verified; every third-party rendered licence body byte-identical to turn 19. |
+| diff-check-final.log | Exit 0; no whitespace defects after the final report update. |
+
+The existing POSIX proof is the one skip; no skip, marker or test timing was
+added or weakened. The first seven-module run, pytest-validation.log, passed
+685 tests / 1 skipped before F3's explicit-empty-list refinement. The first
+repeat, pytest-validation-final.log, recorded 2 failures / 684 passes / 1 skip:
+`test_job_census_catches_vanished_intermediate_and_bounds_pipe_holder[escape]`
+and `[pipe-holder]`. Both roots hit their existing one-second timeout before
+writing pid.txt; the test then raised FileNotFoundError while reading that
+missing stimulus. This repeat also overlapped the temporary F4 manifest
+omission probe, so it is retained as diagnostic evidence, not the final-state
+validation. Neither the smoke runner nor those tests was changed.
+`job-recheck.log` separately runs both cases unchanged: 2 passed in 2.34s.
+The last seven-module run is the FINAL evidence in the table: it ran alone,
+with all probes restored, and passed both job tests plus every other selected
+test. Startup timing sensitivity is observed; host-load causation is an
+inference, not an independently established hardware result. No new timing
+limit or product fix is claimed for these two transient fixture failures.
+
+The module-alone installer residual is the inherited sandbox case
+`test_mapped_child_without_a_pid_is_killed_with_its_descendants[native]`:
+`work/c63b-20-gpi/test_mapped_child_without_a_pi0/tree-kill.log` says
+`ERROR: Access denied`. It reports remaining descendants at its assertion;
+its independent finally teardown reports no failure. The controlled-tree
+case passes. No installer code/test was edited or weakened. The seat still
+owes the outside-sandbox module-alone run.
+
+| Round / turn | Severity and envelope | NEW / REOPENED; reverts | Product-code / test-only fixes; state |
+| --- | --- | --- | --- |
+| A r1-r2 / through t19 | Inherited cumulative ledger above; r1 fixes and seat findings resolved by the subsequent rulings. | No reopened finding reported by A r3. | Seat reports r3 converged; no new review launched by this cell. |
+| A r3 / t20 | 4 MINOR F1-F4 in-envelope, 1 MINOR F5 out; k1/k2 MINOR; 4 advisories A1-A4. Zero new CRITICAL/MAJOR. | NEW r3 findings; 0 REOPENED; no retained revert (four temporary mutants restored). | F1-F3/A1/A3 product tooling, k1/k2/F4 data/rendering, A4 tests, A2/F5 limits. Authorized remediation complete; Reviewer B pending. |
+| Self-verification / t20 | F3's empty-link variant confirmed and fixed within the same finding. | No new product finding or extra review round. | RED/GREEN plus final checks; sandbox installer residual disclosed. |
+
+This turn bundles the authorized r3 remediation into one logical seat commit.
+No new dependency, runtime/product edit, frozen interface or unowned tracked
+file change was made. All writes stayed in this worktree; the seat build,
+footage, real profile and uv interpreter were untouched. No external fetch,
+real PyInstaller build, frozen run, product GUI launch, desktop input,
+QUIT_SCRIPT, Git write, push/tag, gh command, workflow dispatch or role-mailbox
+message occurred. Installer tests retain their existing loopback fixtures.
+
+Remaining with the seat: QA/rebuild plus notices reading (k2/F4 change the
+notices), the smoke rerun decision from the diff (no smoke path changed),
+FULL Reviewer B, and the gate including the outside-sandbox installer run.
+CHARC owns the acceptance, AD-38/register edits and F5's WP6.5 brief update.
+The FFmpeg bundle/ZIP/release carve-out remains WP6.3c's. No package acceptance,
+gate completion or release readiness is claimed. Yield to the dispatcher.

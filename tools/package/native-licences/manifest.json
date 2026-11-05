@@ -239,6 +239,7 @@
       },
       "provenance_kind": "git-tree",
       "source_repository": "https://github.com/llvm/llvm-project",
+      "source_path": "llvm",
       "source_commit": "ee46064b83e7acd5a215ea5bb1c9708d75de6164",
       "source_tag": "llvmorg-3.6.2",
       "source_tag_object": "98b8caa8c194141f8e22f472d778a56277e13f75",
@@ -337,7 +338,7 @@
       "fetch_date": "2026-11-05",
       "fetched_by": "seat",
       "version_evidence": {
-        "method": "vendored_submodule_commit",
+        "method": "vendored_in_tree_path",
         "value": "e4e854eaa8f18d807cd3496028e257e36caa93cc"
       },
       "vendored_distribution": "scipy",
@@ -363,7 +364,7 @@
       "fetch_date": "2026-11-05",
       "fetched_by": "seat",
       "version_evidence": {
-        "method": "vendored_submodule_commit",
+        "method": "vendored_in_tree_path",
         "value": "v1.18.1:scipy/_external/packaging_version/src/LICENSE.BSD"
       },
       "vendored_distribution": "scipy",

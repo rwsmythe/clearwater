@@ -1184,21 +1184,24 @@ def test_excerpt_requires_source_file_and_valid_line_range(native_surface, sourc
     if source is not None:
         row["text_source"] = source
     (native_surface / "manifest.json").write_text(json.dumps(document))
-    with pytest.raises(ValueError, match="text_source"):
+    with pytest.raises(ValueError, match="provenance"):
         load_notices().load_native_licences(native_surface)
 
 
 def test_excerpt_provenance_is_rendered(release, native_surface):
     """Copying an excerpt retains the exact source-file and line attribution."""
-    document = synthetic_native_binding(native_surface)
+    document = provenance_fixture(native_surface, "proprietary-redistributable")
     row = document["components"][0]
-    row["text_kind"] = "excerpt"
-    row["text_source"] = {"file": "build interpreter LICENSE.txt", "lines": [286, 318]}
+    source = (Path(sys.base_prefix) / "LICENSE.txt").read_bytes()
+    excerpt = b"".join(source.splitlines(keepends=True)[282:320])
+    row["text_source"].update(sha256=hashlib.sha256(source).hexdigest(), size_bytes=len(source))
+    (native_surface / row["text_file"]).write_bytes(excerpt)
+    row.update(text_sha256=hashlib.sha256(excerpt).hexdigest(), text_size_bytes=len(excerpt))
     (native_surface / "manifest.json").write_text(json.dumps(document))
     (release["folder"] / "_internal/fixture.dll").write_bytes(b"native bytes")
     module = load_notices()
     output = module.render_notices(plan(module, release, native_licences_path=native_surface))
-    assert b"build interpreter LICENSE.txt, lines 286-318" in output
+    assert b"<build interpreter>/LICENSE.txt, lines 283-320" in output
 
 
 @pytest.mark.parametrize(
@@ -1693,18 +1696,22 @@ def test_namespace_directory_owner_is_exact_and_unique(release, damage):
         plan(load_notices(), release)
 
 
-def declared_vendored_fixture(release):
+def declared_vendored_fixture(release, *, files=None, modules=None):
     """Install one synthetic declaration independently of its optional block."""
     add_distribution(
         release,
         "scipy",
         "1.18.1",
-        {
+        files
+        if files is not None
+        else {
             "scipy/_external/cobyqa/__init__.py": "",
             "scipy/_external/_array_api_compat_vendor.py": "",
             "scipy-1.18.1.dist-info/LICENSE.txt": "synthetic BSD",
         },
-        ["scipy._external.cobyqa", "scipy._external._array_api_compat_vendor"],
+        modules
+        if modules is not None
+        else ["scipy._external.cobyqa", "scipy._external._array_api_compat_vendor"],
     )
     path = release["native_surface"] / "manifest.json"
     document = json.loads(path.read_text())
@@ -1857,3 +1864,150 @@ def test_vendored_block_can_bind_only_files_and_still_checks_distribution_versio
         target.write_bytes(b"changed bytes")
         with pytest.raises(ValueError, match="native file identity"):
             plan(module, release)
+
+
+@pytest.mark.parametrize("kind", ["git-tree", "release-archive"])
+@pytest.mark.parametrize("field", ["text_source", "text_kind"])
+def test_nonproprietary_rows_refuse_excerpt_fields(native_surface, kind, field):
+    """F1: unverified excerpt claims must not enter either source-bearing kind."""
+    document = provenance_fixture(native_surface, kind)
+    document["components"][0][field] = {
+        "text_kind": "excerpt",
+        "text_source": {
+            "file": "invented LICENSE",
+            "lines": [1, 999],
+            "sha256": "0" * 64,
+            "size_bytes": 1,
+        },
+    }[field]
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="provenance"):
+        load_notices().load_native_licences(native_surface)
+
+
+@pytest.mark.parametrize("filename", ["__init__.py", "_fast.pyd", "data.bin"])
+def test_declared_vendored_files_cannot_fall_through_to_parent(release, filename):
+    """F2: a declared subtree needs its block even when only files are shipped."""
+    relative = "scipy/_external/cobyqa/" + filename
+    declared_vendored_fixture(
+        release,
+        files={relative: "vendored bytes", "scipy-1.18.1.dist-info/LICENSE.txt": "synthetic BSD"},
+        modules=[],
+    )
+    make_executable(release["folder"], ["clearwater", "numpy"])
+    target = release["folder"] / "_internal" / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"vendored bytes")
+    with pytest.raises(ValueError, match=r"vendored.*missing.*block.*" + re.escape(filename)):
+        plan(load_notices(), release)
+
+
+@pytest.mark.parametrize("linked", [False, True])
+def test_co_licence_link_requires_nonempty_file_bindings(native_surface, linked):
+    """F3: module-only rows cannot promise that an uncarried co-owner is required."""
+    document = co_licensed_surface(native_surface)
+    for row in document["components"]:
+        row.pop("bundled_files")
+        row.update(component=row["component"], bundled_version_source="ssl.OPENSSL_VERSION")
+    # Use real supported version-source rows; no bytes are claimed by either row.
+    first, second = document["components"]
+    first["component"] = "OpenSSL"
+    first["co_licensed_with"] = [second["component"]]
+    second.pop("bundled_version_source")
+    second.update(
+        vendored_distribution="scipy",
+        vendored_distribution_version="1.18.1",
+        bundled_modules=["scipy._external.fixture"],
+        version_evidence={"method": "vendored_submodule_commit", "value": "a" * 40},
+        co_licensed_with=["OpenSSL"],
+    )
+    document["vendored_paths"] = [
+        {
+            "distribution": "scipy",
+            "module": "scipy._external.fixture",
+            "component": second["component"],
+        }
+    ]
+    if not linked:
+        first["co_licensed_with"] = []
+        second["co_licensed_with"] = []
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match=r"co_licensed_with.*(file|binding)"):
+        load_notices().load_native_licences(native_surface)
+
+
+def test_clearwater_own_licence_is_lf_normalized_before_hashing(release, tmp_path):
+    """k2: checkout CRLF changes neither the rendered project text nor its digest."""
+    module = load_notices()
+    original = plan(module, release)
+    text = tmp_path / "LICENSE"
+    lf = b"project licence\nsecond line\n"
+    text.write_bytes(lf)
+    rows = tuple(
+        row._replace(licence_inputs=(module.LicenceInput(text),))
+        if row.name == "Clearwater"
+        else row
+        for row in original.rows
+    )
+    planned = original._replace(rows=rows)
+    expected = module.render_notices(planned)
+    text.write_bytes(lf.replace(b"\n", b"\r\n"))
+    actual = module.render_notices(planned)
+    assert actual == expected
+    assert hashlib.sha256(lf).hexdigest().encode() in actual
+    assert lf in actual and b"project licence\r\n" not in actual
+
+
+def test_in_tree_component_labels_and_llvm_source_subtree():
+    """k1/F4: artifact pointers describe in-tree code and LLVM's actual subtree."""
+    module = load_notices()
+    records = {
+        row.component: row
+        for row in module.load_native_licences(ROOT / "tools/package/native-licences")
+    }
+    for component in ("prima (pyprima)", "packaging.version"):
+        assert records[component].version_evidence[0] == "vendored_in_tree_path"
+    assert records["LLVM"].source_path == "llvm"
+    assert records["LLVM"].source_urls[0].endswith("/llvm")
+    assert not records["Mesa"].source_path
+
+
+@pytest.mark.parametrize("path", ["/abs", "a/../b", "a\\b", "C:/x", "a//b", "a/", "./a", "", ".."])
+def test_git_tree_source_path_refuses_unsafe_values(native_surface, path):
+    """A4 claim 1: deleting source_path safety must admit an invalid pointer."""
+    document = provenance_fixture(native_surface, "git-tree")
+    document["components"][0]["source_path"] = path
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="unsafe source_path"):
+        load_notices().load_native_licences(native_surface)
+
+
+def test_vendored_prefix_sibling_keeps_parent_licence(release):
+    """A4 claim 2: a cobyqa_evil sibling is outside cobyqa's declaration."""
+    declared_vendored_fixture(
+        release,
+        files={
+            "scipy/_external/cobyqa_evil/__init__.py": "",
+            "scipy-1.18.1.dist-info/LICENSE.txt": "synthetic BSD",
+        },
+        modules=["scipy._external.cobyqa_evil"],
+    )
+    module = load_notices()
+    result = plan(module, release)
+    assert (
+        "pyz:scipy._external.cobyqa_evil"
+        in next(row for row in result.rows if row.name == "scipy").entries
+    )
+    assert not any(row.name == "fixture cobyqa" for row in result.rows)
+
+
+def test_co_licence_asymmetry_is_refused_before_duplicate_claim_check(native_surface):
+    """A4 claim 3: a different selector cannot mask a missing mutual back-link."""
+    document = co_licensed_surface(native_surface)
+    second = document["components"][1]
+    second.pop("co_licensed_with")
+    second["bundled_files"][0].pop("name")
+    second["bundled_files"][0]["relpath_glob"] = "_internal/fixture.dll"
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="dangling/asymmetric link"):
+        load_notices().load_native_licences(native_surface)

@@ -102,6 +102,62 @@ def test_analysis_uses_only_sanitized_path_and_restores_it(tmp_path, monkeypatch
     assert os.environ["PATH"] == original
 
 
+def test_missing_systemroot_is_a_named_build_failure(tmp_path, monkeypatch, capsys):
+    """A3: missing Windows resolver roots fail before importing PyInstaller."""
+    monkeypatch.setattr(build.sys, "platform", "win32")
+    monkeypatch.delenv("SYSTEMROOT", raising=False)
+    monkeypatch.setenv("PATH", "unchanged path")
+    monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setattr(build, "pack_sources", lambda: [])
+    real_import = build.importlib.import_module
+
+    def guarded_import(name):
+        assert name != "PyInstaller.__main__", "missing SYSTEMROOT must stop analysis"
+        return real_import(name)
+
+    monkeypatch.setattr(build.importlib, "import_module", guarded_import)
+    assert build.build("onedir", out=tmp_path / "out") == 1
+    assert "FAILED: PyInstaller: SYSTEMROOT is unset" in capsys.readouterr().out
+    assert os.environ["PATH"] == "unchanged path"
+
+
+@pytest.mark.parametrize(
+    "magic",
+    [
+        b"MZ",
+        b"\x7fELF",
+        b"\xfe\xed\xfa\xce",
+        b"\xce\xfa\xed\xfe",
+        b"\xfe\xed\xfa\xcf",
+        b"\xcf\xfa\xed\xfe",
+        b"\xca\xfe\xba\xbe",
+        b"\xbe\xba\xfe\xca",
+        b"\xca\xfe\xba\xbf",
+        b"\xbf\xba\xfe\xca",
+    ],
+)
+def test_native_origin_refuses_renamed_native_magic(tmp_path, monkeypatch, magic):
+    """A1: a PE/ELF/Mach-O file cannot evade origin checks by changing its suffix."""
+    home = tree(tmp_path / "dist", ["Clearwater.exe"])
+    tree(home, ["_internal/foreign.bin"], magic + b"foreign native")
+    monkeypatch.setattr(build, "_native_origin_hashes", lambda: set())
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
+    monkeypatch.setattr(build, "read_package", lambda _: SimpleNamespace(toc={}))
+    found = build.native_origin_violations(home / "Clearwater.exe", original_path="")
+    assert len(found) == 1 and "_internal/foreign.bin" in found[0]
+
+
+def test_native_origin_checks_mixed_case_extensions(tmp_path, monkeypatch):
+    """A4 claim 4: deleting extension casefold must let this foreign DLL escape."""
+    home = tree(tmp_path / "dist", ["Clearwater.exe"])
+    tree(home, ["_internal/foreign.DlL"], b"foreign without magic")
+    monkeypatch.setattr(build, "_native_origin_hashes", lambda: set())
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
+    monkeypatch.setattr(build, "read_package", lambda _: SimpleNamespace(toc={}))
+    found = build.native_origin_violations(home / "Clearwater.exe", original_path="")
+    assert len(found) == 1 and "_internal/foreign.DlL" in found[0]
+
+
 @pytest.mark.parametrize("archived", [False, True])
 def test_native_origin_refuses_foreign_bytes_and_names_original_path(
     tmp_path, monkeypatch, archived

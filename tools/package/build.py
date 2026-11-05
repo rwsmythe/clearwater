@@ -1798,12 +1798,16 @@ def run_pyinstaller(args: Sequence[str]) -> None:
         args: The command line (:func:`pyinstaller_args`).
 
     Raises:
+        ValueError: Windows SYSTEMROOT is unset, so a safe PATH cannot be formed.
         SystemExit: PyInstaller's own exit on a failed build (non-zero status).
     """
     original = os.environ.get("PATH")
     try:
         if sys.platform == "win32":
-            windows = Path(os.environ["SYSTEMROOT"])
+            system_root = os.environ.get("SYSTEMROOT")
+            if not system_root:
+                raise ValueError("SYSTEMROOT is unset; cannot sanitize the analysis PATH")
+            windows = Path(system_root)
             base = Path(sys.base_prefix)
             os.environ["PATH"] = os.pathsep.join(
                 str(path)
@@ -1828,8 +1832,21 @@ def run_pyinstaller(args: Sequence[str]) -> None:
             os.environ["PATH"] = original
 
 
-def _is_native(name: str) -> bool:
-    return Path(name).suffix.casefold() in {".dll", ".pyd", ".exe", ".so", ".dylib"}
+def _is_native(name: str, data: bytes = b"") -> bool:
+    return Path(name).suffix.casefold() in {".dll", ".pyd", ".exe", ".so", ".dylib"} or (
+        data.startswith((b"MZ", b"\x7fELF"))
+        or data[:4]
+        in {
+            b"\xfe\xed\xfa\xce",
+            b"\xce\xfa\xed\xfe",
+            b"\xfe\xed\xfa\xcf",
+            b"\xcf\xfa\xed\xfe",
+            b"\xca\xfe\xba\xbe",
+            b"\xbe\xba\xfe\xca",
+            b"\xca\xfe\xba\xbf",
+            b"\xbf\xba\xfe\xca",
+        }
+    )
 
 
 def _locked_native_distributions() -> list[importlib.metadata.Distribution]:
@@ -1985,7 +2002,7 @@ def native_origin_violations(executable: Path, *, original_path: str) -> list[st
     errors = []
 
     def inspect(label: str, name: str, data: bytes) -> None:
-        if _is_native(name) and hashlib.sha256(data).hexdigest() not in hashes:
+        if _is_native(name, data) and hashlib.sha256(data).hexdigest() not in hashes:
             likely = next(
                 (
                     Path(part) / Path(name).name
@@ -2181,7 +2198,11 @@ def build(
     print(f"build {form}: PyInstaller {' '.join(args)}", flush=True)
     start = time.monotonic()
     original_path = os.environ.get("PATH", "")
-    run_pyinstaller(args)
+    try:
+        run_pyinstaller(args)
+    except ValueError as error:
+        print(f"FAILED: PyInstaller: {error}".encode("ascii", "backslashreplace").decode("ascii"))
+        return 1
     wall = time.monotonic() - start
     executable = find_executable(root)
     if with_ffmpeg:
