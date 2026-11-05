@@ -324,15 +324,29 @@ A later seat kit that maps a pack from a source child adds `-B` (or sets
 
 ### Re-run after the B r1 fold
 
-SEAT TO FILL
+Run by orchestrator generation 46 on 2026-11-05, 00:24:16Z-00:28:44Z, on the final product head
+`eb80136a` (turns 9-11: the fsync fold, the B-fold advisories and the N13 wording; `git status`
+clean). The kit was unchanged and md5-checked 7 of 7. Run 1's outputs are kept in
+`clearwater-review-evidence\wp6.3a\seat\run1\`, and its worktree folders were renamed aside to
+`work\wp6.3a\appdata-run1` and `frozen-runs-run1`. Free space on C: was 65 GB before and after.
 
-The seat measures the fsync-enabled install wall time and its delta against
-run 1's **248.1 s** (about 248 s). Expected Windows file-fsync count:
-**2,680** (2,679 installed files plus the manifest). New wall time:
-**SEAT TO FILL**; delta: **SEAT TO FILL**. Rebuild from the new candidate,
-retain run 1's appdata/evidence as directed, and re-run the seat proof with
-the source mapping child using `-B`. These are orchestrator actions; the
-cell has not measured real-pack fsync performance or written a seat script.
+| Leg | Run 2 result |
+| --- | --- |
+| Profile before | real `%LOCALAPPDATA%\Clearwater` ABSENT; the owner log's md5 `69ed0432...` |
+| 1. onedir build | exit 0, 85 s; both PASS lines |
+| 2. Real install (frozen, headless) | exit 0, **123.6 s** wall, no window. stdout carries the corrected N13 line verbatim (once, before the download); last line "GPU support is installed. Restart Clearwater to use it." |
+| 3. `--verify` | PASS: 11 distributions, 2,679 files, 2,412.6 MiB |
+| 4. Census | 2,679 files; `SET_EQUAL_RECORD` and `SET_EQUAL_HANDFILLED_MINUS_UV` true; `EXPECTED_2679` true |
+| 5. Two frozen workers | heic 21.3 s and video 12.6 s, both `ok`, GPU, 67 CUDA files, no window |
+| 6. Remove while loaded | source child `loaded`, 56 images mapped. The frozen headless remove gave exit 0, 0.33 s, "will be removed at the next start"; marker PRESENT, pack PRESENT (not renamed), 0 partials |
+| 6a. `--verify` after it | exit 1 with 143 problems, all `__pycache__/*.pyc`, as in run 1. The kit's source child is unchanged and still runs without `-B`; see run 1's note. No RECORD file was missing or altered |
+| 6b. Child exit, final remove | child exit 0; final remove exit 0, 1.24 s; marker, pack and partials ABSENT; root empty |
+| Profile after | the owner log's md5 unchanged; real `%LOCALAPPDATA%\Clearwater` ABSENT; no Clearwater process |
+
+**The fsync cost.** Run 2's install took **123.6 s** against run 1's **248.1 s**, a delta of
+-124.5 s. Both runs fetched the 1.725 GB from `files.pythonhosted.org`, and the wall time is
+dominated by the network. The 2,680 file fsyncs therefore add no cost that can be measured against
+that variation. The figure is a seat observation on a shared laptop, not a benchmark.
 
 ## Limits and remaining handoff
 
@@ -500,8 +514,8 @@ cell's footprint. Depth is supplied by the dispatcher's driver, not estimated.
 | A r2, adjudicated and folded in | 0 / 1 / 2 / 2 | 5 / 0 | 4 / 1 (#2) | 0 | 3 / 2 / 0 finding groups | No new banked finding | Turn-6 end: 229,611, supplied at dispatch 7 |
 | A r3, CONVERGED; all five cleanup findings folded in | 0 / 0 / 2 / 3 | 4 / 1 (R3-5, expressly granted) | 5 / 0 | 0 | 4 / 1 / 0 finding groups; R3-3 integration corrected by delta F1 | None of r3's five left open after delta F1 | Turn-7 end: 109,576 / 475,000, supplied at dispatch 8 |
 | A delta, NO_NEW_CRITICAL_MAJOR; two MINORs folded in | 0 / 0 / 2 / 1 | 3 / 0 | 3 / 0 | 0 | 2 / 0 / 0 finding groups; A1 equivalent, no change | None | Turn-8 end 137,204 / 475,000 |
-| B r1, NEW_CRITICAL_MAJOR_FOUND; ruled folds complete | 0 / 1 / 1 / 7 | 7 / 2 (F5/F9 granted folds; rest banked) | 9 reported / 0 reopened; F8 follows prior rulings | 0 | 4 / 3 / 1 finding groups; F8 banked | F8 and remaining F9 notes to CHARC | DISPATCHER TO FILL |
-| B-fold delta, NO_NEW_CRITICAL_MAJOR; four advisory folds | 0 / 0 / 0 / 6 | 6 / 0 | 6 reported / 0 reopened | 0 | 2 / 1 / 1 finding groups | A2/A4 to seat and CHARC; no code | Prior turn end: 198,141 / 475,000; current DISPATCHER TO FILL |
+| B r1, NEW_CRITICAL_MAJOR_FOUND; ruled folds complete | 0 / 1 / 1 / 7 | 7 / 2 (F5/F9 granted folds; rest banked) | 9 reported / 0 reopened; F8 follows prior rulings | 0 | 4 / 3 / 1 finding groups; F8 banked | F8 and remaining F9 notes to CHARC | 198,141 / 475,000 at the end of turn 9 |
+| B-fold delta, NO_NEW_CRITICAL_MAJOR; four advisory folds | 0 / 0 / 0 / 6 | 6 / 0 | 6 reported / 0 reopened | 0 | 2 / 1 / 1 finding groups | A2/A4 to seat and CHARC; no code | Prior turn end: 198,141 / 475,000; turn 10 end 217,268 / 475,000; turn 11 end 226,196 / 475,000 (session retired) |
 
 The r1 turn bundled its ruled remediation groups in one logical review
 fold-in. At that handoff Reviewer A r2 and the real-download seat proof were
@@ -877,8 +891,8 @@ Darwin errors are exactly `src/clearwater/io/video/pipes.py:56`,
 `tools/spike_io/transport.py:950`. No new error, skip or sandbox residual
 occurred. The POSIX directory-sync test uses descriptor doubles on Windows;
 it is not a real POSIX durability proof. The seat measures real-pack cost
-against 248.1 s; the delta remains **SEAT TO FILL** (2,680 expected Windows
-file fsyncs).
+against 248.1 s: run 2 took 123.6 s, network-dominated (the seat re-run section;
+2,680 Windows file fsyncs).
 The final XML records all 101 installer cases below ten seconds (maximum
 2.048 s). The packaging README repository blobs contained zero CR bytes both
 before and after turn 9. The earlier normalization claim described working
@@ -913,7 +927,7 @@ Ledger: 0 critical / 1 major / 1 minor / 7 advisory, nine reported findings,
 no reopened finding or revert; four product-code / three test-only / one
 documentation finding groups, F8 banked. F5/F9 listed folds are expressly
 granted despite their original envelope classification. Prior depth:
-137,204 / 475,000 (dispatch 9); this turn: DISPATCHER TO FILL. No stopped item,
+137,204 / 475,000 (dispatch 9); this turn: 198,141 / 475,000. No stopped item,
 open question or unapproved deviation remains. Prior-correct controls are
 disclosed above rather than falsely claiming all new tests fail old code.
 
@@ -942,7 +956,7 @@ cleanup description above is historical and is superseded by A1 here.
 A2's cross-process marker/status observation belongs with F8's register row;
 A4's precise NVIDIA `.dist-info` licence location is for the owner at accept.
 No licence wording or shell behavior changes in this turn. The seat re-run
-section and its **SEAT TO FILL** figure remain untouched.
+section was filled by the seat after turn 11.
 
 All command output is under `work/wp6.3a/`. Every pytest command set
 `PYTHONPATH=scripts`, `QT_QPA_PLATFORM=offscreen`, loaded the sandbox shim and
