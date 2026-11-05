@@ -1,1 +1,2 @@
 tests/fixtures/** -text
+tools/package/native-licences/** -text

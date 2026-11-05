@@ -1,13 +1,13 @@
 # WP6.3b release workflow: implementation record
 
-Status: turn 10 closes the ruled OpenSSL input gap with the committed seat-fetched
-native-licence surface and an inventory-driven OpenSSL row. Text integrity,
-runtime version and interpreter build provenance are checked before use. Ruff,
-format, both mypy platforms and all 444 requested tests pass. The generator,
-writer/CLI and --notices wiring are implemented; the real built-folder census,
-any additional native-library inputs, smoke/ZIP and subsequent release work
-remain the seat's/next dispatch's. No real artifact notices, PyInstaller build
-or N13 acceptance is claimed. The separate FFmpeg zvbi HOLD remains unchanged.
+Status: turn 11 adds the native-licence checkout guard and headless smoke,
+proved on synthetic archives and process stubs: 470 tests, Ruff, format and
+both mypy targets pass. The generator, native input
+surface, --notices and --smoke build/standalone paths are implemented. The real
+built-folder census, additional native inputs if needed, real smoke/UIA watch,
+ZIP and subsequent release work remain the seat's/next dispatch's. No real
+artifact notices, PyInstaller build or N13 acceptance is claimed. The separate
+FFmpeg zvbi HOLD remains unchanged; ZIP was not started.
 
 ## Round and turn ledger
 
@@ -26,6 +26,7 @@ Claude pass; no review verdict is claimed here. Context depth is dispatcher-read
 | Turn 8 / input-rule STOP | Read dispatch 6 item 2, dispatch 7, the report and installed materials. Reproduced two complete GPL-3.0 copies under the required wheel-byte-copy rule; requested CHARC's rendering ruling. | No Reviewer A round. NEW MAJOR in-envelope ambiguity; existing zvbi HOLD unchanged. | 1 NEW, 0 REOPENED; no reverts. | Report only; no product or test change. | Fresh session; turn-end figure pending dispatcher reading, not estimated. |
 | Turn 9 / generator and input-gap handoff | Applied dispatch-9 clarification; rendered verified texts, native details and coverage; added atomic writer, CLI and --notices wiring. OpenSSL missing redistribution material confirmed; folders carrying it are refused. | No Reviewer A round. Turn-8 MAJOR closed by seat clarification; 1 NEW MAJOR in-envelope input gap, plus the unchanged zvbi HOLD. | 1 NEW, 0 REOPENED; no reverts. | Notices generator and build option; synthetic/provenance/wiring tests; report. | Dispatcher supplied about 104K at turn-8 yield; turn-9 end pending dispatcher reading, not estimated. |
 | Turn 10 / native input surface and OpenSSL row | Copied the seat's exact text; added manifest schema/integrity/file-coverage validation, runtime/build matching and conditional OpenSSL rendering. Turn-9 input STOP closed under CHARC's ruling. | No Reviewer A round; no new blocking finding. The zvbi HOLD remains with the owner. | 0 NEW, 0 REOPENED; no reverts. Initial patch-placement slip fixed before GREEN. | Native manifest/text data, notices loader/row, tests and report only. | Dispatcher supplied about 167K at turn-9 end; turn-10 end pending dispatcher reading, not estimated. |
+| Turn 11 / checkout defect and headless smoke | One -text attribute rule, two Git-backed guards, isolated allowlisted smoke rows, artifact rechecks, disposable planted-failure copy, process cleanup and build/CLI wiring. | No Reviewer A round. Seat MAJOR checkout defect fixed; direct-child race and minor environment/platform issues fixed. MAJOR process-ancestry limit remains OPEN for seat/CHARC disposition below. | All new observations, 0 REOPENED; no product revert. Temporary missing-smoke-call mutant rejected and byte-restored. | Build/smoke tools, attribute rule, synthetic tool tests and report. No product-runtime file changed. | Fresh session after previous session retired at 199,050; this turn's depth awaits dispatcher reading, never estimated. |
 
 Turn 2 bundled the three changes explicitly commissioned by dispatch 2; the seat
 commits each turn. No git write was performed by the cell.
@@ -1427,3 +1428,191 @@ write, QUIT_SCRIPT test, git write, push, tag, gh or workflow dispatch. Only the
 two new native input files, notices.py, its tests and this report changed, plus
 ignored worktree evidence. The last dispatcher depth was about 167K; the current
 figure is pending the seat's reading, not estimated by the cell.
+
+## Turn 11: native-licence checkout fix and headless smoke (2026-11-05)
+
+This is dispatch 11's two-item turn in a fresh session. Both changes are bundled
+as commissioned. No ZIP work was started; the owner's zvbi HOLD is unchanged.
+
+### Item 1: the CRLF checkout defect
+
+Confirmed MAJOR, in-envelope: the licence's recorded hash is over its exact
+upstream LF bytes, but Git reported `text: unspecified` before the fix. The
+new read-only `git check-attr text -- <licence>` regression failed with that
+value, while the second test already confirmed the manifest SHA-256 against
+`git cat-file -p HEAD:<licence>`'s binary stdout. The ONLY attribute edit is:
+
+```text
+tools/package/native-licences/** -text
+```
+
+After this rule, the two tests pass. The committed OpenSSL text, its manifest
+and the root-block normalization code were not changed. The attribute covers
+future native texts as well; the blob-hash test iterates every manifest row.
+No checkout, Git index write or commit was performed by the cell.
+
+### Item 2: smoke implementation and safety boundary
+
+`tools/package/smoke.py` implements the headless checks. `build.py --smoke`
+runs them after the onedir build's optional notices step; notices must already
+exist and match the generator. `build.py --smoke FOLDER --out OUT` checks an
+existing folder without invoking PyInstaller. Onefile, competing actions and
+an operand-free standalone `--smoke` are refused at parsing. Build failures
+propagate the smoke status; diagnostics name the failing row.
+
+Each Clearwater call must match an EXACT commissioned argument tuple before
+process launch. Empty/GUI-routed/installer argument sets are refused. Every
+row gets its own APPDATA, LOCALAPPDATA, XDG config/cache/data/state/runtime,
+HOME, USERPROFILE and TEMP/TMP beneath a fresh `OUT/smoke/run-*`. Inherited
+Python, XDG and GPU-cache overrides are cleared; PATH is System32 only.
+Environment keys are normalized to upper case to preserve Windows semantics
+after copying `os.environ`. `CREATE_NO_WINDOW`, captured pipes, closed request
+stdin and a positive per-process bound (maximum 60 s) apply to every launch.
+Qt is offscreen as defense in depth; no row selects the GUI or installer.
+
+The runner checks status, exact one-line stderr and empty stdout for each
+Clearwater call. It observes descendants during bounded communication, takes
+a final Windows PPID snapshot (including children of observed ancestors which
+have exited), refuses survivors and kills/waits the observed tree on failure.
+Cleanup kills descendants before its Popen root. A final-snapshot failure
+still enters cleanup. A polling/tree snapshot is process evidence, not UIA
+evidence; the seat's window watch is still required.
+
+Before any entry launch, the tool re-reads forbidden folder/archive content,
+the hidden-import set against the built modules, and the full notice plan.
+The existing notices must byte-match freshly rendered notices, which also
+proves the expected inventory and component-row count. No missing document is
+generated or repaired by smoke. Missing/extra/unknown content fails closed.
+
+The planted exception uses `OUT/smoke/run-*/planted/Clearwater`, a disposable
+copy. It removes ONLY that copy's required
+`_internal/scipy/_lib/_ccallback_c*.pyd` (exactly one required). This breaks the
+worker's SciPy import while leaving NumPy available for config/log reporting.
+The row requires non-zero exit, the reporter's one stderr line naming the
+redirected product log, and exactly one unhandled traceback identifying
+`_ccallback_c` in that log. Shipping bytes are snapshotted and unchanged in
+both complete synthetic variants. There is no product crash switch.
+
+When FFmpeg is absent there is exactly one `FFmpeg: SKIP (not bundled)` line.
+When present, both tools run `-version` under the same isolated environment;
+their status, stderr, exact version token and configure line are checked
+against the lock. An additional `-hide_banner -encoders` row requires
+`hevc_nvenc` and `libx265` by encoder-name fields (capability, no encode).
+The passing run prints total bytes and the ten largest entries.
+
+### Synthetic smoke row table
+
+These are STUB results, not a frozen-build or real FFmpeg proof. The fixture
+contains a real synthetic PyInstaller CArchive/PYZ for inventory checks; the
+native loader boundary invokes an external, stdlib-only Python stub instead
+of executing that archive. The base interpreter is used directly, without a
+venv launcher adding an unrelated bootstrap parent. No product entry runs.
+
+| Row | Arguments / check | Observed result in complete fixtures |
+| --- | --- | --- |
+| refuse-command | `-c pass` | Exit 2; exact command refusal; one stderr line |
+| refuse-module | `-m http.server` | Exit 2; exact no-pack refusal; one stderr line |
+| refuse-fork | `--multiprocessing-fork` | Exit 2; exact multiprocessing refusal |
+| refuse-tracker | `--multiprocessing-resource-tracker` | Exit 2; exact multiprocessing refusal |
+| refuse-r-command | `-R -c pass` | Exit 2; exact command refusal |
+| refuse-t-module | `-t -m http.server` | Exit 2; exact no-pack refusal |
+| refuse-cluster-command | `-Rt -c pass` | Exit 2; exact command refusal |
+| refuse-hash-command | `--check-hash-based-pycs always -c pass` | Exit 2; exact command refusal |
+| refuse-hash-module | `--check-hash-based-pycs never -m http.server` | Exit 2; exact no-pack refusal |
+| refuse-module-fork | `-m http.server --multiprocessing-fork` | Exit 2; exact multiprocessing refusal |
+| worker-empty | `--export-worker`, stdin EOF | Exit 2; `export worker: no request document on stdin` |
+| worker-malformed | `--export-worker`, stdin `{` plus newline | Exit 2; `export worker: the request is not UTF-8 JSON` |
+| planted-exception | Worker in copied folder, required SciPy import absent | Exit 1; one reporter stderr line; one redirected traceback; original unchanged |
+| ffmpeg-version | `ffmpeg.exe -version` | Exit 0; exact pinned version and configuration |
+| ffprobe-version | `ffprobe.exe -version` | Exit 0; exact pinned version and configuration |
+| ffmpeg-encoders | `ffmpeg.exe -hide_banner -encoders` | Exit 0; `hevc_nvenc` and `libx265` found |
+| bundle | Re-read folder and executable archives | PASS; injected CUDA DLL refused before launch |
+| hidden-imports | Scan inputs and re-read built modules | PASS; injected missing `graphlib` refused before launch |
+| notices | Recompute plan/render and compare bytes | PASS; 13 entries / 6 component rows without FFmpeg; 17 / 8 with it; mutated count refused |
+| sizes | Total and largest entries | Printed for both complete fixtures |
+
+The no-FFmpeg fixture launches 13 processes; its FFmpeg variant launches 16.
+All Clearwater rows require empty stdout and exactly one stderr line. Tests
+also exercise wrong status, extra stderr, unexpected stdout, hanging process,
+surviving child, fast-exiting parent with a surviving child, missing exception
+log, wrong tool version/configuration, missing encoder and six unsafe argument
+sets. Fixture fallback cleanup kills/waits its known child tree even on RED.
+
+### RED -> GREEN and validation
+
+All runner output is file-backed under `work/c63b-11-evidence/`.
+
+| Log | Observed result |
+| --- | --- |
+| `red-crlf.log` | 1 failed, 1 passed, 110 deselected: `unspecified` instead of `unset`; blob hash already correct |
+| `green-crlf.log` | 2 passed, 110 deselected after the one attribute rule |
+| `red-smoke.log` | 7 failed, 12 errors: missing smoke implementation and unrecognized CLI, before implementation |
+| `green-smoke-1.log` | Initial 11 failures exposed environment-key casing and the onefile-only fixture used by a new onedir test |
+| `green-smoke-2.log` | 21 passed, 81 deselected after those fixes (early run had the inherited VIRTUAL_ENV warning) |
+| `red-fast-child.log` | New fast-parent child-cleanup control failed, confirming the race |
+| `green-fast-child.log` | Final PPID snapshot control passed |
+| `pytest-preflight.log`, `fast-probe-1.log` | The extra venv redirector could still lose an unobserved intermediate ancestor; diagnostic records the synthetic child PID/PPID; fixture changed to direct base interpreter |
+| `green-smoke-3.log` | 22 passed on the completed direct-interpreter fixture |
+| `red-build-smoke-mutant.log` | 2 failed, 81 deselected when ONLY the smoke build call was removed |
+| `mutant-restore.log` | Mutant rejected; build.py restored byte-exactly with its SHA-256 recorded |
+
+| Final validation log | Observed result on final implementation |
+| --- | --- |
+| `ruff-check.log` | Exit 0; All checks passed! |
+| `ruff-format.log` | Exit 0; 336 files already formatted |
+| `mypy.log` | Exit 0; Success: no issues found in 166 source files |
+| `mypy-darwin.log` | Exit 0; Success: no issues found in 166 source files |
+| `pytest-validation.log` | Exit 0; 470 passed in 35.28 s |
+| `diff-check.log` | Exit 0; no whitespace errors |
+
+The final suite uses all five dispatched modules, `PYTHONPATH=scripts`,
+the sandbox mkdir shim, no cache provider, timeout 300 and fresh basetemp
+`work/c63b-11-final2` (earlier final/preflight roots retained, not reused).
+Counts: 22 smoke, 112 notices, 60 FFmpeg, 83 build, 193 frozen-entry.
+The complete transcripts are at
+`work/c63b-11-final2/test_complete_smoke_preserves_0/out/smoke-transcript.txt`
+and the matching `_1` path, for absent/present FFmpeg respectively.
+No implementation edit followed the final checks. No sandbox-only residual
+occurred in the final required validation; the seat still re-runs outside it.
+The active-environment warning was removed by clearing inherited VIRTUAL_ENV
+in the runner shell; uv still uses this worktree's own .venv.
+
+### Verification-loop dispositions and continuation
+
+| Suspected issue / severity | Independent confirmation | Disposition |
+| --- | --- | --- |
+| MAJOR, seat: CRLF checkout invalidates licensed bytes | Read-only Git attribute query, committed-blob hash, before/after regression | Confirmed/fixed by the one -text rule; upstream bytes unchanged |
+| MAJOR, self-check: a fast parent can hide a surviving direct child | Additional real-process stub control failed; final PPID snapshot and child PID assertion distinguish the fix | Confirmed/fixed for direct children and observed ancestor trees; see evidence limit below |
+| MINOR: Windows environment lookup could fail after copying to dict | Initial real-stub launch rejected missing SystemRoot despite the variable being present | Confirmed/fixed by normalized keys |
+| MINOR: test fixture built the wrong form | Synthetic onedir wiring test could not find its executable | Confirmed/fixed in test fixture; no PyInstaller run |
+| MINOR: Darwin mypy rejects a negative platform exit followed by Windows-only body | `mypy-darwin.log` initial run reported unreachable code | Confirmed/fixed with positive platform wrapper; no runtime platform change |
+| MINOR: cleanup order contradicted its comment | Final code inspection found parent appended before reversing kill list | Fixed; parent now killed through its own Popen handle after descendants |
+| MAJOR: smoke success could ignore a failed/missing build call | Temporary missing-call mutant failed both result-propagation cases | Rejected in final code; byte-exact restoration verified |
+| MAJOR: copy or static checks might modify/launch shipping content | Byte snapshots, removed-import assertions, unsafe-argument trap and pre-launch static-failure controls | Rejected on both complete synthetic variants |
+
+OPEN MAJOR for seat/CHARC disposition: descendant supervision uses observed ancestry and a final PPID
+snapshot. An arbitrary chain whose intermediate parent disappears before ANY
+observation can hide a descendant (the venv-bootstrap probe demonstrated that
+limit). The final fixture models the onedir's direct native process and tests
+both slow and immediate parent exit. This is not a claim of containment for
+arbitrary detached process trees; the seat should retain this limit in its
+review of the real rows. If the no-survivor requirement includes arbitrary
+vanished-intermediate trees, this implementation does not meet that stronger
+requirement; OS-level containment or a ruled narrower envelope is needed.
+The cheap reproduction is `fast-probe-1.log` with the venv-redirector loader,
+before the direct-base-interpreter fixture change. No complete frozen-process
+or no-window claim is made, and GREEN on the final fixture does not close this
+finding. The cell yields it rather than claiming universal process cleanup.
+
+Reviewer A remains the dispatcher's Claude pass; no Reviewer A round or verdict
+is asserted. No new licence ruling, N13 acceptance or gate acceptance is claimed.
+Remaining work: seat real smoke/UIA watch and native census, real bundled V4 /
+encoder evidence, ZIP only after the owner's zvbi ruling, workflow/actionlint,
+checklist/guide/root-notices turn, and both review nets / final seat gate.
+
+All dispatch prohibitions were honored: no network fetch, real FFmpeg archive
+open/extract/execute, frozen run, PyInstaller build, GUI/desktop input, footage
+or real-profile write, QUIT_SCRIPT test, Git write, push/tag/gh/workflow dispatch.
+No dependency or runtime-source change. Only the seven owned files named in
+the return changed, plus ignored in-worktree evidence. Depth awaits the
+dispatcher's footer reading; the cell has no authoritative token figure.

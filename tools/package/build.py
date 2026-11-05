@@ -38,6 +38,9 @@ not release builds. See ``tools/package/README.md`` for the spike measurements.
 ``--notices`` generates the onedir artifact's inventory-backed
 ``THIRD_PARTY_NOTICES.md`` after the FFmpeg step. Missing material, uncovered
 entries or GPL-incompatible bundled FFmpeg components fail the build.
+
+``--smoke`` runs the headless onedir checks after a build; ``--smoke FOLDER``
+checks an existing artifact without rebuilding. It requires generated notices.
 """
 
 from __future__ import annotations
@@ -1815,6 +1818,35 @@ def write_artifact_notices(folder: Path) -> Path:
     return cast(Path, module.write_notices(folder))
 
 
+def smoke_artifact(folder: Path, *, out: Path) -> int:
+    """Run headless smoke checks and report a named failure as a non-zero status.
+
+    Args:
+        folder: The Windows onedir artifact or its parent wrapper.
+        out: The evidence root, with disposable profiles under ``smoke/``.
+
+    Returns:
+        Zero on success, one on failed checks or unavailable inputs.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "_clearwater_artifact_smoke", Path(__file__).with_name("smoke.py")
+    )
+    if spec is None or spec.loader is None:
+        print("FAILED: smoke: cannot load headless checks")
+        return 1
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        module.run_smoke(folder, out=out)
+    except (OSError, RuntimeError, ValueError, KeyError, zipfile.BadZipFile) as error:
+        message = " ".join(str(error).split()).encode("ascii", "backslashreplace").decode("ascii")
+        print(f"FAILED: smoke: {message}")
+        return 1
+    return 0
+
+
 def build(
     form: Form,
     *,
@@ -1823,6 +1855,7 @@ def build(
     ffmpeg_from: str | None = None,
     ffmpeg_sha256: str | None = None,
     notices: bool = False,
+    smoke: bool = False,
 ) -> int:
     """Build one form, check it, and print its summary.
 
@@ -1836,12 +1869,13 @@ def build(
         ffmpeg_from: The pinned archive URL for a release bundle.
         ffmpeg_sha256: Its verified sha256, also checked against the lock.
         notices: Generate the onedir artifact notices after the FFmpeg step.
+        smoke: Run headless checks after notices, failing the build on a bad row.
 
     Returns:
         0 when the build succeeded and the bundle holds nothing forbidden, else 1.
     """
-    if notices and form != "onedir":
-        print("FAILED: --notices requires --form onedir")
+    if (notices or smoke) and form != "onedir":
+        print("FAILED: --notices/--smoke require --form onedir")
         return 1
     if with_ffmpeg and ffmpeg_from is not None:
         print("FAILED: --with-ffmpeg and --ffmpeg-from are mutually exclusive")
@@ -1934,6 +1968,8 @@ def build(
             )
             print(f"FAILED: artifact notices: {message}")
             return 1
+    if smoke:
+        return smoke_artifact(executable.parent, out=out)
     return 0
 
 
@@ -1947,12 +1983,20 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         The parsed namespace, including the paired release FFmpeg URL/hash options.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    action = parser.add_mutually_exclusive_group(required=True)
+    action = parser.add_mutually_exclusive_group()
     action.add_argument("--form", choices=FORMS)
     action.add_argument("--write-manifest", type=Path, metavar="PACK_FOLDER")
     action.add_argument("--verify", type=Path, metavar="PACK_FOLDER")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--notices", action="store_true", help="generate onedir artifact notices")
+    parser.add_argument(
+        "--smoke",
+        nargs="?",
+        const=True,
+        type=Path,
+        metavar="FOLDER",
+        help="headless checks after build, or check an existing folder without a build",
+    )
     ffmpeg = parser.add_mutually_exclusive_group()
     ffmpeg.add_argument(
         "--with-ffmpeg", action="store_true", help="copy from PATH; not for release"
@@ -1960,6 +2004,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     ffmpeg.add_argument("--ffmpeg-from", metavar="URL", help="fetch the pinned release archive")
     parser.add_argument("--ffmpeg-sha256", metavar="HEX", help="the lock's verified archive sha256")
     options = parser.parse_args(argv)
+    standalone_smoke = isinstance(options.smoke, Path)
+    if standalone_smoke and any(
+        value is not None for value in (options.form, options.write_manifest, options.verify)
+    ):
+        parser.error("--smoke FOLDER cannot be combined with another action")
+    if options.smoke is True and options.form != "onedir":
+        parser.error("--smoke without FOLDER requires --form onedir")
+    if not standalone_smoke and all(
+        value is None for value in (options.form, options.write_manifest, options.verify)
+    ):
+        parser.error("choose --form, --write-manifest, --verify or --smoke FOLDER")
     if options.notices and options.form != "onedir":
         parser.error("--notices requires --form onedir")
     if (options.ffmpeg_from is None) != (options.ffmpeg_sha256 is None):
@@ -1992,6 +2047,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.dont_write_bytecode = True
         return verify(Path(os.path.abspath(options.verify)))
     out = Path(os.path.abspath(options.out))
+    if isinstance(options.smoke, Path):
+        return smoke_artifact(Path(os.path.abspath(options.smoke)), out=out)
     return build(
         cast(Form, options.form),
         out=out,
@@ -1999,6 +2056,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ffmpeg_from=options.ffmpeg_from,
         ffmpeg_sha256=options.ffmpeg_sha256,
         notices=options.notices,
+        smoke=options.smoke is True,
     )
 
 

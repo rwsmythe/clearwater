@@ -944,6 +944,7 @@ def test_release_ffmpeg_options_reach_the_build(monkeypatch, tmp_path):
         "ffmpeg_from": "file:///archive.zip",
         "ffmpeg_sha256": "a" * 64,
         "notices": False,
+        "smoke": False,
     }
 
 
@@ -1033,3 +1034,36 @@ def test_notices_writing_follows_ffmpeg_and_fails_the_build_on_error(
         assert "FAILED: artifact notices: planted notice coverage failure" in printed
     else:
         assert "wrote" in printed and "THIRD_PARTY_NOTICES.md" in printed
+
+
+@pytest.mark.parametrize("status", [0, 1])
+def test_smoke_follows_notices_and_propagates_failure(monkeypatch, tmp_path, status):
+    """Dropping --smoke or ignoring its result must not produce a successful build."""
+    monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setattr(build, "pack_sources", lambda: [])
+    out = tmp_path / "out"
+
+    def build_folder(args):
+        folder = Path(args[args.index("--distpath") + 1])
+        folder.mkdir(parents=True, exist_ok=True)
+        source = make_exe(out / "synthetic", [], modules=["clearwater", "graphlib"])
+        shutil.copyfile(source, folder / "Clearwater.exe")
+
+    monkeypatch.setattr(build, "run_pyinstaller", build_folder)
+
+    def notices(folder):
+        path = folder / "THIRD_PARTY_NOTICES.md"
+        path.write_text("generated notices")
+        return path
+
+    called = []
+
+    def smoke(folder, *, out):
+        assert (folder / "THIRD_PARTY_NOTICES.md").read_text() == "generated notices"
+        called.append(folder)
+        return status
+
+    monkeypatch.setattr(build, "write_artifact_notices", notices)
+    monkeypatch.setattr(build, "smoke_artifact", smoke)
+    assert build.main(["--form", "onedir", "--notices", "--smoke", "--out", str(out)]) == status
+    assert len(called) == 1

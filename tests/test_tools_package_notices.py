@@ -9,11 +9,42 @@ import json
 import marshal
 import re
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_native_licence_text_is_exempt_from_checkout_normalization():
+    """A CRLF checkout must preserve the seat-verified licence's exact bytes."""
+    relative = "tools/package/native-licences/openssl-3.5.5-LICENSE.txt"
+    result = subprocess.run(
+        ["git", "check-attr", "text", "--", relative],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    )
+    assert result.stdout.strip() == f"{relative}: text: unset"
+
+
+def test_native_licence_manifest_hash_matches_committed_blob():
+    """The manifest must describe the upstream bytes recorded in Git itself."""
+    folder = ROOT / "tools/package/native-licences"
+    manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+    for row in manifest["components"]:
+        relative = (folder / row["text_file"]).relative_to(ROOT).as_posix()
+        result = subprocess.run(
+            ["git", "cat-file", "-p", f"HEAD:{relative}"],
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+            timeout=30,
+        )
+        assert hashlib.sha256(result.stdout).hexdigest() == row["text_sha256"]
 
 
 def load_notices():
