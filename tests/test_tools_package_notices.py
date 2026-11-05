@@ -64,12 +64,27 @@ def test_pyinstaller_ordinary_stems_cannot_claim_top_level_modules(release, rela
         plan(load_notices(), release)
 
 
+def native_surface_inputs(manifest):
+    """Enumerate terms, full excerpt blobs and attribution inputs for Git checks."""
+    found = set()
+    for row in manifest["components"]:
+        found.add((row["text_file"], row["text_sha256"], row["text_size_bytes"]))
+        for field in ("text_lines", "attribution"):
+            if field in row:
+                value = row[field]
+                found.add((value["file"], value["sha256"], value["size_bytes"]))
+    return sorted(found)
+
+
 def test_native_licence_text_is_exempt_from_checkout_normalization():
     """A CRLF checkout must preserve the seat-verified licence's exact bytes."""
     folder = ROOT / "tools/package/native-licences"
     manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
     relatives = sorted(
-        {(folder / row["text_file"]).relative_to(ROOT).as_posix() for row in manifest["components"]}
+        {
+            (folder / name).relative_to(ROOT).as_posix()
+            for name, _sha, _size in native_surface_inputs(manifest)
+        }
     )
     result = subprocess.run(
         ["git", "check-attr", "text", "--", *relatives],
@@ -86,8 +101,8 @@ def test_native_licence_manifest_hash_matches_committed_blob():
     """Check every working text and its HEAD blob, or read-only Git hash before commit."""
     folder = ROOT / "tools/package/native-licences"
     manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
-    for row in manifest["components"]:
-        relative = (folder / row["text_file"]).relative_to(ROOT).as_posix()
+    for name, sha256, size in native_surface_inputs(manifest):
+        relative = (folder / name).relative_to(ROOT).as_posix()
         tracked = subprocess.run(
             ["git", "ls-tree", "HEAD", "--", relative],
             cwd=ROOT,
@@ -107,16 +122,16 @@ def test_native_licence_manifest_hash_matches_committed_blob():
             timeout=30,
         )
         if tracked.stdout:
-            assert hashlib.sha256(result.stdout).hexdigest() == row["text_sha256"]
+            assert hashlib.sha256(result.stdout).hexdigest() == sha256
         else:
             # Read-only Git hashing uses the actual attributes; compare with the
             # raw Git blob identity to catch checkout/filter byte conversion too.
-            data = (folder / row["text_file"]).read_bytes()
+            data = (folder / name).read_bytes()
             blob = b"blob " + str(len(data)).encode() + b"\0" + data
             assert result.stdout.decode().strip() == hashlib.sha1(blob).hexdigest()
-        working_bytes = (folder / row["text_file"]).read_bytes()
-        assert len(working_bytes) == row["text_size_bytes"], relative
-        assert hashlib.sha256(working_bytes).hexdigest() == row["text_sha256"], relative
+        working_bytes = (folder / name).read_bytes()
+        assert len(working_bytes) == size, relative
+        assert hashlib.sha256(working_bytes).hexdigest() == sha256, relative
 
 
 def load_notices():
@@ -895,6 +910,7 @@ def _make_native_surface(destination):
     document = json.loads(path.read_text())
     document["components"] = [document["components"][0]]
     document.pop("vendored_paths", None)
+    document.pop("embedded_hosts", None)
     for text in destination.iterdir():
         if text.name not in {"manifest.json", document["components"][0]["text_file"]}:
             text.unlink()
@@ -926,7 +942,7 @@ def test_real_native_manifest_verifies_the_seat_bytes():
     module = load_notices()
     surface = ROOT / "tools/package/native-licences"
     records = module.load_native_licences(surface)
-    assert len(records) == 10
+    assert len([record for record in records if not record.embedded_in]) == 10
     row = records[0]
     assert row.component == "OpenSSL"
     assert row.upstream_version == "3.5.5"
@@ -938,6 +954,68 @@ def test_real_native_manifest_verifies_the_seat_bytes():
         hashlib.sha256(data).hexdigest()
         == "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
     )
+
+
+def test_production_embedded_hosts_have_complete_verified_source_text_rows():
+    """The real census inputs load and bind all declared CPython/Qt hosts and texts."""
+    module = load_notices()
+    folder = ROOT / "tools/package/native-licences"
+    document = json.loads((folder / "manifest.json").read_text())
+    records = {record.component: record for record in module.load_native_licences(folder)}
+    hosts = {host.relpath: host for host in module._embedded_declarations(document)}
+    expected = {
+        "_internal/python312.dll": 8,
+        "_internal/pyexpat.pyd": 1,
+        "_internal/_elementtree.pyd": 1,
+        "_internal/_decimal.pyd": 1,
+        "_internal/_bz2.pyd": 1,
+        "_internal/_lzma.pyd": 1,
+        "_internal/unicodedata.pyd": 1,
+        "_internal/PySide6/Qt6Core.dll": 18,
+        "_internal/PySide6/Qt6Gui.dll": 20,
+        "_internal/PySide6/Qt6Network.dll": 2,
+        "_internal/PySide6/Qt6Svg.dll": 1,
+        "_internal/PySide6/plugins/imageformats/qjpeg.dll": 2,
+        "_internal/PySide6/plugins/imageformats/qtiff.dll": 3,
+        "_internal/PySide6/plugins/imageformats/qwebp.dll": 2,
+        "_internal/PySide6/plugins/platforms/qwindows.dll": 1,
+        "_internal/PySide6/plugins/platforms/qdirect2d.dll": 1,
+        "_internal/shiboken6/shiboken6.abi3.dll": 1,
+    }
+    assert set(hosts) == set(expected)
+    for path, count in expected.items():
+        host = hosts[path]
+        assert len(host.components) == count
+        for name, _source in host.components:
+            assert path in records[name].embedded_in
+    unicode_rows = [record for record in records.values() if record.spdx == "Unicode-3.0"]
+    assert len({record.licence_input.path for record in unicode_rows}) == 1
+    assert any(
+        {"_internal/unicodedata.pyd", "_internal/PySide6/Qt6Core.dll"} <= set(record.embedded_in)
+        for record in unicode_rows
+    )
+
+
+def test_release_archive_keeps_sourceware_repository_and_member_path(native_surface):
+    """A non-GitHub source archive must not invent a GitHub-style tree URL."""
+    document = synthetic_native_binding(native_surface)
+    row = document["components"][0]
+    row.update(upstream_repository="https://sourceware.org/git/bzip2.git", source_path="LICENSE")
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    record = load_notices().load_native_licences(native_surface)[0]
+    assert "https://sourceware.org/git/bzip2.git" in record.source_urls
+    assert all("bzip2.git/tree/" not in url for url in record.source_urls)
+    assert "archive member LICENSE" in record.licence_input.provenance
+
+
+@pytest.mark.parametrize("path", ["../outside", "/absolute", "C:/outside", "a\\b", ""])
+def test_release_archive_refuses_unsafe_member_source_path(native_surface, path):
+    """An archive-member provenance path is a safe relative path, as for git trees."""
+    document = synthetic_native_binding(native_surface)
+    document["components"][0]["source_path"] = path
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="unsafe source_path"):
+        load_notices().load_native_licences(native_surface)
 
 
 @pytest.mark.parametrize(
@@ -2130,6 +2208,162 @@ def embedded_host_fixture(release, *, parent="python", carried=True):
 def save_embedded_fixture(release, document):
     """Write only the test copy's manifest after a negative-control mutation."""
     (release["native_surface"] / "manifest.json").write_text(json.dumps(document))
+
+
+def git_excerpt_fixture(release):
+    """Bind a header excerpt to its complete, independently hashed source blob."""
+    document, host, _text = embedded_host_fixture(release)
+    blob = b"/*\r\nSynthetic header terms.\r\n*/\r\nint implementation;\r\n"
+    surface = release["native_surface"]
+    (surface / "source-blob.c").write_bytes(blob)
+    terms = b"/*\r\nSynthetic header terms.\r\n*/\r\n"
+    (surface / "header-excerpt.txt").write_bytes(terms)
+    row = document["components"][-1]
+    row.update(
+        text_file="header-excerpt.txt",
+        text_sha256=hashlib.sha256(terms).hexdigest(),
+        text_size_bytes=len(terms),
+        text_kind="excerpt",
+        text_lines={
+            "file": "source-blob.c",
+            "lines": [1, 3],
+            "git_blob_sha1": hashlib.sha1(b"blob 54\0" + blob).hexdigest(),
+            "sha256": hashlib.sha256(blob).hexdigest(),
+            "size_bytes": len(blob),
+        },
+    )
+    # Git's header includes the decimal byte length (54 for this literal blob).
+    assert len(blob) == 54
+    document["embedded_hosts"][0]["components"][-1]["source"].update(
+        text_kind="excerpt", text_lines=copy.deepcopy(row["text_lines"])
+    )
+    save_embedded_fixture(release, document)
+    return document, host, terms
+
+
+def test_git_excerpt_preserves_exact_line_bytes_and_blob_provenance(release):
+    """The artifact renders only the exact header, with its source-blob identity."""
+    _document, _host, terms = git_excerpt_fixture(release)
+    output = load_notices().render_notices(plan(load_notices(), release))
+    assert output.count(terms) == 1
+    assert b"int implementation;" not in output
+    assert b"lines 1-3" in output
+    assert b"Git blob SHA-1" in output
+
+
+@pytest.mark.parametrize("damage", ["range", "blob", "text", "missing", "source-bytes"])
+def test_git_excerpt_refuses_wrong_range_blob_or_excerpt(release, damage):
+    """A self-consistent excerpt hash cannot replace equality with the source range."""
+    document, host, _terms = git_excerpt_fixture(release)
+    surface = release["native_surface"]
+    row = document["components"][-1]
+    if damage == "range":
+        row["text_lines"]["lines"] = [2, 4]
+    elif damage == "blob":
+        row["text_lines"]["git_blob_sha1"] = "f" * 40
+    elif damage == "text":
+        terms = b"Self-consistent but invented licence terms.\n"
+        (surface / row["text_file"]).write_bytes(terms)
+        row.update(text_sha256=hashlib.sha256(terms).hexdigest(), text_size_bytes=len(terms))
+    elif damage == "missing":
+        (surface / "source-blob.c").unlink()
+    else:
+        (surface / "source-blob.c").write_bytes(b"changed source")
+    document["embedded_hosts"][0]["components"][-1]["source"].update(
+        text_lines=copy.deepcopy(row["text_lines"])
+    )
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError, match=r"embedded.*" + host.name + r".*Embedded beta.*"):
+        plan(load_notices(), release)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("lines", [0, 3]),
+        ("lines", [True, 3]),
+        ("lines", [3, 2]),
+        ("lines", [1, 999]),
+        ("file", "../outside.c"),
+        ("git_blob_sha1", "bad"),
+        ("sha256", "bad"),
+        ("size_bytes", True),
+    ],
+)
+def test_git_excerpt_schema_and_bounds_fail_closed(release, field, value):
+    """Unsafe source paths and malformed or out-of-bounds ranges are refused."""
+    document, _host, _terms = git_excerpt_fixture(release)
+    row = document["components"][-1]
+    row["text_lines"][field] = value
+    document["embedded_hosts"][0]["components"][-1]["source"]["text_lines"] = copy.deepcopy(
+        row["text_lines"]
+    )
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError):
+        plan(load_notices(), release)
+
+
+def test_git_excerpt_revalidates_source_on_render(release):
+    """A source changed after planning cannot authorize the previously valid excerpt."""
+    _document, _host, _terms = git_excerpt_fixture(release)
+    module = load_notices()
+    planned = plan(module, release)
+    (release["native_surface"] / "source-blob.c").write_bytes(b"changed after planning")
+    with pytest.raises(ValueError, match=r"embedded.*Embedded beta"):
+        module.render_notices(planned)
+
+
+def attribution_fixture(release):
+    """Carry the copyright attribution separately from generic licence terms."""
+    document, _host, _text = embedded_host_fixture(release)
+    data = b'{"Copyright": "Copyright 2026 Synthetic Author"}\n'
+    (release["native_surface"] / "attribution.json").write_bytes(data)
+    attribution = {
+        "file": "attribution.json",
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size_bytes": len(data),
+        "git_blob_sha1": hashlib.sha1(
+            b"blob " + str(len(data)).encode() + b"\0" + data
+        ).hexdigest(),
+        "source_path": "src/qt_attribution.json",
+    }
+    document["components"][-1]["attribution"] = attribution
+    document["embedded_hosts"][0]["components"][-1]["source"]["attribution"] = copy.deepcopy(
+        attribution
+    )
+    save_embedded_fixture(release, document)
+    return document, data
+
+
+def test_embedded_attribution_preserves_copyright_and_pinned_source(release):
+    """Generic terms must retain the component's separately published copyright."""
+    _document, data = attribution_fixture(release)
+    module = load_notices()
+    output = module.render_notices(plan(module, release))
+    assert output.count(data) == 1
+    assert b"src/qt_attribution.json" in output
+
+
+@pytest.mark.parametrize("damage", ["bytes", "missing", "blob", "path"])
+def test_embedded_attribution_fails_closed(release, damage):
+    """A missing, changed or misidentified attribution cannot disappear silently."""
+    document, _data = attribution_fixture(release)
+    path = release["native_surface"] / "attribution.json"
+    if damage == "bytes":
+        path.write_bytes(b"invented attribution")
+    elif damage == "missing":
+        path.unlink()
+    else:
+        field = "git_blob_sha1" if damage == "blob" else "source_path"
+        document["components"][-1]["attribution"][field] = (
+            "e" * 40 if damage == "blob" else "../unsafe"
+        )
+        document["embedded_hosts"][0]["components"][-1]["source"]["attribution"] = copy.deepcopy(
+            document["components"][-1]["attribution"]
+        )
+        save_embedded_fixture(release, document)
+    with pytest.raises(ValueError, match=r"embedded.*Embedded beta"):
+        plan(load_notices(), release)
 
 
 @pytest.mark.parametrize("parent", ["python", "numpy"])

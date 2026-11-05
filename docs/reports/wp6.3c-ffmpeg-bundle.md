@@ -1,6 +1,6 @@
 # WP6.3c - FFmpeg bundle
 
-Status: turn 4 edits prepared, 2026-11-05. The dispatch records the seat's fork
+Status: turn 7 CPython / Qt production notices prepared, 2026-11-05. The dispatch records the seat's fork
 commit/export and clean actionlint result; Dockerfile generation was refused by
 the seat's tool policy and a static proof recorded instead. The real asset,
 lock re-pin, remaining package work, review, package gate and release are pending.
@@ -667,5 +667,350 @@ undone, together with every production row/text and the two root attribution
 sentences. Reviewer A remains dispatcher-owned. No external fetch, Git write,
 build, frozen/GUI run, Docker, desktop input or write to a protected source,
 profile, footage or evidence directory occurred.
+
+Depth: unavailable to the cell; the dispatcher supplies `depth_input_tokens`.
+
+
+## Turn 7 - DR-144 production records: CPython and Qt / shiboken
+
+**Built.** Loaded 60 embedded-component rows and 17 exact carried-host
+declarations, bringing the native manifest to 70 records. Copied 93 new input
+files, all referenced: whole licence texts, byte-exact source blobs and header /
+section excerpts, and upstream attribution files. Census SHA-256 was checked
+against `0a39493dde36344348b9cfcc80175d9852b5eebd295078016757e386fabaca2c`.
+Every census input used was checked against section (d3)'s byte count, SHA-256
+and Git blob SHA-1 before copying; all 240 inventory entries were parsed, and
+only the named subset was read. The separately supplied bzip2 text matched its
+1896-byte / SHA-256 / Git-blob record. No input from the concurrent wheel pass
+was used. Scratch preparation and verification scripts/logs are under
+`work/wp6.3c/turn7/`.
+
+The bzip2 row binds `_internal/_bz2.pyd`, tag `bzip2-1.0.8`, tag object
+`75a94bea3918e612b879d6a11ca64b8689526147`, commit
+`6a8690fc8d26c815e798c588f796eabe9d684cf0`, and the published archive
+SHA-256 `ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269`
+/ 810029 bytes. Release-archive provenance now accepts a validated optional
+`source_path` for its licence member (`LICENSE` here). Non-GitHub repositories
+retain their real repository URL; the generator no longer invents a
+Sourceware `/tree/<tag>` URL. Existing GitHub archive URL behavior remains.
+
+The original ten records, interpreter-build record and vendored-path
+declarations are unchanged (independent comparison with HEAD).
+The Python and PySide6 rows in the root audit gain only the commissioned
+attribution sentences. The smoke fixture carries the real `python312.dll`, so
+its notices gain that host's eight embedded rows: its two row-count assertions
+are now 14 / 16 (without / with its synthetic FFmpeg pair). No other smoke edit.
+
+**Exact line-range field.** Schema version remains `1`. A git-tree row uses
+`text_kind: "excerpt"`, its in-tree `source_path`, and:
+
+```json
+"text_lines": {
+  "file": "<flat local filename of the complete source blob>",
+  "lines": [1, 23],
+  "git_blob_sha1": "<40 lowercase hex characters>",
+  "sha256": "<64 lowercase hex characters>",
+  "size_bytes": 38499
+}
+```
+
+`lines` is a one-based, inclusive pair of positive integers, excluding booleans.
+The end cannot exceed the blob's line count. The full source file must be a
+regular, non-linked input with matching byte count, SHA-256 and Git blob SHA-1
+(`blob <decimal byte length>\0<bytes>`). The excerpt's bytes must equal the
+recorded range exactly, preserving original line endings. Both planning/loading
+and rendering check this; a matching excerpt hash alone is insufficient.
+The source path, range and full-blob identity are also part of the independent
+host's source declaration, so a row cannot substitute another source/range.
+Provenance prints the source path, blob hash and range. Complete source blobs
+are verification inputs, not rendered licence text. HACL* carries lines 1-23;
+BLAKE2 carries lines 1-12; the other CPython sections use the census's ranges.
+The existing proprietary-interpreter excerpt contract is unchanged.
+
+**Separate attribution inputs.** The real Qt licence texts sometimes omit the
+component's copyright, which is in its `qt_attribution.json` (or qtsvg
+`REUSE.toml`). Each affected git-tree row also declares:
+
+```json
+"attribution": {
+  "file": "<flat local attribution filename>",
+  "source_path": "<attribution path in the same pinned tree>",
+  "git_blob_sha1": "<40 lowercase hex characters>",
+  "sha256": "<64 lowercase hex characters>",
+  "size_bytes": 731
+}
+```
+
+All fields are strict; unsafe paths, other provenance kinds, unknown keys,
+non-positive/boolean sizes, missing files and hash/blob mismatches fail closed.
+Attributions are copied/rendered verbatim with their own source label. They are
+included in the host's independently required source identity. Shared inputs
+are checked before text sharing. This preserves Wintab's copyright, the
+qsvghandler USC notice and generic-licence users' copyright statements without
+inventing notice text or editing an upstream input. The row's main provenance
+continues to identify its licence text's path separately.
+
+**Host -> components -> texts.** Host paths below omit `_internal/`.
+`cpython` means python/cpython at v3.12.13; `qtbase`, `qtimageformats`, `qtsvg`
+and `pyside-setup` mean the census's resolved v6.12.0 commits. `zlib` is
+madler/zlib v1.3.1; `xz` is tukaani-project/xz v5.8.1. Every full commit / tag
+object, copied filename, text hash/size and attribution identity is in the
+manifest, and each host's source set is independently declared there.
+
+| Host | Emitted embedded rows |
+| --- | --- |
+| `PySide6/Qt6Core.dll` | 18 |
+| `PySide6/Qt6Gui.dll` | 20 |
+| `PySide6/Qt6Network.dll` | 2 |
+| `PySide6/Qt6Svg.dll` | 1 |
+| `PySide6/plugins/imageformats/qjpeg.dll` | 2 |
+| `PySide6/plugins/imageformats/qtiff.dll` | 3 |
+| `PySide6/plugins/imageformats/qwebp.dll` | 2 |
+| `PySide6/plugins/platforms/qdirect2d.dll` | 1 |
+| `PySide6/plugins/platforms/qwindows.dll` | 1 |
+| `_bz2.pyd` | 1 |
+| `_decimal.pyd` | 1 |
+| `_elementtree.pyd` | 1 |
+| `_lzma.pyd` | 1 |
+| `pyexpat.pyd` | 1 |
+| `python312.dll` | 8 |
+| `shiboken6/shiboken6.abi3.dll` | 1 |
+| `unicodedata.pyd` | 1 |
+
+The detailed mapping includes the separate IJG and WebP patent notices as
+required rows; OpenGL and ES2 headers retain their individual revisions.
+FreeType's complete aggregate includes its FTL and GPL alternative texts, with
+separate BDF/PCF rows. Identical shared terms/attributions render once.
+
+| Host(s) | Component | Licence text / excerpt | Separate attribution |
+| --- | --- | --- | --- |
+| `pyexpat.pyd`, `_elementtree.pyd` | expat | `cpython:Doc/license.rst L847-873` | `-` |
+| `_decimal.pyd` | libmpdec (mpdecimal) | `cpython:Doc/license.rst L978-1008` | `-` |
+| `python312.dll` | zlib (CPython) | `zlib:LICENSE` | `-` |
+| `python312.dll` | HACL* (hacl-star bb3d0dc8) | `cpython:Modules/_hacl/Hacl_Hash_MD5.c L1-23` | `-` |
+| `python312.dll` | BLAKE2 reference code (libb2) | `cpython:Modules/_blake2/impl/blake2.h L1-12` | `-` |
+| `python312.dll` | Mersenne Twister (MT19937) | `cpython:Doc/license.rst L305-352` | `-` |
+| `python312.dll` | SipHash24 (Majkowski) | `cpython:Doc/license.rst L599-625` | `-` |
+| `python312.dll` | cfuhash | `cpython:Doc/license.rst L937-975` | `-` |
+| `python312.dll` | strtod and dtoa (David M. Gay) | `cpython:Doc/license.rst L628-655` | `-` |
+| `python312.dll` | Audioop (SoX g771.c, Sun) | `cpython:Doc/license.rst L1048-1076` | `-` |
+| `_lzma.pyd` | liblzma (XZ Utils) | `xz:COPYING.0BSD` | `-` |
+| `_bz2.pyd` | bzip2 / libbzip2 | `bzip2:LICENSE` | `-` |
+| `PySide6/Qt6Core.dll` | zlib (Qt bundled) | `qtbase:src/3rdparty/zlib/LICENSE` | `src/3rdparty/zlib/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | PCRE2 | `qtbase:src/3rdparty/pcre2/LICENCE.md` | `src/3rdparty/pcre2/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | PCRE2 - SLJIT | `qtbase:src/3rdparty/pcre2/LICENSE-SLJIT` | `src/3rdparty/pcre2/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | double-conversion | `qtbase:src/3rdparty/double-conversion/LICENSE` | `src/3rdparty/double-conversion/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | BLAKE2 reference (Qt) | `qtbase:src/3rdparty/blake2/COPYING` | `src/3rdparty/blake2/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | MD4 | `qtbase:LICENSES/CC0-1.0.txt` | `src/3rdparty/md4/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | MD5 | `qtbase:LICENSES/CC0-1.0.txt` | `src/3rdparty/md5/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | SHA-1 (Reichl) | `qtbase:LICENSES/LicenseRef-SHA1-Public-Domain.txt` | `src/3rdparty/sha1/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | SHA-3 Keccak | `qtbase:src/3rdparty/sha3/CC0_LICENSE` | `src/3rdparty/sha3/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | SHA-3 brg_endian | `qtbase:src/3rdparty/sha3/BRG_ENDIAN_LICENSE` | `src/3rdparty/sha3/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | RFC 6234 SHA-384/512 | `qtbase:src/3rdparty/rfc6234/LICENSE` | `src/3rdparty/rfc6234/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | SipHash (Qt) | `qtbase:LICENSES/CC0-1.0.txt` | `src/3rdparty/siphash/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | Easing equations (Penner) | `qtbase:src/3rdparty/easing/LICENSE` | `src/3rdparty/easing/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | TinyCBOR | `qtbase:src/3rdparty/tinycbor/LICENSE` | `src/3rdparty/tinycbor/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | tl::expected | `qtbase:LICENSES/CC0-1.0.txt` | `src/corelib/global/qt_attribution.json` |
+| `PySide6/Qt6Core.dll`, `unicodedata.pyd` | Unicode UCD (Qt and CPython) | `qtbase:LICENSES/Unicode-3.0.txt` | `src/corelib/text/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | Unicode CLDR | `qtbase:LICENSES/Unicode-3.0.txt` | `src/corelib/text/qt_attribution.json` |
+| `PySide6/Qt6Core.dll` | Apache Tika MimeType definitions | `qtbase:LICENSES/Apache-2.0.txt` | `src/corelib/mimetypes/3rdparty/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | FreeType | `qtbase:src/3rdparty/freetype/LICENSE.txt` | `src/3rdparty/freetype/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | FreeType - BDF driver | `qtbase:src/3rdparty/freetype/BDF-LICENSE.txt` | `src/3rdparty/freetype/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | FreeType - PCF driver | `qtbase:src/3rdparty/freetype/PCF-LICENSE.txt` | `src/3rdparty/freetype/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | Anti-aliasing rasterizer (grayraster, from FreeType) | `qtbase:src/3rdparty/freetype/LICENSE.txt` | `src/gui/painting/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | HarfBuzz-NG | `qtbase:src/3rdparty/harfbuzz-ng/COPYING` | `src/3rdparty/harfbuzz-ng/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | libpng | `qtbase:src/3rdparty/libpng/LICENSE` | `src/3rdparty/libpng/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | MD4C | `qtbase:src/3rdparty/md4c/LICENSE.md` | `src/3rdparty/md4c/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | Emoji Segmenter | `qtbase:LICENSES/Apache-2.0.txt` | `src/3rdparty/emoji-segmenter/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | D3D12 Memory Allocator | `qtbase:src/3rdparty/D3D12MemoryAllocator/LICENSE.txt` | `src/3rdparty/D3D12MemoryAllocator/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | Vulkan Memory Allocator | `qtbase:src/3rdparty/VulkanMemoryAllocator/LICENSE.txt` | `src/3rdparty/VulkanMemoryAllocator/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | sRGB ICC profile (sRGB2014.icc) | `qtbase:src/3rdparty/icc/LICENSE.txt` | `src/3rdparty/icc/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | Smooth scaling algorithm (qimagescale.cpp) | `qtbase:src/gui/painting/LICENSE.QIMAGETRANSFORM.txt` | `src/gui/painting/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | X Server helper (qregion.cpp) | `qtbase:src/gui/painting/LICENSE.XCONSORTIUM.txt` | `src/gui/painting/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | Adobe Glyph List For New Fonts | `qtbase:src/gui/text/LICENSE.AGLFN.txt` | `src/gui/text/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | XSVG (qguisvg) | `qtbase:src/gui/util/LICENSE.XSVG.txt` | `src/gui/util/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | WebGradients | `qtbase:util/gradientgen/LICENSE.WEBGRADIENTS.txt` | `util/gradientgen/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | OpenGL headers | `qtbase:src/gui/opengl/LICENSE.KHRONOS.txt` | `src/gui/opengl/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | OpenGL ES 2 headers | `qtbase:src/gui/opengl/LICENSE.KHRONOS.txt` | `src/gui/opengl/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | Vulkan API Registry (vk.xml) | `qtbase:src/gui/vulkan/LICENSE.txt` | `src/gui/vulkan/qt_attribution.json` |
+| `PySide6/Qt6Gui.dll` | MiniEngine D3D12 mipmap shader | `qtbase:src/gui/rhi/LICENSE.MiniEngine.txt` | `src/gui/rhi/qt_attribution.json` |
+| `PySide6/Qt6Network.dll` | libpsl (lookup code) | `qtbase:src/3rdparty/libpsl/src/LICENSE.chromium` | `src/3rdparty/libpsl/qt_attribution.json` |
+| `PySide6/Qt6Network.dll` | Public Suffix List data | `qtbase:src/3rdparty/libpsl/PSL-LICENSE.txt` | `src/3rdparty/libpsl/qt_attribution.json` |
+| `PySide6/plugins/imageformats/qjpeg.dll`, `PySide6/plugins/imageformats/qtiff.dll` | libjpeg-turbo | `qtbase:src/3rdparty/libjpeg/LICENSE` | `src/3rdparty/libjpeg/qt_attribution.json` |
+| `PySide6/plugins/imageformats/qjpeg.dll`, `PySide6/plugins/imageformats/qtiff.dll` | libjpeg-turbo (IJG notice) | `qtbase:src/3rdparty/libjpeg/ijg-license.txt` | `src/3rdparty/libjpeg/qt_attribution.json` |
+| `PySide6/plugins/platforms/qwindows.dll`, `PySide6/plugins/platforms/qdirect2d.dll` | Wintab API headers | `qtbase:LICENSES/LicenseRef-Lcs-Telegraphics.txt` | `src/3rdparty/wintab/qt_attribution.json` |
+| `PySide6/plugins/imageformats/qtiff.dll` | libtiff | `qtimageformats:src/3rdparty/libtiff/COPYRIGHT` | `src/3rdparty/libtiff/qt_attribution.json` |
+| `PySide6/plugins/imageformats/qwebp.dll` | libwebp | `qtimageformats:src/3rdparty/libwebp/COPYING` | `src/3rdparty/libwebp/qt_attribution.json` |
+| `PySide6/plugins/imageformats/qwebp.dll` | libwebp patent grant | `qtimageformats:src/3rdparty/libwebp/PATENTS` | `src/3rdparty/libwebp/qt_attribution.json` |
+| `PySide6/Qt6Svg.dll` | XSVG-derived qsvghandler.cpp (USC ISI) | `qtsvg:LICENSES/HPND-sell-variant.txt` | `src/svg/REUSE.toml` |
+| `shiboken6/shiboken6.abi3.dll` | Python 3.7.0 (shiboken buffer protocol and signatures) | `pyside-setup:sources/shiboken6/shibokenmodule/files.dir/shibokensupport/signature/PSF-3.7.0.txt` | `sources/shiboken6/libshiboken/qt_attribution.json` |
+
+
+**UNSURE dispositions.**
+
+- U1: liblzma 5.8.1 comes from PBS's pinned recipe, not a binary version string;
+  0BSD is retained. The manifest's version evidence states this limit.
+- U2: one Qt-pinned Unicode-3.0 text covers `unicodedata.pyd` (UCD 15.0.0),
+  Qt6Core's UCD revision 36 and CLDR v48.2. The UCD row binds both declared
+  hosts; CLDR retains a distinct component row using the same text. Presence
+  of the separate `python312.dll` Unicode tables was not proved by the census;
+  no additional host claim is invented for it.
+- U3: the carried dtoa notice is David M. Gay / Lucent's permission notice;
+  the Audioop notice is Sun's unrestricted-use / disclaimer text. No SPDX id
+  was established offline, so rows say `LicenseRef-dtoa-notice` and
+  `LicenseRef-Audioop-Sun-notice`, with "licence per ... header, no SPDX id
+  claimed" in their evidence. `LicenseRef-WebP-patent-grant` likewise labels
+  the separate patent text without inventing an SPDX identifier.
+- U4: one PSF-3.7.0 text covers shiboken's compiled buffer-protocol code and
+  attributed adapted signature code in one host-bound row. The signature
+  members' Qt-only headers cannot establish which adapted PSF code survives;
+  the manifest explicitly retains that limit. The PSF text renders once.
+- U5/U6: tl::expected and double-conversion are carried as ruled. Surviving
+  template instantiations / double-conversion presence are not independently
+  proved by strings; Qt's attributions and build definitions are the evidence.
+- U7: FreeType, HarfBuzz, libtiff, libwebp, MD4C, D3D12MA, VMA, TinyCBOR and
+  Emoji Segmenter versions rely on the pinned attributions/build definitions
+  where binary version strings are absent; no stronger claim is made.
+- U8: pillow-heif and the other wheel census belong to the next dispatch.
+- U9: Qt feature states rely on symbols/strings, build definitions and defaults;
+  no configure summary/SBOM was supplied for this wheel.
+- U10: the Windows select/kqueue absence retains the census's unverified
+  `HAVE_KQUEUE` source-guard limit. `selectmodule.c` was not a supplied input.
+- U11: the native census did not inspect the attributed pure-Python modules in
+  PYZ/base_library.zip; their presence remains outside this turn's evidence.
+- U12: pyside-setup's missing root REUSE.toml remains a limit; no replacement
+  was invented. Its supplied component attribution files are carried.
+
+**RED -> GREEN.** No network test or production entry point is added.
+
+| New check | RED evidence | GREEN evidence |
+| --- | --- | --- |
+| Git-tree line-range source/blob/range and rendering controls (15 cases) | `red2.log`: 7 failed, 8 passed, 277 deselected; old schema cannot accept valid excerpt declarations or produce the required component-specific refusals | `green.log`: 15 passed; final `new-final.log` includes all 15 |
+| Separate upstream copyright inputs (5 cases) | `attribution-red.log`: 5 failed, 292 deselected | `green2.log`: 20 passed for both groups; final selection retains all 5 |
+| Production host/row/source/text completeness | `production-red.log`: 1 failed (no production host declarations) | `production-green2.log` includes the passing real manifest; final selection retains it |
+| Sourceware archive member and unsafe-path controls (6 cases) | `archive-red.log`: 6 failed; old validator treats member path as mixed provenance | `production-green2.log`: 7 passed with the production case; final selection retains all 6 |
+
+The corrected test-first baseline follows an initial fixture-only error in
+`red.log`: the literal source blob has 54 bytes, not 55. That length/header was
+corrected before recording `red2.log`; the erroneous run is not a product RED.
+The first production GREEN attempt also reproduced the unsupported bzip2
+member-path issue before its six focused RED controls and fix.
+
+`excerpt-mutant.log`: **6 failed, 298 deselected**, all `DID NOT RAISE`, when a
+test-only plugin substitutes text-hash-only reads for full-blob/range checks.
+It detects wrong range, wrong Git blob, a self-consistent invented excerpt,
+missing/changed full source and source mutation after planning. The product
+file is never changed for this independent negative control.
+
+`new-final.log` / `.xml`: **27 passed, 277 deselected in 4.70s** on final
+inputs. The existing production Git checks now include full source blobs and
+attributions as well as licence texts, checking raw Git identities and `-text`
+checkout attributes for every input. Existing synthetic fixtures remove the
+production declarations when reducing their copy to a synthetic OpenSSL row;
+they do not claim the real census covers synthetic bytes.
+
+**Validation.** Every runner output is file-backed under
+`work/wp6.3c/turn7/`. The unchanged isolated runner (`run_tests.py`) starts with
+`PYTHONPATH=scripts`, removes that environment variable before `pytest.main`,
+retains the loaded `sandbox_mkdir_shim`, disables cacheprovider, uses a
+300-second timeout and excludes QUIT_SCRIPT. No production environment refusal
+is relaxed. The smoke source-entry child was inspected: disposable
+APPDATA/LOCALAPPDATA/XDG roots, blocked Qt imports, stubbed GUI/worker effects
+and a 15-second subprocess bound.
+
+```text
+uv run --no-sync python work/wp6.3c/turn7/run_tests.py tests/test_tools_package_notices.py tests/test_tools_package_build.py tests/test_tools_package_smoke.py tests/test_tools_package_ffmpeg.py --basetemp=work/c63c-7-final --junitxml=work/wp6.3c/turn7/pytest-final.xml -q
+```
+
+- `ruff-check-head.log`: `All checks passed!`, exit 0.
+- `ruff-format-head.log`: `337 files already formatted`, exit 0.
+- `mypy-win32-head.log` and `mypy-darwin-head.log`: each
+  `Success: no issues found in 166 source files`, exit 0.
+- Initial exact `work/c63c-7` selection: `pytest.log` / `.xml`,
+  **2 failed, 530 passed, 1 skipped in 134.60s**. Both failures were
+  `test_complete_smoke_preserves_shipping_bytes_and_checks_conditional_tools`
+  (False/True): the stale 6/8 row-count assertion. The transcript independently
+  recorded 14/16, and the commissioned row-count-only change fixes them.
+- Final fresh `work/c63c-7-final` selection: `pytest-final.log` / `.xml`,
+  **532 passed, 1 skipped in 135.15s**, exit 0.
+
+| Module | Final result |
+| --- | --- |
+| `test_tools_package_notices.py` | 304 passed |
+| `test_tools_package_build.py` | 126 passed |
+| `test_tools_package_smoke.py` | 34 passed, 1 skipped |
+| `test_tools_package_ffmpeg.py` | 68 passed |
+
+
+The unchanged skip is `test_non_windows_containment_never_silently_skips`:
+`POSIX process-group native proof belongs to WP6.5`.
+The final focused input tests and static pass also cover the final patent-grant
+LicenseRef label and explanatory docstring after the full run began; no
+behavioral code changed during that run.
+
+**Positive and negative notices probes (fresh copies only).** `probe.py` first
+copies the commissioned seat folder, then verifies every declared host's full
+hash and size in the copy before running the notices writer. Initial copies
+are under `work/c63c-7/probe/` and `probe-negative/`; the final rerun, after the
+patent-grant label clarification, uses fresh `probe-final/` and
+`probe-negative-final/`. No frozen binary is run. `probe-final.log` and
+`probe-results.json` record:
+
+- POSITIVE: **85 component rows, 1536 entries, 60 embedded-component rows**;
+  all 17 declared hosts present and matching, with per-host counts in the
+  table above. Notices SHA-256
+  `520df27e8c81d6802af37e60cb7cccfd4bfada8bfb8ae3ea8333ba808e0b1ac8`.
+- NEGATIVE (expected refusal): after appending one byte only to the second
+  copy's `_internal/_decimal.pyd`, the writer reports that host's identity
+  differs, expected SHA-256
+  `fcdc8bc61ee2dac17fbb9a8eea45242e22a34d1a71abac9bee7f732dc3f8b79f`
+  / 246272 bytes, actual SHA-256
+  `90936042862745fc94234592fc50f19c0d8f326610922962491e55288fc3a3ff`
+  / 246273 bytes, **re-census required**. It refuses before writing notices.
+- Original seat folder's notices SHA-256 before/after stays
+  `3afe913e26ecd6fe65765943fef798450687bebf7df926d1f720da9b8e999d8c`.
+- `surface-audit.log`: every new row's exact terms and attribution bytes occur
+  in the final output; no unreferenced DR-144 input; the original ten records
+  and other manifest declarations are unchanged; Unicode and PSF texts each
+  occur once; source verification blobs are not rendered as licence texts.
+
+**Verification loop / handoff.**
+
+- [MAJOR, confirmed/fixed] A matching excerpt hash does not prove the text
+  comes from the pinned blob/range. The new equality checks and the independent
+  six-case bypass mutant establish the required distinction.
+- [MAJOR, confirmed/fixed] Generic Qt licence texts alone lose copyrights
+  stored in separate attributions. The byte-verified, source-bound attribution
+  inputs now render with the corresponding terms and fail closed when altered.
+- [MINOR, confirmed/fixed] Sourceware's archive needs its licence member path
+  without a fabricated GitHub tree URL. Six focused controls plus the real
+  bzip2 row verify the extension within release-archive provenance.
+- [MINOR, test-only, confirmed/fixed] The two smoke fixture row totals changed
+  with eight real CPython embedded components. Only their owned assertions
+  changed; the final full selection passes.
+- [MINOR, data, confirmed/fixed] The separate WebP patent row now uses the
+  descriptive `LicenseRef-WebP-patent-grant`, rather than an invalid pseudo-SPDX
+  conjunction. Final focused tests, static checks and both fresh copy probes
+  cover the final input surface.
+- [MINOR, fixture, rejected as product defect] Corrected the initial literal
+  source-blob length before the valid RED. No production change was driven by
+  that fixture error.
+- Final comparison of census mappings, every output term/attribution and shared
+  blocks, ownership boundaries, baseline manifest retention and the full
+  validation results found no additional issue. Read-only `git diff --check`
+  is recorded separately in `diff-check.log`.
+
+**STOPPED ROWS:** none. The supplied bzip2 provenance resolves turn 6's STOP.
+
+This turn bundles only the commissioned production loading and its necessary
+line-range / attribution / archive-path support. Reviewer A is dispatcher-run
+after this yield; no review round or convergence is claimed here. DR-144 is
+not claimed closed: the wider Pillow / SciPy / other-wheel production census
+is the next dispatch. Q1, fork run/asset/re-pin, remaining package work, seat
+gates and the release also remain undone. No build.py, FFmpeg lock or workflow
+edit, dependency/frozen-interface change, external fetch, Git write, real
+PyInstaller build, frozen/GUI launch, Docker, desktop input, original build /
+profile / footage / evidence-folder write, GitHub action or mailbox post was
+performed. Only the files granted for this turn changed.
 
 Depth: unavailable to the cell; the dispatcher supplies `depth_input_tokens`.

@@ -75,8 +75,20 @@ _PROVENANCE_FIELDS = frozenset(
         "licence_urls",
         "text_source",
         "text_kind",
+        "text_lines",
+        "attribution",
     }
 )
+
+
+class _TextExcerpt(NamedTuple):
+    """A complete source blob and its one-based, inclusive excerpt range."""
+
+    path: Path
+    sha256: str
+    size_bytes: int
+    git_blob_sha1: str
+    lines: tuple[int, int]
 
 
 class LicenceInput(NamedTuple):
@@ -88,6 +100,8 @@ class LicenceInput(NamedTuple):
     size_bytes: int = 0
     provenance: str = ""
     context: str = ""
+    excerpt: _TextExcerpt | None = None
+    git_blob_sha1: str = ""
 
 
 class NativeFile(NamedTuple):
@@ -127,6 +141,7 @@ class NativeLicence(NamedTuple):
     text_source: LicenceInput | None
     text_source_lines: tuple[int, ...]
     embedded_in: tuple[str, ...]
+    attribution_input: LicenceInput | None = None
 
 
 class NoticeRow(NamedTuple):
@@ -204,6 +219,76 @@ def _native_text(path: Path, sha256: str, size: int, context: str = "") -> bytes
 
 def _source_identity(row: dict[str, Any]) -> str:
     return json.dumps({key: row[key] for key in _PROVENANCE_FIELDS if key in row}, sort_keys=True)
+
+
+def _git_text_lines(row: dict[str, Any]) -> dict[str, Any] | None:
+    source = row.get("text_lines")
+    if "text_lines" not in row:
+        return None
+    if (
+        row.get("provenance_kind") != "git-tree"
+        or row.get("text_kind") != "excerpt"
+        or not row.get("source_path")
+        or not isinstance(source, dict)
+        or set(source) != {"file", "lines", "git_blob_sha1", "sha256", "size_bytes"}
+        or not _exact_host_path(source.get("file"))
+        or "/" in source["file"]
+        or source["file"] == "manifest.json"
+        or not isinstance(source.get("lines"), list)
+        or len(source["lines"]) != 2
+        or any(type(line) is not int for line in source["lines"])
+        or not 1 <= source["lines"][0] <= source["lines"][1]
+        or not isinstance(source.get("git_blob_sha1"), str)
+        or re.fullmatch(r"[0-9a-f]{40}", source["git_blob_sha1"]) is None
+        or not isinstance(source.get("sha256"), str)
+        or re.fullmatch(r"[0-9a-f]{64}", source["sha256"]) is None
+        or type(source.get("size_bytes")) is not int
+        or source["size_bytes"] <= 0
+    ):
+        raise ValueError("notices: native git-tree text_lines missing/invalid")
+    return cast(dict[str, Any], source)
+
+
+def _licence_bytes(item: LicenceInput) -> bytes:
+    data = _native_text(item.path, item.sha256, item.size_bytes, item.context)
+    if item.git_blob_sha1:
+        digest = hashlib.sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data)
+        if digest.hexdigest() != item.git_blob_sha1:
+            raise ValueError(f"notices: {item.context}attribution Git blob SHA-1 differs")
+    source = item.excerpt
+    if source is not None:
+        blob = _native_text(source.path, source.sha256, source.size_bytes, item.context)
+        digest = hashlib.sha1(b"blob " + str(len(blob)).encode("ascii") + b"\0" + blob)
+        if digest.hexdigest() != source.git_blob_sha1:
+            raise ValueError(f"notices: {item.context}source Git blob SHA-1 differs")
+        lines = blob.splitlines(keepends=True)
+        first, last = source.lines
+        if last > len(lines) or b"".join(lines[first - 1 : last]) != data:
+            raise ValueError(f"notices: {item.context}excerpt differs from source line range")
+    return data
+
+
+def _attribution_spec(row: dict[str, Any]) -> dict[str, Any] | None:
+    item = row.get("attribution")
+    if "attribution" not in row:
+        return None
+    if (
+        row.get("provenance_kind") != "git-tree"
+        or not isinstance(item, dict)
+        or set(item) != {"file", "sha256", "size_bytes", "git_blob_sha1", "source_path"}
+        or not _exact_host_path(item.get("file"))
+        or "/" in item["file"]
+        or item["file"] == "manifest.json"
+        or not _exact_host_path(item.get("source_path"))
+        or not isinstance(item.get("sha256"), str)
+        or re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) is None
+        or not isinstance(item.get("git_blob_sha1"), str)
+        or re.fullmatch(r"[0-9a-f]{40}", item["git_blob_sha1"]) is None
+        or type(item.get("size_bytes")) is not int
+        or item["size_bytes"] <= 0
+    ):
+        raise ValueError("notices: native git-tree attribution missing/invalid")
+    return cast(dict[str, Any], item)
 
 
 def _exact_host_path(value: object) -> bool:
@@ -368,6 +453,8 @@ def _https_url(value: object) -> bool:
 
 def _provenance(row: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
     kind = row.get("provenance_kind")
+    text_lines = _git_text_lines(row)
+    _attribution_spec(row)
     archive = {
         "upstream_repository",
         "source_tag",
@@ -376,6 +463,7 @@ def _provenance(row: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
         "source_archive_url",
         "source_archive_sha256",
         "source_archive_size_bytes",
+        "source_path",
     }
     tree = {"source_repository", "source_commit", "source_tag", "source_tag_object", "source_path"}
     proprietary = {"licence_urls", "text_source"}
@@ -385,8 +473,14 @@ def _provenance(row: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
     allowed = archive if kind == "release-archive" else tree if kind == "git-tree" else proprietary
     if (set(row) & all_fields) - allowed:
         raise ValueError("notices: native provenance mixes fields of different kinds")
-    if kind != "proprietary-redistributable" and row.get("text_kind") == "excerpt":
-        raise ValueError("notices: native provenance excerpt requires proprietary kind")
+    if (
+        kind != "proprietary-redistributable"
+        and row.get("text_kind") == "excerpt"
+        and text_lines is None
+    ):
+        raise ValueError(
+            "notices: native provenance excerpt requires proprietary kind or text_lines"
+        )
     if kind == "proprietary-redistributable":
         source = row.get("text_source")
         urls = row.get("licence_urls")
@@ -412,7 +506,11 @@ def _provenance(row: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
             f"source bytes {source['size_bytes']}",
             tuple(urls),
         )
-    required = archive if kind == "release-archive" else {"source_repository", "source_commit"}
+    required = (
+        archive - {"source_path"}
+        if kind == "release-archive"
+        else {"source_repository", "source_commit"}
+    )
     if not required <= set(row):
         raise ValueError("notices: native provenance missing source fields")
     for key in required - {"source_archive_size_bytes"}:
@@ -428,6 +526,16 @@ def _provenance(row: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
             or re.fullmatch(r"[0-9a-f]{" + str(length) + "}", row[key]) is None
         ):
             raise ValueError(f"notices: native provenance invalid {key}")
+    path = row.get("source_path", "")
+    if "source_path" in row and (
+        not isinstance(path, str)
+        or not path
+        or path != path.strip()
+        or "\\" in path
+        or ":" in path
+        or any(part in {"", ".", ".."} for part in path.split("/"))
+    ):
+        raise ValueError("notices: native provenance unsafe source_path")
     if kind == "release-archive":
         if (
             not _https_url(row["upstream_repository"])
@@ -436,11 +544,15 @@ def _provenance(row: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
             or row["source_archive_size_bytes"] <= 0
         ):
             raise ValueError("notices: native provenance invalid archive URL/size")
+        repository_url = row["upstream_repository"]
+        if urlsplit(repository_url).hostname == "github.com":
+            repository_url += "/tree/" + row["source_tag"]
         return (
             f"upstream tag {row['source_tag']}, commit {row['source_commit']}; "
             f"source archive {row['source_archive_url']}; "
-            f"published SHA-256 {row['source_archive_sha256']}",
-            (row["upstream_repository"] + "/tree/" + row["source_tag"], row["source_archive_url"]),
+            f"published SHA-256 {row['source_archive_sha256']}"
+            + (f"; archive member {path}" if path else ""),
+            (repository_url, row["source_archive_url"]),
         )
     if not _https_url(row["source_repository"]):
         raise ValueError("notices: native provenance invalid source_repository")
@@ -452,21 +564,16 @@ def _provenance(row: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
         or row["source_tag"] != row["source_tag"].strip()
     ):
         raise ValueError("notices: native provenance invalid source_tag")
-    path = row.get("source_path", "")
-    if "source_path" in row and (
-        not isinstance(path, str)
-        or not path
-        or path != path.strip()
-        or "\\" in path
-        or ":" in path
-        or any(part in {"", ".", ".."} for part in path.split("/"))
-    ):
-        raise ValueError("notices: native provenance unsafe source_path")
     label = f"git tree {row['source_repository']} at commit {row['source_commit']}"
     if "source_tag" in row:
         label += f"; annotated tag {row['source_tag']}, object {row['source_tag_object']}"
     if path:
         label += f"; in-tree path {path}"
+    if text_lines is not None:
+        label += (
+            f"; Git blob SHA-1 {text_lines['git_blob_sha1']}; "
+            f"verbatim excerpt, lines {text_lines['lines'][0]}-{text_lines['lines'][1]}"
+        )
     return label, (
         row["source_repository"] + "/tree/" + row["source_commit"] + ("/" + path if path else ""),
     )
@@ -497,7 +604,8 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     """Validate the committed seat-fetched native licence surface, without fetching.
 
     Every component needs one strict provenance kind: release-archive (published
-    archive hash/size and source tag identity), git-tree (exact repository commit,
+    archive hash/size, source tag identity and optional member source_path),
+    git-tree (exact repository commit,
     optional paired annotated tag and an in-tree path for a subtree), or
     proprietary-redistributable (hashed interpreter excerpt and licence URLs).
     All kinds require version evidence and a real text with matching hash/size.
@@ -519,6 +627,13 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     rows use embedded_in (a list of declared paths) instead of another binding
     kind. Carried hosts require all rows and matching source pins before parent
     ownership is considered; absent hosts produce no embedded claims.
+    Git-tree excerpts require text_kind="excerpt" and text_lines: file (a local
+    full-blob filename), lines (one-based inclusive pair), git_blob_sha1, sha256
+    and size_bytes. The complete blob and exact slice are checked at load and
+    render; source_path identifies that blob in the pinned tree.
+    Optional git-tree attribution supplies file, sha256, size_bytes,
+    git_blob_sha1 and source_path for a separate, verbatim copyright input
+    from the same pinned tree. It is checked and rendered with the terms.
 
     Args:
         folder: The committed native-licences folder, or a local test copy.
@@ -588,6 +703,8 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
             "vendored_distribution_version",
             "bundled_modules",
             "embedded_in",
+            "text_lines",
+            "attribution",
         }
         if set(row) - allowed:
             raise ValueError("notices: native licence row has unknown keys")
@@ -628,7 +745,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
         source = row.get("text_source")
         if not isinstance(kind, str) or kind not in {"full", "excerpt"}:
             raise ValueError("notices: native text_kind is invalid")
-        if (kind == "excerpt" or source is not None) and (
+        if ((kind == "excerpt" and "text_lines" not in row) or source is not None) and (
             not isinstance(source, dict)
             or set(source) not in ({"file", "lines"}, {"file", "lines", "sha256", "size_bytes"})
             or not isinstance(source.get("file"), str)
@@ -685,7 +802,6 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
             if embedded_in
             else ""
         )
-        _native_text(path, row["text_sha256"], row["text_size_bytes"], context)
         files.add(filename)
         provenance = (
             f"Seat-verified native input: {row['component']} {row['upstream_version']}; "
@@ -697,6 +813,44 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
                 f"; verbatim {kind} from {source['file']}, "
                 f"lines {source['lines'][0]}-{source['lines'][1]}"
             )
+        text_lines = _git_text_lines(row)
+        excerpt = None
+        if text_lines is not None:
+            files.add(text_lines["file"])
+            excerpt = _TextExcerpt(
+                folder / text_lines["file"],
+                text_lines["sha256"],
+                text_lines["size_bytes"],
+                text_lines["git_blob_sha1"],
+                (text_lines["lines"][0], text_lines["lines"][1]),
+            )
+        licence_input = LicenceInput(
+            path,
+            sha256=row["text_sha256"],
+            size_bytes=row["text_size_bytes"],
+            provenance=provenance,
+            context=context,
+            excerpt=excerpt,
+        )
+        _licence_bytes(licence_input)
+        attribution = _attribution_spec(row)
+        attribution_input = None
+        if attribution is not None:
+            files.add(attribution["file"])
+            attribution_input = LicenceInput(
+                folder / attribution["file"],
+                sha256=attribution["sha256"],
+                size_bytes=attribution["size_bytes"],
+                provenance=(
+                    f"Seat-verified attribution: {row['component']}; "
+                    f"{row['source_repository']} at commit {row['source_commit']}; "
+                    f"in-tree path {attribution['source_path']}; "
+                    f"Git blob SHA-1 {attribution['git_blob_sha1']}"
+                ),
+                context=context,
+                git_blob_sha1=attribution["git_blob_sha1"],
+            )
+            _licence_bytes(attribution_input)
         result.append(
             NativeLicence(
                 row["component"],
@@ -708,13 +862,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
                 row.get("source_archive_url", ""),
                 row.get("source_archive_sha256", ""),
                 row["spdx"],
-                LicenceInput(
-                    path,
-                    sha256=row["text_sha256"],
-                    size_bytes=row["text_size_bytes"],
-                    provenance=provenance,
-                    context=context,
-                ),
+                licence_input,
                 build["release"],
                 build["python_version"],
                 bindings,
@@ -735,6 +883,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
                 else None,
                 tuple(source["lines"]) if source is not None else (),
                 embedded_in,
+                attribution_input,
             )
         )
     by_name = {record.component: record for record in result}
@@ -1648,7 +1797,9 @@ def _native_rows(
                 record.spdx,
                 record.source_urls,
                 tuple(label for label, _sha256 in matched),
-                (record.licence_input,),
+                (record.licence_input, record.attribution_input)
+                if record.attribution_input is not None
+                else (record.licence_input,),
                 tuple(notes),
             )
         )
@@ -1946,7 +2097,7 @@ def render_notices(plan: NoticePlan) -> bytes:
                 source, data = _audited_material(item)
                 label = f"{row.name} {row.version}; {source}; the 1.0.0 audit's upstream copy"
             elif item.provenance:
-                data = _native_text(item.path, item.sha256, item.size_bytes, item.context)
+                data = _licence_bytes(item)
                 label = item.provenance
             else:
                 data = item.path.read_bytes()

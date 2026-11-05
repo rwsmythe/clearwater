@@ -399,7 +399,7 @@ def test_complete_smoke_preserves_shipping_bytes_and_checks_conditional_tools(
     output = capsys.readouterr().out
     (tmp_path / "out/smoke-transcript.txt").write_text(output, encoding="utf-8")
     assert "notices: PASS" in output
-    assert "6 component rows" in output if not ffmpeg else "8 component rows" in output
+    assert "14 component rows" in output if not ffmpeg else "16 component rows" in output
     assert "bundle: PASS" in output and "hidden-imports: PASS" in output
     assert "total" in output and "largest" in output
     assert ("FFmpeg: SKIP (not bundled)" in output) == (not ffmpeg)
