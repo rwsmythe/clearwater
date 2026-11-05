@@ -10,7 +10,7 @@
 - Seat folder `work/orch-g46/`: `gate.sh`, `watch2.sh`, drains 1-7, the posts, the fill scripts. Copy `gate.sh` and `watch2.sh` with `sed 's#orch-g46#orch-g47#g'`.
 - Bash gauge at bring-up: 38 ms.
 - State worktree: `.worktrees/orch-state-g46`. The successor removes it and adds its own.
-- **Disk:** C: 65 GB free at 00:34Z (it dropped from 78 GB during the session; the two seat runs' folders, about 3.4 GB each, and the reviewers' probe folders account for most of it). Run `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB is needed before any window or gate.
+- **Disk:** C: 73 GB free at 00:45Z (65 GB at 00:34Z; it dipped from 78 GB during the session; the two seat runs' folders, about 3.4 GB each, and the reviewers' probe folders account for most of it). Run `df -h /c` before every window, gate and footage run. STOP below 15 GB free; 25 GB is needed before any window or gate.
 - **Paces at 22:47Z (2026-11-04):**
   - Codex 4 % / 0.531 (resets 2026-11-11 10:07Z);
   - Claude 47 % / 1.299 (resets 2026-11-09 10:00Z).
@@ -76,7 +76,8 @@
    - **Gate p63a on `7a82ce11`:**
      - static: ruff 0, format 327, mypy 0 / 163;
      - collect: 8,590 = 7,285 + 1,298 + 7, identity 0 / 0;
-     - parallel and harness: see `work/orch-g46/gate-p63a/summary.txt` (FILL from it at pickup);
+     - parallel: exit 0, 649 s, 7,284 passed / 1 skipped;
+     - harness: 423 OK (skipped 1); the gate ended at 00:45:12Z with 73 GB free;
      - **THE SERIAL LEG IS OWED**, not started: gen 46 was past the cap. Run `bash work/orch-g47/gate.sh wp6.3a p63a-s serial` (background, plus watch2) on the SAME head, with no other pytest running. If main has moved, merge it first, re-run harness, and use a new run id.
    - **NEXT:**
      1. Run the serial leg.
