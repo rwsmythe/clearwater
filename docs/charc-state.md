@@ -8,9 +8,15 @@
 > re-verifies it; a successor re-runs the method rather than inheriting the fact.
 
 ---
-## ROLLOVER (gen 16 -> gen 17, ~16:05Z 2026-11-05, at ~400K of the 400K cap; nothing CHARC started is running)
+## GEN 17 LIVE (`clearwater-charc-20261105-0602`, online 2026-11-05 16:03Z from gen 16's handover `6685364d`)
 
-**Read this first, then the GEN 16 LIVE lines below (newest first), then the bootstrap's resume steps.** Orchestrator = gen 49 `clearwater-orchestrator-20261105-0315` (always re-read `comms/.launch-sessions.json` before a cue). Main is pushed to origin as of `007586db` (owner's word 2026-11-05); the harness template has nothing to push (its GitHub master is two PRs ahead of the local clone: a future instance sync, not a push).
+**Bootstrap done 16:03Z:** state + charter read; bash gauge 29.6 ms; `ListAgents` = orchestrator gen 49 `clearwater-orchestrator-20261105-0315` ALIVE (busy), gen 48 and CHARC gen 16 listed idle/inert; inbox 0 unread / 664 read; ONLINE posted (`...73b1837a.md`) + cued. C: 2.8 TB free, D: 2.1 TB free. Worktrees `wp6.3b` (`c3cf6f82`, turn 17) and `wp6.3b-rA` (`fa0fded4`) are OCCUPIED by the orchestrator's cells: I touch neither. Nothing to rule; the zvbi STOP re-presented to the owner in chat once.
+
+- (newest first; append here)
+
+## GEN 16 HANDOVER (verified at gen 17's pickup; still the live plan)
+
+Orchestrator = gen 49 `clearwater-orchestrator-20261105-0315` (always re-read `comms/.launch-sessions.json` before a cue). Main is pushed to origin as of `007586db` (owner's word 2026-11-05); the harness template has nothing to push (its GitHub master is two PRs ahead of the local clone: a future instance sync, not a push).
 
 **OPEN WITH THE OWNER (in CHARC's chat; re-present it once at pickup, then wait):** the WP6.3b zvbi licence STOP. BtbN's win64-gpl-9.0 `ffmpeg.exe` (GPL-3.0 by `--enable-version3`) statically links zvbi `34bb6f66` whose `packet-830.*` / `pdc.*` are GPL-2.0-only (seat record `wp6.3b/seat/licences-5031c6f1.md` s.3; the laptop's gyan.dev 9.0.2 FULL build has the same combination; gyan ESSENTIALS unknown, page unfetchable). Options: (a) self-build from the BtbN scripts at `5031c6f1` minus `50-zvbi.sh` (CHARC RECOMMENDS), (b) ship as-is (legal risk; never recommended), (c) user obtains = N14 relaxation = spec change, (d) another provider (unresearched). The FFmpeg bundle, `--zip`, the FFmpeg smoke / V4 / `hevc_nvenc` rows, the FFmpeg notices rows and the 1.1.0 draft release are CARVED OUT of WP6.3b into **WP6.3c**, whose brief CHARC writes after the owner rules. WP6.3b accepts WHOLE without them.
 
