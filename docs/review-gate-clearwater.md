@@ -158,6 +158,9 @@ candidate rebased onto main, and records the actual output lines):
   enabling reading and each leg's skip count); and the harness gate `uv run python -m unittest
   discover -s tests/harness` whenever the change touches `scripts/`, `.claude/`,
   the kernel docs or `tests/harness/`.
+- **W-STATIC (WP6.4 accept, AD-36, from 2026-11-05):** `uv run mypy --platform darwin` beside the default
+  `uv run mypy`, the same `files` set, `strict` and `warn_unreachable` unchanged; BOTH runs must report 0
+  errors (the early-return guard form fails one target with [unreachable]; the statement form passes both).
 - **The two-leg pytest gate** (WP-T4, AD-28, from 2026-10-28; measurements and limits in
   `docs/reports/wp-t4-parallel-tests.md`; sizing in `docs/reports/wp-t6-gate-sizing.md`; after
   WP-T6 the per-package gate is parallel about 714 s + serial about 1,389 s, about 35 min wall,
