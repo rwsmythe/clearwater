@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import importlib.util
 import json
 import os
 import subprocess
 import sys
+import time
+import uuid
 from pathlib import Path
 
 import psutil
 import pytest
 
 import test_tools_package_notices as support
-
-pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Windows onedir smoke")
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -55,7 +56,8 @@ if mode == 'hang':
     time.sleep(120)
 if mode in {'leftover', 'fast-leftover'}:
     child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(120)'],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             creationflags=subprocess.CREATE_NO_WINDOW)
     Path(config['pid']).write_text(str(child.pid))
     if mode == 'leftover':
         time.sleep(.2)
@@ -112,6 +114,8 @@ def snapshot(folder):
 
 @pytest.fixture
 def synthetic(tmp_path, monkeypatch):
+    if sys.platform != "win32":
+        pytest.skip("Windows onedir artifact fixture")
     smoke = load_smoke()
     release = support.release.__wrapped__(tmp_path)
     folder = release["folder"]
@@ -164,12 +168,10 @@ def synthetic(tmp_path, monkeypatch):
         "configure": release["ffmpeg"]["configure_line"],
         "refusals": REFUSALS,
     }
-    real_popen = subprocess.Popen
 
-    def launch(args, **kwargs):
+    def launch(executable, arguments, env):
         # Only substitute the native loader; supervision/capture/env/cwd remain real.
-        assert Path(args[0]).name in {"Clearwater.exe", "ffmpeg.exe", "ffprobe.exe"}
-        env = kwargs["env"]
+        assert executable.name in {"Clearwater.exe", "ffmpeg.exe", "ffprobe.exe"}
         assert env["PATH"] == str(Path(os.environ["SYSTEMROOT"]) / "System32")
         for key in (
             "APPDATA",
@@ -182,14 +184,13 @@ def synthetic(tmp_path, monkeypatch):
             "TMP",
         ):
             assert Path(env[key]).is_relative_to(tmp_path / "out/smoke")
-        assert kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW
         env["STUB_CONFIG"] = str(config_path)
-        env["STUB_EXE"] = args[0]
+        env["STUB_EXE"] = str(executable)
         # Use the native interpreter directly, not Windows' venv redirector,
         # which adds an unrelated short-lived bootstrap parent to each stub.
-        return real_popen([sys._base_executable, str(script), *args[1:]], **kwargs)
+        return [sys._base_executable, str(script), *arguments]
 
-    monkeypatch.setattr(smoke.subprocess, "Popen", launch)
+    monkeypatch.setattr(smoke, "_command", launch)
 
     def prepare(mode="", ffmpeg=False):
         config["mode"] = mode
@@ -221,25 +222,10 @@ def test_refusal_status_and_extra_stderr_fail_by_row_name(synthetic, tmp_path, m
 def test_timeout_and_surviving_child_fail_and_are_reaped(synthetic, tmp_path, mode, message):
     smoke, release, prepare, config = synthetic
     prepare(mode)
-    try:
-        with pytest.raises(smoke.SmokeError, match="refuse-command.*" + message):
-            smoke.run_smoke(release["folder"], out=tmp_path / "out", timeout=1)
-        pid = int(Path(config["pid"]).read_text())
-        assert not psutil.pid_exists(pid), psutil.Process(pid).as_dict(
-            attrs=["pid", "ppid", "status", "cmdline"]
-        )
-    finally:
-        # RED must also be bounded and leave no synthetic child behind.
-        if Path(config["pid"]).exists():
-            pid = int(Path(config["pid"]).read_text())
-            if psutil.pid_exists(pid):
-                child = psutil.Process(pid)
-                children = child.children(recursive=True)
-                for target in [*reversed(children), child]:
-                    if target.is_running():
-                        target.kill()
-                _, alive = psutil.wait_procs([*children, child], timeout=5)
-                assert not alive
+    with pytest.raises(smoke.SmokeError, match="refuse-command.*" + message):
+        smoke.run_smoke(release["folder"], out=tmp_path / "out", timeout=1)
+    pid = int(Path(config["pid"]).read_text())
+    assert not psutil.pid_exists(pid)
 
 
 @pytest.mark.parametrize(
@@ -262,6 +248,7 @@ def test_gui_or_other_uncommissioned_arguments_are_refused_before_launch(
         pytest.fail("unsafe argument set reached process launch")
 
     monkeypatch.setattr(smoke.subprocess, "Popen", forbidden)
+    monkeypatch.setattr(smoke, "_command", forbidden)
     with pytest.raises(smoke.SmokeError, match=r"unsafe.*GUI"):
         smoke.run_row(
             tmp_path / "Clearwater.exe",
@@ -356,3 +343,256 @@ def test_smoke_cli_runs_existing_folder_without_building(monkeypatch, tmp_path):
         build.parse_args(["--smoke"])
     with pytest.raises(SystemExit):
         build.parse_args(["--form", "onefile", "--smoke"])
+
+
+class RescueJob:
+    """Own a separate test job so RED cannot leave a synthetic sleeper behind."""
+
+    def __init__(self):
+        from ctypes import wintypes as w
+
+        api = ctypes.WinDLL("kernel32", use_last_error=True)
+        api.CreateJobObjectW.argtypes = [ctypes.c_void_p, w.LPCWSTR]
+        api.CreateJobObjectW.restype = w.HANDLE
+        api.SetInformationJobObject.argtypes = [w.HANDLE, ctypes.c_int, ctypes.c_void_p, w.DWORD]
+        api.CloseHandle.argtypes = [w.HANDLE]
+        self.api = api
+        self.name = "Local\\ClearwaterSmokeTest-" + uuid.uuid4().hex
+        self.handle = api.CreateJobObjectW(None, self.name)
+        assert self.handle, ctypes.WinError(ctypes.get_last_error())
+        # Windows x64 JOBOBJECT_EXTENDED_LIMIT_INFORMATION: LimitFlags at byte 16.
+        limits = ctypes.create_string_buffer(144)
+        ctypes.c_uint32.from_buffer(limits, 16).value = 0x2000
+        assert api.SetInformationJobObject(self.handle, 9, limits, len(limits)), ctypes.WinError(
+            ctypes.get_last_error()
+        )
+
+    def close(self):
+        if self.handle:
+            assert self.api.CloseHandle(self.handle)
+            self.handle = None
+
+
+JOB_STUB = r"""
+import ctypes, json, os, subprocess, sys, time
+from ctypes import wintypes as w
+from pathlib import Path
+config = json.loads(Path(os.environ['JOB_CONFIG']).read_text())
+api = ctypes.WinDLL('kernel32', use_last_error=True)
+api.GetCurrentProcess.restype = w.HANDLE
+api.IsProcessInJob.argtypes = [w.HANDLE, w.HANDLE, ctypes.POINTER(w.BOOL)]
+inside = w.BOOL()
+assert api.IsProcessInJob(api.GetCurrentProcess(), None, ctypes.byref(inside))
+Path(config['started']).write_text(json.dumps({'in_job': bool(inside.value)}))
+rescue_name = config.get('rescue')
+mode = config['mode']
+if mode in {'escape', 'pipe-holder'}:
+    # The intermediate and venv redirector both disappear before census. The
+    # grandchild records its own native PID, avoiding the redirector's PID.
+    sleeper = 'import os,time,ctypes; from ctypes import wintypes as w; from pathlib import Path; '
+    if rescue_name:
+        # RED's sleeper joins the test-owned rescue before it reports its PID.
+        # The root/intermediate remain unchanged, preserving the escape chain.
+        sleeper += ('a=ctypes.WinDLL("kernel32",use_last_error=True); '
+                    'a.OpenJobObjectW.argtypes=[w.DWORD,w.BOOL,w.LPCWSTR]; '
+                    'a.OpenJobObjectW.restype=w.HANDLE; '
+                    'a.GetCurrentProcess.restype=w.HANDLE; '
+                    'a.AssignProcessToJobObject.argtypes=[w.HANDLE,w.HANDLE]; '
+                    'h=a.OpenJobObjectW(1,False,' + repr(rescue_name) + '); '
+                    'assert h; assert a.AssignProcessToJobObject(h,a.GetCurrentProcess()); '
+                    'a.CloseHandle.argtypes=[w.HANDLE]; a.CloseHandle(h); ')
+    sleeper += ('Path(' + repr(config['pid']) + ').write_text(str(os.getpid())); '
+                'time.sleep(120)')
+    middle = ('import subprocess,sys; subprocess.Popen([sys.executable,"-c",'
+              + repr(sleeper) + ']' + ('' if mode == 'pipe-holder' else
+                ',stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL') +
+                ',creationflags=subprocess.CREATE_NO_WINDOW)')
+    subprocess.run([sys.executable, '-c', middle], check=True,
+                   stdout=None if mode == 'pipe-holder' else subprocess.DEVNULL,
+                   stderr=None if mode == 'pipe-holder' else subprocess.DEVNULL,
+                   creationflags=subprocess.CREATE_NO_WINDOW)
+    deadline = time.monotonic() + 5
+    while not Path(config['pid']).exists():
+        assert time.monotonic() < deadline
+        time.sleep(.01)
+elif mode == 'breakaway':
+    try:
+        child = subprocess.Popen([sys.executable, '-c', 'import time;time.sleep(120)'],
+                                 creationflags=(subprocess.CREATE_BREAKAWAY_FROM_JOB |
+                                                subprocess.CREATE_NO_WINDOW))
+    except OSError as error:
+        Path(config['breakaway']).write_text(str(error.winerror))
+        print('breakaway denied WinError ' + str(error.winerror), file=sys.stderr)
+        sys.exit(72)
+    Path(config['pid']).write_text(str(child.pid))
+    print('breakaway child created', file=sys.stderr)
+    sys.exit(73)
+print('Clearwater: -c is not supported', file=sys.stderr)
+sys.exit(2)
+"""
+
+
+@pytest.fixture
+def job_case(tmp_path, monkeypatch):
+    if sys.platform != "win32":
+        pytest.skip("Windows Job Object fixture")
+    smoke = load_smoke()
+    rescue = RescueJob()
+    config = {
+        "mode": "order",
+        "rescue": None if hasattr(smoke, "_kernel32") else rescue.name,
+        "started": str(tmp_path / "started.json"),
+        "pid": str(tmp_path / "pid.txt"),
+        "breakaway": str(tmp_path / "breakaway.txt"),
+    }
+    script = tmp_path / "job-stub.py"
+    script.write_text(JOB_STUB)
+    config_path = tmp_path / "job-config.json"
+    monkeypatch.setenv("JOB_CONFIG", str(config_path))
+    real_popen = subprocess.Popen
+
+    def command(executable, arguments, env):
+        return [sys.executable, str(script), *arguments]
+
+    def legacy_loader(args, **kwargs):
+        return real_popen(command(Path(args[0]), args[1:], kwargs["env"]), **kwargs)
+
+    monkeypatch.setattr(smoke.subprocess, "Popen", legacy_loader)
+    monkeypatch.setattr(smoke, "_command", command, raising=False)
+    # This reproduction explicitly denies PPID observation. The ruled job
+    # census must work even when every intermediate is already gone.
+    monkeypatch.setattr(smoke, "_snapshot_children", lambda *a: None, raising=False)
+    monkeypatch.setattr(smoke, "_live", lambda *a: [], raising=False)
+    monkeypatch.setattr(smoke, "_cleanup", lambda *a: None, raising=False)
+
+    def run(mode="order", bound=1):
+        config["mode"] = mode
+        config_path.write_text(json.dumps(config))
+        return smoke.run_row(
+            tmp_path / "Clearwater.exe",
+            smoke.SmokeRow("job-" + mode, ("-c", "pass"), "", 2, "Clearwater: -c is not supported"),
+            root=tmp_path / "profile",
+            timeout=bound,
+        )
+
+    try:
+        yield smoke, config, run
+    finally:
+        rescue.close()  # the only RED cleanup kill path is this test's own job
+        if Path(config["pid"]).exists():
+            pid = int(Path(config["pid"]).read_text())
+            deadline = time.monotonic() + 5
+            while psutil.pid_exists(pid) and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert not psutil.pid_exists(pid)
+
+
+@pytest.mark.parametrize("mode", ["escape", "pipe-holder"])
+def test_job_census_catches_vanished_intermediate_and_bounds_pipe_holder(job_case, mode):
+    smoke, config, run = job_case
+    error = None
+    try:
+        run(mode)
+    except smoke.SmokeError as caught:
+        error = caught
+    pid = int(Path(config["pid"]).read_text())
+    if error is None:
+        assert psutil.pid_exists(pid), "escape stimulus died before the census assertion"
+    assert error is not None, "row passed with a live unobserved grandchild"
+    message = str(error)
+    assert "job-" + mode in message and "SURVIVORS" in message
+    assert f"pid={pid}" in message and "image=" in message
+    assert "python" in message.lower()
+    assert not psutil.pid_exists(pid)
+
+
+def test_root_is_assigned_to_its_own_job_before_resume(job_case, monkeypatch):
+    smoke, config, run = job_case
+    assert hasattr(smoke, "_kernel32"), "no native job setup exists"
+    api = smoke._kernel32()
+    create, resume, create_process = api.CreateJobObjectW, api.ResumeThread, api.CreateProcessW
+    jobs = []
+    checked = []
+
+    def record_job(*args):
+        handle = create(*args)
+        jobs.append(handle)
+        return handle
+
+    def checked_resume(thread):
+        from ctypes import wintypes as w
+
+        api.GetProcessIdOfThread.argtypes = [w.HANDLE]
+        api.GetProcessIdOfThread.restype = w.DWORD
+        handle = api.OpenProcess(0x1000, False, api.GetProcessIdOfThread(thread))
+        try:
+            inside = w.BOOL()
+            assert api.IsProcessInJob(handle, jobs[-1], ctypes.byref(inside))
+            assert inside.value, "root resumed outside the row's own job"
+            limits = ctypes.create_string_buffer(144)
+            assert api.QueryInformationJobObject(jobs[-1], 9, limits, len(limits), None)
+            flags = ctypes.c_uint32.from_buffer(limits, 16).value
+            assert flags & 0x2000 and not flags & (0x800 | 0x1000)
+            assert not Path(config["started"]).exists(), "root ran before assignment check"
+            checked.append(True)
+        finally:
+            api.CloseHandle(handle)
+        return resume(thread)
+
+    def checked_create(*args):
+        flags = args[5]
+        assert flags & 0x4 and flags & 0x08000000 and flags & 0x80000
+        assert not flags & 0x01000000  # no CREATE_BREAKAWAY_FROM_JOB
+        return create_process(*args)
+
+    monkeypatch.setattr(api, "CreateJobObjectW", record_job)
+    monkeypatch.setattr(api, "ResumeThread", checked_resume)
+    monkeypatch.setattr(api, "CreateProcessW", checked_create)
+    run()
+    assert checked == [True]
+    assert json.loads(Path(config["started"]).read_text()) == {"in_job": True}
+
+
+def test_breakaway_never_produces_a_clean_row(job_case):
+    smoke, config, run = job_case
+    with pytest.raises(smoke.SmokeError, match=r"job-breakaway.*(?:exit 72|SURVIVORS)"):
+        run("breakaway")
+    if Path(config["breakaway"]).exists():
+        assert Path(config["breakaway"]).read_text() == "5"
+    else:
+        assert not psutil.pid_exists(int(Path(config["pid"]).read_text()))
+
+
+@pytest.mark.parametrize(
+    "function",
+    [
+        "CreateJobObjectW",
+        "UpdateProcThreadAttribute",
+        "CreateProcessW",
+        "IsProcessInJob",
+        "ResumeThread",
+    ],
+)
+def test_job_creation_or_atomic_assignment_failure_is_named_and_never_runs_root(
+    job_case, monkeypatch, function
+):
+    smoke, config, run = job_case
+    assert hasattr(smoke, "_kernel32"), "no native job setup exists"
+
+    def denied(*args):
+        ctypes.set_last_error(5)
+        return 0xFFFFFFFF if function == "ResumeThread" else 0
+
+    monkeypatch.setattr(smoke._kernel32(), function, denied)
+    with pytest.raises(smoke.SmokeError, match=r"job-order.*WinError 5"):
+        run()
+    assert not Path(config["started"]).exists()
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="POSIX process-group native proof belongs to WP6.5"
+)
+def test_non_windows_containment_never_silently_skips(tmp_path):
+    smoke = load_smoke()
+    with pytest.raises(smoke.SmokeError, match=r"WP6\.5"):
+        smoke._process(tmp_path / "unused", [], stdin="", root=tmp_path, timeout=1, name="posix")

@@ -1,8 +1,10 @@
 # WP6.3b release workflow: implementation record
 
-Status: turn 11 adds the native-licence checkout guard and headless smoke,
-proved on synthetic archives and process stubs: 470 tests, Ruff, format and
-both mypy targets pass. The generator, native input
+Status: turn 12 implements CHARC's Windows Job Object containment ruling for
+every smoke process, including FFmpeg rows. Final cell validation: 479 passed,
+1 POSIX native-proof skip; Ruff, format and both mypy targets pass. Turn 11's
+OPEN MAJOR **closes on the seat re-run**, not on this cell's result alone.
+The generator, native input
 surface, --notices and --smoke build/standalone paths are implemented. The real
 built-folder census, additional native inputs if needed, real smoke/UIA watch,
 ZIP and subsequent release work remain the seat's/next dispatch's. No real
@@ -27,6 +29,7 @@ Claude pass; no review verdict is claimed here. Context depth is dispatcher-read
 | Turn 9 / generator and input-gap handoff | Applied dispatch-9 clarification; rendered verified texts, native details and coverage; added atomic writer, CLI and --notices wiring. OpenSSL missing redistribution material confirmed; folders carrying it are refused. | No Reviewer A round. Turn-8 MAJOR closed by seat clarification; 1 NEW MAJOR in-envelope input gap, plus the unchanged zvbi HOLD. | 1 NEW, 0 REOPENED; no reverts. | Notices generator and build option; synthetic/provenance/wiring tests; report. | Dispatcher supplied about 104K at turn-8 yield; turn-9 end pending dispatcher reading, not estimated. |
 | Turn 10 / native input surface and OpenSSL row | Copied the seat's exact text; added manifest schema/integrity/file-coverage validation, runtime/build matching and conditional OpenSSL rendering. Turn-9 input STOP closed under CHARC's ruling. | No Reviewer A round; no new blocking finding. The zvbi HOLD remains with the owner. | 0 NEW, 0 REOPENED; no reverts. Initial patch-placement slip fixed before GREEN. | Native manifest/text data, notices loader/row, tests and report only. | Dispatcher supplied about 167K at turn-9 end; turn-10 end pending dispatcher reading, not estimated. |
 | Turn 11 / checkout defect and headless smoke | One -text attribute rule, two Git-backed guards, isolated allowlisted smoke rows, artifact rechecks, disposable planted-failure copy, process cleanup and build/CLI wiring. | No Reviewer A round. Seat MAJOR checkout defect fixed; direct-child race and minor environment/platform issues fixed. MAJOR process-ancestry limit remains OPEN for seat/CHARC disposition below. | All new observations, 0 REOPENED; no product revert. Temporary missing-smoke-call mutant rejected and byte-restored. | Build/smoke tools, attribute rule, synthetic tool tests and report. No product-runtime file changed. | Fresh session after previous session retired at 199,050; this turn's depth awaits dispatcher reading, never estimated. |
+| Turn 12 / ruled containment remediation | Replaced PPID supervision with one kill-on-close, non-breakaway Windows job per process; atomic assignment at process creation, retained thread resume, job census, bounded pipe cleanup and tests. | Turn 11's MAJOR implemented under CHARC's option (b); closes on the seat re-run. No new blocking finding or scope question. | The carried finding is being remediated, not a reopened review item. No product revert. Before-record source swaps restored byte-exactly. | Smoke tool, its synthetic tests and this report only; build wiring and runtime untouched. | Dispatcher supplied 155,874 at turn-11 end; turn-12 figure awaits dispatcher reading, never estimated. |
 
 Turn 2 bundled the three changes explicitly commissioned by dispatch 2; the seat
 commits each turn. No git write was performed by the cell.
@@ -1616,3 +1619,149 @@ or real-profile write, QUIT_SCRIPT test, Git write, push/tag/gh/workflow dispatc
 No dependency or runtime-source change. Only the seven owned files named in
 the return changed, plus ignored in-worktree evidence. Depth awaits the
 dispatcher's footer reading; the cell has no authoritative token figure.
+
+## Turn 12: OS containment for every smoke process (2026-11-05)
+
+CHARC's turn-11 ruling (main `1a8beb0d`, pasted in dispatch 12) selects option
+(b). **The OPEN MAJOR closes on the seat re-run.** The cell's tests are green;
+no seat, Reviewer A or package acceptance is asserted by this report.
+
+### Method and boundary
+
+Every Windows smoke row, including FFmpeg version/capability calls, now runs
+under its own job owned by the smoke process. Limits set ONLY
+`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`; neither breakaway allowance flag is set.
+A product requesting breakaway would fail the row by design; AD-23's helper
+requests none. Nested jobs are supported on Windows 8+; this launch method's
+startup job-list attribute requires Windows 10+, consistent with the Windows
+11 release target. A failure on an unsupported/restricted host is a named
+Win32 error, never an uncontained fallback.
+
+**Choice: own `CreateProcessW`, with `PROC_THREAD_ATTRIBUTE_JOB_LIST`.** The
+job list makes assignment atomic with process creation. Unlike a Popen-based
+post-create assignment, a refused assignment leaves no unassigned suspended
+root requiring a separate termination path. The code retains both process
+and primary-thread handles, creates the root with `CREATE_SUSPENDED` and
+`CREATE_NO_WINDOW`, checks membership in THIS row's job with `IsProcessInJob`,
+and only then calls `ResumeThread`. It also uses an explicit inherited-handle
+list containing only the child's three standard pipe handles. Job handles
+are non-inheritable and remain owned by the smoke process.
+
+All ctypes calls are against kernel32, in AD-36's positive win32 branch.
+ctypes structures represent the native limit, startup and process records;
+stdlib msvcrt transfers parent pipe handles into binary file descriptors.
+No dependency was added. `build.py` is unchanged: `_process` retains its
+signature and returns `CompletedProcess[str]`, preserving the smoke wiring.
+
+The native runner keeps the existing isolated environment, request stdin,
+captured outputs, row names, status/line checks and per-row time bound.
+Daemon pipe readers and a request writer run independently of the root wait.
+After root exit, the runner waits within the same bound for pipe completion
+and an empty **job process-list census** (`JobObjectBasicProcessIdList`).
+The census buffer grows on `ERROR_MORE_DATA`. A live root at the deadline
+is a timeout; an exited root with remaining job processes is `SURVIVORS`,
+naming every returned PID and image. `QueryFullProcessImageNameW` supplies
+images, with psutil's name used only as a diagnostic fallback. No PPID scan
+participates in success, failure or cleanup.
+
+The failure/census is printed and flushed BEFORE job close. Finally blocks
+close the job, which is the ONLY kill path for a row's tree; there is no
+TerminateProcess, TerminateJobObject or PID kill. Retained handles wait for
+termination, and pipe threads join with one shared five-second cleanup bound.
+Pipe, process, primary-thread, attribute-list and diagnostic handles are
+released. Job create/setup/atomic-assignment failures are named and never
+resume a root; failures after creation kill the still-contained root on close.
+
+### Reproduction and census rows: RED then GREEN
+
+All evidence lives under `work/c63b-12-evidence/`. The real native kernel job
+mechanism is exercised, but EVERY executable payload is a stdlib Python stub.
+The release archive/executable is never executed. The synthetic inventory,
+notice coverage and shipping-byte invariance checks remain intact.
+
+| Case | RED / before record on turn 11 | GREEN / final native-job record |
+| --- | --- | --- |
+| Venv redirector, vanished intermediate, lingering native grandchild | `red-escape-confirmed.log`: 1 failed / 29 deselected. Turn 11 printed PASS while the recorded grandchild PID was still alive. PPID observation was explicitly unavailable, and old PID cleanup was disabled; a test-owned rescue job held the sleeper for safe RED cleanup. | Named `job-escape: SURVIVORS`, PID and image required; descendant is gone after the row returns. Final census includes native Python, its venv redirector and associated conhost. |
+| Grandchild retains stdout/stderr after root exit | `red-pipeholder-before.log`: bounded five-second watchdog exit 1; turn 11 blocked in Popen's stdout.close with a pipe reader waiting for EOF. Its test process's exit closed the rescue job and killed the sleeper. | Row's one-second deadline ends in `job-pipe-holder: SURVIVORS`, naming PID/image; job close kills it and pipe readers end. No unbounded stream close. |
+| Hanging root | Retained turn-11 timeout regression; already covered the old root wait. | Named timeout; root is killed by job close and no process remains. |
+| Slow parent / immediate parent with survivor | Retained turn-11 controls; old PPID proof was insufficient for the vanished-intermediate case above. | Both fail by row name and job census, then the recorded child PID is gone. |
+| Assignment before ANY root code | `red-setup-before.log`: no native job setup; before-record membership/order test fails. | Actual suspended process is verified in the row's OWN job before ResumeThread, with startup canary still absent. Kernel-read limits prove kill-on-close and neither breakaway flag; creation flags include suspended/no-window and exclude breakaway. Stub's first act records in-job membership. |
+| Breakaway requested by child | Initial before record rejected it under inherited host restrictions; this alone did not prove a row-owned policy. | In the final run creation succeeded but child remained in the row job. `job-breakaway: SURVIVORS` names it; job close kills it. Never a clean row or escaped child. |
+| CreateJobObjectW / atomic assignment attribute / CreateProcessW failures | Native setup absent on turn 11; corresponding before-record checks fail. | Injected WinError 5 at each stage produces a named failure and no startup canary; no uncontained root runs. |
+| Membership-query / ResumeThread failures after contained creation | Native setup absent on turn 11; corresponding before-record checks fail. | Injected WinError 5 produces a named failure, no startup canary, and job-close cleanup of the suspended root. |
+| POSIX branch | No native POSIX proof was commissioned here. | One explicit skip on win32, naming WP6.5; Darwin type check passes. See limit below. |
+
+`red-setup-before.log` has 6 failed / 26 deselected (order plus five fault-stage
+checks) against the exact HEAD turn-11 tool. Each before-record script reads
+the old tool with read-only `git show`, temporarily writes only the owned
+smoke file, and restores turn-12 bytes exactly in a finally; restore logs are
+`before-restore.log`, `before-pipe-restore.log`, `before-setup-restore.log`.
+No source entry point or GUI is involved. There is no test PID-kill fallback.
+
+The initial `green-job-1.log` had 2 failed / 4 passed: a rescue guard joined
+the ROOT to an additional job and the escape fixture produced no survivors.
+That was not the required live-grandchild stimulus. The corrected RED guard
+is joined only by the sleeper before it reports its PID; GREEN relies solely
+on the production row job. The re-run proves the actual live-child RED and
+job-census GREEN. `green-smoke.log` then had 28 passed / 1 skipped before the
+additional setup-fault controls. `job-census-evidence.log` has 9 passed / 23
+deselected with captured per-case census/Win32 errors.
+
+The FINAL `pytest-validation.log` uses `-rP` to retain the passing negative
+controls' diagnostics. Example final censuses: escape lists PID 13220 (venv
+Python), 26900 (native Python) and 8560 (conhost); pipe-holder lists 30768,
+31908 and 23124; breakaway lists 33184, 3500 and 31104, with full image paths.
+These are ephemeral test PIDs, not identities to act on. Every reported
+process belongs to the row's job; the handle closes them without PID kills.
+All stub descendants request no-window creation; conhost census membership
+is not interpreted as window evidence. The real seat UIA watch remains owed.
+
+### Non-Windows limit
+
+The ruled POSIX method is `start_new_session=True`, a process-group census
+using `killpg(pgid, 0)`, and bounded killpg cleanup. WP6.5 must implement/prove
+that path natively. This Windows release tool cannot honestly assert such a
+proof, so its non-win32 containment branch explicitly fails CLOSED with a
+named `POSIX start_new_session/killpg containment awaits WP6.5 native proof`
+error and launches nothing. It never silently skips containment. The branch
+docstring states this limit; its contract test skips on Windows with that
+native-proof reason, and `mypy --platform darwin` checks the selected branch.
+
+### Final required validation and verification loop
+
+| Log | Observed final result |
+| --- | --- |
+| `ruff-check.log` | Exit 0; All checks passed! |
+| `ruff-format.log` | Exit 0; 336 files already formatted |
+| `mypy.log` | Exit 0; Success: no issues found in 166 source files |
+| `mypy-darwin.log` | Exit 0; Success: no issues found in 166 source files |
+| `pytest-validation.log` | Exit 0; 479 passed, 1 skipped in 29.48 s |
+
+The final five-module selection is dispatch 12's, with PYTHONPATH=scripts,
+the sandbox mkdir shim, no cache provider, timeout 300 and fresh basetemp
+`work/c63b-12-final`. The initial required run used `work/c63b-12` and also
+passed (479 / 1); the final run additionally retains captured case output and
+follows explicit no-window flags on every stub descendant. Counts: 31 smoke
+passes + 1 POSIX skip, 112 notices, 60 FFmpeg, 83 build, 193 frozen-entry.
+No implementation edit followed final validation. No sandbox-only residual
+occurred. The WinError 5 fault cases are DELIBERATE injections, not sandbox
+denials of job creation/assignment. No check was weakened for the sandbox.
+
+| Suspected issue / severity | Confirmation | Disposition |
+| --- | --- | --- |
+| Carried MAJOR: vanished parent hides descendant | Exact turn-11 before record passes with live grandchild; final kernel job census names and cleans it | Implemented under CHARC's option (b); **closes on the seat re-run** |
+| MAJOR: inherited pipe holder defeats the row bound | Old source blocks in stream.close under bounded watchdog; final job/IO runner returns a named survivor failure at the row bound | Fixed in cell, pending seat re-run |
+| MAJOR: setup/assignment failure could run an uncontained bootstrap | Five native API fault stages, absent canary and atomic startup job-list assignment | Rejected for final implementation; failures never resume the root |
+| MAJOR: breakaway could escape or silently pass | Child requests breakaway, remains counted, row fails and recorded PID is gone | Fixed/green under actual row-job policy |
+| MINOR: rescue fixture could change the stimulus | Initial root-level rescue case had no survivors | Corrected: sleeper-only rescue on RED, no secondary job on GREEN |
+| MINOR: native branch could break Darwin typing or imply unproved POSIX support | Darwin mypy and explicit fail-closed branch/skip | Green; native POSIX implementation/proof remains WP6.5's |
+
+No new blocking finding was found in the final pass. The only carried
+acceptance item is the ruled seat re-run; Reviewer A is the dispatcher's
+Claude pass and has not run in this turn. No package/release/N13 acceptance
+is claimed. ZIP, the zvbi ruling and later workflow/document work remain
+untouched. No network, real FFmpeg archive access, frozen run, PyInstaller
+build, product GUI/desktop input, footage or real-profile write, QUIT_SCRIPT,
+Git write, push/tag/gh/workflow dispatch occurred. Only smoke.py, its tests
+and this report changed, plus ignored worktree evidence. The authoritative
+depth remains the dispatcher's reading (last supplied 155,874), not an estimate.

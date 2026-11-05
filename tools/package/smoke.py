@@ -8,20 +8,21 @@ supervision is not window evidence: the seat supplies the independent UIA watch.
 
 from __future__ import annotations
 
-import contextlib
+import ctypes
 import importlib.util
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import zipfile
 from collections.abc import Sequence
 from functools import cache
 from pathlib import Path
 from types import ModuleType
-from typing import NamedTuple, cast
+from typing import BinaryIO, NamedTuple, cast
 
 import psutil
 
@@ -151,60 +152,449 @@ def _environment(root: Path) -> dict[str, str]:
     return env
 
 
-def _live(processes: Sequence[psutil.Process]) -> list[psutil.Process]:
-    alive = []
-    for process in processes:
+def _command(executable: Path, arguments: Sequence[str], env: dict[str, str]) -> list[str]:
+    # The native loader boundary is replaced by Python stubs in tool tests only.
+    return [str(executable), *arguments]
+
+
+if sys.platform == "win32":
+    import msvcrt
+    from ctypes import wintypes as w
+
+    class _BasicLimit(ctypes.Structure):
+        _fields_ = [
+            ("process_time", ctypes.c_longlong),
+            ("job_time", ctypes.c_longlong),
+            ("flags", w.DWORD),
+            ("minimum_working_set", ctypes.c_size_t),
+            ("maximum_working_set", ctypes.c_size_t),
+            ("active_process_limit", w.DWORD),
+            ("affinity", ctypes.c_size_t),
+            ("priority_class", w.DWORD),
+            ("scheduling_class", w.DWORD),
+        ]
+
+    class _IoCounters(ctypes.Structure):
+        _fields_ = [
+            (name, ctypes.c_ulonglong)
+            for name in (
+                "read_operations",
+                "write_operations",
+                "other_operations",
+                "read_bytes",
+                "write_bytes",
+                "other_bytes",
+            )
+        ]
+
+    class _ExtendedLimit(ctypes.Structure):
+        _fields_ = [
+            ("basic", _BasicLimit),
+            ("io", _IoCounters),
+            ("process_memory", ctypes.c_size_t),
+            ("job_memory", ctypes.c_size_t),
+            ("peak_process_memory", ctypes.c_size_t),
+            ("peak_job_memory", ctypes.c_size_t),
+        ]
+
+    class _SecurityAttributes(ctypes.Structure):
+        _fields_ = [("length", w.DWORD), ("descriptor", ctypes.c_void_p), ("inherit", w.BOOL)]
+
+    class _StartupInfo(ctypes.Structure):
+        _fields_ = [
+            ("cb", w.DWORD),
+            ("reserved", w.LPWSTR),
+            ("desktop", w.LPWSTR),
+            ("title", w.LPWSTR),
+            ("x", w.DWORD),
+            ("y", w.DWORD),
+            ("width", w.DWORD),
+            ("height", w.DWORD),
+            ("x_chars", w.DWORD),
+            ("y_chars", w.DWORD),
+            ("fill", w.DWORD),
+            ("flags", w.DWORD),
+            ("show", w.WORD),
+            ("reserved_size", w.WORD),
+            ("reserved_bytes", ctypes.c_void_p),
+            ("stdin", w.HANDLE),
+            ("stdout", w.HANDLE),
+            ("stderr", w.HANDLE),
+        ]
+
+    class _StartupInfoEx(ctypes.Structure):
+        _fields_ = [("startup", _StartupInfo), ("attributes", ctypes.c_void_p)]
+
+    class _ProcessInfo(ctypes.Structure):
+        _fields_ = [("process", w.HANDLE), ("thread", w.HANDLE), ("pid", w.DWORD), ("tid", w.DWORD)]
+
+    @cache
+    def _kernel32() -> ctypes.WinDLL:
+        api = ctypes.WinDLL("kernel32", use_last_error=True)
+        signatures = {
+            "CreateJobObjectW": ([ctypes.c_void_p, w.LPCWSTR], w.HANDLE),
+            "SetInformationJobObject": ([w.HANDLE, ctypes.c_int, ctypes.c_void_p, w.DWORD], w.BOOL),
+            "QueryInformationJobObject": (
+                [w.HANDLE, ctypes.c_int, ctypes.c_void_p, w.DWORD, ctypes.c_void_p],
+                w.BOOL,
+            ),
+            "CloseHandle": ([w.HANDLE], w.BOOL),
+            "CreatePipe": (
+                [
+                    ctypes.POINTER(w.HANDLE),
+                    ctypes.POINTER(w.HANDLE),
+                    ctypes.POINTER(_SecurityAttributes),
+                    w.DWORD,
+                ],
+                w.BOOL,
+            ),
+            "SetHandleInformation": ([w.HANDLE, w.DWORD, w.DWORD], w.BOOL),
+            "InitializeProcThreadAttributeList": (
+                [ctypes.c_void_p, w.DWORD, w.DWORD, ctypes.POINTER(ctypes.c_size_t)],
+                w.BOOL,
+            ),
+            "UpdateProcThreadAttribute": (
+                [
+                    ctypes.c_void_p,
+                    w.DWORD,
+                    ctypes.c_size_t,
+                    ctypes.c_void_p,
+                    ctypes.c_size_t,
+                    ctypes.c_void_p,
+                    ctypes.c_void_p,
+                ],
+                w.BOOL,
+            ),
+            "DeleteProcThreadAttributeList": ([ctypes.c_void_p], None),
+            "CreateProcessW": (
+                [
+                    w.LPCWSTR,
+                    w.LPWSTR,
+                    ctypes.c_void_p,
+                    ctypes.c_void_p,
+                    w.BOOL,
+                    w.DWORD,
+                    ctypes.c_void_p,
+                    w.LPCWSTR,
+                    ctypes.c_void_p,
+                    ctypes.POINTER(_ProcessInfo),
+                ],
+                w.BOOL,
+            ),
+            "IsProcessInJob": ([w.HANDLE, w.HANDLE, ctypes.POINTER(w.BOOL)], w.BOOL),
+            "ResumeThread": ([w.HANDLE], w.DWORD),
+            "WaitForSingleObject": ([w.HANDLE, w.DWORD], w.DWORD),
+            "GetExitCodeProcess": ([w.HANDLE, ctypes.POINTER(w.DWORD)], w.BOOL),
+            "OpenProcess": ([w.DWORD, w.BOOL, w.DWORD], w.HANDLE),
+            "QueryFullProcessImageNameW": (
+                [w.HANDLE, w.DWORD, w.LPWSTR, ctypes.POINTER(w.DWORD)],
+                w.BOOL,
+            ),
+        }
+        for name, (arguments, result) in signatures.items():
+            function = getattr(api, name)
+            function.argtypes = arguments
+            function.restype = result
+        return api
+
+    def _win_error(name: str, operation: str) -> SmokeError:
+        code = ctypes.get_last_error()
+        return SmokeError(
+            f"{name}: {operation}: WinError {code}: {ctypes.FormatError(code).strip()}"
+        )
+
+    def _job_pids(api: ctypes.WinDLL, job: int, name: str) -> list[int]:
+        capacity = 32
+        while capacity <= 100_000:
+            data = ctypes.create_string_buffer(8 + capacity * ctypes.sizeof(ctypes.c_size_t))
+            result = api.QueryInformationJobObject(job, 3, data, len(data), None)
+            assigned = ctypes.c_uint32.from_buffer(data).value
+            listed = ctypes.c_uint32.from_buffer(data, 4).value
+            if result and assigned <= listed <= capacity:
+                pids = (ctypes.c_size_t * listed).from_buffer(data, 8)
+                return list(pids)
+            if not result and ctypes.get_last_error() != 234:  # ERROR_MORE_DATA
+                raise _win_error(name, "QueryInformationJobObject(process list)")
+            capacity = max(capacity * 2, assigned + 16)
+        raise SmokeError(f"{name}: job process census exceeds 100000 entries")
+
+    def _image(api: ctypes.WinDLL, pid: int) -> str:
+        handle = api.OpenProcess(0x1000, False, pid)  # QUERY_LIMITED_INFORMATION
+        if handle:
+            try:
+                size = w.DWORD(32768)
+                text = ctypes.create_unicode_buffer(size.value)
+                if api.QueryFullProcessImageNameW(handle, 0, text, ctypes.byref(size)):
+                    return text.value
+            finally:
+                api.CloseHandle(handle)
         try:
-            if process.is_running() and process.status() != psutil.STATUS_ZOMBIE:
-                alive.append(process)
-        except psutil.NoSuchProcess:
-            pass
-    return alive
+            return cast(str, psutil.Process(pid).name())
+        except psutil.Error:
+            return "<image unavailable>"
 
+    def _contained_process(
+        executable: Path,
+        arguments: Sequence[str],
+        *,
+        stdin: str,
+        root: Path,
+        timeout: float,
+        name: str,
+    ) -> subprocess.CompletedProcess[str]:
+        """Create a suspended root atomically inside a non-breakaway, kill-on-close job.
 
-def _snapshot_children(pid: int, started: float, tracked: dict[int, psutil.Process]) -> None:
-    # Unlike Process.children(), a PPID snapshot also finds direct children after
-    # a fast parent has exited. Retain all observed ancestor IDs, not just live
-    # ones, and reject older processes (PID reuse). Windows keeps inherited PPIDs.
-    processes = list(psutil.process_iter(["pid", "ppid", "create_time"]))
-    parents = {pid, *tracked}
-    while True:
-        found = False
-        for child in processes:
-            if child.pid in parents:
-                continue
-            info = child.info
-            if (
-                info["ppid"] in parents
-                and info["create_time"] is not None
-                and info["create_time"] >= started
-            ):
-                parents.add(child.pid)
-                tracked[child.pid] = child
-                found = True
-        if not found:
-            return
+        PROC_THREAD_ATTRIBUTE_JOB_LIST (Windows 10+) makes assignment part of
+        CreateProcessW: failure leaves no unassigned suspended root to terminate.
+        The root's membership is checked before its retained thread is resumed.
+        Readers/writer are daemon threads; census/waits remain bounded even when
+        an orphan holds a pipe. Only closing this job kills its process tree.
+        """
+        api = _kernel32()
+        job = 0
+        handles: set[int] = set()
+        streams: list[BinaryIO] = []
+        workers: list[threading.Thread] = []
+        info = _ProcessInfo()
+        attributes_ready = False
+        attribute_memory = None
+        output = [b"", b""]
+        io_errors: list[str] = []
+        argv: list[str] = []
 
+        def check(result: object, operation: str) -> None:
+            if not result:
+                raise _win_error(name, operation)
 
-def _cleanup(
-    process: subprocess.Popen[str],
-    parent: psutil.Process | None,
-    tracked: list[psutil.Process],
-    name: str,
-) -> None:
-    if parent is not None:
-        with contextlib.suppress(psutil.NoSuchProcess):
-            tracked.extend(parent.children(recursive=True))
-    # Kill descendants before the root; Process objects guard against PID reuse.
-    for child in reversed(tracked):
-        with contextlib.suppress(psutil.NoSuchProcess):
-            child.kill()
-    if process.poll() is None:
-        process.kill()
-    process.wait(timeout=5)
-    _, alive = psutil.wait_procs(tracked, timeout=5)
-    if _live(alive):
-        raise SmokeError(f"{name}: process left after cleanup")
+        def close_handle(handle: int) -> None:
+            check(api.CloseHandle(handle), "CloseHandle")
+            handles.discard(handle)
+
+        def pipe() -> tuple[int, int]:
+            read, write = w.HANDLE(), w.HANDLE()
+            security = _SecurityAttributes(ctypes.sizeof(_SecurityAttributes), None, True)
+            check(
+                api.CreatePipe(ctypes.byref(read), ctypes.byref(write), ctypes.byref(security), 0),
+                "CreatePipe",
+            )
+            assert read.value is not None and write.value is not None
+            handles.update((read.value, write.value))
+            return read.value, write.value
+
+        def stream_for(handle: int, mode: str) -> BinaryIO:
+            access = os.O_WRONLY if mode == "wb" else os.O_RDONLY
+            descriptor = msvcrt.open_osfhandle(handle, os.O_BINARY | access)
+            handles.discard(handle)  # the descriptor now owns the Win32 handle
+            stream = cast(BinaryIO, os.fdopen(descriptor, mode, buffering=0))
+            streams.append(stream)
+            return stream
+
+        def read_pipe(stream: BinaryIO, index: int) -> None:
+            try:
+                output[index] = stream.read()
+            except OSError as error:
+                io_errors.append(str(error))
+
+        def write_pipe(stream: BinaryIO) -> None:
+            try:
+                stream.write(stdin.encode("utf-8"))
+            except BrokenPipeError:
+                pass  # refusal may exit without consuming input, as with communicate()
+            except OSError as error:
+                io_errors.append(str(error))
+            finally:
+                stream.close()  # request EOF is part of the worker protocol
+
+        try:
+            env = _environment(root)
+            argv = _command(executable, arguments, env)
+            job = api.CreateJobObjectW(None, None)
+            check(job, "CreateJobObjectW")
+            limits = _ExtendedLimit()
+            limits.basic.flags = 0x2000  # KILL_ON_JOB_CLOSE; both BREAKAWAY flags absent
+            check(
+                api.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits)),
+                "SetInformationJobObject(limits)",
+            )
+            child_in, parent_in = pipe()
+            parent_out, child_out = pipe()
+            parent_err, child_err = pipe()
+            for handle in (parent_in, parent_out, parent_err):
+                check(api.SetHandleInformation(handle, 1, 0), "SetHandleInformation(no inherit)")
+            size = ctypes.c_size_t()
+            api.InitializeProcThreadAttributeList(None, 2, 0, ctypes.byref(size))
+            check(size.value, "InitializeProcThreadAttributeList(size)")
+            attribute_memory = ctypes.create_string_buffer(size.value)
+            check(
+                api.InitializeProcThreadAttributeList(attribute_memory, 2, 0, ctypes.byref(size)),
+                "InitializeProcThreadAttributeList",
+            )
+            attributes_ready = True
+            job_list = (w.HANDLE * 1)(job)
+            check(
+                api.UpdateProcThreadAttribute(
+                    attribute_memory, 0, 0x2000D, job_list, ctypes.sizeof(job_list), None, None
+                ),
+                "UpdateProcThreadAttribute(atomic job assignment)",
+            )
+            handle_list = (w.HANDLE * 3)(child_in, child_out, child_err)
+            check(
+                api.UpdateProcThreadAttribute(
+                    attribute_memory,
+                    0,
+                    0x20002,
+                    handle_list,
+                    ctypes.sizeof(handle_list),
+                    None,
+                    None,
+                ),
+                "UpdateProcThreadAttribute(pipe handles)",
+            )
+            startup = _StartupInfoEx()
+            startup.startup.cb = ctypes.sizeof(startup)
+            startup.startup.flags = 0x100  # STARTF_USESTDHANDLES
+            startup.startup.stdin, startup.startup.stdout, startup.startup.stderr = (
+                child_in,
+                child_out,
+                child_err,
+            )
+            startup.attributes = ctypes.addressof(attribute_memory)
+            command_line = ctypes.create_unicode_buffer(subprocess.list2cmdline(argv))
+            environment = ctypes.create_unicode_buffer(
+                "\0".join(f"{key}={value}" for key, value in sorted(env.items())) + "\0\0"
+            )
+            # SUSPENDED | NO_WINDOW | UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT.
+            check(
+                api.CreateProcessW(
+                    argv[0],
+                    command_line,
+                    None,
+                    None,
+                    True,
+                    0x08080404,
+                    environment,
+                    str(executable.parent),
+                    ctypes.byref(startup),
+                    ctypes.byref(info),
+                ),
+                "CreateProcessW(atomic job assignment)",
+            )
+            handles.update((info.process, info.thread))
+            for handle in (child_in, child_out, child_err):
+                close_handle(handle)
+            inside = w.BOOL()
+            check(
+                api.IsProcessInJob(info.process, job, ctypes.byref(inside)),
+                "IsProcessInJob(before resume)",
+            )
+            if not inside.value:
+                raise SmokeError(f"{name}: suspended root is not in its row job")
+            write_stream = stream_for(parent_in, "wb")
+            read_streams = [stream_for(parent_out, "rb"), stream_for(parent_err, "rb")]
+            workers = [
+                threading.Thread(target=read_pipe, args=(stream, index), daemon=True)
+                for index, stream in enumerate(read_streams)
+            ]
+            workers.append(threading.Thread(target=write_pipe, args=(write_stream,), daemon=True))
+            for worker in workers:
+                worker.start()
+            deadline = time.monotonic() + timeout
+            previous = api.ResumeThread(info.thread)
+            if previous == 0xFFFFFFFF:
+                raise _win_error(name, "ResumeThread")
+            if previous != 1:
+                raise SmokeError(f"{name}: unexpected initial thread suspend count {previous}")
+            while True:
+                wait = api.WaitForSingleObject(info.process, 0)
+                if wait == 0xFFFFFFFF:
+                    raise _win_error(name, "WaitForSingleObject(root)")
+                pids = _job_pids(api, job, name) if wait == 0 else []
+                if wait == 0 and not pids and not any(worker.is_alive() for worker in workers):
+                    break
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    if wait != 0:
+                        raise SmokeError(f"{name}: timeout after {timeout:g} s (root still alive)")
+                    if pids:
+                        census = "; ".join(f"pid={pid} image={_image(api, pid)}" for pid in pids)
+                        raise SmokeError(f"{name}: SURVIVORS (process left in job): {census}")
+                    raise SmokeError(f"{name}: timeout waiting for pipe EOF after root exit")
+                time.sleep(min(0.01, remaining))
+            status = w.DWORD()
+            check(api.GetExitCodeProcess(info.process, ctypes.byref(status)), "GetExitCodeProcess")
+            if io_errors:
+                raise SmokeError(f"{name}: pipe IO failed: {'; '.join(io_errors)}")
+            print(
+                f"{name}: job census PASS (0 processes; assigned before resume; breakaway denied)"
+            )
+            return subprocess.CompletedProcess(
+                argv,
+                status.value,
+                output[0].decode("utf-8", "replace"),
+                output[1].decode("utf-8", "replace"),
+            )
+        except (SmokeError, OSError) as error:
+            # The survivor census/error is recorded while the job still owns it.
+            message = str(error).encode("ascii", "backslashreplace").decode("ascii")
+            print(f"{name}: FAIL ({message})", flush=True)
+            raise
+        finally:
+            waiting: list[int] = []
+            try:
+                if job:
+                    for pid in _job_pids(api, job, name):
+                        handle = api.OpenProcess(
+                            0x101000, False, pid
+                        )  # SYNCHRONIZE | QUERY_LIMITED
+                        if handle:
+                            waiting.append(handle)
+            finally:
+                if job:
+                    # No TerminateProcess / PID kill path: close kills this entire job.
+                    check(api.CloseHandle(job), "CloseHandle(job; kill tree)")
+                cleanup_deadline = time.monotonic() + 5
+                try:
+                    for handle in ([info.process] if info.process else []) + waiting:
+                        milliseconds = max(0, int((cleanup_deadline - time.monotonic()) * 1000))
+                        if api.WaitForSingleObject(handle, milliseconds) != 0:
+                            raise SmokeError(
+                                f"{name}: job process did not terminate after job close"
+                            )
+                    for worker in workers:
+                        worker.join(max(0, cleanup_deadline - time.monotonic()))
+                    if any(worker.is_alive() for worker in workers):
+                        raise SmokeError(f"{name}: pipe thread did not end after job close")
+                finally:
+                    for handle in waiting:
+                        api.CloseHandle(handle)
+                    for stream in streams:
+                        if not any(worker.is_alive() for worker in workers):
+                            stream.close()
+                    for handle in handles:
+                        api.CloseHandle(handle)
+                    if attributes_ready:
+                        api.DeleteProcThreadAttributeList(attribute_memory)
+
+else:
+
+    def _contained_process(
+        executable: Path,
+        arguments: Sequence[str],
+        *,
+        stdin: str,
+        root: Path,
+        timeout: float,
+        name: str,
+    ) -> subprocess.CompletedProcess[str]:
+        """Refuse unproved POSIX containment; WP6.5 must supply its native proof.
+
+        The ruled method is start_new_session=True with a process-group census
+        via killpg(pgid, 0) and bounded killpg cleanup. It has not been proved
+        natively here, so this Windows release tool never launches uncontained.
+        """
+        raise SmokeError(
+            f"{name}: POSIX start_new_session/killpg containment awaits WP6.5 native proof"
+        )
 
 
 def _process(
@@ -216,56 +606,12 @@ def _process(
     timeout: float,
     name: str,
 ) -> subprocess.CompletedProcess[str]:
-    flags = 0
-    if sys.platform == "win32":
-        flags = subprocess.CREATE_NO_WINDOW
-    tracked: dict[int, psutil.Process] = {}
-    started = time.time()
     try:
-        with subprocess.Popen(
-            [str(executable), *arguments],
-            cwd=executable.parent,
-            env=_environment(root),
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=flags,
-        ) as process:
-            parent = None
-            try:
-                # A fast refusal may exit before the process snapshot.
-                with contextlib.suppress(psutil.NoSuchProcess):
-                    parent = psutil.Process(process.pid)
-                deadline = time.monotonic() + timeout
-                request: str | None = stdin
-                while True:
-                    try:
-                        for child in [] if parent is None else parent.children(recursive=True):
-                            tracked[child.pid] = child
-                    except psutil.NoSuchProcess:
-                        pass
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0:
-                        raise SmokeError(f"{name}: timeout after {timeout:g} s")
-                    try:
-                        stdout, stderr = process.communicate(request, timeout=min(0.05, remaining))
-                        break
-                    except subprocess.TimeoutExpired:
-                        request = None
-                _snapshot_children(process.pid, started, tracked)
-                if _live(list(tracked.values())):
-                    raise SmokeError(f"{name}: process left after parent exit")
-                return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
-            finally:
-                try:
-                    _snapshot_children(process.pid, started, tracked)
-                finally:
-                    _cleanup(process, parent, list(tracked.values()), name)
-    except (OSError, psutil.Error, subprocess.TimeoutExpired) as error:
-        raise SmokeError(f"{name}: process supervision failed: {error}") from error
+        return _contained_process(
+            executable, arguments, stdin=stdin, root=root, timeout=timeout, name=name
+        )
+    except OSError as error:
+        raise SmokeError(f"{name}: native containment failed: {error}") from error
 
 
 def run_row(executable: Path, row: SmokeRow, *, root: Path, timeout: float = 60) -> None:
