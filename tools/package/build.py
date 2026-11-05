@@ -642,7 +642,10 @@ def find_executable(root: Path) -> Path:
     Raises:
         FileNotFoundError: No executable named :data:`APP_NAME` is there.
     """
-    suffix = ".exe" if sys.platform == "win32" else ""
+    if sys.platform == "win32":
+        suffix = ".exe"
+    else:
+        suffix = ""
     for candidate in (root / APP_NAME / f"{APP_NAME}{suffix}", root / f"{APP_NAME}{suffix}"):
         if candidate.is_file():
             return candidate

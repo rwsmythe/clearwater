@@ -117,6 +117,21 @@ def hits(found: list[str], needle: str) -> list[str]:
     return [line for line in found if needle in line]
 
 
+@pytest.mark.parametrize(
+    ("platform", "filename"), [("win32", "Clearwater.exe"), ("darwin", "Clearwater")]
+)
+@pytest.mark.parametrize("nested", [False, True])
+def test_executable_finder_preserves_both_layouts_and_platforms(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, platform: str, filename: str, nested: bool
+) -> None:
+    home = tmp_path / "Clearwater" if nested else tmp_path
+    home.mkdir(exist_ok=True)
+    expected = home / filename
+    expected.write_bytes(b"synthetic executable")
+    monkeypatch.setattr(build.sys, "platform", platform)
+    assert build.find_executable(tmp_path) == expected
+
+
 # F1: nested GPU content, at any depth.
 
 

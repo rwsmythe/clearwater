@@ -733,19 +733,28 @@ def _install_locked(root: Path, progress: Progress) -> PackResult:
         if problem is not None:
             raise _InstallError(problem)
         _cancel(progress)
-        os.replace(staging, destination)
-        staging = None  # Publication is complete; cleanup must never delete the installed pack.
-        if sys.platform != "win32":
-            try:
+        try:
+            os.replace(staging, destination)
+            staging = None  # Publication is complete; cleanup no longer owns this tree.
+            if sys.platform != "win32":
                 for folder in (destination, root):
                     descriptor = os.open(folder, os.O_RDONLY)
                     try:
                         os.fsync(descriptor)
                     finally:
                         os.close(descriptor)
-            except OSError as error:
+        except (Exception, KeyboardInterrupt):
+            # A rename can finish before interruption returns control to this block.
+            # Only a moved staging tree proves publication when replace did not return.
+            if staging is not None:
+                if staging.exists() or not destination.is_dir():
+                    raise
+                staging = None
+            # Reporting is best effort after publication, including an unprintable error
+            # or a handler that raises. Neither may change the installed outcome.
+            with suppress(Exception, KeyboardInterrupt):
                 _LOG.warning(
-                    "GPU pack directory fsync failed; installed pack kept: %s", _ascii(error)
+                    "GPU pack publication or directory fsync interrupted; installed pack kept"
                 )
         return PackResult(
             True, "GPU support is installed. Restart Clearwater to use it.", destination

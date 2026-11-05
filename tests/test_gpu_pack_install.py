@@ -26,6 +26,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
 
+import psutil
 import pytest
 
 from clearwater import gpu_pack
@@ -506,6 +507,110 @@ def test_a_failed_final_rename_cleans_up_staging(fake_index, monkeypatch):
     result = _installer().install(Progress())
     assert not result.ok and "open handle" in result.message
     assert list(fake_index.root.iterdir()) == []
+
+
+@pytest.fixture
+def local_pack(empty_plan, monkeypatch):
+    """Install a real synthetic wheel without opening the loopback index."""
+    installer, root = empty_plan
+    filename = "published-1.0-py3-none-any.whl"
+    data = _wheel("published")
+    distribution = gpu_pack.LockedDistribution(
+        "published",
+        "1.0",
+        (
+            (
+                filename,
+                hashlib.sha256(data).hexdigest(),
+                "https://files.pythonhosted.org/" + filename,
+                len(data),
+            ),
+        ),
+    )
+    monkeypatch.setattr(gpu_pack, "LOCKED_DISTRIBUTIONS", (distribution,))
+
+    def download(wheel, downloads, reporter, completed):
+        assert wheel.filename == filename
+        archive = downloads / filename
+        archive.write_bytes(data)
+        return archive
+
+    monkeypatch.setattr(installer, "_download", download)
+    return installer, root
+
+
+@pytest.mark.parametrize("failure", [RuntimeError, KeyboardInterrupt])
+@pytest.mark.parametrize("site", ["rename", "directory-sync"])
+def test_a_post_publication_failure_keeps_success(local_pack, monkeypatch, caplog, failure, site):
+    installer, root = local_pack
+    destination = root / gpu_pack.STAMP
+    replace, open_file = os.replace, os.open
+    injected = []
+
+    def publish(source, target):
+        replace(source, target)
+        if Path(target) == destination and site == "rename":
+            injected.append(site)
+            raise failure("injected after the real rename")
+
+    def open_directory(path, flags, *args, **kwargs):
+        if Path(path) == destination and site == "directory-sync":
+            assert destination.is_dir()
+            injected.append(site)
+            raise failure("injected after publication")
+        return open_file(path, flags, *args, **kwargs)
+
+    def refuse_cleanup(*args):
+        pytest.fail("cleanup attempted after publication")
+
+    monkeypatch.setattr(os, "replace", publish)
+    monkeypatch.setattr(os, "open", open_directory)
+    monkeypatch.setattr(installer, "_remove_tree", refuse_cleanup)
+    # Only the publication block is platform-dependent; do not select a foreign lock backend.
+    monkeypatch.setattr(sys, "platform", "darwin")
+    result = installer._install_locked(root, Progress())
+    assert injected == [site]
+    assert result.ok and not result.cancelled, result.message
+    assert result.message == "GPU support is installed. Restart Clearwater to use it."
+    assert result.path == destination and destination.is_dir()
+    assert list(gpu_pack.pack_problems(destination, full=True)) == []
+    assert list(root.iterdir()) == [destination]
+    assert len(caplog.records) == 1
+    assert "installed pack kept" in caplog.text
+
+
+@pytest.mark.parametrize("warning_failure", ["format", "handler", "interrupt"])
+def test_a_post_publication_warning_cannot_change_success(local_pack, monkeypatch, warning_failure):
+    installer, root = local_pack
+    destination = root / gpu_pack.STAMP
+    open_file = os.open
+    attempts = []
+
+    class UnprintableError(OSError):
+        def __str__(self):
+            raise RuntimeError("warning formatting failed")
+
+    def open_directory(path, flags, *args, **kwargs):
+        if Path(path) == destination:
+            raise UnprintableError()
+        return open_file(path, flags, *args, **kwargs)
+
+    def broken_warning(*args, **kwargs):
+        attempts.append(1)
+        if warning_failure == "interrupt":
+            raise KeyboardInterrupt
+        raise RuntimeError("warning handler failed")
+
+    monkeypatch.setattr(os, "open", open_directory)
+    if warning_failure != "format":
+        monkeypatch.setattr(installer._LOG, "warning", broken_warning)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    result = installer._install_locked(root, Progress())
+    assert result.ok and not result.cancelled, result.message
+    assert result.message == "GPU support is installed. Restart Clearwater to use it."
+    assert result.path == destination
+    assert list(gpu_pack.pack_problems(destination, full=True)) == []
+    assert len(attempts) == (0 if warning_failure == "format" else 1)
 
 
 def test_removal_handles_a_read_only_pack_file(fake_index):
@@ -1471,27 +1576,109 @@ while not Path(release).exists():
             assert snapshot() == before
         finally:
             release.touch()
-            try:
-                child.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                if ready.exists():
-                    with suppress(ProcessLookupError):
-                        os.kill(int(ready.read_text(encoding="ascii")), signal.SIGTERM)
-                else:
-                    if sys.platform == "win32":
-                        # Kill the tree while the launcher PID still identifies its children.
-                        with suppress(OSError, subprocess.TimeoutExpired):
-                            subprocess.run(
-                                ["taskkill", "/T", "/F", "/PID", str(child.pid)],
-                                stdin=subprocess.DEVNULL,
-                                stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL,
-                                timeout=5,
-                                check=False,
-                            )
-                    with suppress(OSError):
-                        child.kill()
-                child.wait(timeout=10)  # The interpreter also retains its own 8 s deadline.
+            _finish_mapped_child(child, ready)
         assert child.returncode == 0
     assert installer.apply_pending_removal().ok
     assert list(root.iterdir()) == []
+
+
+def _finish_mapped_child(child, ready, *, timeout=3):
+    """Finish a mapped-image child, including a launcher that never reports its PID."""
+    try:
+        child.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        if ready.exists():
+            with suppress(ProcessLookupError):
+                os.kill(int(ready.read_text(encoding="ascii")), signal.SIGTERM)
+        else:
+            if sys.platform == "win32":
+                # Kill the tree while the launcher PID still identifies its children.
+                with suppress(OSError, subprocess.TimeoutExpired):
+                    subprocess.run(
+                        ["taskkill", "/T", "/F", "/PID", str(child.pid)],
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=5,
+                        check=False,
+                    )
+            with suppress(OSError):
+                child.kill()
+        child.wait(timeout=10)  # The mapped-image interpreter retains its own 8 s deadline.
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows launcher-tree cleanup")
+@pytest.mark.timeout(60)
+@pytest.mark.parametrize("tree_kill", ["native", "controlled"])
+def test_mapped_child_without_a_pid_is_killed_with_its_descendants(
+    tmp_path, monkeypatch, tree_kill
+):
+    """Removing the no-PID tree kill leaves the live grandchild behind and fails this test."""
+    ready, alive = tmp_path / "unreported-pid", tmp_path / "alive"
+    environment = os.environ.copy()
+    for key in (
+        "APPDATA",
+        "LOCALAPPDATA",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+    ):
+        environment[key] = str(tmp_path / key)
+    code = """
+import subprocess, sys, time
+leaf_code = (
+    "import sys, time; from pathlib import Path; "
+    "Path(sys.argv[1]).write_text('alive', encoding='ascii'); time.sleep(30)"
+)
+leaf = subprocess.Popen([sys.executable, '-c', leaf_code, sys.argv[1]])
+time.sleep(30)
+"""
+    descendants = []
+    run = subprocess.run
+
+    def record_tree_kill(command, **kwargs):
+        if tree_kill == "controlled":
+            # Exercise the real live tree even when the restricted token denies taskkill.
+            assert command == ["taskkill", "/T", "/F", "/PID", str(child.pid)]
+            for process in reversed(descendants):
+                with suppress(psutil.NoSuchProcess):
+                    process.kill()
+            child.kill()
+            return subprocess.CompletedProcess(command, 0)
+        kwargs.update(stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        done = run(command, **kwargs)
+        (tmp_path / "tree-kill.log").write_bytes(done.stdout)
+        return done
+
+    monkeypatch.setattr(subprocess, "run", record_tree_kill)
+    with (tmp_path / "no-pid-child.log").open("wb") as log:
+        child = subprocess.Popen(
+            [sys.executable, "-c", code, str(alive)],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=log,
+        )
+        try:
+            deadline = time.monotonic() + 5
+            while not alive.exists() and child.poll() is None and time.monotonic() < deadline:
+                time.sleep(0.02)
+            descendants = psutil.Process(child.pid).children(recursive=True)
+            assert alive.exists(), "no-PID child did not start; see no-pid-child.log"
+            assert descendants, "the no-PID child must have a live descendant"
+            assert not ready.exists() and child.poll() is None
+            _finish_mapped_child(child, ready, timeout=0.2)
+            assert child.returncode is not None
+            _, remaining = psutil.wait_procs(descendants, timeout=3)
+            assert not remaining, "no-PID cleanup left an orphan"
+        finally:
+            # Independent teardown also contains the deliberately broken cleanup mutant.
+            for process in reversed(descendants):
+                with suppress(psutil.NoSuchProcess):
+                    process.kill()
+            if child.poll() is None:
+                child.kill()
+            child.wait(timeout=5)
+            _, remaining = psutil.wait_procs(descendants, timeout=5)
+            assert not remaining, "test teardown left an orphan"
