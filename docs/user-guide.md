@@ -308,6 +308,16 @@ workflow. It includes presets, batch export, provenance and safe export cleanup.
 The release's gate figures and acknowledged debt are recorded at acceptance in
 docs/proofs/release-1.0.0.md; the tag is made only with the owner's approval.
 
+### Upgrading on macOS from a 1.0.0 source run
+
+From this release Clearwater on macOS keeps its settings and presets under
+`~/Library/Application Support/Clearwater`, so they start fresh there. The
+folders a 1.0.0 source run used, `~/.config/clearwater` and
+`~/.cache/clearwater`, are not read, moved or deleted: copy a preset you want
+to keep from `~/.config/clearwater/presets` into the new `presets` folder (or
+use Import... in the Presets panel), and remove the old folders when you no
+longer need them.
+
 ## 8. Licence
 
 Clearwater is free software under **GPL-2.0-or-later**, meaning GPL version 2 or

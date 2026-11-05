@@ -11,6 +11,7 @@ dispatcher fills the depth figures.
 | 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | - | 247,937 (cell1, at return) |
 | A r2 (group B; folded turn 5) | Reviewer A, Codex | 0 / 6 | 2 minor, 3 advisory | 11 / 0 | 11 NEW / 0 REOPENED | 0 | tool 1 (item 1, `tools/footage_guard.py`) / tests-only 8 (items 2-6, 9-11); item 7 REJECTED, item 8 a report sentence | Codex review; cell5 fold | 314,460 at the turn-5 yield (cell5) |
 | A r3 (delta on turns 4 + 5; folded turn 6) | Reviewer A, Codex: NO_NEW_CRITICAL_MAJOR (A converged) | 0 / 0 | 2 minor, 2 advisory | 4 / 0 | 4 NEW / 0 REOPENED | 0 | product 0 / tests-only 4 (plus one verification-loop fix to #1) | Codex review; cell6 fold | 168,651 at the turn-6 yield (cell6) |
+| B r1 (on `d55573f1`; folded turn 7) | Reviewer B, Codex (WSL Linux, read-only): NEW_CRITICAL_MAJOR_FOUND | 0 / 3 | 3 minor, 2 advisory | 8 / 0 | 8 NEW / 0 REOPENED | 0 | product 2 (B1 `gui/batch_panel.py`, B4 `config/presets.py`) / tests-only 3 (B2, B5, B7) plus the guide 1 (B6); B3 BANKED, B8 no change (as ruled) | Codex review; cell7 fold | Depth at turn-7 yield: DISPATCHER TO FILL |
 
 ## Round 0
 
@@ -1088,3 +1089,107 @@ chain; the agent's shell resets its cwd between calls); every later call used ab
 Depth at point 1 (`c6ae9a19`): not read at the seat
 Depth at point 2 (`688163fc`): not read at the seat
 Depth at turn-6 yield: 168,651 (cell_depth.py --live, read at the seat ~00:23Z after the return; 85 turns). Under the 250K yield point. cell6 retired; Reviewer B's fold goes to a fresh cell (multi-finding, product).
+
+## Reviewer B fold-in (turn 7)
+
+Cell `wp64-cell7` (implementer-opus-high, FRESH), dispatch-7, base `d5bef275` (main `aaa8fc92`
+merged in, carrying CHARC's rulings). Reviewer B (Codex under WSL Linux, read-only, on `d55573f1`
+against `1e7cb908`): NEW_CRITICAL_MAJOR_FOUND, 3 MAJOR, 3 MINOR, 2 ADVISORY
+(`clearwater-review-evidence\wp6.4\B\review-B.txt`). The fold follows the brief's "Reviewer B
+rulings": B1, B2, B4, B5, B6, B7 folded; B3 BANKED (one limits line); B8 no change. Evidence in
+`work\wp6.4\`: `t7_yield.sh`, `t7-*.log`; the in-memory "before" plugins (`old_add_paths`,
+`old_presets`, `as_darwin`, `mut_nodev`, `mut_emptymsg`) live in the cell's scratch folder and
+load the `d5bef275` definitions from `git show` text, never a reverted file.
+
+### T7.1 Commits
+
+| Commit | What |
+|---|---|
+| `b439d093` | B1 and B4 (product): `add_paths` compares the queued paths' current identities and their lexical keys; the no-link fallback rechecks `os.path.lexists` and refuses with `FileExistsError`; the three B1 tests; W-FS[P73]'s `PresetStore.rename` model |
+| `a9131f3c` | B4: the W-FS[P73] model pairs written as ASCII escapes (the verification loop) |
+| `61aacbc0` | B2, B5, B7 (tests): the darwin-safe environment cases (the module's third and last edit), the explicit case-insensitive APFS image and the alias controls, the P29 two-device and P11 non-empty-message checks |
+| (this commit) | docs: the user guide's upgrade notice (B6), the report's turn-7 section, counts and limits, this section |
+
+All by pathspec with `-c core.autocrlf=false` and the Co-Authored-By line; blob check 0 CR in
+every committed file, and no non-ASCII byte added (`config/presets.py` keeps its one pre-existing
+line, the superscript digits of the reserved device names).
+
+### T7.2 The fold (B numbering)
+
+The report's section 1 "Turn 7" table carries finding -> change -> test -> before / after. In
+short:
+
+- **B1 MAJOR DONE (product).** Old code in memory: delete + reuse FAIL (B dropped), replace FAIL
+  (A twice); hard links pass on both. New: 4 / 4 (`t7-b1new.log`, `t7-b1old.log`).
+- **B2 MAJOR DONE (tests, third edit).** The tool's `sys` patched to darwin in memory: the old
+  module 5 FAIL / 14 pass (B named four; `test_psutil_failures_degrade:184` also asserts the
+  parsed GPU model, so it is folded in the same edit); the new module 19 / 19 under darwin and on
+  this host (`t7-b2old.log`, `t7-b2new.log`, `t7-b2host.log`). The darwin "never run
+  `nvidia-smi`" control is W-TOOL's in `test_portability`, unchanged.
+- **B3 BANKED.** One line in the report's section 10; the register row is CHARC's at the accept.
+- **B4 MINOR DONE (product).** The old fallback: `DID NOT RAISE` at `I` / dotless i (the model's
+  rename replaced `I.json`); new: pass (`t7-b4old.log`, `t7-b4new2.log`). The report's P73 line and
+  section 10 carry D1's limit.
+- **B5 MINOR DONE (tests).** REASONED only: the M cases skip off darwin.
+- **B6 MINOR DONE.** `docs/user-guide.md` section 7, one new subsection; nothing else changed.
+- **B7 ADVISORY DONE.** `st_dev`-dropped and empty-message mutants both FAIL; clean pass
+  (`t7-b7-*.log`).
+- **B8.** No change.
+
+### T7.3 Static and counts at `61aacbc0` (from the worktree root)
+
+    uv run --no-sync ruff check .                  All checks passed!
+    uv run --no-sync ruff format --check .         326 files already formatted
+    uv run --no-sync mypy                          Success: no issues found in 162 source files
+    uv run --no-sync mypy --platform darwin        Success: no issues found in 162 source files
+
+| Module | Whole module | Parallel leg, `-n 4` (collected / passed / skipped) | Serial leg (collected / passed / skipped) | Fullclip |
+|---|---|---|---|---|
+| `test_portability` | 185 passed | 168 / 168 / 0 | 17 / 17 / 0 | 0 |
+| `test_macos_portability` | 224 skipped | 205 / 0 / 205 | 19 / 0 / 19 | 0 |
+| `test_environment_report` | 19 passed | 19 / 19 / 0 | 0 | 0 |
+| `test_gui_batch_panel` | 47 passed (module-level `gui` mark: all on the serial leg; legs not run separately) | - | - | - |
+| `test_config_presets` | 121 passed | - | - | - |
+| `test_gui_preset_panel` | 46 passed | - | - | - |
+
+`--collect-only` over W and M: 409 = 373 + 36 + 0. Every M skip reads "macOS native leg (WP6.5)".
+No case id added or moved between legs (`t7-yield.log`).
+
+### T7.4 Verification loop (suspected / confirmed / rejected / fixed)
+
+- Suspected: the first B1 runs imported the MAIN tree's `clearwater` (an `AttributeError` for
+  `_stat`). Confirmed: `uv run` from the session's folder used the main tree's venv. Fixed: every
+  later run uses `uv run --directory <worktree>` (its `.venv`, its `src`); the first runs were
+  read-only test runs with their basetemp under the worktree's `work\wp6.4\`.
+- Suspected: the Edit tool wrote the `\u0131` / `\u00e9` / `\u0301` escapes as raw characters.
+  Confirmed (5 lines of `test_portability.py` in `b439d093`); fixed in `a9131f3c`, re-run.
+- Suspected: B's list of darwin failures is incomplete. Confirmed (the fifth case above); folded.
+- Suspected: the fallback's WARNING ("renamed ...") is logged before a refusal. Confirmed in the
+  first draft; fixed before commit (the WARNING follows the recheck; the text now says "without the
+  atomic no-replace check").
+- Suspected: the recheck refuses a rename the volume calls case-only but the store's policy does
+  not (`I` to dotless i on exFAT). Rejected as a defect: it refuses, the safe side, as the link
+  path's EEXIST would; recorded here as the behaviour.
+- Suspected: the in-memory "before" plugins do not install the old code. Rejected: each prints its
+  marker and turns the new tests red as predicted.
+- Suspected: B5's distinct-name controls are wrong on the sensitive image. REASONED, not
+  executable here: `DIVE/FOOTAGE` is a second real folder (its own identity) and darwin's
+  `normcase` keeps case, so `is_inside` is False; WP6.5 runs it.
+- A second pass (ruff, format, both mypy runs, CR / ASCII, the six modules and both legs) found
+  nothing new.
+
+### T7.5 Discipline record
+
+No stash, no bare `cd`, no mailbox post, no edit outside the owned and granted files
+(`src/clearwater/gui/batch_panel.py`, `src/clearwater/config/presets.py`,
+`tests/test_gui_batch_panel.py` (an existing `batch_panel` module), `tests/test_portability.py`,
+`tests/test_macos_portability.py`, `tests/test_environment_report.py`, `docs/user-guide.md`
+section 7 only, the report, this ledger), no frozen interface, no new dependency, no real FFmpeg
+or `nvidia-smi` from a test (the environment cases keep `FakeRun`), no entry point called, no
+Windows API under a patched platform (the darwin and linux views rebind only the tool's own `sys`
+name), every test run offscreen with `PYTEST_ADDOPTS` unset. One slip: the first runs used the
+main tree's venv (T7.4).
+
+Depth at point 1 (`a9131f3c`): not read at the seat
+Depth at point 2 (`61aacbc0`): not read at the seat
+Depth at turn-7 yield: DISPATCHER TO FILL

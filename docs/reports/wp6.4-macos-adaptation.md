@@ -16,12 +16,17 @@ group-B yield rulings).
   fix and the folded M and W instruments (section 1, "Turn 5").
 - `wp64-cell6` ran the Reviewer A r3 fold-in (turn 6): four test-only folds in the W helper
   instruments (section 1, "Turn 6").
+- `wp64-cell7` ran the Reviewer B fold-in (turn 7): the queue's current-identity comparison, the
+  preset fallback's recheck, the darwin-safe environment tests, the explicit APFS images, two W
+  mutant controls and the user guide's upgrade notice (section 1, "Turn 7").
 
 The ledger is `docs/proofs/wp6.4-ledger.md`, branch `wp6.4`. **No Mac was run.** Every M test is
-written to run natively and is UNEXECUTED until WP6.5. The counts below are the turn-6 cell's own
-runs at `a9e59e13`. Reviewer A (Codex) r2 on group B returned NEW_CRITICAL_MAJOR_FOUND and was
+written to run natively and is UNEXECUTED until WP6.5. The counts below are the turn-7 cell's own
+runs at `61aacbc0`. Reviewer A (Codex) r2 on group B returned NEW_CRITICAL_MAJOR_FOUND and was
 folded in turn 5; Reviewer A r3 (the delta on turns 4 + 5) returned NO_NEW_CRITICAL_MAJOR (2 MINOR,
-2 ADVISORY), folded in turn 6. Reviewer B and the package gate follow.
+2 ADVISORY), folded in turn 6. Reviewer B (Codex, on `d55573f1`) returned NEW_CRITICAL_MAJOR_FOUND
+(3 MAJOR, 3 MINOR, 2 ADVISORY), folded in turn 7 as CHARC ruled (the brief's "Reviewer B
+rulings"). A Codex delta on turns 6 + 7 and the package gate follow.
 
 ## 1. What was built
 
@@ -52,13 +57,17 @@ The per-item build cycles are recorded in ledger A.1.
   - The missing-tool text is platform-neutral (P16).
 - **Filesystem identity and names.**
   - DR-121: the queue identity is `(st_dev, st_ino)`, with the lexical fallback (P29); labels are
-    unchanged (D5).
+    unchanged (D5). Since turn 7 (Reviewer B 1) every queued path's identity is read again at each
+    add, and the lexical key is a second key: an identity is never cached past its file.
   - P70: the output-name refusal names the character and the stem.
   - P71: the wheel accumulates to 120 units per step. This is the fix of a pre-existing Windows
     defect: the old `wheelEvent` zoomed a full step on any non-zero delta, so a precision touchpad
     over-zoomed (section 10).
-  - P73: the preset rename never replaces (case-only rename, link then unlink, and the
-    EPERM / EXDEV / ENOTSUP / EMLINK fallback with one WARNING).
+  - P73: the preset rename does not replace another preset (case-only rename, link then unlink,
+    and the EPERM / EXDEV / ENOTSUP / EMLINK fallback with one WARNING), with D1's accepted
+    fallback limit: on a volume that makes no hard link the fallback rechecks that the target is
+    absent (turn 7, Reviewer B 4) and then uses POSIX `os.rename`, which replaces a file another
+    writer creates between that check and the rename (the residual race, DR-34(a)).
 - **The P55 docstrings in `interfaces/settings.py`.**
 - **The CPU-only dependency expression and the `macos` marker (item 12).**
 
@@ -226,6 +235,29 @@ reached through an attribute (`mod.helper()`) or a `match` statement is not foll
 counts as no stop, the strict side). The borrowed-case pin knows the fixture by its name
 `monkeypatch`; a patch made through another fixture's object (`request.getfixturevalue`) is not
 modelled. The link model is a virtual tree in which every non-link name is a folder.
+
+### Turn 7: the Reviewer B fold-in
+
+Reviewer B (Codex under WSL Linux, read-only, on `d55573f1` against `1e7cb908`) returned
+NEW_CRITICAL_MAJOR_FOUND: 3 MAJOR, 3 MINOR, 2 ADVISORY
+(`clearwater-review-evidence\wp6.4\B\review-B.txt`). CHARC ruled the fold (the brief's "Reviewer
+B rulings"); `wp64-cell7` folded B 1, 2, 4, 5, 6 and 7: `b439d093` + `a9131f3c` (B1, B4; product),
+`61aacbc0` (B2, B5, B7; tests), then the guide, this section and the ledger. Each "before" run
+loads the `d5bef275` definition in memory (a pytest plugin that `exec`s the old function from
+`git show` text into the live module, or rebinds the tool's `sys` name): no file of the tree is
+reverted, no entry point is called, no Windows API runs under a patched platform. Logs
+`work\wp6.4\t7-*.log`.
+
+| B finding | Change | Test | Before -> after (mutant result) |
+|---|---|---|---|
+| 1 MAJOR: queue identities cached at add time | `gui/batch_panel.py` `add_paths`: the queued paths' lexical keys (`_path_key`, 1.0.0's key) and their CURRENT identities (`_key` re-read for every queued path; a missing file gives its lexical key, so no identity) are built at each call; a new path is a duplicate when its lexical key or its identity matches. `BatchItem.key` stays (the key when queued); labels unchanged (D5) | `test_gui_batch_panel.py`: delete + number reuse (B is queued), replace in place + re-add and a hard link to the replacement (nothing new), two live hard links in one call and two (one item) and one number on two devices (two items); a mutable fake `os.stat` | the old `add_paths` / `_key`: delete + reuse FAIL (B dropped), replace FAIL (A queued twice); the hard-link test passes on both (`t7-b1old.log`); new: 4 of 4 pass |
+| 2 MAJOR: four environment tests fail on darwin | `test_environment_report.py`, the THIRD (and last) edit: the NVIDIA parsing cases use the `nvidia_platform` fixture, which on a darwin host rebinds ONLY the tool's own `sys` name to a view with `platform = "linux"` (no other module sees it; nothing Windows-only can run); the key test accepts darwin's disposition (`unavailable` = the three GPU keys, "not applicable"); W-TOOL's darwin "never run `nvidia-smi`" control unchanged | the six NVIDIA cases (`gpu_line_parses`, `gpu_uses_first_line_only`, `nvidia_smi_absent`, `nvidia_smi_bad_output` x6, `ffmpeg_failure`, `psutil_failures_degrade`) and `report_has_every_key` | the tool's `sys.platform` patched to darwin in memory: the `d5bef275` module 5 FAIL (B's four plus `test_psutil_failures_degrade`, which also asserts the parsed GPU model), 14 pass; the new module 19 / 19; on this host 19 / 19 |
+| 3 MAJOR (reasoned): a bind mount of a footage SUBfolder | none: BANKED (section 10) | - | - |
+| 4 MINOR: "never replaces" overstated; no recheck before the fallback | `config/presets.py` `_rename_without_replace`: after a refused link, `os.path.lexists(target)` (the volume's own name rule) and, when the name is taken, `FileExistsError` as the link raises; the WARNING follows only a rename; section 1's P73 line carries D1's limit | W-FS[P73] gains `PresetStore.rename` on a no-hard-link model (link EPERM; `lexists` and a REPLACING `rename` by an exFAT-like upcase rule, `_upcase`, chosen apart from NFC / casefold): `I` / `\u0131`, `i` / `\u0131` (the policy misses them; the recheck refuses), `Look` / `LOOK`, `caf\u00e9` / NFD (the policy refuses), and the control `Fresh` | the old fallback: FAIL, `DID NOT RAISE` at `I` / `\u0131` (the model's rename replaced `I.json`; `t7-b4old.log`); new: pass |
+| 5 MINOR: M-FS relies on the host temp volume's case | `test_macos_portability.py`: `volumes` creates THREE images (`APFS` case-insensitive, `Case-sensitive APFS`, `ExFAT`; `_IMAGES`), no host folder; `_fs_native_alias` (T17, T26-T29) puts its case alias on the insensitive image and its distinct-name controls (`DIVE/FOOTAGE` a second real folder, `dive` absent) on the sensitive one | M-FS[P29, P30, P44, P45, X29] (identity), [P40, P41, P49, P73] (presets), [T17, T26-T29] (aliases) | REASONED: the M cases skip off darwin; WP6.5 runs them |
+| 6 MINOR: no upgrade notice | `docs/user-guide.md` section 7, new subsection "Upgrading on macOS from a 1.0.0 source run" (the Library folder; `~/.config/clearwater` and `~/.cache/clearwater` left for the user to copy from or remove) | - | - |
+| 7 ADVISORY: two surviving W mutants | W-FS[P29]: one file number on two devices is two keys; W-CODEC[P11]: the no-encoder message is non-empty and says "No HEVC encoder is available" | the two cases | `st_dev` dropped from `_key`: FAIL (`'file:41' != 'file:41'`); the no-encoder message emptied: FAIL; clean: both pass (`t7-b7-*.log`) |
+| 8 ADVISORY: the B prompt's launch lock | none (the orchestrator's prompt error, as ruled) | - | - |
 
 ### Notable tests
 
@@ -513,18 +545,21 @@ Source: ledger A.4 and `uv-lock.record.txt`.
 
 ## 7. The W and M test counts per gate leg
 
-Re-taken by the turn-6 cell at `a9e59e13` for the W and M modules (`-p no:cacheprovider
---timeout 600`, `QT_QPA_PLATFORM=offscreen`, `PYTEST_ADDOPTS` unset; the parallel expression with
-`-n 4`, the serial expression without; `work\wp6.4\t6_yield.sh`, `t6-counts.log`):
+Re-taken by the turn-7 cell at `61aacbc0` (`-p no:cacheprovider --timeout 600`,
+`QT_QPA_PLATFORM=offscreen`, `PYTEST_ADDOPTS` unset; the parallel expression with `-n 4`, the
+serial expression without; `work\wp6.4\t7_yield.sh`, `t7-yield.log`):
 
 | Module | Parallel leg (collected / passed / skipped) | Serial leg (collected / passed / skipped) | Fullclip |
 |---|---|---|---|
 | `test_portability` (185) | 168 / 168 / 0 | 17 / 17 / 0 (14 `gui`, 3 `slow`) | 0 |
 | `test_macos_portability` (224) | 205 / 0 / 205 | 19 / 0 / 19 (`macos` + `gui`: M-GUI 15, M-BUNDLE 4) | 0 |
-| `test_environment_report` (19, turn 5's run; unchanged since) | 19 / 19 / 0 | 0 | 0 |
+| `test_environment_report` (19) | 19 / 19 / 0 | 0 | 0 |
 
-The W and M modules together at `a9e59e13`: parallel 373 collected, 168 passed, 205 skipped;
-serial 36 collected, 17 passed, 19 skipped; fullclip 0; `--collect-only` 409 = 373 + 36. Turn 6
+The W and M modules together at `61aacbc0`: parallel 373 collected, 168 passed, 205 skipped;
+serial 36 collected, 17 passed, 19 skipped; fullclip 0; `--collect-only` 409 = 373 + 36. Turn 7
+adds no case id (its W checks sit inside W-FS[P29], W-FS[P73] and W-CODEC[P11]); whole modules at
+`61aacbc0`: `test_gui_batch_panel` 47 passed (three new tests, `gui`, serial leg),
+`test_config_presets` 121 passed, `test_gui_preset_panel` 46 passed. Turn 6
 adds four W cases (the A r3 #3 model test), on the parallel leg; turn 5 added one W case (the
 item-2 pin) and 46 M cases (the M-V4 corpus), all on the parallel leg and all skipped off darwin.
 No case moved between legs.
@@ -604,6 +639,14 @@ A Mac `uv sync` installs no CuPy, and the product runs CPU-only (P22).
 - **The native tests are unmarked beyond `macos` by ruling** (A r2 item 7, REJECTED): they run
   real FFmpeg and encoder trials on the Mac; WP6.5 sets their markers from the measured walls.
 - **Linux has a roster (NVENC then x265, as ruled), but nothing is proved for Linux.**
+- **A bind mount of a footage SUBfolder bypasses the guard on Linux** (Reviewer B 3, BANKED as
+  ruled; pre-existing): `realpath` keeps the mount's spelling, so `Footage/sub` bound at `/alias`
+  is not seen inside `Footage`. The owner's envelope is covered: Windows `realpath` resolves
+  junctions and mount points, and macOS has no user bind mounts.
+- **The preset fallback's residual race** (Reviewer B 4, D1's accepted limit): on a volume that
+  makes no hard link, the rename rechecks that the target is absent and then uses POSIX
+  `os.rename`, which replaces a target created in between. "The preset rename never replaces"
+  holds only where the volume makes hard links (and on Windows).
 - **P71's Windows behaviour change is the FIX of a pre-existing Windows defect.** The old
   `wheelEvent` zoomed a full step on any non-zero delta, so a precision touchpad over-zoomed.
   - A mouse notch (120) is unchanged.
@@ -633,7 +676,7 @@ A Mac `uv sync` installs no CuPy, and the product runs CPU-only (P22).
 | P73 | the link / unlink / fallback branches stubbed (W-FS) | M-FS[P40, P41, P49, P73]: the DR-34(a) folding corpus on both APFS modes. M-FS[P48]: exFAT link refusal |
 | P71 | synthetic offscreen `QWheelEvent`s (W-GUI) | M-GUI[P71]: Cocoa wheel phases including momentum; the owner's trackpad by hand |
 | T14 | a synthetic `._` tree (W-FS) | M-FS[T14]: exFAT AppleDouble files made by `xattr` |
-| T17 T26-T29 | the planted case alias reproduced through footage_guard's text and link-resolution seams on NTFS, and the symlink-then-`..` alias through a POSIX `realpath` model (W-FS, D3 parity) | M-FS[T17, T26-T29]: a native symlink alias, a native case alias and a native symlink-then-`..` alias |
+| T17 T26-T29 | the planted case alias reproduced through footage_guard's text and link-resolution seams on NTFS, and the symlink-then-`..` alias through a POSIX `realpath` model (W-FS, D3 parity) | M-FS[T17, T26-T29]: a native symlink alias, a native case alias on the case-insensitive APFS image (its distinct-name controls on the case-sensitive one) and a native symlink-then-`..` alias |
 | T01 T02 | the environment facts with stubs (W-TOOL); on by default (S-B1) | M-TOOL[T01, T02]: the native report (arm64, macosx-*, NVIDIA not applicable, the VT / x265 rows) |
 | T11 T12 | the Windows licence-scan forms are pinned (W-TOOL) | M-TOOL[T11, T12]: xfail until candidate DR 3 adds the Mach-O forms |
 | P16 P24 P57 X28 | source / frozen command construction (W-SPAWN) | M-BUNDLE with `CLEARWATER_MAC_BUNDLE`, plus the owner's Finder, Dock-Quit and Cmd-Q checks |
