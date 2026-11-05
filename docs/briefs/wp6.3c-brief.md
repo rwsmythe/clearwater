@@ -40,6 +40,10 @@ WP6.3b pinned BtbN's `win64-gpl-9.0` autobuild (`autobuild-2026-10-31-12-59`, bu
 
 The release zip's `.sha256` sidecar must end with LF and its `# source-commit` line must start on its own line (a test on the writer; a writer without a trailing LF would glue the comment to the hash line). A tag force-moved and re-pushed passes `release.yml`'s annotated-tag gate (it is annotated and peels to the new commit); `docs/release-checklist.md` step 10's comparison of the downloaded zip against the local release-gate build is what catches it: the checklist text states this.
 
+## CHARC note (2026-11-05 ~19:25Z, from WP6.3b Reviewer B r3 advisories 1, 2, 3, 5; WP6.3c re-touches `release.yml` for the draft release)
+
+The tag gate's hardening, folded here with the FFmpeg step: (1) the tag re-fetch gets hard transport bounds (`-c http.lowSpeedLimit=1 -c http.lowSpeedTime=20` or equivalent) so a surviving `git-remote-https` cannot hold the job to its 120-minute limit; (2) the gate also requires the annotated tag object's own `tag` header to equal the tag's name (a lightweight `v1.1.0` pointing at another tag's object is refused); (3) the real-git test pins `--no-tags` and the single-tag refspec (origin force-moves ANOTHER tag after the clone; the gate must not import it); (5) an origin tag deleted after checkout gives a named refusal line, not a `CalledProcessError` traceback. Each with its real-git case.
+
 ## Verification and the proof
 
 - The cell: the tool tests (lock validation with the new fields; the fetch / verify / extract on a synthetic archive whose `-version` stub prints a `--disable-libzvbi` configure line; `--zip` determinism, two builds byte-equal; the smoke rows on the stub executable); `actionlint` on the fork workflow; the generated Dockerfile check if Docker is present.
