@@ -178,3 +178,14 @@ Verified at the seat: `tools/package/smoke.py:166-178` finds survivors by a `psu
 6. One resumed turn on `01a1abc1` (155K): the job, the census, the three tests, the report; then yield. The OPEN MAJOR closes on that turn's seat re-run.
 
 The zip and the release use still wait on the owner's zvbi ruling. Reviewer A's prompt carries the CRLF sweep addition.
+
+## Seat-proof split ruling (CHARC gen 16, 2026-11-05 ~14:20Z; head `00b221cb`, Reviewer A r1 running; the zvbi HOLD with the owner)
+
+Verified at the seat: `tools/package/notices.py:419-422` refuses any lock row with `gpl3_compatible: "no"`, and the BtbN lock's zvbi row is exactly that (`ffmpeg.lock.json`, `licence_basis: seat-verified`), so a seat build carrying the BtbN archive fails closed at the notices step by design.
+
+**RULED: the two-stage split, with the FFmpeg bundle CARVED OUT of WP6.3b into a follow-on package, so WP6.3b accepts WHOLE rather than partially.**
+
+- **Stage 1 (WP6.3b, now):** after Reviewer A converges, the real `build.py --form onedir --notices --smoke` with NO FFmpeg in the folder; every smoke refusal / worker / planted-exception row under the job with the census on the real onedir; the native census of the real built folder (every unknown binary named; libffi / SQLite / Tcl-Tk / MSVC runtime rows only if carried, each a seat fetch plus a manifest row); the UIA window watch; the notices read in full against the folder listing. Then Reviewer B, the gate (two legs + harness + darwin mypy + the module-alone install tests), and the ACCEPT of WP6.3b with its scope recorded as: the workflow (FFmpeg step present, parameters from the lock, `--zip` carried as the named pending flag), the hook and cache variables, ADV-1..3, the notices generator and native-licences surface, the smoke, checklist v2, the guide, the limited root notices. A STOP found by the real build or the census is handled inside WP6.3b as usual.
+- **Carved out = WP6.3c "FFmpeg bundle" (CHARC's brief after the owner's zvbi ruling):** the provider per the ruling (under (a) the self-build workflow from BtbN's scripts at `5031c6f1` minus zvbi and the re-pinned lock; under (c) no bundle, the user-obtained installer path, the guide / workflow rework and the N14 spec change), `--zip`, the FFmpeg smoke rows, the V4 check and the `hevc_nvenc` capability line on the BUNDLED binary, the notices' FFmpeg rows, the root notices' FFmpeg row, and the 1.1.0 draft release itself. One register row at WP6.3b's accept names the carve-out and its owner. The 1.1.0 release waits on WP6.3c.
+- **Never:** a seat build that carries the BtbN archive with the refusal bypassed; nothing on main uses the held bundle.
+- **Not chosen:** holding the whole seat proof until the ruling (it idles the real-build evidence most likely to surface findings).
