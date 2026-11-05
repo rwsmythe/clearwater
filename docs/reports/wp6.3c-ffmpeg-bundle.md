@@ -400,3 +400,182 @@ mailbox post was performed. Git writes occurred only in pytest's disposable
 fixture repositories under the commissioned basetemp.
 
 Depth: unavailable to the cell; the dispatcher supplies `depth_input_tokens`.
+
+## Turn 5 - DR-144 embedded components in carried natives (synthetic)
+
+**Built.** Added independently declared, exact host identities and required
+embedded-component/source sets. Planning measures carried hosts before consulting
+interpreter or wheel ownership. A missing component row/binding, mismatched
+source pin, or mismatched host identity refuses the artifact. Identity refusals
+name the host, expected and actual SHA-256/size, and `re-census required`.
+Embedded-text integrity errors name the host(s), component and text. An absent
+host creates no embedded redistribution claim. Each carried host retains its
+real parent row, including the parent's existing licence material and Qt
+replaceability terms, plus explicit attribution to every embedded component.
+The parent declaration is checked against the resolved owner, not used to grant
+ownership. Coverage still checks entries and rows in both directions.
+
+Embedded rows retain their own provenance and sources. Identical embedded text
+bytes share one rendered block (SHA-256 plus byte count), while every individual
+input is checked before sharing, including on a later render. Standalone native,
+vendored, co-licensed and FFmpeg rules remain active. The loader's existing JSON,
+path and schema checks are shared with the host preflight; invalid inputs are
+not passed directly to ownership fallback.
+
+**Exact schema addition for turn 6.** Schema version stays `1`. The optional
+top-level `embedded_hosts` field is a list of records with exactly these keys:
+
+```text
+{
+  "relpath": "<exact executable-folder-relative host path, using />",
+  "sha256": "<64 lowercase hex characters>",
+  "size_bytes": <positive integer, not boolean>,
+  "parent": "<normalized audited parent owner, e.g. python or pyside6-essentials>",
+  "components": [
+    {"component": "<exact component-row name>", "source": {<provenance fields>}}
+  ]
+}
+```
+
+The host path is exact: no absolute paths, empty/dot/parent segments, backslash,
+colon, or wildcard characters. Host declarations are unique case-insensitively;
+inventory matching is case-insensitive. Each host's component list is nonempty
+and has no duplicate names. Parent names use canonical lowercase distribution
+spelling (`python` is the interpreter owner).
+
+Each `source` object uses one of the existing provenance kinds, unchanged:
+`release-archive`, `git-tree`, or `proprietary-redistributable`. It contains only
+the selected component row's provenance fields: `provenance_kind`,
+`upstream_repository`, `source_repository`, `source_commit`, `source_tag`,
+`source_tag_object`, `source_path`, `source_archive_url`,
+`source_archive_sha256`, `source_archive_size_bytes`, `licence_urls`,
+`text_source`, `text_kind`, as applicable to that kind. It passes the existing
+provenance validator and must equal the component row's corresponding field set
+and values exactly (canonical JSON comparison). For the incoming CPython/Qt
+git-tree rows this means `provenance_kind`, `source_repository`, `source_commit`,
+`source_path`, and the paired `source_tag`/`source_tag_object` if supplied. A
+well-formed replacement commit, tag, tag object or path still fails against the
+independent host declaration.
+
+Each embedded component row adds `embedded_in`, a nonempty list of the exact
+declared `relpath` strings, without case-insensitive duplicates. Every path must
+declare that component. This binding replaces `bundled_files`, `bundled_modules`,
+`bundled_version_source`, `vendored_distribution`,
+`vendored_distribution_version` and `co_licensed_with`; mixing those forms is
+refused. All existing component-row fields, real text hash/size checks, version
+evidence and provenance requirements still apply. One component can bind
+several hosts, each with its own measured identity and parent. The fixture
+exercises this across interpreter and wheel hosts, including one absent host.
+
+No production manifest row or licence text was written. The production manifest
+is byte-unchanged and does not yet declare any host. No smoke row-count edit is
+needed. Turn 6 must supply the seat-verified production records/texts against
+this schema; DR-144 is not claimed closed here.
+
+**RED -> GREEN.** Evidence is under `work/wp6.3c/turn5/`.
+The test-first baseline (`red.log` / `.xml`, `work/c63c-5-red`) reports
+`24 failed, 245 deselected in 4.63s`. The baseline has no embedded declarations
+or bindings: its strict schema refuses the new top-level field, so positive
+cases cannot plan and the negative cases cannot produce their required
+host/component-specific refusals. No claim is made that the baseline accepts
+an unknown manifest field.
+
+| Required case | Observed baseline RED | Final GREEN |
+| --- | --- | --- |
+| Missing row despite interpreter/RECORD owner | 2 failed | 2 passed |
+| Changed host hash or size; both identities and re-census diagnostic | 2 failed | 2 passed |
+| Wrong commit, tag, tag object or source path | 4 failed | 4 passed |
+| Tampered text hash/size or missing text | 3 failed | 3 passed |
+| Absent declared host, no redistributed text/claim | 1 failed | 1 passed |
+| Complete Python, wheel and PySide6 hosts; parent + every text, exact coverage | 3 failed | 3 passed |
+
+The other nine baseline failures are schema controls (wildcard/duplicate host,
+bad identity/parent/source, unknown key, duplicate component and unbound row).
+The final fixture has three embedded components and two distinct texts: alpha
+and beta share one text, gamma has a different text; both texts render once.
+
+Eight further controls cover removed/malformed bindings, a missing row whose
+unique text would otherwise be orphaned, two-host carriage/absence, wrong parent
+attribution, and a shared text copied to a separate path then tampered after
+planning. `controls-red.log` / `.xml` reports `2 failed, 30 passed`: a null
+binding leaked TypeError, and a scalar binding produced a generic schema error
+without host/component context. The host preflight now requires a list before
+membership testing. `green3.log` / `.xml`, fresh `work/c63c-5-green3`, reports
+`32 passed, 245 deselected in 3.51s`.
+
+Independent negative control: `run_guard_mutant.py` loads the real module and
+replaces only `_embedded_claims` with an empty result in the test process.
+`guard-mutant.log` / `.xml`, fresh `work/c63c-5-mutant`, reports
+`6 failed, 271 deselected in 1.15s`, all six `DID NOT RAISE`. Thus both
+missing-component cases and all four source-pin cases detect parent fallback
+when the host preflight is disabled. No product file is changed for this proof.
+
+**Final validation.** Used `work/wp6.3c/turn5/run_tests.py`, an exact copy of
+turn 4's isolated runner: launch with `PYTHONPATH=scripts`, remove that variable
+before `pytest.main`, retain `sandbox_mkdir_shim`, disable cacheprovider, set
+the 300-second timeout, and exclude QUIT_SCRIPT. Command:
+
+```text
+uv run --no-sync python work/wp6.3c/turn5/run_tests.py tests/test_tools_package_notices.py tests/test_tools_package_build.py tests/test_tools_package_smoke.py tests/test_tools_package_ffmpeg.py --basetemp=work/c63c-5 --junitxml=work/wp6.3c/turn5/pytest.xml -q
+```
+
+- `ruff-check.log`: `All checks passed!` (exit 0).
+- `ruff-format.log`: `337 files already formatted` (exit 0).
+- `mypy-win32.log` and `mypy-darwin.log`: each reports
+  `Success: no issues found in 166 source files` (exit 0).
+- `pytest.log` / `.xml`: `505 passed, 1 skipped in 96.68s (0:01:36)` (exit 0).
+- `evidence-summary.txt`, independently read from final JUnit XML: notices
+  277 passed; build 126 passed; smoke 34 passed / 1 skipped; FFmpeg 68 passed.
+  The unchanged skip is `test_non_windows_containment_never_silently_skips`:
+  `POSIX process-group native proof belongs to WP6.5`.
+- `diff-check.log`: read-only `git diff --check`, exit 0.
+
+The smoke module's source-entry child was inspected before execution: redirected
+APPDATA/LOCALAPPDATA/XDG roots, blocked Qt imports, stubbed GUI/worker effects and
+a 15-second subprocess timeout. No QUIT_SCRIPT test was run. The uv commands
+report the inherited main-tree VIRTUAL_ENV is ignored in favor of this project's
+`.venv`; no environment override was used to evade a production check.
+
+**Real-folder notices probe (copy only).** Copied the commissioned
+`C:/Users/rwsmy/clearwater/work/wp6.3b-stage1d/dist-onedir/Clearwater-1.0.0-windows-onedir/Clearwater`
+to `work/c63c-5/probe/Clearwater`, then ran:
+
+```text
+uv run --no-sync python tools/package/notices.py work/c63c-5/probe/Clearwater
+```
+
+`probe.log`: exit 0, notices written in the copy.
+Inventory: **1536 entries; 25 component rows**. Notices SHA-256:
+`3afe913e26ecd6fe65765943fef798450687bebf7df926d1f720da9b8e999d8c`.
+It equals WP6.3b's supplied hash exactly; no notice lines changed.
+`probe-source-before.log` and `probe-source-after.log` independently record that
+same hash for the original's notices. The original build folder was never
+written. The summary script records the probe count/digest/equality separately
+in `evidence-summary.txt`.
+
+**Verification loop / handoff.**
+
+- [MAJOR, confirmed/fixed] Removing the carried-host preflight lets a missing
+  embedded notice/source mismatch fall back to valid parent coverage. The
+  independent mutant confirms this; the unmodified product's six controls pass.
+- [MINOR, confirmed/fixed] Null/scalar embedded bindings lacked the required
+  refusal behavior/context. Confirmed by the two additional RED cases; fixed
+  before the focused and full GREEN runs.
+- [MINOR, fixture, rejected as product defect] The initial Qt complete-host
+  assertion read an entire upstream-audit container as if it were one licence
+  input. Its actual input was an audited block, correctly rendered in isolation.
+  Made this synthetic fixture carry its own installed LGPL text, so its
+  byte-preservation assertion names the actual text. Existing audited-block
+  negative controls remain unchanged and pass.
+- [MINOR, static] Corrected initial line-length/format slips. Final static checks
+  and both mypy targets pass. The final requirements/diff pass found nothing new.
+
+Reviewer A is the dispatcher's pass after this yield; no review round is claimed
+inside the turn. Turn 6's production census/records/texts, Q1, fork/asset/re-pin,
+seat/release gates and the release remain undone as commissioned. Changed only
+the notices module, its granted test module and this report. No dependency or
+frozen-interface change, external fetch, Git write, real PyInstaller build,
+frozen/GUI launch, Docker, desktop input, original build/footage/profile write,
+GitHub action or mailbox post was performed.
+
+Depth: unavailable to the cell; the dispatcher supplies `depth_input_tokens`.

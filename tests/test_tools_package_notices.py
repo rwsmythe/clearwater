@@ -2055,3 +2055,298 @@ def test_co_licence_asymmetry_is_refused_before_duplicate_claim_check(native_sur
     (native_surface / "manifest.json").write_text(json.dumps(document))
     with pytest.raises(ValueError, match="dangling/asymmetric link"):
         load_notices().load_native_licences(native_surface)
+
+
+def embedded_host_fixture(release, *, parent="python", carried=True):
+    """Declare synthetic embedded sources independently of their licence rows."""
+    if parent == "pyside6-essentials":
+        add_distribution(
+            release,
+            parent,
+            "6.12.0",
+            {
+                "PySide6/QtCore.dll": "synthetic Qt host",
+                "pyside6_essentials-6.12.0.dist-info/licenses/LGPL-3.0.txt": (
+                    "GNU LESSER GENERAL PUBLIC LICENSE\nsynthetic Qt terms\n"
+                ),
+            },
+            [],
+        )
+        append_upstream_audit(release)
+    relative = {
+        "python": "_internal/python312.dll",
+        "numpy": "_internal/numpy/_core/test.pyd",
+        "pyside6-essentials": "_internal/PySide6/QtCore.dll",
+    }[parent]
+    host = release["folder"] / relative
+    body = host.read_bytes()
+    surface = release["native_surface"]
+    document = json.loads((surface / "manifest.json").read_text())
+    source = {
+        "provenance_kind": "git-tree",
+        "source_repository": "https://example.org/synthetic-source",
+        "source_commit": "a" * 40,
+        "source_tag": "v1.0",
+        "source_tag_object": "b" * 40,
+        "source_path": "Doc/synthetic-licence.rst",
+    }
+    names = ["Embedded alpha", "Embedded gamma", "Embedded beta"]
+    document["embedded_hosts"] = [
+        {
+            "relpath": relative,
+            "sha256": hashlib.sha256(body).hexdigest(),
+            "size_bytes": len(body),
+            "parent": parent,
+            "components": [{"component": name, "source": copy.deepcopy(source)} for name in names],
+        }
+    ]
+    text = b"Synthetic embedded terms, shared by alpha and beta.\n"
+    (surface / "embedded-terms.txt").write_bytes(text)
+    for name in names:
+        terms = b"Synthetic distinct gamma terms.\n" if name == "Embedded gamma" else text
+        filename = "gamma-terms.txt" if name == "Embedded gamma" else "embedded-terms.txt"
+        (surface / filename).write_bytes(terms)
+        document["components"].append(
+            {
+                "component": name,
+                **source,
+                "upstream_version": "synthetic-1.0",
+                "spdx": "MIT",
+                "text_file": filename,
+                "text_sha256": hashlib.sha256(terms).hexdigest(),
+                "text_size_bytes": len(terms),
+                "fetch_date": "2026-11-05",
+                "fetched_by": "seat",
+                "version_evidence": {"method": "interpreter_build_record", "value": "fixture"},
+                "embedded_in": [relative],
+            }
+        )
+    if not carried:
+        host.unlink()
+    save_embedded_fixture(release, document)
+    return document, host, text
+
+
+def save_embedded_fixture(release, document):
+    """Write only the test copy's manifest after a negative-control mutation."""
+    (release["native_surface"] / "manifest.json").write_text(json.dumps(document))
+
+
+@pytest.mark.parametrize("parent", ["python", "numpy"])
+def test_embedded_missing_component_cannot_fall_back_to_parent(release, parent):
+    """Removing a row must fail even with a valid interpreter or wheel owner."""
+    document, host, _text = embedded_host_fixture(release, parent=parent)
+    document["components"].pop()
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError, match=r"embedded.*" + re.escape(host.name) + r".*Embedded beta"):
+        plan(load_notices(), release)
+
+
+@pytest.mark.parametrize("damage", ["hash", "size"])
+def test_embedded_changed_host_requires_recensus(release, damage):
+    """Measure carried bytes before fallback and name expected and actual identities."""
+    document, host, _text = embedded_host_fixture(release)
+    declared = document["embedded_hosts"][0]
+    body = host.read_bytes()
+    host.write_bytes(bytes([body[0] ^ 1]) + body[1:] if damage == "hash" else body + b"x")
+    with pytest.raises(ValueError) as error:
+        plan(load_notices(), release)
+    for fragment in (
+        host.name,
+        declared["sha256"],
+        str(declared["size_bytes"]),
+        hashlib.sha256(host.read_bytes()).hexdigest(),
+        str(host.stat().st_size),
+        "expected",
+        "actual",
+        "re-census required",
+    ):
+        assert fragment in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("source_commit", "c" * 40),
+        ("source_tag", "v2.0"),
+        ("source_path", "Doc/wrong.rst"),
+        ("source_tag_object", "d" * 40),
+    ],
+)
+def test_embedded_wrong_source_pin_fails_by_host_and_component(release, field, value):
+    """A valid replacement source pin cannot reuse the declared host bytes."""
+    document, host, _text = embedded_host_fixture(release)
+    document["components"][-1][field] = value
+    save_embedded_fixture(release, document)
+    with pytest.raises(
+        ValueError, match=r"embedded.*" + re.escape(host.name) + r".*Embedded beta.*source pin"
+    ):
+        plan(load_notices(), release)
+
+
+@pytest.mark.parametrize("damage", ["hash", "size", "missing"])
+def test_embedded_tampered_text_names_host_and_component(release, damage):
+    """Every embedded text's integrity remains mandatory, with actionable context."""
+    _document, host, text = embedded_host_fixture(release)
+    path = release["native_surface"] / "embedded-terms.txt"
+    if damage == "missing":
+        path.unlink()
+    else:
+        path.write_bytes(b"X" + text[1:] if damage == "hash" else text + b"x")
+    with pytest.raises(
+        ValueError, match=r"embedded.*" + re.escape(host.name) + r".*Embedded alpha.*text"
+    ):
+        plan(load_notices(), release)
+
+
+def test_embedded_absent_host_emits_no_component_claim_or_text(release):
+    """Declarations describe possible carriage, never redistribution by themselves."""
+    _document, _host, text = embedded_host_fixture(release, carried=False)
+    module = load_notices()
+    result = plan(module, release)
+    assert not any(row.name.startswith("Embedded ") for row in result.rows)
+    assert text not in module.render_notices(result)
+    module.validate_coverage(result.entries, result.rows)
+
+
+@pytest.mark.parametrize("parent", ["python", "numpy", "pyside6-essentials"])
+def test_embedded_complete_host_keeps_parent_and_distinct_text_blocks(release, parent):
+    """Parent terms and every component cover the host; identical terms render once."""
+    _document, host, text = embedded_host_fixture(release, parent=parent)
+    module = load_notices()
+    result = plan(module, release)
+    rows = {row.name: row for row in result.rows}
+    label = "file:" + host.relative_to(release["folder"]).as_posix()
+    parent_row = rows["Python" if parent == "python" else parent]
+    for name in ("Embedded alpha", "Embedded gamma", "Embedded beta"):
+        assert rows[name].entries == (label,)
+        assert rows[name].sources == (
+            "https://example.org/synthetic-source/tree/" + "a" * 40 + "/Doc/synthetic-licence.rst",
+        )
+        assert label in parent_row.entries
+        assert any(name in note and host.name in note for note in parent_row.notes)
+    rendered = module.render_notices(result)
+    assert rendered.count(text) == 1
+    assert rendered.count(b"Synthetic distinct gamma terms.\n") == 1
+    assert parent_row.licence_inputs[0].path.read_bytes() in rendered
+    assert b"source pin" in rendered
+    module.validate_coverage(result.entries, result.rows)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "wildcard",
+        "duplicate",
+        "bad-hash",
+        "bad-size",
+        "bad-parent",
+        "unknown-key",
+        "bad-source",
+        "duplicate-component",
+        "unbound-row",
+    ],
+)
+def test_embedded_schema_refuses_ambiguous_or_unsafe_declarations(release, damage):
+    """No wildcard, duplicate host, malformed pin or unattached row is accepted."""
+    document, _host, _text = embedded_host_fixture(release)
+    declared = document["embedded_hosts"][0]
+    if damage == "wildcard":
+        declared["relpath"] = "_internal/*.dll"
+    elif damage == "duplicate":
+        document["embedded_hosts"].append(copy.deepcopy(declared))
+    elif damage == "bad-hash":
+        declared["sha256"] = "bad"
+    elif damage == "bad-size":
+        declared["size_bytes"] = True
+    elif damage == "bad-parent":
+        declared["parent"] = "Python"
+    elif damage == "unknown-key":
+        declared["accept_new_build"] = True
+    elif damage == "bad-source":
+        declared["components"][0]["source"]["source_commit"] = "branch"
+    elif damage == "duplicate-component":
+        declared["components"].append(copy.deepcopy(declared["components"][0]))
+    else:
+        document["components"][-1]["embedded_in"] = ["_internal/undeclared.dll"]
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError, match="embedded"):
+        plan(load_notices(), release)
+
+
+@pytest.mark.parametrize("binding", [None, [], "_internal/python312.dll"])
+def test_embedded_removed_or_malformed_binding_cannot_use_parent(release, binding):
+    """A declared source row must explicitly bind the measured host with a list."""
+    document, host, _text = embedded_host_fixture(release)
+    document["components"][-1]["embedded_in"] = binding
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError, match="embedded.*" + re.escape(host.name) + ".*Embedded beta"):
+        plan(load_notices(), release)
+
+
+def test_embedded_missing_unique_component_is_named_before_orphan_text(release):
+    """A removed row cannot hide behind generic unused-text or parent coverage errors."""
+    document, host, _text = embedded_host_fixture(release)
+    document["components"] = [
+        row for row in document["components"] if row["component"] != "Embedded gamma"
+    ]
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError, match="embedded.*" + re.escape(host.name) + ".*Embedded gamma"):
+        plan(load_notices(), release)
+
+
+@pytest.mark.parametrize("carried", [False, True])
+def test_embedded_component_may_bind_several_independently_measured_hosts(release, carried):
+    """A component can span Python and a wheel while each host retains its parent."""
+    document, _host, _text = embedded_host_fixture(release)
+    relative = "_internal/numpy/_core/test.pyd"
+    host = release["folder"] / relative
+    second = copy.deepcopy(document["embedded_hosts"][0])
+    second.update(
+        relpath=relative,
+        parent="numpy",
+        sha256=hashlib.sha256(host.read_bytes()).hexdigest(),
+        size_bytes=host.stat().st_size,
+    )
+    document["embedded_hosts"].append(second)
+    for row in document["components"][1:]:
+        row["embedded_in"].append(relative)
+    if not carried:
+        host.unlink()
+    save_embedded_fixture(release, document)
+    module = load_notices()
+    result = plan(module, release)
+    rows = {row.name: row for row in result.rows}
+    for name in ("Embedded alpha", "Embedded beta", "Embedded gamma"):
+        assert ("file:" + relative in rows[name].entries) == carried
+        assert "file:_internal/python312.dll" in rows[name].entries
+    assert ("file:" + relative in rows["numpy"].entries) == carried
+    module.validate_coverage(result.entries, result.rows)
+
+
+def test_embedded_parent_declaration_must_match_actual_owner(release):
+    """The source census cannot invent a parent attribution to another package."""
+    document, host, _text = embedded_host_fixture(release)
+    document["embedded_hosts"][0]["parent"] = "numpy"
+    save_embedded_fixture(release, document)
+    with pytest.raises(
+        ValueError, match="embedded.*" + re.escape(host.name) + ".*parent attribution"
+    ):
+        plan(load_notices(), release)
+
+
+def test_embedded_shared_text_is_rechecked_for_each_component_at_render(release):
+    """Deduplication cannot skip a second path's text verification after planning."""
+    document, host, text = embedded_host_fixture(release)
+    duplicate = release["native_surface"] / "beta-terms.txt"
+    duplicate.write_bytes(text)
+    document["components"][-1]["text_file"] = duplicate.name
+    save_embedded_fixture(release, document)
+    module = load_notices()
+    result = plan(module, release)
+    assert module.render_notices(result).count(text) == 1
+    duplicate.write_bytes(b"X" + text[1:])
+    with pytest.raises(
+        ValueError, match="embedded.*" + re.escape(host.name) + ".*Embedded beta.*text"
+    ):
+        module.render_notices(result)

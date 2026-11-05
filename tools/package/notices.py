@@ -5,6 +5,8 @@ installed RECORDs to the locked source-install audit, and refuses unsafe release
 claims. Third-party licence files are copied verbatim; Clearwater's own licence
 is LF-normalized for checkout-independent output. Audited upstream blocks are checked
 against their recorded SHA-256 and byte count before reuse.
+Declared embedded components bind exact carried-host identities and source pins,
+retain their parent's attribution and cannot fall back to parent-only coverage.
 No bundled runtime package, product entry point or external binary is executed.
 """
 
@@ -58,6 +60,23 @@ THIRD_PARTY_NATIVE_PATTERNS = (
     "libcrypto-*.dll",
     "libssl-*.dll",
 )
+_PROVENANCE_FIELDS = frozenset(
+    {
+        "provenance_kind",
+        "upstream_repository",
+        "source_repository",
+        "source_commit",
+        "source_tag",
+        "source_tag_object",
+        "source_path",
+        "source_archive_url",
+        "source_archive_sha256",
+        "source_archive_size_bytes",
+        "licence_urls",
+        "text_source",
+        "text_kind",
+    }
+)
 
 
 class LicenceInput(NamedTuple):
@@ -68,6 +87,7 @@ class LicenceInput(NamedTuple):
     sha256: str = ""
     size_bytes: int = 0
     provenance: str = ""
+    context: str = ""
 
 
 class NativeFile(NamedTuple):
@@ -106,6 +126,7 @@ class NativeLicence(NamedTuple):
     bundled_modules: tuple[str, ...]
     text_source: LicenceInput | None
     text_source_lines: tuple[int, ...]
+    embedded_in: tuple[str, ...]
 
 
 class NoticeRow(NamedTuple):
@@ -142,6 +163,16 @@ class _Entry(NamedTuple):
     kind: str
 
 
+class _EmbeddedHost(NamedTuple):
+    """An exact carried-host identity and its independently declared source set."""
+
+    relpath: str
+    sha256: str
+    size_bytes: int
+    parent: str
+    components: tuple[tuple[str, str], ...]
+
+
 @cache
 def _build_tool() -> ModuleType:
     # A sibling load works for both a direct tools script and pytest's path import.
@@ -159,15 +190,169 @@ def _normalize(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def _native_text(path: Path, sha256: str, size: int) -> bytes:
+def _native_text(path: Path, sha256: str, size: int, context: str = "") -> bytes:
+    prefix = "notices: " + context
     if path.is_symlink() or not path.is_file():
-        raise ValueError(f"notices: native licence text missing or linked: {path.name}")
+        raise ValueError(f"{prefix}native licence text missing or linked: {path.name}")
     data = path.read_bytes()
     if len(data) != size:
-        raise ValueError(f"notices: native licence text byte count differs: {path.name}")
+        raise ValueError(f"{prefix}native licence text byte count differs: {path.name}")
     if hashlib.sha256(data).hexdigest() != sha256:
-        raise ValueError(f"notices: native licence text SHA-256 hash differs: {path.name}")
+        raise ValueError(f"{prefix}native licence text SHA-256 hash differs: {path.name}")
     return data
+
+
+def _source_identity(row: dict[str, Any]) -> str:
+    return json.dumps({key: row[key] for key in _PROVENANCE_FIELDS if key in row}, sort_keys=True)
+
+
+def _exact_host_path(value: object) -> bool:
+    return bool(
+        isinstance(value, str)
+        and value
+        and value == value.strip()
+        and not any(char in value for char in "\\:?*[]")
+        and all(part not in {"", ".", ".."} for part in value.split("/"))
+    )
+
+
+def _embedded_declarations(document: dict[str, Any]) -> tuple[_EmbeddedHost, ...]:
+    values = document.get("embedded_hosts", [])
+    if not isinstance(values, list):
+        raise ValueError("notices: embedded_hosts must be a list")
+    result: list[_EmbeddedHost] = []
+    seen: set[str] = set()
+    for item in values:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"relpath", "sha256", "size_bytes", "parent", "components"}
+            or not _exact_host_path(item.get("relpath"))
+            or not isinstance(item.get("sha256"), str)
+            or re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) is None
+            or type(item.get("size_bytes")) is not int
+            or item["size_bytes"] <= 0
+            or not isinstance(item.get("parent"), str)
+            or re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", item["parent"]) is None
+            or not isinstance(item.get("components"), list)
+            or not item["components"]
+        ):
+            raise ValueError("notices: embedded host declaration is invalid")
+        if item["relpath"].casefold() in seen:
+            raise ValueError("notices: embedded host declaration is duplicate")
+        seen.add(item["relpath"].casefold())
+        components: list[tuple[str, str]] = []
+        for reference in item["components"]:
+            if (
+                not isinstance(reference, dict)
+                or set(reference) != {"component", "source"}
+                or not isinstance(reference.get("component"), str)
+                or not reference["component"].strip()
+                or reference["component"] != reference["component"].strip()
+                or reference["component"] in {name for name, _pin in components}
+                or not isinstance(reference.get("source"), dict)
+                or set(reference["source"]) - _PROVENANCE_FIELDS
+            ):
+                raise ValueError(
+                    f"notices: embedded {item['relpath']} component declaration invalid"
+                )
+            try:
+                _provenance(reference["source"])
+            except ValueError as error:
+                raise ValueError(
+                    f"notices: embedded {item['relpath']} "
+                    f"component {reference['component']}: {error}"
+                ) from error
+            components.append((reference["component"], _source_identity(reference["source"])))
+        result.append(
+            _EmbeddedHost(
+                item["relpath"],
+                item["sha256"],
+                item["size_bytes"],
+                item["parent"],
+                tuple(components),
+            )
+        )
+    return tuple(result)
+
+
+def _embedded_bindings(row: dict[str, Any], hosts: tuple[_EmbeddedHost, ...]) -> tuple[str, ...]:
+    if "embedded_in" not in row:
+        return ()
+    values = row["embedded_in"]
+    if (
+        not isinstance(values, list)
+        or not values
+        or any(not _exact_host_path(value) for value in values)
+        or len({value.casefold() for value in values}) != len(values)
+        or set(row)
+        & {
+            "bundled_files",
+            "bundled_modules",
+            "bundled_version_source",
+            "vendored_distribution",
+            "vendored_distribution_version",
+            "co_licensed_with",
+        }
+    ):
+        raise ValueError(
+            "notices: embedded_in requires unique exact hosts and no other binding kind"
+        )
+    for value in values:
+        if not any(
+            host.relpath == value and row["component"] in {name for name, _pin in host.components}
+            for host in hosts
+        ):
+            raise ValueError(
+                f"notices: embedded {value} component {row['component']} is undeclared"
+            )
+    return tuple(values)
+
+
+def _embedded_claims(
+    entries: list[_Entry], home: Path, hosts: tuple[_EmbeddedHost, ...], document: dict[str, Any]
+) -> tuple[dict[str, list[tuple[str, str]]], dict[str, _EmbeddedHost]]:
+    claims: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    carried: dict[str, _EmbeddedHost] = {}
+    rows = (
+        {
+            row.get("component"): row
+            for row in document.get("components", [])
+            if isinstance(row, dict) and isinstance(row.get("component"), str)
+        }
+        if isinstance(document.get("components"), list)
+        else {}
+    )
+    inventory = {entry.name.casefold(): entry for entry in entries if entry.kind == "file"}
+    for host in hosts:
+        entry = inventory.get(host.relpath.casefold())
+        if entry is None:
+            continue
+        data = (home / entry.name).read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        if (digest, len(data)) != (host.sha256, host.size_bytes):
+            raise ValueError(
+                f"notices: embedded {entry.name} identity differs: expected SHA-256 {host.sha256} "
+                f"size {host.size_bytes}; actual SHA-256 {digest} size {len(data)}; "
+                "re-census required"
+            )
+        for component, pin in host.components:
+            row = rows.get(component)
+            if (
+                row is None
+                or not isinstance(row.get("embedded_in"), list)
+                or host.relpath not in row["embedded_in"]
+            ):
+                raise ValueError(
+                    f"notices: embedded {entry.name} component {component} "
+                    "missing licence row/binding"
+                )
+            if _source_identity(row) != pin:
+                raise ValueError(
+                    f"notices: embedded {entry.name} component {component} source pin differs"
+                )
+            claims[component].append((entry.label, digest))
+        carried[entry.label] = host
+    return claims, carried
 
 
 def _https_url(value: object) -> bool:
@@ -287,6 +472,27 @@ def _provenance(row: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
     )
 
 
+def _native_document(folder: Path) -> dict[str, Any]:
+    manifest = folder / "manifest.json"
+    if folder.is_symlink() or manifest.is_symlink() or not manifest.is_file():
+        raise ValueError("notices: native licence manifest missing or linked")
+    try:
+        document = json.loads(manifest.read_text(encoding="utf-8"))
+    except ValueError as error:
+        raise ValueError("notices: native licence manifest is not valid JSON") from error
+    if (
+        not isinstance(document, dict)
+        or not {"schema_version", "interpreter_build", "components"} <= set(document)
+        or set(document)
+        - {"schema_version", "interpreter_build", "components", "vendored_paths", "embedded_hosts"}
+        or type(document.get("schema_version")) is not int
+        or document["schema_version"] != 1
+        or not isinstance(document.get("components"), list)
+    ):
+        raise ValueError("notices: native licence manifest schema is invalid")
+    return document
+
+
 def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     """Validate the committed seat-fetched native licence surface, without fetching.
 
@@ -308,6 +514,11 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     proprietary runtime). Version sources alone never claim bundled files.
     OpenSSL additionally checks the build interpreter's OpenSSL, CPython and
     build-release versions; proprietary excerpts bind to its actual LICENSE.txt.
+    Optional embedded_hosts declares exact relative host paths, hashes, sizes,
+    normalized parent owners and required component/source records. Component
+    rows use embedded_in (a list of declared paths) instead of another binding
+    kind. Carried hosts require all rows and matching source pins before parent
+    ownership is considered; absent hosts produce no embedded claims.
 
     Args:
         folder: The committed native-licences folder, or a local test copy.
@@ -320,26 +531,9 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
         ValueError: Schema, provenance, file coverage or text integrity is invalid.
         OSError: An input cannot be read.
     """
-    manifest = folder / "manifest.json"
-    if folder.is_symlink() or manifest.is_symlink() or not manifest.is_file():
-        raise ValueError("notices: native licence manifest missing or linked")
-    try:
-        document = json.loads(manifest.read_text(encoding="utf-8"))
-    except ValueError as error:
-        raise ValueError("notices: native licence manifest is not valid JSON") from error
-    if (
-        not isinstance(document, dict)
-        or set(document)
-        not in (
-            {"schema_version", "interpreter_build", "components"},
-            {"schema_version", "interpreter_build", "components", "vendored_paths"},
-        )
-        or type(document.get("schema_version")) is not int
-        or document["schema_version"] != 1
-        or not isinstance(document.get("components"), list)
-    ):
-        raise ValueError("notices: native licence manifest schema is invalid")
+    document = _native_document(folder)
     _vendored_declarations(document)
+    embedded_hosts = _embedded_declarations(document)
     build = document.get("interpreter_build")
     if (
         not isinstance(build, dict)
@@ -393,6 +587,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
             "vendored_distribution",
             "vendored_distribution_version",
             "bundled_modules",
+            "embedded_in",
         }
         if set(row) - allowed:
             raise ValueError("notices: native licence row has unknown keys")
@@ -455,7 +650,8 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
         if "co_licensed_with" in row and not bindings:
             raise ValueError("notices: native co_licensed_with requires non-empty file bindings")
         module_bindings = _vendored_bindings(row, document)
-        if not version_source and not bindings and not module_bindings:
+        embedded_in = _embedded_bindings(row, embedded_hosts)
+        if not version_source and not bindings and not module_bindings and not embedded_in:
             raise ValueError("notices: native licence row missing version/file binding")
         if row["component"] in components:
             raise ValueError("notices: native licence manifest has duplicate component rows")
@@ -484,7 +680,12 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
         if filename in {".", "..", "manifest.json"} or "/" in filename or "\\" in filename:
             raise ValueError("notices: native licence row has unsafe text_file")
         path = folder / filename
-        _native_text(path, row["text_sha256"], row["text_size_bytes"])
+        context = (
+            f"embedded {', '.join(embedded_in)} component {row['component']}: "
+            if embedded_in
+            else ""
+        )
+        _native_text(path, row["text_sha256"], row["text_size_bytes"], context)
         files.add(filename)
         provenance = (
             f"Seat-verified native input: {row['component']} {row['upstream_version']}; "
@@ -512,6 +713,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
                     sha256=row["text_sha256"],
                     size_bytes=row["text_size_bytes"],
                     provenance=provenance,
+                    context=context,
                 ),
                 build["release"],
                 build["python_version"],
@@ -532,6 +734,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
                 if row["provenance_kind"] == "proprietary-redistributable" and source is not None
                 else None,
                 tuple(source["lines"]) if source is not None else (),
+                embedded_in,
             )
         )
     by_name = {record.component: record for record in result}
@@ -1061,6 +1264,9 @@ def plan_notices(
     version-bound licence blocks. Native/data entries must match a RECORD path
     or a flattened, SHA-256-verified native basename.
     Independently licensed natives need their own exact-byte manifest row.
+    Declared embedded hosts require their measured identity and every embedded
+    source/text row before interpreter or RECORD ownership is considered. Their
+    parent must still cover the host, with explicit component attributions.
     Only stdlib extensions and CPython DLLs use the PSF fallback. Artifact code and bundled
     runtime packages are not imported; no external process is started.
 
@@ -1091,10 +1297,13 @@ def plan_notices(
             _build_tool().trusted_distributions(versions),
         )
         distribution = trusted.__getitem__
+    # Read declarations independently: a removed row/text must not let parent
+    # RECORD/interpreter ownership absorb a carried host's embedded terms.
+    document = _native_document(native_licences_path)
+    embedded_hosts = _embedded_declarations(document)
+    embedded_claims, carried_hosts = _embedded_claims(entries, home, embedded_hosts, document)
     native_records = load_native_licences(native_licences_path)
-    declarations = _vendored_declarations(
-        json.loads((native_licences_path / "manifest.json").read_text(encoding="utf-8"))
-    )
+    declarations = _vendored_declarations(document)
     runtime = {
         key: row
         for key, row in audit.items()
@@ -1151,8 +1360,8 @@ def plan_notices(
     module_claims = _vendored_claims(
         entries, native_records, declarations, modules, directories, installed, versions, runtime
     )
-    native_rows = _native_rows(entries, home, native_records, module_claims)
-    native_labels = {label for row in native_rows for label in row.entries}
+    native_rows = _native_rows(entries, home, native_records, module_claims, embedded_claims)
+    native_labels = {label for row in native_rows for label in row.entries} - carried_hosts.keys()
     selected: dict[str, list[str]] = defaultdict(list)
     ffmpeg_labels = {entry for row in ffmpeg for entry in row.entries}
     python_names = _python_file_names()
@@ -1289,6 +1498,30 @@ def plan_notices(
             NoticeRow(base, version, row.licence, row.sources, tuple(sorted(labels)), inputs)
         )
     result = _native_details(result, installed, audit_path)
+    for label, host in carried_hosts.items():
+        parents = [
+            row for row in result if _normalize(row.name) == host.parent and label in row.entries
+        ]
+        if len(parents) != 1:
+            raise ValueError(
+                f"notices: embedded {host.relpath} missing/ambiguous "
+                f"parent attribution: {host.parent}"
+            )
+    result = [
+        row._replace(
+            notes=(
+                *row.notes,
+                *(
+                    f"Embedded components in {host.relpath} "
+                    "(source pins and texts in component rows): "
+                    + ", ".join(name for name, _pin in host.components)
+                    for label, host in sorted(carried_hosts.items())
+                    if _normalize(row.name) == host.parent and label in row.entries
+                ),
+            )
+        )
+        for row in result
+    ]
     inventory_labels = tuple(sorted(entry.label for entry in entries))
     ordered = tuple(sorted(result, key=lambda row: row.name.casefold()))
     validate_coverage(inventory_labels, ordered)
@@ -1308,12 +1541,15 @@ def _native_rows(
     home: Path,
     records: tuple[NativeLicence, ...],
     module_claims: dict[str, list[str]] | None = None,
+    embedded_claims: dict[str, list[tuple[str, str]]] | None = None,
 ) -> list[NoticeRow]:
     selected: dict[str, list[tuple[str, str]]] = defaultdict(list)
     errors: list[str] = []
     by_name = {record.component: record for record in records}
     for component, labels in (module_claims or {}).items():
         selected[component].extend((label, "") for label in labels)
+    for component, identities in (embedded_claims or {}).items():
+        selected[component].extend(identities)
     for entry in entries:
         if entry.kind != "file" or not entry.label.startswith("file:"):
             continue
@@ -1359,7 +1595,13 @@ def _native_rows(
             _check_proprietary_source(record)
         notes = [
             (
-                "Clearwater 1.1.0 redistributes the interpreter's native libraries; 1.0.0 did not."
+                "Redistributed embedded component; exact host identities "
+                "and source pin bind these terms."
+                if record.embedded_in
+                else (
+                    "Clearwater 1.1.0 redistributes the interpreter's native libraries; "
+                    "1.0.0 did not."
+                )
                 if record.bundled_version_source
                 else "Redistributed vendored component; inventory below binds the source pin. "
                 if record.vendored_distribution
@@ -1368,6 +1610,8 @@ def _native_rows(
             ),
             "Version evidence: " + ": ".join(record.version_evidence),
         ]
+        if record.embedded_in:
+            notes.append("Embedded text provenance: " + record.licence_input.provenance)
         if record.provenance_kind == "proprietary-redistributable":
             notes.append(
                 "Proprietary redistributable; URLs identify licence and redistribution "
@@ -1645,6 +1889,8 @@ def render_notices(plan: NoticePlan) -> bytes:
     FFmpeg rows share one dedicated FFmpeg licence block; it is absent when the
     release folder carries no FFmpeg. Audited upstream blocks are UTF-8/LF
     copies checked against both recorded integrity fields before use.
+    Embedded rows share one block per distinct text hash/size, but each input is
+    rechecked before sharing and each row retains its own source attribution.
 
     Args:
         plan: An inventory-backed component plan from :func:`plan_notices`.
@@ -1687,6 +1933,7 @@ def render_notices(plan: NoticePlan) -> bytes:
     ]
     materials: dict[LicenceInput, tuple[str, bytes]] = {}
     references: dict[LicenceInput, str] = {}
+    embedded_texts: dict[tuple[str, int], LicenceInput] = {}
     for row in rows:
         if not row.licence_inputs:
             raise ValueError(f"notices: {row.name} missing licence material")
@@ -1699,7 +1946,7 @@ def render_notices(plan: NoticePlan) -> bytes:
                 source, data = _audited_material(item)
                 label = f"{row.name} {row.version}; {source}; the 1.0.0 audit's upstream copy"
             elif item.provenance:
-                data = _native_text(item.path, item.sha256, item.size_bytes)
+                data = _native_text(item.path, item.sha256, item.size_bytes, item.context)
                 label = item.provenance
             else:
                 data = item.path.read_bytes()
@@ -1712,6 +1959,12 @@ def render_notices(plan: NoticePlan) -> bytes:
                     label = f"Build source: {row.name} {row.version}; {item.path.name}"
             if not data:
                 raise ValueError(f"notices: {row.name} missing licence material")
+            if item.context:
+                identity = (hashlib.sha256(data).hexdigest(), len(data))
+                if identity in embedded_texts:
+                    references[item] = references[embedded_texts[identity]]
+                    continue
+                embedded_texts[identity] = item
             materials[item] = (label, data)
             references[item] = f"licence-{len(materials)}"
         links = ", ".join(
