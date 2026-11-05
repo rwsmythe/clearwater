@@ -77,6 +77,7 @@ _PROVENANCE_FIELDS = frozenset(
         "text_kind",
         "text_lines",
         "attribution",
+        "carried_notice",
     }
 )
 
@@ -341,7 +342,10 @@ def _embedded_declarations(document: dict[str, Any]) -> tuple[_EmbeddedHost, ...
                     f"notices: embedded {item['relpath']} component declaration invalid"
                 )
             try:
-                _provenance(reference["source"])
+                if "carried_notice" in reference["source"]:
+                    _carried_notice(reference["source"], source_only=True)
+                else:
+                    _provenance(reference["source"])
             except ValueError as error:
                 raise ValueError(
                     f"notices: embedded {item['relpath']} "
@@ -358,6 +362,62 @@ def _embedded_declarations(document: dict[str, Any]) -> tuple[_EmbeddedHost, ...
             )
         )
     return tuple(result)
+
+
+def _carried_notice(row: dict[str, Any], *, source_only: bool = False) -> dict[str, Any]:
+    value = row.get("carried_notice")
+    fields = {
+        "component",
+        "upstream_version",
+        "spdx",
+        "version_evidence",
+        "embedded_in",
+        "carried_notice",
+    }
+    if (
+        set(row) != ({"carried_notice"} if source_only else fields)
+        or not isinstance(value, dict)
+        or set(value) != {"row", "inputs"}
+        or not isinstance(value.get("row"), str)
+        or not value["row"].strip()
+        or value["row"] != value["row"].strip()
+        or not isinstance(value.get("inputs"), list)
+        or not value["inputs"]
+    ):
+        raise ValueError("notices: embedded carried notice reference is invalid")
+    identities = set()
+    for item in value["inputs"]:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"sha256", "size_bytes"}
+            or not isinstance(item.get("sha256"), str)
+            or re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) is None
+            or type(item.get("size_bytes")) is not int
+            or item["size_bytes"] <= 0
+        ):
+            raise ValueError("notices: embedded carried notice input identity is invalid")
+        identity = (item["sha256"], item["size_bytes"])
+        if identity in identities:
+            raise ValueError("notices: embedded carried notice has duplicate inputs")
+        identities.add(identity)
+    if not source_only:
+        if any(
+            not isinstance(row[key], str) or not row[key].strip() or row[key] != row[key].strip()
+            for key in ("component", "upstream_version", "spdx")
+        ):
+            raise ValueError("notices: embedded carried notice metadata is invalid")
+        evidence = row["version_evidence"]
+        if (
+            not isinstance(evidence, dict)
+            or set(evidence) != {"method", "value"}
+            or not isinstance(evidence.get("method"), str)
+            or evidence.get("method")
+            not in {"embedded_string", "interpreter_build_record", "vendored_in_tree_path"}
+            or not isinstance(evidence.get("value"), str)
+            or not evidence["value"].strip()
+        ):
+            raise ValueError("notices: embedded carried notice version evidence is invalid")
+    return cast(dict[str, Any], value)
 
 
 def _embedded_bindings(row: dict[str, Any], hosts: tuple[_EmbeddedHost, ...]) -> tuple[str, ...]:
@@ -634,13 +694,22 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     Optional git-tree attribution supplies file, sha256, size_bytes,
     git_blob_sha1 and source_path for a separate, verbatim copyright input
     from the same pinned tree. It is checked and rendered with the terms.
+    An embedded carried_notice reference instead has exactly component,
+    upstream_version, spdx, version_evidence, embedded_in and carried_notice.
+    The reference has row (an existing carried notice row) and inputs (unique
+    sha256/size_bytes pairs). It cannot mix source/text fields or chain to
+    another reference. Its independent host declaration pins this reference
+    in source instead of a provenance kind. Planning resolves it against the
+    original carried row and rendering rechecks every reused input. Such
+    references create no local text file or additional provenance kind.
 
     Args:
         folder: The committed native-licences folder, or a local test copy.
 
     Returns:
-        Verified native inputs. Bundled versions are checked separately when
-        the inventory actually carries the associated component's binaries.
+        Verified local native inputs. Carried-notice references are validated
+        here and resolved during planning. Bundled versions are checked
+        separately when the inventory carries the associated binaries.
 
     Raises:
         ValueError: Schema, provenance, file coverage or text integrity is invalid.
@@ -674,6 +743,14 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     files = {"manifest.json"}
     claims: dict[str, set[str]] = defaultdict(set)
     for row in document["components"]:
+        if isinstance(row, dict) and "carried_notice" in row:
+            _carried_notice(row)
+            if row["component"] in components:
+                raise ValueError("notices: native licence manifest has duplicate component rows")
+            components.add(row["component"])
+            if not _embedded_bindings(row, embedded_hosts):
+                raise ValueError("notices: embedded carried notice requires host bindings")
+            continue
         if not isinstance(row, dict) or any(
             not isinstance(row.get(key), str) or not row[key] or row[key] != row[key].strip()
             for key in string_fields
@@ -1647,6 +1724,7 @@ def plan_notices(
             NoticeRow(base, version, row.licence, row.sources, tuple(sorted(labels)), inputs)
         )
     result = _native_details(result, installed, audit_path)
+    result.extend(_carried_notice_rows(document, embedded_claims, result))
     for label, host in carried_hosts.items():
         parents = [
             row for row in result if _normalize(row.name) == host.parent and label in row.entries
@@ -1683,6 +1761,80 @@ def plan_notices(
             "obtain licence and source from its publisher."
         )
     return NoticePlan(inventory_labels, ordered, tuple(statements))
+
+
+def _carried_notice_rows(
+    document: dict[str, Any],
+    claims: dict[str, list[tuple[str, str]]],
+    rows: list[NoticeRow],
+) -> list[NoticeRow]:
+    result = []
+    # Resolve only against original, actually carried rows; references cannot
+    # chain or use an absent distribution as a source of redistribution terms.
+    for record in document["components"]:
+        if "carried_notice" not in record or not claims.get(record["component"]):
+            continue
+        reference = _carried_notice(record)
+        context = (
+            f"embedded {', '.join(record['embedded_in'])} "
+            f"component {record['component']} carried notice: "
+        )
+        candidates = [row for row in rows if row.name == reference["row"]]
+        if len(candidates) != 1:
+            raise ValueError(f"notices: {context}missing/ambiguous source row {reference['row']}")
+        source = candidates[0]
+        inputs = []
+        for expected in reference["inputs"]:
+            matches = []
+            for item in source.licence_inputs:
+                try:
+                    data = (
+                        _audited_material(item)[1]
+                        if item.block_id
+                        else _licence_bytes(item)
+                        if item.sha256
+                        else item.path.read_bytes()
+                    )
+                except (ValueError, OSError) as error:
+                    raise ValueError(f"notices: {context}{error}") from error
+                if (hashlib.sha256(data).hexdigest(), len(data)) == (
+                    expected["sha256"],
+                    expected["size_bytes"],
+                ):
+                    matches.append(item)
+            if len(matches) != 1:
+                raise ValueError(
+                    f"notices: {context}missing/ambiguous input identity in {source.name}"
+                )
+            inputs.append(
+                matches[0]._replace(
+                    sha256=expected["sha256"],
+                    size_bytes=expected["size_bytes"],
+                    context=context,
+                    provenance=(
+                        matches[0].provenance
+                        or f"Reused carried notice: {source.name}; " + _wheel_label(matches[0].path)
+                    )
+                    if not matches[0].block_id
+                    else matches[0].provenance,
+                )
+            )
+        result.append(
+            NoticeRow(
+                record["component"],
+                record["upstream_version"],
+                record["spdx"],
+                source.sources,
+                tuple(sorted(label for label, _digest in claims[record["component"]])),
+                tuple(inputs),
+                (
+                    f"Reused carried notice: {source.name}; exact input SHA-256 and size "
+                    "checked; original provenance retained.",
+                    "Version evidence: " + record["version_evidence"]["value"],
+                ),
+            )
+        )
+    return result
 
 
 def _native_rows(
@@ -2094,13 +2246,18 @@ def render_notices(plan: NoticePlan) -> bytes:
             if item.path.name.casefold() == "licenseref-qt-commercial.txt":
                 raise ValueError("notices: commercial Qt licence must never be reproduced")
             if item.block_id:
-                source, data = _audited_material(item)
+                try:
+                    source, data = _audited_material(item)
+                except (ValueError, OSError) as error:
+                    if item.context:
+                        raise ValueError(f"notices: {item.context}{error}") from error
+                    raise
                 label = f"{row.name} {row.version}; {source}; the 1.0.0 audit's upstream copy"
             elif item.provenance:
                 data = _licence_bytes(item)
                 label = item.provenance
             else:
-                data = item.path.read_bytes()
+                data = _licence_bytes(item) if item.context else item.path.read_bytes()
                 if row.name == "Clearwater":
                     data = data.replace(b"\r\n", b"\n")
                 label = f"Installed wheel: {row.name} {row.version}; {_wheel_label(item.path)}"
@@ -2110,12 +2267,14 @@ def render_notices(plan: NoticePlan) -> bytes:
                     label = f"Build source: {row.name} {row.version}; {item.path.name}"
             if not data:
                 raise ValueError(f"notices: {row.name} missing licence material")
-            if item.context:
-                identity = (hashlib.sha256(data).hexdigest(), len(data))
-                if identity in embedded_texts:
-                    references[item] = references[embedded_texts[identity]]
-                    continue
-                embedded_texts[identity] = item
+            identity = (hashlib.sha256(data).hexdigest(), len(data))
+            if item.context and identity != (item.sha256, item.size_bytes):
+                raise ValueError(f"notices: {item.context}text identity differs")
+            previous = embedded_texts.get(identity)
+            if previous is not None and (item.context or previous.context):
+                references[item] = references[previous]
+                continue
+            embedded_texts[identity] = item
             materials[item] = (label, data)
             references[item] = f"licence-{len(materials)}"
         links = ", ".join(

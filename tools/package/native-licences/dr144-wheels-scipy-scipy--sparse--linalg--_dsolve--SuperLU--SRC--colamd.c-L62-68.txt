@@ -1,0 +1,7 @@
+    Copyright and License:
+
+	Copyright (c) 1998-2007, Timothy A. Davis, All Rights Reserved.
+	COLAMD is also available under alternate licenses, contact T. Davis
+	for details.
+
+        See COLAMD/Doc/License.txt for the license.

@@ -1,0 +1,20 @@
+/*
+ *
+ * This file accompanied with the header file specfun.h is a partial
+ * C translation of the Fortran code by Zhang and Jin following
+ * original description:
+ *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ *       COMPUTATION OF SPECIAL FUNCTIONS
+ *
+ *          Shanjie Zhang and Jianming Jin
+ *
+ *       Copyrighted but permission granted to use code in programs.
+ *       Buy their book:
+ *
+ *          Shanjie Zhang, Jianming Jin,
+ *          Computation of Special Functions,
+ *          Wiley, 1996,
+ *          ISBN: 0-471-11963-6,
+ *          LC: QA351.C45.
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *

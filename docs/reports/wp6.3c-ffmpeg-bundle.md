@@ -1014,3 +1014,255 @@ profile / footage / evidence-folder write, GitHub action or mailbox post was
 performed. Only the files granted for this turn changed.
 
 Depth: unavailable to the cell; the dispatcher supplies `depth_input_tokens`.
+
+
+## Turn 8 - DR-144 production wheel-native census
+
+**Built.** Loaded the second seat census, `dr144-census-wheels.md`, SHA-256
+`c00de8a67b4222b927f1979112626f759863395c4f5cec510d6c6ff7563637cd`.
+The parser consumes all 111 host identities in section (c) and all 170 text
+inventory records in section (d3). The production manifest gains 43 embedded
+component records and 93 independently measured host declarations (110 total).
+All 83 SciPy natives are declared, including the 82 .pyd files' static runtime.
+There are 113 component records: 108 local-text records and five references to
+already carried notice inputs. The original ten standalone records stay first;
+embedded component records, new host component lists and host paths are sorted.
+
+`work/wp6.3c/turn8/load_records.py` is the seat-reviewable generation script.
+It verifies the census hash and every selected input's byte count, SHA-256 and
+Git blob SHA-1 before copying. Exact hosts and their hashes/sizes come only from
+census (c), not from filenames or installed-file inference. The supplementary
+`audit_surface.py` independently compares all 33 selected whole blobs to the
+seat files and all 20 excerpt records to their one-based inclusive slices.
+There are 53 new text/blob files; some rows share a whole input. A repeated
+load is byte-identical. Final manifest SHA-256: `306b748543be40986bd8631071d8942e3aa9ee7fd42c3a6b96d9848e438d9156`.
+`generated-hosts.json` records all new declarations; `verified-inputs.json`
+records the selected full-blob identities. These scripts/results are scratch
+files under `work/wp6.3c/turn8/`, not committed product or seat-folder edits.
+
+**Why notices.py changes.** The original three provenance kinds remain intact.
+Their local text-file schema could not bind an embedded runtime to an already
+rendered wheel/audit input. Added a strictly separate carried-notice reference
+binding, without a fourth provenance kind or invented source pin. Its row has
+exactly `component`, `upstream_version`, `spdx`, `version_evidence`,
+`embedded_in`, `carried_notice`. The last object has exactly `row` (an original
+carried notice row's exact name) and `inputs` (unique objects with `sha256` and
+`size_bytes`). The independent host declaration pins `{"carried_notice": ...}`
+in its `source` field. Reference rows cannot mix local source/text fields.
+The local-input loader validates references; planning resolves each against
+one original carried row and one input per identity. Absent/ambiguous rows or
+inputs refuse. References cannot chain. Absent hosts emit no reference claim.
+Host hash/size, owner attribution, source-reference equality and ordinary
+native/vendored/FFmpeg checks all remain active. Render rechecks each input
+before sharing and names host/component on embedded audit-text failures.
+
+GCC GPL/exception inputs, the MinGW-w64/winpthreads inputs, Pillow's
+libyuv/libsharpyuv aggregate and NumPy's code terms are REUSED, not copied into
+the surface. Text blocks are shared across original carried and embedded rows
+by exact bytes; every source input is still checked. Original wheel/audit
+provenance stays with the reused material. No new GCC/GPL, winpthreads,
+libyuv or sharpyuv licence file is introduced. The rows supply explicit host
+bindings even where the carried aggregate names another library or host.
+
+**Host -> component -> text table (new records).** Paths below are relative to
+`_internal/`; `.cp312-win_amd64.pyd` suffixes are shortened only in this table.
+Every exact path, independent host identity, source commit, text hash/size and
+full-blob/excerpt input is in the manifest. Seven xsf dependency users are
+`special/{_ufuncs,_ufuncs_cxx,_special_ufuncs,_gufuncs,_specfun,_ellip_harm_2,cython_special}`;
+the attribution follows the census and pinned xsf build dependency, without
+claiming a per-function symbol/instantiation proof for each header.
+
+| Host(s) | Component | Verified text / reused input |
+| --- | --- | --- |
+| `scipy/special/_ellip_harm_2`, `scipy/special/_gufuncs`, `scipy/special/_specfun`, `scipy/special/_special_ufuncs`, `scipy/special/_ufuncs`, `scipy/special/_ufuncs_cxx`, `scipy/special/cython_special` | AMOS (xsf) | `scipy/xsf@f7b85f505a94:include/xsf/amos/amos.h`; lines 1-37 |
+| `scipy/sparse/linalg/_eigen/arpack/_arpacklib` | ARPACK (SciPy) | `scipy/scipy@e4e854eaa8f1:scipy/sparse/linalg/_eigen/arpack/arnaud/ARPACK_LICENSE.txt`; lines 52-91 |
+| `scipy/optimize/_highspy/_core`, `scipy/optimize/_highspy/_highs_options` | BASICLU and IPX (HiGHS terms) | `scipy/HiGHs@4f96ee8f40b2:LICENSE.txt` |
+| `scipy/optimize/_highspy/_core`, `scipy/optimize/_highspy/_highs_options` | BASICLU copyright notice (SciPy) | `scipy/HiGHs@4f96ee8f40b2:highs/ipm/basiclu/basiclu_factorize.c`; lines 1-6 |
+| `scipy/stats/_biasedurn` | BiasedUrn (SciPy) | `scipy/scipy@e4e854eaa8f1:scipy/stats/biasedurn/license.txt` |
+| `scipy/interpolate/_rbfinterp_pythran`, `scipy/linalg/_linalg_pythran`, `scipy/optimize/_group_columns`, `scipy/special/_ufuncs_cxx`, `scipy/stats/_stats_pythran` | Boost.Math and Pythran Boost headers | `boostorg/math@c114cf4a6ae9:LICENSE` |
+| `scipy/sparse/linalg/_dsolve/_superlu` | COLAMD copyright notice (SciPy) | `scipy/scipy@e4e854eaa8f1:scipy/sparse/linalg/_dsolve/SuperLU/SRC/colamd.c`; lines 62-68 |
+| `scipy/special/_ellip_harm_2`, `scipy/special/_gufuncs`, `scipy/special/_specfun`, `scipy/special/_special_ufuncs`, `scipy/special/_ufuncs`, `scipy/special/_ufuncs_cxx`, `scipy/special/cython_special` | Cephes (xsf) | `scipy/xsf@f7b85f505a94:LICENSES_bundled.txt`; lines 3-37 |
+| `scipy/optimize/_direct` | DIRECT (SciPy) | `scipy/scipy@e4e854eaa8f1:scipy/optimize/_direct/COPYING` |
+| `scipy/special/_ellip_harm_2`, `scipy/special/_gufuncs`, `scipy/special/_specfun`, `scipy/special/_special_ufuncs`, `scipy/special/_ufuncs`, `scipy/special/_ufuncs_cxx`, `scipy/special/cython_special` | Faddeeva (xsf) | `scipy/xsf@f7b85f505a94:LICENSES_bundled.txt`; lines 39-61 |
+| all 82 SciPy .pyd (census c; exact paths in manifest) | GCC runtime (SciPy static) | REUSE `scipy` (1 exact SHA-256/size input(s)); original provenance |
+| `scipy/optimize/_highspy/_core`, `scipy/optimize/_highspy/_highs_options` | HiGHS (SciPy) | `scipy/HiGHs@4f96ee8f40b2:LICENSE.txt` |
+| `scipy/sparse/csgraph/_matching` | LAPJVsp (SciPy) | `scipy/scipy@e4e854eaa8f1:LICENSES_bundled.txt`; lines 33-66 |
+| `scipy/optimize/_lsap` | LSAP (SciPy) | `scipy/scipy@e4e854eaa8f1:scipy/optimize/rectangular_lsap/rectangular_lsap.cpp`; lines 1-41 |
+| `libde265-0-da04b6b2448c39c0b7f218769dedb2f1.dll` | MD5 notice (libde265) | `strukturag/libde265@ba62bf4cfb32:libde265/md5.cc`; lines 1-36 |
+| all 82 SciPy .pyd + scipy.libs/OpenBLAS + numpy.libs/OpenBLAS | MinGW-w64 CRT and winpthreads (static wheels) | REUSE `pillow-heif / MinGW runtime` (2 exact SHA-256/size input(s)); original provenance |
+| `scipy/linalg/_fblas`, `scipy/linalg/_flapack`, `scipy/stats/_biasedurn`, `scipy/stats/_rcont/rcont` | NumPy code embedded in SciPy | REUSE `numpy` (3 exact SHA-256/size input(s)); original provenance |
+| `scipy/sparse/linalg/_propack` | PROPACK (SciPy) | `scipy/scipy@e4e854eaa8f1:scipy/sparse/linalg/_propack/PROPACK/PROPACK_LICENSE.txt` |
+| `scipy/interpolate/_rbfinterp_pythran`, `scipy/linalg/_linalg_pythran`, `scipy/optimize/_group_columns`, `scipy/stats/_stats_pythran` | Pythran runtime (SciPy) | `serge-sans-paille/pythran@580c5abea7bd:LICENSE` |
+| `libstdc++-6-e4d43a335d57132a6ec3004cece76b4f.dll` | Ryu (libstdc++) | `gcc-mirror/gcc@78d4ac73dd39:libstdc++-v3/src/c++17/ryu/common.h`; lines 1-16 |
+| `scipy/sparse/linalg/_dsolve/_superlu` | SuperLU (SciPy) | `scipy/scipy@e4e854eaa8f1:scipy/sparse/linalg/_dsolve/SuperLU/License.txt` |
+| `scipy/optimize/_moduleTNC` | TNBC original credit (TNC) | `scipy/scipy@e4e854eaa8f1:scipy/optimize/tnc/tnc.c`; lines 27-47 |
+| `scipy/optimize/_moduleTNC` | TNC (SciPy) | `scipy/scipy@e4e854eaa8f1:scipy/optimize/tnc/LICENSE` |
+| `scipy/special/_ufuncs_cxx` | Wright omega (SciPy) | `scipy/scipy@e4e854eaa8f1:scipy/special/wright.cc`; lines 21-51 |
+| `scipy/sparse/linalg/_eigen/arpack/_arpacklib`, `scipy/sparse/linalg/_propack` | arnaud (SciPy) | `scipy/scipy@e4e854eaa8f1:scipy/sparse/linalg/_eigen/arpack/arnaud/LICENSE` |
+| `scipy/optimize/_highspy/_core`, `scipy/optimize/_highspy/_highs_options` | cuPDLP-C (HiGHS terms) | `scipy/HiGHs@4f96ee8f40b2:LICENSE.txt` |
+| `PIL/_avif` | dav1d (Pillow) | `videolan/dav1d@b546257f7707:COPYING` |
+| `libstdc++-6-e4d43a335d57132a6ec3004cece76b4f.dll` | fast_float (libstdc++) | `gcc-mirror/gcc@78d4ac73dd39:libstdc++-v3/src/c++17/fast_float/fast_float.h`; lines 11-39 |
+| `scipy/optimize/_highspy/_core`, `scipy/optimize/_highspy/_highs_options` | filereaderlp (SciPy) | `scipy/HiGHs@4f96ee8f40b2:extern/filereaderlp/LICENSE` |
+| `libx265-217-276e7d75772a32bd086b54d54e01fd11.dll` | json11 (x265) | `Multicorewareinc/x265@e9b88125dc21:source/dynamicHDR10/json11/LICENSE.txt` |
+| `PIL/_avif` | libaom (Pillow) | `python-pillow/Pillow@bb1d8e8ab8d2:wheels/dependency_licenses/AOM.txt` |
+| `PIL/_avif`, `PIL/_imaging`, `PIL/_webp` | libsharpyuv (Pillow) | REUSE `pillow` (1 exact SHA-256/size input(s)); original provenance |
+| `PIL/_avif` | libyuv (Pillow) | REUSE `pillow` (1 exact SHA-256/size input(s)); original provenance |
+| `scipy/ndimage/_nd_image` | ndimage (SciPy) | `scipy/scipy@e4e854eaa8f1:scipy/ndimage/LICENSE.txt` |
+| `scipy/optimize/_highspy/_core`, `scipy/optimize/_highspy/_highs_options` | pdqsort (SciPy) | `scipy/HiGHs@4f96ee8f40b2:extern/pdqsort/license.txt` |
+| `scipy/fft/_duccfft/pyduccfft`, `scipy/optimize/_highspy/_core`, `scipy/optimize/_highspy/_highs_options`, `scipy/optimize/_pava_pybind`, `scipy/spatial/_distance_pybind` | pybind11 (SciPy) | `scipy/scipy@e4e854eaa8f1:LICENSES_bundled.txt`; lines 111-140 |
+| `PIL/_avif`, `PIL/_imaging`, `PIL/_imagingcms`, `PIL/_imagingmath`, `PIL/_imagingtk`, `PIL/_webp` | pythoncapi_compat (Pillow) | `python-pillow/Pillow@bb1d8e8ab8d2:src/thirdparty/pythoncapi_compat.h`; lines 1-15 |
+| `scipy/special/_ellip_harm_2`, `scipy/special/_gufuncs`, `scipy/special/_specfun`, `scipy/special/_special_ufuncs`, `scipy/special/_ufuncs`, `scipy/special/_ufuncs_cxx`, `scipy/special/cython_special` | qd double-double (xsf) | `scipy/xsf@f7b85f505a94:LICENSES_bundled.txt`; lines 63-114 |
+| `scipy/special/_ellip_harm_2`, `scipy/special/_gufuncs`, `scipy/special/_specfun`, `scipy/special/_special_ufuncs`, `scipy/special/_ufuncs`, `scipy/special/_ufuncs_cxx`, `scipy/special/cython_special` | specfun (xsf) | `scipy/xsf@f7b85f505a94:include/xsf/specfun/specfun.h`; lines 1-20 |
+| `scipy/optimize/_trlib/_trlib` | trlib (SciPy) | `scipy/scipy@e4e854eaa8f1:scipy/optimize/_trlib/trlib_krylov.c`; lines 1-23 |
+| `PIL/_avif` | x86inc (dav1d) | `videolan/dav1d@b546257f7707:src/ext/x86/x86inc.asm`; lines 1-22 |
+| `libx265-217-276e7d75772a32bd086b54d54e01fd11.dll` | x86inc (x265) | `Multicorewareinc/x265@e9b88125dc21:source/common/x86/x86inc.asm`; lines 1-24 |
+| `scipy/special/_ellip_harm_2`, `scipy/special/_gufuncs`, `scipy/special/_specfun`, `scipy/special/_special_ufuncs`, `scipy/special/_ufuncs`, `scipy/special/_ufuncs_cxx`, `scipy/special/cython_special` | xsf (SciPy) | `scipy/xsf@f7b85f505a94:LICENSE` |
+
+TNC additionally retains the original Stephen G. Nash TNBC credit and the C
+conversion credit (tnc.c lines 27-47); the MIT terms remain in the TNC row.
+BASICLU's exact copyright notice is separate from the shared HiGHS terms;
+COLAMD's exact notice is labelled LicenseRef, not an inferred BSD grant.
+The two HiGHS component rows share the same MIT text with HiGHS. ARPACK and
+PROPACK retain their originals' texts as well as the shared SciPy rewrite
+licence. Ryu selects the BSL-1.0 alternative; the original dual-licence header
+is preserved and full BSL terms are also carried by the Boost row.
+
+**STOPPED ROWS (excluded; no closure or substitute licence inferred).**
+
+| Item / row | Missing input or ruling |
+| --- | --- |
+| U-S1: L-BFGS-B | Original upstream notice/obligations for the C rewrite absent from v1.18.1 tree. |
+| U-S1: MINPACK | Original upstream notice/acknowledgment for the C rewrite absent. |
+| U-S1: SLSQP | Original upstream notice/obligations for the C rewrite absent. |
+| U-S1: NNLS | Original upstream notice/obligations for the C rewrite absent. |
+| U-S1: LSODA | Original upstream notice/obligations for the C rewrite absent. |
+| U-S1: VODE / ZVODE | Original upstream notice/obligations for the C rewrite absent. |
+| U-S1: FITPACK | Original upstream notice/obligations for C/C++ rewrites absent. |
+| U-S1: original ID | Only the SciPy rewrite header, not the original ID notice, is established. |
+| U-S1: original CDFLIB | Only the SciPy rewrite header, not the original CDFLIB notice, is established. |
+| U-S1: original QUADPACK | Only the SciPy rewrite header, not the original upstream notice, is established. |
+| U-P2: AOM PATENTS | Text not fetched; CHARC/owner ruling pending. |
+| U-P2: libyuv PATENTS | Text not fetched; CHARC/owner ruling pending. |
+| U-T1: Tcl/Tk Pillow shim excerpt | Whether declaration-only _tkmini.h embeds copyrightable expression is pending; excerpt omitted as directed. |
+| U-P1: libaom fastfeat, vector, SVT-AV1 kernels, x86inc | AOM build files and exact inclusion/texts not established. The separately proved dav1d x86inc row is loaded. |
+| U-N2: libquadmath in either OpenBLAS DLL | Presence and applicable text not established; strings/import absence is not proof. |
+| U-S6: mdspan/Kokkos in xsf | Header not fetched; instantiation/host not established. The bundled text is only a pointer. |
+| U-S8: Cython-generated utility code | Whether a notice is owed and which text/hosts are required is not established. |
+| U-S9: Sobol Joe-Kuo direction-number data | Carried data copy and applicable notice not established by this native census. |
+| U-H3: Ryu / fast_float statically inside SciPy | Their use by any SciPy .pyd is not established; only the proven pillow-heif libstdc++ hosts are bound. |
+
+The declared runtime rows for U-S1's compiled hosts still bind their proven
+GCC/MinGW components. They do not supply a licence ruling for the stopped
+upstream algorithm notices. COLAMD's missing referenced licence and the
+inferred BASICLU/IPX/cuPDLP-C terms remain material limits below. DR-144 is
+NOT claimed closed; the 1.1.0 draft remains subject to these dispositions.
+
+**Limits (loaded records retained where only version/build option is unsure).**
+
+- U-P3: AOM text is Pillow's exact 12.3.0 copy, not a verified AOM-tree text.
+- U-N1: numpy Highway/x86-simd-sort coverage follows numpy build defaults;
+  numpy-release build options were not obtained. Existing carried texts stay.
+- U-S2: SciPy's bundled-licence path mislabels are reported by the census;
+  this turn uses verified actual paths and does not edit upstream sources.
+- U-S3: CRT/winpthreads versions are unknown; reused texts point at mingw-w64
+  master. The SciPy GCC 15.2.0 ident is established for all 82 .pyd. Generic
+  GPL/exception terms reused from the carried OpenBLAS aggregate do not claim
+  the same compiler release as its GCC 10.3.0 source-path evidence.
+- U-S4: COLAMD's copyright notice is loaded; its referenced licence is absent.
+  No BSD-3-Clause determination is substituted for that missing document.
+- U-S5: BASICLU/IPX/cuPDLP-C are built in HiGHS; repository-wide MIT coverage
+  is inferred, not a separately verified upstream licence grant. The manifest
+  evidence and generated notices say this; BASICLU's actual header is retained.
+- U-S7: pybind11's exact release is not known; SciPy's pinned licence statement
+  is used. Pythran is 0.19.0, but its bundled Boost-header version is not fixed
+  by the Boost.Math 1.91.0 source pin; only the BSL terms are shared.
+- U-H1: json11 presence has RTTI evidence; HDR10+ build options are inferred.
+- U-H2: x86inc assembly build options in dav1d/x265 are not proved; both exact
+  notices are loaded as directed.
+- U-H3: libstdc++ 16.2.0 is inferred from siblings; to_chars/from_chars exports
+  prove Ryu/fast_float presence. Their static inclusion in SciPy is not proved
+  and no such additional SciPy binding is invented.
+- Other build-derived versions (OpenJPEG, liblzma, libyuv, libsharpyuv, dav1d)
+  are described as census/build evidence rather than new binary-version reads.
+
+**RED -> GREEN and verification loop.** All logs remain file-backed under
+`work/wp6.3c/turn8/`; none of the production entry points is invoked by the new
+checks. The source-entry smoke child was inspected: disposable roots, Qt import
+block, GUI/worker stubs, 15-second bound. QUIT_SCRIPT stays excluded.
+
+| Suspected / confirmed / rejected / fixed | Evidence |
+| --- | --- |
+| Missing embedded reuse binding: CONFIRMED, FIXED | `red.log`/`.xml`: 7 failed; `green-reference2`: 7 passed. Existing texts now get host attribution without copying them. |
+| Missing wheel records/runtime hosts: CONFIRMED, FIXED | `red-data`: 5 failed; `green-data2`: 13 passed (including reference/previous production checks). |
+| Generated evidence trailing spaces: CONFIRMED, FIXED | Initial `green-data` schema refusal; generator trims metadata; subsequent checks load all inputs. |
+| Audit failure lacked host context; TNBC original credit omitted: CONFIRMED, FIXED | Corrected-fixture `controls-red2`: 2 failed / 2 passed; `controls-green`: 4 passed. Initial `controls-red` had a test-fixture source-URL omission, corrected before the meaningful RED. |
+| All new tests distinguish old production: CONFIRMED | `run_head_red.py` loads unmodified `git show HEAD:tools/package/notices.py` from scratch, patches only the test loader: 16 failed / 304 deselected, no errors. HEAD remains ec59bd66. |
+| Regeneration might vary host ordering/material identity: REJECTED | `surface-audit.json`: repeated generation byte-equal; 33 whole inputs and 20 slices independently matched. |
+| Final source/provenance description might claim a header where an aggregate exists: CONFIRMED, FIXED | Generator distinguishes source-file headers from line-range excerpts of licence files. `final-records`: 16 passed on the final manifest; fresh `probe-verified` rerun below. |
+
+The final verification pass checked source-byte identities, deterministic
+manifest loading, host bindings, reused-text rendering and refusal behavior;
+no further in-envelope issue was found. Reviewer A has not run in this cell;
+the dispatcher runs it between turns. No review ledger round is claimed here.
+
+**Fresh copy probes (final manifest).** `probe-verified.log` and `probe-results.json`:
+
+- POSITIVE: **128 rows, 1536 entries, 103 embedded rows**, all 110 declared hosts measured and matching. Notices SHA-256 `e4d9cd344e9d7da4bf6680d1a08306d0648e63264dc5b5a9ddc1b5385ce51afa`.
+- Embedded rows by package: pillow 6; pillow-heif 5; numpy 1; scipy 32. The MinGW row is shared by numpy/SciPy, so these package counts overlap.
+- NEGATIVE: `notices: embedded _internal/scipy/optimize/_highspy/_core.cp312-win_amd64.pyd identity differs: expected SHA-256 e6beb8321a4905c9bd0ba0eec2dfa7e27d76a01ab7d0abeab81fcce9ae6732e1 size 6709248; actual SHA-256 83281d6efb662f1a3d70c135d070dd66ec0cee47fc15ff327a50a99e39d75d9b size 6709249; re-census required`. One appended byte in a separate copy; refusal before notices are written.
+- Source notices unchanged before/after: `3afe913e26ecd6fe65765943fef798450687bebf7df926d1f720da9b8e999d8c`. No frozen binary, GUI, PyInstaller build or export was run.
+
+**Scope / remaining work.** Only the native-licences surface, notices tool,
+notices tests and this report are changed. Smoke test row-count changes were
+unnecessary. No source/application/frozen interface, lock, build.py, workflow,
+root notices, dependency, network, git write, desktop input or protected-folder
+write is involved. The seven-turn build's prior FFmpeg/fork/release work is not
+reopened here. Q1 remains with the owner. STOPPED ROWS and limits above remain
+for CHARC/seat disposition; the cell does not close DR-144 or authorize a draft.
+Depth: `depth_input_tokens` unavailable to this fresh cell; dispatcher read due
+at the turn boundary (no estimate supplied).
+
+
+**Final validation.** All commands used `uv run --no-sync` in this worktree;
+logs and JUnit XML are under `work/wp6.3c/turn8/`. Checker exit codes are in
+`static-exits-final.txt` (all 0).
+
+- `ruff-check-final.log`: `All checks passed!`.
+- `ruff-format-final.log`: `337 files already formatted`.
+- `mypy-win32-final.log`, `mypy-darwin-final.log`: each
+  `Success: no issues found in 166 source files`.
+- `pytest-final.log`/`.xml`, fresh `work/c63c-8-final`:
+  **548 passed, 1 skipped in 151.37s (0:02:31)**, exit 0.
+- `final-records.log`/`.xml`, fresh `work/c63c-8-final-records`:
+  **16 passed, 304 deselected**, on the final evidence wording/manifest.
+- `diff-check.log`: read-only `git diff --check`, exit 0.
+
+The first full run, `pytest.log`/`.xml` with exactly `work/c63c-8`, was
+**544 passed, 1 skipped in 150.91s**. Four final verification controls and their
+fixes account for the final run's four additional passes. The provenance-only
+manifest clarification during that final run was then checked with all 16 new
+cases and the fresh `probe-verified` copies; no behavioral code changed after
+the final run began.
+
+| Module | Final result |
+| --- | --- |
+| `test_tools_package_build.py` | 126 passed |
+| `test_tools_package_ffmpeg.py` | 68 passed |
+| `test_tools_package_notices.py` | 320 passed |
+| `test_tools_package_smoke.py` | 34 passed, 1 skipped |
+
+The unchanged skip is `test_non_windows_containment_never_silently_skips`:
+`POSIX process-group native proof belongs to WP6.5`.
+
+Exact isolated-runner command (starts with `PYTHONPATH=scripts`, then removes
+that environment variable before pytest while retaining the loaded shim;
+no source environment check is bypassed):
+
+```text
+uv run --no-sync python work/wp6.3c/turn8/run_tests.py tests/test_tools_package_notices.py tests/test_tools_package_build.py tests/test_tools_package_smoke.py tests/test_tools_package_ffmpeg.py --basetemp=work/c63c-8-final --junitxml=work/wp6.3c/turn8/pytest-final.xml -q
+```
+
+The runner enforces `-p sandbox_mkdir_shim -p no:cacheprovider --timeout 300`
+and excludes `test_python_m_clearwater_starts_the_shell_and_exits_0`.
+No package gate, Reviewer A/B pass, fork run, real FFmpeg build, V4/GPU proof,
+release/version/tag step or network fetch was attempted in this turn.

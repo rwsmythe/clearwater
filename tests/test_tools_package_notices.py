@@ -68,6 +68,8 @@ def native_surface_inputs(manifest):
     """Enumerate terms, full excerpt blobs and attribution inputs for Git checks."""
     found = set()
     for row in manifest["components"]:
+        if "carried_notice" in row:
+            continue
         found.add((row["text_file"], row["text_sha256"], row["text_size_bytes"]))
         for field in ("text_lines", "attribution"):
             if field in row:
@@ -982,7 +984,7 @@ def test_production_embedded_hosts_have_complete_verified_source_text_rows():
         "_internal/PySide6/plugins/platforms/qdirect2d.dll": 1,
         "_internal/shiboken6/shiboken6.abi3.dll": 1,
     }
-    assert set(hosts) == set(expected)
+    assert set(expected) <= set(hosts)
     for path, count in expected.items():
         host = hosts[path]
         assert len(host.components) == count
@@ -2584,3 +2586,185 @@ def test_embedded_shared_text_is_rechecked_for_each_component_at_render(release)
         ValueError, match="embedded.*" + re.escape(host.name) + ".*Embedded beta.*text"
     ):
         module.render_notices(result)
+
+
+def carried_notice_fixture(release):
+    """Bind a second host claim to numpy's already rendered, measured terms."""
+    module = load_notices()
+    original = plan(module, release)
+    parent = next(row for row in original.rows if row.name == "numpy")
+    assert len(parent.licence_inputs) == 1
+    terms = parent.licence_inputs[0].path.read_bytes()
+    relative = "_internal/numpy/_core/test.pyd"
+    body = (release["folder"] / relative).read_bytes()
+    reference = {
+        "row": "numpy",
+        "inputs": [{"sha256": hashlib.sha256(terms).hexdigest(), "size_bytes": len(terms)}],
+    }
+    document = json.loads((release["native_surface"] / "manifest.json").read_text())
+    document["embedded_hosts"] = [
+        {
+            "relpath": relative,
+            "sha256": hashlib.sha256(body).hexdigest(),
+            "size_bytes": len(body),
+            "parent": "numpy",
+            "components": [
+                {"component": "Carried runtime", "source": {"carried_notice": reference}}
+            ],
+        }
+    ]
+    document["components"].append(
+        {
+            "component": "Carried runtime",
+            "upstream_version": "fixture runtime",
+            "spdx": "MIT",
+            "version_evidence": {"method": "embedded_string", "value": "fixture"},
+            "embedded_in": [relative],
+            "carried_notice": reference,
+        }
+    )
+    save_embedded_fixture(release, document)
+    return module, document, terms
+
+
+def test_embedded_carried_notice_reuses_existing_text_without_copy(release):
+    """An embedded runtime must reuse its audited input and retain its host attribution."""
+    module, _document, terms = carried_notice_fixture(release)
+    result = plan(module, release)
+    runtime = next(row for row in result.rows if row.name == "Carried runtime")
+    assert runtime.entries == ("file:_internal/numpy/_core/test.pyd",)
+    output = module.render_notices(result)
+    assert output.count(terms) == 1
+    assert b"Carried runtime" in output and b"Reused carried notice: numpy" in output
+
+
+@pytest.mark.parametrize("damage", ["hash", "size", "missing-row", "extra-field", "source-pin"])
+def test_embedded_carried_notice_refuses_unverified_reference(release, damage):
+    """Wrong or ambiguous references cannot silently fall back to the host's owner."""
+    module, document, _terms = carried_notice_fixture(release)
+    row = document["components"][-1]
+    if damage == "hash":
+        row["carried_notice"]["inputs"][0]["sha256"] = "f" * 64
+    elif damage == "size":
+        row["carried_notice"]["inputs"][0]["size_bytes"] += 1
+    elif damage == "missing-row":
+        row["carried_notice"]["row"] = "Absent source"
+    elif damage == "extra-field":
+        row["carried_notice"]["extra"] = "bad"
+    else:
+        row["source_commit"] = "a" * 40
+    # Mutate both independent declarations so the reference resolver is exercised.
+    document["embedded_hosts"][0]["components"][0]["source"] = {
+        "carried_notice": copy.deepcopy(row["carried_notice"])
+    }
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError, match=r"carried notice|source pin differs"):
+        plan(module, release)
+
+
+def test_embedded_carried_notice_rechecks_terms_at_render(release):
+    """Changing a reused source input after planning must refuse rendering."""
+    module, _document, _terms = carried_notice_fixture(release)
+    result = plan(module, release)
+    runtime = next(row for row in result.rows if row.name == "Carried runtime")
+    with runtime.licence_inputs[0].path.open("ab") as stream:
+        stream.write(b"x")
+    with pytest.raises(ValueError, match=r"Carried runtime|carried notice"):
+        module.render_notices(result)
+
+
+def test_production_wheel_census_binds_every_scipy_native_runtime():
+    """All audited SciPy natives must require the appropriate carried runtime texts."""
+    module = load_notices()
+    document = json.loads((ROOT / "tools/package/native-licences/manifest.json").read_text())
+    hosts = {host.relpath: host for host in module._embedded_declarations(document)}
+    scipy = {path: host for path, host in hosts.items() if host.parent == "scipy"}
+    assert len(scipy) == 83
+    extensions = {path: host for path, host in scipy.items() if path.endswith(".pyd")}
+    assert len(extensions) == 82
+    for host in extensions.values():
+        names = {name for name, _pin in host.components}
+        assert {
+            "GCC runtime (SciPy static)",
+            "MinGW-w64 CRT and winpthreads (static wheels)",
+        } <= names
+    assert any(path.endswith("/_slsqplib.cp312-win_amd64.pyd") for path in extensions)
+
+
+@pytest.mark.parametrize(
+    "component,expected",
+    [
+        ("libaom (Pillow)", ("_internal/PIL/_avif.cp312-win_amd64.pyd",)),
+        ("json11 (x265)", ("_internal/libx265-217-276e7d75772a32bd086b54d54e01fd11.dll",)),
+        ("fast_float (libstdc++)", ("_internal/libstdc++-6-e4d43a335d57132a6ec3004cece76b4f.dll",)),
+        (
+            "SuperLU (SciPy)",
+            ("_internal/scipy/sparse/linalg/_dsolve/_superlu.cp312-win_amd64.pyd",),
+        ),
+    ],
+)
+def test_production_wheel_texts_bind_exact_censused_hosts(component, expected):
+    """The verified library terms cannot be detached from their actual carried host."""
+    module = load_notices()
+    records = {
+        row.component: row
+        for row in module.load_native_licences(ROOT / "tools/package/native-licences")
+    }
+    assert records[component].embedded_in == expected
+    if component == "libaom (Pillow)":
+        assert (
+            records[component].licence_input.sha256
+            == "60f3f7e003a4a7736aad7c008380fbfbcd3bf19544c589efebba824a2b9e145b"
+        )
+
+
+@pytest.mark.parametrize("rehash", [False, True])
+def test_carried_audit_text_refusal_names_embedded_host_and_component(tmp_path, rehash):
+    """Even internally valid replacement audit blocks must match the embedded text pin."""
+    module = load_notices()
+    data = b"Original runtime exception terms.\n"
+    digest = hashlib.sha256(data).hexdigest()
+    audit = tmp_path / "audit.md"
+    altered = b"Replaced runtime exception terms.\n"
+    recorded = hashlib.sha256(altered).hexdigest() if rehash else digest
+    audit.write_text(
+        '<a id="text-1"></a>\n'
+        f"Source: `https://example.org/terms`. SHA-256: `{recorded}`. "
+        f"UTF-8/LF bytes: {len(altered)}.\n"
+        "````text\n" + altered.decode() + "````\n",
+        encoding="utf-8",
+    )
+    item = module.LicenceInput(
+        audit,
+        "text-1",
+        digest,
+        len(data),
+        context="embedded _internal/test.pyd component Runtime carried notice: ",
+    )
+    row = module.NoticeRow(
+        "Runtime",
+        "1",
+        "MIT",
+        ("https://example.org/source",),
+        ("file:_internal/test.pyd",),
+        (item,),
+    )
+    result = module.NoticePlan(row.entries, (row,), ())
+    with pytest.raises(ValueError, match=r"test.pyd.*Runtime"):
+        module.render_notices(result)
+
+
+def test_carried_notice_absent_host_adds_no_claim(release):
+    """A declared but absent host cannot redistribute a runtime reference."""
+    module, _document, _terms = carried_notice_fixture(release)
+    (release["folder"] / "_internal/numpy/_core/test.pyd").unlink()
+    assert not any(row.name == "Carried runtime" for row in plan(module, release).rows)
+
+
+def test_production_tnc_retains_original_tnbc_attribution():
+    """The TNC terms must not discard the original Stephen G. Nash TNBC credit."""
+    records = load_notices().load_native_licences(ROOT / "tools/package/native-licences")
+    row = next((row for row in records if row.component == "TNBC original credit (TNC)"), None)
+    assert row is not None
+    assert b"STEPHEN G. NASH" in row.licence_input.path.read_bytes()
+    assert row.embedded_in == ("_internal/scipy/optimize/_moduleTNC.cp312-win_amd64.pyd",)
