@@ -158,12 +158,21 @@ class NoticeRow(NamedTuple):
     verdict: str = "Redistributed in this artifact"
 
 
+class NoticeLimit(NamedTuple):
+    """A verbatim limits statement bound to declared, census-verified host paths."""
+
+    component: str
+    hosts: tuple[str, ...]
+    statement: str
+
+
 class NoticePlan(NamedTuple):
     """Validated entry coverage plus separately obtained component statements."""
 
     entries: tuple[str, ...]
     rows: tuple[NoticeRow, ...]
     user_obtained: tuple[str, ...]
+    limits: tuple[NoticeLimit, ...] = ()
 
 
 class _AuditRow(NamedTuple):
@@ -362,6 +371,43 @@ def _embedded_declarations(document: dict[str, Any]) -> tuple[_EmbeddedHost, ...
             )
         )
     return tuple(result)
+
+
+def _limit_declarations(
+    document: dict[str, Any], hosts: tuple[_EmbeddedHost, ...]
+) -> tuple[NoticeLimit, ...]:
+    values = document.get("limits", [])
+    if not isinstance(values, list):
+        raise ValueError("notices: limits must be a list")
+    declared = {host.relpath for host in hosts}
+    seen: set[str] = set()
+    result: list[NoticeLimit] = []
+    for item in values:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"component", "hosts", "statement"}
+            or any(
+                not isinstance(item.get(key), str)
+                or not item[key]
+                or item[key] != item[key].strip()
+                for key in ("component", "statement")
+            )
+            or not isinstance(item.get("hosts"), list)
+            or not item["hosts"]
+            or any(not _exact_host_path(host) for host in item["hosts"])
+        ):
+            raise ValueError("notices: limits entry schema is invalid")
+        paths = item["hosts"]
+        if paths != sorted(paths) or len({path.casefold() for path in paths}) != len(paths):
+            raise ValueError("notices: limits hosts must be sorted and duplicate-free")
+        for path in paths:
+            if path not in declared:
+                raise ValueError(f"notices: limits {item['component']} host {path} is undeclared")
+        if item["component"] in seen:
+            raise ValueError("notices: limits has duplicate component names")
+        seen.add(item["component"])
+        result.append(NoticeLimit(item["component"], tuple(paths), item["statement"]))
+    return tuple(sorted(result))
 
 
 def _carried_notice(row: dict[str, Any], *, source_only: bool = False) -> dict[str, Any]:
@@ -651,7 +697,14 @@ def _native_document(folder: Path) -> dict[str, Any]:
         not isinstance(document, dict)
         or not {"schema_version", "interpreter_build", "components"} <= set(document)
         or set(document)
-        - {"schema_version", "interpreter_build", "components", "vendored_paths", "embedded_hosts"}
+        - {
+            "schema_version",
+            "interpreter_build",
+            "components",
+            "vendored_paths",
+            "embedded_hosts",
+            "limits",
+        }
         or type(document.get("schema_version")) is not int
         or document["schema_version"] != 1
         or not isinstance(document.get("components"), list)
@@ -687,6 +740,12 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     rows use embedded_in (a list of declared paths) instead of another binding
     kind. Carried hosts require all rows and matching source pins before parent
     ownership is considered; absent hosts produce no embedded claims.
+    Optional limits is a list of exact component/hosts/statement objects.
+    Component and statement are nonempty, unpadded strings; hosts is a nonempty,
+    sorted, duplicate-free list of declared embedded host paths. Component names
+    are unique. Planning retains only carried hosts after the same identity
+    checks as embedded rows; all-absent statements are omitted. Limits carry no
+    text file or provenance kind and do not replace a component's text row.
     Git-tree excerpts require text_kind="excerpt" and text_lines: file (a local
     full-blob filename), lines (one-based inclusive pair), git_blob_sha1, sha256
     and size_bytes. The complete blob and exact slice are checked at load and
@@ -718,6 +777,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     document = _native_document(folder)
     _vendored_declarations(document)
     embedded_hosts = _embedded_declarations(document)
+    _limit_declarations(document, embedded_hosts)
     build = document.get("interpreter_build")
     if (
         not isinstance(build, dict)
@@ -1760,7 +1820,21 @@ def plan_notices(
             "FFmpeg / ffprobe: user-obtained, not redistributed; "
             "obtain licence and source from its publisher."
         )
-    return NoticePlan(inventory_labels, ordered, tuple(statements))
+    # Select only hosts that passed the existing census preflight. Declarations
+    # alone do not assert redistribution, just as for embedded component rows.
+    carried_paths = {
+        host.relpath: label.removeprefix("file:") for label, host in carried_hosts.items()
+    }
+    limits = tuple(
+        limit._replace(
+            hosts=tuple(
+                sorted(carried_paths[path] for path in limit.hosts if path in carried_paths)
+            )
+        )
+        for limit in _limit_declarations(document, embedded_hosts)
+        if any(path in carried_paths for path in limit.hosts)
+    )
+    return NoticePlan(inventory_labels, ordered, tuple(statements), limits)
 
 
 def _carried_notice_rows(
@@ -2194,6 +2268,8 @@ def render_notices(plan: NoticePlan) -> bytes:
     copies checked against both recorded integrity fields before use.
     Embedded rows share one block per distinct text hash/size, but each input is
     rechecked before sharing and each row retains its own source attribution.
+    Carried limits follow the component details in component/host order, with
+    statements preserved verbatim. Empty limits add no output bytes.
 
     Args:
         plan: An inventory-backed component plan from :func:`plan_notices`.
@@ -2305,6 +2381,15 @@ def render_notices(plan: NoticePlan) -> bytes:
             "Bundled entries: " + ", ".join(f"`{entry}`" for entry in row.entries),
             "",
         ]
+    if plan.limits:
+        header += ["## Components with no carried licence text, and limits", ""]
+        for limit in sorted(plan.limits):
+            header += [
+                "Component: " + limit.component,
+                "Hosts: " + ", ".join("file:" + host for host in sorted(limit.hosts)),
+                limit.statement,
+                "",
+            ]
     header += ["## Full licence texts and provenance", ""]
     output = ["\n".join(header).encode("utf-8")]
     for item, (label, data) in materials.items():

@@ -1,6 +1,6 @@
 # WP6.3c - FFmpeg bundle
 
-Status: turn 9 DR-144 commissioned loading complete, 2026-11-05; acceptance pending. The dispatch records the seat's fork
+Status: turn 10 shipped DR-144 limits complete, 2026-11-05; acceptance pending. The dispatch records the seat's fork
 commit/export and clean actionlint result; Dockerfile generation was refused by
 the seat's tool policy and a static proof recorded instead. The real asset,
 lock re-pin, remaining package work, review, package gate and release are pending.
@@ -1481,3 +1481,214 @@ COMMISSIONED to the subsequent dispatches/seat. CHARC's R4 register record at
 accept remains COMMISSIONED to CHARC. No per-row input/ruling is left undone.
 Depth: `depth_input_tokens` is unavailable to this fresh cell; dispatcher read
 due at the turn boundary, with no estimate supplied.
+
+
+## Turn 10 - Shipped DR-144 limits statements
+
+**Built.** Added optional `limits` to the native-licences manifest and its
+fail-closed loader/planner/renderer contract. An entry has exactly `component`,
+`hosts`, `statement`; unknown top-level/entry keys are refused. Component and
+statement must be nonempty strings without leading/trailing whitespace; component
+names are unique. Hosts must be a nonempty, sorted, case-insensitively
+duplicate-free list of exact relative paths already declared in `embedded_hosts`.
+No provenance kind, text-file rule, source pin, host identity or component row
+was changed. `NoticeLimit` carries the selected statements in `NoticePlan`;
+the new plan field defaults to an empty tuple for existing callers.
+
+**Absent-host decision.** Use only hosts returned by the EXISTING
+`_embedded_claims` census preflight, never an independent weaker identity check.
+A carried host with different bytes refuses by name with expected/actual hash
+and size and `re-census required`, before package coverage or notice publication.
+An absent declared host contributes no embedded claim and no limits host;
+an entry whose hosts are ALL legitimately absent is omitted, matching embedded
+rows' absence rule. Partial carriage renders only actual carried paths, sorted.
+Both a text row and a limits entry for one component render independently.
+
+**Production data.** The deterministic seat-reviewable loader is
+`work/wp6.3c/turn10/load_limits.py`. It pins the turn-9 manifest SHA-256,
+adds ONLY the sorted `limits` list and asserts every other manifest value is
+unchanged. Repeated loading yields identical bytes: manifest SHA-256
+`a53e8573a94489a07505d14d170baa0c1e298aee21b871ce19147a7cbf3e183b`.
+All 17 commissioned entries loaded; STOPPED ENTRIES: NONE. The effective
+shipped count is **17**, including COLAMD and BASICLU / IPX / cuPDLP-C;
+any earlier dispatch shorthand of "16 limits" is superseded. No such literal
+count appeared in the prior turn-9 report, so no historical count was replaced.
+The seven mdspan host paths are turn 8's exact xsf users. The supplied census
+does not establish the exact Cython build subset: the expressly allowed
+fallback binds all 82 declared SciPy `.pyd`, with the statement naming
+"SciPy extensions built from Cython sources". U-H3 also binds all 82 without
+asserting inclusion. There is no new host declaration or licence text.
+
+**PROCESS.** Turn 9's first launch was stopped by the seat within a minute: the seat record was re-hashed by its producing subagent after the dispatch pinned the earlier hash; rule adopted: a dispatch pins a seat record's hash only after the producing subagent has returned.
+
+**RED -> GREEN.** All logs/XML and scratch instruments are under
+`work/wp6.3c/turn10/`.
+
+- `red.log` / `.xml`, fresh `work/c63c-10-red`: **24 failed, 1 passed,
+  333 deselected** before the schema/renderer/data changes. The existing
+  top-level unknown-key control is the passing preservation check. The old
+  strict schema already refuses `limits`, so new negative cases require
+  limits-specific diagnostics rather than claiming the old code accepted
+  malformed declarations. Positive tests expose the unsupported field and
+  production test exposes the absent 17 entries.
+- `green.log` / `.xml`, fresh `work/c63c-10-green`: **25 passed,
+  333 deselected**. Covers exact schema/types/unknown keys, undeclared hosts,
+  duplicate components/hosts, whitespace, unsafe/unsorted paths, absent/empty
+  lists, both text and limits, deterministic text/order, all-absent/partial/full
+  host carriage, altered-host refusal and production host declarations.
+- No source/product entry point was added. The existing smoke source-entry
+  child was inspected before the full run: disposable APPDATA/LOCALAPPDATA/XDG
+  roots, blocked PySide6/shiboken6 imports, GUI and worker stubs, timeout 15 s.
+
+**Validation.** `validation-exits.json`: all five exit codes 0.
+
+- `ruff-check.log`: `All checks passed!`.
+- `ruff-format.log`: `337 files already formatted`.
+- `mypy-win32.log`, `mypy-darwin.log`: each
+  `Success: no issues found in 166 source files`.
+- `pytest.log` / `.xml`, fresh `work/c63c-10`: **586 passed,
+  1 skipped**.
+
+| Module | Final result |
+| --- | --- |
+| `test_tools_package_build.py` | 126 passed |
+| `test_tools_package_ffmpeg.py` | 68 passed |
+| `test_tools_package_notices.py` | 358 passed |
+| `test_tools_package_smoke.py` | 34 passed, 1 skipped |
+
+The single unchanged skip is
+`test_non_windows_containment_never_silently_skips`:
+`POSIX process-group native proof belongs to WP6.5`.
+Exact isolated runner (launched with `PYTHONPATH=scripts`, removed before
+pytest while retaining the shim on `sys.path`):
+
+```text
+uv run --no-sync python work/wp6.3c/turn10/run_tests.py tests/test_tools_package_notices.py tests/test_tools_package_build.py tests/test_tools_package_smoke.py tests/test_tools_package_ffmpeg.py --basetemp=work/c63c-10 --junitxml=work/wp6.3c/turn10/pytest.xml -q -rs
+```
+
+It enforces `-p sandbox_mkdir_shim -p no:cacheprovider --timeout 300` and
+`-k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`. No source
+environment refusal is bypassed. `diff-check.log`: read-only `git diff --check`,
+exit 0.
+
+**Fresh-copy probes.** `probe.py`, `probe.log`, `probe-results.json` use
+fresh `work/c63c-10/probes/positive/` and `negative/` copies of the commissioned
+stage-1d folder. No copied executable or native is executed.
+
+- POSITIVE: **140 rows, 1536 entries,
+  17 limits entries**; all 110 declared hosts measured
+  and matching. Notices SHA-256 `e9aec25af81312d48221b59abbc42e8778d575c6d3ad6ea891e65ecd5db8df22`.
+- Section: zero-based byte offset **242907**,
+  length **16000** (heading through separator LF,
+  ending immediately before `## Full licence texts and provenance`);
+  SHA-256 `45526f42af10824333029d0a4818ef6edb008b8e0c285c9c60206c8c46fc4b1b`.
+- ABSENT and EMPTY lists each render byte-identically to turn 9's
+  `e06211214c7edda2c38c3691d4710e764e677f680e706ef10195566372f257a7`.
+  This uses a separate surface copy; no production manifest is changed by
+  the probe. Repeated planning/rendering of the new output is byte-identical.
+- NEGATIVE: appending one byte to the second copy's limits-only algorithm
+  host (which also carries its existing runtime rows) yields:
+  `notices: embedded _internal/scipy/integrate/_quadpack.cp312-win_amd64.pyd identity differs: expected SHA-256 03e0ed70dc1910b227f32676d4f4c8621f4b82ab45429e6f167dc582c4c67dd8 size 142336; actual SHA-256 74ef347aa381ccc27b409fb3ce657b965e24b10c6e5119c14148ad35898aae68 size 142337; re-census required`.
+  Refusal preserves the copy's previous notices.
+- Original seat-folder notices before/after:
+  `3afe913e26ecd6fe65765943fef798450687bebf7df926d1f720da9b8e999d8c` (unchanged).
+
+**Verification loop.**
+
+| Suspected / disposition | Independent confirmation / result |
+| --- | --- |
+| Missing shipped limits: CONFIRMED, FIXED | RED positives and absent production list; GREEN controls plus fresh-copy section with all 17 verbatim statements. |
+| Limits might weaken census or infer absent carriage: REJECTED | Existing preflight is the only carried-host source; altered-byte control and separate real `_quadpack` refusal; all-absent/partial/full cases pass. |
+| Optional field might alter old notices: REJECTED | Both fresh-copy empty/absent outputs equal the independently supplied turn-9 digest and each other byte-for-byte. |
+| Loading might change prior census/source rows or ordering: REJECTED | Loader asserts full prior manifest equality outside `limits`; repeat gives the same manifest digest; sorted-render control and all old tests pass. |
+
+The final owned-diff/requirements pass found nothing new. No review round is
+claimed; Reviewer A is the dispatcher-run pass after this yield.
+
+**Rendered section (complete, verbatim).** The following is the exact 16,000-byte
+section from the positive probe; its copy is `rendered-section.txt`.
+
+```text
+## Components with no carried licence text, and limits
+
+Component: BASICLU / IPX / cuPDLP-C (U-S5)
+Hosts: file:_internal/scipy/optimize/_highspy/_core.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_highspy/_highs_options.cp312-win_amd64.pyd
+These components are built in HiGHS; repository-wide MIT coverage is inferred, not a separately verified upstream licence grant. BASICLU's actual header is retained.
+
+Component: COLAMD (U-S4)
+Hosts: file:_internal/scipy/sparse/linalg/_dsolve/_superlu.cp312-win_amd64.pyd
+The copyright notice is carried; its referenced License.txt is absent from the pinned tree. No SPDX id is substituted for that missing document.
+
+Component: Cython-generated code (U-S8)
+Hosts: file:_internal/scipy/_cyutility.cp312-win_amd64.pyd, file:_internal/scipy/_lib/_ccallback_c.cp312-win_amd64.pyd, file:_internal/scipy/_lib/_fpumode.cp312-win_amd64.pyd, file:_internal/scipy/_lib/_uarray/_uarray.cp312-win_amd64.pyd, file:_internal/scipy/_lib/messagestream.cp312-win_amd64.pyd, file:_internal/scipy/fft/_duccfft/pyduccfft.cp312-win_amd64.pyd, file:_internal/scipy/integrate/_dop.cp312-win_amd64.pyd, file:_internal/scipy/integrate/_odepack.cp312-win_amd64.pyd, file:_internal/scipy/integrate/_quadpack.cp312-win_amd64.pyd, file:_internal/scipy/integrate/_vode.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_dierckx.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_fitpack.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_interpnd.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_ppoly.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_rbfinterp_pythran.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_rgi_cython.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_batched_linalg.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_cythonized_array_utils.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_decomp_interpolative.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_decomp_update.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_fblas.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_flapack.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_internal_matfuncs.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_linalg_pythran.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_matfuncs_sqrtm_triu.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_solve_toeplitz.cp312-win_amd64.pyd, file:_internal/scipy/linalg/cython_blas.cp312-win_amd64.pyd, file:_internal/scipy/linalg/cython_lapack.cp312-win_amd64.pyd, file:_internal/scipy/ndimage/_nd_image.cp312-win_amd64.pyd, file:_internal/scipy/ndimage/_ni_label.cp312-win_amd64.pyd, file:_internal/scipy/ndimage/_rank_filter_1d.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_bglu_dense.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_direct.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_group_columns.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_highspy/_core.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_highspy/_highs_options.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_lbfgsb.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_lsap.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_lsq/givens_elimination.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_minpack.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_moduleTNC.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_pava_pybind.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_trlib/_trlib.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_zeros.cp312-win_amd64.pyd, file:_internal/scipy/sparse/_csparsetools.cp312-win_amd64.pyd, file:_internal/scipy/sparse/_sparsetools.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_flow.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_matching.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_min_spanning_tree.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_reordering.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_shortest_path.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_tools.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_traversal.cp312-win_amd64.pyd, file:_internal/scipy/sparse/linalg/_dsolve/_superlu.cp312-win_amd64.pyd, file:_internal/scipy/sparse/linalg/_eigen/arpack/_arpacklib.cp312-win_amd64.pyd, file:_internal/scipy/sparse/linalg/_propack.cp312-win_amd64.pyd, file:_internal/scipy/spatial/_ckdtree.cp312-win_amd64.pyd, file:_internal/scipy/spatial/_distance_pybind.cp312-win_amd64.pyd, file:_internal/scipy/spatial/_distance_wrap.cp312-win_amd64.pyd, file:_internal/scipy/spatial/_hausdorff.cp312-win_amd64.pyd, file:_internal/scipy/spatial/_qhull.cp312-win_amd64.pyd, file:_internal/scipy/spatial/_voronoi.cp312-win_amd64.pyd, file:_internal/scipy/spatial/transform/_rigid_transform_cy.cp312-win_amd64.pyd, file:_internal/scipy/spatial/transform/_rotation_cy.cp312-win_amd64.pyd, file:_internal/scipy/special/_comb.cp312-win_amd64.pyd, file:_internal/scipy/special/_ellip_harm_2.cp312-win_amd64.pyd, file:_internal/scipy/special/_gufuncs.cp312-win_amd64.pyd, file:_internal/scipy/special/_specfun.cp312-win_amd64.pyd, file:_internal/scipy/special/_special_ufuncs.cp312-win_amd64.pyd, file:_internal/scipy/special/_ufuncs.cp312-win_amd64.pyd, file:_internal/scipy/special/_ufuncs_cxx.cp312-win_amd64.pyd, file:_internal/scipy/special/cython_special.cp312-win_amd64.pyd, file:_internal/scipy/stats/_ansari_swilk_statistics.cp312-win_amd64.pyd, file:_internal/scipy/stats/_biasedurn.cp312-win_amd64.pyd, file:_internal/scipy/stats/_levy_stable/levyst.cp312-win_amd64.pyd, file:_internal/scipy/stats/_qmc_cy.cp312-win_amd64.pyd, file:_internal/scipy/stats/_qmvnt_cy.cp312-win_amd64.pyd, file:_internal/scipy/stats/_rcont/rcont.cp312-win_amd64.pyd, file:_internal/scipy/stats/_sobol.cp312-win_amd64.pyd, file:_internal/scipy/stats/_stats.cp312-win_amd64.pyd, file:_internal/scipy/stats/_stats_pythran.cp312-win_amd64.pyd
+For SciPy extensions built from Cython sources, whether Cython utility code owes a notice and which text or hosts are required were not established by the census. This limits entry conservatively binds all 82 SciPy extensions; no extra licence text is carried.
+
+Component: DCDFLIB
+Hosts: file:_internal/scipy/special/_ufuncs.cp312-win_amd64.pyd, file:_internal/scipy/special/cython_special.cp312-win_amd64.pyd
+The ACM Algorithms Policy condition (no copying for direct commercial advantage) is met on its face because Clearwater is distributed without fee; which DCDFLIB routines are ACM's was not traced.
+
+Component: FITPACK
+Hosts: file:_internal/scipy/interpolate/_dierckx.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_fitpack.cp312-win_amd64.pyd
+SciPy's C / C++ rewrites of Paul Dierckx's FITPACK (double-precision form by Pearu Peterson) are distributed at https://www.netlib.org/dierckx/ with no licence or copyright statement; no text is carried.
+
+Component: L-BFGS-B
+Hosts: file:_internal/scipy/optimize/_lbfgsb.cp312-win_amd64.pyd
+The published License.txt is a BSD-3 template with unfilled placeholders and names no holder; Zhu, Byrd, Nocedal, Morales and the citation condition come from the authors' separately carried README.
+
+Component: LSODA (ODEPACK)
+Hosts: file:_internal/scipy/integrate/_odepack.cp312-win_amd64.pyd
+SciPy's C translation of LSODA from ODEPACK (A. C. Hindmarsh and L. R. Petzold, Lawrence Livermore National Laboratory) is distributed at https://www.netlib.org/odepack/ and https://computing.llnl.gov/projects/odepack/software with no licence or copyright statement; no text is carried.
+
+Component: NNLS
+Hosts: file:_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd
+SciPy's C translation of Lawson and Hanson's NNLS (Solving Least Squares Problems, 1974; SIAM reprint 1995) is distributed by netlib at https://www.netlib.org/lawson-hanson/ with no licence or copyright statement; no text is carried.
+
+Component: QUADPACK
+Hosts: file:_internal/scipy/integrate/_quadpack.cp312-win_amd64.pyd
+SciPy's C rewrite of QUADPACK (R. Piessens, E. de Doncker-Kapenga, C. W. Ueberhuber, D. K. Kahaner) is distributed at https://www.netlib.org/quadpack/ with no licence statement (netlib's permission file reads "prehistoric"); no text is carried.
+
+Component: Ryu / fast_float in SciPy (U-H3)
+Hosts: file:_internal/scipy/_cyutility.cp312-win_amd64.pyd, file:_internal/scipy/_lib/_ccallback_c.cp312-win_amd64.pyd, file:_internal/scipy/_lib/_fpumode.cp312-win_amd64.pyd, file:_internal/scipy/_lib/_uarray/_uarray.cp312-win_amd64.pyd, file:_internal/scipy/_lib/messagestream.cp312-win_amd64.pyd, file:_internal/scipy/fft/_duccfft/pyduccfft.cp312-win_amd64.pyd, file:_internal/scipy/integrate/_dop.cp312-win_amd64.pyd, file:_internal/scipy/integrate/_odepack.cp312-win_amd64.pyd, file:_internal/scipy/integrate/_quadpack.cp312-win_amd64.pyd, file:_internal/scipy/integrate/_vode.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_dierckx.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_fitpack.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_interpnd.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_ppoly.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_rbfinterp_pythran.cp312-win_amd64.pyd, file:_internal/scipy/interpolate/_rgi_cython.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_batched_linalg.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_cythonized_array_utils.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_decomp_interpolative.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_decomp_update.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_fblas.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_flapack.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_internal_matfuncs.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_linalg_pythran.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_matfuncs_sqrtm_triu.cp312-win_amd64.pyd, file:_internal/scipy/linalg/_solve_toeplitz.cp312-win_amd64.pyd, file:_internal/scipy/linalg/cython_blas.cp312-win_amd64.pyd, file:_internal/scipy/linalg/cython_lapack.cp312-win_amd64.pyd, file:_internal/scipy/ndimage/_nd_image.cp312-win_amd64.pyd, file:_internal/scipy/ndimage/_ni_label.cp312-win_amd64.pyd, file:_internal/scipy/ndimage/_rank_filter_1d.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_bglu_dense.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_direct.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_group_columns.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_highspy/_core.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_highspy/_highs_options.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_lbfgsb.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_lsap.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_lsq/givens_elimination.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_minpack.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_moduleTNC.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_pava_pybind.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_trlib/_trlib.cp312-win_amd64.pyd, file:_internal/scipy/optimize/_zeros.cp312-win_amd64.pyd, file:_internal/scipy/sparse/_csparsetools.cp312-win_amd64.pyd, file:_internal/scipy/sparse/_sparsetools.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_flow.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_matching.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_min_spanning_tree.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_reordering.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_shortest_path.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_tools.cp312-win_amd64.pyd, file:_internal/scipy/sparse/csgraph/_traversal.cp312-win_amd64.pyd, file:_internal/scipy/sparse/linalg/_dsolve/_superlu.cp312-win_amd64.pyd, file:_internal/scipy/sparse/linalg/_eigen/arpack/_arpacklib.cp312-win_amd64.pyd, file:_internal/scipy/sparse/linalg/_propack.cp312-win_amd64.pyd, file:_internal/scipy/spatial/_ckdtree.cp312-win_amd64.pyd, file:_internal/scipy/spatial/_distance_pybind.cp312-win_amd64.pyd, file:_internal/scipy/spatial/_distance_wrap.cp312-win_amd64.pyd, file:_internal/scipy/spatial/_hausdorff.cp312-win_amd64.pyd, file:_internal/scipy/spatial/_qhull.cp312-win_amd64.pyd, file:_internal/scipy/spatial/_voronoi.cp312-win_amd64.pyd, file:_internal/scipy/spatial/transform/_rigid_transform_cy.cp312-win_amd64.pyd, file:_internal/scipy/spatial/transform/_rotation_cy.cp312-win_amd64.pyd, file:_internal/scipy/special/_comb.cp312-win_amd64.pyd, file:_internal/scipy/special/_ellip_harm_2.cp312-win_amd64.pyd, file:_internal/scipy/special/_gufuncs.cp312-win_amd64.pyd, file:_internal/scipy/special/_specfun.cp312-win_amd64.pyd, file:_internal/scipy/special/_special_ufuncs.cp312-win_amd64.pyd, file:_internal/scipy/special/_ufuncs.cp312-win_amd64.pyd, file:_internal/scipy/special/_ufuncs_cxx.cp312-win_amd64.pyd, file:_internal/scipy/special/cython_special.cp312-win_amd64.pyd, file:_internal/scipy/stats/_ansari_swilk_statistics.cp312-win_amd64.pyd, file:_internal/scipy/stats/_biasedurn.cp312-win_amd64.pyd, file:_internal/scipy/stats/_levy_stable/levyst.cp312-win_amd64.pyd, file:_internal/scipy/stats/_qmc_cy.cp312-win_amd64.pyd, file:_internal/scipy/stats/_qmvnt_cy.cp312-win_amd64.pyd, file:_internal/scipy/stats/_rcont/rcont.cp312-win_amd64.pyd, file:_internal/scipy/stats/_sobol.cp312-win_amd64.pyd, file:_internal/scipy/stats/_stats.cp312-win_amd64.pyd, file:_internal/scipy/stats/_stats_pythran.cp312-win_amd64.pyd
+Static inclusion in SciPy was not established; this limits entry conservatively binds all 82 SciPy extensions and does not assert presence. Only the previously proven pillow-heif libstdc++ hosts carry their licence rows.
+
+Component: SLSQP
+Hosts: file:_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd
+The BSD licence was named in the ACM e-mail, never written; the holder is ACM per the thread and Dieter Kraft per the source. No BSD text is invented.
+
+Component: Sobol direction numbers (U-S9)
+Hosts: file:_internal/scipy/stats/_sobol.cp312-win_amd64.pyd
+The carried Sobol direction-number data copy and applicable notice were not established by the native census. No extra licence text is carried.
+
+Component: Tcl/Tk header (U-T1)
+Hosts: file:_internal/PIL/_imagingtk.cp312-win_amd64.pyd
+The Tcl/Tk header declaration carries no copyrightable code into the binary; Tcl/Tk terms are already rendered through the Python row. No additional excerpt or text is carried.
+
+Component: VODE / ZVODE
+Hosts: file:_internal/scipy/integrate/_vode.cp312-win_amd64.pyd
+SciPy's C translations of VODE and ZVODE (P. N. Brown, G. D. Byrne, A. C. Hindmarsh) are distributed at https://www.netlib.org/ode/ and https://computing.llnl.gov/projects/odepack/software with no licence or copyright statement; no text is carried.
+
+Component: libquadmath (U-N2)
+Hosts: file:_internal/numpy.libs/libscipy_openblas64_-ed4f167a5330424524f45258e7ca2c8d.dll, file:_internal/scipy.libs/libscipy_openblas-197ee2fc9b4d071f7e048078cac74115.dll
+Presence in either OpenBLAS DLL and the applicable text were not established; strings or import absence is not proof. No extra licence text is carried.
+
+Component: mdspan (Kokkos, U-S6)
+Hosts: file:_internal/scipy/special/_ellip_harm_2.cp312-win_amd64.pyd, file:_internal/scipy/special/_gufuncs.cp312-win_amd64.pyd, file:_internal/scipy/special/_specfun.cp312-win_amd64.pyd, file:_internal/scipy/special/_special_ufuncs.cp312-win_amd64.pyd, file:_internal/scipy/special/_ufuncs.cp312-win_amd64.pyd, file:_internal/scipy/special/_ufuncs_cxx.cp312-win_amd64.pyd, file:_internal/scipy/special/cython_special.cp312-win_amd64.pyd
+Header instantiation and carried host were not established; the fetched xsf text is only a pointer. The upstream terms are Apache-2.0 WITH LLVM-exception; no extra licence text is carried.
+
+Component: x86inc (libaom)
+Hosts: file:_internal/PIL/_avif.cp312-win_amd64.pyd
+Inclusion is inferred from aom's x86-64 assembler build, not a Pillow build log or binary inclusion read.
+
+```
+
+**Scope / handoff.** Only notices.py's schema/planner/renderer, the manifest's
+`limits` list, notices tests and this report changed. Smoke row-count changes
+were unnecessary. STOPPED ENTRIES: NONE; no commissioned turn-10 item remains
+undone. No dependency, frozen interface, FFmpeg lock, build.py, release workflow,
+root notices or other row/text changed. No network, Git write, real PyInstaller
+build, frozen/GUI launch, Docker, synthetic desktop input, protected-folder
+write, GitHub action, push, tag or mailbox post occurred. Q1, fork/asset/re-pin,
+remaining package/release work, independent reviews and gates remain with
+later dispatches/seat. The cell does not close DR-144 or assert N13/release
+completion. One logical change this turn. `depth_input_tokens` is unavailable
+to the fresh cell; dispatcher read due at the boundary, no estimate supplied.

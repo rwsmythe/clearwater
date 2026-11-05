@@ -913,6 +913,7 @@ def _make_native_surface(destination):
     document["components"] = [document["components"][0]]
     document.pop("vendored_paths", None)
     document.pop("embedded_hosts", None)
+    document.pop("limits", None)
     for text in destination.iterdir():
         if text.name not in {"manifest.json", document["components"][0]["text_file"]}:
             text.unlink()
@@ -2210,6 +2211,205 @@ def embedded_host_fixture(release, *, parent="python", carried=True):
 def save_embedded_fixture(release, document):
     """Write only the test copy's manifest after a negative-control mutation."""
     (release["native_surface"] / "manifest.json").write_text(json.dumps(document))
+
+
+LIMITS_HEADING = b"## Components with no carried licence text, and limits\n\n"
+
+
+def limits_fixture(release):
+    """Bind both text-bearing and textless statements to independently measured hosts."""
+    document, host, _text = embedded_host_fixture(release)
+    relative = host.relative_to(release["folder"]).as_posix()
+    document["limits"] = [
+        {
+            "component": "Textless algorithm",
+            "hosts": [relative],
+            "statement": "No statement exists.",
+        },
+        {"component": "Embedded alpha", "hosts": [relative], "statement": "Inclusion is inferred."},
+    ]
+    save_embedded_fixture(release, document)
+    return document, host
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "top-key",
+        "entry-key",
+        "missing-key",
+        "not-list",
+        "not-entry",
+        "undeclared",
+        "duplicate-component",
+        "blank-component",
+        "trim-component",
+        "bad-component",
+        "blank-statement",
+        "trim-statement",
+        "bad-statement",
+        "empty-hosts",
+        "not-hosts",
+        "duplicate-host",
+        "unsafe-host",
+        "unsorted-hosts",
+    ],
+)
+def test_limits_schema_refuses_invalid_or_undeclared_statements(release, damage):
+    """Limits cannot bypass exact schema, declaration or deterministic-host requirements."""
+    document, _host = limits_fixture(release)
+    entry = document["limits"][0]
+    if damage == "top-key":
+        document["unexpected"] = []
+    elif damage == "entry-key":
+        entry["unexpected"] = "unknown"
+    elif damage == "missing-key":
+        del entry["statement"]
+    elif damage == "not-list":
+        document["limits"] = {}
+    elif damage == "not-entry":
+        document["limits"] = [None]
+    elif damage == "undeclared":
+        entry["hosts"] = ["_internal/absent.pyd"]
+    elif damage == "duplicate-component":
+        document["limits"].append(copy.deepcopy(entry))
+    elif damage in {"blank-component", "trim-component", "bad-component"}:
+        entry["component"] = {"blank-component": "", "trim-component": " name", "bad-component": 1}[
+            damage
+        ]
+    elif damage in {"blank-statement", "trim-statement", "bad-statement"}:
+        entry["statement"] = {
+            "blank-statement": " ",
+            "trim-statement": "terms ",
+            "bad-statement": None,
+        }[damage]
+    elif damage == "empty-hosts":
+        entry["hosts"] = []
+    elif damage == "not-hosts":
+        entry["hosts"] = entry["hosts"][0]
+    elif damage == "duplicate-host":
+        entry["hosts"] *= 2
+    elif damage == "unsafe-host":
+        entry["hosts"] = ["../host.pyd"]
+    else:
+        second = copy.deepcopy(document["embedded_hosts"][0])
+        second["relpath"] = "_internal/another.pyd"
+        document["embedded_hosts"].append(second)
+        entry["hosts"].append(second["relpath"])
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError, match="schema" if damage == "top-key" else "limits"):
+        load_notices().load_native_licences(release["native_surface"])
+
+
+def test_limits_empty_or_absent_preserves_existing_render_bytes(release):
+    """Optional empty lists leave the complete pre-limits output byte-identical."""
+    document, _host, _text = embedded_host_fixture(release)
+    module = load_notices()
+    before = module.render_notices(plan(module, release))
+    assert LIMITS_HEADING not in before
+    document["limits"] = []
+    save_embedded_fixture(release, document)
+    assert module.render_notices(plan(module, release)) == before
+
+
+def test_limits_render_both_carried_text_and_verbatim_statement_in_sorted_section(release):
+    """Statements remain separate from text rows and sort independently of manifest order."""
+    document, host = limits_fixture(release)
+    module = load_notices()
+    result = plan(module, release)
+    before = module.render_notices(result)
+    relative = host.relative_to(release["folder"]).as_posix()
+    expected = (
+        LIMITS_HEADING.decode()
+        + "Component: Embedded alpha\nHosts: file:"
+        + relative
+        + "\nInclusion is inferred.\n\nComponent: Textless algorithm\nHosts: file:"
+        + relative
+        + "\nNo statement exists.\n\n"
+    ).encode()
+    assert expected in before
+    assert before.index(b"### Embedded alpha\n") < before.index(expected)
+    assert before.index(expected) < before.index(b"## Full licence texts and provenance")
+    assert b"Synthetic embedded terms, shared by alpha and beta.\n" in before
+    assert not any(row.name == "Textless algorithm" for row in result.rows)
+    document["limits"].reverse()
+    save_embedded_fixture(release, document)
+    assert module.render_notices(plan(module, release)) == before
+
+
+@pytest.mark.parametrize("carried", [0, 1, 2])
+def test_limits_absent_hosts_follow_embedded_claims_and_only_name_carried_hosts(release, carried):
+    """All-absent statements disappear; partial carriage retains only the actual hosts."""
+    document, first = limits_fixture(release)
+    relative = "_internal/numpy/_core/test.pyd"
+    second = release["folder"] / relative
+    host = copy.deepcopy(document["embedded_hosts"][0])
+    host.update(
+        relpath=relative,
+        parent="numpy",
+        sha256=hashlib.sha256(second.read_bytes()).hexdigest(),
+        size_bytes=second.stat().st_size,
+    )
+    document["embedded_hosts"].append(host)
+    for row in document["components"][1:]:
+        row["embedded_in"].append(relative)
+    for entry in document["limits"]:
+        entry["hosts"] = sorted([relative, first.relative_to(release["folder"]).as_posix()])
+    if carried < 2:
+        second.unlink()
+    if carried == 0:
+        first.unlink()
+    save_embedded_fixture(release, document)
+    module = load_notices()
+    rendered = module.render_notices(plan(module, release))
+    if carried == 0:
+        assert LIMITS_HEADING not in rendered
+    else:
+        section = rendered.split(LIMITS_HEADING)[1].split(b"## Full licence texts")[0]
+        actual = [
+            name for name in document["limits"][0]["hosts"] if (release["folder"] / name).exists()
+        ]
+        assert ("Hosts: " + ", ".join("file:" + name for name in actual)).encode() in section
+        assert (relative.encode() in section) == (carried == 2)
+
+
+def test_limits_only_component_cannot_weaken_host_identity_check(release):
+    """A textless component still uses the existing census guard before parent coverage."""
+    _document, host = limits_fixture(release)
+    host.write_bytes(host.read_bytes() + b"x")
+    relative = host.relative_to(release["folder"]).as_posix()
+    with pytest.raises(ValueError, match=re.escape(relative) + ".*re-census required"):
+        plan(load_notices(), release)
+
+
+def test_production_limits_bind_every_commissioned_host_to_its_census():
+    """All seventeen commissioned limits use exact declared identities, without new texts."""
+    module = load_notices()
+    folder = ROOT / "tools/package/native-licences"
+    document = json.loads((folder / "manifest.json").read_bytes())
+    module.load_native_licences(folder)
+    entries = document.get("limits", [])
+    assert len(entries) == 17
+    assert [entry["component"] for entry in entries] == sorted(
+        entry["component"] for entry in entries
+    )
+    declared = {host["relpath"] for host in document["embedded_hosts"]}
+    by_name = {entry["component"]: entry for entry in entries}
+    for entry in entries:
+        assert set(entry["hosts"]) <= declared
+        assert entry["hosts"] == sorted(set(entry["hosts"]))
+    suffix = ".cp312-win_amd64.pyd"
+    assert by_name["QUADPACK"]["hosts"] == ["_internal/scipy/integrate/_quadpack" + suffix]
+    assert by_name["FITPACK"]["hosts"] == [
+        "_internal/scipy/interpolate/" + name + suffix for name in ("_dierckx", "_fitpack")
+    ]
+    scipy = sorted(
+        path for path in declared if path.startswith("_internal/scipy/") and path.endswith(".pyd")
+    )
+    assert len(scipy) == 82
+    for name in ("Cython-generated code (U-S8)", "Ryu / fast_float in SciPy (U-H3)"):
+        assert by_name[name]["hosts"] == scipy
+    assert len(by_name["mdspan (Kokkos, U-S6)"]["hosts"]) == 7
 
 
 def git_excerpt_fixture(release):

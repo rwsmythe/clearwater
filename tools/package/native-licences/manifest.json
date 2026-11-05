@@ -10538,5 +10538,298 @@
         }
       ]
     }
+  ],
+  "limits": [
+    {
+      "component": "BASICLU / IPX / cuPDLP-C (U-S5)",
+      "hosts": [
+        "_internal/scipy/optimize/_highspy/_core.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_highspy/_highs_options.cp312-win_amd64.pyd"
+      ],
+      "statement": "These components are built in HiGHS; repository-wide MIT coverage is inferred, not a separately verified upstream licence grant. BASICLU's actual header is retained."
+    },
+    {
+      "component": "COLAMD (U-S4)",
+      "hosts": [
+        "_internal/scipy/sparse/linalg/_dsolve/_superlu.cp312-win_amd64.pyd"
+      ],
+      "statement": "The copyright notice is carried; its referenced License.txt is absent from the pinned tree. No SPDX id is substituted for that missing document."
+    },
+    {
+      "component": "Cython-generated code (U-S8)",
+      "hosts": [
+        "_internal/scipy/_cyutility.cp312-win_amd64.pyd",
+        "_internal/scipy/_lib/_ccallback_c.cp312-win_amd64.pyd",
+        "_internal/scipy/_lib/_fpumode.cp312-win_amd64.pyd",
+        "_internal/scipy/_lib/_uarray/_uarray.cp312-win_amd64.pyd",
+        "_internal/scipy/_lib/messagestream.cp312-win_amd64.pyd",
+        "_internal/scipy/fft/_duccfft/pyduccfft.cp312-win_amd64.pyd",
+        "_internal/scipy/integrate/_dop.cp312-win_amd64.pyd",
+        "_internal/scipy/integrate/_odepack.cp312-win_amd64.pyd",
+        "_internal/scipy/integrate/_quadpack.cp312-win_amd64.pyd",
+        "_internal/scipy/integrate/_vode.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_dierckx.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_fitpack.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_interpnd.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_ppoly.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_rbfinterp_pythran.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_rgi_cython.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_batched_linalg.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_cythonized_array_utils.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_decomp_interpolative.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_decomp_update.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_fblas.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_flapack.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_internal_matfuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_linalg_pythran.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_matfuncs_sqrtm_triu.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_solve_toeplitz.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/cython_blas.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/cython_lapack.cp312-win_amd64.pyd",
+        "_internal/scipy/ndimage/_nd_image.cp312-win_amd64.pyd",
+        "_internal/scipy/ndimage/_ni_label.cp312-win_amd64.pyd",
+        "_internal/scipy/ndimage/_rank_filter_1d.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_bglu_dense.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_direct.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_group_columns.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_highspy/_core.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_highspy/_highs_options.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_lbfgsb.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_lsap.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_lsq/givens_elimination.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_minpack.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_moduleTNC.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_pava_pybind.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_trlib/_trlib.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_zeros.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/_csparsetools.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/_sparsetools.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_flow.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_matching.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_min_spanning_tree.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_reordering.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_shortest_path.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_tools.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_traversal.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/linalg/_dsolve/_superlu.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/linalg/_eigen/arpack/_arpacklib.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/linalg/_propack.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/_ckdtree.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/_distance_pybind.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/_distance_wrap.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/_hausdorff.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/_qhull.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/_voronoi.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/transform/_rigid_transform_cy.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/transform/_rotation_cy.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_comb.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_ellip_harm_2.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_gufuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_specfun.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_special_ufuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_ufuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_ufuncs_cxx.cp312-win_amd64.pyd",
+        "_internal/scipy/special/cython_special.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_ansari_swilk_statistics.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_biasedurn.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_levy_stable/levyst.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_qmc_cy.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_qmvnt_cy.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_rcont/rcont.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_sobol.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_stats.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_stats_pythran.cp312-win_amd64.pyd"
+      ],
+      "statement": "For SciPy extensions built from Cython sources, whether Cython utility code owes a notice and which text or hosts are required were not established by the census. This limits entry conservatively binds all 82 SciPy extensions; no extra licence text is carried."
+    },
+    {
+      "component": "DCDFLIB",
+      "hosts": [
+        "_internal/scipy/special/_ufuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/special/cython_special.cp312-win_amd64.pyd"
+      ],
+      "statement": "The ACM Algorithms Policy condition (no copying for direct commercial advantage) is met on its face because Clearwater is distributed without fee; which DCDFLIB routines are ACM's was not traced."
+    },
+    {
+      "component": "FITPACK",
+      "hosts": [
+        "_internal/scipy/interpolate/_dierckx.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_fitpack.cp312-win_amd64.pyd"
+      ],
+      "statement": "SciPy's C / C++ rewrites of Paul Dierckx's FITPACK (double-precision form by Pearu Peterson) are distributed at https://www.netlib.org/dierckx/ with no licence or copyright statement; no text is carried."
+    },
+    {
+      "component": "L-BFGS-B",
+      "hosts": [
+        "_internal/scipy/optimize/_lbfgsb.cp312-win_amd64.pyd"
+      ],
+      "statement": "The published License.txt is a BSD-3 template with unfilled placeholders and names no holder; Zhu, Byrd, Nocedal, Morales and the citation condition come from the authors' separately carried README."
+    },
+    {
+      "component": "LSODA (ODEPACK)",
+      "hosts": [
+        "_internal/scipy/integrate/_odepack.cp312-win_amd64.pyd"
+      ],
+      "statement": "SciPy's C translation of LSODA from ODEPACK (A. C. Hindmarsh and L. R. Petzold, Lawrence Livermore National Laboratory) is distributed at https://www.netlib.org/odepack/ and https://computing.llnl.gov/projects/odepack/software with no licence or copyright statement; no text is carried."
+    },
+    {
+      "component": "NNLS",
+      "hosts": [
+        "_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd"
+      ],
+      "statement": "SciPy's C translation of Lawson and Hanson's NNLS (Solving Least Squares Problems, 1974; SIAM reprint 1995) is distributed by netlib at https://www.netlib.org/lawson-hanson/ with no licence or copyright statement; no text is carried."
+    },
+    {
+      "component": "QUADPACK",
+      "hosts": [
+        "_internal/scipy/integrate/_quadpack.cp312-win_amd64.pyd"
+      ],
+      "statement": "SciPy's C rewrite of QUADPACK (R. Piessens, E. de Doncker-Kapenga, C. W. Ueberhuber, D. K. Kahaner) is distributed at https://www.netlib.org/quadpack/ with no licence statement (netlib's permission file reads \"prehistoric\"); no text is carried."
+    },
+    {
+      "component": "Ryu / fast_float in SciPy (U-H3)",
+      "hosts": [
+        "_internal/scipy/_cyutility.cp312-win_amd64.pyd",
+        "_internal/scipy/_lib/_ccallback_c.cp312-win_amd64.pyd",
+        "_internal/scipy/_lib/_fpumode.cp312-win_amd64.pyd",
+        "_internal/scipy/_lib/_uarray/_uarray.cp312-win_amd64.pyd",
+        "_internal/scipy/_lib/messagestream.cp312-win_amd64.pyd",
+        "_internal/scipy/fft/_duccfft/pyduccfft.cp312-win_amd64.pyd",
+        "_internal/scipy/integrate/_dop.cp312-win_amd64.pyd",
+        "_internal/scipy/integrate/_odepack.cp312-win_amd64.pyd",
+        "_internal/scipy/integrate/_quadpack.cp312-win_amd64.pyd",
+        "_internal/scipy/integrate/_vode.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_dierckx.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_fitpack.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_interpnd.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_ppoly.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_rbfinterp_pythran.cp312-win_amd64.pyd",
+        "_internal/scipy/interpolate/_rgi_cython.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_batched_linalg.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_cythonized_array_utils.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_decomp_interpolative.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_decomp_update.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_fblas.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_flapack.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_internal_matfuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_linalg_pythran.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_matfuncs_sqrtm_triu.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/_solve_toeplitz.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/cython_blas.cp312-win_amd64.pyd",
+        "_internal/scipy/linalg/cython_lapack.cp312-win_amd64.pyd",
+        "_internal/scipy/ndimage/_nd_image.cp312-win_amd64.pyd",
+        "_internal/scipy/ndimage/_ni_label.cp312-win_amd64.pyd",
+        "_internal/scipy/ndimage/_rank_filter_1d.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_bglu_dense.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_direct.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_group_columns.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_highspy/_core.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_highspy/_highs_options.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_lbfgsb.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_lsap.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_lsq/givens_elimination.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_minpack.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_moduleTNC.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_pava_pybind.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_trlib/_trlib.cp312-win_amd64.pyd",
+        "_internal/scipy/optimize/_zeros.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/_csparsetools.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/_sparsetools.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_flow.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_matching.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_min_spanning_tree.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_reordering.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_shortest_path.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_tools.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/csgraph/_traversal.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/linalg/_dsolve/_superlu.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/linalg/_eigen/arpack/_arpacklib.cp312-win_amd64.pyd",
+        "_internal/scipy/sparse/linalg/_propack.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/_ckdtree.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/_distance_pybind.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/_distance_wrap.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/_hausdorff.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/_qhull.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/_voronoi.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/transform/_rigid_transform_cy.cp312-win_amd64.pyd",
+        "_internal/scipy/spatial/transform/_rotation_cy.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_comb.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_ellip_harm_2.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_gufuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_specfun.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_special_ufuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_ufuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_ufuncs_cxx.cp312-win_amd64.pyd",
+        "_internal/scipy/special/cython_special.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_ansari_swilk_statistics.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_biasedurn.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_levy_stable/levyst.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_qmc_cy.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_qmvnt_cy.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_rcont/rcont.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_sobol.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_stats.cp312-win_amd64.pyd",
+        "_internal/scipy/stats/_stats_pythran.cp312-win_amd64.pyd"
+      ],
+      "statement": "Static inclusion in SciPy was not established; this limits entry conservatively binds all 82 SciPy extensions and does not assert presence. Only the previously proven pillow-heif libstdc++ hosts carry their licence rows."
+    },
+    {
+      "component": "SLSQP",
+      "hosts": [
+        "_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd"
+      ],
+      "statement": "The BSD licence was named in the ACM e-mail, never written; the holder is ACM per the thread and Dieter Kraft per the source. No BSD text is invented."
+    },
+    {
+      "component": "Sobol direction numbers (U-S9)",
+      "hosts": [
+        "_internal/scipy/stats/_sobol.cp312-win_amd64.pyd"
+      ],
+      "statement": "The carried Sobol direction-number data copy and applicable notice were not established by the native census. No extra licence text is carried."
+    },
+    {
+      "component": "Tcl/Tk header (U-T1)",
+      "hosts": [
+        "_internal/PIL/_imagingtk.cp312-win_amd64.pyd"
+      ],
+      "statement": "The Tcl/Tk header declaration carries no copyrightable code into the binary; Tcl/Tk terms are already rendered through the Python row. No additional excerpt or text is carried."
+    },
+    {
+      "component": "VODE / ZVODE",
+      "hosts": [
+        "_internal/scipy/integrate/_vode.cp312-win_amd64.pyd"
+      ],
+      "statement": "SciPy's C translations of VODE and ZVODE (P. N. Brown, G. D. Byrne, A. C. Hindmarsh) are distributed at https://www.netlib.org/ode/ and https://computing.llnl.gov/projects/odepack/software with no licence or copyright statement; no text is carried."
+    },
+    {
+      "component": "libquadmath (U-N2)",
+      "hosts": [
+        "_internal/numpy.libs/libscipy_openblas64_-ed4f167a5330424524f45258e7ca2c8d.dll",
+        "_internal/scipy.libs/libscipy_openblas-197ee2fc9b4d071f7e048078cac74115.dll"
+      ],
+      "statement": "Presence in either OpenBLAS DLL and the applicable text were not established; strings or import absence is not proof. No extra licence text is carried."
+    },
+    {
+      "component": "mdspan (Kokkos, U-S6)",
+      "hosts": [
+        "_internal/scipy/special/_ellip_harm_2.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_gufuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_specfun.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_special_ufuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_ufuncs.cp312-win_amd64.pyd",
+        "_internal/scipy/special/_ufuncs_cxx.cp312-win_amd64.pyd",
+        "_internal/scipy/special/cython_special.cp312-win_amd64.pyd"
+      ],
+      "statement": "Header instantiation and carried host were not established; the fetched xsf text is only a pointer. The upstream terms are Apache-2.0 WITH LLVM-exception; no extra licence text is carried."
+    },
+    {
+      "component": "x86inc (libaom)",
+      "hosts": [
+        "_internal/PIL/_avif.cp312-win_amd64.pyd"
+      ],
+      "statement": "Inclusion is inferred from aom's x86-64 assembler build, not a Pillow build log or binary inclusion read."
+    }
   ]
 }
