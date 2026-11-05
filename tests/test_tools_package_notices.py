@@ -22,32 +22,54 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_native_licence_text_is_exempt_from_checkout_normalization():
     """A CRLF checkout must preserve the seat-verified licence's exact bytes."""
-    relative = "tools/package/native-licences/openssl-3.5.5-LICENSE.txt"
+    folder = ROOT / "tools/package/native-licences"
+    manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+    relatives = sorted(
+        {(folder / row["text_file"]).relative_to(ROOT).as_posix() for row in manifest["components"]}
+    )
     result = subprocess.run(
-        ["git", "check-attr", "text", "--", relative],
+        ["git", "check-attr", "text", "--", *relatives],
         cwd=ROOT,
         capture_output=True,
         text=True,
         check=True,
         timeout=30,
     )
-    assert result.stdout.strip() == f"{relative}: text: unset"
+    assert result.stdout.splitlines() == [f"{relative}: text: unset" for relative in relatives]
 
 
 def test_native_licence_manifest_hash_matches_committed_blob():
-    """The manifest must describe the upstream bytes recorded in Git itself."""
+    """Check every working text and its HEAD blob, or read-only Git hash before commit."""
     folder = ROOT / "tools/package/native-licences"
     manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
     for row in manifest["components"]:
         relative = (folder / row["text_file"]).relative_to(ROOT).as_posix()
-        result = subprocess.run(
-            ["git", "cat-file", "-p", f"HEAD:{relative}"],
+        tracked = subprocess.run(
+            ["git", "ls-tree", "HEAD", "--", relative],
             cwd=ROOT,
             capture_output=True,
             check=True,
             timeout=30,
         )
-        assert hashlib.sha256(result.stdout).hexdigest() == row["text_sha256"]
+        result = subprocess.run(
+            (
+                ["git", "cat-file", "-p", f"HEAD:{relative}"]
+                if tracked.stdout
+                else ["git", "hash-object", "--", relative]
+            ),
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+            timeout=30,
+        )
+        if tracked.stdout:
+            assert hashlib.sha256(result.stdout).hexdigest() == row["text_sha256"]
+        else:
+            # Read-only Git hashing uses the actual attributes; compare with the
+            # raw Git blob identity to catch checkout/filter byte conversion too.
+            data = (folder / row["text_file"]).read_bytes()
+            blob = b"blob " + str(len(data)).encode() + b"\0" + data
+            assert result.stdout.decode().strip() == hashlib.sha1(blob).hexdigest()
         working_bytes = (folder / row["text_file"]).read_bytes()
         assert len(working_bytes) == row["text_size_bytes"], relative
         assert hashlib.sha256(working_bytes).hexdigest() == row["text_sha256"], relative
@@ -827,6 +849,11 @@ def _make_native_surface(destination):
     # surface to those bytes rather than the seat-measured production DLLs.
     path = destination / "manifest.json"
     document = json.loads(path.read_text())
+    document["components"] = [document["components"][0]]
+    document.pop("vendored_paths", None)
+    for text in destination.iterdir():
+        if text.name not in {"manifest.json", document["components"][0]["text_file"]}:
+            text.unlink()
     document["components"][0]["bundled_files"] = [
         {
             "name": name,
@@ -855,7 +882,7 @@ def test_real_native_manifest_verifies_the_seat_bytes():
     module = load_notices()
     surface = ROOT / "tools/package/native-licences"
     records = module.load_native_licences(surface)
-    assert len(records) == 1
+    assert len(records) == 10
     row = records[0]
     assert row.component == "OpenSSL"
     assert row.upstream_version == "3.5.5"
@@ -1465,3 +1492,368 @@ def test_basename_only_match_without_record_digest_never_claims_file(release, re
     target.write_bytes(body)
     with pytest.raises(ValueError, match=re.escape(relative)):
         plan(module, release)
+
+
+def provenance_fixture(surface, kind):
+    """Make one synthetic row in the requested strict provenance form."""
+    document = synthetic_native_binding(surface)
+    row = document["components"][0]
+    row["provenance_kind"] = kind
+    if kind != "release-archive":
+        for key in list(row):
+            if key.startswith("source_") or key == "upstream_repository":
+                row.pop(key)
+    if kind == "git-tree":
+        row.update(source_repository="https://example.com/fixture/project", source_commit="a" * 40)
+    elif kind == "proprietary-redistributable":
+        row["bundled_files"][0]["version_evidence"] = {
+            "method": "pe_file_version",
+            "value": "1.2.3",
+        }
+        row.update(
+            text_kind="excerpt",
+            text_source={
+                "file": "<build interpreter>/LICENSE.txt",
+                "lines": [283, 320],
+                "sha256": "b" * 64,
+                "size_bytes": 25066,
+            },
+            licence_urls=["https://example.com/terms", "https://example.com/redistribution"],
+        )
+    return document
+
+
+@pytest.mark.parametrize("kind", ["release-archive", "git-tree", "proprietary-redistributable"])
+def test_provenance_kinds_accept_exactly_their_own_form(native_surface, kind):
+    """Each ruled provenance form carries an independently valid identity."""
+    document = provenance_fixture(native_surface, kind)
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    records = load_notices().load_native_licences(native_surface)
+    assert records[0].provenance_kind == kind
+
+
+@pytest.mark.parametrize(
+    "kind,foreign",
+    [
+        ("release-archive", {"source_repository": "https://example.com/project"}),
+        ("release-archive", {"licence_urls": ["https://example.com/terms"]}),
+        ("git-tree", {"source_archive_sha256": "c" * 64}),
+        ("git-tree", {"licence_urls": ["https://example.com/terms"]}),
+        ("proprietary-redistributable", {"source_archive_url": "https://example.com/source.zip"}),
+        ("proprietary-redistributable", {"source_commit": "c" * 40}),
+    ],
+)
+def test_provenance_kinds_refuse_mixed_forms(native_surface, kind, foreign):
+    """Fields belonging to another kind cannot disguise missing provenance."""
+    document = provenance_fixture(native_surface, kind)
+    document["components"][0].update(foreign)
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="provenance"):
+        load_notices().load_native_licences(native_surface)
+
+
+@pytest.mark.parametrize("damage", ["unknown", "short-commit", "tag-only", "object-only"])
+def test_provenance_kind_identity_errors_fail_closed(native_surface, damage):
+    """Unknown kinds, short commits and unpaired annotated tags are refused."""
+    document = provenance_fixture(native_surface, "git-tree")
+    row = document["components"][0]
+    if damage == "unknown":
+        row["provenance_kind"] = "optional-everything"
+    elif damage == "short-commit":
+        row["source_commit"] = "a" * 39
+    elif damage == "tag-only":
+        row["source_tag"] = "v1"
+    else:
+        row["source_tag_object"] = "d" * 40
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="provenance"):
+        load_notices().load_native_licences(native_surface)
+
+
+NATIVE_CENSUS_NAMES = (
+    "libffi",
+    "Microsoft Visual C++ Redistributable (Microsoft Distributable Code)",
+    "Mesa",
+    "LLVM",
+)
+
+
+@pytest.mark.parametrize("component", NATIVE_CENSUS_NAMES)
+def test_census_native_rows_validate_and_bind_synthetic_bytes(release, tmp_path, component):
+    """Each real row verifies its text and refuses changed carried binary bytes."""
+    module = load_notices()
+    surface = tmp_path / "real-native-surface"
+    shutil.copytree(ROOT / "tools/package/native-licences", surface)
+    document = json.loads((surface / "manifest.json").read_text())
+    row = next((r for r in document["components"] if r["component"] == component), None)
+    assert row is not None, f"missing census row: {component}"
+    related = {component, *row.get("co_licensed_with", [])}
+    body = b"synthetic census binary; never executed"
+    for item in document["components"]:
+        if item["component"] in related:
+            for binding in item["bundled_files"]:
+                binding["sha256"] = hashlib.sha256(body).hexdigest()
+                binding["size_bytes"] = len(body)
+    (surface / "manifest.json").write_text(json.dumps(document))
+    records = module.load_native_licences(surface)
+    assert component in {r.component for r in records}
+    for binding in row["bundled_files"]:
+        target = release["folder"] / binding["relpath_glob"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(body)
+    result = plan(module, release, native_licences_path=surface)
+    actual = next(r for r in result.rows if r.name == component)
+    assert len(actual.entries) == (11 if component.startswith("Microsoft") else 1)
+    output = module.render_notices(result)
+    assert (surface / row["text_file"]).read_bytes() in output
+    if component in {"Mesa", "LLVM"}:
+        assert b"| Mesa |" in output and b"| LLVM |" in output
+        assert (surface / "mesa-11.2.2-docs-license.html").read_bytes() in output
+        assert (surface / "llvm-3.6.2-LICENSE.TXT").read_bytes() in output
+    if component.startswith("Microsoft"):
+        assert b"<build interpreter>/LICENSE.txt, lines 283-320" in output
+        assert b"886a0ead2d89030ee62dbff52b04e47ab91998341295bb9c56fb952b4e081c7a" in output
+        assert all(
+            b["version_evidence"]["method"] == "pe_file_version" for b in row["bundled_files"]
+        )
+        assert b"https://visualstudio.microsoft.com/license-terms/" in output
+        assert (
+            b"https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution" in output
+        )
+    target.write_bytes(b"corrupt synthetic binary")
+    with pytest.raises(ValueError, match="native file identity"):
+        plan(module, release, native_licences_path=surface)
+    target.write_bytes(body)
+    text = surface / row["text_file"]
+    text.write_bytes(text.read_bytes() + b"x")
+    with pytest.raises(ValueError, match="native licence text"):
+        module.load_native_licences(surface)
+
+
+@pytest.mark.parametrize("damage", ["missing", "wrong-method", "empty"])
+def test_proprietary_files_require_each_measured_file_version(native_surface, damage):
+    """One row cannot hide multiple runtime versions behind a row-level label."""
+    document = provenance_fixture(native_surface, "proprietary-redistributable")
+    binding = document["components"][0]["bundled_files"][0]
+    if damage == "missing":
+        binding.pop("version_evidence")
+    elif damage == "wrong-method":
+        binding["version_evidence"] = {"method": "embedded_string", "value": "1.2.3"}
+    elif damage == "empty":
+        binding["version_evidence"] = {"method": "pe_file_version", "value": ""}
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="version_evidence"):
+        load_notices().load_native_licences(native_surface)
+
+
+@pytest.mark.parametrize("namespace", ["scipy._external", "scipy._external.packaging_version"])
+def test_record_directory_maps_namespace_without_a_file(release, namespace):
+    """A namespace owner comes from RECORD files beneath an exact directory."""
+    add_distribution(
+        release,
+        "scipy",
+        "1.18.1",
+        {
+            "scipy/_external/packaging_version/version.py": "",
+            "scipy-1.18.1.dist-info/LICENSE.txt": "synthetic BSD",
+        },
+        [namespace],
+    )
+    result = plan(load_notices(), release)
+    assert "pyz:" + namespace in next(r for r in result.rows if r.name == "scipy").entries
+
+
+@pytest.mark.parametrize("damage", ["lookalike", "ambiguous"])
+def test_namespace_directory_owner_is_exact_and_unique(release, damage):
+    """A sibling prefix or two RECORD owners must never claim a namespace."""
+    add_distribution(
+        release,
+        "scipy",
+        "1.18.1",
+        {
+            ("scipy_evil" if damage == "lookalike" else "scipy") + "/_external/code.py": "",
+            "scipy-1.18.1.dist-info/LICENSE.txt": "synthetic BSD",
+        },
+        ["scipy._external"],
+    )
+    if damage == "ambiguous":
+        add_distribution(
+            release,
+            "other",
+            "1.0",
+            {
+                "scipy/_external/other.py": "",
+                "other-1.0.dist-info/LICENSE.txt": "synthetic MIT",
+            },
+            ["scipy._external"],
+        )
+    with pytest.raises(
+        ValueError, match=r"unknown or ambiguous bundled entry pyz:scipy\._external"
+    ):
+        plan(load_notices(), release)
+
+
+def declared_vendored_fixture(release):
+    """Install one synthetic declaration independently of its optional block."""
+    add_distribution(
+        release,
+        "scipy",
+        "1.18.1",
+        {
+            "scipy/_external/cobyqa/__init__.py": "",
+            "scipy/_external/_array_api_compat_vendor.py": "",
+            "scipy-1.18.1.dist-info/LICENSE.txt": "synthetic BSD",
+        },
+        ["scipy._external.cobyqa", "scipy._external._array_api_compat_vendor"],
+    )
+    path = release["native_surface"] / "manifest.json"
+    document = json.loads(path.read_text())
+    document["vendored_paths"] = [
+        {
+            "distribution": "scipy",
+            "module": "scipy._external.cobyqa",
+            "component": "fixture cobyqa",
+        }
+    ]
+    path.write_text(json.dumps(document))
+    return document
+
+
+def test_declared_vendored_module_without_block_fails_closed(release):
+    """A wheel RECORD is insufficient for a declared separately licensed subtree."""
+    declared_vendored_fixture(release)
+    with pytest.raises(ValueError, match=r"vendored.*missing.*block"):
+        plan(load_notices(), release)
+
+
+def test_vendored_block_covers_only_its_path_and_keeps_parent_shim(release):
+    """The declared vendored package gets its text; SciPy's own shim stays BSD."""
+    document = declared_vendored_fixture(release)
+    row = copy.deepcopy(document["components"][0])
+    row.update(
+        component="fixture cobyqa",
+        vendored_distribution="scipy",
+        vendored_distribution_version="1.18.1",
+        bundled_modules=["scipy._external.cobyqa", "scipy._external.cobyqa.*"],
+        version_evidence={"method": "vendored_submodule_commit", "value": "a" * 40},
+    )
+    row.pop("bundled_version_source")
+    row.pop("bundled_files")
+    document["components"].append(row)
+    (release["native_surface"] / "manifest.json").write_text(json.dumps(document))
+    module = load_notices()
+    result = plan(module, release)
+    assert next(r for r in result.rows if r.name == "fixture cobyqa").entries == (
+        "pyz:scipy._external.cobyqa",
+    )
+    assert (
+        "pyz:scipy._external._array_api_compat_vendor"
+        in next(r for r in result.rows if r.name == "scipy").entries
+    )
+    assert b"vendored_submodule_commit" in module.render_notices(result)
+
+
+SCIPY_BLOCKS = (
+    ("array-api-compat", "array_api_compat", "MIT"),
+    ("array-api-extra", "array_api_extra", "MIT"),
+    ("cobyqa", "cobyqa", "BSD-3-Clause"),
+    ("prima (pyprima)", "pyprima", "BSD-3-Clause"),
+    ("packaging.version", "packaging_version", "BSD-2-Clause"),
+)
+
+
+@pytest.mark.parametrize("component,path,spdx", SCIPY_BLOCKS)
+def test_real_scipy_vendored_blocks_bind_module_inventory(release, tmp_path, component, path, spdx):
+    """Each seat text is selected by its actual declared PYZ path, not by wheel ownership alone."""
+    module = load_notices()
+    surface = tmp_path / "vendored-real-surface"
+    shutil.copytree(ROOT / "tools/package/native-licences", surface)
+    records = module.load_native_licences(surface)
+    record = next((r for r in records if r.component == component), None)
+    assert record is not None, f"missing SciPy component: {component}"
+    prefix = "scipy._external." + path
+    add_distribution(
+        release,
+        "scipy",
+        "1.18.1",
+        {
+            prefix.replace(".", "/") + "/code.py": "",
+            "scipy/_external/_array_api_compat_vendor.py": "",
+            "scipy-1.18.1.dist-info/LICENSE.txt": "synthetic BSD",
+        },
+        [prefix, prefix + ".code", "scipy._external", "scipy._external._array_api_compat_vendor"],
+    )
+    result = plan(module, release, native_licences_path=surface)
+    row = next(r for r in result.rows if r.name == component)
+    assert row.licence == spdx
+    assert row.entries == ("pyz:" + prefix, "pyz:" + prefix + ".code")
+    assert record.licence_input.path.read_bytes() in module.render_notices(result)
+    assert "pyz:scipy._external" in next(r for r in result.rows if r.name == "scipy").entries
+    record.licence_input.path.write_bytes(b"tampered")
+    with pytest.raises(ValueError, match="native licence text"):
+        module.load_native_licences(surface)
+
+
+@pytest.mark.parametrize("damage", ["sha256", "size_bytes", "lines"])
+def test_msvc_excerpt_is_bound_to_the_build_interpreter(release, tmp_path, damage):
+    """A carried runtime cannot render an excerpt attributed to a different build licence."""
+    surface = tmp_path / "msvc-source-surface"
+    shutil.copytree(ROOT / "tools/package/native-licences", surface)
+    document = json.loads((surface / "manifest.json").read_text())
+    row = next(r for r in document["components"] if r["component"].startswith("Microsoft"))
+    for binding in row["bundled_files"]:
+        body = b"synthetic runtime binary"
+        binding["sha256"] = hashlib.sha256(body).hexdigest()
+        binding["size_bytes"] = len(body)
+        target = release["folder"] / binding["relpath_glob"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(body)
+    row["text_source"][damage] = {"sha256": "0" * 64, "size_bytes": 1, "lines": [1, 2]}[damage]
+    (surface / "manifest.json").write_text(json.dumps(document))
+    with pytest.raises(ValueError, match=r"(text source|excerpt)"):
+        plan(load_notices(), release, native_licences_path=surface)
+
+
+@pytest.mark.parametrize("wrong_version", [False, True])
+def test_vendored_block_can_bind_only_files_and_still_checks_distribution_version(
+    release, wrong_version
+):
+    """File-only vendored blocks retain hash and parent-wheel version requirements."""
+    document = declared_vendored_fixture(release)
+    row = copy.deepcopy(document["components"][0])
+    row.pop("bundled_version_source")
+    body = b"synthetic vendored file"
+    relative = "_internal/scipy/_external/cobyqa/data.bin"
+    row.update(
+        component="fixture cobyqa",
+        vendored_distribution="scipy",
+        vendored_distribution_version="0.0" if wrong_version else "1.18.1",
+        version_evidence={"method": "vendored_submodule_commit", "value": "a" * 40},
+        bundled_files=[
+            {
+                "relpath_glob": relative,
+                "sha256": hashlib.sha256(body).hexdigest(),
+                "size_bytes": len(body),
+            }
+        ],
+    )
+    document["components"].append(row)
+    (release["native_surface"] / "manifest.json").write_text(json.dumps(document))
+    make_executable(
+        release["folder"], ["clearwater", "numpy", "scipy._external._array_api_compat_vendor"]
+    )
+    target = release["folder"] / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(body)
+    module = load_notices()
+    if wrong_version:
+        with pytest.raises(ValueError, match="vendored distribution version"):
+            plan(module, release)
+    else:
+        result = plan(module, release)
+        assert next(r for r in result.rows if r.name == "fixture cobyqa").entries == (
+            "file:" + relative,
+        )
+        target.write_bytes(b"changed bytes")
+        with pytest.raises(ValueError, match="native file identity"):
+            plan(module, release)

@@ -2853,3 +2853,235 @@ push/tag, gh command or workflow dispatch occurred. The report is the only
 tracked change. The FFmpeg/ZIP/release carve-out remains WP6.3c's. This turn
 yields the MAJOR finding before implementation; the remaining dispatch-18
 work and all subsequent seat proofs/reviews/gates remain outstanding.
+
+
+## Turn 19: strict provenance kinds, native census and SciPy vendored blocks
+
+Dispatch 19 resumes after the turn-18 input STOP, at `b6b1a286`. CHARC's
+Turn-18 ruling (`5dd307d5`) and the new seat input
+`clearwater-review-evidence/wp6.3b/seat/native-licences-provenance.md` supply
+its resolution. The earlier census, libffi and binary-measure records remain
+the data authority. The dispatcher supplied depth about 99K at this dispatch;
+final depth is pending its reading, with no cell estimate.
+
+### Item 0: three strict provenance kinds
+
+Every component now requires `provenance_kind` and version evidence.
+`release-archive` preserves the original complete release/archive identity,
+published source hash and positive size. `git-tree` requires an HTTPS source
+repository and full 40-hex commit; an annotated tag and its object are an
+optional pair, and subtree sources carry their in-tree path.
+`proprietary-redistributable` admits no source identity fields: it requires
+an interpreter-LICENSE excerpt with the original source hash/size and the
+licence/redistribution URL lines. Mixed fields, missing fields, unknown kinds,
+39-hex commits and unpaired tags are refused. Provenance labels distinguish
+published archive hashes, git commits and proprietary terms accurately.
+
+OpenSSL's existing row gains only `provenance_kind: release-archive`.
+`final-input-check.log` verifies the row's other bytes literally unchanged,
+not just equivalent JSON; the manifest retains its original LF bytes.
+The eight new source-bearing rows use git-tree. The sole proprietary row is
+Microsoft Visual C++ Redistributable (Microsoft Distributable Code).
+
+The manifest's optional `vendored_paths` declarations name distribution,
+module root and component independently of the component block. Blocks use
+`vendored_distribution`, its exact locked version and `bundled_modules`
+globs and/or `bundled_files` identities. Module globs stay within their
+explicit declarations; overlapping declarations are refused. Every new row
+retains schema-checked, hashed and sized text material. A proprietary runtime
+file requires its own `pe_file_version` evidence in addition to the row's
+version evidence. Its original `<build interpreter>/LICENSE.txt` is checked
+by SHA-256/size, and the excerpt is compared byte-for-byte with the recorded
+inclusive source line range before a carried runtime row is emitted.
+
+### Item 1: census-native rows and their measured identities
+
+- libffi 3.4.7: MIT, exact `_internal/libffi-8.dll` binding, with the PBS
+  20260303 Windows build's cpython-source-deps commit and interpreter-build
+  evidence supplied by the seat (not downloads.py's other-platform version).
+- Microsoft Visual C++ Redistributable: one row covering all eleven EXACT
+  relative paths and their differing bytes. Each file retains its measured
+  FileVersion, 14.44.35211.0 or numpy's 14.40.33810.0. The text is the seat's
+  verbatim interpreter-LICENSE excerpt, lines 283-320, source SHA-256
+  `886a0ead2d89030ee62dbff52b04e47ab91998341295bb9c56fb952b4e081c7a`,
+  25,066 source bytes. Both required Microsoft URL lines are rendered.
+- Mesa 11.2.2 (MIT) and LLVM 3.6.2 (NCSA): two required, mutually linked
+  `co_licensed_with` rows on the one measured `opengl32sw.dll` identity.
+  Their embedded-string version evidence, exact commits and annotated tag
+  objects come from the seat. Both verbatim texts are rendered.
+
+No native filename fallback was broadened. Exact binary hash/size checks and
+all previous OpenSSL checks remain active. Missing co-owners still fail.
+Unit tests bind each real native row to synthetic file bytes, including all
+eleven MSVC paths, then independently corrupt binary/text material to confirm
+refusal. No synthetic binary was executed.
+
+### Item 2: namespaces and SciPy's five vendored blocks
+
+A module without its own RECORD file now selects the UNIQUE distribution
+with RECORD files below that exact dotted path's directory. Prefixes are
+formed from directory components, so `scipy_evil` cannot claim `scipy`.
+Two namespace candidates are refused. A declared vendored module cannot fall
+through to its parent distribution if its component/block/glob is absent.
+Its module RECORD owner and locked/audited distribution version must match.
+File-only vendored blocks retain those parent-version and binary-hash checks.
+An in-tree vendored source also requires its path when its source repository
+is the parent distribution's repository.
+
+The five committed blocks are array-api-compat (MIT), array-api-extra (MIT),
+cobyqa (BSD-3-Clause), prima / pyprima (BSD-3-Clause), and packaging.version
+(BSD-2-Clause). Their source pins, paired annotated tags where supplied and
+two in-tree paths match the new seat record. The common version-evidence
+method is `vendored_submodule_commit`; for in-tree pyprima the value names
+SciPy's commit, and packaging.version uses the SciPy tag plus licence path.
+Neither in-tree component is described as an actual Git submodule.
+
+array-api-extra's `v0.10.1` is a LIGHTWEIGHT tag with no tag object, so the
+manifest records its verified commit and no tag/object pair. Cobyqa is absent
+from SciPy's own `LICENSES_bundled.txt`. Packaging.version's supplied text
+has two clauses and no non-endorsement clause, so its row follows BSD-2-Clause,
+while SciPy's aggregate labels it BSD-3-Clause; this discrepancy is disclosed,
+not copied into the component's licence claim.
+
+`scipy._external` and `scipy._external._array_api_compat_vendor` remain in
+SciPy's own BSD row. The root notices change is confined to ONE SciPy audit
+row: one added sentence names all five projects and points to the artifact
+notices. No root licence text or other audit row changes.
+
+### Item 3: copied real-folder probe and coverage
+
+The seat build and all seat inputs remained READ ONLY. The clean build was
+copied to `work/c63b-19-probe/Clearwater`; only this worktree copy received
+the writing CLI's notices. No executable from that copy was launched.
+`notices-probe-final.log` records exit 0 and:
+
+```text
+wrote work\c63b-19-probe\Clearwater\THIRD_PARTY_NOTICES.md
+```
+
+`probe-summary-final.log` and `coverage-summary.log` confirm complete coverage:
+1,536 inventory entries and 25 component rows, including the generated
+notices file itself. Selected census/vendored coverage is:
+
+| Component | Carried entries | Licence |
+| --- | --- | --- |
+| libffi | 1 file | MIT |
+| Microsoft Visual C++ Redistributable | 11 files | Microsoft Distributable Code |
+| Mesa | 1 file, shared with LLVM | MIT |
+| LLVM | 1 file, shared with Mesa | NCSA |
+| OpenSSL | 2 files | Apache-2.0 |
+| array-api-compat | 26 PYZ modules | MIT |
+| array-api-extra | 11 PYZ modules | MIT |
+| cobyqa | 13 PYZ modules | BSD-3-Clause |
+| prima (pyprima) | 26 PYZ modules | BSD-3-Clause |
+| packaging.version | 3 PYZ modules | BSD-2-Clause |
+
+Final notices SHA-256: `509555ccbe64e7bf871a48db21986c3c365ba2e20d5d1de3d65c5a2c182b3ba6`.
+The 79 vendored PYZ modules have all five blocks. Both namespace gaps are
+resolved; the parent namespace and shim still have only SciPy as their owner.
+The OpenSSL row passes its existing interpreter, build-release and binary
+identity checks. There is no FFmpeg in this Stage-1 folder.
+
+### Text bytes and checkout guards
+
+All nine texts were copied BYTE-EXACT from the seat, with their hashes/sizes
+checked before and after each copy. No licence text was fetched or typed by
+the cell. `final-input-check.log` independently checks every source/copy pair
+and every manifest integrity value, with zero CR bytes in all nine inputs.
+
+
+
+`git check-attr` confirms `text: unset` for all ten licence texts, including
+OpenSSL. The existing `-text` rule covers every new file without an edit.
+The test guard now checks every manifest text's actual working bytes and
+attributes. Existing texts also retain the HEAD-blob check. Before the seat
+commits a NEW text (which has no HEAD blob), the guard compares read-only
+Git hashing under the real attributes with its raw blob identity; after the
+seat commits, the same test automatically takes the HEAD-blob path. No Git
+object or index write was used to make pre-commit tests pass.
+
+### RED / GREEN and verification loop
+
+Every runner writes to `work/c63b-19-evidence/`. Every pytest run uses
+`PYTHONPATH=scripts`, `sandbox_mkdir_shim`, no cacheprovider, a 300-second
+per-test timeout and a fresh basetemp. There is no entry-point call in the new
+tests: they load packaging tools and inspect synthetic archives/files.
+
+| Item / log | RED | GREEN |
+| --- | --- | --- |
+| 0, item0-red.log / item0-green.log | 13 failures: the three forms unsupported; mixed/unknown/short/unpaired cases lacked their new provenance contract. | 13 passed; accepted forms and all required refusals. |
+| 1, item1-red.log / item1-green.log | 7 failures: four native rows absent and per-file proprietary version evidence not required. | 22 passed, including item-0 controls and all new text guards. |
+| 2, item2-red.log / item2-green.log | 9 failed / 2 refusal controls passed: namespace success, vendored declarations and five real blocks missing. | All 11 namespace/vendored cases passed. |
+| 3, turn-18 provenance-probe.log / notices-probe-final.log | The unchanged pre-data clean-folder plan refused 13 natives and two namespaces, as recorded in turn 18. | CLI exit 0; complete 1,536-entry / 25-row coverage above. |
+| Verification, verification-red.log / verification-green2.log | 5 failures confirmed missing interpreter-excerpt binding and file-only vendored support/version checks. | 22 focused tests passed, including native/provenance controls; final full suite also passed them. |
+
+The first verification edit script stopped on its own replacement assertion
+before writing product code; the following RED remained unchanged. The edit
+was corrected, the five cases went green, and final validation ran after
+source edits ended. Initial lint/type checks identified formatting and two
+schema typing details; those were corrected before the final checks below.
+The manifest's Python text writer initially converted its LF bytes to CRLF;
+verification restored its original byte convention and independently proved
+OpenSSL's row unchanged except for the required field. This did not alter
+any licence text; all nine copies always retained the seat's bytes.
+
+Suspected/confirmed: two additional MINOR self-verification gaps (the source
+excerpt binding and file-only vendored version path), both independently
+reproduced and fixed. Rejected false positives: zero. Fixed: both. Final
+coverage, integrity, comments/docstrings and owned-diff checks found no new
+issue. No review findings were invented or rejected; Reviewer A remains the
+dispatcher's Claude pass.
+
+### Final validation and residual
+
+| Log | Observed result on final code/tests |
+| --- | --- |
+| ruff-check.log | Exit 0; All checks passed! |
+| ruff-format.log | Exit 0; 337 files already formatted. |
+| mypy.log | Exit 0; Success: no issues found in 166 source files. |
+| mypy-darwin.log | Exit 0; Success: no issues found in 166 source files. |
+| pytest-validation.log | Exit 0; 652 passed, 1 skipped in 51.26s; basetemp work/c63b-19. |
+| pytest-gpi.log | Exit 1; 112 passed, 1 failed in 15.40s; basetemp work/c63b-19-gpi. |
+| notices-probe-final.log | Exit 0; wrote the copied folder's notices, without executing the artifact. |
+| final-input-check.log | Exit 0; nine exact source/copy pairs; eight git-tree provenance identities match the seat record; OpenSSL row otherwise byte-identical; all text guards unset. |
+| coverage-summary.log | Exit 0; complete coverage and the parent SciPy namespace/shim remain in SciPy's own row. |
+| diff-check.log | Final report-only completion followed by git diff --check; exit 0, no whitespace defects. |
+
+The one suite skip is the existing POSIX proof skip on Windows. No new skip
+or marker was added. The module-alone installer residual is exactly
+`test_mapped_child_without_a_pid_is_killed_with_its_descendants[native]`.
+Its `work/c63b-19-gpi/test_mapped_child_without_a_pi0/tree-kill.log` says
+`ERROR: Access denied`, reproducing the sandbox-token limitation from turns
+16/17. The assertion reports that the tested no-PID fallback left an orphan;
+the independent finally teardown completed with no teardown failure.
+The controlled-tree case passes. No installer product/test file was edited,
+no test was weakened, and a green module-alone run on this head is still
+owed at the seat outside the sandbox. The dispatch's 113-pass seat result
+was for turn 17, not a result newly claimed on turn 19.
+
+### Cumulative ledger continuation and handoff
+
+| Round / turn | Severity and envelope | NEW / REOPENED; reverts | Product-code / test-only fixes; state |
+| --- | --- | --- | --- |
+| Dispatch data / t18 -> t19 | 1 MAJOR input finding, in-envelope, resolved by CHARC's three-kind ruling and new verified record. | Existing t18 finding CLOSED; 0 REOPENED, 0 reverts. | Provenance code, real rows/texts and tests; no invented archive metadata. |
+| Self-verification / t19 | 2 MINOR implementation gaps, in-envelope, both confirmed and fixed before final validation. | 2 NEW self-check findings; 0 REOPENED, 0 reverts. | Product/schema checks plus synthetic regression tests; final tests green. |
+| Validation / t19 | Inherited sandbox-only native taskkill residual; not a new product finding. | Existing environmental residual, unchanged. | No installer edits; seat module-alone rerun pending. |
+
+This turn bundles dispatch 19's schema, native data, vendored mapping and
+root-row pointer in one logical seat commit. Dispatch-18/19 items 0-3 are
+implemented and the notices probe is GREEN; the sole validation residual is
+the named sandbox native-taskkill test. No new dependency, frozen interface,
+OS-specific product code, `.gitattributes` edit or unowned tracked-file change
+was made. All writes stayed in this worktree; the original seat build, seat
+licence inputs, footage, real user profile and uv interpreter were untouched.
+No network fetch, PyInstaller build, frozen run, GUI launch, desktop input,
+QUIT_SCRIPT run, Git write, push/tag, gh command, workflow dispatch or mailbox
+message occurred. Existing installer tests use their own loopback fixtures;
+no external fetch was made by this turn.
+
+Remaining: seat provenance verification before Reviewer A r3, the clean
+rebuild/notices/job-and-UIA smoke and full notices-versus-folder reading,
+Reviewer A r3 delta, Reviewer B and the gate (including the outside-sandbox
+module-alone run). CHARC's acceptance/register/AD-38 edits remain its own.
+WP6.3c still owns the held FFmpeg bundle, ZIP and release work. No package
+acceptance, gate completion or release readiness is asserted. Yield now.

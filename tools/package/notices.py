@@ -76,10 +76,11 @@ class NativeFile(NamedTuple):
     relpath_glob: str
     sha256: str
     size_bytes: int
+    version_evidence: tuple[str, str] | tuple[()] = ()
 
 
 class NativeLicence(NamedTuple):
-    """A seat-fetched native licence with its exact upstream and build provenance."""
+    """A verified native or vendored licence and its strict source/terms provenance."""
 
     component: str
     bundled_version_source: str
@@ -96,6 +97,14 @@ class NativeLicence(NamedTuple):
     bundled_files: tuple[NativeFile, ...]
     version_evidence: tuple[str, str]
     co_licensed_with: tuple[str, ...]
+    provenance_kind: str
+    source_path: str
+    source_urls: tuple[str, ...]
+    vendored_distribution: str
+    vendored_distribution_version: str
+    bundled_modules: tuple[str, ...]
+    text_source: LicenceInput | None
+    text_source_lines: tuple[int, ...]
 
 
 class NoticeRow(NamedTuple):
@@ -160,21 +169,142 @@ def _native_text(path: Path, sha256: str, size: int) -> bytes:
     return data
 
 
+def _https_url(value: object) -> bool:
+    if not isinstance(value, str) or value != value.strip():
+        return False
+    url = urlsplit(value)
+    return bool(
+        url.scheme == "https"
+        and url.hostname
+        and not (url.username or url.password or url.query or url.fragment)
+    )
+
+
+def _provenance(row: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
+    kind = row.get("provenance_kind")
+    archive = {
+        "upstream_repository",
+        "source_tag",
+        "source_tag_object",
+        "source_commit",
+        "source_archive_url",
+        "source_archive_sha256",
+        "source_archive_size_bytes",
+    }
+    tree = {"source_repository", "source_commit", "source_tag", "source_tag_object", "source_path"}
+    proprietary = {"licence_urls"}
+    all_fields = archive | tree | proprietary
+    if kind not in ("release-archive", "git-tree", "proprietary-redistributable"):
+        raise ValueError("notices: native provenance_kind missing/unknown")
+    allowed = archive if kind == "release-archive" else tree if kind == "git-tree" else proprietary
+    if (set(row) & all_fields) - allowed:
+        raise ValueError("notices: native provenance mixes fields of different kinds")
+    if kind == "proprietary-redistributable":
+        source = row.get("text_source")
+        urls = row.get("licence_urls")
+        if (
+            row.get("text_kind") != "excerpt"
+            or not isinstance(source, dict)
+            or set(source) != {"file", "lines", "sha256", "size_bytes"}
+            or source.get("file") != "<build interpreter>/LICENSE.txt"
+            or not isinstance(source.get("sha256"), str)
+            or re.fullmatch(r"[0-9a-f]{64}", source["sha256"]) is None
+            or type(source.get("size_bytes")) is not int
+            or source["size_bytes"] <= 0
+            or not isinstance(urls, list)
+            or len(urls) < 2
+            or any(not _https_url(url) for url in urls)
+            or len(set(urls)) != len(urls)
+        ):
+            raise ValueError(
+                "notices: native proprietary provenance needs hashed excerpt and licence URLs"
+            )
+        return (
+            f"proprietary redistributable; audited text source SHA-256 {source['sha256']}; "
+            f"source bytes {source['size_bytes']}",
+            tuple(urls),
+        )
+    required = archive if kind == "release-archive" else {"source_repository", "source_commit"}
+    if not required <= set(row):
+        raise ValueError("notices: native provenance missing source fields")
+    for key in required - {"source_archive_size_bytes"}:
+        if not isinstance(row[key], str) or not row[key] or row[key] != row[key].strip():
+            raise ValueError(f"notices: native provenance invalid {key}")
+    for key, length in (
+        ("source_commit", 40),
+        ("source_tag_object", 40),
+        ("source_archive_sha256", 64),
+    ):
+        if key in row and (
+            not isinstance(row[key], str)
+            or re.fullmatch(r"[0-9a-f]{" + str(length) + "}", row[key]) is None
+        ):
+            raise ValueError(f"notices: native provenance invalid {key}")
+    if kind == "release-archive":
+        if (
+            not _https_url(row["upstream_repository"])
+            or not _https_url(row["source_archive_url"])
+            or type(row["source_archive_size_bytes"]) is not int
+            or row["source_archive_size_bytes"] <= 0
+        ):
+            raise ValueError("notices: native provenance invalid archive URL/size")
+        return (
+            f"upstream tag {row['source_tag']}, commit {row['source_commit']}; "
+            f"source archive {row['source_archive_url']}; "
+            f"published SHA-256 {row['source_archive_sha256']}",
+            (row["upstream_repository"] + "/tree/" + row["source_tag"], row["source_archive_url"]),
+        )
+    if not _https_url(row["source_repository"]):
+        raise ValueError("notices: native provenance invalid source_repository")
+    if ("source_tag" in row) != ("source_tag_object" in row):
+        raise ValueError("notices: native provenance requires tag/object pair")
+    if "source_tag" in row and (
+        not isinstance(row["source_tag"], str)
+        or not row["source_tag"].strip()
+        or row["source_tag"] != row["source_tag"].strip()
+    ):
+        raise ValueError("notices: native provenance invalid source_tag")
+    path = row.get("source_path", "")
+    if "source_path" in row and (
+        not isinstance(path, str)
+        or not path
+        or path != path.strip()
+        or "\\" in path
+        or ":" in path
+        or any(part in {"", ".", ".."} for part in path.split("/"))
+    ):
+        raise ValueError("notices: native provenance unsafe source_path")
+    label = f"git tree {row['source_repository']} at commit {row['source_commit']}"
+    if "source_tag" in row:
+        label += f"; annotated tag {row['source_tag']}, object {row['source_tag_object']}"
+    if path:
+        label += f"; in-tree path {path}"
+    return label, (
+        row["source_repository"] + "/tree/" + row["source_commit"] + ("/" + path if path else ""),
+    )
+
+
 def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     """Validate the committed seat-fetched native licence surface, without fetching.
 
-    Every component needs a source identity, published source-archive hash and
-    a real text with matching hash and byte count. Every file other than the
-    manifest needs a component reference. Symlinks, unsafe paths, duplicate
-    components, unknown keys and unsupported version-source bindings fail closed.
-    A row needs a supported version source or bundled_files identities. Each
+    Every component needs one strict provenance kind: release-archive (published
+    archive hash/size and source tag identity), git-tree (exact repository commit,
+    optional paired annotated tag and an in-tree path for a subtree), or
+    proprietary-redistributable (hashed interpreter excerpt and licence URLs).
+    All kinds require version evidence and a real text with matching hash/size.
+    Every file other than the manifest needs a component reference. Symlinks,
+    unsafe paths, duplicate components, unknown keys and mixed provenance fail.
+    A row needs a supported version source, bundled_files or vendored module
+    bindings. Declared vendored paths require their own block when carried. Each
     identity has exactly one name or relpath_glob, a SHA-256 and a positive byte
     count; matching is case-insensitive. Globs are relative to the executable's
     folder, and fnmatch's ``*`` crosses ``/``. Use relpath_glob when binding
     several copies of one basename. Co-licensed shared hashes require mutual
     links, with every linked row present for each carried file.
-    Version sources alone never claim bundled files. OpenSSL additionally
-    checks the build interpreter's OpenSSL, CPython and build-release versions.
+    File bindings may include per-file PE version evidence (required for the
+    proprietary runtime). Version sources alone never claim bundled files.
+    OpenSSL additionally checks the build interpreter's OpenSSL, CPython and
+    build-release versions; proprietary excerpts bind to its actual LICENSE.txt.
 
     Args:
         folder: The committed native-licences folder, or a local test copy.
@@ -196,12 +326,17 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
         raise ValueError("notices: native licence manifest is not valid JSON") from error
     if (
         not isinstance(document, dict)
-        or set(document) != {"schema_version", "interpreter_build", "components"}
+        or set(document)
+        not in (
+            {"schema_version", "interpreter_build", "components"},
+            {"schema_version", "interpreter_build", "components", "vendored_paths"},
+        )
         or type(document.get("schema_version")) is not int
         or document["schema_version"] != 1
         or not isinstance(document.get("components"), list)
     ):
         raise ValueError("notices: native licence manifest schema is invalid")
+    _vendored_declarations(document)
     build = document.get("interpreter_build")
     if (
         not isinstance(build, dict)
@@ -216,12 +351,6 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     string_fields = (
         "component",
         "upstream_version",
-        "upstream_repository",
-        "source_tag",
-        "source_tag_object",
-        "source_commit",
-        "source_archive_url",
-        "source_archive_sha256",
         "spdx",
         "text_file",
         "text_sha256",
@@ -248,9 +377,23 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
             "co_licensed_with",
             "text_kind",
             "text_source",
+            "provenance_kind",
+            "upstream_repository",
+            "source_repository",
+            "source_tag",
+            "source_tag_object",
+            "source_commit",
+            "source_path",
+            "source_archive_url",
+            "source_archive_sha256",
+            "licence_urls",
+            "vendored_distribution",
+            "vendored_distribution_version",
+            "bundled_modules",
         }
         if set(row) - allowed:
             raise ValueError("notices: native licence row has unknown keys")
+        provenance, source_urls = _provenance(row)
         evidence = row.get("version_evidence")
         if (
             not isinstance(evidence, dict)
@@ -262,6 +405,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
                 "interpreter_build_record",
                 "embedded_string",
                 "ssl.OPENSSL_VERSION",
+                "vendored_submodule_commit",
             }
             or not isinstance(evidence.get("value"), str)
             or not evidence["value"].strip()
@@ -287,7 +431,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
             raise ValueError("notices: native text_kind is invalid")
         if (kind == "excerpt" or source is not None) and (
             not isinstance(source, dict)
-            or set(source) != {"file", "lines"}
+            or set(source) not in ({"file", "lines"}, {"file", "lines", "sha256", "size_bytes"})
             or not isinstance(source.get("file"), str)
             or not source["file"].strip()
             or not isinstance(source.get("lines"), list)
@@ -304,35 +448,19 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
                 "notices: native licence row has an unsupported version-source binding"
             )
         bindings = _native_file_bindings(row, claims)
-        if not version_source and not bindings:
+        module_bindings = _vendored_bindings(row, document)
+        if not version_source and not bindings and not module_bindings:
             raise ValueError("notices: native licence row missing version/file binding")
         if row["component"] in components:
             raise ValueError("notices: native licence manifest has duplicate component rows")
         components.add(row["component"])
-        for key, length in (
-            ("source_commit", 40),
-            ("source_tag_object", 40),
-            ("source_archive_sha256", 64),
-            ("text_sha256", 64),
-        ):
-            if re.fullmatch(r"[0-9a-f]{" + str(length) + "}", row[key]) is None:
-                raise ValueError(f"notices: native licence row has invalid {key}")
-        for key in ("text_size_bytes", "source_archive_size_bytes"):
-            if type(row.get(key)) is not int or row[key] <= 0:
-                raise ValueError(f"notices: native licence row has invalid {key}")
-        for key in ("upstream_repository", "source_archive_url"):
-            url = urlsplit(row[key])
-            if (
-                url.scheme != "https"
-                or not url.hostname
-                or url.username
-                or url.password
-                or url.query
-                or url.fragment
-            ):
-                raise ValueError(f"notices: native licence row has invalid {key}")
+        if re.fullmatch(r"[0-9a-f]{64}", row["text_sha256"]) is None:
+            raise ValueError("notices: native licence row has invalid text_sha256")
+        if type(row.get("text_size_bytes")) is not int or row["text_size_bytes"] <= 0:
+            raise ValueError("notices: native licence row has invalid text_size_bytes")
         if row["component"] == "OpenSSL" and (
-            re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+[a-z]?", row["upstream_version"]) is None
+            row["provenance_kind"] != "release-archive"
+            or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+[a-z]?", row["upstream_version"]) is None
             or row["source_tag"] != "openssl-" + row["upstream_version"]
             or row["spdx"] != "Apache-2.0"
         ):
@@ -354,10 +482,8 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
         files.add(filename)
         provenance = (
             f"Seat-verified native input: {row['component']} {row['upstream_version']}; "
-            f"upstream tag {row['source_tag']}, commit {row['source_commit']}; "
-            f"source archive {row['source_archive_url']}; "
-            f"published SHA-256 {row['source_archive_sha256']}; "
-            f"fetched by seat on {row['fetch_date']}"
+            + provenance
+            + f"; fetched by seat on {row['fetch_date']}"
         )
         if source is not None:
             provenance += (
@@ -369,11 +495,11 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
                 row["component"],
                 version_source,
                 row["upstream_version"],
-                row["upstream_repository"],
-                row["source_tag"],
-                row["source_commit"],
-                row["source_archive_url"],
-                row["source_archive_sha256"],
+                cast(str, row.get("upstream_repository", row.get("source_repository", ""))),
+                row.get("source_tag", ""),
+                row.get("source_commit", ""),
+                row.get("source_archive_url", ""),
+                row.get("source_archive_sha256", ""),
                 row["spdx"],
                 LicenceInput(
                     path,
@@ -386,6 +512,20 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
                 bindings,
                 (evidence["method"], evidence["value"]),
                 tuple(links),
+                row["provenance_kind"],
+                row.get("source_path", ""),
+                source_urls,
+                row.get("vendored_distribution", ""),
+                row.get("vendored_distribution_version", ""),
+                module_bindings,
+                LicenceInput(
+                    Path(sys.base_prefix) / "LICENSE.txt",
+                    sha256=source["sha256"],
+                    size_bytes=source["size_bytes"],
+                )
+                if row["provenance_kind"] == "proprietary-redistributable" and source is not None
+                else None,
+                tuple(source["lines"]) if source is not None else (),
             )
         )
     by_name = {record.component: record for record in result}
@@ -413,6 +553,165 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     return tuple(result)
 
 
+def _vendored_declarations(document: dict[str, Any]) -> tuple[tuple[str, str, str], ...]:
+    values = document.get("vendored_paths", [])
+    if not isinstance(values, list):
+        raise ValueError("notices: vendored paths must be a list")
+    result: list[tuple[str, str, str]] = []
+    for item in values:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"distribution", "module", "component"}
+            or any(
+                not isinstance(item.get(key), str)
+                or not item[key].strip()
+                or item[key] != item[key].strip()
+                for key in item
+            )
+        ):
+            raise ValueError("notices: vendored path declaration is invalid")
+        distribution, module, component = item["distribution"], item["module"], item["component"]
+        if _normalize(distribution) != distribution or not all(
+            part.isidentifier() for part in module.split(".")
+        ):
+            raise ValueError("notices: vendored distribution/module declaration is invalid")
+        if any(
+            module == previous
+            or module.startswith(previous + ".")
+            or previous.startswith(module + ".")
+            for _dist, previous, _component in result
+        ):
+            raise ValueError("notices: vendored path declarations overlap")
+        result.append((distribution, module, component))
+    return tuple(result)
+
+
+def _vendored_bindings(row: dict[str, Any], document: dict[str, Any]) -> tuple[str, ...]:
+    fields = {"vendored_distribution", "vendored_distribution_version", "bundled_modules"}
+    required = fields - {"bundled_modules"}
+    if not set(row) & fields:
+        return ()
+    if (
+        not required <= set(row)
+        or not isinstance(row["vendored_distribution"], str)
+        or _normalize(row["vendored_distribution"]) != row["vendored_distribution"]
+        or not isinstance(row["vendored_distribution_version"], str)
+        or not row["vendored_distribution_version"].strip()
+        or row["vendored_distribution_version"] != row["vendored_distribution_version"].strip()
+        or row["version_evidence"]["method"] != "vendored_submodule_commit"
+        or not isinstance(row.get("bundled_modules", []), list)
+        or (not row.get("bundled_modules") and not row.get("bundled_files"))
+    ):
+        raise ValueError("notices: vendored block binding/version evidence invalid")
+    roots = [
+        module
+        for dist, module, component in _vendored_declarations(document)
+        if dist == row["vendored_distribution"] and component == row["component"]
+    ]
+    bindings = row.get("bundled_modules", [])
+    if (
+        not roots
+        or any(
+            not isinstance(pattern, str)
+            or not any(
+                pattern == root
+                or (
+                    pattern.startswith(root + ".")
+                    and re.fullmatch(r"[A-Za-z0-9_.*]+", pattern) is not None
+                )
+                for root in roots
+            )
+            for pattern in bindings
+        )
+        or len(set(bindings)) != len(bindings)
+    ):
+        raise ValueError("notices: vendored module glob outside its declared path")
+    return tuple(bindings)
+
+
+def _check_vendored_version(
+    record: NativeLicence,
+    installed: dict[str, importlib.metadata.Distribution],
+    versions: dict[str, set[str]],
+    runtime: dict[str, _AuditRow],
+) -> None:
+    distribution = record.vendored_distribution
+    dist = installed.get(distribution)
+    if (
+        dist is None
+        or distribution not in runtime
+        or dist.version != record.vendored_distribution_version
+        or versions.get(distribution) != {dist.version}
+        or runtime[distribution].version != dist.version
+    ):
+        raise ValueError(f"notices: vendored distribution version differs: {distribution}")
+    if (
+        record.provenance_kind == "git-tree"
+        and not record.source_path
+        and any(
+            source == record.upstream_repository
+            or source.startswith(record.upstream_repository + "/")
+            for source in runtime[distribution].sources
+        )
+    ):
+        raise ValueError("notices: vendored in-tree provenance requires source_path")
+
+
+def _binding_matches(binding: NativeFile, name: str) -> bool:
+    return bool(
+        (binding.name and Path(name).name.casefold() == binding.name.casefold())
+        or (
+            binding.relpath_glob
+            and fnmatch.fnmatchcase(name.casefold(), binding.relpath_glob.casefold())
+        )
+    )
+
+
+def _vendored_claims(
+    entries: list[_Entry],
+    records: tuple[NativeLicence, ...],
+    declarations: tuple[tuple[str, str, str], ...],
+    modules: dict[str, set[str]],
+    directories: dict[str, set[str]],
+    installed: dict[str, importlib.metadata.Distribution],
+    versions: dict[str, set[str]],
+    runtime: dict[str, _AuditRow],
+) -> dict[str, list[str]]:
+    claims: dict[str, list[str]] = defaultdict(list)
+    by_name = {record.component: record for record in records}
+    for entry in entries:
+        if entry.kind != "module":
+            continue
+        for distribution, prefix, component in declarations:
+            if entry.name != prefix and not entry.name.startswith(prefix + "."):
+                continue
+            record = by_name.get(component)
+            if (
+                record is None
+                or record.vendored_distribution != distribution
+                or not any(
+                    fnmatch.fnmatchcase(entry.name, pattern) for pattern in record.bundled_modules
+                )
+            ):
+                raise ValueError(f"notices: vendored path missing licence block: {entry.label}")
+            owners = modules.get(entry.name, directories.get(entry.name, set()))
+            if owners != {distribution}:
+                raise ValueError(
+                    f"notices: vendored module has unknown/ambiguous RECORD owner: {entry.label}"
+                )
+            _check_vendored_version(record, installed, versions, runtime)
+            claims[component].append(entry.label)
+    for record in records:
+        if record.vendored_distribution and any(
+            entry.kind == "file"
+            and entry.label.startswith("file:")
+            and any(_binding_matches(binding, entry.name) for binding in record.bundled_files)
+            for entry in entries
+        ):
+            _check_vendored_version(record, installed, versions, runtime)
+    return dict(claims)
+
+
 def _native_file_bindings(
     row: dict[str, Any], claims: dict[str, set[str]]
 ) -> tuple[NativeFile, ...]:
@@ -423,7 +722,7 @@ def _native_file_bindings(
         raise ValueError("notices: native bundled_files must be a non-empty list")
     result = []
     for item in files:
-        if not isinstance(item, dict) or set(item) not in (
+        if not isinstance(item, dict) or set(item) - {"version_evidence"} not in (
             {"name", "sha256", "size_bytes"},
             {"relpath_glob", "sha256", "size_bytes"},
         ):
@@ -452,7 +751,24 @@ def _native_file_bindings(
         # Record overlaps; cross-row validation requires explicit co-licensing.
         for key in ("selector:" + selector.casefold(), "hash:" + sha256):
             claims[key].add(row["component"])
-        binding = NativeFile(item.get("name", ""), item.get("relpath_glob", ""), sha256, size)
+        evidence = item.get("version_evidence")
+        required = row.get("provenance_kind") == "proprietary-redistributable"
+        if (required or evidence is not None) and (
+            not isinstance(evidence, dict)
+            or set(evidence) != {"method", "value"}
+            or evidence.get("method") != "pe_file_version"
+            or not isinstance(evidence.get("value"), str)
+            or not evidence["value"].strip()
+            or evidence["value"] != evidence["value"].strip()
+        ):
+            raise ValueError("notices: native file version_evidence missing/invalid")
+        binding = NativeFile(
+            item.get("name", ""),
+            item.get("relpath_glob", ""),
+            sha256,
+            size,
+            (evidence["method"], evidence["value"]) if evidence else (),
+        )
         if binding in result:
             raise ValueError("notices: native manifest has duplicate file binding")
         result.append(binding)
@@ -720,8 +1036,10 @@ def plan_notices(
 ) -> NoticePlan:
     """Inventory an onedir folder and select only the rows supported by its contents.
 
-    Pure modules are matched to wheel RECORD paths; native/data entries must
-    match a RECORD path or a flattened, SHA-256-verified native basename.
+    Pure modules match wheel RECORD paths; namespace modules match unique,
+    exact RECORD directory prefixes. Declared vendored paths need their own
+    version-bound licence blocks. Native/data entries must match a RECORD path
+    or a flattened, SHA-256-verified native basename.
     Independently licensed natives need their own exact-byte manifest row.
     Only stdlib extensions and CPython DLLs use the PSF fallback. Artifact code and bundled
     runtime packages are not imported; no external process is started.
@@ -746,8 +1064,10 @@ def plan_notices(
     ffmpeg = _ffmpeg_rows(home, ffmpeg_lock_path)
     audit = _audit_rows(audit_path)
     versions = _locked_versions(uv_lock_path)
-    native_rows = _native_rows(entries, home, load_native_licences(native_licences_path))
-    native_labels = {label for row in native_rows for label in row.entries}
+    native_records = load_native_licences(native_licences_path)
+    declarations = _vendored_declarations(
+        json.loads((native_licences_path / "manifest.json").read_text(encoding="utf-8"))
+    )
     runtime = {
         key: row
         for key, row in audit.items()
@@ -759,6 +1079,7 @@ def plan_notices(
     paths: dict[str, set[str]] = defaultdict(set)
     basenames: dict[str, list[tuple[str, str]]] = defaultdict(list)
     modules: dict[str, set[str]] = defaultdict(set)
+    directories: dict[str, set[str]] = defaultdict(set)
     for name in (*runtime, "pyinstaller", "pyinstaller-hooks-contrib"):
         try:
             dist = distribution(name)
@@ -768,6 +1089,10 @@ def plan_notices(
         for path in dist.files or ():
             relative = str(path).replace("\\", "/")
             paths[relative.casefold()].add(name)
+            parts = relative.split("/")
+            for length in range(1, len(parts)):
+                if all(part.isidentifier() for part in parts[:length]):
+                    directories[".".join(parts[:length])].add(name)
             if Path(relative).suffix.lower() in {".dll", ".pyd", ".so", ".dylib"}:
                 record_hash = path.hash
                 sha256 = record_hash.value if record_hash and record_hash.mode == "sha256" else ""
@@ -786,6 +1111,11 @@ def plan_notices(
                     )
                 ):
                     modules[runtime_module].add(name)
+    module_claims = _vendored_claims(
+        entries, native_records, declarations, modules, directories, installed, versions, runtime
+    )
+    native_rows = _native_rows(entries, home, native_records, module_claims)
+    native_labels = {label for row in native_rows for label in row.entries}
     selected: dict[str, list[str]] = defaultdict(list)
     ffmpeg_labels = {entry for row in ffmpeg for entry in row.entries}
     python_names = _python_file_names()
@@ -812,7 +1142,7 @@ def plan_notices(
             selected["python"].append(entry.label)
             continue
         if entry.kind == "module":
-            owners = modules.get(name, set())
+            owners = modules.get(name, directories.get(name, set()))
         else:
             relative = name.removeprefix("_internal/")
             filename = Path(relative).name.casefold()
@@ -937,11 +1267,16 @@ def plan_notices(
 
 
 def _native_rows(
-    entries: list[_Entry], home: Path, records: tuple[NativeLicence, ...]
+    entries: list[_Entry],
+    home: Path,
+    records: tuple[NativeLicence, ...],
+    module_claims: dict[str, list[str]] | None = None,
 ) -> list[NoticeRow]:
     selected: dict[str, list[tuple[str, str]]] = defaultdict(list)
     errors: list[str] = []
     by_name = {record.component: record for record in records}
+    for component, labels in (module_claims or {}).items():
+        selected[component].extend((label, "") for label in labels)
     for entry in entries:
         if entry.kind != "file" or not entry.label.startswith("file:"):
             continue
@@ -949,11 +1284,7 @@ def _native_rows(
             (record, binding)
             for record in records
             for binding in record.bundled_files
-            if (binding.name and Path(entry.name).name.casefold() == binding.name.casefold())
-            or (
-                binding.relpath_glob
-                and fnmatch.fnmatchcase(entry.name.casefold(), binding.relpath_glob.casefold())
-            )
+            if _binding_matches(binding, entry.name)
         ]
         if not matches:
             continue
@@ -987,16 +1318,26 @@ def _native_rows(
             continue
         if record.component == "OpenSSL":
             _check_openssl_version(record)
+        if record.provenance_kind == "proprietary-redistributable":
+            _check_proprietary_source(record)
         notes = [
             (
                 "Clearwater 1.1.0 redistributes the interpreter's native libraries; 1.0.0 did not."
                 if record.bundled_version_source
+                else "Redistributed vendored component; inventory below binds the source pin. "
+                if record.vendored_distribution
                 else "Redistributed native component; exact file identities below bind "
                 "the recorded upstream version."
             ),
-            "Published source archive SHA-256: " + record.source_archive_sha256,
             "Version evidence: " + ": ".join(record.version_evidence),
         ]
+        if record.provenance_kind == "proprietary-redistributable":
+            notes.append(
+                "Proprietary redistributable; URLs identify licence and redistribution "
+                "terms, not corresponding source."
+            )
+        if record.source_archive_sha256:
+            notes.append("Published source archive SHA-256: " + record.source_archive_sha256)
         if record.co_licensed_with:
             notes.append(
                 "Co-licensed with (all rows required): " + ", ".join(record.co_licensed_with)
@@ -1010,22 +1351,43 @@ def _native_rows(
                 + "; version source: "
                 + record.bundled_version_source
             )
-        notes.extend(f"Bundled file {label}; SHA-256: {sha256}" for label, sha256 in matched)
+        notes.extend(
+            f"Bundled file {label}; SHA-256: {sha256}" for label, sha256 in matched if sha256
+        )
+        notes.extend(
+            f"File version evidence: {binding.relpath_glob or binding.name}; "
+            + ": ".join(binding.version_evidence)
+            for binding in record.bundled_files
+            if binding.version_evidence
+        )
         result.append(
             NoticeRow(
                 record.component,
                 record.upstream_version,
                 record.spdx,
-                (
-                    record.upstream_repository + "/tree/" + record.source_tag,
-                    record.source_archive_url,
-                ),
+                record.source_urls,
                 tuple(label for label, _sha256 in matched),
                 (record.licence_input,),
                 tuple(notes),
             )
         )
     return result
+
+
+def _check_proprietary_source(record: NativeLicence) -> None:
+    source = record.text_source
+    if source is None:
+        raise ValueError("notices: proprietary text source missing")
+    try:
+        data = _native_text(source.path, source.sha256, source.size_bytes)
+    except ValueError as error:
+        raise ValueError(
+            "notices: proprietary text source differs from build interpreter"
+        ) from error
+    first, last = record.text_source_lines
+    excerpt = b"".join(data.splitlines(keepends=True)[first - 1 : last])
+    if excerpt != record.licence_input.path.read_bytes():
+        raise ValueError("notices: proprietary excerpt differs from build interpreter text source")
 
 
 def _check_openssl_version(record: NativeLicence) -> None:
@@ -1265,9 +1627,10 @@ def render_notices(plan: NoticePlan) -> bytes:
         "# Clearwater artifact third-party notices",
         "",
         "Clearwater is GPL-2.0-or-later. Copyright and licence terms for each",
-        "redistributed component are preserved below. Corresponding source is",
-        "available at the versioned source links in each row; FFmpeg build recipes",
-        "identify every linked repository and pin. Preserve these notices on redistribution.",
+        "redistributed component are preserved below. Source links identify exact",
+        "releases and commits; FFmpeg build recipes identify linked repositories and pins.",
+        "Proprietary redistributables carry licence/redistribution terms, with no source claim.",
+        "Preserve these notices on redistribution.",
     ]
     if ffmpeg:
         header += [
@@ -1282,7 +1645,7 @@ def render_notices(plan: NoticePlan) -> bytes:
         "",
         f"Inventory: {len(plan.entries)} entries; {len(rows)} component rows.",
         "",
-        "| Component | Version | Licence | Verdict | Corresponding source | Texts |",
+        "| Component | Version | Licence | Verdict | Corresponding source / terms | Texts |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
     materials: dict[LicenceInput, tuple[str, bytes]] = {}

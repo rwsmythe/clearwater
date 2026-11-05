@@ -8,6 +8,7 @@
   "components": [
     {
       "component": "OpenSSL",
+      "provenance_kind": "release-archive",
       "bundled_version_source": "ssl.OPENSSL_VERSION",
       "version_evidence": {
         "method": "ssl.OPENSSL_VERSION",
@@ -39,6 +40,368 @@
           "size_bytes": 1579008
         }
       ]
+    },
+    {
+      "component": "libffi",
+      "upstream_version": "3.4.7",
+      "spdx": "MIT",
+      "text_file": "libffi-cpython-source-deps-LICENSE.txt",
+      "text_sha256": "67894089811f93fca47a76f85e017da6f8582d4ba0905963c6e0f1ad6df7a195",
+      "text_size_bytes": 1132,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "version_evidence": {
+        "method": "interpreter_build_record",
+        "value": "PBS 20260303 cpython-windows/build.py clones python/cpython-source-deps@libffi; head e7a5ad74 = libffi 3.4.7"
+      },
+      "provenance_kind": "git-tree",
+      "source_repository": "https://github.com/python/cpython-source-deps",
+      "source_commit": "e7a5ad74ebde4c7fc7ba679875dc46bda35e2a15",
+      "bundled_files": [
+        {
+          "relpath_glob": "_internal/libffi-8.dll",
+          "sha256": "1163e242ec38a0de598ba7956353987c7167c0c6d5000625c3b3fc6e75669206",
+          "size_bytes": 28160
+        }
+      ]
+    },
+    {
+      "component": "Microsoft Visual C++ Redistributable (Microsoft Distributable Code)",
+      "upstream_version": "14.44.35211.0 / 14.40.33810.0",
+      "spdx": "LicenseRef-Microsoft-Distributable-Code",
+      "text_file": "msvc-distributable-code-excerpt.txt",
+      "text_sha256": "c10e7bdc0c0b3cec84e8527a4ca5871063d02f423619b71336a0b9140bc47b89",
+      "text_size_bytes": 1735,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "version_evidence": {
+        "method": "pe_file_version",
+        "value": "14.44.35211.0 / 14.40.33810.0"
+      },
+      "provenance_kind": "proprietary-redistributable",
+      "text_kind": "excerpt",
+      "text_source": {
+        "file": "<build interpreter>/LICENSE.txt",
+        "lines": [
+          283,
+          320
+        ],
+        "sha256": "886a0ead2d89030ee62dbff52b04e47ab91998341295bb9c56fb952b4e081c7a",
+        "size_bytes": 25066
+      },
+      "licence_urls": [
+        "https://visualstudio.microsoft.com/license-terms/",
+        "https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution"
+      ],
+      "bundled_files": [
+        {
+          "relpath_glob": "_internal/VCRUNTIME140.dll",
+          "sha256": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066",
+          "size_bytes": 124544,
+          "version_evidence": {
+            "method": "pe_file_version",
+            "value": "14.44.35211.0"
+          }
+        },
+        {
+          "relpath_glob": "_internal/VCRUNTIME140_1.dll",
+          "sha256": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f",
+          "size_bytes": 49792,
+          "version_evidence": {
+            "method": "pe_file_version",
+            "value": "14.44.35211.0"
+          }
+        },
+        {
+          "relpath_glob": "_internal/PySide6/MSVCP140.dll",
+          "sha256": "f6f1d55bfd64027820ddce48f9cd8cf46d53bfa34047e6acf4ef348d492a05cb",
+          "size_bytes": 549176,
+          "version_evidence": {
+            "method": "pe_file_version",
+            "value": "14.44.35211.0"
+          }
+        },
+        {
+          "relpath_glob": "_internal/PySide6/MSVCP140_1.dll",
+          "sha256": "2be87527c41e1ba8aff48e326e0adcd4743516e0bbcc9304986c726e27de6aca",
+          "size_bytes": 27448,
+          "version_evidence": {
+            "method": "pe_file_version",
+            "value": "14.44.35211.0"
+          }
+        },
+        {
+          "relpath_glob": "_internal/PySide6/MSVCP140_2.dll",
+          "sha256": "6a72ed8a87eae1671640bd1ca98eccb989f1772ae46ab84594e385bf6d4ac4fb",
+          "size_bytes": 271672,
+          "version_evidence": {
+            "method": "pe_file_version",
+            "value": "14.44.35211.0"
+          }
+        },
+        {
+          "relpath_glob": "_internal/PySide6/VCRUNTIME140.dll",
+          "sha256": "a36e0cb185eb89533ed96d4568138f86a1315756a8b2644c5963a8ce23e32101",
+          "size_bytes": 116024,
+          "version_evidence": {
+            "method": "pe_file_version",
+            "value": "14.44.35211.0"
+          }
+        },
+        {
+          "relpath_glob": "_internal/PySide6/VCRUNTIME140_1.dll",
+          "sha256": "302b1e160e858602490a55e32ae2e29ddfc0bec2a188e19550cb655cdaa58f9c",
+          "size_bytes": 41272,
+          "version_evidence": {
+            "method": "pe_file_version",
+            "value": "14.44.35211.0"
+          }
+        },
+        {
+          "relpath_glob": "_internal/shiboken6/MSVCP140.dll",
+          "sha256": "1ba4d7c0a95d375da138a057a57593b33510ad5bda6c5e2686afd68faa5b4231",
+          "size_bytes": 549176,
+          "version_evidence": {
+            "method": "pe_file_version",
+            "value": "14.44.35211.0"
+          }
+        },
+        {
+          "relpath_glob": "_internal/shiboken6/VCRUNTIME140.dll",
+          "sha256": "e7be9112ee9a5b9f44b44bff24cb761cca9b1ed7550b612f77b70edfcf5fdabf",
+          "size_bytes": 116024,
+          "version_evidence": {
+            "method": "pe_file_version",
+            "value": "14.44.35211.0"
+          }
+        },
+        {
+          "relpath_glob": "_internal/shiboken6/VCRUNTIME140_1.dll",
+          "sha256": "f02cd4a862b85a9a3153d27e15e5a213f5df8e3d77004ed2e87b8a7e8873d97c",
+          "size_bytes": 41272,
+          "version_evidence": {
+            "method": "pe_file_version",
+            "value": "14.44.35211.0"
+          }
+        },
+        {
+          "relpath_glob": "_internal/numpy.libs/msvcp140-a4c2229bdc2a2a630acdc095b4d86008.dll",
+          "sha256": "a4c2229bdc2a2a630acdc095b4d86008e5c3e3bc7773174354f3da4f5beb9cde",
+          "size_bytes": 575056,
+          "version_evidence": {
+            "method": "pe_file_version",
+            "value": "14.40.33810.0"
+          }
+        }
+      ]
+    },
+    {
+      "component": "Mesa",
+      "upstream_version": "11.2.2",
+      "spdx": "MIT",
+      "text_file": "mesa-11.2.2-docs-license.html",
+      "text_sha256": "288ddfae338be168ef2492c21de42ee2f5c8ebc5a734b4e58b37007141bc2d6d",
+      "text_size_bytes": 3763,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "version_evidence": {
+        "method": "embedded_string",
+        "value": "Mesa 11.2.2"
+      },
+      "provenance_kind": "git-tree",
+      "source_repository": "https://gitlab.freedesktop.org/mesa/mesa",
+      "source_commit": "3a9f6283f435f90ca1a2901be39ec9d629c95bb6",
+      "source_tag": "mesa-11.2.2",
+      "source_tag_object": "56cd706fb829c9333dc5fa8f5730f208d7296733",
+      "bundled_files": [
+        {
+          "relpath_glob": "_internal/PySide6/opengl32sw.dll",
+          "sha256": "18aedc7a4b610f53bcc7b7a5c5ed9293c7e86f030e3273ad54ed3bb1ebd36702",
+          "size_bytes": 20639544
+        }
+      ],
+      "co_licensed_with": [
+        "LLVM"
+      ]
+    },
+    {
+      "component": "LLVM",
+      "upstream_version": "3.6.2",
+      "spdx": "NCSA",
+      "text_file": "llvm-3.6.2-LICENSE.TXT",
+      "text_sha256": "e3bc36440fc927c62d5cc24efeefe225a14d4e34ffeb0c92e430625cce9ee444",
+      "text_size_bytes": 3281,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "version_evidence": {
+        "method": "embedded_string",
+        "value": "LLVM 3.6.2"
+      },
+      "provenance_kind": "git-tree",
+      "source_repository": "https://github.com/llvm/llvm-project",
+      "source_commit": "ee46064b83e7acd5a215ea5bb1c9708d75de6164",
+      "source_tag": "llvmorg-3.6.2",
+      "source_tag_object": "98b8caa8c194141f8e22f472d778a56277e13f75",
+      "bundled_files": [
+        {
+          "relpath_glob": "_internal/PySide6/opengl32sw.dll",
+          "sha256": "18aedc7a4b610f53bcc7b7a5c5ed9293c7e86f030e3273ad54ed3bb1ebd36702",
+          "size_bytes": 20639544
+        }
+      ],
+      "co_licensed_with": [
+        "Mesa"
+      ]
+    },
+    {
+      "component": "array-api-compat",
+      "provenance_kind": "git-tree",
+      "upstream_version": "1.14.0",
+      "spdx": "MIT",
+      "source_repository": "https://github.com/data-apis/array-api-compat",
+      "source_commit": "145bd7d3f41d0cf98f0a7f35ba7e255874dec948",
+      "text_file": "array-api-compat-LICENSE",
+      "text_sha256": "4ffd978e3fa18d058d98c66771cfea7ed634aaf7023cf9612b8b55eee9a8f0fe",
+      "text_size_bytes": 1097,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "version_evidence": {
+        "method": "vendored_submodule_commit",
+        "value": "145bd7d3f41d0cf98f0a7f35ba7e255874dec948"
+      },
+      "vendored_distribution": "scipy",
+      "vendored_distribution_version": "1.18.1",
+      "bundled_modules": [
+        "scipy._external.array_api_compat",
+        "scipy._external.array_api_compat.*"
+      ],
+      "source_tag": "1.14",
+      "source_tag_object": "d5258bdf44b8d29f589fc6ac335cf7bb9419592b"
+    },
+    {
+      "component": "array-api-extra",
+      "provenance_kind": "git-tree",
+      "upstream_version": "0.10.1",
+      "spdx": "MIT",
+      "source_repository": "https://github.com/data-apis/array-api-extra",
+      "source_commit": "02afc63f8133caad1bf8991eefffb1f8d13ca700",
+      "text_file": "array-api-extra-LICENSE",
+      "text_sha256": "58494398fe147fdce76a68b2decd4c08ce3a1ea237b6d6785001c15f822c6ed6",
+      "text_size_bytes": 1097,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "version_evidence": {
+        "method": "vendored_submodule_commit",
+        "value": "02afc63f8133caad1bf8991eefffb1f8d13ca700"
+      },
+      "vendored_distribution": "scipy",
+      "vendored_distribution_version": "1.18.1",
+      "bundled_modules": [
+        "scipy._external.array_api_extra",
+        "scipy._external.array_api_extra.*"
+      ]
+    },
+    {
+      "component": "cobyqa",
+      "provenance_kind": "git-tree",
+      "upstream_version": "69b7177b9febb9178a5f7a9d61200407f1f77d25",
+      "spdx": "BSD-3-Clause",
+      "source_repository": "https://github.com/cobyqa/cobyqa",
+      "source_commit": "69b7177b9febb9178a5f7a9d61200407f1f77d25",
+      "text_file": "cobyqa-LICENSE",
+      "text_sha256": "a4d7975be6d6487b7125ce6e79f299a5396b300b1a67e3644a1cf6467b426708",
+      "text_size_bytes": 1525,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "version_evidence": {
+        "method": "vendored_submodule_commit",
+        "value": "69b7177b9febb9178a5f7a9d61200407f1f77d25"
+      },
+      "vendored_distribution": "scipy",
+      "vendored_distribution_version": "1.18.1",
+      "bundled_modules": [
+        "scipy._external.cobyqa",
+        "scipy._external.cobyqa.*"
+      ]
+    },
+    {
+      "component": "prima (pyprima)",
+      "provenance_kind": "git-tree",
+      "upstream_version": "scipy v1.18.1",
+      "spdx": "BSD-3-Clause",
+      "source_repository": "https://github.com/scipy/scipy",
+      "source_commit": "e4e854eaa8f18d807cd3496028e257e36caa93cc",
+      "text_file": "pyprima-LICENCE.txt",
+      "text_sha256": "997379b2c1bf53a391d2fd3295dce75bf3c94ed28d64882ede30d1b518cb0dd6",
+      "text_size_bytes": 1533,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "version_evidence": {
+        "method": "vendored_submodule_commit",
+        "value": "e4e854eaa8f18d807cd3496028e257e36caa93cc"
+      },
+      "vendored_distribution": "scipy",
+      "vendored_distribution_version": "1.18.1",
+      "bundled_modules": [
+        "scipy._external.pyprima",
+        "scipy._external.pyprima.*"
+      ],
+      "source_tag": "v1.18.1",
+      "source_tag_object": "c2df8ace0d9859f090e79058b2bd2ffc584f19e6",
+      "source_path": "subprojects/pyprima/pyprima"
+    },
+    {
+      "component": "packaging.version",
+      "provenance_kind": "git-tree",
+      "upstream_version": "scipy v1.18.1",
+      "spdx": "BSD-2-Clause",
+      "source_repository": "https://github.com/scipy/scipy",
+      "source_commit": "e4e854eaa8f18d807cd3496028e257e36caa93cc",
+      "text_file": "packaging-LICENSE.BSD",
+      "text_sha256": "b70e7e9b742f1cc6f948b34c16aa39ffece94196364bc88ff0d2180f0028fac5",
+      "text_size_bytes": 1344,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat",
+      "version_evidence": {
+        "method": "vendored_submodule_commit",
+        "value": "v1.18.1:scipy/_external/packaging_version/src/LICENSE.BSD"
+      },
+      "vendored_distribution": "scipy",
+      "vendored_distribution_version": "1.18.1",
+      "bundled_modules": [
+        "scipy._external.packaging_version",
+        "scipy._external.packaging_version.*"
+      ],
+      "source_tag": "v1.18.1",
+      "source_tag_object": "c2df8ace0d9859f090e79058b2bd2ffc584f19e6",
+      "source_path": "scipy/_external/packaging_version"
+    }
+  ],
+  "vendored_paths": [
+    {
+      "distribution": "scipy",
+      "module": "scipy._external.array_api_compat",
+      "component": "array-api-compat"
+    },
+    {
+      "distribution": "scipy",
+      "module": "scipy._external.array_api_extra",
+      "component": "array-api-extra"
+    },
+    {
+      "distribution": "scipy",
+      "module": "scipy._external.cobyqa",
+      "component": "cobyqa"
+    },
+    {
+      "distribution": "scipy",
+      "module": "scipy._external.pyprima",
+      "component": "prima (pyprima)"
+    },
+    {
+      "distribution": "scipy",
+      "module": "scipy._external.packaging_version",
+      "component": "packaging.version"
     }
   ]
 }
