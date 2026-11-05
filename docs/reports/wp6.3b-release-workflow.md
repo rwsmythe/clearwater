@@ -1,12 +1,13 @@
 # WP6.3b release workflow: implementation record
 
-Status: turns 2-5 implemented; turn 6 item 1 (seat-verified licences and strict
-lock validation) is green. Turn 6 item 2 has NOT been started: the required LGPL
-full texts are absent from the installed Qt/Shiboken/pillow-heif wheel licence
-files, and the pillow-heif manifest gives no MinGW/libstdc++ source version.
-This is a reproduced input/provenance STOP to CHARC, alongside the independently
-pending zvbi redistribution STOP. No artifact notices, release refusal, smoke,
-ZIP, workflow or release-document changes are claimed complete.
+Status: turn 7 has reached the commissioned coverage boundary. The new notices
+planner inventories an onedir artifact, maps its files/modules to audited locked
+rows, validates coverage/material availability, and applies the FFmpeg refusal.
+The 14 coverage cases and all 345 requested tests are green. No artifact notices
+writer or --notices build option exists yet. Full-text rendering/provenance tests,
+native-component details and build wiring remain for the continuation after the
+dispatcher's depth reading. CHARC's turn-6 provenance/MinGW/PyInstaller rulings
+are accepted; the separate zvbi redistribution HOLD remains unchanged.
 
 ## Round and turn ledger
 
@@ -21,6 +22,7 @@ Claude pass; no review verdict is claimed here. Context depth is dispatcher-read
 | Turn 4 / Group A finish and Group B yield | Closed the ruled bootstrap/QUIT_SCRIPT rows; proved lazy blocked-import behavior; added the bootloader flag and cache variables before all three activations. | No Reviewer A round; no new blocking finding. The known sandbox-only worker witness remains the sole validation failure. | No review reopenings. Temporary eager-import mutant caught twice and restored before Group B; no mutant remains. | Product: PyInstaller argument and frozen cache setup only. Tests: blocked-config/NumPy cases, argument-list cases, activation-boundary cases and environment restoration. | Turn-end figure pending dispatcher reading; no cell estimate. |
 | Turn 5 / FFmpeg lock and bundle path | Pinned archive/source record, lock validation, release fetch/hash/selective extraction/version checks and CLI/build wiring. | No Reviewer A round; no new blocking issue. Eleven primary licences and five extra-source licences are explicitly UNVERIFIED for the seat audit. | No review reopenings. Build-call deletion mutant rejected and byte-restored; schema type error and raw-ZIP fixture corrected. | Product: build tool plus lock; tests: offline ZIP/file transport, real Python tool stubs, schema mutations and build integration. | Fresh session; turn-end depth pending dispatcher reading, no estimate. |
 | Turn 6 / seat licence transfer, input STOP | All 103 licence slots transferred exactly; strict verified-licence validation GREEN and incompatible data retained. Generator not started: its mandatory wheel LGPL input is absent; exact MinGW source release is absent too. | No Reviewer A round. NEW MAJOR input/provenance STOP; MINOR pre-existing indirect-source limitation and root PyInstaller runtime-row discrepancy reported below. Existing zvbi STOP remains the owner's/CHARC's. | No review reopenings or reverts; no generator workaround. | Product: lock and shared validator. Tests: verified-only rejection and preservation of incompatible rows. | Dispatcher supplied about 134K at turn-5 end; turn-6 depth pending dispatcher reading, no estimate. |
+| Turn 7 / notices coverage-boundary yield | New onedir inventory and notice-plan API, source-audit/uv.lock/installed-RECORD matching, material checks, coverage closure and conditional FFmpeg rows/refusal. Rendering, provenance tests and build wiring not begun. | No Reviewer A round or new blocking finding; turn-6 input STOPs ruled by CHARC. | No review reopenings or reverts. Initial typing/lint errors corrected; no product-entry or real-binary execution. | New notices planning module and synthetic coverage test module; report. No existing build/lock/test file changed. | Dispatcher supplied 171K at turn-6 yield; current depth is pending dispatcher reading, not estimated. |
 
 Turn 2 bundled the three changes explicitly commissioned by dispatch 2; the seat
 commits each turn. No git write was performed by the cell.
@@ -833,3 +835,171 @@ git write, push, tag, gh command or workflow dispatch occurred. The seat commits
 No release refusal, N13 acceptance or resolution of the owner's zvbi STOP is
 claimed. Next action: CHARC rules the input/provenance question, then the cell
 resumes item 2 with RED coverage tests followed by the prescribed yield.
+
+## Turn 7: notices inventory/coverage GREEN; firm boundary yield
+
+Read CHARC's complete Turn-6 rulings in the main-tree brief at `2258e5ab`
+before writing. The seat's dispatch records turn 6 committed as `817a31b2`, zero
+licence-table mismatches and 331 tests passing outside the sandbox. No earlier
+protocol or report document was re-read into context. This turn implements the
+coverage group and yields **before text-provenance tests**, as commissioned, so
+the dispatcher can read depth before authorizing/resuming the next group. It
+is not a completed artifact notices generator or a completed WP6.3b package.
+
+### Rulings folded into the design
+
+- Actual wheel licence files are the preferred inputs. Qt's commercial file is
+  excluded from the planner's text references. For Qt/Shiboken's unavailable
+  LGPL text, the planner references the root's `text-36`; it does not copy it.
+  The renderer still MUST verify the recorded SHA-256 AND byte count and emit
+  the exact granted label "the 1.0.0 audit's upstream copy", true URL and version.
+  The same verified root reuse applies to pillow-heif texts 37-44. None of those
+  reuse paths has yet been copied or provenance-tested.
+- PyInstaller bootloader and run-time hooks get separate rows, respectively
+  GPL-2.0-or-later WITH Bootloader Exception and Apache-2.0. Their installed
+  COPYING inputs are references now; exact per-kind byte copying remains in the
+  rendering/provenance group. No root-audit wording was changed.
+- **Accepted MinGW limit:** the wheel does not name the toolchain release.
+  The final artifact notices must name libgcc_s_seh-1.dll, libstdc++-6.dll and
+  libwinpthread-1.dll, GPL-3.0 with GCC Runtime Library Exception / MIT-BSD terms,
+  and the unversioned source pointer. CHARC opens the register row at accept.
+
+### What is implemented
+
+`tools/package/notices.py` exposes `plan_notices` and `validate_coverage`, with
+small immutable rows carrying source URLs, version/licence, entry labels and
+real licence-input references. It never renders a success artifact yet.
+
+The inventory uses the existing build tool's executable finder and PyInstaller
+archive reader, reads every on-disk file beside the executable (including
+`_internal`), every embedded archive entry and every PYZ module, and inventories
+standard-library ZIP members. No built executable or product entry is invoked.
+Synthetic tests use PyInstaller's archive WRITERS to create genuine CArchive/PYZ
+containers, not a build. The readers and metadata machinery execute as tooling;
+no bundled runtime package is imported.
+
+The runtime table is parsed from the root audit, not duplicated into a new
+hard-coded distribution table. Installed metadata/RECORD paths determine module,
+file and unambiguous flattened-native-basename ownership. Selected distributions
+must match BOTH uv.lock and the source-install audit. Standard-library modules
+and interpreter binary names are attributed to Python. Unknown/ambiguous data,
+unknown PYZ modules and unrecorded native files even beneath a known package fail
+closed. Licence material must exist and be nonempty, and selected rows need source
+URLs. Only selected components get redistributed rows; user-obtained statements
+are separate, so they cannot conceal uncovered binary entries.
+
+`validate_coverage` rejects a missing entry, duplicate row, row with no entries,
+row claiming an absent entry, or row without source/licence evidence. A file can
+support multiple real components: the Clearwater executable supports both the
+application and PyInstaller's bootloader. This is intentional many-to-one
+coverage, not an invented additional file.
+
+FFmpeg is conditional on the actual adjacent executables. No tools means no
+FFmpeg rows, and the explicit "user-obtained, not redistributed" statement.
+A partial executable/provenance/licence set fails. With FFmpeg present, the
+shared verified-lock validator runs; EVERY no row, including an extra repository,
+is named in a single-line GPL-3.0-incompatible refusal. There is no override.
+For a compatible synthetic lock, the BUILD record's provider/tag/asset/hash,
+FFmpeg/build commits, source pointer, version and configure line must match;
+component rows retain repository-at-pin sources and the licence/patent notes.
+Downloaded-not-built alternatives are not emitted as redistributed components.
+The real lock's zvbi HOLD is untouched; the compatible fixture is not a ruling
+that permits redistributing the real binary.
+
+### Synthetic row table at this boundary
+
+The baseline fixture contains a fake `_internal`, a real synthetic PYZ/CArchive,
+fake distribution metadata/RECORDs, small placeholder licence inputs and a minimal
+source-audit/uv.lock fixture. No binary or runtime package is executed. Its native
+extension and interpreter are inert bytes. The baseline passes with no FFmpeg
+against an incompatible lock as well as against the compatible fixture.
+
+Evidence: `work/c63b-7/test_inventory_selects_only_bu0/coverage-plan.json`.
+
+| Component row | Version | Licence | Inventory labels supporting the row |
+| --- | --- | --- | --- |
+| Clearwater | 1.0.0 | GPL-2.0-or-later | `archive:__main__`; `file:Clearwater.exe`; `pyz:clearwater` |
+| numpy | 2.5.4 | BSD-3-Clause | `file:_internal/numpy/_core/test.pyd`; `pyz:numpy`; `pyz:numpy.linalg` |
+| PyInstaller bootloader | 6.22.3 | GPL-2.0-or-later WITH Bootloader Exception | `archive:PYZ.pyz`; `archive:pyimod01_archive`; `file:Clearwater.exe` |
+| PyInstaller run-time hooks | 6.22.3 | Apache-2.0 | `archive:pyi_rth_inspect` |
+| Python | 3.12.13 | PSF-2.0 | `file:_internal/python312.dll`; `pyz:json` |
+
+The baseline has **11 unique inventory entries and 5 rows**; all entries are covered, every row has actual entry evidence and every verdict
+is "Redistributed in this artifact". There are twelve attribution edges because
+the executable supports both Clearwater and the bootloader. GPU pack and FFmpeg
+are explicitly user-obtained, outside this redistributed row table.
+
+The compatible FFmpeg variant adds four files and two rows: `FFmpeg / ffprobe`
+and `FFmpeg component: x265`; both cite those four files. A wrong BUILD version
+fails. The incompatible variant names the main x265 row and an extra repository
+in one refusal line. Removing either tool, BUILD or licence material fails.
+
+### RED, GREEN and final validation
+
+All pytest output is file-backed, with `PYTHONPATH=scripts`, the sandbox mkdir
+shim, `-p no:cacheprovider`, a 300-second runner timeout and fresh worktree-local
+basetemps. The final run sets offscreen Qt, retains the existing frozen-entry
+root redirection/blockers and never selects QUIT_SCRIPT.
+
+| File under `work/c63b-7-logs/` | Observed result |
+| --- | --- |
+| `red-coverage.log` | Exit 1: 14 failed; the new module was a docstring scaffold and the planning API was absent. |
+| `green-coverage.log` | Exit 0: 14 passed after the coverage implementation. |
+| `ruff-edit.log`, `ruff-check-initial.log` | Initial import/format, long-line, regex-intent and conditional-style findings; fixed before final validation. |
+| `mypy-initial.log` | Six errors: metadata SimplePath conversion and reuse of inferred variable names for different types; fixed with explicit Path conversion and distinct names. |
+| `ruff-check-final.log` | Exit 0: All checks passed! |
+| `ruff-format-final.log` | Exit 0: 334 files already formatted. |
+| `mypy-final.log` | Exit 0: Success: no issues found in 165 source files. |
+| `mypy-darwin-final.log` | Exit 0: Success: no issues found in 165 source files. |
+| `pytest-validation.log` | Exit 0: 345 passed in 11.04 s. |
+| `diff-check.log` | Exit 0: no whitespace errors. |
+
+The final pytest command is the exact four-module dispatch selection with
+basetemp `work/c63b-7`: notices (14), FFmpeg (60), build (78), frozen entry (193).
+**No sandbox-only residual** occurs in this requested set. uv's inherited
+VIRTUAL_ENV warning is retained and explicitly selects the worktree environment.
+The only post-test source edit clarified a docstring: PyInstaller's tooling is
+imported, while artifact/runtime code is not. No executable logic changed after
+the final test run.
+
+### Verification loop
+
+| Suspected issue / severity | Independent evidence | Disposition |
+| --- | --- | --- |
+| MAJOR: a known package directory could conceal an unrecorded binary/data file. | Unknown .dll and .dat under the synthetic numpy directory each fail; real RECORD paths still pass. | Rejected by exact ownership matching; no directory-wide native allowlist. |
+| MAJOR: a row could claim an absent file, or an unlisted module could be silently omitted. | Absent-entry row and unknown PYZ module controls through the real coverage validator/inventory. | Rejected; every inventory label has row support and every row has present entries. |
+| MAJOR: optional FFmpeg absence or incompatibility could be misrepresented. | Same incompatible lock succeeds with no FFmpeg rows/statements; adjacent tools fail naming main/extra rows on one line; partial sets fail. | Required conditional/refusal behavior is green. No owner HOLD resolution or override. |
+| MINOR: audit/locked version or required material could drift. | Independent synthetic audit/lock/installed metadata versions; wrong lock, removed licence and missing source controls. | Drift and missing material rejected; native-specific material completion remains below. |
+| MINOR: PyInstaller tooling execution could be confused with artifact code execution. | Inspected actual CArchive writer/reader path and metadata-only planner; no process-launch call. | Clarified module/function docstrings; no product code or binary executed. |
+
+### Exact continuation state
+
+This is the commissioned **coverage-boundary yield before text-provenance tests**.
+The dispatcher reads depth; the cell neither estimates it nor starts another
+implementation group while that checkpoint is pending. `notices.py` is a planning
+API, not yet a runnable notices generator. Specifically still undone:
+
+1. Finish native/component detail for actual Qt/Shiboken, pillow-heif's embedded
+   libheif/libde265/x265/MinGW, NumPy/SciPy/Pillow aggregates and OpenSSL/Python.
+   Supply the exact Qt release source and LGPL replacement rights, the accepted
+   MinGW limitation, and preserve native attribution terms from the audit.
+2. Render the complete notices header, per-component/source table, full licence
+   bytes and patent notes. Byte-copy the installed PyInstaller per-kind terms /
+   Bootloader Exception, verify SHA-256 AND byte count for each root reuse, label
+   true provenance/version, deduplicate repeated texts and never copy commercial
+   Qt terms. The current root references are not yet reused or verified.
+3. Add the explicitly deferred provenance tests: Bootloader Exception equality,
+   every root-block reuse path, altered digest/byte-count failures, labels,
+   commercial-text omission, and deterministic repeated output.
+4. Implement the notices writer/CLI and `build.py --notices` wiring plus its
+   tests. Existing build.py and test_tools_package_build.py were not edited.
+5. Re-run the requested validation and deliver the completed generator report;
+   real built-folder generation, reviews and broader gates remain the seat's.
+
+The firm boundary permits this partial return; no completion of rendering,
+source-delivery obligations or N13 acceptance is claimed. Later smoke/ZIP and
+workflow/checklist/guide/root notices remain turn 8 and turn 9 as re-split.
+Only the two new planning/test modules and this report changed. No network,
+real FFmpeg archive access, frozen run, PyInstaller build, desktop GUI launch,
+synthetic input, footage/profile write, git write, push, tag, gh command or
+workflow dispatch was performed. The seat commits these paths.
