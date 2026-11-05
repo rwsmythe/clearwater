@@ -1796,13 +1796,13 @@ def _fs_p73_store_on_a_volume_without_links(monkeypatch: pytest.MonkeyPatch, roo
     def no_link(a: object, b: object) -> None:
         raise OSError(errno.EPERM, "links are not supported on this volume (exFAT)")
 
-    assert presets._name_key("I") != presets._name_key("ı")  # the store's policy misses it
-    assert _upcase("I") == _upcase("ı")  # the volume calls them one name
+    assert presets._name_key("I") != presets._name_key("\u0131")  # the store's policy misses it
+    assert _upcase("I") == _upcase("\u0131")  # the volume calls them one name
     pairs = {
-        ("I", "ı"): True,  # the volume's collision the policy misses: the recheck refuses
-        ("i", "ı"): True,
+        ("I", "\u0131"): True,  # the volume's collision the policy misses: the recheck refuses
+        ("i", "\u0131"): True,
         ("Look", "LOOK"): True,  # both rules: the policy refuses first
-        ("café", "café"): True,  # the policy's collision the volume does not have
+        ("caf\u00e9", "cafe\u0301"): True,  # the policy's collision the volume does not have
         ("Reef", "Fresh"): False,  # the control: no collision, the rename goes through
     }
     for number, ((occupant, new), refused) in enumerate(pairs.items()):
