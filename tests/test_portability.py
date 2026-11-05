@@ -3397,15 +3397,15 @@ def platform_guard_offenders(source: str, markers: Sequence[str], name: str) -> 
                 else [statement.body, statement.orelse]
             )
             return all(stops_block(block, returns=returns) for block in taken)
-        if isinstance(statement, ast.With):
-            return stops_block(statement.body, returns=returns)
         if isinstance(statement, ast.Try):
             if stops_block(statement.finalbody, returns=returns):
                 return True
             return stops_block(statement.body, returns=returns) and all(
                 stops_block(handler.body, returns=returns) for handler in statement.handlers
             )
-        return False  # a loop may run zero times; a nested def or class runs nothing here
+        # A loop may run zero times; a ``with`` may swallow the exit (``pytest.raises``,
+        # ``suppress``); a nested def or class runs nothing here.
+        return False
 
     def stubs_launch(statement: ast.stmt) -> bool:
         """``monkeypatch.setattr`` of a process-launch operation, as a statement of its own."""
@@ -3594,6 +3594,11 @@ GUARD_PROBES = {
         "def test_x(monkeypatch):\n    monkeypatch.setattr(subprocess, 'run', print)\n"
         "    subprocess.run(['mklink'])\n",
         0,
+    ),
+    "swallowed skip": (  # the turn-6 verification loop: pytest.raises swallows the skip
+        "def f():\n    with pytest.raises(Exception):\n        if sys.platform != 'win32':\n"
+        "            pytest.skip('x')\n    subprocess.run(['mklink'])\n",
+        1,
     ),
     "comment only": (  # A r3 #4: a comment is not code
         "def f():\n    # mklink is mentioned only in this comment\n    pass\n",
