@@ -14,7 +14,8 @@ Claude pass; no review verdict is claimed here. Context depth is dispatcher-read
 | --- | --- | --- | --- | --- | --- |
 | Turn 1 / round 0 | Read-only design return; no files or processes. CHARC accepted the read-back and Q2-Q4. Source-worker hook site and guide section-3 launch paragraph granted; ADV-3 corrected to a live child that times out without reporting its PID. Q1 ruled BtbN month-end autobuild `autobuild-2026-10-31-12-59`, subject to the brief's source, configuration, hash and retention conditions. | 0 critical, 1 major, 2 minor; all 3 in-envelope questions, now ruled. | 3 NEW, 0 REOPENED; no reverts. | None. | 146,885 / 475,000 at turn end, supplied in dispatch 2. |
 | Turn 2 / build part 1 | ADV-1 publication outcome, ADV-3 no-PID fallback coverage/mutant, D4(d) statement guard. One native `taskkill` residual remains for the seat. | No Reviewer A findings yet; native process-control denial disclosed below. | No review reopenings. Temporary test-only kill-removal mutant restored. | Product: publication block and executable-finder guard. Tests: local wheel, fault injection, live child tree and layout/platform cases. | Turn-end figure pending dispatcher reading. |
-| Turn 3 / build part 2, Group A yield | Fatal reporter, GUI notification, source-worker hook site and isolated tests. STOP on bootstrap logging's transitive NumPy dependency; Group B not started. | No Reviewer A round. Self-check: 1 MAJOR scope STOP; 1 MINOR validation-rule question; one final worker-test residual for the seat. | All new observations, no review reopenings or product reverts. Rotation and the regression fixture's logging stub corrected in-envelope. | Product: entry reporter, interpreter catch, GUI callback and the single granted worker site. Tests: new hook suite and frozen-entry regression. | Fresh session; final depth pending dispatcher reading, never estimated by the cell. |
+| Turn 3 / build part 2, Group A yield | Fatal reporter, GUI notification, source-worker hook site and isolated tests. Both STOPs now settled by CHARC's turn-3 rulings; Group B was not started in turn 3. | No Reviewer A round. Self-check: 1 MAJOR scope STOP and 1 MINOR validation-rule question, both closed; worker residual confirmed sandbox-only by the seat. | All new observations, no review reopenings or product reverts. Rotation and the regression fixture's logging stub corrected in-envelope. | Product: entry reporter, interpreter catch, GUI callback and the single granted worker site. Tests: new hook suite and frozen-entry regression. | About 157K at the Group A yield, supplied in dispatch 4. |
+| Turn 4 / Group A finish and Group B yield | Closed the ruled bootstrap/QUIT_SCRIPT rows; proved lazy blocked-import behavior; added the bootloader flag and cache variables before all three activations. | No Reviewer A round; no new blocking finding. The known sandbox-only worker witness remains the sole validation failure. | No review reopenings. Temporary eager-import mutant caught twice and restored before Group B; no mutant remains. | Product: PyInstaller argument and frozen cache setup only. Tests: blocked-config/NumPy cases, argument-list cases, activation-boundary cases and environment restoration. | Turn-end figure pending dispatcher reading; no cell estimate. |
 
 This turn bundles the three changes explicitly commissioned by dispatch 2; the seat
 commits them. No git write was performed by the cell.
@@ -218,33 +219,30 @@ child plants its exception with a trace callback at the call to the worker's
 `main()`, after the granted hook-install site, without changing the worker's
 protocol, stdin handling or product code for fault injection.
 
-### Verification loop, findings and rulings requested
+### Turn-3 verification loop and dispositions
 
 | Severity / suspected issue | Independent evidence | Disposition |
 | --- | --- | --- |
-| MAJOR: a dependency failure can make the ostensibly stdlib bootstrap reporter unable to resolve or write its product log. | `dependency-probe.py` blocks NumPy, blocks Qt, stubs `app.main` with a function that imports NumPy, redirects all product/home roots, and executes the real source entry. A second bounded run records exit 1, one line `Clearwater: unexpected error; log unavailable: Clearwater product log (path unavailable)`, and no product log. `clearwater.config.__init__` imports presets/settings/interfaces; `interfaces/image.py` imports NumPy. | **STOP, scope ruling requested.** The currently owned entry files cannot normally import `config.paths` without executing the unowned eager package initializer. Request a narrow grant/design ruling for a stdlib-only route to the existing AD-25 resolver/log support, or an explicit accepted limitation. No duplicate per-OS resolver or manual loading of frozen modules was invented as a workaround. Group A is not complete. |
-| MINOR: requested legacy source-entry test conflicts with the explicit entry-point isolation rule. | `tests/test_app_startup.py`'s `QUIT_SCRIPT` executes the real GUI and event loop. It redirects profile/home roots and uses offscreen Qt, but neither blocks PySide6/shiboken6 nor stubs `app.main`. | **STOP, validation ruling requested.** This test was deselected, never executed by this cell. The file is outside this turn's grant. The seat can commission a compliant replacement or give an explicit exception for this existing integration test. Other startup tests build components over supplied disposable Locations under offscreen Qt. |
+| MAJOR: a dependency failure can make the ostensibly stdlib bootstrap reporter unable to resolve or write its product log. | `dependency-probe.py` blocks NumPy, blocks Qt, stubs `app.main` with a function that imports NumPy, redirects all product/home roots, and executes the real source entry. A second bounded run records exit 1, one line `Clearwater: unexpected error; log unavailable: Clearwater product log (path unavailable)`, and no product log. `clearwater.config.__init__` imports presets/settings/interfaces; `interfaces/image.py` imports NumPy. | **CLOSED by CHARC's turn-3 ruling, option (c), AD-38 accepted limitation.** Keep installation stdlib-only and resolve config/log lazily in the handler. Failure to import them gives one `log unavailable` stderr line, non-zero exit and no log file. Turn 4 pins both blocked-config and blocked-NumPy cases with an eager-import mutant control. No duplicated resolver, manual frozen-module loading or config initializer edit. |
+| MINOR: requested legacy source-entry test conflicts with the explicit entry-point isolation rule. | `tests/test_app_startup.py`'s `QUIT_SCRIPT` executes the real GUI and event loop. It redirects profile/home roots and uses offscreen Qt, but neither blocks PySide6/shiboken6 nor stubs `app.main`. | **CLOSED by CHARC's turn-3 ruling and the owner's recorded QUIT_SCRIPT exception (`1a38c935`).** The SEAT alone runs this existing integration test in gate legs with redirected roots, offscreen Qt and a bound. The cell continues to deselect it on every revision. Other startup tests build components over supplied disposable Locations under offscreen Qt. |
 | MINOR: direct crash-log append could bypass D88 rotation. | The additional rotation RED uses a real configured handler with a small limit, a previous record and the fatal traceback; the rotated file was missing. | Fixed in-envelope by reusing the owning handler's rollover/formatter with checked stream IO. All 14 hook cases pass in the final runs. |
 | MINOR: the frozen-entry regression's fixture stubbed away the real log handler. | The first broad run failed only the newly strengthened pack-module exception assertion, with no log file. The existing pack fixture replaces configure_logging with a call recorder. | Test-only fix: restore the captured real configure_logging for these two cases, retain redirected profile roots, and close it in the finalizer. The 257-case focused final and final broad run pass both cases. |
-| MINOR, validation residual: worker eager-import witness fails before reaching any new hook code. | Both broad runs and the isolated residual run trace unchanged `clearwater.app.__init__` -> composition -> core -> SciPy -> numpy.testing -> platform.win32_ver -> `_syscmd_ver` -> subprocess. The witness forbids Popen and raises `AssertionError: spawn before stdin isolation`. This occurs before export_worker.py's granted bottom-of-module site. | Seat re-run outside the restricted token required. No edit was made to `tests/test_app_export_worker.py`, app package imports or the worker's isolation logic. This is an observed environmental/import-path residual; outside-sandbox success is not claimed. |
+| MINOR, validation residual: worker eager-import witness fails before reaching any new hook code. | Both broad runs and the isolated residual run trace unchanged `clearwater.app.__init__` -> composition -> core -> SciPy -> numpy.testing -> platform.win32_ver -> `_syscmd_ver` -> subprocess. The witness forbids Popen and raises `AssertionError: spawn before stdin isolation`. This occurs before export_worker.py's granted bottom-of-module site. | **DISPOSITIONED at the seat:** dispatch 4 records 328 passed outside the sandbox at `74ce225c`, including QUIT_SCRIPT and this witness. Sandbox-only residual; do not chase it. No edit to its test, package imports or stdin isolation. New-turn outside-sandbox verification remains the seat's. |
 | MINOR, validation residual: default-settings startup never finishes GPU detection under the initial environment. | Two runs time out waiting 60 s for the device label; the independent diagnostic stack is in CuPy `_compiler_cache._write_encoded` -> tempfile `_mkstemp_inner`, reached from `_probe_gpu`. | Cleared in the final broad run with runner-only temp/cache roots under the worktree. No kernel-cache or driver write outside the worktree is claimed. Group B still must implement the frozen product settings separately. |
 
-The first four findings concern this implementation/validation envelope. The
-worker-import residual is on unchanged pre-hook code and remains a seat check;
-it is not silently fixed beyond the grant. There is no Reviewer A verdict or
-five-round review gate to report yet. The new major observation stops the build
-before a claim that the required stdlib-only bootstrap failure coverage is met.
+The first four findings concern this implementation/validation envelope. CHARC's
+turn-3 rulings settle both STOPs; turn 4 supplies the required regression proof.
+The worker-import residual is on unchanged pre-hook code and is confirmed
+sandbox-only by the seat, never fixed beyond the grant. There is no Reviewer A
+verdict or five-round review gate to report yet.
 
 ### Handoff and remaining work
 
-Request CHARC's ruling on the two STOP rows above. Then finish the bootstrap
-logging requirement within its granted scope, re-run the hook/frozen tests and
-resume Group B: `--disable-windowed-traceback` plus its argument-list regression,
-and both frozen-only cache variables before all three activation sites with the
-specified default/source/explicit-value tests. The seat must disposition the
-worker-import residual and the legacy excluded source-entry test. The remaining
-release workflow/FFmpeg/notices/smoke/zip/documentation work from the main brief
-is still commissioned to later turns, unchanged.
+Turn 3 yielded both STOPs to CHARC. Dispatch 4 supplies their rulings and the
+seat's worker-witness verification; its implementation and validation are
+recorded in the turn-4 section below. The remaining release workflow/FFmpeg/
+notices/smoke/zip/documentation work from the main brief stays commissioned to
+later turns, unchanged.
 
 No workflow/network fetch, frozen executable, package build, desktop GUI launch,
 synthetic input, git write, push, tag or workflow dispatch was performed. Only
@@ -254,3 +252,143 @@ hook check entered the real GUI event loop. No write to footage or to the owner'
 real application profile is claimed; all observed evidence is inside the
 worktree. New test file MD5 at the final run:
 `56CBC2C37D3E03A335B345DC5287D033` (`tests/test_exception_hook.py`).
+
+## Turn 4: Group A finished; Group B built and validated
+
+Both dispatch-4 groups are complete under CHARC's turn-3 rulings. The turn-3
+verification-loop dispositions above are closed, including the seat's 328-test
+outside-sandbox pass at `74ce225c` supplied in dispatch 4. This is a build-group
+yield; it is not acceptance of the whole release work package. No Reviewer A
+round has run yet, and the seat commits this turn's six changed files.
+
+### Group A: lazy reporting and its accepted limitation
+
+The reporter's imports are already lazy: `__main__.py:91` imports `config.paths`
+inside `_ExceptionReporter.__call__`, and `:94` imports `config.log` only after
+resolving the path. `install_exception_hooks` at `:160-173` imports neither;
+module-level imports are standard library only. No production hook change was
+needed for CHARC's ruling, and no configuration initializer or resolver was
+edited.
+
+**AD-38 limitation (CHARC's turn-3 ruling): a failure before `clearwater.config`
+can import, such as broken NumPy or a broken install, gives one `log unavailable`
+stderr line and a non-zero exit, but no log file.**
+
+TEST A is now
+`test_unimportable_log_dependencies_still_report_and_exit`, parameterized over
+blocked `clearwater.config` and blocked `numpy`. Each fresh child redirects all
+product/home roots, blocks Qt, has a 12-second subprocess timeout, imports the
+entry and installs its hooks, verifies that installation imported none of
+config/NumPy/Qt, prints a flushed installation canary, then raises a planted
+RuntimeError. The parent requires the canary, a non-zero exit, exactly one
+ASCII-safe stderr line containing `log unavailable`, and no `clearwater.log`
+anywhere under the disposable root. The canary prevents an earlier import
+failure from being mistaken for the intended post-install fatal failure.
+
+RED control: a temporary eager `from clearwater.config.paths import
+app_locations` was inserted at the start of `install_exception_hooks`. Both
+cases failed because the installation canary was absent. The original entry
+was restored from its byte backup and SHA-256 equality was checked before any
+Group B product edit. The two cases then passed with the other hook and frozen
+tests. No mutant remains.
+
+TEST B already exists, so no duplicate was added:
+`test_uncaught_source_failures_exit_without_qt_and_report_once[startup]` runs the
+actual source entry with a planted GPU-loader import failure while config is
+available. It asserts non-zero exit, no stdout, one ASCII stderr line naming
+the redirected product log, exactly one full `Traceback (most recent call last)`
+in that log, `RuntimeError: planted startup failure`, and no Qt-blocker failure.
+`test_startup_report_writes_traceback_flushes_and_exits_once` additionally checks
+the source `raise RuntimeError` frame and the full multiline/Unicode exception
+text in the log, along with the single stderr line and termination call. Both
+cases pass in the Group A run and final validation.
+
+QUIT_SCRIPT remains excluded from every cell run collecting startup tests. The
+owner's recorded exception permits only the seat to run it in a gate leg; it
+was not executed this turn. The cell did not chase or change the worker witness
+that the seat has confirmed passes outside the sandbox.
+
+### Group B: bootloader flag and frozen GPU cache roots
+
+`tools/package/build.py:338` adds `--disable-windowed-traceback` to the shared
+PyInstaller argument list. A two-case regression checks that exactly one such
+argument is present for both forms. It calls only `pyinstaller_args`; no build,
+PyInstaller process or frozen executable was run.
+
+`__main__.py` adds `_configure_gpu_caches` at `:304`, with a frozen-only guard
+and an activation-time lazy resolver import at `:311`. It uses
+`os.environ.setdefault` with `app_locations().cache_dir` for
+`CUDA_CACHE_PATH = <cache>/nvidia-compute-cache` and
+`CUPY_CACHE_DIR = <cache>/cupy-kernel-cache`. It creates no folder itself.
+The calls immediately precede every loader activation: `:410-411` for the
+allowed module attempt, `:501-502` for the frozen worker and `:528-529` for the
+GUI branch. A source call leaves both settings alone. Missing/pending packs and
+refusal statuses retain their existing control flow; the module branch's
+conditional expression became a statement block to put configuration before
+activation.
+
+Eighteen activation-boundary cases cover each variable on each branch with a
+frozen default, source mode and an explicit frozen value. The assertion runs
+inside the stand-in loader, so moving setup after activation fails the test.
+The fixture supplies a cache root under the redirected disposable profile;
+Qt is blocked and the GUI entry is a stand-in. Tests assert the final value and
+branch status as well as exactly one activation. The frozen-entry autouse
+fixture now restores both cache environment values at teardown, alongside its
+existing hook restoration, so product setup cannot leak into subsequent tests.
+
+RED: six frozen-default cases and both argument-list cases failed; the twelve
+source/explicit-value controls already passed. GREEN: all twenty Group B cases
+passed. The final six-module validation also passes all these cases.
+
+### Turn-4 validation
+
+Runner files are under `work/c63b-4-logs/`. All pytest runs used
+`PYTHONPATH=scripts`, `-p sandbox_mkdir_shim`, `-p no:cacheprovider`, offscreen Qt
+and fresh worktree-local basetemps. No invocation ran QUIT_SCRIPT. The final
+command is the dispatch's exact six-module selection and exclusion, with
+basetemp `work/c63b-4`; runner TEMP/TMP/TMPDIR, CUPY_CACHE_DIR and CUDA_CACHE_PATH
+are under `work/c63b-4-runner/`, retaining turn 3's environment isolation.
+
+| Evidence file | Observed summary |
+| --- | --- |
+| `red-a-mutant.log` | Exit 1: `2 failed, 14 deselected in 0.73s`; eager-import mutant rejected for both blocked dependencies. |
+| `green-a.log` | Exit 0: `191 passed in 13.35s`; 16 hook and 175 pre-Group-B frozen-entry cases. |
+| `red-b.log` | Exit 1: `8 failed, 12 passed, 243 deselected in 1.07s`; missing frozen defaults and bootloader flag distinguished. |
+| `green-b.log` | Exit 0: `20 passed, 243 deselected in 0.70s`. |
+| `ruff-check.log` | Exit 0: `All checks passed!` for the repository. |
+| `ruff-format.log` | Exit 0: `331 files already formatted`. |
+| `mypy.log` | Exit 0: `Success: no issues found in 164 source files`. |
+| `mypy-darwin.log` | Exit 0: `Success: no issues found in 164 source files`. |
+| `pytest-validation.log` | Exit 1: `1 failed, 348 passed, 1 deselected, 1 warning in 85.66s (0:01:25)`. |
+| `diff-check.log`, `desktop-input-grep.log` | No whitespace errors or synthetic desktop-input API matches; Git's LF-to-CRLF working-copy warnings are retained. |
+
+The sole final failure is
+`tests/test_app_export_worker.py::test_eager_imports_and_isolation_spawn_nothing_and_import_no_cupy`:
+the unchanged SciPy/NumPy import chain reaches `platform.win32_ver`'s subprocess
+fallback, and the witness raises `AssertionError: spawn before stdin isolation`.
+Dispatch 4 explicitly confirms it as sandbox-only from the seat's outside run;
+there is no new skip or fix for it. All other selected cases pass, including all
+16 hook, 193 frozen-entry and 70 packaging-tool cases. The one deselection is
+QUIT_SCRIPT, as required. The warning is CuPy's existing CUDA-path warning; uv's
+inherited-VIRTUAL_ENV warning is also retained in the files and does not change
+the worktree environment it selects.
+
+### Turn-4 verification loop and handoff
+
+| Suspected issue | Confirmation | Disposition |
+| --- | --- | --- |
+| Config import might occur at module/install time. | Read the handler/installer sites; the new children require an installation canary with both config and NumPy unavailable, and reject the eager-import mutant. | Confirmed lazy installation; no product change needed. AD-38's unavailable-log limitation pinned and recorded. |
+| A healthy config import might still fail to produce the full traceback. | Existing source-startup child and direct full-traceback test in both Green A and final validation. | Rejected; existing coverage is sufficient, with no duplicate test. |
+| Bootloader dialog suppression or a frozen activation site could be missed. | The new eight-case RED and twenty-case GREEN; final six-module run. | Fixed in the shared argument list and at all three activation sites. |
+| In-process entry calls could leak cache values between tests. | Product `setdefault` writes directly to os.environ, while the previous fixture restored hooks only. | Test teardown now snapshots/restores both variables; the final combined run covers the resulting test order. |
+| The worker witness might represent a product regression. | Same pre-hook failure chain in final validation; dispatcher reports its outside-sandbox pass at the turn-3 head. | Known sandbox-only residual, carried for the seat's new-head rerun; not changed. |
+
+The final inspection found no new in-envelope issue. Both turn-3 STOPs are
+settled; no new scope question remains. Reviewer A and new-head outside-sandbox
+validation remain the dispatcher's gates. Later commissioned turns still own
+the FFmpeg lock, notices, smoke/ZIP, workflow, checklist and guide; none was
+started here. No network fetch, frozen run, build, desktop GUI launch, synthetic
+input, footage/profile write, git write, tag, push, gh command or workflow
+dispatch was performed. No dependency, frozen interface, app/main code or
+export-worker code changed this turn. Depth at this Group B yield is for the
+dispatcher to read and fill; the cell supplies no estimate.

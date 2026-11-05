@@ -301,6 +301,20 @@ def _refuse(reason: str) -> int:
     return REFUSED_STATUS
 
 
+def _configure_gpu_caches() -> None:
+    """Before frozen pack activation, keep GPU caches under the product cache root.
+
+    Explicit user settings win. Source installations keep their existing cache behavior;
+    the app-data resolver is imported only when a frozen branch is about to activate.
+    """
+    if getattr(sys, "frozen", False):
+        from clearwater.config.paths import app_locations
+
+        root = app_locations().cache_dir
+        os.environ.setdefault("CUDA_CACHE_PATH", str(root / "nvidia-compute-cache"))
+        os.environ.setdefault("CUPY_CACHE_DIR", str(root / "cupy-kernel-cache"))
+
+
 def interpreter_reentry(arguments: Sequence[str]) -> list[str] | None:
     """Return a frozen interpreter re-entry's arguments normalised, or None when it is not one.
 
@@ -391,7 +405,10 @@ def run_interpreter_option(arguments: Sequence[str]) -> int:
     if len(arguments) < 3 or not arguments[2]:
         return _refuse("-m needs a module name")
     module = arguments[2]
-    status = None if _removal_pending() else gpu_pack.activate()
+    status = None
+    if not _removal_pending():
+        _configure_gpu_caches()
+        status = gpu_pack.activate()
     site = None if status is None or status.outcome != "loaded" else status.site_packages
     if site is None:
         return _refuse(f"-m {module!a}: no GPU pack is loaded")
@@ -481,6 +498,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if frozen:
         if arguments[1:2] == [WORKER_FLAG]:  # frozen only: a source run is 1.0.0 (A r3 #1)
             if not _removal_pending():
+                _configure_gpu_caches()
                 gpu_pack.activate()
             from clearwater.app import export_worker
 
@@ -507,6 +525,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             gpu_pack_install.apply_pending_removal()
         pending = _removal_pending(log=False)
     if not pending:
+        _configure_gpu_caches()
         gpu_pack.activate()
     from clearwater.app.main import main as gui_main
 

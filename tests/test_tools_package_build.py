@@ -669,6 +669,13 @@ def test_every_hidden_import_is_passed_to_pyinstaller(tmp_path: Path) -> None:
     assert "--hidden-import" not in build.pyinstaller_args("onedir", out=tmp_path, version="1")
 
 
+@pytest.mark.parametrize("form", ["onedir", "onefile"])
+def test_pyinstaller_disables_its_windowed_traceback_dialog(tmp_path: Path, form) -> None:
+    """Uncaught errors must reach the product reporter without a bootloader dialog."""
+    args = build.pyinstaller_args(form, out=tmp_path, version="1")
+    assert args.count("--disable-windowed-traceback") == 1
+
+
 def test_a_planted_removal_from_the_committed_list_fails_the_bundle_check_by_name(
     tmp_path: Path,
 ) -> None:

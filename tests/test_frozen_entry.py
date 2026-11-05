@@ -39,10 +39,19 @@ BLOCKED = ("PySide6", "shiboken6", "clearwater.gui", "clearwater.app.main")
 
 
 @pytest.fixture(autouse=True)
-def restore_exception_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Entry calls may install hooks; never leave them attached to the pytest host."""
+def restore_entry_state(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Keep entry-installed hooks and GPU cache settings from leaking into the pytest host."""
     monkeypatch.setattr(sys, "excepthook", sys.excepthook)
     monkeypatch.setattr(threading, "excepthook", threading.excepthook)
+    caches = {key: os.environ.get(key) for key in ("CUDA_CACHE_PATH", "CUPY_CACHE_DIR")}
+    try:
+        yield
+    finally:
+        for key, value in caches.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 @pytest.mark.timeout(10)
@@ -145,6 +154,56 @@ def _fake_gui(monkeypatch: pytest.MonkeyPatch, seen: list[tuple[str, Any]]) -> N
 
     fake.main = gui_main  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "clearwater.app.main", fake)
+
+
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize(
+    ("variable", "folder"),
+    [
+        ("CUDA_CACHE_PATH", "nvidia-compute-cache"),
+        ("CUPY_CACHE_DIR", "cupy-kernel-cache"),
+    ],
+)
+@pytest.mark.parametrize("branch", ["worker", "module", "gui"])
+@pytest.mark.parametrize("mode", ["frozen-default", "source", "frozen-explicit"])
+def test_gpu_cache_locations_are_ready_before_activation(
+    monkeypatch, tmp_path, calls, variable, folder, branch, mode
+):
+    """Every frozen activation uses the product cache root, preserving explicit settings."""
+    entry, blocker = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+    for key in ("CUDA_CACHE_PATH", "CUPY_CACHE_DIR"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    if mode == "source":
+        monkeypatch.delattr(sys, "frozen", raising=False)
+        expected = None
+    else:
+        _frozen(monkeypatch, tmp_path)
+        expected = str(tmp_path / "cache" / folder)
+        if mode == "frozen-explicit":
+            expected = str(tmp_path / "user-cache")
+            monkeypatch.setenv(variable, expected)
+    observed = []
+
+    def activate():
+        # Assert inside the boundary: setting a variable after activate() is too late.
+        observed.append(os.environ.get(variable))
+        assert observed[-1] == expected
+        return None
+
+    monkeypatch.setattr(gpu_pack, "activate", activate)
+    arguments = {
+        "worker": ["--export-worker"],
+        "module": ["-m", "packmod_cache.probe"],
+        "gui": [],
+    }[branch]
+    status = entry.main(["Clearwater.exe", *arguments])
+    wanted = 3 if mode == "source" or branch == "gui" else 7 if branch == "worker" else 2
+    assert status == wanted
+    assert observed == [expected]
+    assert os.environ.get(variable) == expected
+    assert blocker.attempts == []
 
 
 # Q5 (a): the worker command.

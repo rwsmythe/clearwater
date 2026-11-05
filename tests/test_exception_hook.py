@@ -255,6 +255,35 @@ def _child(tmp_path, body):
     )
 
 
+@pytest.mark.parametrize("blocked_root", ["clearwater.config", "numpy"])
+def test_unimportable_log_dependencies_still_report_and_exit(tmp_path, blocked_root):
+    """AD-38: install without product imports; a broken install loses only the log file."""
+    body = r"""
+attempts = []
+class BlockDependency(importlib.abc.MetaPathFinder):
+    def find_spec(self, name, path=None, target=None):
+        if name == BLOCKED_ROOT or name.startswith(BLOCKED_ROOT + '.'):
+            attempts.append(name)
+            raise ImportError('planted unavailable log dependency: ' + name)
+        return None
+sys.meta_path.insert(0, BlockDependency())
+from clearwater.__main__ import install_exception_hooks
+install_exception_hooks()
+assert not attempts
+assert not any(name == 'numpy' or name.startswith(('clearwater.config', 'PySide6', 'shiboken6'))
+               for name in sys.modules)
+print('installed without product imports', flush=True)
+raise RuntimeError('planted failure with unavailable log dependency')
+"""
+    done = _child(tmp_path, "BLOCKED_ROOT = " + repr(blocked_root) + "\n" + body)
+    assert done.returncode != 0
+    assert done.stdout == "installed without product imports\n"
+    assert done.stderr.count("\n") == 1, done.stderr
+    assert "log unavailable" in done.stderr
+    assert done.stderr.isascii()
+    assert list(tmp_path.rglob("clearwater.log")) == []
+
+
 @pytest.mark.parametrize("branch", ["startup", "worker", "thread"])
 def test_uncaught_source_failures_exit_without_qt_and_report_once(tmp_path, branch):
     """Exercise real top-level/thread hooks, including the source worker's own entry."""

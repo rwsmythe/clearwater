@@ -335,6 +335,7 @@ def pyinstaller_args(
         "--name",
         APP_NAME,
         "--windowed",
+        "--disable-windowed-traceback",
         "--noconfirm",
         "--clean",
         "--paths",
