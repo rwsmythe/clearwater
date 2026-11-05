@@ -27,8 +27,8 @@ pytestmark = [pytest.mark.gui, pytest.mark.timeout(10)]
 LICENSE = (
     "GPU support downloads CuPy and NVIDIA's CUDA runtime libraries from PyPI into your user "
     "folder. The NVIDIA libraries are provided by NVIDIA under the NVIDIA Software License "
-    "Agreement (the file `License.txt` inside each nvidia package after the install); CuPy is "
-    "MIT. Clearwater does not redistribute them."
+    "Agreement (the file `License.txt` in each NVIDIA package's `.dist-info` folder after the "
+    "install); CuPy is MIT. Clearwater does not redistribute them."
 )
 
 

@@ -117,7 +117,7 @@ until worker cleanup completes. The completion text is:
 
 The licence statement is verbatim:
 
-> GPU support downloads CuPy and NVIDIA's CUDA runtime libraries from PyPI into your user folder. The NVIDIA libraries are provided by NVIDIA under the NVIDIA Software License Agreement (the file `License.txt` inside each nvidia package after the install); CuPy is MIT. Clearwater does not redistribute them.
+> GPU support downloads CuPy and NVIDIA's CUDA runtime libraries from PyPI into your user folder. The NVIDIA libraries are provided by NVIDIA under the NVIDIA Software License Agreement (the file `License.txt` in each NVIDIA package's `.dist-info` folder after the install); CuPy is MIT. Clearwater does not redistribute them.
 
 Worker callables are module functions holding no Qt objects. They convert the
 product result to the existing IF-8 JobResult; its warnings tuple carries the
@@ -978,3 +978,21 @@ run/build, desktop input, git write or real-profile/footage write occurred.
 Prior depth is 198,141 / 475,000 (dispatch 10); current depth is DISPATCHER
 TO FILL. Four commissioned advisory folds are complete; A2/A4 remain banked
 as directed, with no open implementation question.
+
+## B-fold delta ruling (A4)
+
+| Ruling | Change | Verification |
+| --- | --- | --- |
+| CHARC A4 | Replace the installer/dialog N13 constants and their pinned tests with the exact corrected `.dist-info` licence location wording; update the verbatim report quote. Neither user guide nor README quotes the line, so both remain unchanged | Constants identical, exact and ASCII; source/tests have zero superseded-phrase matches. The unowned brief retains one historical quote. Ruff check clean; format check 327 files; mypy clean in 163 files; installer module **104 passed in 9.57 s**, offscreen dialog **24 passed in 1.04 s**. Five owned files changed, 0 CR bytes, clean diff check |
+
+Evidence under `work/wp6.3a/`: `a4-ruff.log`, `a4-format.log`, `a4-mypy.log`,
+`a4-tests.log`, `a4-gui.log`, `a4-audit.log`. Test commands were
+`PYTHONPATH=scripts uv run --no-sync pytest -q -p sandbox_mkdir_shim -p no:cacheprovider --timeout 300 tests/test_gpu_pack_install.py --basetemp=work/c63a-11`
+and the offscreen equivalent with `--timeout 600 tests/test_gui_gpu_pack_dialog.py --basetemp=work/c63a-11gui`;
+the GUI run also loaded the binding sandbox shim. GNU grep was attempted
+before and after but failed with `CreateFileMapping`, Win32 error 5, exit 256
+(`a4-grep-final.log`). Equivalent `rg -n -F` searches recorded six initial
+matches and one remaining match, solely `docs/briefs/wp6.3a-brief.md:36`
+(`a4-before.log`, `a4-rg-after.log`); the brief is not owned this turn.
+No real network, GPU activation, frozen/build run, desktop input, git write
+or real-profile/footage write occurred. The seat re-run section is unchanged.
