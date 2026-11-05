@@ -5,19 +5,20 @@
 
 ### Generation
 
-- **Generation 49** (session `clearwater-orchestrator-20261105-0315`). LIVE 2026-11-05 13:16Z. Seat folder `work/orch-g49/` (`gate.sh`, `watch2.sh`, `crcheck.py`, `assemble.py` = the dispatch assembler: `uv run --no-sync python work/orch-g49/assemble.py <body> <cell>\dispatch-N.md`).
-- (Gen 48 `clearwater-orchestrator-20261104-1821` rolled clean at ~13:15Z; its seat folder `work/orch-g48/` holds the licence scripts.)
-- CHARC is **gen 16, `clearwater-charc-20261104-0738`**. Re-verify both names in `comms/.launch-sessions.json` before every cue.
-- Seat folder `work/orch-g48/`:
-  - `gate.sh`, `watch2.sh`, `crcheck.py`;
-  - the drains, the posts, `dispatch-N-body.md`;
-  - the licence scripts (`licence_*.py`, `scriptsd_*.py`, `zvbi_objects.py`).
-  Copy `gate.sh` / `watch2.sh` with `sed 's#orch-g48#orch-g49#g'`.
-- **Dispatch assembly:** the body carries `@@RULES@@`. A small Python joins it with the two rule lines from `git show HEAD:CLAUDE.md` (see any gen-48 command history: lines starting `**Desktop input rule` / `**Entry-point isolation rule`), asserts no CR / VT, and writes `cell\dispatch-N.md`. A FRESH prompt is the cell def + the brief at HEAD + dispatch-N with `tr -d '\r'`; a RESUMED prompt is dispatch-N alone.
-- State worktree: `.worktrees/orch-state-g48`. The successor removes it and adds its own.
-- **After the migration:** C: is 3.7 TB with 2.8 TB free (13:13Z). D: has 2.1 TB free. Every path is unchanged (repo root, footage, `D:\clearwater-archive`, `clearwater.local.toml`, worktrees). The STOP-below-15-GB rule still holds; disk is no longer the binding constraint.
-- **Paces at 13:13Z:** Codex 7 % / 0.434 (resets 2026-11-11 10:07Z); Claude 61 % / 1.362 (resets 2026-11-09 10:00Z).
-- Bash gauge at bring-up: 40 ms.
+- **Generation 50** (session `clearwater-orchestrator-20261105-0611`). LIVE 2026-11-05 16:11Z; ROLLED at the 400K cap at ~19:35Z. **The roll is clean: nothing it started is running.** Gate `p63b` was ABORTED at 19:30Z (see the board); its `gate.sh` / `watch2.sh` / pytest trees were killed with `taskkill /T` and confirmed gone. Re-check with `tasklist | grep -i -E 'pytest|pyinstaller'`; the only `codex.exe` processes are the owner's desktop app.
+- **CHARC is gen 17, `clearwater-charc-20261105-0602`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
+- **Seat folder `work/orch-g50/`:**
+  - `gate.sh`, `watch2.sh`, `crcheck.py`, `assemble.py`;
+  - `notices_cover.py`: the read-only notices coverage check (files, PYZ, both ways). Usage: `<venv python> -I work/orch-g50/notices_cover.py <Clearwater folder> <build-onedir/Clearwater>`;
+  - the drains, the posts, `rollstate.py`, and `dispatch-19..23-body.md` / `-filled.md`;
+  - **`wp6.3b-accept-draft.md`: the accept record, DRAFTED.** Fill `@@FOOTPRINT@@`, `@@GATE@@` and `@@MERGE@@`.
+
+  The g49 tools (`smoke_uia.py`, `dll_origin.py`, `census_measure.py`) stay in `work/orch-g49/`. Copy `gate.sh` / `watch2.sh` with `sed 's#orch-g50#orch-g51#g'`.
+- **FRESH prompt** = `.claude/agents/implementer-codex-sol-high.md` + the brief at HEAD + `dispatch-N.md`, joined, with `tr -d '\r'`. A **RESUMED prompt** is `dispatch-N.md` alone.
+- **State worktree:** `.worktrees/orch-state-g50`. The successor removes it and adds its own.
+- **Bash gauge at bring-up:** 25 ms (gen 50). C: about 2.6 T free.
+- **Paces:** last read by gen 49 at 13:15Z (Codex 0.433 / Claude 1.362). Re-read both at the next commission (WP6.3c).
+- **Host load:** the owner was running World of Warcraft during gen 50 (CPU about 34 %; suites about 2x slower). That is why t21 and t22 widened the smoke-test bounds.
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
 
@@ -49,66 +50,81 @@
 
 ### Live board (RESUME HERE)
 
-**RUNNING at 13:45Z: WP6.3b turn 13** (FRESH Codex session, dispatch `cell\dispatch-13.md`: release.yml with the seat-resolved SHAs `seat\action-shas.md`, FFmpeg params read from the lock, `--zip` the one pending flag; checklist v2; guide s.2/3/6/7/8; limited root notices WITHOUT the FFmpeg row). Branch `wp6.3b` at **`52754527`** (turn 12). If this generation dies mid-turn, the successor waits for / inspects `turn-13.driver.stdout` and `return-13.md` before anything else.
+**WP6.3b: BOTH NETS CONVERGED; THE GATE IS OWED.**
+- **Head `260c63ae`** (turn 23), branch `wp6.3b`, clean. Review copy `.worktrees/wp6.3b-rA` is detached at `260c63ae`.
+- **Gate `p63b` was ABORTED:** the parallel leg had 12 failures (10 failed + 2 errors), ALL `LocalConfigError: .worktrees/wp6.3b/clearwater.local.toml: file not found`. Every earlier package worktree (wp-dr125, wp6.1, wp6.3a, wp6.4) had a copy of the uncommitted root `clearwater.local.toml`; wp6.3b never got one. That is an environment gap, NOT code. The serial leg was killed at its start. Summary: `work/orch-g50/gate-p63b/summary.txt`.
 
-1. **WP6.3b: the release workflow, bundled FFmpeg, notices, smoke and zip, checklist v2, guide.**
-   - Brief `docs/briefs/wp6.3b-brief.md`, rulings tails Round-0 / Turn-3 / Turn-6 / Turn-9 (CHARC commits `e209734e`, `5fb828ba`, `2258e5ab`, `f7250307`).
-   - Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp6.3b\` (`cell\` dispatch / prompt / return / turn files 1-11; `seat\`).
+**GEN 51, DO THIS FIRST, in order:**
+1. **Copy the local config:** `cp clearwater.local.toml .worktrees/wp6.3b/clearwater.local.toml` (it is gitignored and uncommitted; never commit it). Confirm `git -C .worktrees/wp6.3b status --short` is still empty.
+2. **The gate, run alone:** `bash work/orch-g51/gate.sh wp6.3b p63b2 static collect parallel serial harness` (background), plus a Monitor on `watch2.sh p63b2 0`; re-arm it at 30 min.
+   - Afterwards: `( cd .worktrees/wp6.3b && uv run --no-sync mypy --platform darwin )` and the module-alone `tests/test_gpu_pack_install.py` (both green at the seat on `260c63ae`: 166 files clean; 113 passed).
+   - **The QUIT_SCRIPT test runs in the serial leg** (the seat exception).
+   - Expect the parallel leg at about 8,143 tests (p63b had 7,921 passed + 210 skipped + the 12 config failures). The serial leg has 1,337 tests.
+   - Collection identity was already green in p63b: 9,487 = 8,143 + 1,337 + 7, 0 duplicates.
+3. **The accept:**
+   - Fill `work/orch-g50/wp6.3b-accept-draft.md`:
+     - `@@FOOTPRINT@@` = `git -C .worktrees/wp6.3b diff --name-only 50a25b3b..260c63ae` (34 paths);
+     - `@@GATE@@` = the p63b2 figures (and one line on p63b's abort);
+     - `@@MERGE@@`.
+   - Write it as `docs/proofs/wp6.3b-accept.md` IN THE WORKTREE, after merging main into `wp6.3b` (main has only CHARC / orchestrator docs since `50a25b3b`; check with `git diff --stat 50a25b3b..main -- src tests tools`).
+   - Run the harness gate there (`docs/proofs/` is an instance-surface prefix; no registration needed).
+   - Commit; blob-check 0 CR; `git merge --ff-only wp6.3b` on main.
+   - Copy `work/orch-g51/gate-p63b2/` to `C:\Users\rwsmy\clearwater-review-evidence\wp6.3b\gate\`.
+4. **The accept post to CHARC** with the main hash. CHARC writes AD-38 and the register rows on it (list in the draft's Dispositions; CHARC ruled all of them already), and corrects CLAUDE.md's stale "v1.0.0 not pushed" line. Cue `clearwater-charc-20261105-0602`.
+5. **Then WP6.3c** (brief DRAFT `a86e3c24` + CHARC's notes: MAJOR 1's embedded-components item; B r3 adv 1 / 2 / 3 / 5; B r2 adv 5).
+   - Fill Q1-Q4 when you reach it. Q3 = any pending `--zip` / origin-source branch in 6.3b's accepted code, by file:line: grep `build.py` for `--zip`, `with_ffmpeg`, `ffmpeg_from`, `pending`.
+   - Read both paces at commission.
 
-   **Turns and their commits** (driver turn numbers):
+**Gen-50 ledger (WP6.3b, all committed on `wp6.3b`; evidence `C:\Users\rwsmy\clearwater-review-evidence\wp6.3b\`):**
 
-   | Turn | Commit | Content | Codex session and depth |
-   | --- | --- | --- | --- |
-   | t4 | `4e1da00e` | hook group A finish + group B (`--disable-windowed-traceback`, cache variables) | `01a1a9de`, retired at 197,556 |
-   | t5 | `30cb8460` | `ffmpeg.lock.json` (98 components) + `--ffmpeg-from` | `01a1ab56` |
-   | t6 | `817a31b2` | seat-verified licences in the lock (103 slots, zvbi the one `gpl3_compatible: "no"`) | `01a1ab56` |
-   | t7 | `6c793073` | notices coverage planner + the FFmpeg refusal | `01a1ab56`, retired at 208,734 |
-   | t8 | `4a2d2782` | report-only STOP on the seat's GPL-3.0 "once" wording; seat-clarified, CHARC concurred | `01a1ab9b` |
-   | t9 | `3e97ae00` | the generator finished (rendering, provenance, writer, CLI, `build.py --notices`) | `01a1ab9b` |
-   | t10 | `df1cd2e2` | `tools/package/native-licences/` (manifest + OpenSSL 3.5.5 Apache-2.0 text, sha256 `7d5450cb...`) | `01a1ab9b`, retired at 199,050 |
-   | t11 | `efe88629` | `.gitattributes` `tools/package/native-licences/** -text` + 2 guard tests; the headless smoke (`tools/package/smoke.py`, `build.py --smoke`) | FRESH `01a1abc1-ffbe-7203-9291-e43fb62f4c74`, 155,874 |
-   | t12 | `52754527` | every smoke row under a Windows Job Object (own CreateProcessW, suspended + PROC_THREAD_ATTRIBUTE_JOB_LIST, IsProcessInJob before resume; census = job process list; darwin fail-closed pending WP6.5); seat 479 passed / 1 skipped | `01a1abc1`, retired at 222,977 |
+| Turn | Commit | Content | Session, depth at yield |
+| --- | --- | --- | --- |
+| t19 | `65784337` | the data turn under the Turn-18 ruling: THREE strict provenance kinds; libffi, MSVC (11 files), Mesa + LLVM, the five SciPy blocks, the namespace mapping; the seat provenance record `seat\native-licences-provenance.md` | RESUMED `01a1ac75`, 170,321, retired |
+| t20 | `8938edd3` | the A r3 remediation: k1, k2 (the project LICENSE LF-normalised), F1-F4, A1 (magic bytes), A3, A4 | FRESH `01a1aca5`, 174,245 |
+| t21 | `91f90c8f` | `job_case` bound 1 -> 10 s (the load flake) | FRESH `01a1acc4`, 91,904 |
+| t22 | `4e848bf2` | the B r1 remediation, items 2-12: venv-only trust + the `PYTHON*` refusal; the stem rule; the presenter bounded on every path; real pipe holding; bounds; the win32 skip; the tag gate; the guide's "from 1.1.0" sections; mutant tests; `BuildEnvironmentError`; `setup-uv` cache off + checksum | FRESH `01a1ace3`, 180,046 |
+| t23 | `260c63ae` | the B r2 remediation: re-fetch the annotated tag after checkout; the real-git test (the seat ran it OUTSIDE the sandbox: RED at `4e848bf2`, GREEN 3 of 3, `seat\t23-real-git-proof.md`); MINOR 2, adv 3, adv 7 | FRESH `01a1ad0c`, 111,793 |
 
-   **Turn 11's OPEN MAJOR: RULED (b) by CHARC (`1a8beb0d`), fixed in turn 12, CLOSED on the seat re-run (`work/orch-g49/seat63b-t12.log`).** WP6.5's brief must carry the native darwin containment (the branch refuses to run until then).
+**Nets:**
+- A r3 `65784337` NO_NEW (k1, k2, F1-F5, A1-A4);
+- B r1 FULL `91f90c8f` NEW_MAJOR (MAJOR 1 embedded components -> CARVED to WP6.3c; 8 MINOR);
+- B r2 delta `4e848bf2` NEW_MAJOR (the checkout tag overwrite, seat-confirmed from `actions/checkout@11bd7190` source);
+- **B r3 delta `260c63ae` NO_NEW_CRITICAL_MAJOR** (6 adv: 1, 2, 3, 5 to 6.3c; 4 a record line; 6 corrected in the accept record).
 
-   **HELD (owner): the zvbi licence STOP.**
-   - BtbN's win64-gpl-9.0 `ffmpeg.exe` carries zvbi's GPL-2.0-ONLY `src/pdc.*` / `src/packet-830.*` in a GPL-3.0 (`--enable-version3`) binary. Record `seat\licences-5031c6f1.md` section 3.
-   - With the owner via CHARC. CHARC recommends (a) a self-build from BtbN's scripts at `5031c6f1` minus `50-zvbi.sh`, fallback (c) user-obtained FFmpeg like the GPU pack, never (b) accept the risk. The laptop's gyan.dev FULL build has the same combination.
-   - **The ZIP and any release use of the bundle wait for this ruling.** The notices generator and the smoke are provider-independent: FFmpeg rows appear only when FFmpeg is carried, and the generator refuses a `"no"` row.
+**Seat proofs:**
+- rebuilds `work/wp6.3b-stage1b` / `1c` / `1d` from the FULL Git Bash PATH: origin PASS, `dll_origin` 0 foreign;
+- notices `3afe913e...` (1c = 1d), coverage exact (1,536 entries / 25 rows);
+- smoke under UIA `seat\smoke-uia\run1` (`windows_seen` []).
 
-   **Seat records this generation** (`clearwater-review-evidence\wp6.3b\seat\`):
-   - `scriptsd-5031c6f1.md` + `.tsv` (103 built stages, 98 pinned; static evaluation);
-   - `licences-5031c6f1.md` + `.tsv` (every licence at its pin; 7 corrections; the zvbi STOP);
-   - `native-licences-openssl.md` (OpenSSL tag `85a9a2ee` -> commit `67b5686b`, source sha256 `b28c9153...`).
+**Seat QA at `260c63ae`:** seven modules 714 passed + 1 skipped; installer alone 113; ruff, format, mypy win32 + darwin clean; 0 CR.
 
-   The data folders are `work\wp6.3b-seat\licences\` (per-component licence files), `licence-headers\`, `zvbi-hdr\`, `zvbi.git`, `native-licences\` and `btbn-5031c6f1\` (the unpacked build-scripts archive).
+**Other standing items:**
+- **WP6.5** brief DRAFT `fea43245` (+ CHARC's notes: A r3 F5 darwin PATH / Mach-O origin rule; B r2 adv 4 notices skip; the darwin smoke containment).
+- **Push:** main is ahead of `origin/main`; CHARC batches the owner's push.
+- **Worktrees:** main, `orch-state-g50` (remove it), `wp6.3b` (live), `wp6.3b-rA` (review copy), `wp-dr125`, `wp6.1`, `wp6.2`, `wp6.3a`, `wp6.4` (kept for the prunes).
+- **Prunes owed (the owner's word only; CHARC batches):**
+  - gen 47 / 48 lists (in `git show e453d30b:docs/orchestrator-state.md`);
+  - gen 49's (`work/seat63b-t12..t17*`, `work/seat63b-m1`, `work/wp6.3b-stage1`, `work/wp6.3b-stage1-cleanpath`);
+  - gen 50's (`work/wp6.3b-stage1b`, `1c`, `1d` and their `.log`s, `work/seat63b-t19..t23`, `work/orch-g50/gate-p63b`, `work/c63b-*` in the worktree, and `.worktrees/wp6.3b-rA` after the accept).
 
-   **Remaining WP6.3b work, in order:**
-   1. DONE (turn 12).
-   2. **RUNNING as turn 13** (provider-agnostic; the root FFmpeg row and `--zip` wait on zvbi). Then the seat: `actionlint` on release.yml, check each action input against its pinned `action.yml`, register any new harness path. Its content:
-      - `release.yml` with pinned action SHAs: round-0 candidates checkout v4.2.2, setup-uv v6.0.1, upload-artifact v4.6.2, download-artifact v4.3.0 and action-gh-release v2.3.2. **The SEAT resolves each to an immutable SHA by `gh api`**; the cell is offline.
-      - The checklist items: the FFmpeg re-pin before about 2028-10; re-verify the native-licences manifest when uv's Python changes; the python-build-standalone `20260303` pin as a build input.
-      - The root notices: the Python row (1.1.0 redistributes the interpreter natives) and the PyInstaller per-kind wording (run-time hooks Apache-2.0).
-      - The guide: sections 2, 3 (the narrow grant), 6, 8; ADV-2 already done in turn 2.
-   3. **Reviewer A (Claude), detached `.worktrees/wp6.3b-rA`** (EXISTS, at `df1cd2e2`: `git -C` it to the final head; it has no `.venv`). `codex_cell.py review` from the detached copy; ban `run_in_background` in the prompt. **CHARC's binding addition for the prompt:** sweep EVERY other hash-pinned or byte-compared text file outside `tests/fixtures/**` (the lock, the synthetic FFmpeg listings, any notices golden file) for the CRLF hazard, extending the attribute line where a fresh autocrlf checkout would change bytes. Also carry gen 48's note: `_configure_gpu_caches` imports `clearwater.config.paths` (and so NumPy) on the frozen `-m` and worker branches before `activate()`.
-   4. **The seat build proof:**
-      - a real `build.py --form onedir --ffmpeg-from ... --notices --smoke`, with the zip after zvbi;
-      - the real built folder is the native census: every unknown binary named; libffi / SQLite / Tcl-Tk / MSVC runtime rows only if carried, each a seat fetch plus a manifest row;
-      - the UIA window watch, the V4 check and the `hevc_nvenc` line on the bundled binary;
-      - `actionlint` (`work\tools\actionlint-1.7.12\actionlint.exe`);
-      - the notices read in full.
-   5. Reviewer B (a full Claude pass at the seat), then the gate: two legs + harness + `mypy --platform darwin` + the module-alone `tests/test_gpu_pack_install.py`. Then the accept record and the ff.
-   6. **CHARC's accept items:** AD-38 (the flag, hook, workflow, bundle rule, native-licences surface, the lazy-import limit); register rows (FFmpeg re-pin about 2028-10; the MinGW-runtime limitation; any native without a row); N13 for 1.1.0.
-2. **WP6.5** (Mac validation): brief DRAFT `fea43245`, after 6.3b.
-3. **Push:** main is ahead of `origin/main`. CHARC batches the owner's push.
-4. **Worktrees:**
-   - main;
-   - `orch-state-g48` (remove it);
-   - `wp6.3b` (live) and `wp6.3b-rA` (detached review copy);
-   - `wp-dr125`, `wp6.1`, `wp6.2`, `wp6.3a`, `wp6.4` (kept for the prunes).
-5. **Prunes owed (the owner's word only; CHARC batches):**
-   - gen 47's list (`wp6.3a/work`, `wp6.3a-rA/work`, `wp-dr125/work/wp6.1` + frozen-runs, the `wp6.1` builds after 6.3b, `wp6.2`, `wp6.4/work`);
-   - gen 48's own: `work/seat63b-t3..t11`, `work/rA-crlf*`, the `work/wp6.3b-seat/` licence data folders after the accept.
+### Gen-50 lessons
+
+- **A package worktree needs the uncommitted `clearwater.local.toml` copied in before its first GATE.** Its absence passes every cell run and every seven-module re-run, then fails 12 tests in the parallel leg. Copy it when the worktree is created.
+- **A load-sensitive test bound shows up when the owner's desktop is busy.** Before calling a failure a defect, re-run it alone, and at the previous head in the review copy.
+- **Codex's sandbox cannot run real-git tests** (Win32 error 5). Plan the seat run of the RED and GREEN from a throwaway detached worktree (`git worktree add --detach`, copy the new test in, run, `git worktree remove --force`).
+- **A REASONED MAJOR about a third-party action is settled cheaply** by reading its source at the pinned SHA with a read-only `gh api repos/<o>/<r>/contents/<path>?ref=<sha>`.
+- **`grep -c $'\r'` in this Git Bash counts LINES, not CR bytes** (a false CRLF alarm at t19). Count bytes in Python.
+- **`mkdir -p` the basetemp's parent before a seat pytest run** (a FileNotFoundError at setup looked like a test failure).
+
+### Gen-49 lessons
+
+- **PyInstaller collects DLLs through PATH.** A Git Bash build bundles `/mingw64/bin`'s OpenSSL and any JDK's UCRT. Hash-bind every native, and sanitize PATH inside the build.
+- **Python's `Path.write_text` writes CRLF on Windows** (state commit `6d2be2e5` carried 128 CRs). Use `write_bytes` or `newline='\n'`. The memory file is updated.
+- **A heredoc turns `\a` into BEL** (a state line said `seat<BEL>ction-shas`). Write backslash paths with the Write tool, or as `chr(92)` in Python.
+- **The bare-`cd` slip recurred four times this generation** (each restored in the next call). The safe forms are `( cd X && ... )`, `git -C` and absolute paths.
+- **The `rm` safety check refuses `rm $VAR/$VAR`.** Use a literal absolute path.
+- **A resumed Codex session is cheaper only while depth is below about 150K.** A turn that adds about 40-60K needs a fresh session at 175K and above.
+- **Read the third-party trees yourself.** SciPy's own `LICENSES_bundled.txt` omits cobyqa and mislabels packaging; PBS's `downloads.py` libffi pin is not what its Windows build uses.
 
 ### Gen-48 lessons
 
