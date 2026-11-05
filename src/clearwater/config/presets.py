@@ -92,8 +92,13 @@ def _rename_without_replace(source: Path, target: Path, *, case_only: bool) -> N
     one silently, so: a case-only rename (the target is the source itself on a case-insensitive
     volume) uses ``os.rename``, which is safe there; any other rename links ``target`` to the
     file, which fails when ``target`` exists, then unlinks ``source``. On a volume that makes
-    no hard links the rename falls back to ``os.rename`` with one WARNING naming the file (the
-    NFC / casefold check before it still stands; the residual race is DR-34(a)'s).
+    no hard links the rename falls back to ``os.rename`` with one WARNING naming the file. The
+    fallback first asks the volume itself whether ``target`` names a file (``os.path.lexists``,
+    which applies the volume's own name equivalence: exFAT's upcase table makes the dotless i,
+    U+0131, the same name as ``I`` where NFC / casefold does not) and refuses as the link does
+    when it does; the WARNING follows only a rename. Between that check and the rename another
+    writer can still create ``target``, which POSIX ``os.rename`` then replaces: the residual
+    race D1 accepts (DR-34(a)).
 
     Args:
         source: The existing preset file.
@@ -113,8 +118,12 @@ def _rename_without_replace(source: Path, target: Path, *, case_only: bool) -> N
         except OSError as error:
             if error.errno not in _LINKS_REFUSED:
                 raise
+            if os.path.lexists(target):  # the volume says the name is taken: refuse, as link does
+                raise FileExistsError(
+                    errno.EEXIST, os.strerror(errno.EEXIST), str(target)
+                ) from error
             _LOG.warning(
-                "preset %s: the volume makes no hard link (%s); renamed without the "
+                "preset %s: the volume makes no hard link (%s); renamed without the atomic "
                 "no-replace check",
                 ascii(target.name),
                 errno.errorcode.get(error.errno or 0, "unknown"),

@@ -10,6 +10,7 @@ The stub (``StubExportJobs`` in ``test_gui_export_panel``) writes real files thr
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from dataclasses import replace
 from pathlib import Path
@@ -644,6 +645,88 @@ def test_refused_files_are_warned_about_and_duplicates_are_not_queued(rig: Rig) 
     assert len(warnings) == 2 and {w.owner for w in warnings} == {"batch"}
     assert any("cam.LRV" in w.text for w in warnings)
     assert [batch.queue.item(i).text() for i in range(batch.queue.count())] == ["ok.mp4 - queued"]
+
+
+class _Identity:
+    """A stat result with only the identity fields the queue reads."""
+
+    def __init__(self, dev: int, ino: int) -> None:
+        self.st_dev, self.st_ino = dev, ino
+
+
+def _files(monkeypatch: pytest.MonkeyPatch) -> dict[str, tuple[int, int]]:
+    """Install a mutable fake ``os.stat`` on the queue; return its table (absolute path -> id).
+
+    A path missing from the table does not exist. Editing the table between two ``add_paths``
+    calls models a file deleted, created or replaced in place.
+    """
+    table: dict[str, tuple[int, int]] = {}
+
+    def stat(path: str) -> _Identity:
+        if path not in table:
+            raise FileNotFoundError(path)
+        return _Identity(*table[path])
+
+    monkeypatch.setattr(batch_module, "_stat", stat)
+    return table
+
+
+QA, QB, QL = Path("/queue/A.mp4"), Path("/queue/B.mp4"), Path("/queue/link-to-A.mp4")
+
+
+def _abs(path: Path) -> str:
+    return os.path.abspath(path)
+
+
+def test_a_new_file_on_a_deleted_queued_files_number_is_queued(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reviewer B finding 1: delete queued A, create B on A's reused number; B is queued."""
+    files = _files(monkeypatch)
+    batch = batch_of(rig)
+    files[_abs(QA)] = (7, 41)
+    batch.add_paths([QA])
+    del files[_abs(QA)]
+    files[_abs(QB)] = (7, 41)
+    batch.add_paths([QB])
+    assert [i.path for i in batch.items()] == [QA, QB]
+    assert [batch.queue.item(i).text() for i in range(batch.queue.count())] == [
+        "A.mp4 - queued",
+        "B.mp4 - queued",
+    ]
+
+
+def test_a_queued_file_replaced_in_place_is_not_queued_twice(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reviewer B finding 1: A replaced in place; re-adding A or a link to it adds nothing.
+
+    The replacement has a new file number; the hard link is caught only by the current one.
+    """
+    files = _files(monkeypatch)
+    batch = batch_of(rig)
+    files[_abs(QA)] = (7, 41)
+    batch.add_paths([QA])
+    files[_abs(QA)] = (7, 42)
+    files[_abs(QL)] = (7, 42)
+    batch.add_paths([QA])
+    assert [i.path for i in batch.items()] == [QA]
+    batch.add_paths([QL])  # caught only by the queued path's CURRENT identity
+    assert [i.path for i in batch.items()] == [QA]
+
+
+def test_two_live_hard_links_are_one_item_and_another_device_is_another(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two names of one live file stay one item; one file number on two devices is two files."""
+    files = _files(monkeypatch)
+    batch = batch_of(rig)
+    files[_abs(QA)], files[_abs(QL)], files[_abs(QB)] = (7, 41), (7, 41), (8, 41)
+    batch.add_paths([QA, QL])
+    batch.add_paths([QL])
+    assert [i.path for i in batch.items()] == [QA]
+    batch.add_paths([QB])
+    assert [i.path for i in batch.items()] == [QA, QB]
 
 
 ONE, TWO = Path("/card-one/GX010001.MP4"), Path("/card-two/GX010001.MP4")

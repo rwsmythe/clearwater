@@ -1758,6 +1758,76 @@ def _fs_p73(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         patched.setattr(presets.os, "link", record("link"))
         presets._rename_without_replace(source, target, case_only=False)
     assert calls == [("rename", "look.json", "Look.json")]
+    _fs_p73_store_on_a_volume_without_links(monkeypatch, tmp_path)
+
+
+def _upcase(name: str) -> str:
+    """The model volume's name rule, chosen apart from the store's NFC / casefold policy.
+
+    exFAT's: every character compared by its simple upper case (one character to one), no
+    Unicode normalisation; so dotless ``\\u0131`` names ``I``, and NFD stays distinct from NFC.
+    """
+    return "".join(c.upper() if len(c.upper()) == 1 else c for c in name)
+
+
+def _fs_p73_store_on_a_volume_without_links(monkeypatch: pytest.MonkeyPatch, root: Path) -> None:
+    """Reviewer B finding 4: ``PresetStore.rename`` on a volume that makes no hard link.
+
+    The model volume refuses ``link`` (EPERM), answers ``lexists`` by its own upcase rule and
+    REPLACES through ``rename`` (POSIX). Each pair is (occupant, new name for "Mover"); the
+    pairs are chosen by the volume's rule or by the store's, never filtered by the store's.
+    """
+    from clearwater.config import presets
+
+    test_presets = importlib.import_module("test_config_presets")
+    real_replace = os.replace
+
+    def lexists(path: object) -> bool:
+        wanted = Path(str(path))
+        return any(_upcase(e.name) == _upcase(wanted.name) for e in wanted.parent.iterdir())
+
+    def rename(a: object, b: object) -> None:
+        source, target = Path(str(a)), Path(str(b))
+        for entry in target.parent.iterdir():  # POSIX rename replaces what the volume calls b
+            if entry.name != source.name and _upcase(entry.name) == _upcase(target.name):
+                entry.unlink()
+        real_replace(source, target)
+
+    def no_link(a: object, b: object) -> None:
+        raise OSError(errno.EPERM, "links are not supported on this volume (exFAT)")
+
+    assert presets._name_key("I") != presets._name_key("ı")  # the store's policy misses it
+    assert _upcase("I") == _upcase("ı")  # the volume calls them one name
+    pairs = {
+        ("I", "ı"): True,  # the volume's collision the policy misses: the recheck refuses
+        ("i", "ı"): True,
+        ("Look", "LOOK"): True,  # both rules: the policy refuses first
+        ("café", "café"): True,  # the policy's collision the volume does not have
+        ("Reef", "Fresh"): False,  # the control: no collision, the rename goes through
+    }
+    for number, ((occupant, new), refused) in enumerate(pairs.items()):
+        store = presets.PresetStore(root / f"no-links-{number}")
+        held = store.save(occupant, test_presets._set())
+        mover = store.save("Mover", test_presets._set())
+        held_bytes, mover_bytes = held.read_bytes(), mover.read_bytes()
+        with monkeypatch.context() as patched:
+            patched.setattr(presets, "rename_replaces", lambda: True)
+            patched.setattr(presets.os, "link", no_link)
+            patched.setattr(presets.os.path, "lexists", lexists)
+            patched.setattr(presets.os, "rename", rename)
+            if refused:
+                with pytest.raises((presets.PresetError, FileExistsError)):
+                    store.rename("Mover", new)
+            else:
+                store.rename("Mover", new)
+        names = sorted(p.name for p in store.folder.iterdir())
+        assert held.read_bytes() == held_bytes, (occupant, new)
+        if refused:
+            assert names == sorted([held.name, mover.name]), (occupant, new)
+            assert mover.read_bytes() == mover_bytes
+        else:
+            assert names == sorted([held.name, f"{new}.json"])
+            assert (store.folder / f"{new}.json").read_bytes() == mover_bytes
 
 
 def _settings() -> Any:

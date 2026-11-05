@@ -77,7 +77,8 @@ class BatchItem:
         outputs: The files the item produced.
         warnings: The warnings its job returned.
         failure: The failure text of a failed item, or None.
-        key: The key every spelling of one file shares (:func:`_key`; duplicate detection).
+        key: The file's key when it was queued (:func:`_key`); duplicate detection reads the
+            path's current key instead (``add_paths``).
     """
 
     path: Path
@@ -93,22 +94,27 @@ _stat = os.stat
 """The call that reads a queued file's identity; a test replaces it with a fake provider."""
 
 
+def _path_key(path: Path) -> str:
+    """Return the lexical key of a path: ``normcase`` of its absolute spelling (1.0.0's key)."""
+    return "path:" + os.path.normcase(os.path.abspath(path))
+
+
 def _key(path: Path) -> str:
     """Return the key every spelling of one file shares (DR-121).
 
     An existing file's key is its identity, the device and file number ``os.stat`` reports: one
     file under two case spellings is one item, and two distinct files whose names differ only
     by case (a case-sensitive volume) are two. A path that cannot be read, or a file system
-    that reports no file number, falls back to the lexical key (``normcase`` of the absolute
-    path), as before.
+    that reports no file number, falls back to the lexical key (:func:`_path_key`), as before.
+    The identity is the file's NOW: a deleted file's number can be reused and a file replaced in
+    place gets a new one, so a key is read again whenever it is compared (``add_paths``).
     """
-    absolute = os.path.abspath(path)
     try:
-        info = _stat(absolute)
+        info = _stat(os.path.abspath(path))
     except OSError:
         info = None
     if info is None or info.st_ino == 0:
-        return "path:" + os.path.normcase(absolute)
+        return _path_key(path)
     return f"file:{info.st_dev}:{info.st_ino}"
 
 
@@ -281,23 +287,31 @@ class BatchPanel(QWidget):
 
         Each path goes through ``sources.route``: a refusal (a sidecar, an unsupported
         extension) is presented as a warning with owner ``"batch"`` and the file is not queued;
-        a path already queued is not queued twice. Ignored while a batch runs.
+        a path already queued is not queued twice. A file is a duplicate when its path's
+        lexical key (:func:`_path_key`) matches a queued item's, or when its identity
+        (:func:`_key`) matches the CURRENT identity of a queued item's path: every queued path is
+        read again here, and a queued file that no longer exists contributes no identity
+        (Reviewer B finding 1: an identity cached at add time outlives its file). Ignored while
+        a batch runs.
 
         Args:
             paths: The chosen files.
         """
         if self._running:
             return
-        known = {item.key for item in self._items}
+        known_paths = {_path_key(item.path) for item in self._items}
+        known_files = {_key(item.path) for item in self._items} - known_paths
         for path in paths:
             kind = sources.route(path)
             if isinstance(kind, Message):
                 self._context.messages.present(Message("warning", kind.text, path, OWNER))
                 continue
-            key = _key(path)
-            if key in known:
+            lexical, key = _path_key(path), _key(path)
+            if lexical in known_paths or key in known_files:
                 continue
-            known.add(key)
+            known_paths.add(lexical)
+            if key != lexical:
+                known_files.add(key)
             self._items.append(BatchItem(path, kind, key=key))
         self._refresh_rows()
 
