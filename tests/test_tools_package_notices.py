@@ -8,6 +8,7 @@ import importlib.util
 import json
 import marshal
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -137,13 +138,14 @@ version = "6.22.3"
     }
 
 
-def plan(module, release):
+def plan(module, release, **kwargs):
     return module.plan_notices(
         release["folder"],
         audit_path=release["audit"],
         uv_lock_path=release["uv_lock"],
         ffmpeg_lock_path=release["ffmpeg_path"],
         distribution=release["distributions"].__getitem__,
+        **kwargs,
     )
 
 
@@ -611,12 +613,16 @@ def test_cli_writes_notices_or_returns_one_line_failure(release, monkeypatch, ca
         assert "wrote" in captured.out
 
 
-def test_openssl_dlls_cannot_be_mislicensed_as_python_psf_terms(release):
-    """The source-install Python audit has no redistributed OpenSSL licence text."""
+def test_openssl_dlls_cannot_be_mislicensed_as_python_psf_terms(release, native_surface):
+    """A carried OpenSSL library needs a row in the verified native input surface."""
     module = load_notices()
     (release["folder"] / "_internal/libcrypto-3-x64.dll").write_bytes(b"synthetic OpenSSL")
-    with pytest.raises(ValueError, match=r"OpenSSL.*licence.*source"):
-        plan(module, release)
+    document = json.loads((native_surface / "manifest.json").read_text())
+    document["components"] = []
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    (native_surface / "openssl-3.5.5-LICENSE.txt").unlink()
+    with pytest.raises(ValueError, match=r"OpenSSL.*missing.*(row|material)"):
+        plan(module, release, native_licences_path=native_surface)
 
 
 @pytest.mark.parametrize("ffmpeg", [False, True])
@@ -742,3 +748,201 @@ def test_writer_publication_failure_retains_old_content_and_removes_its_temporar
     else:
         assert not destination.exists()
     assert not list(release["folder"].parent.glob("*.tmp"))
+
+
+@pytest.fixture
+def native_surface(tmp_path):
+    destination = tmp_path / "native-licences"
+    shutil.copytree(ROOT / "tools/package/native-licences", destination)
+    return destination
+
+
+def change_native_row(surface, field, value):
+    path = surface / "manifest.json"
+    document = json.loads(path.read_text())
+    document["components"][0][field] = value
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+
+def add_openssl(release, names=("libcrypto-3-x64.dll", "libssl-3-x64.dll")):
+    for name in names:
+        (release["folder"] / "_internal" / name).write_bytes(b"synthetic interpreter native")
+
+
+def test_real_native_manifest_verifies_the_seat_bytes():
+    module = load_notices()
+    surface = ROOT / "tools/package/native-licences"
+    records = module.load_native_licences(surface)
+    assert len(records) == 1
+    row = records[0]
+    assert row.component == "OpenSSL"
+    assert row.upstream_version == "3.5.5"
+    assert row.spdx == "Apache-2.0"
+    assert row.licence_input.path == surface / "openssl-3.5.5-LICENSE.txt"
+    data = row.licence_input.path.read_bytes()
+    assert len(data) == 10175
+    assert (
+        hashlib.sha256(data).hexdigest()
+        == "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+    )
+
+
+@pytest.mark.parametrize(
+    "damage", ["text", "size", "hash", "missing-text", "orphan-text", "duplicate"]
+)
+def test_native_surface_refuses_integrity_and_coverage_errors(native_surface, damage):
+    module = load_notices()
+    path = native_surface / "openssl-3.5.5-LICENSE.txt"
+    if damage == "text":
+        data = path.read_bytes()
+        path.write_bytes(b"!" + data[1:])
+    elif damage == "size":
+        change_native_row(native_surface, "text_size_bytes", 1)
+    elif damage == "hash":
+        change_native_row(native_surface, "text_sha256", "0" * 64)
+    elif damage == "missing-text":
+        path.unlink()
+    elif damage == "orphan-text":
+        (native_surface / "orphan-LICENSE.txt").write_bytes(b"unclaimed text")
+    else:
+        manifest = native_surface / "manifest.json"
+        document = json.loads(manifest.read_text())
+        document["components"].append(document["components"][0])
+        manifest.write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="native"):
+        module.load_native_licences(native_surface)
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("component", ""),
+        ("bundled_version_source", "invented.source"),
+        ("upstream_version", None),
+        ("source_tag", ""),
+        ("source_commit", "not-a-commit"),
+        ("source_tag_object", "0"),
+        ("source_archive_url", "file:///source.tar.gz"),
+        ("source_archive_sha256", "nope"),
+        ("spdx", ""),
+        ("text_file", "../outside.txt"),
+        ("text_file", "sub\\outside.txt"),
+        ("text_size_bytes", True),
+        ("fetch_date", "yesterday"),
+        ("fetched_by", "cell"),
+    ],
+)
+def test_native_manifest_rejects_unverifiable_schema_fields(native_surface, field, value):
+    module = load_notices()
+    change_native_row(native_surface, field, value)
+    with pytest.raises(ValueError, match="native"):
+        module.load_native_licences(native_surface)
+
+
+@pytest.mark.parametrize(
+    "names",
+    [("libcrypto-3-x64.dll",), ("libssl-3-x64.dll",), ("libcrypto-3-x64.dll", "libssl-3-x64.dll")],
+)
+def test_openssl_rows_and_verbatim_text_follow_only_carried_dlls(release, names):
+    module = load_notices()
+    add_openssl(release, names)
+    result = plan(module, release)
+    row = next(row for row in result.rows if row.name == "OpenSSL")
+    assert row.version == "3.5.5"
+    assert row.licence == "Apache-2.0"
+    assert set(row.entries) == {f"file:_internal/{name}" for name in names}
+    python_row = next(row for row in result.rows if row.name == "Python")
+    assert not set(row.entries).intersection(python_row.entries)
+    output = module.render_notices(result)
+    text = (ROOT / "tools/package/native-licences/openssl-3.5.5-LICENSE.txt").read_bytes()
+    assert output.count(text) == 1
+    assert b"openssl-3.5.5" in output
+    assert (
+        b"https://github.com/openssl/openssl/releases/download/openssl-3.5.5/openssl-3.5.5.tar.gz"
+        in output
+    )
+    assert b"b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89" in output
+    assert b"1.1.0 redistributes the interpreter's native libraries" in output
+    assert b"1.0.0 did not" in output
+    assert b"fetched by seat" in output
+    assert b"Installed wheel: OpenSSL" not in output
+
+
+@pytest.mark.parametrize(
+    "reading", ["OpenSSL 9.9.9 1 Jan 2026", "LibreSSL 3.5.5", "OpenSSL 3.5.5-dev"]
+)
+def test_native_version_mismatch_fails_for_carried_openssl(release, monkeypatch, reading):
+    module = load_notices()
+    add_openssl(release)
+    monkeypatch.setattr(module.ssl, "OPENSSL_VERSION", reading)
+    with pytest.raises(ValueError, match=r"OpenSSL.*version"):
+        plan(module, release)
+
+
+def test_absent_openssl_never_emits_a_native_row_or_text(release):
+    module = load_notices()
+    result = plan(module, release)
+    assert not any(row.name == "OpenSSL" for row in result.rows)
+    output = module.render_notices(result)
+    assert b"Seat-verified native input: OpenSSL" not in output
+    assert b"openssl-3.5.5.tar.gz" not in output
+
+
+def test_native_text_is_rechecked_when_rendering_after_a_plan(release, native_surface):
+    module = load_notices()
+    add_openssl(release)
+    result = plan(module, release, native_licences_path=native_surface)
+    path = native_surface / "openssl-3.5.5-LICENSE.txt"
+    path.write_bytes(path.read_bytes() + b"tamper")
+    with pytest.raises(ValueError, match=r"native.*(hash|byte|size)"):
+        module.render_notices(result)
+
+
+def test_different_python_build_release_fails_only_when_openssl_is_carried(release, native_surface):
+    module = load_notices()
+    path = native_surface / "manifest.json"
+    document = json.loads(path.read_text())
+    document["interpreter_build"]["release"] = "20260304"
+    path.write_text(json.dumps(document))
+    assert not any(
+        row.name == "OpenSSL"
+        for row in plan(module, release, native_licences_path=native_surface).rows
+    )
+    add_openssl(release)
+    with pytest.raises(ValueError, match=r"OpenSSL.*build release"):
+        plan(module, release, native_licences_path=native_surface)
+
+
+def test_native_writer_keeps_openssl_coverage_and_bytes_deterministic(release):
+    module = load_notices()
+    add_openssl(release)
+    path = module.write_notices(release["folder"], **writer_kwargs(release))
+    expected = path.read_bytes()
+    assert b"| OpenSSL | 3.5.5 | Apache-2.0 | Redistributed in this artifact |" in expected
+    assert b"python-build-standalone 20260303" in expected
+    assert module.write_notices(release["folder"], **writer_kwargs(release)) == path
+    assert path.read_bytes() == expected
+    result = plan(module, release)
+    assert {entry for row in result.rows for entry in row.entries} == set(result.entries)
+
+
+@pytest.mark.parametrize(
+    "damage", ["not-object", "bool-schema", "missing-components", "bad-build", "missing-spdx"]
+)
+def test_native_manifest_rejects_invalid_document_shapes(native_surface, damage):
+    module = load_notices()
+    path = native_surface / "manifest.json"
+    document = json.loads(path.read_text())
+    if damage == "not-object":
+        document = []
+    elif damage == "bool-schema":
+        document["schema_version"] = True
+    elif damage == "missing-components":
+        del document["components"]
+    elif damage == "bad-build":
+        document["interpreter_build"] = "unverified"
+    else:
+        del document["components"][0]["spdx"]
+    path.write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="native"):
+        module.load_native_licences(native_surface)

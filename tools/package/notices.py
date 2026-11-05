@@ -16,16 +16,19 @@ import importlib.util
 import json
 import os
 import re
+import ssl
 import sys
 import tempfile
 import tomllib
 import zipfile
 from collections import defaultdict
 from collections.abc import Callable, Sequence
+from datetime import date
 from functools import cache
 from pathlib import Path
 from types import ModuleType
 from typing import Any, NamedTuple, cast
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_URL = "https://github.com/rwsmythe/clearwater"
@@ -37,6 +40,26 @@ class LicenceInput(NamedTuple):
 
     path: Path
     block_id: str = ""
+    sha256: str = ""
+    size_bytes: int = 0
+    provenance: str = ""
+
+
+class NativeLicence(NamedTuple):
+    """A seat-fetched native licence with its exact upstream and build provenance."""
+
+    component: str
+    bundled_version_source: str
+    upstream_version: str
+    upstream_repository: str
+    source_tag: str
+    source_commit: str
+    source_archive_url: str
+    source_archive_sha256: str
+    spdx: str
+    licence_input: LicenceInput
+    interpreter_release: str
+    python_version: str
 
 
 class NoticeRow(NamedTuple):
@@ -88,6 +111,171 @@ def _build_tool() -> ModuleType:
 
 def _normalize(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _native_text(path: Path, sha256: str, size: int) -> bytes:
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"notices: native licence text missing or linked: {path.name}")
+    data = path.read_bytes()
+    if len(data) != size:
+        raise ValueError(f"notices: native licence text byte count differs: {path.name}")
+    if hashlib.sha256(data).hexdigest() != sha256:
+        raise ValueError(f"notices: native licence text SHA-256 hash differs: {path.name}")
+    return data
+
+
+def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
+    """Validate the committed seat-fetched native licence surface, without fetching.
+
+    Every component needs a source identity, published source-archive hash and
+    a real text with matching hash and byte count. Every file other than the
+    manifest needs a component reference. Symlinks, unsafe paths, duplicate
+    components and unsupported version-source bindings fail closed.
+
+    Args:
+        folder: The committed native-licences folder, or a local test copy.
+
+    Returns:
+        Verified native inputs. Bundled versions are checked separately when
+        the inventory actually carries the associated component's binaries.
+
+    Raises:
+        ValueError: Schema, provenance, file coverage or text integrity is invalid.
+        OSError: An input cannot be read.
+    """
+    manifest = folder / "manifest.json"
+    if folder.is_symlink() or manifest.is_symlink() or not manifest.is_file():
+        raise ValueError("notices: native licence manifest missing or linked")
+    try:
+        document = json.loads(manifest.read_text(encoding="utf-8"))
+    except ValueError as error:
+        raise ValueError("notices: native licence manifest is not valid JSON") from error
+    if (
+        not isinstance(document, dict)
+        or type(document.get("schema_version")) is not int
+        or document["schema_version"] != 1
+        or not isinstance(document.get("components"), list)
+    ):
+        raise ValueError("notices: native licence manifest schema is invalid")
+    build = document.get("interpreter_build")
+    if (
+        not isinstance(build, dict)
+        or build.get("provider") != "python-build-standalone"
+        or not isinstance(build.get("release"), str)
+        or re.fullmatch(r"[0-9]{8}", build["release"]) is None
+        or not isinstance(build.get("python_version"), str)
+        or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", build["python_version"]) is None
+    ):
+        raise ValueError("notices: native licence interpreter build record is invalid")
+    string_fields = (
+        "component",
+        "bundled_version_source",
+        "upstream_version",
+        "upstream_repository",
+        "source_tag",
+        "source_tag_object",
+        "source_commit",
+        "source_archive_url",
+        "source_archive_sha256",
+        "spdx",
+        "text_file",
+        "text_sha256",
+        "fetch_date",
+        "fetched_by",
+    )
+    result: list[NativeLicence] = []
+    components: set[str] = set()
+    files = {"manifest.json"}
+    for row in document["components"]:
+        if not isinstance(row, dict) or any(
+            not isinstance(row.get(key), str) or not row[key] or row[key] != row[key].strip()
+            for key in string_fields
+        ):
+            raise ValueError("notices: native licence row has missing/invalid string fields")
+        if row["component"] != "OpenSSL" or row["bundled_version_source"] != "ssl.OPENSSL_VERSION":
+            raise ValueError(
+                "notices: native licence row has an unsupported version-source binding"
+            )
+        if row["component"] in components:
+            raise ValueError("notices: native licence manifest has duplicate component rows")
+        components.add(row["component"])
+        for key, length in (
+            ("source_commit", 40),
+            ("source_tag_object", 40),
+            ("source_archive_sha256", 64),
+            ("text_sha256", 64),
+        ):
+            if re.fullmatch(r"[0-9a-f]{" + str(length) + "}", row[key]) is None:
+                raise ValueError(f"notices: native licence row has invalid {key}")
+        for key in ("text_size_bytes", "source_archive_size_bytes"):
+            if type(row.get(key)) is not int or row[key] <= 0:
+                raise ValueError(f"notices: native licence row has invalid {key}")
+        for key in ("upstream_repository", "source_archive_url"):
+            url = urlsplit(row[key])
+            if (
+                url.scheme != "https"
+                or not url.hostname
+                or url.username
+                or url.password
+                or url.query
+                or url.fragment
+            ):
+                raise ValueError(f"notices: native licence row has invalid {key}")
+        if (
+            re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+[a-z]?", row["upstream_version"]) is None
+            or row["source_tag"] != "openssl-" + row["upstream_version"]
+            or row["spdx"] != "Apache-2.0"
+            or row["fetched_by"] != "seat"
+        ):
+            raise ValueError(
+                "notices: native OpenSSL provenance/version/licence fields are invalid"
+            )
+        try:
+            if date.fromisoformat(row["fetch_date"]).isoformat() != row["fetch_date"]:
+                raise ValueError("not ISO date")
+        except ValueError as error:
+            raise ValueError("notices: native licence row has invalid fetch_date") from error
+        filename = row["text_file"]
+        if filename in {".", "..", "manifest.json"} or "/" in filename or "\\" in filename:
+            raise ValueError("notices: native licence row has unsafe text_file")
+        path = folder / filename
+        _native_text(path, row["text_sha256"], row["text_size_bytes"])
+        files.add(filename)
+        provenance = (
+            f"Seat-verified native input: {row['component']} {row['upstream_version']}; "
+            f"upstream tag {row['source_tag']}, commit {row['source_commit']}; "
+            f"source archive {row['source_archive_url']}; "
+            f"published SHA-256 {row['source_archive_sha256']}; "
+            f"fetched by seat on {row['fetch_date']}"
+        )
+        result.append(
+            NativeLicence(
+                row["component"],
+                row["bundled_version_source"],
+                row["upstream_version"],
+                row["upstream_repository"],
+                row["source_tag"],
+                row["source_commit"],
+                row["source_archive_url"],
+                row["source_archive_sha256"],
+                row["spdx"],
+                LicenceInput(
+                    path,
+                    sha256=row["text_sha256"],
+                    size_bytes=row["text_size_bytes"],
+                    provenance=provenance,
+                ),
+                build["release"],
+                build["python_version"],
+            )
+        )
+    actual = {path.name for path in folder.iterdir()}
+    if actual != files:
+        raise ValueError(
+            "notices: native licence files without manifest rows: "
+            + ", ".join(sorted(actual - files))
+        )
+    return tuple(result)
 
 
 def _audit_rows(path: Path) -> dict[str, _AuditRow]:
@@ -331,6 +519,7 @@ def plan_notices(
     audit_path: Path = ROOT / "THIRD_PARTY_NOTICES.md",
     uv_lock_path: Path = ROOT / "uv.lock",
     ffmpeg_lock_path: Path = ROOT / "tools/package/ffmpeg.lock.json",
+    native_licences_path: Path = ROOT / "tools/package/native-licences",
     distribution: Callable[
         [str], importlib.metadata.Distribution
     ] = importlib.metadata.distribution,
@@ -347,6 +536,7 @@ def plan_notices(
         audit_path: The source-install audit's runtime table and audited texts.
         uv_lock_path: The build's locked distribution versions.
         ffmpeg_lock_path: The FFmpeg identity and verified source/licence rows.
+        native_licences_path: The committed seat-verified native licence inputs.
         distribution: Installed-metadata resolver, also usable with fixture wheels.
 
     Returns:
@@ -502,6 +692,7 @@ def plan_notices(
         result.append(
             NoticeRow(base, version, row.licence, row.sources, tuple(sorted(labels)), inputs)
         )
+    result = _interpreter_native_rows(result, load_native_licences(native_licences_path))
     result = _native_details(result, installed, audit_path)
     inventory_labels = tuple(sorted(entry.label for entry in entries))
     ordered = tuple(sorted(result, key=lambda row: row.name.casefold()))
@@ -515,6 +706,70 @@ def plan_notices(
             "obtain licence and source from its publisher."
         )
     return NoticePlan(inventory_labels, ordered, tuple(statements))
+
+
+def _interpreter_native_rows(
+    rows: list[NoticeRow], records: tuple[NativeLicence, ...]
+) -> list[NoticeRow]:
+    labels = tuple(
+        sorted(
+            {
+                label
+                for row in rows
+                for label in row.entries
+                if label.startswith("file:")
+                and Path(label.removeprefix("file:"))
+                .name.casefold()
+                .startswith(("libcrypto-", "libssl-"))
+            }
+        )
+    )
+    if not labels:
+        return rows
+    record = next((row for row in records if row.component == "OpenSSL"), None)
+    if record is None:
+        raise ValueError("notices: OpenSSL missing native licence manifest row/material")
+    reading = re.match(r"^OpenSSL ([0-9]+\.[0-9]+\.[0-9]+[a-z]?)(?:\s|$)", ssl.OPENSSL_VERSION)
+    if reading is None or reading[1] != record.upstream_version:
+        raise ValueError("notices: OpenSSL bundled version differs from native licence manifest")
+    if ".".join(map(str, sys.version_info[:3])) != record.python_version:
+        raise ValueError(
+            "notices: OpenSSL interpreter version differs from native licence manifest"
+        )
+    build_marker = Path(sys.base_prefix) / "BUILD"
+    if (
+        not build_marker.is_file()
+        or build_marker.read_text(encoding="utf-8").strip() != record.interpreter_release
+    ):
+        raise ValueError(
+            "notices: OpenSSL interpreter build release differs from native licence manifest"
+        )
+    result = []
+    for row in rows:
+        remaining = tuple(label for label in row.entries if label not in labels)
+        if remaining:
+            result.append(row._replace(entries=remaining))
+    result.append(
+        NoticeRow(
+            "OpenSSL",
+            record.upstream_version,
+            record.spdx,
+            (record.upstream_repository + "/tree/" + record.source_tag, record.source_archive_url),
+            labels,
+            (record.licence_input,),
+            (
+                "Clearwater 1.1.0 redistributes the interpreter's native libraries; 1.0.0 did not.",
+                "Published source archive SHA-256: " + record.source_archive_sha256,
+                "Build input: python-build-standalone "
+                + record.interpreter_release
+                + "; CPython "
+                + record.python_version
+                + "; version source: "
+                + record.bundled_version_source,
+            ),
+        )
+    )
+    return result
 
 
 def _component_material(
@@ -557,15 +812,6 @@ def _native_details(
 ) -> list[NoticeRow]:
     result: list[NoticeRow] = []
     for row in rows:
-        if row.name == "Python" and any(
-            Path(label.removeprefix("file:")).name.casefold().startswith(("libcrypto-", "libssl-"))
-            for label in row.entries
-            if label.startswith("file:")
-        ):
-            raise ValueError(
-                "notices: OpenSSL missing redistributed licence/source material; "
-                "the source-install Python audit does not supply it"
-            )
         if row.name in {"pyside6-essentials", "shiboken6"}:
             for item in row.licence_inputs:
                 if item.block_id == "text-36":
@@ -774,6 +1020,9 @@ def render_notices(plan: NoticePlan) -> bytes:
             if item.block_id:
                 source, data = _audited_material(item)
                 label = f"{row.name} {row.version}; {source}; the 1.0.0 audit's upstream copy"
+            elif item.provenance:
+                data = _native_text(item.path, item.sha256, item.size_bytes)
+                label = item.provenance
             else:
                 data = item.path.read_bytes()
                 label = f"Installed wheel: {row.name} {row.version}; {_wheel_label(item.path)}"
@@ -843,6 +1092,7 @@ def write_notices(
     audit_path: Path = ROOT / "THIRD_PARTY_NOTICES.md",
     uv_lock_path: Path = ROOT / "uv.lock",
     ffmpeg_lock_path: Path = ROOT / "tools/package/ffmpeg.lock.json",
+    native_licences_path: Path = ROOT / "tools/package/native-licences",
     distribution: Callable[
         [str], importlib.metadata.Distribution
     ] = importlib.metadata.distribution,
@@ -859,6 +1109,7 @@ def write_notices(
         audit_path: The source-install audit table and verified upstream texts.
         uv_lock_path: The locked distribution versions.
         ffmpeg_lock_path: The FFmpeg provenance and licence lock.
+        native_licences_path: The committed seat-verified native licence inputs.
         distribution: Installed wheel metadata resolver.
 
     Returns:
@@ -876,6 +1127,7 @@ def write_notices(
                 audit_path=audit_path,
                 uv_lock_path=uv_lock_path,
                 ffmpeg_lock_path=ffmpeg_lock_path,
+                native_licences_path=native_licences_path,
                 distribution=distribution,
             )
         )

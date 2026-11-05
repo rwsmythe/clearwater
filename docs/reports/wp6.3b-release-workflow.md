@@ -1,14 +1,13 @@
 # WP6.3b release workflow: implementation record
 
-Status: turn 9 implements full-text rendering, native Qt/pillow-heif details,
-the notices writer/module CLI and build.py's --notices option. Ruff, format,
-both mypy platforms and all 408 requested tests pass. Dispatch 9 resolves the
-turn-8 GPL-3.0 wording question. A NEW MAJOR input gap remains: the interpreter
-carries OpenSSL DLLs, but neither its licence file nor the root audit supplies
-OpenSSL's redistributed licence/source material. Such a folder now fails closed;
-the seat must supply verified material and a ruling before the OpenSSL row can
-be completed. No real artifact notices, PyInstaller build or N13 acceptance is
-claimed. The separate FFmpeg zvbi redistribution HOLD remains unchanged.
+Status: turn 10 closes the ruled OpenSSL input gap with the committed seat-fetched
+native-licence surface and an inventory-driven OpenSSL row. Text integrity,
+runtime version and interpreter build provenance are checked before use. Ruff,
+format, both mypy platforms and all 444 requested tests pass. The generator,
+writer/CLI and --notices wiring are implemented; the real built-folder census,
+any additional native-library inputs, smoke/ZIP and subsequent release work
+remain the seat's/next dispatch's. No real artifact notices, PyInstaller build
+or N13 acceptance is claimed. The separate FFmpeg zvbi HOLD remains unchanged.
 
 ## Round and turn ledger
 
@@ -26,6 +25,7 @@ Claude pass; no review verdict is claimed here. Context depth is dispatcher-read
 | Turn 7 / notices coverage-boundary yield | New onedir inventory and notice-plan API, source-audit/uv.lock/installed-RECORD matching, material checks, coverage closure and conditional FFmpeg rows/refusal. Rendering, provenance tests and build wiring not begun. | No Reviewer A round or new blocking finding; turn-6 input STOPs ruled by CHARC. | No review reopenings or reverts. Initial typing/lint errors corrected; no product-entry or real-binary execution. | New notices planning module and synthetic coverage test module; report. No existing build/lock/test file changed. | Dispatcher supplied 171K at turn-6 yield; current depth is pending dispatcher reading, not estimated. |
 | Turn 8 / input-rule STOP | Read dispatch 6 item 2, dispatch 7, the report and installed materials. Reproduced two complete GPL-3.0 copies under the required wheel-byte-copy rule; requested CHARC's rendering ruling. | No Reviewer A round. NEW MAJOR in-envelope ambiguity; existing zvbi HOLD unchanged. | 1 NEW, 0 REOPENED; no reverts. | Report only; no product or test change. | Fresh session; turn-end figure pending dispatcher reading, not estimated. |
 | Turn 9 / generator and input-gap handoff | Applied dispatch-9 clarification; rendered verified texts, native details and coverage; added atomic writer, CLI and --notices wiring. OpenSSL missing redistribution material confirmed; folders carrying it are refused. | No Reviewer A round. Turn-8 MAJOR closed by seat clarification; 1 NEW MAJOR in-envelope input gap, plus the unchanged zvbi HOLD. | 1 NEW, 0 REOPENED; no reverts. | Notices generator and build option; synthetic/provenance/wiring tests; report. | Dispatcher supplied about 104K at turn-8 yield; turn-9 end pending dispatcher reading, not estimated. |
+| Turn 10 / native input surface and OpenSSL row | Copied the seat's exact text; added manifest schema/integrity/file-coverage validation, runtime/build matching and conditional OpenSSL rendering. Turn-9 input STOP closed under CHARC's ruling. | No Reviewer A round; no new blocking finding. The zvbi HOLD remains with the owner. | 0 NEW, 0 REOPENED; no reverts. Initial patch-placement slip fixed before GREEN. | Native manifest/text data, notices loader/row, tests and report only. | Dispatcher supplied about 167K at turn-9 end; turn-10 end pending dispatcher reading, not estimated. |
 
 Turn 2 bundled the three changes explicitly commissioned by dispatch 2; the seat
 commits each turn. No git write was performed by the cell.
@@ -1291,3 +1291,139 @@ frozen executable run, desktop GUI/input, footage/profile write, QUIT_SCRIPT tes
 git write, push, tag, gh invocation, workflow dispatch or mailbox post occurred.
 Depth remains dispatcher-read; the last supplied figure was about 104K, not a
 current estimate. The seat commits these five paths as one generator turn.
+
+## Turn 10: committed native-licence surface and OpenSSL (2026-11-05)
+
+CHARC's turn-9 ruling at main `f7250307` grants this input surface. The seat's
+verified record is `clearwater-review-evidence/wp6.3b/seat/native-licences-openssl.md`.
+The cell copied the seat's file bytes and did not fetch or type a licence.
+
+### Build input and committed provenance
+
+**Build input: python-build-standalone release `20260303`, CPython `3.12.13`.**
+The build interpreter's `BUILD` marker and `sys.version_info` are matched to
+the manifest when OpenSSL is carried. Its `ssl.OPENSSL_VERSION` is
+`OpenSSL 3.5.5 27 Jan 2026`; that runtime reading is matched to the row's
+upstream version, not inferred from a DLL filename.
+
+`tools/package/native-licences/manifest.json` records schema version 1, the
+interpreter build, and one OpenSSL component with every ruled provenance field:
+
+| Field | Seat-verified input |
+| --- | --- |
+| Component / bundled-version source | OpenSSL / ssl.OPENSSL_VERSION |
+| Upstream version / SPDX | 3.5.5 / Apache-2.0 |
+| Upstream repository / tag | https://github.com/openssl/openssl / openssl-3.5.5 |
+| Tag object | 85a9a2ee19845d6a68a2c68255271068935f57f4 |
+| Source commit | 67b5686b4419b4cb8caa502711c41815f5279751 |
+| Source archive | https://github.com/openssl/openssl/releases/download/openssl-3.5.5/openssl-3.5.5.tar.gz |
+| Published source archive SHA-256 | b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89 |
+| Source archive bytes | 53,104,821 (seat record; archive not downloaded by the cell) |
+| Text file | openssl-3.5.5-LICENSE.txt |
+| Text SHA-256 | 7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a |
+| Text bytes | 10,175 |
+| Fetch date / fetched by | 2026-11-05 / seat |
+
+`seat-copy.log` and the final `openssl-summary.log` independently confirm that
+the committed licence file is byte-equal to the seat's input, with the exact
+size and digest above. The text itself was never pasted or rewritten. Source
+archive identity/hash remain the seat's published-hash evidence; the loader
+does not claim to have downloaded or hashed that archive.
+
+### Implemented validation and output
+
+`load_native_licences` validates document shape, build metadata, required
+non-empty fields, supported component/version-source binding, commit/tag-object
+and SHA-256 syntax, positive integer sizes (booleans refused), HTTPS source
+URLs, OpenSSL version/tag/SPDX, seat fetch attribution and ISO date. It refuses
+duplicate components, missing/linked text files, unsafe text paths and files
+without manifest rows. Each referenced text's byte count AND SHA-256 verify
+before a row can be used. The initial surface supports OpenSSL's specified
+binding; future components need their own explicitly implemented version source.
+
+`plan_notices` loads the surface and emits an OpenSSL row only when the folder
+actually carries a libcrypto/libssl file. Missing row, runtime version mismatch,
+unrecognized/development version string, Python version mismatch or different
+python-build-standalone release fails closed. A library present alone has only
+its own entry in the row; the missing partner is never claimed. OpenSSL entries
+are removed from Python's PSF row and attributed to Apache-2.0 instead.
+
+The row points at the upstream tag and exact source archive. Its full-text label
+starts `Seat-verified native input: OpenSSL 3.5.5`, names tag and commit, source
+archive URL, its **published** SHA-256, and `fetched by seat on 2026-11-05`.
+This is distinct from wheel provenance and the root audit's fallback provenance.
+The renderer rechecks text integrity, catching changes made after planning.
+The output states: `Clearwater 1.1.0 redistributes the interpreter's native
+libraries; 1.0.0 did not.` It also names the interpreter build/version source.
+
+The synthetic writer case carries two stub DLLs (never executed), covers every
+entry, includes the committed OpenSSL text exactly once and produces identical
+bytes on repeated generation. A folder without these DLLs has no OpenSSL row,
+source archive pointer or licence block, even though the surface itself verifies.
+The native surface may be selected through the plan/writer's local
+`native_licences_path` parameter for validation fixtures; production uses the
+committed default. No build-tool file or runtime entry point changed this turn.
+
+### RED -> GREEN and required validation
+
+All logs are under `work/c63b-10-evidence/`:
+
+| Log | Observed result |
+| --- | --- |
+| `seat-copy.log` | Exit 0; seat/destination bytes equal; 10,175 bytes; expected text SHA-256. |
+| `red-native-surface.log` | 29 failed, 74 passed: loader absent, old refusal guard still active, no native-version/render integration. |
+| `green-native-initial.log` | 8 failed, 95 passed: a patch inserted the new renderer branch in the pillow-heif parser; misplaced branch corrected before GREEN. |
+| `green-native.log` | Exit 0; 103 passed after loader, conditional row and render-time integrity verification. |
+| `ruff-check.log` | Exit 0; All checks passed! |
+| `ruff-format.log` | Exit 0; 334 files already formatted. |
+| `mypy.log` | Exit 0; Success: no issues found in 165 source files. |
+| `mypy-darwin.log` | Exit 0; Success: no issues found in 165 source files. |
+| `pytest-validation.log` | Exit 0; 444 passed in 14.76 s. |
+| `openssl-summary.log` | Exit 0; final seat-byte equality and rendered OpenSSL row/provenance, with exactly one verbatim text occurrence. |
+
+The final test selection is dispatch 10's exact four modules, with
+`PYTHONPATH=scripts`, the sandbox mkdir shim, no cache provider, timeout 300,
+and fresh basetemp `work/c63b-10`. Counts: 110 notices, 60 FFmpeg, 81 build,
+193 frozen-entry. No sandbox-only residual occurred. The seven checks added
+after the first GREEN cover changed interpreter build pin, writer/coverage
+determinism and invalid manifest document shapes. Both mypy runs and final
+Ruff/format use the final source code; no implementation edits followed them.
+
+The required controls are all GREEN: tampered bytes, wrong hash/byte count,
+missing text, orphan text, duplicate component, malformed metadata, injected
+different OPENSSL_VERSION, missing OpenSSL row, real manifest verification,
+verbatim rendered text and no row when no DLL is carried. No new dependency
+was introduced; initial formatting/import-order findings were corrected before
+the final checks.
+
+### Verification loop and continuation
+
+| Suspected issue / severity | Confirmation | Disposition |
+| --- | --- | --- |
+| MAJOR: copied text could differ from the seat's licensed input | Source/destination byte comparison, independent size/digest and rendered-byte equality | Rejected; exact seat bytes committed and rendered. |
+| MAJOR: wrong native input version/build could ship plausible but wrong notices | Three injected OPENSSL_VERSION readings, altered build pin, missing-row control | Fixed/green; version/build/source binding fails closed. |
+| MAJOR: missing/orphan/tampered inputs could escape validation | Text/hash/size, missing-file, orphan-file and duplicate-row cases | Fixed/green; complete manifest file coverage and integrity enforced. |
+| MAJOR: output could claim absent DLLs or leave OpenSSL under PSF terms | Crypto-only, SSL-only and pair fixtures; Python-entry disjointness; no-OpenSSL fixture | Fixed/green; only present libraries attributed to OpenSSL. |
+| MINOR: post-plan text changes could bypass validation | Modify the copied text after constructing the plan | Fixed/green; renderer verifies again. |
+| MINOR: initial parser/renderer branch placement broke unrelated native notices | Existing pillow-heif cases and new label/hash cases failed together | Fixed before GREEN; all old cases remain green. |
+
+The final pass found no new issue within this turn's envelope. Turn 9's OpenSSL
+input STOP is closed under CHARC's ruling. Reviewer A has not run in this turn;
+that Claude pass remains the dispatcher's. AD-38's native-surface record is
+CHARC's accept-time action.
+
+**Checklist-turn reminder: re-verify the native-licences manifest when uv's Python changes.**
+The workflow must select/verify the recorded interpreter build input or fail;
+the cell has not relaxed the version/build checks. The real built-folder census
+still decides whether libffi, SQLite, Tcl/Tk, MSVC or other native components
+need additional seat-fetched texts, manifest rows and version bindings. No such
+component's redistribution obligations are claimed closed by the OpenSSL fixture.
+
+As dispatch 10 requires, yield here: no smoke or ZIP has been started. The ZIP
+still waits on the owner's zvbi ruling; that HOLD is unchanged. Root-notices and
+checklist edits remain for their owned turn. There was no network fetch, real
+FFmpeg archive access, frozen run, PyInstaller build, GUI/input, footage/profile
+write, QUIT_SCRIPT test, git write, push, tag, gh or workflow dispatch. Only the
+two new native input files, notices.py, its tests and this report changed, plus
+ignored worktree evidence. The last dispatcher depth was about 167K; the current
+figure is pending the seat's reading, not estimated by the cell.

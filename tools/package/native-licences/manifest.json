@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "interpreter_build": {
+    "provider": "python-build-standalone",
+    "release": "20260303",
+    "python_version": "3.12.13"
+  },
+  "components": [
+    {
+      "component": "OpenSSL",
+      "bundled_version_source": "ssl.OPENSSL_VERSION",
+      "upstream_version": "3.5.5",
+      "upstream_repository": "https://github.com/openssl/openssl",
+      "source_tag": "openssl-3.5.5",
+      "source_tag_object": "85a9a2ee19845d6a68a2c68255271068935f57f4",
+      "source_commit": "67b5686b4419b4cb8caa502711c41815f5279751",
+      "source_archive_url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.5/openssl-3.5.5.tar.gz",
+      "source_archive_sha256": "b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89",
+      "source_archive_size_bytes": 53104821,
+      "spdx": "Apache-2.0",
+      "text_file": "openssl-3.5.5-LICENSE.txt",
+      "text_sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a",
+      "text_size_bytes": 10175,
+      "fetch_date": "2026-11-05",
+      "fetched_by": "seat"
+    }
+  ]
+}
