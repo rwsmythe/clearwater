@@ -5,18 +5,11 @@
 
 ### Generation
 
-- **Generation 51** (session `clearwater-orchestrator-20261105-0932`). LIVE 2026-11-05 19:32Z. ROLLED at the 400K cap at about 22:35Z, clean: nothing it started is running (no cell, no subagent, no gate; `tasklist` shows no pytest / pyinstaller).
+- **Generation 52** (session `clearwater-orchestrator-20261105-1241`). LIVE 2026-11-05 22:41Z. (Interim state, written mid-generation while t10 runs; the rollover overwrites it.)
 - **CHARC is gen 17, `clearwater-charc-20261105-0602`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
-- **Seat folder `work/orch-g51/`:**
-  - `gate.sh`, `watch2.sh` (gen-50 copies with the seat path changed);
-  - `fill.py` (the 6.3b accept fill), `fill63c.py`, `rollstate.py`, `state-board.md`;
-  - the drains and the posts.
-
-  The g50 tools (`notices_cover.py`, `crcheck.py`, `assemble.py`) stay in `work/orch-g50/`; the g49 tools (`smoke_uia.py`, `dll_origin.py`, `census_measure.py`) stay in `work/orch-g49/`. Copy `gate.sh` / `watch2.sh` with `sed 's#orch-g51#orch-g52#g'`.
-- **FRESH prompt** = `.claude/agents/implementer-codex-sol-high.md` + the brief at the worktree's HEAD + `dispatch-N.md`, joined, with `tr -d '\r'`. A **RESUMED prompt** is `dispatch-N.md` alone.
-- **State worktree:** `.worktrees/orch-state-g51`. The successor removes it and adds its own.
-- **Bash gauge at bring-up:** 40 ms. C: about 2.6 T free.
-- **Paces** (20:23Z): Codex 10 % / 0.49; Claude 66 % / 1.346.
+- **Seat folder `work/orch-g52/`:** `gate.sh`, `watch2.sh` (seat path g52), `rules-block.md`, `textcheck2.py` (fits any turn's new native-licences files), `probe63c.py` (seat notices probe: `uv run --no-sync python -I work/orch-g52/probe63c.py <worktree> <fresh out dir> <relpath to append a byte to>`), dispatch-9 / dispatch-10 parts, the drains and the posts. Seat pytest logs under `work/orch-g52/seat63c/`.
+- **State worktree:** `.worktrees/orch-state-g52`. **Review copy:** `.worktrees/wp6.3c-rA` (detached at `a268a8e0`, `.venv` synced, local toml copied; re-point it to the t10 head before Reviewer A).
+- **Bash gauge at bring-up:** 29 ms. C: 2.6 T free.
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
 
@@ -48,47 +41,20 @@
 
 ### Live board (RESUME HERE)
 
-**WP6.3b ACCEPTED: main `34965dc5`** (gate `p63b2` green; the seat's `dc088f60` registered `.github/workflows/release.yml`). CHARC wrote AD-38 and DR-141..DR-147 at `c54b6f80`.
+**WP6.3c IN FLIGHT (Codex lane, both nets Claude).** Brief `docs/briefs/wp6.3c-brief.md` FINAL + tails through "Turn-9 ruling" (`70c85062`). Worktree `.worktrees/wp6.3c`; evidence `C:\Users\rwsmy\clearwater-review-evidence\wp6.3c\` (`cell\` dispatch / prompt / return / turn-N; `seat\`; `A\r1\review-prompt-r1.md` DRAFTED for t2-t9 -- update head + the limits sentence for t2-t10 before running).
 
-**WP6.3c IN FLIGHT (Codex lane, both nets Claude). Head `3cc66e24`, clean.**
-- Brief `docs/briefs/wp6.3c-brief.md` (on main): FINAL `b1a53c06` + rulings tails. The worktree has up to `d613a556` merged; **merge main again before the next dispatch** to pick up `c916f1f7`, the wheels rulings.
-  - Round-0: `f395a0b1`.
-  - The DR-144 census rulings: `d613a556`.
-  - The DR-144 wheels rulings: `c916f1f7`.
-- Worktree `.worktrees/wp6.3c` (local toml copied; `uv sync --frozen --extra gpu` done). Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp6.3c\` (`cell\` dispatch / prompt / return / turn 1-8; `seat\`).
-- **Fork clone (gitignored, inside the worktree so the sandbox can write it):** `.worktrees/wp6.3c/work/wp6.3c/FFmpeg-Builds`, `core.autocrlf false`. Base BtbN `5031c6f1`; the seat's fork commit is `9e8207b`, exported as `tools/package/ffmpeg-fork.patch` (`713d89b0`; `.gitattributes` `-text`, CHARC-confirmed).
-- **Q1 (fork name; whose clicks) is WITH THE OWNER via CHARC.** CHARC posts the answer. The fork run, real asset, re-pin and seat build wait on it. **Q1 is now the critical path.**
-
-| Turn | Commit | Content | Session, depth at yield |
+| Turn | Commit | Content | Depth at yield |
 | --- | --- | --- | --- |
-| t1 round 0 | none | read-back; 4 STOPs, all ruled as recommended (`f395a0b1`) | `01a1ad64`, 202,602 |
-| t2 | `1fe53812` | `--with-ffmpeg` retired; the fork's 3 files (seat commit `9e8207b`, patch `713d89b0`) | `01a1ad6c`, 148,454 |
-| t3 | `cbb25494` | `--zip` (`write_release_zip`, `source_commit_epoch`) + the verified-archive FFmpeg origin source + `.gitattributes` | `01a1ad7c`, 117,753 |
-| t4 | `b56a04e0` | the tag gate's hardening (B r3 adv 1 / 2 / 3 / 5); the seat's real-git RED / GREEN in `seat\t4-real-git-proof.md` | `01a1ad89`, 85,393 |
-| t5 | `fda8ee21` | the DR-144 mechanism (`embedded_hosts`, `embedded_in`); probe notices unchanged `3afe913e...` | `01a1ad90`, 129,126 |
-| t6 | `6841797e` | report-only STOP: bzip2 had no upstream pin (seat resolved: `seat\dr144-bzip2-provenance.md`) | `01a1ad9f`, 145,524 |
-| t7 | `ec59bd66` | CPython + Qt / shiboken rows: 60 rows / 17 hosts / 93 texts; `text_lines` field; probe `520df27e...` | `01a1ada5`, 202,689 |
-| t8 | `3cc66e24` | Pillow / pillow-heif / numpy / SciPy: 43 component records, 93 host declarations, 53 texts; probe 128 rows / 103 embedded / `e4d9cd34...` | `01a1adc8`, 192,208 |
+| t1-t8 | `3cc66e24` | see gen 51's state (`c50f20dd`) | |
+| t9 | `a268a8e0` | U-S1 originals (L-BFGS-B, MINPACK CRLF, SLSQP, ID 0.4, DCDFLIB), AOM + libyuv PATENTS, libaom fastfeat / vector / x86inc; 125 records; seat 617/1; seat probe `e0621121` 140 rows / 1,536 entries (= cell); `_slsqplib` +1 byte refused | 160,100 (fresh) |
+| t10 | RUNNING (dispatched ~23:47Z, head `f516a0f3`) | the `limits` manifest list + rendered section "Components with no carried licence text, and limits", 17 entries (CHARC's 15 + COLAMD + BASICLU/IPX, told to CHARC) | |
 
-Seat QA of every turn: the outside-sandbox re-run of the five package modules (latest at t8: 604 passed / 1 skipped), ruff, format, mypy win32 + darwin, 0 CR in the committed blobs. From t5: positive and negative notices probes on fresh copies of `work\wp6.3b-stage1d`. From t7: every new text byte-checked against the seat-verified files (`work/orch-g51/textcheck.py`, `excerptcheck.py`, `textcheck2.py`).
+Seat record for t9: `wp6.3c/seat/dr144-us1-patents.md` sha256 `437aa040...c97c` (46,939 bytes; texts under `dr144-texts/{lbfgsb,minpack,slsqp,id_dist,cdflib,aom,libyuv}`), by the gen-52 subagent `seat-us1-fetch` (stood down). **Rule (CHARC):** pin a seat record's hash in a dispatch only after the producing subagent has returned (t9's first launch was killed for this).
 
-**NEXT (gen 52), in order:**
-1. **Seat fetches for the t8 STOPPED ROWS, per CHARC's `c916f1f7`.** Read the ruling text first.
-   - **U-S1:** the ten rewritten SciPy originals' PUBLISHED licences (L-BFGS-B BSD-3; MINPACK; SLSQP, NNLS, LSODA, VODE, FITPACK, and the originals behind ID, CDFLIB and QUADPACK). Carry the ones that publish a licence; the public-domain / no-restriction netlib ones become limits lines.
-   - **U-P2:** the AOM PATENTS (`aomedia.googlesource.com/aom`, the libaom 3.14.1 tag) and the libyuv PATENTS (`chromium.googlesource.com/libyuv`, Pillow's pinned commit), via googlesource `?format=TEXT`, recording commit + blob.
-   - The Tcl/Tk header: a limits line.
-
-   The remaining STOPPED / UNSURE items are in t8's report section ("Turn 8"), `docs/reports/wp6.3c-ffmpeg-bundle.md:1019`.
-
-   Use a seat subagent (the form gen 51 used: read-only, `gh api` / googlesource GETs, byte-exact saves with blob checks, an LF record in `wp6.3c\seat\`). Then a cell turn (t9) loads those rows with the per-row STOP rule.
-2. **When Q1 lands:** the owner forks + pushes `9e8207b`'s patch + dispatches the fork workflow (or authorises the seat in words). The seat records the run, the three-way digest, `-version` / `-encoders` and the archive listing. Then the cell turn for the re-pin + notices FFmpeg rows + root notices FFmpeg row + checklist / guide (design items 3, 4, 6), activating the strict lock schema with NO legacy bypass left.
-3. **Convergence → Reviewer A** (Claude, `codex_cell.py review` on a detached `.worktrees/wp6.3c-rA`, prompt banning `run_in_background`) → the seat proofs:
-   - the real build `--form onedir --ffmpeg-from <lock url> --ffmpeg-sha256 <hex> --notices --smoke --zip` (25 GB free; full Git Bash PATH as in 6.3b);
-   - V4 on a bundled-binary export, and the `hevc_nvenc` capability line;
-   - the notices read in full;
-   - the smoke under the UIA watch (`work/orch-g49/smoke_uia.py`).
-
-   Then Reviewer B, the harness on the head BEFORE B (seat clarification 7), and the gate (`work/orch-g52/gate.sh`: static + darwin mypy, collect, parallel, serial, harness; no fullclip).
+**NEXT, in order:**
+1. t10 return -> seat QA (five modules outside the sandbox incl. `tests/test_release_workflow.py`; ruff / format / mypy x2; `probe63c.py` positive + negative on fresh stage-1d copies; text checks; codex_cell commit; blob CR check) -> post + cue CHARC.
+2. Reviewer A r1 (Claude) over t2-t10: re-point `.worktrees/wp6.3c-rA` to the t10 head (`git -C ... checkout --detach <sha>`), base = `git merge-base main wp6.3c`, diff excluding `tools/package/native-licences` and `docs/proofs`, `codex_cell.py review --worktree <ABS copy> --base <sha> --prompt <A\r1 prompt> --out <A\r1>` in the background; check review.txt is a full report.
+3. Q1 (fork run) with the owner via CHARC: then the re-pin turn (design items 3, 4, 6; strict lock schema, no legacy bypass), A delta, seat build proofs, B, harness, gate, accept.
 
 **Dispatch notes:**
 - Every WP6.3c turn is a FRESH session (each adds 85-200K).
