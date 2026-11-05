@@ -161,6 +161,10 @@ candidate rebased onto main, and records the actual output lines):
 - **W-STATIC (WP6.4 accept, AD-36, from 2026-11-05):** `uv run mypy --platform darwin` beside the default
   `uv run mypy`, the same `files` set, `strict` and `warn_unreachable` unchanged; BOTH runs must report 0
   errors (the early-return guard form fails one target with [unreachable]; the statement form passes both).
+- **Entry-point isolation, recorded exception (owner's word 2026-11-05; WP6.3b turn 3):** an existing
+  integration test whose purpose IS the real GUI start (`tests/test_app_startup.py` `QUIT_SCRIPT`) imports
+  PySide6 and runs the event loop under redirected roots, `QT_QPA_PLATFORM=offscreen` and a bounded timeout,
+  at the SEAT in a gate leg only; no cell runs it on any revision.
 - **The two-leg pytest gate** (WP-T4, AD-28, from 2026-10-28; measurements and limits in
   `docs/reports/wp-t4-parallel-tests.md`; sizing in `docs/reports/wp-t6-gate-sizing.md`; after
   WP-T6 the per-package gate is parallel about 714 s + serial about 1,389 s, about 35 min wall,
