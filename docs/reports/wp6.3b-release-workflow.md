@@ -1,6 +1,11 @@
 # WP6.3b release workflow: implementation record
 
-Status: turn 7 has reached the commissioned coverage boundary. The new notices
+Status: turn 8 yields a NEW MAJOR text-rule ambiguity to CHARC before implementation:
+the installed NumPy and SciPy aggregate licence files each contain the full
+GPL-3.0 text. Byte-copying both files conflicts with the dispatch's single-copy
+rule (and its FFmpeg provenance rule when bundled). The reproduction and proposed
+ruling are in the turn-8 section below. No generator/build/test code changed in
+turn 8. The following remains the verified turn-7 state: the new notices
 planner inventories an onedir artifact, maps its files/modules to audited locked
 rows, validates coverage/material availability, and applies the FFmpeg refusal.
 The 14 coverage cases and all 345 requested tests are green. No artifact notices
@@ -23,6 +28,7 @@ Claude pass; no review verdict is claimed here. Context depth is dispatcher-read
 | Turn 5 / FFmpeg lock and bundle path | Pinned archive/source record, lock validation, release fetch/hash/selective extraction/version checks and CLI/build wiring. | No Reviewer A round; no new blocking issue. Eleven primary licences and five extra-source licences are explicitly UNVERIFIED for the seat audit. | No review reopenings. Build-call deletion mutant rejected and byte-restored; schema type error and raw-ZIP fixture corrected. | Product: build tool plus lock; tests: offline ZIP/file transport, real Python tool stubs, schema mutations and build integration. | Fresh session; turn-end depth pending dispatcher reading, no estimate. |
 | Turn 6 / seat licence transfer, input STOP | All 103 licence slots transferred exactly; strict verified-licence validation GREEN and incompatible data retained. Generator not started: its mandatory wheel LGPL input is absent; exact MinGW source release is absent too. | No Reviewer A round. NEW MAJOR input/provenance STOP; MINOR pre-existing indirect-source limitation and root PyInstaller runtime-row discrepancy reported below. Existing zvbi STOP remains the owner's/CHARC's. | No review reopenings or reverts; no generator workaround. | Product: lock and shared validator. Tests: verified-only rejection and preservation of incompatible rows. | Dispatcher supplied about 134K at turn-5 end; turn-6 depth pending dispatcher reading, no estimate. |
 | Turn 7 / notices coverage-boundary yield | New onedir inventory and notice-plan API, source-audit/uv.lock/installed-RECORD matching, material checks, coverage closure and conditional FFmpeg rows/refusal. Rendering, provenance tests and build wiring not begun. | No Reviewer A round or new blocking finding; turn-6 input STOPs ruled by CHARC. | No review reopenings or reverts. Initial typing/lint errors corrected; no product-entry or real-binary execution. | New notices planning module and synthetic coverage test module; report. No existing build/lock/test file changed. | Dispatcher supplied 171K at turn-6 yield; current depth is pending dispatcher reading, not estimated. |
+| Turn 8 / input-rule STOP | Read dispatch 6 item 2, dispatch 7, the report and installed materials. Reproduced two complete GPL-3.0 copies under the required wheel-byte-copy rule; requested CHARC's rendering ruling. | No Reviewer A round. NEW MAJOR in-envelope ambiguity; existing zvbi HOLD unchanged. | 1 NEW, 0 REOPENED; no reverts. | Report only; no product or test change. | Fresh session; turn-end figure pending dispatcher reading, not estimated. |
 
 Turn 2 bundled the three changes explicitly commissioned by dispatch 2; the seat
 commits each turn. No git write was performed by the cell.
@@ -1003,3 +1009,76 @@ Only the two new planning/test modules and this report changed. No network,
 real FFmpeg archive access, frozen run, PyInstaller build, desktop GUI launch,
 synthetic input, footage/profile write, git write, push, tag, gh command or
 workflow dispatch was performed. The seat commits these paths.
+
+## Turn 8: NEW MAJOR rendering-rule STOP (2026-11-05)
+
+### Confirmed conflict and requested ruling
+
+Dispatch 8 item 2 requires both "wheel licence files are byte-copied when
+present" and "the GPL-3.0 text appears ONCE, from the folder's
+ffmpeg-LICENSE.txt when FFmpeg is carried". Dispatch 6 item 2 also requires
+NumPy/SciPy's installed full licence texts. Both installed aggregate files
+contain a complete GPL-3.0 text, including the terms and application appendix.
+Thus byte-copying just these two required files already emits TWO full copies,
+before any FFmpeg licence is rendered. Whole-file content deduplication cannot
+resolve this: their other component notices differ, and even their GPL-3.0
+tails differ in upstream HTTP/HTTPS URLs and a final newline.
+
+This is an in-envelope MAJOR ambiguity, not a licence-incompatibility claim.
+The brief's plan-4.5 no-assumptions rule requires a ruling before choosing which
+text requirement to relax. No renderer, tests or wiring were written around it.
+
+**Requested CHARC ruling (recommended):** preserve the installed wheel files
+byte-for-byte, allowing their embedded GPL-3.0 copies; interpret ONCE as one
+dedicated FFmpeg GPL-3.0 block, shared by all FFmpeg component rows. This avoids
+editing any publisher's aggregate text. Alternatively, explicitly authorize
+splitting wheel aggregates into verbatim slices and replacing their embedded
+GPL-3.0 text with references to a shared block, with a rule for differing
+upstream text variants and the no-FFmpeg case. The cell has chosen neither.
+
+### Cheap reproduction (read-only inputs; no product entry point)
+
+All probe output is under `work/c63b-8-evidence/`, inside this worktree:
+
+| Evidence file | Observed result |
+| --- | --- |
+| `gpl3-byte-copy-conflict.log` | Exit 0; NumPy aggregate 45,831 bytes, GPL-3.0 starts at byte 10,681; SciPy aggregate 45,881 bytes, GPL-3.0 starts at byte 10,734. Each contains one full GPL-3.0 heading followed by the terms and application appendix. Concatenating byte-exact inputs yields `BYTE_COPY_BOTH_GPL3_COUNT: 2`. |
+| `gpl3-equivalence.log` | Exit 0; whitespace-normalized tails differ too, so an exact-content deduplicator cannot merge them. |
+| `gpl3-tail-diff.log` | Exit 0; independent line diff identifies the HTTP/HTTPS URL variants, a different why-not-lgpl URL and the final-newline difference. |
+
+The probes only read the installed NumPy/SciPy licence files. They do not open,
+extract or execute the real FFmpeg archive, invoke PyInstaller, import product
+entry points, or reach the network. The separate interpreter-material inventory
+is saved at `work/c63b8-interpreter-inputs.log`; no new ruling is requested on it
+in this turn.
+
+### Turn-8 item disposition and validation
+
+| Commissioned item | RED / GREEN and current state |
+| --- | --- |
+| Native-component details and header | Not implemented this turn; prior planner retained. |
+| Full-text rendering and provenance tests | Blocked before implementation by the confirmed rule conflict above; no RED/GREEN unit-test cycle claimed. |
+| Determinism | Deferred with rendering; no result claimed. |
+| Writer / CLI / build `--notices` wiring | Deferred; no build or tool-test changes. |
+| Synthetic bundled-entry vs row table, with and without FFmpeg | No new rendered table produced. Turn 7's inventory/coverage evidence remains historical evidence, not a turn-8 rerun. |
+| Per-text provenance labels | Not rendered yet; turn-6's audited-block SHA-256/byte-count and truthful upstream-copy rules remain binding. |
+| ruff / format / mypy / darwin mypy / four-module pytest | Not run: input-rule STOP before any code or test change. The turn-7 results are not represented as current validation. |
+
+MinGW limit carried unchanged: the pillow-heif wheel does not name the toolchain
+release; libgcc_s_seh-1.dll and libstdc++-6.dll use GPL-3.0 with the GCC Runtime
+Library Exception, and libwinpthread-1.dll uses MIT/BSD, with the disclosed
+unversioned source pointers. CHARC's tracking row remains due at accept.
+
+### Verification-loop record and handoff
+
+Suspected MAJOR conflict -> independently confirmed from both installed files,
+heading counts and a tail diff -> no guessed resolution or product fix -> yield
+to CHARC. No Reviewer A round occurred. The FFmpeg zvbi HOLD remains unchanged.
+This is one logical report-only turn; the seat commits only this report.
+
+No network fetch, real FFmpeg archive access, frozen run, PyInstaller build,
+desktop GUI launch/input, footage/profile write, QUIT_SCRIPT test, git write,
+push, tag, gh invocation or workflow dispatch occurred. No files outside the
+owned report and ignored worktree evidence were changed. The next dispatch
+needs the rendering ruling before the four commissioned implementation items
+can continue. Depth is pending the dispatcher's reading; no estimate is offered.
