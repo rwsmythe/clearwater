@@ -2794,12 +2794,28 @@ def _gui_p27(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
 
 
 def _gui_p31(qtbot: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """P31: File / View / Tools; Settings is Tools' sole action (a Cocoa merge may empty it)."""
+    """P31: File / View / Tools; Settings is Tools' sole VISIBLE action off win32/Linux.
+
+    On darwin no GPU pack root exists, so a Cocoa merge may empty Tools. WP6.3a's two GPU
+    actions follow Settings where a pack root exists and are hidden when
+    ``gpu_pack.pack_root()`` is None (``shell._update_gpu_actions``); both legs patch it.
+    """
+    from clearwater import gpu_pack
+
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda **_: tmp_path / "gpu-pack")
     window = _gui_window(qtbot, tmp_path)
     menus = [a.text() for a in window.menuBar().actions()]
     assert menus == ["&File", "&View", "&Tools"]
     tools = window.menuBar().actions()[2].menu()
-    assert [a.text() for a in tools.actions()] == ["&Settings..."]
+
+    def visible() -> list[str]:
+        return [a.text() for a in tools.actions() if a.isVisible()]
+
+    tools.aboutToShow.emit()
+    assert visible() == ["&Settings...", "Install GPU support...", "Remove GPU support"]
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda **_: None)
+    tools.aboutToShow.emit()
+    assert visible() == ["&Settings..."]
     quit_action = window.shell_actions.quit
     assert quit_action.text() == "&Quit" and window.shell_actions.settings.text() == "&Settings..."
 
