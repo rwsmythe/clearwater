@@ -11,7 +11,7 @@ dispatcher fills the depth figures.
 | 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | - | 247,937 (cell1, at return) |
 | A r2 (group B; folded turn 5) | Reviewer A, Codex | 0 / 6 | 2 minor, 3 advisory | 11 / 0 | 11 NEW / 0 REOPENED | 0 | tool 1 (item 1, `tools/footage_guard.py`) / tests-only 8 (items 2-6, 9-11); item 7 REJECTED, item 8 a report sentence | Codex review; cell5 fold | 314,460 at the turn-5 yield (cell5) |
 | A r3 (delta on turns 4 + 5; folded turn 6) | Reviewer A, Codex: NO_NEW_CRITICAL_MAJOR (A converged) | 0 / 0 | 2 minor, 2 advisory | 4 / 0 | 4 NEW / 0 REOPENED | 0 | product 0 / tests-only 4 (plus one verification-loop fix to #1) | Codex review; cell6 fold | 168,651 at the turn-6 yield (cell6) |
-| B r1 (on `d55573f1`; folded turn 7) | Reviewer B, Codex (WSL Linux, read-only): NEW_CRITICAL_MAJOR_FOUND | 0 / 3 | 3 minor, 2 advisory | 8 / 0 | 8 NEW / 0 REOPENED | 0 | product 2 (B1 `gui/batch_panel.py`, B4 `config/presets.py`) / tests-only 3 (B2, B5, B7) plus the guide 1 (B6); B3 BANKED, B8 no change (as ruled) | Codex review; cell7 fold | Depth at turn-7 yield: DISPATCHER TO FILL |
+| B r1 (on `d55573f1`; folded turn 7) | Reviewer B, Codex (WSL Linux, read-only): NEW_CRITICAL_MAJOR_FOUND | 0 / 3 | 3 minor, 2 advisory | 8 / 0 | 8 NEW / 0 REOPENED | 0 | product 2 (B1 `gui/batch_panel.py`, B4 `config/presets.py`) / tests-only 3 (B2, B5, B7) plus the guide 1 (B6); B3 BANKED, B8 no change (as ruled) | Codex review; cell7 fold | Depth at turn-7 yield: 183,979 at the turn-7 yield (cell7) |
 
 ## Round 0
 
@@ -1192,4 +1192,4 @@ main tree's venv (T7.4).
 
 Depth at point 1 (`a9131f3c`): not read at the seat
 Depth at point 2 (`61aacbc0`): not read at the seat
-Depth at turn-7 yield: DISPATCHER TO FILL
+Depth at turn-7 yield: 183,979 (cell_depth.py --live, read at the seat ~00:42Z after the return; 80 turns). Under the 250K yield point. cell7 retired.
