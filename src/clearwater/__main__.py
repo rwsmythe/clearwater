@@ -41,6 +41,7 @@ branch imports what it needs.
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import sys
 from collections.abc import MutableMapping, Sequence
@@ -262,7 +263,7 @@ def run_interpreter_option(arguments: Sequence[str]) -> int:
     if len(arguments) < 3 or not arguments[2]:
         return _refuse("-m needs a module name")
     module = arguments[2]
-    status = gpu_pack.activate()
+    status = None if _removal_pending() else gpu_pack.activate()
     site = None if status is None or status.outcome != "loaded" else status.site_packages
     if site is None:
         return _refuse(f"-m {module!a}: no GPU pack is loaded")
@@ -283,6 +284,19 @@ def run_interpreter_option(arguments: Sequence[str]) -> int:
     return 0
 
 
+def _removal_pending(*, log: bool = True) -> bool:
+    """Read the shared marker without installer side effects on worker/child branches."""
+    try:
+        marker = gpu_pack.pending_removal_path()
+        pending = marker is not None and marker.exists()
+    except OSError as error:
+        logging.getLogger(__name__).warning("GPU pack removal pending: %s", error)
+        return True
+    if pending and log:
+        logging.getLogger(__name__).info("GPU pack removal pending")
+    return pending
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the export worker, a pack module (frozen re-entry) or the GUI, as arguments select.
 
@@ -298,9 +312,45 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _refuse(MULTIPROCESSING_REFUSAL)
     frozen = getattr(sys, "frozen", False)
     prepend_executable_folder()
+    if arguments[1:2] in (["--install-gpu-pack"], ["--remove-gpu-pack"]):
+        if len(arguments) != 2:
+            return _refuse(f"{arguments[1]} takes no further arguments")
+        from clearwater import gpu_pack_install
+
+        class ConsoleProgress:
+            """Print one line per wheel without importing GUI or numerical modules."""
+
+            def __init__(self) -> None:
+                """Start with no reported wheel."""
+                self._wheel = ""
+
+            def report(self, done: int, total: int | None, message: str) -> None:
+                """Print the first byte report for each wheel to redirected stderr."""
+                if message.endswith(".whl") and message != self._wheel:
+                    self._wheel = message
+                    if sys.stderr is not None:
+                        print(f"{message}: {done}/{total} bytes", file=sys.stderr, flush=True)
+
+            def cancelled(self) -> bool:
+                """Allow terminal interruption through the installer's KeyboardInterrupt path."""
+                return False
+
+        if arguments[1] == "--install-gpu-pack":
+            notice = gpu_pack_install.replacement_notice()
+            if notice is not None and sys.stderr is not None:
+                print(notice, file=sys.stderr, flush=True)
+        outcome = (
+            gpu_pack_install.install(ConsoleProgress())
+            if arguments[1] == "--install-gpu-pack"
+            else gpu_pack_install.remove()
+        )
+        if sys.stderr is not None:
+            print(outcome.message, file=sys.stderr, flush=True)
+        return 0 if outcome.ok else 1
     if frozen:
         if arguments[1:2] == [WORKER_FLAG]:  # frozen only: a source run is 1.0.0 (A r3 #1)
-            gpu_pack.activate()
+            if not _removal_pending():
+                gpu_pack.activate()
             from clearwater.app import export_worker
 
             return export_worker.main(arguments[2:])
@@ -308,7 +358,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         if reentry is not None:
             return run_interpreter_option([arguments[0], *reentry])
         _start_logging()
-    gpu_pack.activate()
+    try:
+        marker = gpu_pack.pending_removal_path()
+        root = gpu_pack.pack_root()
+        cleanup = (marker is not None and marker.exists()) or (
+            root is not None
+            and root.is_dir()
+            and next(root.glob(f"{gpu_pack.STAMP}.partial-*"), None) is not None
+        )
+    except OSError as error:
+        logging.getLogger(__name__).warning("GPU pack removal pending: %s", error)
+        pending = True
+    else:
+        if cleanup:
+            from clearwater import gpu_pack_install
+
+            gpu_pack_install.apply_pending_removal()
+        pending = _removal_pending(log=False)
+    if not pending:
+        gpu_pack.activate()
     from clearwater.app.main import main as gui_main
 
     return gui_main(arguments)

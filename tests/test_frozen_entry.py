@@ -36,6 +36,27 @@ BLOCKED = ("PySide6", "shiboken6", "clearwater.gui", "clearwater.app.main")
 """Modules the worker branch must never import (AD-31: the worker is Qt-free)."""
 
 
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("frozen", [False, True])
+@pytest.mark.parametrize("operation", ["install", "remove"])
+def test_gpu_pack_command_dispatch_is_qt_free(monkeypatch, tmp_path, calls, frozen, operation):
+    from clearwater import gpu_pack_install
+
+    entry, blocker = _fresh_entry(monkeypatch)
+    monkeypatch.setattr(sys, "frozen", frozen, raising=False)
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "Clearwater.exe"))
+    monkeypatch.setattr(entry, "prepend_executable_folder", lambda: calls.append(("path", None)))
+
+    def run(*args):
+        calls.append((operation, len(args)))
+        return gpu_pack_install.PackResult(True, "done")
+
+    monkeypatch.setattr(gpu_pack_install, operation, run)
+    assert entry.main(["Clearwater", f"--{operation}-gpu-pack"]) == 0
+    assert calls == [("path", None), (operation, 1 if operation == "install" else 0)]
+    assert blocker.attempts == []
+
+
 class _Blocker(importlib.abc.MetaPathFinder):
     """Refuse, and record, every import of a :data:`BLOCKED` module."""
 
@@ -118,6 +139,215 @@ def _fake_gui(monkeypatch: pytest.MonkeyPatch, seen: list[tuple[str, Any]]) -> N
 
 
 # Q5 (a): the worker command.
+
+
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("frozen", [False, True])
+@pytest.mark.parametrize("in_use", [False, True])
+def test_gui_start_applies_pending_removal_only_before_activation(
+    monkeypatch,
+    tmp_path,
+    calls,
+    frozen,
+    in_use,
+    caplog,
+):
+    """Only the GUI start may delete a deferred pack; a locked pack stays unactivated."""
+    from clearwater import gpu_pack_install
+
+    if frozen:
+        _frozen(monkeypatch, tmp_path)
+        monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    else:
+        monkeypatch.delattr(sys, "frozen", raising=False)
+    root = tmp_path / "packs"
+    root.mkdir()
+    marker = root / (gpu_pack.STAMP + ".remove")
+    marker.touch()
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: root)
+    entry, blocker = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+
+    def pending():
+        calls.append(("pending", None))
+        if not in_use:
+            marker.unlink()
+        return gpu_pack_install.PackResult(not in_use, "pending")
+
+    monkeypatch.setattr(gpu_pack_install, "apply_pending_removal", pending, raising=False)
+    with caplog.at_level(logging.INFO):
+        assert entry.main(["Clearwater"]) == 3
+    expected = ([("log", tmp_path / "cfg" / "logs")] if frozen else []) + [("pending", None)]
+    if not in_use:
+        expected.append(("activate", None))
+    assert calls == [*expected, ("gui", ["Clearwater"])]
+    assert marker.exists() == in_use
+    assert blocker.attempts == []
+
+
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("frozen", [False, True])
+def test_gui_start_sweeps_markerless_partial_without_creating_absent_root(
+    monkeypatch, tmp_path, calls, frozen
+):
+    """A real GUI-branch cleanup sweeps leftovers but creates no root for a first start."""
+    if frozen:
+        _frozen(monkeypatch, tmp_path)
+        monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    else:
+        monkeypatch.delattr(sys, "frozen", raising=False)
+    root = tmp_path / "packs"
+    partial = root / (gpu_pack.STAMP + ".partial-interrupted")
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: root)
+    entry, blocker = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+
+    def activate():
+        assert not partial.exists(), "partial must be swept before activation"
+        calls.append(("activate", None))
+
+    monkeypatch.setattr(gpu_pack, "activate", activate)
+    assert entry.main(["Clearwater"]) == 3
+    assert not root.exists(), "no-pack startup must not create the pack root or lock"
+    expected = ([("log", tmp_path / "cfg" / "logs")] if frozen else []) + [
+        ("activate", None),
+        ("gui", ["Clearwater"]),
+    ]
+    assert calls == expected
+    calls.clear()
+    partial.mkdir(parents=True)
+    (partial / "leftover.dll").write_bytes(b"unmapped remainder")
+    assert not gpu_pack.pending_removal_path().exists()
+    assert entry.main(["Clearwater"]) == 3
+    assert list(root.iterdir()) == []
+    assert calls == expected
+    assert blocker.attempts == []
+
+
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize(
+    "branch, probe",
+    [
+        ("gui", "path"),
+        ("gui", "exists"),
+        ("gui", "is_dir"),
+        ("gui", "glob"),
+        ("worker", "path"),
+        ("module", "path"),
+    ],
+)
+def test_unreadable_removal_probes_skip_activation(
+    monkeypatch, tmp_path, calls, caplog, branch, probe
+):
+    """Unreadable marker/root probes fail closed on every entry branch, without cleanup."""
+    from clearwater import gpu_pack_install
+
+    _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    root = tmp_path / "packs"
+    root.mkdir()
+    marker = root / (gpu_pack.STAMP + ".remove")
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: root)
+    if probe == "path":
+
+        def denied_path():
+            raise PermissionError("synthetic marker probe denied")
+
+        monkeypatch.setattr(gpu_pack, "pending_removal_path", denied_path)
+    else:
+        method = {"exists": Path.exists, "is_dir": Path.is_dir, "glob": Path.glob}[probe]
+
+        def denied(path, *args, **kwargs):
+            if path == (marker if probe == "exists" else root):
+                raise PermissionError("synthetic marker probe denied")
+            return method(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, probe, denied)
+    monkeypatch.setattr(
+        gpu_pack_install, "apply_pending_removal", lambda: pytest.fail("unreadable cleanup")
+    )
+    entry, blocker = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+    with caplog.at_level(logging.INFO):
+        if branch == "gui":
+            assert entry.main(["Clearwater"]) == 3
+        elif branch == "worker":
+            assert entry.main(["Clearwater", "--export-worker"]) == 7
+        else:
+            assert entry.main(["Clearwater", "-m", "cuda.pathfinder"]) == 2
+    assert not any(name == "activate" for name, _ in calls)
+    assert len([r for r in caplog.records if "GPU pack removal pending" in r.message]) == 1
+    assert blocker.attempts == []
+
+
+@pytest.mark.timeout(10)
+def test_gui_start_locked_pack_keeps_marker_and_skips_activation(
+    monkeypatch,
+    tmp_path,
+    calls,
+    caplog,
+):
+    """The real pending-removal path leaves an in-use pack intact at GUI startup."""
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    root = tmp_path / "packs"
+    folder = root / gpu_pack.STAMP
+    folder.mkdir(parents=True)
+    (folder / "keep").write_bytes(b"intact")
+    marker = root / (gpu_pack.STAMP + ".remove")
+    marker.touch()
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: root)
+    entry, blocker = _fresh_entry(monkeypatch)
+    _fake_gui(monkeypatch, calls)
+
+    def denied(*args):
+        raise PermissionError("synthetic in-use pack")
+
+    monkeypatch.setattr(os, "replace", denied)
+    assert entry.main(["Clearwater"]) == 3
+    assert calls == [("gui", ["Clearwater"])]
+    assert marker.exists() and (folder / "keep").read_bytes() == b"intact"
+    assert len([r for r in caplog.records if "GPU pack removal pending" in r.message]) == 1
+    assert blocker.attempts == []
+
+
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("branch", ["worker", "module"])
+def test_child_pending_removal_is_read_only_and_skips_activation(
+    monkeypatch,
+    tmp_path,
+    calls,
+    branch,
+    capsys,
+    caplog,
+):
+    """Frozen children leave the marker and pack intact and never run the installer."""
+    from clearwater import gpu_pack_install
+
+    _frozen(monkeypatch, tmp_path)
+    monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+    root = tmp_path / "packs"
+    root.mkdir()
+    marker = root / (gpu_pack.STAMP + ".remove")
+    marker.touch()
+    monkeypatch.setattr(gpu_pack, "pack_root", lambda: root)
+    monkeypatch.setattr(
+        gpu_pack_install,
+        "apply_pending_removal",
+        lambda: pytest.fail("child wrote pack"),
+        raising=False,
+    )
+    entry, blocker = _fresh_entry(monkeypatch)
+    with caplog.at_level(logging.INFO):
+        if branch == "worker":
+            assert entry.main(["Clearwater.exe", "--export-worker"]) == 7
+            assert calls == [("worker", [])]
+        else:
+            assert entry.main(["Clearwater.exe", "-m", "cuda.pathfinder"]) == 2
+            assert "no GPU pack is loaded" in capsys.readouterr().err
+            assert calls == []
+    assert "GPU pack removal pending" in caplog.text
+    assert marker.read_bytes() == b""
+    assert blocker.attempts == []
 
 
 def _frozen(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> str:

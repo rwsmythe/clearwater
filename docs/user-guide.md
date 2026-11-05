@@ -59,6 +59,23 @@ CUDA toolkit install is normally unnecessary. Without a suitable card or usable
 GPU libraries, Clearwater uses the CPU and tells you why. Hardware video encoding
 is a separate capability from GPU colour processing.
 
+In the one-folder application, choose **Tools > Install GPU support...**, review
+the wheels, sizes, destination and NVIDIA licence statement, then press
+**Download and install**. The dialog calculates the download size from the locked
+wheels and shows the installed-space estimate; allow that space before starting.
+Wait for completion and restart Clearwater to use the pack. **Tools > Remove GPU
+support** asks for confirmation and takes effect at the next start. If a running
+Clearwater is using the pack, removal is deferred until the next GUI start; close
+other Clearwater windows if removal remains pending. For a terminal
+or script in cmd.exe, use `start /wait "" Clearwater.exe --install-gpu-pack > install.log 2>&1` or
+`start /wait "" Clearwater.exe --remove-gpu-pack > remove.log 2>&1`. This waits for the
+windowed executable to finish; it prints only when its output is redirected.
+In **PowerShell**, use `Start-Process -Wait -FilePath .\Clearwater.exe -ArgumentList '--install-gpu-pack' -RedirectStandardOutput install.log -RedirectStandardError install.err`.
+The same requests in source are
+`python -m clearwater --install-gpu-pack` and `python -m clearwater --remove-gpu-pack`;
+source runs use their environment's GPU extra, while the downloaded pack is loaded
+by the frozen application at its next start.
+
 For people developing Clearwater, the ordinary command is:
 
 ```powershell

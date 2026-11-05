@@ -146,8 +146,20 @@ The frozen application loads CuPy and the CUDA wheels from a per-user folder, th
 `cupy-cuda12x` version plus the CUDA major version (`14.2.0-cu12`). The loader acts only in a
 frozen build, and only reads the folder.
 
-For the spike the pack is filled by hand with the eleven locked wheels (`--no-deps`, from the
-uv cache, no network), and the manifest is then written by this script:
+The normal path is **Tools > Install GPU support...** in Clearwater. The dialog calculates
+the locked wheels' download size, shows the installed estimate and licence statement, and
+downloads only after **Download and install** is pressed. Restart Clearwater after completion.
+**Tools > Remove GPU support** removes the pack, taking effect at the next start. Headless
+requests in cmd.exe use `start /wait "" Clearwater.exe --install-gpu-pack > install.log 2>&1`
+or `start /wait "" Clearwater.exe --remove-gpu-pack > remove.log 2>&1`. `start /wait` waits for
+this windowed executable to finish, with output redirected to the log. In **PowerShell**, use
+`Start-Process -Wait -FilePath .\Clearwater.exe -ArgumentList '--install-gpu-pack' -RedirectStandardOutput install.log -RedirectStandardError install.err`.
+Source requests use
+`uv run --no-sync python -m clearwater --install-gpu-pack` or `--remove-gpu-pack`; the pack
+loader still acts only in frozen builds.
+
+For the spike the pack was filled by hand with the eleven locked wheels (`--no-deps`, from the
+uv cache, no network). This remains a developer path; the manifest is written by this script:
 
 ```
 uv pip install --offline --no-deps --target <pack root>/<stamp>/site-packages <the eleven pins>
