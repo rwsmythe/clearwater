@@ -37,7 +37,7 @@ The owner shoots an Insta360 camera on SCUBA dives and edits the recordings in I
 
 ## Open questions for the fill
 
-- Q1. The Studio export settings the owner used (codec, quality, "FlowState" stabilisation on/off, colour profile): ask the owner once in CHARC's chat; recorded as the inputs' provenance, not acted on.
+- Q1. ANSWERED by the owner 2026-11-05 (verbatim: "encoding was H.265, bitrate was ~71-73 (file dependent); ProRes did not offer bitrate."): the HEVC exports were set to about 71-73 Mbps (the probe shows 71.0 / 73.0 / 73.4 Mbps for three of them and 50.0 Mbps for the seventh `SCUBA vids.mp4`, so that one was exported at a different setting); the ProRes exports had no bitrate control (Standard 422 profile, about 538 Mbps). The files carry no other Studio metadata (CHARC read every tag and the `udta` / `meta` / `ilst` boxes: only `Lavf60.3.100` / `Lavc60.3.100` and creation times 2026-11-02 07:32-07:33Z). Stabilisation and colour profile: not recorded; the report says so.
 - Q2. Whether `tools/export_oracle.py`'s comparison takes two product outputs directly or needs the D: oracle folder (read the tool; if the latter, a two-output comparison is a one-function addition the cell may make in `tools/` with the brief's "files owned" widened at round 0).
 - Q3. GPU pack state at dispatch (installed via 6.3a's installer or absent): the GPU path is required for the figures; the orchestrator states which and installs the pack on the seat if absent (the 6.3a installer, 124 s).
 
