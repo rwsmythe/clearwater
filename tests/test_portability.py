@@ -718,6 +718,8 @@ def _codec_p11(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     with pytest.raises(VideoEncodeError) as caught:
         resolve_encoder("auto", nothing, roster=darwin)
     assert caught.value.kind == "unavailable"
+    message = str(caught.value)  # Reviewer B finding 7: the user is told why, never left blank
+    assert message.strip() and "No HEVC encoder is available" in message, message
 
 
 def _codec_p14(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -1631,6 +1633,11 @@ def _fs_p29(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     sensitive = {"clip.MP4": (7, 41), "CLIP.mp4": (7, 42)}  # two objects (case-sensitive APFS)
     monkeypatch.setattr(batch_panel, "_stat", _identity_provider(sensitive))
     assert batch_panel._key(tmp_path / "clip.MP4") != batch_panel._key(tmp_path / "CLIP.mp4")
+    # Reviewer B finding 7: one file number on two devices (two cards) is two files, so a key
+    # without the device fails here.
+    two_devices = {"one.MP4": (7, 41), "two.MP4": (8, 41)}
+    monkeypatch.setattr(batch_panel, "_stat", _identity_provider(two_devices))
+    assert batch_panel._key(tmp_path / "one.MP4") != batch_panel._key(tmp_path / "two.MP4")
     # A blanket casefold key would fail the control above; the lexical fallback stays for a
     # path that cannot be read and for a file system that reports no file number.
     monkeypatch.setattr(batch_panel, "_stat", _identity_provider({"x.mp4": (7, 0)}))

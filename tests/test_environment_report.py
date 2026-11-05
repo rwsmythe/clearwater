@@ -73,6 +73,29 @@ def stub_trial_seam(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(environment_report, "_encoder_rows", lambda: [])
 
 
+class _SysView:
+    """The tool's view of ``sys`` with another ``platform``; every other name is the real one."""
+
+    def __init__(self, platform: str) -> None:
+        self.platform = platform
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(sys, name)
+
+
+@pytest.fixture
+def nvidia_platform(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run the tool's NVIDIA branch on every host (Reviewer B finding 2).
+
+    On macOS the tool never runs ``nvidia-smi`` (AD-36), so the NVIDIA parsing cases give the
+    tool a non-darwin platform there: ``linux``, rebinding only the tool's own ``sys`` name, so
+    no other module sees it and no Windows code path is reached. Elsewhere nothing changes.
+    The darwin control (``nvidia-smi`` never run) is W-TOOL's, in ``test_portability``.
+    """
+    if environment_report.sys.platform == "darwin":
+        monkeypatch.setattr(environment_report, "sys", _SysView("linux"))
+
+
 def _healthy() -> dict[str, Any]:
     return {
         "nvidia-smi": _completed("NVIDIA Test GPU, 8188, 560.94\n"),
@@ -98,7 +121,10 @@ def test_report_has_every_key(
     data = _run_main(tmp_path, monkeypatch)
     assert set(data) == EXPECTED_KEYS
     assert list(data) == EXPECTED_KEY_ORDER
-    assert data["unavailable"] == {}
+    if environment_report.sys.platform == "darwin":  # AD-36: NVIDIA not applicable, not run
+        assert data["unavailable"] == dict.fromkeys(GPU_KEYS, environment_report._NOT_APPLICABLE)
+    else:
+        assert data["unavailable"] == {}
     assert data["report_version"] == 1
     assert next(iter(data)) == "report_version"
     assert data["cpu_model"] == "Test CPU @ 1.0GHz"
@@ -112,6 +138,7 @@ def test_report_has_every_key(
     assert Path(printed).name.endswith("Z.json")
 
 
+@pytest.mark.usefixtures("nvidia_platform")
 def test_gpu_line_parses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     data = _run_main(tmp_path, monkeypatch)
     assert data["gpu_model"] == "NVIDIA Test GPU"
@@ -119,6 +146,7 @@ def test_gpu_line_parses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     assert data["gpu_driver_version"] == "560.94"
 
 
+@pytest.mark.usefixtures("nvidia_platform")
 def test_gpu_uses_first_line_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     out = _completed("First GPU, 100, 1.0\nSecond GPU, 200, 2.0\n")
     data = _run_main(tmp_path, monkeypatch, **{"nvidia-smi": out})
@@ -126,6 +154,7 @@ def test_gpu_uses_first_line_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert data["gpu_memory_bytes"] == 100 * 1024 * 1024
 
 
+@pytest.mark.usefixtures("nvidia_platform")
 def test_nvidia_smi_absent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     data = _run_main(tmp_path, monkeypatch, **{"nvidia-smi": FileNotFoundError("nvidia-smi")})
     for key in GPU_KEYS:
@@ -134,6 +163,7 @@ def test_nvidia_smi_absent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     assert set(data["unavailable"]) == set(GPU_KEYS)
 
 
+@pytest.mark.usefixtures("nvidia_platform")
 @pytest.mark.parametrize(
     "outcome",
     [
@@ -154,6 +184,7 @@ def test_nvidia_smi_bad_output(
         assert data["unavailable"][key]
 
 
+@pytest.mark.usefixtures("nvidia_platform")
 def test_ffmpeg_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     data = _run_main(tmp_path, monkeypatch, ffmpeg=_completed("", 1))
     assert data["ffmpeg_version"] is None
@@ -171,6 +202,7 @@ def test_cpuinfo_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     assert "cpu_model" in data["unavailable"]
 
 
+@pytest.mark.usefixtures("nvidia_platform")
 def test_psutil_failures_degrade(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     def boom() -> object:
         raise OSError("psutil boom")

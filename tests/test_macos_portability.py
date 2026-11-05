@@ -7,11 +7,12 @@ patches ``sys.platform``: the platform is the host's.
 
 The rows shared with the Windows-side module re-run that module's case NATIVELY (the real APFS
 volume, the real macOS ``realpath`` and ``normcase``, the real FFmpeg), then add the checks only
-a Mac can make: a case-sensitive and an exFAT disk image (``hdiutil``, created and detached
-under the test's temporary folder), real VideoToolbox encodes, a child in its own session, the
-Cocoa platform. A runner without VideoToolbox (a CI Mac) passes M-CODEC and M-V4 on a PROVED
-"unavailable" with its reason and the x265 fallback, and skips the VT-only cases with that
-reason; it does not replace the owner's hardware evidence (audit section 8).
+a Mac can make: a case-insensitive APFS, a case-sensitive APFS and an exFAT disk image
+(``hdiutil``, created and detached under the test's temporary folder; a case check never relies
+on the host temporary volume's case behaviour), real VideoToolbox encodes, a child in its own
+session, the Cocoa platform. A runner without VideoToolbox (a CI Mac) passes M-CODEC and M-V4
+on a PROVED "unavailable" with its reason and the x265 fallback, and skips the VT-only cases
+with that reason; it does not replace the owner's hardware evidence (audit section 8).
 
 Isolation (CLAUDE.md's entry-point rule; DR-124): every child that imports the product runs
 with HOME, APPDATA, LOCALAPPDATA and the XDG variables pointed at a disposable folder and a
@@ -247,13 +248,22 @@ def _encode(source: Path, out: Path, *, encoder: str, quality: str, bit_depth: i
 # --- volumes ---------------------------------------------------------------------------------
 
 
+_IMAGES = (("insensitive", "APFS"), ("sensitive", "Case-sensitive APFS"), ("exfat", "ExFAT"))
+"""The disk images ``volumes`` attaches: (label, ``hdiutil -fs`` name); APFS is case-insensitive."""
+
+
 @pytest.fixture(scope="module")
 def volumes(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dict[str, Path]]:
-    """Attach a case-sensitive APFS and an exFAT disk image under the temporary folder."""
+    """Attach a case-insensitive APFS, a case-sensitive APFS and an exFAT disk image.
+
+    Every image is created explicitly (Reviewer B finding 5): the host temporary volume's case
+    behaviour is never relied on, so the case-alias checks run on ``insensitive`` and the
+    distinct-name controls on ``sensitive`` whatever the host's volume is.
+    """
     root = tmp_path_factory.mktemp("volumes")
     mounted: dict[str, Path] = {}
     try:
-        for label, fs in (("sensitive", "Case-sensitive APFS"), ("exfat", "ExFAT")):
+        for label, fs in _IMAGES:
             image, mount = root / f"{label}.dmg", root / label
             created = _run(
                 [
@@ -280,11 +290,9 @@ def volumes(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dict[str, Path
                     f"hdiutil could not attach the {fs} image: {attached.stderr.strip()[-200:]}"
                 )
             mounted[label] = mount
-        mounted["insensitive"] = root / "default"
-        mounted["insensitive"].mkdir()
         yield mounted
     finally:
-        for label in ("sensitive", "exfat"):
+        for label, _fs in _IMAGES:
             if label in mounted:
                 _run(["hdiutil", "detach", "-force", str(mounted[label])])
 
@@ -1175,17 +1183,35 @@ def _fs_exfat_links(volumes: dict[str, Path]) -> None:
     shutil.rmtree(folder)
 
 
-def _fs_native_alias(site: str, tmp_path: Path) -> None:
-    """T17 / T26-T29: a symlink alias, a case alias and a symlink-then-``..`` alias of the
-    footage root are refused natively, before any write."""
+def _fs_native_alias(site: str, tmp_path: Path, volumes: dict[str, Path]) -> None:
+    """T17 / T26-T29: symlink, case and symlink-then-``..`` aliases of the root are refused.
+
+    Natively, before any write. The case alias runs on the case-insensitive image and its
+    distinct-name control on the case-sensitive one (Reviewer B finding 5), never on the host
+    temporary volume.
+    """
     footage_guard = importlib.import_module("footage_guard")
     root = tmp_path / "Dive" / "Footage"
     (root / "clips").mkdir(parents=True)
     link = tmp_path / "alias"
     link.symlink_to(root, target_is_directory=True)
-    for unsafe in (link / "out", tmp_path / "DIVE" / "FOOTAGE" / "out"):
-        assert footage_guard.is_inside(unsafe, root), unsafe
-        assert _w()._guard_refusals(site, root, unsafe)
+    case_base = volumes["insensitive"] / f"alias-{site}"
+    case_root = case_base / "Dive" / "Footage"
+    (case_root / "clips").mkdir(parents=True)
+    for unsafe, guarded in (
+        (link / "out", root),
+        (case_base / "DIVE" / "FOOTAGE" / "out", case_root),
+    ):
+        assert footage_guard.is_inside(unsafe, guarded), unsafe
+        assert _w()._guard_refusals(site, guarded, unsafe)
+    shutil.rmtree(case_base)
+    distinct_base = volumes["sensitive"] / f"alias-{site}"
+    distinct_root = distinct_base / "Dive" / "Footage"
+    (distinct_root / "clips").mkdir(parents=True)
+    (distinct_base / "DIVE" / "FOOTAGE").mkdir(parents=True)  # another folder on this volume
+    for other in (distinct_base / "DIVE" / "FOOTAGE" / "out", distinct_base / "dive" / "out"):
+        assert not footage_guard.is_inside(other, distinct_root), other
+    shutil.rmtree(distinct_base)
     assert not footage_guard.is_inside(tmp_path / "Dive" / "Footage-out", root)
     # A r2 item 1, natively: a real symlink to a sub-folder, then ``..`` (the kernel's order).
     folder = tmp_path / "dotdot"
@@ -1223,7 +1249,7 @@ def _fs_native(
     elif site == "P48":
         _fs_exfat_links(request.getfixturevalue("volumes"))
     elif site in ("T17", "T26", "T27", "T28", "T29"):
-        _fs_native_alias(site, tmp_path / "alias")
+        _fs_native_alias(site, tmp_path / "alias", request.getfixturevalue("volumes"))
     elif site == "P70":
         _fs_finder_slash(tmp_path)
 
