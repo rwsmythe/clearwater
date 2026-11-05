@@ -22,7 +22,19 @@
       "text_sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a",
       "text_size_bytes": 10175,
       "fetch_date": "2026-11-05",
-      "fetched_by": "seat"
+      "fetched_by": "seat",
+      "bundled_files": [
+        {
+          "name": "libcrypto-3-x64.dll",
+          "sha256": "e3575b8d13adfa7693ca7f8b7e4f94f24df33c8d64085972e28c213e225ddcb0",
+          "size_bytes": 7976960
+        },
+        {
+          "name": "libssl-3-x64.dll",
+          "sha256": "28143bcd23fb00b7fabd66fdfba23a68640862f1fb1582d6ec581419afd206be",
+          "size_bytes": 1579008
+        }
+      ]
     }
   ]
 }

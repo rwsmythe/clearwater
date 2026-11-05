@@ -1,6 +1,14 @@
 # WP6.3b release workflow: implementation record
 
-Status: turn 13 adds the pinned-action release workflow, checklist v2, Windows
+Status: turn 15 remediates Reviewer A round 1's notices MAJOR M2 and binding
+MINOR m1 with restricted PSF coverage, native identities and verified flattened
+wheel matching. Real notices generation is expected to refuse unrecorded
+native DLLs for the seat's census; no new real-component rows were added.
+The current turn's evidence and limits are recorded in its section below.
+FFmpeg bundling, ZIP and their release proof are carved out to WP6.3c under
+CHARC's seat-proof split ruling. No package or release acceptance is claimed.
+
+Historical turn-13 status: turn 13 adds the pinned-action release workflow, checklist v2, Windows
 artifact installation guide and limited Python/PyInstaller root-notices update.
 Cell validation: 497 passed, 1 POSIX native-proof skip; Ruff, format and both
 mypy targets pass. Dispatch 13 records the seat's turn-12 outside-sandbox
@@ -32,6 +40,7 @@ Claude pass; no review verdict is claimed here. Context depth is dispatcher-read
 | Turn 11 / checkout defect and headless smoke | One -text attribute rule, two Git-backed guards, isolated allowlisted smoke rows, artifact rechecks, disposable planted-failure copy, process cleanup and build/CLI wiring. | No Reviewer A round. Seat MAJOR checkout defect fixed; direct-child race and minor environment/platform issues fixed. MAJOR process-ancestry limit remains OPEN for seat/CHARC disposition below. | All new observations, 0 REOPENED; no product revert. Temporary missing-smoke-call mutant rejected and byte-restored. | Build/smoke tools, attribute rule, synthetic tool tests and report. No product-runtime file changed. | Fresh session after previous session retired at 199,050; this turn's depth awaits dispatcher reading, never estimated. |
 | Turn 12 / ruled containment remediation | Replaced PPID supervision with one kill-on-close, non-breakaway Windows job per process; atomic assignment at process creation, retained thread resume, job census, bounded pipe cleanup and tests. | Turn 11's MAJOR implemented under CHARC's option (b); closes on the seat re-run. No new blocking finding or scope question. | The carried finding is being remediated, not a reopened review item. No product revert. Before-record source swaps restored byte-exactly. | Smoke tool, its synthetic tests and this report only; build wiring and runtime untouched. | Dispatcher supplied 155,874 at turn-11 end; turn-12 figure awaits dispatcher reading, never estimated. |
 | Turn 13 / workflow and release documents | Pinned two-job workflow, offline contracts/executed version gate, checklist v2, guide sections and limited root-notices update. Dispatch 13 supplies the seat's clean turn-12 re-run. | No Reviewer A round or new blocking finding. One MINOR out-of-turn README residual confirmed below. Existing zvbi HOLD and unimplemented --zip remain explicit release blockers. | 0 NEW review findings, 0 REOPENED; no product revert. Three workflow mutants and the checklist before-record restored byte-exactly. | Workflow/configuration and prose plus one new test module; no runtime/tool implementation edit. | Fresh session after prior session retired at dispatcher-read 222,977; this turn's depth awaits dispatcher reading, never estimated. |
+| Turn 15 / Reviewer A round 1 notices subset | M2 and binding m1 confirmed and remediated: narrow PSF fallback, explicit separately licensed native names, flattened RECORD SHA-256 checks, generic native-file bindings and OpenSSL byte identities. Other round-1 findings remain dispatched separately; this is not a round-convergence claim. | Adjudicated subset: 0 critical, 1 MAJOR, 1 MINOR; both in-envelope. No finding rejected as false positive. | 2 NEW in this subset, 0 REOPENED; no product reverts. Two temporary HEAD before-record swaps restored byte-exactly. | Product: notices matching/schema and measured OpenSSL manifest bindings. Tests: regression cases and independent synthetic manifests; report. | Fresh session; turn-end depth awaits dispatcher reading, never estimated. |
 
 Turn 2 bundled the three changes explicitly commissioned by dispatch 2; the seat
 commits each turn. No git write was performed by the cell.
@@ -2055,3 +2064,197 @@ and deferred FFmpeg row remain unchanged. No real build/artifact/release or new
 N13 acceptance is claimed. No network, frozen/PyInstaller/GUI run, synthetic
 desktop input, footage/real-profile write, QUIT_SCRIPT, Git write, push/tag,
 workflow dispatch, mailbox post, dependency or unowned-file edit occurred.
+
+
+## Turn 15: Reviewer A round 1 notices M2 and binding m1
+
+### Disposition and matching rules
+
+**MAJOR M2, in-envelope, confirmed and fixed pending the seat's review.**
+Previously a filename present in the interpreter's root/DLLs set could receive
+PSF terms, regardless of that file's own terms. A RECORD basename could also
+claim a file at an unrelated depth without checking any bytes. Wheel paths
+could absorb Microsoft's runtimes and Mesa, and OpenSSL names alone reached
+the OpenSSL row. The synthetic before-record reproductions below distinguish
+these paths from the new ones; no real artifact was executed or built.
+
+**MINOR m1, in-envelope, confirmed and fixed pending the seat's review.**
+The native surface now accepts generic exact-file bindings, so adding verified
+seat data will not need another per-component version-source implementation.
+The old vcruntime ambiguity and unknown UCRT refusal are now explicit missing
+native-row diagnostics. Those two cases already refused in HEAD: their RED
+assertions distinguish the required native-row diagnosis, not a previously
+successful build. This turn does not claim to supply their missing licences.
+
+(a) `_python_file_names` now supplies the build interpreter's stdlib module
+names, not its DLL directory inventory. `_is_python_binary` restricts PSF
+fallback to flattened `_internal` stdlib `.pyd` modules (including ABI suffixes)
+and `python3[digits][_d].dll`. Other interpreter DLLs cannot use this fallback.
+Pure stdlib modules retain their existing PSF coverage. A `_ctypes.pyd` plus
+`python312.dll` fixture proves the retained coverage.
+
+(b) ONE explicit case-insensitive basename list,
+`THIRD_PARTY_NATIVE_PATTERNS`, takes priority over wheel paths and basenames
+at every depth: `vcruntime140*.dll`, `msvcp140*.dll`, `concrt140.dll`,
+`ucrtbase.dll`, `api-ms-win-*.dll`, `opengl32sw.dll`; also the interpreter-native
+families `libffi*.dll`, `sqlite3.dll`, `tcl*.dll`, `tk*.dll`, `libcrypto-*.dll`
+and `libssl-*.dll`. Each requires a verified native row. The wildcard in
+`msvcp140*.dll` catches `numpy.libs/msvcp140-abc123.dll` just as it catches an
+unhashed or version-suffixed MSVC name: only the basename is matched. Tests
+exercise exact RECORD paths, hashed names and flattened runtime files.
+
+(c) A wheel basename fallback is permitted ONLY for an immediate child of
+`_internal`, with SHA-256 equal to that file's owning wheel RECORD SHA-256.
+The code compares the unpadded URL-safe base64 digest used by wheel RECORDs.
+A missing/non-SHA-256 RECORD hash cannot grant ownership; multiple matching
+owners remain ambiguous. Exact RECORD paths still use the existing path rule,
+subject to (b). A nested `elsewhere/test.pyd`, a flattened changed file and a
+missing RECORD digest all refuse; the flattened exact-digest control passes.
+
+(d) `NativeFile` and `NativeLicence.bundled_files` provide a generic identity
+binding. Each manifest item has exactly ONE `name` (a basename) OR
+`relpath_glob` (relative to the release folder), plus lowercase 64-hex `sha256`
+and positive integer `size_bytes`. Selectors are case-insensitive; names
+cannot contain paths/globs, and unsafe relative paths are refused. Each match
+must satisfy BOTH hash and byte count. A selector match with changed bytes
+fails closed, even if a wheel path could claim the file. Native rows are
+selected before wheel/interpreter classification and claim only present,
+verified files. The notices show the recorded upstream version and every
+matched file's SHA-256. Version-source-only records never claim files.
+
+The manifest/document, interpreter-build record, component row and file-binding
+objects refuse unknown keys. Every row needs either the supported
+`ssl.OPENSSL_VERSION` source for OpenSSL or a nonempty bundled-files list;
+unsupported version sources still refuse. Duplicate components and identical
+selectors/byte identities claimed across component rows refuse. Overlapping
+globs are also checked against actual matched files, which must have exactly
+one component owner. Existing source provenance, seat-fetch/date, text hash,
+text byte count, file coverage and render-time text re-verification are retained.
+OpenSSL additionally retains the live build interpreter's OpenSSL version,
+CPython version and PBS BUILD-release checks. No new version-source adapter
+or network lookup was introduced.
+
+### Measured OpenSSL inputs; no new real component rows
+
+The ONLY production manifest edit is `bundled_files` on the existing OpenSSL
+row; its prior data and licence text remain unchanged. Read-only PowerShell
+`Get-FileHash -Algorithm SHA256 -LiteralPath ...` and `Get-Item ... | Select-Object
+Name,Length` measured the two explicitly authorized DLLs in
+`C:/Users/rwsmy/AppData/Roaming/uv/python/cpython-3.12-windows-x86_64-none/DLLs/`:
+
+| File | Bytes | SHA-256 |
+| --- | --- | --- |
+| libcrypto-3-x64.dll | 7976960 | e3575b8d13adfa7693ca7f8b7e4f94f24df33c8d64085972e28c213e225ddcb0 |
+| libssl-3-x64.dll | 1579008 | 28143bcd23fb00b7fabd66fdfba23a68640862f1fb1582d6ec581419afd206be |
+
+No DLL was copied, executed or written. No libffi, SQLite, MSVC, UCRT or Mesa
+production row or licence text was added. Generic tests use fixture component
+names and disposable copies of the existing text input; they make no new
+real-component provenance claim.
+
+### RED and GREEN evidence
+
+All outputs are under `work/c63b-15-evidence/`. Pytest always used
+`PYTHONPATH=scripts`, `-p sandbox_mkdir_shim`, `-p no:cacheprovider`, a 300-second
+per-test timeout and fresh worktree-local basetemps. HEAD was
+`00b221cb8205ed6645c7dc2c5d4769e19e87a490`.
+
+The initial `red.log` was run before any production edit: 17 failed, 12 passed,
+112 deselected. `red-schema.log` strengthened schema witnesses on a supported
+OpenSSL row: 8 failed, 2 passed, 131 deselected. Initial schema tests using an
+unsupported generic row could pass for the old rejection reason, so that
+was not accepted as evidence of strict unknown-key validation.
+
+Final inspection also found the first four interpreter witnesses replaced the
+old filename set without keeping `python312.dll`; they could fail on the
+control DLL before proving the claimed native problem. They now keep that
+control, and `red-final.log` supersedes those initial witnesses. Against HEAD,
+libffi/SQLite/Tcl/Tk are accepted and all four corrected refusal assertions fail
+with DID NOT RAISE. The vcruntime/UCRT rows already refused with an ambiguity/
+unknown diagnosis; their assertions fail on the missing native-row diagnosis.
+
+`red-final.log`: **35 failed, 3 passed, 112 deselected**. This includes every
+commissioned new case plus the additional hash/size, absent-digest and census
+checks. The three passing controls on HEAD are the stdlib/CPython PSF row,
+the correctly hashed flattened basename, and the already-rejected row with
+neither binding. The two temporary before-record runs swapped ONLY
+`notices.py` to `git show HEAD:tools/package/notices.py` bytes and restored the
+current bytes in `finally`, asserting exact restoration. Their driver logs
+record exit 1 and byte restoration; no Git write or product entry was involved.
+
+| Item | RED against HEAD | GREEN proof in the final requested run |
+| --- | --- | --- |
+| (a) narrow interpreter fallback | Four corrected non-PSF DLL refusal tests fail with DID NOT RAISE. | libffi, SQLite, Tcl/Tk refuse; stdlib `.pyd` and CPython DLL retain PSF. |
+| (b) separately licensed natives | Six exact wheel-path/hashed-name refusal tests fail with DID NOT RAISE; vcruntime/UCRT fail the native-row diagnosis assertion. | All eight cases name the carried file as missing a native row. |
+| (c) flattened RECORD identity | Nested/changed/missing-digest refusal tests fail; exact-digest control passes. | Both nested cases, both changed/missing-digest cases and the exact-digest control pass. |
+| (d) generic bindings and OpenSSL | Generic success rows fail as unknown; eight strict-schema damage cases accepted by HEAD; duplicate claim rejected for the old missing-field reason; wrong OpenSSL bytes accepted by HEAD. | Generic basename/glob success, hash/size refusal, duplicate claims, strict schema, OpenSSL identity/version/provenance and deterministic rendering all pass. |
+
+Existing OpenSSL success fixtures now bind COPIED manifests to their synthetic
+DLL hashes; their version/provenance/determinism expectations remain intact.
+`plan` and `writer_kwargs` pass these disposable manifests. The production
+manifest is still tested separately against its real seat-fetched text.
+
+An initial full validation found **523 passed, 1 skipped, 15 setup errors**:
+changing `release` to take a required `native_surface` fixture broke the smoke
+module's direct `release.__wrapped__(tmp_path)` caller. This was an introduced
+test-fixture error, not a sandbox residual. The original one-argument fixture
+API is restored. Both fixture callers get independent synthetic manifest copies
+through a test-only helper; no smoke-test file was edited or assertion weakened.
+The final requested run below supersedes that failed intermediate run.
+
+### Expected seat census and remaining work
+
+A REAL build's `--notices` is EXPECTED TO FAIL CLOSED after this turn. With valid
+existing inputs it names every carried native lacking a row: `libffi-8.dll`,
+`sqlite3.dll` if carried, the MSVC/UCRT runtime family (`vcruntime140*.dll`,
+`msvcp140*.dll`, `concrt140.dll`, `ucrtbase.dll`, `api-ms-win-*.dll`),
+`opengl32sw.dll`, Tcl/Tk if carried, and any other unknown entry. Unknown entry
+classification is collected into one diagnostic rather than stopping at its
+first member; a multi-native synthetic census proves all four missing paths
+are named. Hash/schema failures remain hard refusals too. The seat measures
+actual carried bytes and fetches/verifies the missing texts; a later authorized
+data turn supplies their rows. This refusal is the required census, not a defect.
+
+No other Reviewer A round-1 finding was adjudicated or edited here: C1, M1 and
+m2-m6 remain assigned to their separate turns (including any item already handled
+by turn 14). This is not a Reviewer A convergence, stage-1 proof, N13 satisfaction
+or release claim. FFmpeg bundle/rows, ZIP, V4 and the real release remain WP6.3c.
+No real build, frozen binary, GUI, network fetch, synthetic desktop input,
+footage/real-profile write, QUIT_SCRIPT, Git write, push/tag, workflow dispatch,
+mailbox message, dependency change or edit outside the four dispatch-15 files
+occurred. All runtime/product-entry files are unchanged.
+
+
+### Final validation and verification loop
+
+| Evidence log | Observed result |
+| --- | --- |
+| ruff-check.log | Exit 0; All checks passed! |
+| ruff-format.log | Exit 0; 337 files already formatted. |
+| mypy.log | Exit 0; Success: no issues found in 166 source files. |
+| mypy-darwin.log | Exit 0; Success: no issues found in 166 source files. |
+| pytest-validation-final.log | Exit 0; 538 passed, 1 skipped in 33.41s; fresh basetemp work/c63b-15-final. |
+| diff-check.log | Exit 0; no whitespace defect; existing LF-to-CRLF checkout warning on the test file. |
+
+The final six-module run contains all 150 notices cases and the requested smoke,
+FFmpeg-tool, build, isolated frozen-entry and workflow tests. The sole skip is
+the existing POSIX process-group native-proof case on Windows; no new skip was
+introduced. The earlier required basetemp `work/c63b-15` is retained with the
+fixture-error intermediate run; the final re-run deliberately uses a fresh root.
+No code/test edit followed the final test run, only this report.
+
+Sandbox-only residuals: NONE in the final run. The inherited VIRTUAL_ENV still
+points at the main checkout; uv explicitly ignores it for this worktree's .venv.
+PowerShell wraps that warning as NativeCommandError text even on successful
+exit 0; it is environment noise, not a failed test or type check. Known residuals
+from other turns are not adjudicated by this requested six-module run.
+
+Verification loop: independently confirmed the reviewer's unsafe coverage
+branches; added RED checks before production edits; corrected vacuous schema
+and interpreter witnesses; fixed matching/schema in-envelope; tested generic
+native hash/size rejection and missing-row census against HEAD; corrected the
+introduced cross-module fixture API error; repeated the requested validation
+with a fresh basetemp. Final inspection found no further issue within (a)-(d).
+Zero findings were rejected as false positives; no production revert remains.
+Both assigned review findings are code-remediated, with real census/data and
+Reviewer A confirmation still owed at the seat. This turn now yields as directed.

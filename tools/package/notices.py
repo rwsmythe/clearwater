@@ -10,6 +10,8 @@ No bundled runtime package, product entry point or external binary is executed.
 from __future__ import annotations
 
 import argparse
+import base64
+import fnmatch
 import hashlib
 import importlib.metadata
 import importlib.util
@@ -33,6 +35,22 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_URL = "https://github.com/rwsmythe/clearwater"
 GPU_NAMES = frozenset({"cuda-pathfinder", "cuda-toolkit", "cupy-cuda12x"})
+# Match case-insensitive basenames at every depth before consulting wheel RECORDs.
+# The wildcard also catches versioned and delvewheel hash-suffixed runtime names.
+THIRD_PARTY_NATIVE_PATTERNS = (
+    "vcruntime140*.dll",
+    "msvcp140*.dll",
+    "concrt140.dll",
+    "ucrtbase.dll",
+    "api-ms-win-*.dll",
+    "opengl32sw.dll",
+    "libffi*.dll",
+    "sqlite3.dll",
+    "tcl*.dll",
+    "tk*.dll",
+    "libcrypto-*.dll",
+    "libssl-*.dll",
+)
 
 
 class LicenceInput(NamedTuple):
@@ -43,6 +61,15 @@ class LicenceInput(NamedTuple):
     sha256: str = ""
     size_bytes: int = 0
     provenance: str = ""
+
+
+class NativeFile(NamedTuple):
+    """A seat-measured binary identity, selected by basename or relative-path glob."""
+
+    name: str
+    relpath_glob: str
+    sha256: str
+    size_bytes: int
 
 
 class NativeLicence(NamedTuple):
@@ -60,6 +87,7 @@ class NativeLicence(NamedTuple):
     licence_input: LicenceInput
     interpreter_release: str
     python_version: str
+    bundled_files: tuple[NativeFile, ...]
 
 
 class NoticeRow(NamedTuple):
@@ -130,7 +158,12 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     Every component needs a source identity, published source-archive hash and
     a real text with matching hash and byte count. Every file other than the
     manifest needs a component reference. Symlinks, unsafe paths, duplicate
-    components and unsupported version-source bindings fail closed.
+    components, unknown keys and unsupported version-source bindings fail closed.
+    A row needs a supported version source or bundled_files identities. Each
+    identity has exactly one name or relpath_glob (relative to the release
+    folder), a SHA-256 and a positive byte count; matching is case-insensitive.
+    Version sources alone never claim bundled files. OpenSSL additionally
+    checks the build interpreter's OpenSSL, CPython and build-release versions.
 
     Args:
         folder: The committed native-licences folder, or a local test copy.
@@ -152,6 +185,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
         raise ValueError("notices: native licence manifest is not valid JSON") from error
     if (
         not isinstance(document, dict)
+        or set(document) != {"schema_version", "interpreter_build", "components"}
         or type(document.get("schema_version")) is not int
         or document["schema_version"] != 1
         or not isinstance(document.get("components"), list)
@@ -160,6 +194,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     build = document.get("interpreter_build")
     if (
         not isinstance(build, dict)
+        or set(build) != {"provider", "release", "python_version"}
         or build.get("provider") != "python-build-standalone"
         or not isinstance(build.get("release"), str)
         or re.fullmatch(r"[0-9]{8}", build["release"]) is None
@@ -169,7 +204,6 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
         raise ValueError("notices: native licence interpreter build record is invalid")
     string_fields = (
         "component",
-        "bundled_version_source",
         "upstream_version",
         "upstream_repository",
         "source_tag",
@@ -186,16 +220,32 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     result: list[NativeLicence] = []
     components: set[str] = set()
     files = {"manifest.json"}
+    claims: dict[str, str] = {}
     for row in document["components"]:
         if not isinstance(row, dict) or any(
             not isinstance(row.get(key), str) or not row[key] or row[key] != row[key].strip()
             for key in string_fields
         ):
             raise ValueError("notices: native licence row has missing/invalid string fields")
-        if row["component"] != "OpenSSL" or row["bundled_version_source"] != "ssl.OPENSSL_VERSION":
+        allowed = {
+            *string_fields,
+            "text_size_bytes",
+            "source_archive_size_bytes",
+            "bundled_version_source",
+            "bundled_files",
+        }
+        if set(row) - allowed:
+            raise ValueError("notices: native licence row has unknown keys")
+        version_source = row.get("bundled_version_source", "")
+        if "bundled_version_source" in row and (
+            row["component"] != "OpenSSL" or version_source != "ssl.OPENSSL_VERSION"
+        ):
             raise ValueError(
                 "notices: native licence row has an unsupported version-source binding"
             )
+        bindings = _native_file_bindings(row, claims)
+        if not version_source and not bindings:
+            raise ValueError("notices: native licence row missing version/file binding")
         if row["component"] in components:
             raise ValueError("notices: native licence manifest has duplicate component rows")
         components.add(row["component"])
@@ -221,15 +271,16 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
                 or url.fragment
             ):
                 raise ValueError(f"notices: native licence row has invalid {key}")
-        if (
+        if row["component"] == "OpenSSL" and (
             re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+[a-z]?", row["upstream_version"]) is None
             or row["source_tag"] != "openssl-" + row["upstream_version"]
             or row["spdx"] != "Apache-2.0"
-            or row["fetched_by"] != "seat"
         ):
             raise ValueError(
                 "notices: native OpenSSL provenance/version/licence fields are invalid"
             )
+        if row["fetched_by"] != "seat":
+            raise ValueError("notices: native licence input must be fetched by seat")
         try:
             if date.fromisoformat(row["fetch_date"]).isoformat() != row["fetch_date"]:
                 raise ValueError("not ISO date")
@@ -251,7 +302,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
         result.append(
             NativeLicence(
                 row["component"],
-                row["bundled_version_source"],
+                version_source,
                 row["upstream_version"],
                 row["upstream_repository"],
                 row["source_tag"],
@@ -267,6 +318,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
                 ),
                 build["release"],
                 build["python_version"],
+                bindings,
             )
         )
     actual = {path.name for path in folder.iterdir()}
@@ -275,6 +327,48 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
             "notices: native licence files without manifest rows: "
             + ", ".join(sorted(actual - files))
         )
+    return tuple(result)
+
+
+def _native_file_bindings(row: dict[str, Any], claims: dict[str, str]) -> tuple[NativeFile, ...]:
+    if "bundled_files" not in row:
+        return ()
+    files = row["bundled_files"]
+    if not isinstance(files, list) or not files:
+        raise ValueError("notices: native bundled_files must be a non-empty list")
+    result = []
+    for item in files:
+        if not isinstance(item, dict) or set(item) not in (
+            {"name", "sha256", "size_bytes"},
+            {"relpath_glob", "sha256", "size_bytes"},
+        ):
+            raise ValueError("notices: native file binding has unknown/missing keys or selectors")
+        selector = item.get("name", item.get("relpath_glob"))
+        if (
+            not isinstance(selector, str)
+            or not selector
+            or selector != selector.strip()
+            or "\\" in selector
+            or ":" in selector
+            or any(part in {"", ".", ".."} for part in selector.split("/"))
+            or ("name" in item and any(char in selector for char in "/?*[]"))
+        ):
+            raise ValueError("notices: native file binding has unsafe name/relpath_glob")
+        sha256 = item["sha256"]
+        size = item["size_bytes"]
+        if not isinstance(sha256, str) or re.fullmatch(r"[0-9a-f]{64}", sha256) is None:
+            raise ValueError("notices: native file binding has invalid sha256")
+        if type(size) is not int or size <= 0:
+            raise ValueError("notices: native file binding has invalid size_bytes")
+        # Refuse identical selectors or byte identities claimed by different rows.
+        for key in ("selector:" + selector.casefold(), "hash:" + sha256):
+            if key in claims and claims[key] != row["component"]:
+                raise ValueError("notices: native manifest has duplicate file claim across rows")
+            claims[key] = row["component"]
+        binding = NativeFile(item.get("name", ""), item.get("relpath_glob", ""), sha256, size)
+        if binding in result:
+            raise ValueError("notices: native manifest has duplicate file binding")
+        result.append(binding)
     return tuple(result)
 
 
@@ -391,13 +485,18 @@ def _licence_inputs(
 
 
 def _python_file_names() -> set[str]:
-    base = Path(sys.base_prefix)
-    return {
-        path.name.casefold()
-        for folder in (base, base / "DLLs")
-        for path in folder.glob("*")
-        if path.is_file() and path.suffix.lower() in {".dll", ".pyd", ".so"}
-    }
+    # Only standard-library extension modules and CPython's own DLLs have PSF
+    # coverage here. Being shipped in the interpreter's DLLs folder is not a licence.
+    return {name.casefold() for name in sys.stdlib_module_names}
+
+
+def _is_python_binary(relative: str, stdlib: set[str]) -> bool:
+    if "/" in relative:
+        return False
+    filename = relative.casefold()
+    return bool(re.fullmatch(r"python3[0-9]*(?:_d)?\.dll", filename)) or (
+        filename.endswith(".pyd") and filename.split(".", 1)[0] in stdlib
+    )
 
 
 def _ffmpeg_rows(home: Path, lock_path: Path) -> list[NoticeRow]:
@@ -527,8 +626,9 @@ def plan_notices(
     """Inventory an onedir folder and select only the rows supported by its contents.
 
     Pure modules are matched to wheel RECORD paths; native/data entries must
-    match a RECORD path or an unambiguous native basename. Standard-library
-    binaries are matched to this build interpreter. Artifact code and bundled
+    match a RECORD path or a flattened, SHA-256-verified native basename.
+    Independently licensed natives need their own exact-byte manifest row.
+    Only stdlib extensions and CPython DLLs use the PSF fallback. Artifact code and bundled
     runtime packages are not imported; no external process is started.
 
     Args:
@@ -551,6 +651,8 @@ def plan_notices(
     ffmpeg = _ffmpeg_rows(home, ffmpeg_lock_path)
     audit = _audit_rows(audit_path)
     versions = _locked_versions(uv_lock_path)
+    native_rows = _native_rows(entries, home, load_native_licences(native_licences_path))
+    native_labels = {label for row in native_rows for label in row.entries}
     runtime = {
         key: row
         for key, row in audit.items()
@@ -560,7 +662,7 @@ def plan_notices(
     }
     installed: dict[str, importlib.metadata.Distribution] = {}
     paths: dict[str, set[str]] = defaultdict(set)
-    basenames: dict[str, set[str]] = defaultdict(set)
+    basenames: dict[str, list[tuple[str, str]]] = defaultdict(list)
     modules: dict[str, set[str]] = defaultdict(set)
     for name in (*runtime, "pyinstaller", "pyinstaller-hooks-contrib"):
         try:
@@ -572,7 +674,9 @@ def plan_notices(
             relative = str(path).replace("\\", "/")
             paths[relative.casefold()].add(name)
             if Path(relative).suffix.lower() in {".dll", ".pyd", ".so", ".dylib"}:
-                basenames[Path(relative).name.casefold()].add(name)
+                record_hash = path.hash
+                sha256 = record_hash.value if record_hash and record_hash.mode == "sha256" else ""
+                basenames[Path(relative).name.casefold()].append((name, sha256))
             if module := _module_name(relative):
                 modules[module].add(name)
                 if name in {"pyinstaller", "pyinstaller-hooks-contrib"}:
@@ -580,8 +684,9 @@ def plan_notices(
     selected: dict[str, list[str]] = defaultdict(list)
     ffmpeg_labels = {entry for row in ffmpeg for entry in row.entries}
     python_names = _python_file_names()
+    unknown: list[str] = []
     for entry in entries:
-        if entry.label in ffmpeg_labels:
+        if entry.label in ffmpeg_labels or entry.label in native_labels:
             continue
         name = entry.name
         if (
@@ -605,25 +710,44 @@ def plan_notices(
             owners = modules.get(name, set())
         else:
             relative = name.removeprefix("_internal/")
+            filename = Path(relative).name.casefold()
+            if any(
+                fnmatch.fnmatchcase(filename, pattern) for pattern in THIRD_PARTY_NATIVE_PATTERNS
+            ):
+                component = "OpenSSL " if filename.startswith(("libcrypto-", "libssl-")) else ""
+                unknown.append(f"{component}missing native licence row/material: {entry.label}")
+                continue
             owners = paths.get(relative.casefold(), set())
-            if not owners:
-                owners = basenames.get(Path(relative).name.casefold(), set())
+            if not owners and name.startswith("_internal/") and "/" not in relative:
+                candidates = basenames.get(filename, [])
+                if candidates:
+                    digest = (
+                        base64.urlsafe_b64encode(
+                            hashlib.sha256((home / name).read_bytes()).digest()
+                        )
+                        .decode("ascii")
+                        .rstrip("=")
+                    )
+                    owners = {owner for owner, sha256 in candidates if sha256 == digest}
             if (
                 not owners
-                and "/" not in relative
-                and Path(relative).name.casefold() in python_names
+                and name.startswith("_internal/")
+                and _is_python_binary(relative, python_names)
             ):
                 selected["python"].append(entry.label)
                 continue
         if len(owners) != 1:
-            raise ValueError(f"notices: unknown or ambiguous bundled entry {entry.label}")
+            unknown.append(f"unknown or ambiguous bundled entry {entry.label}")
+            continue
         owner = next(iter(owners))
         if owner in {"pyinstaller", "pyinstaller-hooks-contrib"} and (
             name.startswith("pyi_rth_") or name.startswith("_pyi_rth_utils")
         ):
             owner += "-runtime"
         selected[owner].append(entry.label)
-    result: list[NoticeRow] = list(ffmpeg)
+    if unknown:
+        raise ValueError("notices: " + "; ".join(unknown))
+    result: list[NoticeRow] = [*ffmpeg, *native_rows]
     for name, labels in sorted(selected.items()):
         if name == "clearwater":
             result.append(
@@ -692,7 +816,6 @@ def plan_notices(
         result.append(
             NoticeRow(base, version, row.licence, row.sources, tuple(sorted(labels)), inputs)
         )
-    result = _interpreter_native_rows(result, load_native_licences(native_licences_path))
     result = _native_details(result, installed, audit_path)
     inventory_labels = tuple(sorted(entry.label for entry in entries))
     ordered = tuple(sorted(result, key=lambda row: row.name.casefold()))
@@ -708,27 +831,87 @@ def plan_notices(
     return NoticePlan(inventory_labels, ordered, tuple(statements))
 
 
-def _interpreter_native_rows(
-    rows: list[NoticeRow], records: tuple[NativeLicence, ...]
+def _native_rows(
+    entries: list[_Entry], home: Path, records: tuple[NativeLicence, ...]
 ) -> list[NoticeRow]:
-    labels = tuple(
-        sorted(
-            {
-                label
-                for row in rows
-                for label in row.entries
-                if label.startswith("file:")
-                and Path(label.removeprefix("file:"))
-                .name.casefold()
-                .startswith(("libcrypto-", "libssl-"))
-            }
+    selected: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    errors: list[str] = []
+    for entry in entries:
+        if entry.kind != "file" or not entry.label.startswith("file:"):
+            continue
+        matches = [
+            (record, binding)
+            for record in records
+            for binding in record.bundled_files
+            if (binding.name and Path(entry.name).name.casefold() == binding.name.casefold())
+            or (
+                binding.relpath_glob
+                and fnmatch.fnmatchcase(entry.name.casefold(), binding.relpath_glob.casefold())
+            )
+        ]
+        if not matches:
+            continue
+        data = (home / entry.name).read_bytes()
+        sha256 = hashlib.sha256(data).hexdigest()
+        if any(
+            len(data) != binding.size_bytes or sha256 != binding.sha256
+            for _record, binding in matches
+        ):
+            errors.append(f"native file identity hash/size differs: {entry.label}")
+            continue
+        owners = {record.component for record, _binding in matches}
+        if len(owners) != 1:
+            errors.append(f"native file has duplicate component claims: {entry.label}")
+            continue
+        selected[next(iter(owners))].append((entry.label, sha256))
+    if errors:
+        raise ValueError("notices: " + "; ".join(errors))
+    result = []
+    for record in records:
+        matched = sorted(selected.get(record.component, []))
+        if not matched:
+            continue
+        if record.component == "OpenSSL":
+            _check_openssl_version(record)
+        notes = [
+            (
+                "Clearwater 1.1.0 redistributes the interpreter's native libraries; 1.0.0 did not."
+                if record.bundled_version_source
+                else "Redistributed native component; exact file identities below bind "
+                "the recorded upstream version."
+            ),
+            "Published source archive SHA-256: " + record.source_archive_sha256,
+        ]
+        if record.bundled_version_source:
+            notes.append(
+                "Build input: python-build-standalone "
+                + record.interpreter_release
+                + "; CPython "
+                + record.python_version
+                + "; version source: "
+                + record.bundled_version_source
+            )
+        notes.extend(f"Bundled file {label}; SHA-256: {sha256}" for label, sha256 in matched)
+        result.append(
+            NoticeRow(
+                record.component,
+                record.upstream_version,
+                record.spdx,
+                (
+                    record.upstream_repository + "/tree/" + record.source_tag,
+                    record.source_archive_url,
+                ),
+                tuple(label for label, _sha256 in matched),
+                (record.licence_input,),
+                tuple(notes),
+            )
         )
-    )
-    if not labels:
-        return rows
-    record = next((row for row in records if row.component == "OpenSSL"), None)
-    if record is None:
-        raise ValueError("notices: OpenSSL missing native licence manifest row/material")
+    return result
+
+
+def _check_openssl_version(record: NativeLicence) -> None:
+    if record.bundled_version_source != "ssl.OPENSSL_VERSION":
+        raise ValueError("notices: OpenSSL missing ssl.OPENSSL_VERSION binding")
     reading = re.match(r"^OpenSSL ([0-9]+\.[0-9]+\.[0-9]+[a-z]?)(?:\s|$)", ssl.OPENSSL_VERSION)
     if reading is None or reading[1] != record.upstream_version:
         raise ValueError("notices: OpenSSL bundled version differs from native licence manifest")
@@ -744,32 +927,6 @@ def _interpreter_native_rows(
         raise ValueError(
             "notices: OpenSSL interpreter build release differs from native licence manifest"
         )
-    result = []
-    for row in rows:
-        remaining = tuple(label for label in row.entries if label not in labels)
-        if remaining:
-            result.append(row._replace(entries=remaining))
-    result.append(
-        NoticeRow(
-            "OpenSSL",
-            record.upstream_version,
-            record.spdx,
-            (record.upstream_repository + "/tree/" + record.source_tag, record.source_archive_url),
-            labels,
-            (record.licence_input,),
-            (
-                "Clearwater 1.1.0 redistributes the interpreter's native libraries; 1.0.0 did not.",
-                "Published source archive SHA-256: " + record.source_archive_sha256,
-                "Build input: python-build-standalone "
-                + record.interpreter_release
-                + "; CPython "
-                + record.python_version
-                + "; version source: "
-                + record.bundled_version_source,
-            ),
-        )
-    )
-    return result
 
 
 def _component_material(

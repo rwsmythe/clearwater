@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import importlib.metadata
 import importlib.util
@@ -101,6 +102,7 @@ def make_executable(folder, modules):
 
 @pytest.fixture
 def release(tmp_path):
+    native_surface = _make_native_surface(tmp_path / "release-native-licences")
     folder = tmp_path / "release"
     internal = folder / "_internal"
     (internal / "numpy/_core").mkdir(parents=True)
@@ -166,10 +168,12 @@ version = "6.22.3"
         "uv_lock": uv_lock,
         "ffmpeg": ffmpeg,
         "ffmpeg_path": ffmpeg_path,
+        "native_surface": native_surface,
     }
 
 
 def plan(module, release, **kwargs):
+    kwargs.setdefault("native_licences_path", release["native_surface"])
     return module.plan_notices(
         release["folder"],
         audit_path=release["audit"],
@@ -587,6 +591,7 @@ def writer_kwargs(release):
         "uv_lock_path": release["uv_lock"],
         "ffmpeg_lock_path": release["ffmpeg_path"],
         "distribution": release["distributions"].__getitem__,
+        "native_licences_path": release["native_surface"],
     }
 
 
@@ -783,8 +788,25 @@ def test_writer_publication_failure_retains_old_content_and_removes_its_temporar
 
 @pytest.fixture
 def native_surface(tmp_path):
-    destination = tmp_path / "native-licences"
+    return _make_native_surface(tmp_path / "native-licences")
+
+
+def _make_native_surface(destination):
+    """Make an independent synthetic OpenSSL binding for either fixture consumer."""
     shutil.copytree(ROOT / "tools/package/native-licences", destination)
+    # Existing OpenSSL tests carry synthetic bytes, so bind their copied input
+    # surface to those bytes rather than the seat-measured production DLLs.
+    path = destination / "manifest.json"
+    document = json.loads(path.read_text())
+    document["components"][0]["bundled_files"] = [
+        {
+            "name": name,
+            "sha256": hashlib.sha256(b"synthetic interpreter native").hexdigest(),
+            "size_bytes": len(b"synthetic interpreter native"),
+        }
+        for name in ("libcrypto-3-x64.dll", "libssl-3-x64.dll")
+    ]
+    path.write_text(json.dumps(document))
     return destination
 
 
@@ -977,3 +999,274 @@ def test_native_manifest_rejects_invalid_document_shapes(native_surface, damage)
     path.write_text(json.dumps(document))
     with pytest.raises(ValueError, match="native"):
         module.load_native_licences(native_surface)
+
+
+def record_hash(dist, relative, body):
+    """Give one fixture RECORD entry a real wheel-style SHA-256 and size."""
+    record = Path(str(dist.locate_file(""))) / dist._path.name / "RECORD"
+    digest = base64.urlsafe_b64encode(hashlib.sha256(body).digest()).decode().rstrip("=")
+    lines = record.read_text().splitlines()
+    record.write_text(
+        "\n".join(
+            f"{relative},sha256={digest},{len(body)}" if line.split(",")[0] == relative else line
+            for line in lines
+        )
+        + "\n"
+    )
+
+
+def synthetic_native_binding(
+    surface, *, component="Fixture native", selector=None, body=b"native bytes"
+):
+    """Use a fixture row and fixture bytes; no real component provenance is added."""
+    path = surface / "manifest.json"
+    document = json.loads(path.read_text())
+    row = document["components"][0]
+    row["component"] = component
+    row.pop("bundled_version_source", None)
+    row["bundled_files"] = [
+        {
+            **(selector or {"name": "fixture.dll"}),
+            "sha256": hashlib.sha256(body).hexdigest(),
+            "size_bytes": len(body),
+        }
+    ]
+    path.write_text(json.dumps(document))
+    return document
+
+
+@pytest.mark.parametrize("filename", ["libffi-8.dll", "sqlite3.dll", "tcl86t.dll", "tk86t.dll"])
+def test_interpreter_non_psf_dll_needs_its_own_native_row(release, monkeypatch, filename):
+    """Interpreter membership alone must never grant PSF terms to native DLLs."""
+    module = load_notices()
+    monkeypatch.setattr(module, "_python_file_names", lambda: {filename, "python312.dll"})
+    (release["folder"] / "_internal" / filename).write_bytes(b"interpreter DLL")
+    with pytest.raises(ValueError, match=re.escape(filename)):
+        plan(module, release)
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "PySide6/opengl32sw.dll",
+        "PySide6/msvcp140.dll",
+        "numpy.libs/msvcp140-abc123.dll",
+        "PySide6/vcruntime140_1.dll",
+        "PySide6/concrt140.dll",
+        "PySide6/api-ms-win-crt-runtime-l1-1-0.dll",
+    ],
+)
+def test_wheel_record_cannot_absorb_third_party_runtime_terms(release, relative):
+    """Separate native terms take priority over an exact wheel RECORD path."""
+    module = load_notices()
+    add_distribution(
+        release,
+        "pyside6-essentials",
+        "6.12.0",
+        {
+            relative: "separately licensed native",
+            "pyside6_essentials-6.12.0.dist-info/licenses/LGPL.txt": (
+                "GNU LESSER GENERAL PUBLIC LICENSE\nVersion 3\nfixture"
+            ),
+        },
+        [],
+    )
+    with pytest.raises(ValueError, match=re.escape(relative)):
+        plan(module, release)
+
+
+@pytest.mark.parametrize("filename", ["vcruntime140.dll", "ucrtbase.dll"])
+def test_flattened_windows_runtime_is_named_as_missing_native_row(release, filename):
+    module = load_notices()
+    for name in ("pyside6-essentials", "shiboken6"):
+        add_distribution(
+            release,
+            name,
+            "6.12.0",
+            {
+                f"{name}/{filename}": "runtime",
+                f"{name}-6.12.0.dist-info/licenses/LGPL.txt": (
+                    "GNU LESSER GENERAL PUBLIC LICENSE\nVersion 3\nfixture"
+                ),
+            },
+            [],
+        )
+        (release["folder"] / "_internal" / name / filename).unlink()
+    (release["folder"] / "_internal" / filename).write_bytes(b"runtime")
+    with pytest.raises(ValueError, match="native.*" + re.escape(filename)):
+        plan(module, release)
+
+
+@pytest.mark.parametrize(
+    "relative, body",
+    [
+        ("elsewhere/test.pyd", b"synthetic native extension"),
+        ("test.pyd", b"wrong bytes"),
+    ],
+)
+def test_basename_fallback_requires_flattening_and_record_hash(release, relative, body):
+    module = load_notices()
+    record_hash(
+        release["distributions"]["numpy"], "numpy/_core/test.pyd", b"synthetic native extension"
+    )
+    target = release["folder"] / "_internal" / relative
+    target.parent.mkdir(exist_ok=True)
+    target.write_bytes(body)
+    with pytest.raises(ValueError, match=re.escape(relative)):
+        plan(module, release)
+
+
+def test_correctly_hashed_flattened_wheel_native_is_accepted(release):
+    module = load_notices()
+    record_hash(
+        release["distributions"]["numpy"], "numpy/_core/test.pyd", b"synthetic native extension"
+    )
+    (release["folder"] / "_internal/test.pyd").write_bytes(b"synthetic native extension")
+    row = next(row for row in plan(module, release).rows if row.name == "numpy")
+    assert "file:_internal/test.pyd" in row.entries
+
+
+def test_stdlib_extension_and_python_dll_keep_psf_row(release):
+    module = load_notices()
+    (release["folder"] / "_internal/_ctypes.pyd").write_bytes(b"stdlib module")
+    row = next(row for row in plan(module, release).rows if row.name == "Python")
+    assert {"file:_internal/_ctypes.pyd", "file:_internal/python312.dll"} <= set(row.entries)
+
+
+def test_openssl_name_with_wrong_bytes_fails_closed(release):
+    module = load_notices()
+    (release["folder"] / "_internal/libcrypto-3-x64.dll").write_bytes(b"wrong OpenSSL")
+    with pytest.raises(ValueError, match=r"libcrypto-3-x64\.dll"):
+        plan(module, release)
+
+
+@pytest.mark.parametrize(
+    "selector", [{"name": "fixture.dll"}, {"relpath_glob": "_internal/natives/*.dll"}]
+)
+def test_generic_native_row_covers_exact_bytes_and_reports_hash(release, native_surface, selector):
+    module = load_notices()
+    synthetic_native_binding(native_surface, selector=selector)
+    target = release["folder"] / "_internal/natives/fixture.dll"
+    target.parent.mkdir()
+    target.write_bytes(b"native bytes")
+    result = plan(module, release, native_licences_path=native_surface)
+    row = next(row for row in result.rows if row.name == "Fixture native")
+    assert row.version == "3.5.5"
+    assert row.entries == ("file:_internal/natives/fixture.dll",)
+    assert hashlib.sha256(b"native bytes").hexdigest().encode() in module.render_notices(result)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "root-key",
+        "build-key",
+        "row-key",
+        "binding-key",
+        "no-binding",
+        "bad-hash",
+        "duplicate-claim",
+        "both-selectors",
+        "unsafe-glob",
+        "bool-size",
+    ],
+)
+def test_native_binding_schema_fails_closed(native_surface, damage):
+    module = load_notices()
+    document = json.loads((native_surface / "manifest.json").read_text())
+    row = document["components"][0]
+    row["bundled_files"] = [{"name": "fixture.dll", "sha256": "a" * 64, "size_bytes": 12}]
+    if damage == "root-key":
+        document["unknown"] = True
+    elif damage == "build-key":
+        document["interpreter_build"]["unknown"] = True
+    elif damage == "row-key":
+        row["unknown"] = True
+    elif damage == "binding-key":
+        row["bundled_files"][0]["unknown"] = True
+    elif damage == "no-binding":
+        row.pop("bundled_files")
+        row.pop("bundled_version_source")
+    elif damage == "bad-hash":
+        row["bundled_files"][0]["sha256"] = "bad"
+    elif damage == "duplicate-claim":
+        other = {**row, "component": "Other native"}
+        other.pop("bundled_version_source")
+        document["components"].append(other)
+    elif damage == "both-selectors":
+        row["bundled_files"][0]["relpath_glob"] = "_internal/*.dll"
+    elif damage == "unsafe-glob":
+        row["bundled_files"][0] = {**row["bundled_files"][0], "name": "../fixture.dll"}
+    else:
+        row["bundled_files"][0]["size_bytes"] = True
+    (native_surface / "manifest.json").write_text(json.dumps(document))
+    expected = "native.*duplicate file claim" if damage == "duplicate-claim" else "native"
+    with pytest.raises(ValueError, match=expected):
+        module.load_native_licences(native_surface)
+
+
+@pytest.mark.parametrize("body", [b"wrong! bytes", b"native bytes plus extra"])
+def test_generic_native_binding_refuses_changed_hash_or_size(release, native_surface, body):
+    module = load_notices()
+    synthetic_native_binding(native_surface)
+    (release["folder"] / "_internal/fixture.dll").write_bytes(body)
+    with pytest.raises(ValueError, match=r"native.*identity.*file:_internal/fixture\.dll"):
+        plan(module, release, native_licences_path=native_surface)
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "libffi-8.dll",
+        "PySide6/opengl32sw.dll",
+        "numpy.libs/msvcp140-abc123.dll",
+    ],
+)
+def test_exact_native_identity_takes_priority_over_record_or_interpreter(
+    release, native_surface, relative
+):
+    module = load_notices()
+    synthetic_native_binding(native_surface, selector={"name": Path(relative).name})
+    target = release["folder"] / "_internal" / relative
+    target.parent.mkdir(exist_ok=True)
+    target.write_bytes(b"native bytes")
+    result = plan(module, release, native_licences_path=native_surface)
+    label = "file:_internal/" + relative
+    assert [row.name for row in result.rows if label in row.entries] == ["Fixture native"]
+
+
+def test_missing_native_census_names_every_carried_file(release):
+    module = load_notices()
+    names = ["libffi-8.dll", "sqlite3.dll", "ucrtbase.dll", "opengl32sw.dll"]
+    for name in names:
+        (release["folder"] / "_internal" / name).write_bytes(b"missing native")
+    with pytest.raises(ValueError) as caught:
+        plan(module, release)
+    assert all("file:_internal/" + name in str(caught.value) for name in names)
+
+
+def test_openssl_version_source_alone_cannot_claim_bytes(release, native_surface):
+    module = load_notices()
+    path = native_surface / "manifest.json"
+    document = json.loads(path.read_text())
+    document["components"][0].pop("bundled_files")
+    path.write_text(json.dumps(document))
+    add_openssl(release)
+    with pytest.raises(ValueError, match=r"OpenSSL.*missing native.*libcrypto-3-x64\.dll"):
+        plan(module, release, native_licences_path=native_surface)
+
+
+@pytest.mark.parametrize(
+    "relative, body",
+    [
+        ("elsewhere/test.pyd", b"synthetic native extension"),
+        ("test.pyd", b"wrong bytes"),
+    ],
+)
+def test_basename_only_match_without_record_digest_never_claims_file(release, relative, body):
+    module = load_notices()
+    target = release["folder"] / "_internal" / relative
+    target.parent.mkdir(exist_ok=True)
+    target.write_bytes(body)
+    with pytest.raises(ValueError, match=re.escape(relative)):
+        plan(module, release)
