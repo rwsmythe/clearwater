@@ -18,6 +18,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from types import ModuleType
@@ -29,11 +30,19 @@ from clearwater import gpu_pack
 from clearwater.app import composition, export_worker
 from clearwater.config import log as config_log
 from clearwater.config import paths as config_paths
+from clearwater.config.log import configure_logging as _configure_logging
 from clearwater.jobs.export_process import ProcessExportJobs
 from clearwater.jobs.export_seam import unavailable_exports
 
 BLOCKED = ("PySide6", "shiboken6", "clearwater.gui", "clearwater.app.main")
 """Modules the worker branch must never import (AD-31: the worker is Qt-free)."""
+
+
+@pytest.fixture(autouse=True)
+def restore_exception_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Entry calls may install hooks; never leave them attached to the pytest host."""
+    monkeypatch.setattr(sys, "excepthook", sys.excepthook)
+    monkeypatch.setattr(threading, "excepthook", threading.excepthook)
 
 
 @pytest.mark.timeout(10)
@@ -1042,17 +1051,25 @@ def test_built_in_stdlib_and_bundle_modules_are_not_from_the_pack(tmp_path: Path
     ("body", "status"), [("raise SystemExit(5)", 5), ("raise RuntimeError('boom')", 1)]
 )
 def test_a_pack_modules_exit_passes_and_its_exception_is_printed_not_raised(
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
     capsys: pytest.CaptureFixture[str],
     pack: tuple[Path, list[tuple[str, Any]]],
     body: str,
     status: int,
 ) -> None:
-    """``SystemExit`` keeps its code; any other exception is printed, status 1 (no dialog)."""
+    """Explicit exits keep their code; an exception logs, prints one line and exits 1."""
     site, _ = pack
     name = f"packmod_exit{status}"
     _package(site, name, body=body)
     import clearwater.__main__ as entry
 
+    # The pack fixture stubs normal GUI logging. Fatal reporting needs the real
+    # handler, still resolving only the fixture's disposable profile.
+    monkeypatch.setattr(config_log, "configure_logging", _configure_logging)
+    request.addfinalizer(config_log.shutdown_logging)
+    exits: list[int] = []
+    monkeypatch.setattr(os, "_exit", exits.append)
     result: object
     try:
         result = entry.main(["Clearwater.exe", "-m", f"{name}.probe"])
@@ -1060,7 +1077,12 @@ def test_a_pack_modules_exit_passes_and_its_exception_is_printed_not_raised(
         result = stop.code
     assert result == status
     err = capsys.readouterr().err
-    assert ("RuntimeError: boom" in err) == (status == 1)
+    assert err.count("\n") == (1 if status == 1 else 0)
+    assert exits == ([1] if status == 1 else [])
+    if status == 1:
+        assert "RuntimeError: boom" in config_paths.app_locations().log_file.read_text(
+            encoding="utf-8"
+        )
 
 
 @pytest.mark.parametrize(

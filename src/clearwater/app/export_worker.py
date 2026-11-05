@@ -437,4 +437,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    from clearwater.__main__ import install_exception_hooks
+
+    install_exception_hooks()
     sys.exit(main())

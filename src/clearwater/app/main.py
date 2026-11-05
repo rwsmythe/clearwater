@@ -23,14 +23,17 @@ The only ``clearwater.app`` module that imports ``clearwater.gui`` or loads Qt.
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import logging
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from threading import Event
 
+from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 from PySide6.QtGui import QCloseEvent
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from clearwater.analysis import AnalysisEngine
 from clearwater.config import Locations, app_locations
@@ -318,6 +321,42 @@ def build_application(
     return application
 
 
+def _present_exception(text: str) -> None:
+    """Show one plain log-path message, without exposing a traceback in the dialog."""
+    box = QMessageBox(QMessageBox.Icon.Critical, "Clearwater", text, QMessageBox.StandardButton.Ok)
+    box.setTextFormat(Qt.TextFormat.PlainText)
+    box.exec()
+
+
+class _ExceptionDialog(QObject):
+    """Marshal a fatal notification to Qt's thread before the reporter exits."""
+
+    requested = Signal(str, object)
+
+    def __init__(self, app: QApplication) -> None:
+        super().__init__(app)
+        self.requested.connect(self._show)
+
+    @Slot(str, object)
+    def _show(self, text: str, done: Event) -> None:
+        """A presenter failure must still release the reporting thread to exit."""
+        try:
+            with contextlib.suppress(BaseException):
+                _present_exception(text)
+        finally:
+            done.set()
+
+    def present(self, text: str) -> None:
+        """Show directly on Qt's thread, or queue and wait a bounded time from a thread."""
+        done = Event()
+        if QThread.currentThread() == self.thread():
+            self._show(text, done)
+        else:
+            self.requested.emit(text, done)
+            # A GUI whose event loop cannot run must not keep a failed process alive.
+            done.wait(30)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run Clearwater until its window closes (``python -m clearwater``).
 
@@ -327,9 +366,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     Returns:
         The Qt event loop's exit code.
     """
+    from clearwater.__main__ import install_exception_hooks
+
+    reporter = install_exception_hooks()
     existing = QApplication.instance()
     app = (
         existing if existing is not None else QApplication(list(sys.argv if argv is None else argv))
     )
+    assert isinstance(app, QApplication)
+    reporter.presenter = _ExceptionDialog(app).present
     _running = build_application(app_locations())  # held: the window lives while this does
     return int(app.exec())

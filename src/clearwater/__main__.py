@@ -34,8 +34,8 @@ before any other, and the GUI branch opens the log file before the loader logs i
 source run (``python -m clearwater``) does neither, exactly as 1.0.0: the loader is a no-op
 there and the shell configures logging itself.
 
-Only the standard library and :mod:`clearwater.gpu_pack` are imported at module level; each
-branch imports what it needs.
+Only the standard library is imported at module level. Fatal exception hooks are installed
+before product imports; headless branches never enable the GUI's log-path notification.
 """
 
 from __future__ import annotations
@@ -44,9 +44,134 @@ import contextlib
 import logging
 import os
 import sys
-from collections.abc import MutableMapping, Sequence
+import threading
+import traceback
+from collections.abc import Callable, MutableMapping, Sequence
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from types import TracebackType
+from typing import cast
 
-from clearwater import gpu_pack
+
+class _ExceptionReporter:
+    """Report the first uncaught failure without delegating to stderr logging handlers.
+
+    The hook is its own process-wide identity marker: executing this file as a script and
+    later importing its canonical module must share the same reporter and GUI callback.
+    """
+
+    _clearwater_exception_reporter = True
+
+    def __init__(self) -> None:
+        self.presenter: Callable[[str], None] | None = None
+        self._lock = threading.Lock()
+        self._reported = False
+
+    def __call__(
+        self,
+        kind: type[BaseException],
+        error: BaseException,
+        trace: TracebackType | None,
+    ) -> None:
+        """Flush one traceback and stderr line, optionally notify Qt, then exit the process."""
+        if issubclass(kind, SystemExit):
+            return  # CPython does not report explicit exits, including those in threads
+        if not self._lock.acquire(blocking=False):
+            return  # reporting itself may fail or re-enter through a user-supplied sink
+        try:
+            if self._reported:
+                return
+            self._reported = True
+        finally:
+            self._lock.release()
+
+        path: Path | None = None
+        available = False
+        try:
+            from clearwater.config.paths import app_locations
+
+            path = app_locations().log_file
+            from clearwater.config.log import configure_logging
+
+            text = "".join(traceback.format_exception(kind, error, trace))
+            # Normal logging may not exist yet. Avoid propagation to a parent's stderr
+            # or the export worker's protocol handler, which would duplicate the traceback.
+            configure_logging(path.parent)
+            handler = next(
+                handler
+                for handler in reversed(logging.getLogger("clearwater").handlers)
+                if isinstance(handler, RotatingFileHandler)
+                and handler.baseFilename == os.path.abspath(path)
+            )
+            record = logging.LogRecord(
+                "clearwater",
+                logging.CRITICAL,
+                __file__,
+                0,
+                "Unhandled exception\n" + text,
+                (),
+                None,
+            )
+            handler.acquire()
+            try:
+                # Use the owning handler's rotation and formatter, but write directly:
+                # emit() swallows IO errors and can print an extra logging traceback.
+                handler.flush()
+                if handler.shouldRollover(record):
+                    handler.doRollover()
+                stream = handler.stream
+                assert stream is not None
+                stream.write(handler.format(record) + handler.terminator)
+                handler.flush()
+            finally:
+                handler.release()
+            available = True
+        except BaseException:
+            pass  # no fallback file, default hook or recursive traceback dialog
+
+        intended = str(path) if path is not None else "Clearwater product log (path unavailable)"
+        location = intended.encode("ascii", "backslashreplace").decode("ascii")
+        location = location.replace("\r", r"\r").replace("\n", r"\n")
+        detail = f"see log: {location}" if available else f"log unavailable: {location}"
+        line = f"Clearwater: unexpected error; {detail}"
+        try:
+            if sys.stderr is not None:
+                sys.stderr.write(line + "\n")
+                sys.stderr.flush()
+        except BaseException:
+            pass
+        try:
+            if self.presenter is not None:
+                self.presenter(line)
+        except BaseException:
+            pass
+        # SystemExit raised on a worker thread would terminate only that thread. A fatal
+        # error must also end a GUI or child with non-daemon threads still running.
+        os._exit(1)
+
+    def thread_exception(self, args: threading.ExceptHookArgs) -> None:
+        """Route a Python thread's uncaught exception through the same process-wide hook."""
+        error = args.exc_value
+        if error is None:
+            error = args.exc_type()
+        self(args.exc_type, error, args.exc_traceback)
+
+
+def install_exception_hooks() -> _ExceptionReporter:
+    """Install/reuse the stdlib-only fatal reporter before importing product dependencies.
+
+    Returns:
+        The active reporter; only the GUI entry enables its optional Qt presenter.
+    """
+    current = sys.excepthook
+    if getattr(current, "_clearwater_exception_reporter", False):
+        reporter = cast(_ExceptionReporter, current)
+    else:
+        reporter = _ExceptionReporter()
+        sys.excepthook = reporter
+    threading.excepthook = reporter.thread_exception
+    return reporter
+
 
 WORKER_FLAG = "--export-worker"
 """The first argument that selects the export worker branch."""
@@ -247,8 +372,8 @@ def run_interpreter_option(arguments: Sequence[str]) -> int:
     ``[<module's file>, *args]`` as CPython's ``-m`` gives it) only when the pack is loaded and
     the module's top-level package resolves from it (:func:`clearwater.gpu_pack.module_from_pack`).
     A missing module name, an absent or rejected pack, or any other module is refused. An
-    exception escaping the module is printed to stderr and gives status 1 (as CPython does),
-    so a windowed build shows no traceback dialog; ``SystemExit`` passes through.
+    exception escaping the module uses the fatal log/stderr reporter and exits 1 without
+    a window; ``SystemExit`` passes through.
 
     Args:
         arguments: The program name, then a re-entry as :func:`interpreter_reentry`
@@ -258,6 +383,9 @@ def run_interpreter_option(arguments: Sequence[str]) -> int:
         The exit status: the module's (0 when it returns), 1 on an exception, or
         :data:`REFUSED_STATUS`.
     """
+    reporter = install_exception_hooks()
+    from clearwater import gpu_pack
+
     if arguments[1] == COMMAND_OPTION:
         return _refuse("-c is not supported")
     if len(arguments) < 3 or not arguments[2]:
@@ -270,22 +398,22 @@ def run_interpreter_option(arguments: Sequence[str]) -> int:
     if not gpu_pack.module_from_pack(module, site):
         return _refuse(f"-m {module!a}: not a GPU pack module")
     import runpy
-    import traceback
 
     sys.argv[:] = [arguments[0], *arguments[3:]]
     try:
         runpy.run_module(module, run_name="__main__", alter_sys=True)
     except SystemExit:
         raise
-    except BaseException:
-        if sys.stderr is not None:
-            traceback.print_exc()
+    except BaseException as error:
+        reporter(type(error), error, error.__traceback__)
         return 1
     return 0
 
 
 def _removal_pending(*, log: bool = True) -> bool:
     """Read the shared marker without installer side effects on worker/child branches."""
+    from clearwater import gpu_pack
+
     try:
         marker = gpu_pack.pending_removal_path()
         pending = marker is not None and marker.exists()
@@ -306,6 +434,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     Returns:
         The exit status of the branch run.
     """
+    install_exception_hooks()
+    from clearwater import gpu_pack
+
     arguments = list(sys.argv if argv is None else argv)
     # The FIRST statement after the arguments are read (A r3 #3, r4 #5; CHARC bae5dba5 (3)).
     if getattr(sys, "frozen", False) and multiprocessing_reentry(arguments):
@@ -383,4 +514,5 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    install_exception_hooks()
     raise SystemExit(main())
