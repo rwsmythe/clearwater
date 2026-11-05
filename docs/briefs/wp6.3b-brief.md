@@ -1,6 +1,6 @@
-# WP6.3b — Release workflow, bundled FFmpeg and its notices, checklist v2, guide (dispatch brief, DRAFT)
+# WP6.3b — Release workflow, bundled FFmpeg and its notices, checklist v2, guide (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-11-04 by CHARC (generation 15, session `clearwater-charc-20261104-0027`) after the WP6.1 accept `b2eb4f74` and CP6a (owner verbatim "onedir"). Second half of the plan's WP6.3; dispatched AFTER WP6.3a's accept (the artifact must carry the downloader). The orchestrator fills the dispatch section; CHARC marks it FINAL. Spec v0.6.2; no spec clause changes (N13 and N14 are satisfied, not changed). Owner decisions inside the package: the FFmpeg build provider (Q1) is CHARC's call unless the cell's licence read finds a problem, which goes to the owner; the version bump to 1.1.0 and the tag are the owner's word at release time, not this package's.
+**Status:** FINAL 2026-11-05 ~01:45Z by CHARC gen 16 (session `clearwater-charc-20261104-0738`) on orchestrator gen 47's fill `8479efb4`: the three owned additions CONFIRMED, seat clarifications 1-6 CONFIRMED (see the FINAL tail); binding together with the 'CHARC additions'. DRAFT 2026-11-04 by CHARC (generation 15, session `clearwater-charc-20261104-0027`) after the WP6.1 accept `b2eb4f74` and CP6a (owner verbatim "onedir"). Second half of the plan's WP6.3; dispatched AFTER WP6.3a's accept (the artifact must carry the downloader). The orchestrator fills the dispatch section; CHARC marks it FINAL. Spec v0.6.2; no spec clause changes (N13 and N14 are satisfied, not changed). Owner decisions inside the package: the FFmpeg build provider (Q1) is CHARC's call unless the cell's licence read finds a problem, which goes to the owner; the version bump to 1.1.0 and the tag are the owner's word at release time, not this package's.
 
 | Field | Content |
 |---|---|
@@ -16,7 +16,7 @@
 | Markers | The tool tests parallel-leg (no marker; the fetch is mocked with a local file URL; the smoke test is exercised on a synthetic folder with a stub executable). No `gpu`, `footage`, `gui`, `slow`. |
 | Hardware flags | None for the cell. The orchestrator's seat: one local build with `--ffmpeg-from` (the real fetch, pinned), `--smoke`, `--notices`, `--zip`, and the V4 container check on one video export made with the BUNDLED FFmpeg (the existing `tools/` instrument), plus one GPU export through the pack to show the encoder probe finds `hevc_nvenc` in the bundled binary. |
 | Out of scope | Code signing, SmartScreen reputation, an installer (MSIX / Inno), auto-update, telemetry; macOS (WP6.5 adds the `macos-latest` job to this workflow); Linux; a non-draft publish (the owner clicks "publish" on the draft); a CPU/GPU split of the artifact (one artifact, N14). |
-| Debt and decided items | At the accept CHARC writes: N13 SATISFIED for 1.1.0 on the artifact notices; AD-38 (the release workflow and the FFmpeg bundle rule); the WP6.1 fold-in advisories (a), (e) and the `--verify` link rule CLOSED here or carried; DR-129 opened for any component whose corresponding source the cell could only cite indirectly; the checklist v2 pointer in CLAUDE.md. The 1.1.0 release record itself is written by CHARC at the release, not here. |
+| Debt and decided items | At the accept CHARC writes: N13 SATISFIED for 1.1.0 on the artifact notices; AD-38 (the release workflow and the FFmpeg bundle rule); the WP6.1 fold-in advisories (a), (e) and the `--verify` link rule CLOSED here or carried; a NEW register row (the next free number; DR-129 is the review-driver row) opened for any component whose corresponding source the cell could only cite indirectly; the checklist v2 pointer in CLAUDE.md. The 1.1.0 release record itself is written by CHARC at the release, not here. |
 | Done | Plan 4.5. ruff / format / mypy clean (the tool modules are under mypy strict); the new tests green; the seat's local build + smoke + notices + zip green with the V4 check; `actionlint` (or the workflow's own `--dry-run` job) clean on `release.yml`; the report; Reviewer A converged; Reviewer B clean or its single remediation done. The REAL workflow run is the release step's proof (the owner's push), recorded in the 1.1.0 release record, not a condition of this accept. |
 
 ## Why
@@ -57,13 +57,60 @@ Standard Codex turns through `scripts/codex_cell.py`: round 0 (the design read-b
 
 ## Dispatch (orchestrator fills)
 
-- Base commit: (fill)
-- Lane paces at dispatch: (fill)
-- Worktree and session: (fill)
-- Depth at each yield: (fill)
+Filled by orchestrator gen 47, 2026-11-05 ~01:45Z, for CHARC's FINAL.
+
+- **Base commit:** main at the commit that marks this brief FINAL, which is AFTER WP6.4's accept. WP6.4 edits `docs/user-guide.md` section 7 (the macOS upgrade notice), and this package rewrites section 7's "no packaged executable" line, so 6.3b starts from the merged guide. The worktree is `.worktrees/wp6.3b`, branch `wp6.3b`, created from that commit. Before turn 1 the seat runs `uv sync --frozen --extra gpu` there, the same environment as `.worktrees/wp6.3a` (CuPy present), so that `build.py`'s hidden-import scan and the seat build read the eleven RECORDs. The cell reads the brief at that HEAD.
+- **Lane paces at the fill** (read 2026-11-05 00:48Z; re-read at turn 1):
+  - Codex 6 % used, pace 0.687 (resets 2026-11-11 10:07Z);
+  - Claude 50 % used, pace 1.337 (resets 2026-11-09 10:00Z).
+
+  **The lane is CODEX, as commissioned.** The package touches no frozen interface: the exception hook and the cache variables sit in `__main__.py` / `app/main.py`, outside `interfaces/`. Codex is also the lower pace. Both nets are therefore Claude: Reviewer A by `codex_cell.py review` at the seat on a detached copy `.worktrees/wp6.3b-rA`, to convergence, with the five-round gate; Reviewer B is a full Claude pass at the seat. Every Claude review prompt bans `run_in_background`.
+- **Worktree and session:** `C:\Users\rwsmy\clearwater\.worktrees\wp6.3b`. The cell is `implementer-codex-sol-high`, driven by `scripts/codex_cell.py turn` with an ABSOLUTE `--worktree`. Turn 1 = round 0 is a FRESH session; its prompt is the cell definition, this brief at HEAD and dispatch-1, joined. Evidence goes to `C:\Users\rwsmy\clearwater-review-evidence\wp6.3b\` (`cell\`, `A\`, `B\`, `seat\`, `gate\`).
+- **Depth at each yield:** the footer's `depth_input_tokens`, read at every turn end and recorded with its moment in the report's round ledger and in each dispatch. Evaluate at about 200K. STOP near 250K: the next turn is a fresh session, from the report and the dispatches.
+- **Binding text pasted into EVERY dispatch:** the DESKTOP INPUT RULE and the ENTRY-POINT ISOLATION RULE, verbatim from CLAUDE.md. The planted-exception smoke row (CHARC additions) and the hook's Qt box test run offscreen or under the frozen smoke's UIA watch, never with a visible desktop window. Any cell-written GUI or proof script is grepped at the seat for SendKeys / AppActivate / SendInput / keybd_event / mouse_event / pyautogui / SetForegroundWindow, and is RUN AT THE SEAT FROM md5-CHECKED COPIES.
+
+**Owned files added by this fill** (each is a carried item named in the orchestrator state or CHARC's rulings; CHARC's FINAL confirms or strikes each):
+
+1. **`tools/package/build.py:645` (WP6.4 D4 (d)):** the expression-form platform guard `suffix = ".exe" if sys.platform == "win32" else ""` becomes AD-36's statement form, one edit. `mypy --platform darwin` on the file stays clean. The file is already owned; this names the site.
+2. **WP6.3a's B delta 2 ADV-1..3, banked here:**
+   - **ADV-1 (`src/clearwater/gpu_pack_install.py:737-756`, ONE site, owned for this item only):** after `os.replace` publishes the pack, an exception other than the directory-fsync `OSError` reaches the outer handlers and reports "cancelled" or an error while the complete pack is kept. Examples: `KeyboardInterrupt` during the fsync off win32, Ctrl+C in the gap before `staging = None`, or a raise from `_ascii`. The fix: once the rename has succeeded, the outcome is SUCCESS with the restart line. A later failure is at most one warning line, the pack is never removed by the `finally` (AD-33 as amended at `e2013308`: "a failure after the rename keeps the pack"), and a `KeyboardInterrupt` after publication is reported as installed, not swallowed silently. Tests in `tests/test_gpu_pack_install.py` (owned for these tests only): a raise injected after `os.replace` (a non-`OSError`, and `KeyboardInterrupt`) gives success with the pack kept and the full check clean.
+   - **ADV-2 (`docs/user-guide.md` section 2 and `tools/package/README.md:156`; the README becomes owned for this recipe only):** the PowerShell form `Start-Process -Wait ... -RedirectStandardOutput install.log -RedirectStandardError install.err` splits the streams. The N13 notice goes to `install.log`, while the progress lines and the outcome go to `install.err`. The text names both files and says the outcome is in `install.err`, or uses a form that merges them. A PowerShell `--remove-gpu-pack` form is added beside the cmd one. Section 2 is rewritten here anyway (design item 8); the cmd form stays byte-equal in meaning.
+   - **ADV-3 (`tests/test_gpu_pack_install.py:1480-1494`, test only):** the A5 never-reports-a-PID fallback of the mapped-image child test is forced once: a child that exits without printing its PID, and the test's fallback path observed. No product change.
+3. **The exception hook (CHARC additions):** `src/clearwater/__main__.py` and `src/clearwater/app/main.py`. Both are present on main; the frozen entry dispatches at `__main__.py:300` `main`, and the `activate()` sites are `:266`, `:353` and `:379`. Their tests go in `tests/test_frozen_entry.py` and a NEW `tests/test_exception_hook.py` (source; Qt offscreen for the box, no `exec()`). Both entries follow the Entry-point isolation rule: redirected roots, GUI blocked or `app.main` stubbed, bounded. The cache variables (design item 6) go beside the `activate()` calls in `__main__.py` on every branch, as CHARC prefers. The cell confirms the file at round 0.
+
+**Seat clarifications (CHARC confirms or rules at FINAL):**
+
+1. **The cell is OFFLINE** (the Codex sandbox has no network; 6.3a's loopback refusal showed it).
+   - **Q1's provider read at round 0** is a CLAIM LIST from the cell's knowledge: the provider, the exact release and asset name, the archive URL form, what the provider publishes for (a)-(d) of design item 2, and the configure-line flags it expects. **The seat verifies every claim against the live pages before CHARC rules round 0**, and records the checked URLs in `wp6.3b\seat\q1-verify.md`.
+   - The ONE real archive fetch (to pin the sha256 and read the archive's own `LICENSE` and configure line) is the seat's, after round 0 is ruled. The cell writes `ffmpeg.lock.json` from the seat's verified record in turn 2.
+   - A provider fact the seat cannot verify is a STOP to CHARC. It is never a guess written into the lock.
+2. **`actionlint` is not installed on this laptop.** The seat downloads ONE pinned `actionlint` release binary (Windows x64, its sha256 checked against the release's checksums file) into `work/tools/`, as a dev tool. It is not a project dependency, nothing goes into `pyproject.toml`, and it is run on `release.yml` at the seat. The workflow's `--dry-run` alternative is not needed.
+3. **The FFmpeg major (Q1):** the laptop's FFmpeg is 9.0.2 (gyan.dev). A 9.x release from the chosen provider keeps D26 and the V4 equivalences. A different major is the brief's STOP.
+4. **Disk:** the seat build needs the onedir (about 670 MiB with FFmpeg), the archive (about 150-200 MB), the zip (about 300 MB) and the smoke roots; 25 GB free is checked before it. The WP6.1 hand-filled pack is not needed (the V4 export runs on the CPU unless a pack is present; 6.3a's seat removed its own).
+5. **The workflow's REAL run is not part of this accept** (the brief's Done row). Nothing in this package pushes, tags or dispatches a workflow; the seat does not run `gh workflow run`.
+6. **Gate:** the two-leg gate plus harness, `mypy --platform darwin` (W-STATIC, as of WP6.4's accept), and a module-alone run of `tests/test_gpu_pack_install.py` (6.3a's F2 check, because ADV-1 touches it).
 
 ## CHARC additions (gen 16, 2026-11-04 ~19:20Z, from WP-DR125 Reviewer B r1b; binding on the fill)
 
 - **`--disable-windowed-traceback` in `build.py`'s PyInstaller arguments (6.3b owns `build.py`).** Today any unhandled exception in ANY frozen process (the GUI, the worker, a `-m` re-entry, the headless rows) opens PyInstaller's modal traceback dialog: a child hangs its parent, and a dialog appears with nobody watching it. With the flag an unhandled exception exits non-zero, which AD-31's parent already handles.
 - **Companion, REQUIRED (the product has NO exception hook today; without one the flag turns a GUI start-up failure into a silent exit):** a product exception hook installed at every entry (`sys.excepthook` and `threading.excepthook`) in the entry module: it writes the traceback to the product log (AD-25's log file) and one line to stderr, then exits non-zero; in the GUI process once Qt is up, it also shows ONE plain message box naming the log file before exiting (no traceback text in the box). Worker and `-m` children: log + stderr + exit only, no window. Owned files gain the entry module(s) for this hook (`src/clearwater/__main__.py` and `app/main.py` as the fill finds them) and its tests (source, Qt offscreen for the box; the frozen smoke of item 4 gains a planted-exception row: exit non-zero, one stderr line, NO window under the UIA watch).
 - Record at the accept: AD-38 gains the flag and the hook; the hook is the N1-clean replacement of the bootloader dialog.
+
+## FINAL (CHARC gen 16, 2026-11-05 ~01:45Z, on the fill `8479efb4`)
+
+FINAL as filled. Base = main at this FINAL commit's successor AFTER WP6.4's accept (6.3b starts from the merged guide). Lane CODEX, both nets Claude, every review prompt banning `run_in_background`. The three owned additions are each CONFIRMED:
+
+1. `tools/package/build.py:645` to AD-36's statement form (WP6.4 D4 (d)): confirmed; `build.py` is owned anyway.
+2. WP6.3a's ADV-1..3: confirmed as the fill words them. ADV-1's rule, binding: once `os.replace` has published the pack the outcome is SUCCESS with the restart line, a later failure is at most one warning, the `finally` never removes a published pack, and a `KeyboardInterrupt` after publication reports installed (never silent). The `gpu_pack_install.py` grant is that ONE site and its tests; nothing else in 6.3a's files.
+3. The exception hook and the cache variables in `__main__.py` (beside each `activate()` site, every branch) and `app/main.py`, with `tests/test_exception_hook.py` NEW and `tests/test_frozen_entry.py`: confirmed, as the "CHARC additions" bind. The hook's GUI box is ONE plain message naming the log file, no traceback text; worker and `-m` children log + stderr + exit only.
+
+Seat clarifications 1-6 are each the brief's intended reading:
+
+- (1) The offline cell's Q1 read is a CLAIM LIST; the seat verifies every claim against the live pages and records `wp6.3b\seat\q1-verify.md` BEFORE CHARC rules round 0; an unverifiable provider fact is a STOP, never a guess in `ffmpeg.lock.json`; the one real archive fetch is the seat's, after round 0.
+- (2) `actionlint`: ONE pinned release binary, sha256 against the release's checksums file, into `work/tools/` (gitignored), a dev tool only; the seat's one network fetch for it is authorised; it never enters `pyproject.toml`.
+- (3) FFmpeg 9.x only (the laptop's 9.0.2); a different major is the brief's STOP.
+- (4) 25 GB free checked before the seat build; the WP6.1 hand-filled pack is not needed.
+- (5) Nothing pushes, tags or dispatches a workflow; the real run is the release's.
+- (6) The gate: two legs + harness + `mypy --platform darwin` + the module-alone `tests/test_gpu_pack_install.py` run.
+
+Record numbering: the "Debt and decided items" row's "DR-129" is corrected above to "the next free number". At the accept CHARC writes AD-38 (the workflow, the FFmpeg bundle rule, the flag + hook), N13 SATISFIED for 1.1.0 on the artifact notices, the WP6.1 advisories' dispositions, the checklist v2 pointer in CLAUDE.md.
