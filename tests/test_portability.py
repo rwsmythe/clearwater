@@ -18,15 +18,18 @@ import ast
 import errno
 import hashlib
 import importlib
+import importlib.util
 import io
 import logging
 import os
+import posixpath
+import stat
 import sys
 import tokenize
 from collections.abc import Sequence
 from dataclasses import replace
 from fractions import Fraction
-from pathlib import Path
+from pathlib import Path, PurePath
 from types import SimpleNamespace
 from typing import Any
 
@@ -2261,30 +2264,62 @@ def _planted(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     return root, alias, alias / "out", sibling / "out"
 
 
-def posix_link_model(links: dict[Path, Path]) -> Any:
-    """A ``realpath`` in POSIX's order over a virtual link table, in this host's path syntax.
+def posix_link_model(links: dict[Path, Path], cwd: PurePath | None = None) -> Any:
+    """The stdlib's own ``posixpath.realpath`` over a virtual link table, in host syntax.
 
-    The names are taken left to right; a name the table holds as a link is replaced by its
-    target (itself resolved), and a ``..`` then drops the last name of the RESOLVED prefix.
-    Win32 collapses ``..`` by text BEFORE it follows a junction, so this topology cannot be
-    built natively on Windows; the M module builds it with a real symlink on the Mac.
+    A private copy of ``posixpath`` (never the imported module) runs with its ``os`` replaced
+    by a virtual file system (A r3 #3): ``lstat`` reports each table entry as a link (keyed by
+    ``os.path.normcase``, so this host's case rule picks the entry) and every other name as a
+    folder, ``readlink`` gives the entry's target (a relative target stays relative, so the
+    stdlib resolves it against the link's CONTAINING folder), ``stat`` refuses a loop with
+    ``ELOOP`` (``strict`` only) and ``getcwd`` gives ``cwd`` (default the real one). Loops are
+    the stdlib's own: non-strict, the rest is appended unresolved. A drive path ``C:\\x`` runs
+    as ``/C:/x`` and comes back in host syntax. Win32 collapses ``..`` by text BEFORE it
+    follows a junction, so this topology cannot be built natively on Windows; the M module
+    builds it with a real symlink on the Mac.
     """
     table = {os.path.normcase(str(link)): target for link, target in links.items()}
 
+    def virtual(path: PurePath | str) -> str:
+        text = PurePath(path).as_posix()
+        return "/" + text if PurePath(path).is_absolute() and text[:1] != "/" else text
+
+    def host(text: str) -> str:
+        drive = PurePath(text[1:]).drive  # "/C:/x" -> "C:" on a drive host; "" on POSIX
+        if not drive:
+            return str(PurePath(text))
+        return str(PurePath(drive + "/") / text[1 + len(drive) :].lstrip("/"))
+
+    def getcwd() -> str:
+        return virtual(cwd if cwd is not None else os.getcwd())
+
+    def key(path: str) -> str:  # a relative name is looked up from the working folder
+        return os.path.normcase(host(posixpath.join(getcwd(), path)))
+
+    def lstat(path: str) -> SimpleNamespace:
+        mode = stat.S_IFLNK if key(path) in table else stat.S_IFDIR
+        return SimpleNamespace(st_mode=mode | 0o755)
+
+    def readlink(path: str) -> str:
+        return virtual(table[key(path)])
+
+    def loop(path: str) -> None:
+        raise OSError(errno.ELOOP, "virtual link loop", path)
+
+    spec = importlib.util.spec_from_file_location("_virtual_posixpath", posixpath.__file__)
+    assert spec is not None and spec.loader is not None
+    private = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(private)
+    private.os = SimpleNamespace(  # type: ignore[attr-defined]
+        fspath=os.fspath,
+        lstat=lstat,
+        readlink=readlink,
+        stat=loop,
+        getcwd=getcwd,
+    )
+
     def realpath(path: Any, *, strict: bool = False) -> str:
-        given = Path(os.fspath(path))
-        if not given.is_absolute():
-            given = Path(os.getcwd()) / given
-        current = Path(given.anchor)
-        for name in given.parts[1:]:
-            if name == "..":
-                current = current.parent
-            elif name != ".":
-                current = current / name
-                target = table.get(os.path.normcase(str(current)))
-                if target is not None:
-                    current = Path(realpath(target))
-        return str(current)
+        return host(private.realpath(virtual(os.fspath(path)), strict=strict))
 
     return realpath
 
@@ -2301,6 +2336,34 @@ def link_topology(tmp_path: Path) -> tuple[Path, Path, dict[Path, Path]]:
     (tmp_path / "Footage-out").mkdir()
     alias = tmp_path / "alias"
     return root, alias / ".." / "output", {alias: root / "sub"}
+
+
+@pytest.mark.parametrize(
+    ("links", "cwd", "given", "expected"),
+    [
+        (
+            {"/review/deep/alias": "../Footage/sub"},
+            "/review",
+            "deep/alias/../output",
+            "Footage/output",
+        ),
+        ({"/review/loop": "/review/loop"}, "/review", "loop/x", "loop/x"),
+        ({"/review/alias": "/review/Footage/sub"}, "/review", "alias/../output", "Footage/output"),
+        ({"/review/alias": "/review/Footage/sub"}, "/review", "alias/../../x", "x"),
+    ],
+    ids=["relative-target", "self-loop", "absolute-target", "above-target"],
+)
+def test_portability_posix_link_model_agrees_with_posixpath(
+    links: dict[str, str], cwd: str, given: str, expected: str
+) -> None:
+    """A r3 #3: the model is ``posixpath.realpath`` itself, so a relative target resolves from
+    the link's folder and a loop is non-strict; the values are Python 3.12's, under ``/review``."""
+    model = posix_link_model({Path(k): Path(v) for k, v in links.items()}, cwd=PurePath(cwd))
+    assert PurePath(model(Path(given))).as_posix() == f"/review/{expected}"
+    if "loop" in given:
+        with pytest.raises(OSError) as caught:
+            model(Path(given), strict=True)
+        assert caught.value.errno == errno.ELOOP
 
 
 def tree(root: Path) -> list[str]:
@@ -3890,58 +3953,156 @@ def _is_patch_context(node: ast.expr) -> bool:
     return isinstance(node, ast.Call) and ast.unparse(node.func) == "pytest.MonkeyPatch.context"
 
 
-def shared_monkeypatch_offenders(source: str) -> list[str]:
-    """Return ``function:line`` for each borrowed W case that could share a monkeypatch.
+W_HELPERS = frozenset(
+    {"guard_form_offenders", "labelled_rows", "_stub_probes", "_guard_refusals", "link_topology"}
+    | {"tree"}
+)
+"""The W instruments the M module may call through ``_w()`` (A r3 #2): none is a case registry,
+so none re-runs a W case under the native half's patches."""
+PATCH_OPERATIONS = frozenset(
+    {"setattr", "setitem", "delattr", "delitem", "setenv", "delenv", "syspath_prepend", "chdir"}
+)
+"""The ``MonkeyPatch`` operations; a call of one outside a function body patches at import."""
 
-    A borrowed case is any ``..._CASES[...]`` subscript of ``_w()``. It is isolated only when it
+
+def shared_monkeypatch_offenders(source: str) -> list[str]:
+    """Return ``scope:line`` for each way a borrowed W case could share a monkeypatch.
+
+    A borrowed case is a ``..._CASES[...]`` subscript of ``_w()``. It is isolated only when it
     is called directly, its first argument is the name bound by an enclosing ``with
     pytest.MonkeyPatch.context() as NAME``, that ``with`` holds nothing but the call (so no
-    native check runs under it) and NAME is used nowhere else in the function.
+    native check runs under it), NAME is used nowhere else in the function, and the fixture
+    ``monkeypatch`` is not used before that ``with`` (so no fixture patch, ``setitem`` on a
+    module ``__dict__`` included, is live under the W case).
+
+    Every other form is CLASSIFIED or an offender (A r3 #2): a ``_CASES`` reference of any
+    other shape (through an alias such as ``w = _w()``, a name, ``getattr`` text or an import);
+    ``_w`` used other than as ``_w().ATTRIBUTE``, or with an attribute neither a registry nor
+    in :data:`W_HELPERS`; the W module named outside ``_w``; a ``MonkeyPatch`` built other than
+    as a ``with`` item's ``MonkeyPatch.context()``; and, outside every function body (module
+    and class level, decorators, defaults), any :data:`PATCH_OPERATIONS` call or assignment to
+    an attribute or subscript. ``scope`` is the innermost function, or ``<module>``.
     """
     tree = ast.parse(source)
-    offenders = []
-    for function in (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)):
+    parents: dict[ast.AST, ast.AST] = {}
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+    scope_of: dict[ast.AST, ast.FunctionDef | ast.AsyncFunctionDef] = {}
+    for function in (
+        n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef)
+    ):
+        for statement in function.body:
+            for node in ast.walk(statement):
+                inner = scope_of.get(node)
+                if inner is None or inner.lineno < function.lineno:
+                    scope_of[node] = function  # the innermost (latest-starting) function wins
+    offenders: list[str] = []
+
+    def offend(node: ast.AST) -> None:
+        scope = scope_of.get(node)
+        offenders.append(f"{scope.name if scope else '<module>'}:{getattr(node, 'lineno', 0)}")
+
+    def isolated(node: ast.Subscript) -> bool:
+        function = scope_of.get(node)
+        if function is None:
+            return False
         withs = [n for n in ast.walk(function) if isinstance(n, ast.With)]
-        for node in ast.walk(function):
+        call = parents.get(node)
+        if not (isinstance(call, ast.Call) and call.func is node):
+            return False
+        first = call.args[0] if call.args else None
+        owner = next(
+            (
+                w
+                for w in withs
+                if len(w.items) == 1
+                and _is_patch_context(w.items[0].context_expr)
+                and isinstance(w.items[0].optional_vars, ast.Name)
+                and isinstance(first, ast.Name)
+                and w.items[0].optional_vars.id == first.id
+                and len(w.body) == 1
+                and isinstance(w.body[0], ast.Expr)
+                and w.body[0].value is call
+            ),
+            None,
+        )
+        if owner is None or not isinstance(first, ast.Name):
+            return False
+        uses = [
+            n
+            for n in ast.walk(function)
+            if isinstance(n, ast.Name) and n.id == first.id and n is not first
+        ]
+        fixture_before = [
+            n
+            for n in ast.walk(function)
+            if isinstance(n, ast.Name)
+            and n.id == "monkeypatch"
+            and isinstance(n.ctx, ast.Load)
+            and n.lineno < owner.lineno
+        ]
+        return uses == [owner.items[0].optional_vars] and not fixture_before
+
+    for node in ast.walk(tree):
+        parent = parents.get(node)
+        if isinstance(node, ast.Attribute) and node.attr.endswith("_CASES"):
             if not (
-                isinstance(node, ast.Subscript)
-                and isinstance(node.value, ast.Attribute)
-                and node.value.attr.endswith("_CASES")
-                and ast.unparse(node.value.value) == "_w()"
+                isinstance(parent, ast.Subscript)
+                and parent.value is node
+                and ast.unparse(node.value) == "_w()"
+                and isolated(parent)
             ):
+                offend(node)
+        elif isinstance(node, ast.Name) and node.id.endswith("_CASES"):
+            offend(node)  # a registry under a bare name (an alias or an import)
+        elif isinstance(node, ast.alias) and (
+            node.name.endswith("_CASES") or node.name.split(".")[0] == "test_portability"
+        ):
+            offend(node)  # an imported registry or the W module imported by name
+        elif isinstance(node, ast.ImportFrom) and (node.module or "").startswith(
+            "test_portability"
+        ):
+            offend(node)
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            in_w = isinstance(scope_of.get(node), ast.FunctionDef) and scope_of[node].name == "_w"
+            if "_CASES" in node.value or (node.value == "test_portability" and not in_w):
+                offend(node)
+        elif isinstance(node, ast.Name) and node.id == "_w" and isinstance(node.ctx, ast.Load):
+            call = parent
+            if not (isinstance(call, ast.Call) and call.func is node):
+                offend(node)  # the factory itself aliased or passed on
                 continue
-            call = next(
-                (c for c in ast.walk(function) if isinstance(c, ast.Call) and c.func is node), None
+            attribute = parents.get(call)
+            if not isinstance(attribute, ast.Attribute) or not (
+                attribute.attr.endswith("_CASES") or attribute.attr in W_HELPERS
+            ):
+                offend(node)  # the W module aliased, passed on, or an unclassified attribute
+        elif isinstance(node, ast.Call):
+            text = ast.unparse(node.func)
+            if text.endswith("MonkeyPatch") or (
+                text.endswith("MonkeyPatch.context")
+                and not (isinstance(parent, ast.withitem) and parent.context_expr is node)
+            ):
+                offend(node)  # a patcher that no ``with`` closes
+            elif (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr in PATCH_OPERATIONS
+                and node not in scope_of
+            ):
+                offend(node)  # a patch at import
+        elif (
+            isinstance(node, ast.Assign | ast.AugAssign | ast.AnnAssign | ast.Delete)
+            and node not in scope_of
+            and any(
+                isinstance(t, ast.Attribute | ast.Subscript)
+                for t in (
+                    node.targets if isinstance(node, ast.Assign | ast.Delete) else [node.target]
+                )
             )
-            first = call.args[0] if call is not None and call.args else None
-            owner = next(
-                (
-                    w
-                    for w in withs
-                    if len(w.items) == 1
-                    and _is_patch_context(w.items[0].context_expr)
-                    and isinstance(w.items[0].optional_vars, ast.Name)
-                    and isinstance(first, ast.Name)
-                    and w.items[0].optional_vars.id == first.id
-                    and len(w.body) == 1
-                    and isinstance(w.body[0], ast.Expr)
-                    and w.body[0].value is call
-                ),
-                None,
-            )
-            uses = (
-                [
-                    n
-                    for n in ast.walk(function)
-                    if isinstance(n, ast.Name) and n.id == first.id and n is not first
-                ]
-                if isinstance(first, ast.Name)
-                else []
-            )
-            bound = owner is not None and uses == [owner.items[0].optional_vars]
-            if not bound:
-                offenders.append(f"{function.name}:{node.lineno}")
-    return offenders
+        ):
+            offend(node)  # a module or class attribute replaced at import
+    return sorted(set(offenders), key=lambda o: (int(o.rsplit(":", 1)[1]), o))
 
 
 def test_portability_macos_module_isolates_every_borrowed_case() -> None:
@@ -3971,6 +4132,31 @@ def test_portability_macos_module_isolates_every_borrowed_case() -> None:
             "        _w().FS_CASES[site](w_patch, tmp_path)\n",
             "        case = _w().FS_CASES[site]\n        case(w_patch, tmp_path)\n",
         ),
+        "getattr text": isolated.replace("_w().FS_CASES", 'getattr(_w(), "FS_CASES")'),
     }
     for label, planted in leaks.items():
         assert shared_monkeypatch_offenders(planted) == ["test_x:3"], label
+    surviving = {  # A r3 #2's three forms that escaped the r2 pin, each caught now
+        "helper alias": (
+            "def test_x(site, monkeypatch, tmp_path):\n"
+            "    borrow_fs(site, monkeypatch, tmp_path)\n"
+            "    native(site, monkeypatch)\n"
+            "def borrow_fs(site, patch, tmp):\n"
+            "    w = _w()\n"
+            "    w.FS_CASES[site](patch, tmp)\n",
+            ["borrow_fs:5", "borrow_fs:6"],
+        ),
+        "module-level patch": (
+            '_mp = pytest.MonkeyPatch()\n_mp.setattr(subprocess, "run", print)\n' + isolated,
+            ["<module>:1", "<module>:2"],
+        ),
+        "fixture setitem": (
+            isolated.replace(
+                "    with pytest",
+                '    monkeypatch.setitem(subprocess.__dict__, "run", print)\n    with pytest',
+            ),
+            ["test_x:4"],
+        ),
+    }
+    for label, (planted, expected) in surviving.items():
+        assert shared_monkeypatch_offenders(planted) == expected, label
