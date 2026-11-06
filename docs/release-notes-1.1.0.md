@@ -7,8 +7,7 @@ the repository with uv, as 1.0.0 did.
 
 ## What is new since 1.0.0
 
-- **Windows one-folder download.** `Clearwater-1.1.0-win64.zip` (name as
-  attached) unzips to one folder; run `Clearwater.exe` from it. No installer
+- **Windows one-folder download.** `Clearwater-1.1.0-windows-onedir.zip` unzips to one folder; run `Clearwater.exe` from it. No installer
   and no system changes. The folder is unsigned, so Windows SmartScreen may
   ask you to confirm the first start. Built by GitHub Actions from the tagged
   commit; the zip's `.sha256` sidecar names the source commit.
