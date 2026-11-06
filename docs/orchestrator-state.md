@@ -5,10 +5,10 @@
 
 ### Generation
 
-- **Generation 55** (session `clearwater-orchestrator-20261106-0342`). LIVE 2026-11-06 ~13:43Z. ROLLED at the 400K cap after the WP6.3d second census pass returned, nothing running (no cell, no subagent working, no review, no build, no gate; `tasklist`: only the owner's `swing` and the comms UI Python). Bash gauge 37 ms.
+- **Generation 56** (session `clearwater-orchestrator-20261106-0830`). LIVE 2026-11-06 ~18:30Z. Bash gauge 44 ms. Inbox drained at pickup (empty), then `afa8eac3` (CHARC's pass-2 rulings).
 - **CHARC is gen 18, `clearwater-charc-20261105-1358`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
-- **Seat folder `work/orch-g55/`:** `gate.sh` + `watch2.sh` (repointed to orch-g55: copy both and repoint `L` for your seat), `build_uia.py` (gen 54's driver, md5 `48ae19ef...`), `gpu_proof.seat.py` (the Q3 GPU-proof driver: WP6.3c's export proof + `--gpu-pack`; derived by `make_gpu_proof.py` + `fix_gpu_proof.py`, final sha256 `e0332412...`; read in full at the seat, ruff clean, NOT yet run), `prune.py` (the owner's prune; `--dry-run` clean: 26 items + 2 worktrees, DR-148 check clean) + `prune-2026-11-06.skeleton.md`, `bump.py` / `bump2.py`, census briefs `stage-census-prompt.md` / `stage-census-2-prompt.md`, scratch `stage-census/`, posts and drains 1-8.
-- **State worktree:** `.worktrees/orch-state-g55` (remove it; add your own).
+- **Seat folder `work/orch-g56/`:** `gate.sh` + `watch2.sh` (repointed to orch-g56), `review63d.py` (codex_cell review wrapper excluding `native-licences/` and the root notices), `review-prompt-A1.draft.md` (Reviewer A r1 for WP6.3d; fill `@HEAD@` / `@BASE@`), `state_edit.py`, posts / drains. Gen 55's seat files (`build_uia.py`, `gpu_proof.seat.py`, `prune.py`, run sheet) stay in `work/orch-g55/`.
+- **State worktree:** `.worktrees/orch-state-g56`.
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
 
@@ -39,6 +39,8 @@
 - **Running downloaded build scripts is refused** by the auto-mode classifier ("code from external"). Read them as text (gen 48's `scriptsd_static.py`).
 
 ### Live board (RESUME HERE)
+
+**GEN 56 (top of board): WP6.3d Codex TURN 1 RUNNING** (launched ~18:34Z, background task at gen 56's seat; dies with the pane). Fresh session, worktree `.worktrees/wp6.3d` at `ad8ee70a` (ff'd to main). Dispatch `wp6.3d\cell\dispatch-1.md` (sha256 `c8f63044...`) = the whole package in one turn with CHARC's `7cf2e64a` / `7e8bdd22` / `afa8eac3` verbatim as Appendices A / B / C (C wins); prompt `prompt-1.md` (`43a66ade...`). Census (pass 1 + 2, 290 files) staged byte-identical into the worktree's `work/wp6.3d/census/`. CHARC's pass-2 rulings (`afa8eac3`): AML-glslang compatible, SPDX ids kept, + `AML-glslang` `MIT-Khronos-old` `LicenseRef-PFFFT-modified-BSD` `ISC-Veillard` in the component constant, libxml2 `MIT AND ISC-Veillard`, ONE OR-any parser, shaderc back to `Apache-2.0`, the two U5 scripts dropped, absent status = built. NEXT: turn return -> `codex_cell.py commit` (or pathspec commit in the worktree) -> seat QA (five package modules + harness; texts byte-checked vs `index-2.json`) -> Reviewer A r1 (Claude, `review63d.py review` from a DETACHED copy with `work/rva-input/dispatch-1.md` + `work/wp6.3d/census/` copied in) -> B -> seat rebuild -> CHARC accept -> ff -> the bump below. If the seat rolled with the turn running, the turn is LOST: re-launch it fresh from `prompt-1.md` on a clean worktree.
 
 **WP6.3c ACCEPTED + MERGED (main `c258f80a`, record `docs/proofs/wp6.3c-accept.md`).** The two WP6.3c worktrees are HELD for the owner's prune (below).
 
