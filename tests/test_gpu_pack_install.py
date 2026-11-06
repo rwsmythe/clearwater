@@ -337,7 +337,7 @@ def test_happy_path_is_a_fully_checked_pack(fake_index):
     total = sum(len(b) for b in fake_index.bodies.values())
     assert progress.reports[-1][:2] == (total, total)
     assert [r[0] for r in progress.reports] == sorted(r[0] for r in progress.reports)
-    assert all(agent == "Clearwater/1.0.0" for _, _, agent in fake_index.requests)
+    assert all(agent == "Clearwater/1.1.0" for _, _, agent in fake_index.requests)
 
 
 def test_hash_mismatch_stops_on_the_third_wheel(fake_index):
