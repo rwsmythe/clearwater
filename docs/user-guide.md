@@ -15,9 +15,6 @@ for future clips. See [accepted inputs and refusals](underwater-correction-spec.
 
 ## 2. Install on Windows 11 (from 1.1.0)
 
-These instructions describe the planned 1.1.0 artifact, which is not released yet.
-For the current source release, follow the
-[v1.0.0 installation instructions](https://github.com/rwsmythe/clearwater/blob/v1.0.0/docs/user-guide.md).
 The 1.1.0 Windows artifact bundles FFmpeg and ffprobe beside `Clearwater.exe`;
 its artifact notices identify their versions, terms and corresponding sources.
 
@@ -49,7 +46,7 @@ release page. This happens because the application is unsigned (N14).
 
 For GPU processing, choose **Tools > Install GPU support...**, review the wheels,
 sizes, destination and NVIDIA licence statement, then press **Download and install**.
-The pack is a large download (roughly 2.4 GB); the dialog calculates the exact
+The pack is a large download (about 1.7 GB to download, 2.5 GB installed); the dialog calculates the exact
 locked download size and installed-space estimate. Installing obtains the
 optional NVIDIA components separately under NVIDIA's EULA; the release zip
 contains no CUDA libraries. Wait for completion and restart Clearwater to use

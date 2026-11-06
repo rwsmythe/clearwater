@@ -23,10 +23,11 @@ the repository with uv, as 1.0.0 did.
   FFmpeg 9.0 (release branch, GPL build with x265 and NVENC), built from
   BtbN's build scripts in the maintainer's fork with the zvbi stage removed so
   that every component is GPL-3.0 compatible. `THIRD_PARTY_NOTICES.md` inside
-  the folder lists every bundled component with its licence and source,
-  including code compiled into the carried native libraries and into the FFmpeg
-  binary itself (its build components and the Rust and GCC runtimes), and
-  carries their licence texts, with the exceptions it names.
+  the folder lists every bundled component with its licence and source or
+  redistribution terms, including code compiled into the carried native
+  libraries and into the FFmpeg binary itself (its build components and the
+  Rust and GCC runtimes), and carries their licence texts, with the
+  exceptions it names.
 - **Hardened frozen application.** Video exports run in an isolated worker
   process with its own standard input; an unexpected error in the frozen app
   is written to the log and reported in one message instead of a silent exit;
