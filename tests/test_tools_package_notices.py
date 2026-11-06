@@ -244,10 +244,13 @@ version = "6.22.3"
 """)
     ffmpeg = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_text())
     ffmpeg["configure_line"] = (
-        "configuration: --enable-gpl --enable-version3 --enable-libx265 --disable-libzvbi"
+        "configuration: --enable-gpl --enable-version3 --enable-libx265 "
+        "--disable-libzvbi --extra-version=20261106"
     )
     ffmpeg["components"] = [next(c for c in ffmpeg["components"] if c["name"] == "x265")]
-    ffmpeg["excluded"] = []
+    ffmpeg["excluded"] = [r for r in ffmpeg["excluded"] if r["stage"] == "scripts.d/50-zvbi.sh"]
+    ffmpeg["toolchain_runtime"] = []
+    ffmpeg["toolchain"]["static_link_flags"] = []
     ffmpeg_path = tmp_path / "ffmpeg.lock.json"
     ffmpeg_path.write_text(json.dumps(ffmpeg))
     return {
@@ -283,11 +286,14 @@ def add_ffmpeg(release):
         "\n".join(
             [
                 f"Provider: {pin['provider']}",
+                f"Parent provider: {pin['parent_provider']['repository']} @ "
+                f"{pin['parent_provider']['commit']}",
                 f"Release tag: {pin['release_tag']}",
                 f"Asset: {pin['asset_name']}",
                 f"SHA256: {pin['github_sha256']}",
                 f"FFmpeg version: {pin['version']}",
                 f"FFmpeg commit: {pin['ffmpeg_commit']}",
+                f"FFmpeg ref: {pin['ffmpeg_ref']}",
                 f"Build repository commit: {pin['build_repository_commit']}",
                 f"Per-component source recipes: {pin['source_record_url']}",
                 pin["configure_line"],
@@ -469,8 +475,11 @@ def test_fork_ffmpeg_notices_render_all_built_sources_and_explain_exclusions(rel
     add_ffmpeg(release)
     result = plan(module, release)
     rows = [row for row in result.rows if row.name.startswith("FFmpeg")]
-    assert len(rows) == 101
-    assert len({row.licence_inputs for row in rows}) == 1
+    assert len(rows) == 333
+    assert (
+        len({row.licence_inputs for row in rows if not row.name.startswith("FFmpeg toolchain")})
+        == 1
+    )
     assert not any(row.name == "FFmpeg component: zvbi" for row in rows)
     output = module.render_notices(result).decode()
     assert output.count("### Bundled FFmpeg GPL-3.0") == 1
@@ -480,8 +489,118 @@ def test_fork_ffmpeg_notices_render_all_built_sources_and_explain_exclusions(rel
         "built from BtbN's scripts at 5031c6f1 with the zvbi stage disabled; "
         "FFmpeg release/9.0 at b204e94e"
     ) in output
-    assert "Excluded scripts.d/50-zvbi.sh: GPL-2.0-only src/packet-830.* / src/pdc.*" in output
+    assert (
+        "Excluded scripts.d/50-zvbi.sh (not-built(disabled)): "
+        "GPL-2.0-only src/packet-830.* / src/pdc.*" in output
+    )
+    assert "Build stage scripts.d/55-rustdedup.sh (BUILT):" in output
+    assert "Build stage scripts.d/zz-final.sh (ENTRY):" in output
     assert 'owner ruling 2026-11-05 "self-build is fine"' in output
+
+
+def test_ffmpeg_toolchain_census_renders_every_row_and_deduplicates_terms(release):
+    """Dropping a runtime row or duplicating shared full texts loses census coverage."""
+    module = load_notices()
+    lock = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_bytes())
+    release["ffmpeg"] = lock
+    release["ffmpeg_path"].write_text(json.dumps(lock))
+    add_ffmpeg(release)
+    rows = module._ffmpeg_rows(release["folder"], release["ffmpeg_path"])
+    runtime = [r for r in rows if r.name.startswith("FFmpeg toolchain runtime:")]
+    assert len(runtime) == 232
+    rendered = module.render_notices(module.NoticePlan(rows[0].entries, tuple(rows), ()))
+    runtime_only = module.render_notices(module.NoticePlan(rows[0].entries, tuple(runtime), ()))
+    # The root links byte-preserved inputs rather than copying them into a
+    # Markdown file whose line endings Git changes on Windows checkout.
+    root_annex = (
+        (ROOT / "THIRD_PARTY_NOTICES.md")
+        .read_text(encoding="utf-8")
+        .split("<!-- WP6.3c generated FFmpeg toolchain runtime census -->", 1)[1]
+    )
+    artifact = runtime_only.decode().replace("\r\n", "\n")
+    root_table = [
+        line.rsplit("|", 2)[0]
+        for line in root_annex.splitlines()
+        if line.startswith("| FFmpeg toolchain runtime:")
+    ]
+    artifact_table = [
+        line.rsplit("|", 2)[0]
+        for line in artifact.splitlines()
+        if line.startswith("| FFmpeg toolchain runtime:")
+    ]
+    assert root_table == artifact_table
+    details = "## Component details and coverage\n"
+    root_details = root_annex.split(details, 1)[1].split("## Runtime licence text files", 1)[0]
+    artifact_details = artifact.split(details, 1)[1].split(
+        "## Full licence texts and provenance", 1
+    )[0]
+    assert root_details == artifact_details
+    expected_hashes = {t["sha256"] for r in lock["toolchain_runtime"] for t in r["texts"]}
+    assert len(expected_hashes) == 157
+    for digest in expected_hashes:
+        assert rendered.count(f"SHA-256: `{digest}`".encode()) == 1
+        assert root_annex.count(f"SHA-256: `{digest}`") == 1
+    for filename in {t["path"] for r in lock["toolchain_runtime"] for t in r["texts"]}:
+        assert "tools/package/native-licences/ffmpeg-toolchain/" + filename in root_annex
+    for source, row in zip(lock["toolchain_runtime"], runtime, strict=True):
+        assert (
+            row.name == f"FFmpeg toolchain runtime: {source['name']} {source['version']} "
+            f"({source['reached_via']})"
+        )
+        assert row.version == source["version"]
+        assert row.licence == source["licence"]
+        assert row.entries == rows[0].entries
+        assert source["source_url"] in row.sources
+        assert f"{source['repository']} @ {source['pin']}" in row.sources
+        assert (
+            "statically linked into ffmpeg.exe / ffprobe.exe by the fork build at "
+            + lock["build_repository_commit"]
+            in row.notes
+        )
+        if source["chosen"]:
+            assert "licence chosen: Apache-2.0" in row.notes
+        if source["licence"] == "MPL-2.0":
+            assert "MPL-2.0 (secondary licence: GPL-3.0 permitted, section 3.3)" in row.notes
+
+
+@pytest.mark.parametrize("damage", ["missing", "hash", "after-plan"])
+def test_ffmpeg_toolchain_text_identity_fails_closed(release, monkeypatch, tmp_path, damage):
+    """Runtime text integrity is checked both at planning and at rendering."""
+    module = load_notices()
+    lock = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_bytes())
+    release["ffmpeg"] = lock
+    release["ffmpeg_path"].write_text(json.dumps(lock))
+    add_ffmpeg(release)
+    texts = tmp_path / "runtime-texts"
+    shutil.copytree(ROOT / "tools/package/native-licences/ffmpeg-toolchain", texts)
+    monkeypatch.setattr(module, "FFMPEG_TOOLCHAIN_PATH", texts, raising=False)
+    path = texts / lock["toolchain_runtime"][0]["texts"][0]["path"]
+    if damage == "after-plan":
+        rows = module._ffmpeg_rows(release["folder"], release["ffmpeg_path"])
+    if damage == "missing":
+        path.unlink()
+    else:
+        path.write_bytes(path.read_bytes() + b"changed")
+    with pytest.raises(ValueError, match=r"FFmpeg toolchain runtime.*(text|identity|missing|hash)"):
+        if damage == "after-plan":
+            module.render_notices(module.NoticePlan(rows[0].entries, tuple(rows), ()))
+        else:
+            module._ffmpeg_rows(release["folder"], release["ffmpeg_path"])
+
+
+@pytest.mark.parametrize("field", ["Parent provider", "FFmpeg ref"])
+def test_ffmpeg_build_record_requires_parent_and_ref(release, field):
+    """The in-artifact source record cannot omit the fork's parent or FFmpeg ref."""
+    module = load_notices()
+    add_ffmpeg(release)
+    record = release["folder"] / "ffmpeg-BUILD.txt"
+    record.write_text(
+        "\n".join(
+            line for line in record.read_text().splitlines() if not line.startswith(field + ":")
+        )
+    )
+    with pytest.raises(ValueError, match="provenance differs: " + field):
+        plan(module, release)
 
 
 @pytest.mark.parametrize("missing", ["ffprobe.exe", "ffmpeg-BUILD.txt", "ffmpeg-LICENSE.txt"])
@@ -936,7 +1055,11 @@ def native_surface(tmp_path):
 
 def _make_native_surface(destination):
     """Make an independent synthetic OpenSSL binding for either fixture consumer."""
-    shutil.copytree(ROOT / "tools/package/native-licences", destination)
+    shutil.copytree(
+        ROOT / "tools/package/native-licences",
+        destination,
+        ignore=shutil.ignore_patterns("ffmpeg-toolchain"),
+    )
     # Existing OpenSSL tests carry synthetic bytes, so bind their copied input
     # surface to those bytes rather than the seat-measured production DLLs.
     path = destination / "manifest.json"
@@ -969,6 +1092,9 @@ def omit_production_embedded_census(surface):
     document.pop("limits", None)
     keep = {"manifest.json", *(name for name, _sha, _size in native_surface_inputs(document))}
     for item in surface.iterdir():
+        # This subdirectory is checked separately against the FFmpeg lock.
+        if item.name == "ffmpeg-toolchain" and item.is_dir():
+            continue
         if item.name not in keep:
             item.unlink()
     path.write_text(json.dumps(document))

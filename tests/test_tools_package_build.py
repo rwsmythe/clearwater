@@ -1369,11 +1369,28 @@ def test_zip_option_selects_only_a_checked_onedir_build(monkeypatch, tmp_path):
         return 7
 
     monkeypatch.setattr(build, "build", run)
+    pin = build.load_ffmpeg_lock()
     assert (
-        build.main(["--form", "onedir", "--notices", "--smoke", "--zip", "--out", str(tmp_path)])
+        build.main(
+            [
+                "--form",
+                "onedir",
+                "--notices",
+                "--smoke",
+                "--zip",
+                "--out",
+                str(tmp_path),
+                "--ffmpeg-from",
+                pin["asset_url"],
+                "--ffmpeg-sha256",
+                pin["github_sha256"],
+            ]
+        )
         == 7
     )
     assert seen["zip_release"] is True
+    assert seen["ffmpeg_from"] == pin["asset_url"]
+    assert seen["ffmpeg_sha256"] == pin["github_sha256"]
     for args in (
         ["--form", "onefile", "--zip"],
         ["--verify", "pack", "--zip"],
@@ -1385,6 +1402,18 @@ def test_zip_option_selects_only_a_checked_onedir_build(monkeypatch, tmp_path):
         with pytest.raises(SystemExit) as caught:
             build.parse_args(args)
         assert caught.value.code == 2
+
+
+def test_zip_requires_verified_ffmpeg_arguments_and_refuses_before_build(
+    tmp_path, monkeypatch, capsys
+):
+    """A release zip must not publish a distribution without the verified FFmpeg pair."""
+    with pytest.raises(SystemExit, match="2"):
+        build.parse_args(["--form", "onedir", "--notices", "--smoke", "--zip"])
+    assert "--zip requires --ffmpeg-from and --ffmpeg-sha256" in capsys.readouterr().err
+    monkeypatch.setattr(build, "pack_sources", lambda: pytest.fail("scan reached"))
+    assert build.build("onedir", out=tmp_path, notices=True, smoke=True, zip_release=True) == 1
+    assert "--zip requires --ffmpeg-from and --ffmpeg-sha256" in capsys.readouterr().out
 
 
 def test_release_zip_is_deterministic_and_has_fixed_metadata(tmp_path):
@@ -1501,7 +1530,19 @@ def test_zip_is_published_only_after_successful_notices_and_smoke(
     monkeypatch.setattr(build, "write_artifact_notices", notices)
     monkeypatch.setattr(build, "smoke_artifact", smoke)
     monkeypatch.setattr(build, "source_commit_epoch", epoch, raising=False)
-    status = build.build("onedir", out=out, notices=True, smoke=True, zip_release=True)
+    pin = build.load_ffmpeg_lock()
+    # Bundle validation is exercised by the synthetic-archive cases; this case
+    # isolates zip ordering/publication from executable loading and transport.
+    monkeypatch.setattr(build, "bundle_ffmpeg", lambda *a, **kw: [])
+    status = build.build(
+        "onedir",
+        out=out,
+        notices=True,
+        smoke=True,
+        zip_release=True,
+        ffmpeg_from=pin["asset_url"],
+        ffmpeg_sha256=pin["github_sha256"],
+    )
     assert status == int(failure != "none")
     assert order == (["notices"] if failure == "notices" else ["notices", "smoke"])
     archive = out / (root.name + ".zip")
@@ -1558,7 +1599,21 @@ def test_release_zip_refuses_smoke_mutations(tmp_path, monkeypatch, capsys, muta
     monkeypatch.setattr(build, "write_artifact_notices", notices)
     monkeypatch.setattr(build, "smoke_artifact", smoke)
     monkeypatch.setattr(build, "source_commit_epoch", lambda: 1793908801)
-    assert build.build("onedir", out=out, notices=True, smoke=True, zip_release=True) == 1
+    pin = build.load_ffmpeg_lock()
+    # Keep this test focused on the pre-smoke snapshot rather than transport.
+    monkeypatch.setattr(build, "bundle_ffmpeg", lambda *a, **kw: [])
+    assert (
+        build.build(
+            "onedir",
+            out=out,
+            notices=True,
+            smoke=True,
+            zip_release=True,
+            ffmpeg_from=pin["asset_url"],
+            ffmpeg_sha256=pin["github_sha256"],
+        )
+        == 1
+    )
     message = capsys.readouterr().out
     assert "release zip" in message and mutation in message
     assert ("new-file.txt" if mutation == "added" else "THIRD_PARTY_NOTICES.md") in message

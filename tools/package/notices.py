@@ -1113,7 +1113,13 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
             raise ValueError(
                 "notices: native manifest has duplicate file claim without co-licensing"
             )
-    actual = {path.name for path in folder.iterdir()}
+    # FFmpeg runtime texts have their own lock and integrity checks in
+    # _ffmpeg_rows. Other unclaimed files/directories still fail closed here.
+    actual = {
+        path.name
+        for path in folder.iterdir()
+        if not (path.name == "ffmpeg-toolchain" and path.is_dir())
+    }
     if actual != files:
         raise ValueError(
             "notices: native licence files without manifest rows: "
@@ -1495,6 +1501,10 @@ def _is_python_binary(relative: str, stdlib: dict[str, str], path: Path) -> bool
     return filename in stdlib and hashlib.sha256(path.read_bytes()).hexdigest() == stdlib[filename]
 
 
+FFMPEG_TOOLCHAIN_PATH = ROOT / "tools/package/native-licences/ffmpeg-toolchain"
+"""Byte-exact, deduplicated runtime texts indexed by the FFmpeg lock."""
+
+
 def _ffmpeg_rows(home: Path, lock_path: Path) -> list[NoticeRow]:
     tools = [home / "ffmpeg.exe", home / "ffprobe.exe"]
     material = [home / "ffmpeg-BUILD.txt", home / "ffmpeg-LICENSE.txt"]
@@ -1521,11 +1531,15 @@ def _ffmpeg_rows(home: Path, lock_path: Path) -> list[NoticeRow]:
     text = material[0].read_text(encoding="utf-8")
     expected = {
         "Provider": lock["provider"],
+        "Parent provider": (
+            f"{lock['parent_provider']['repository']} @ {lock['parent_provider']['commit']}"
+        ),
         "Release tag": lock["release_tag"],
         "Asset": lock["asset_name"],
         "SHA256": lock["github_sha256"],
         "FFmpeg version": lock["version"],
         "FFmpeg commit": lock["ffmpeg_commit"],
+        "FFmpeg ref": lock["ffmpeg_ref"],
         "Build repository commit": lock["build_repository_commit"],
         "Per-component source recipes": lock["source_record_url"],
     }
@@ -1546,7 +1560,11 @@ def _ffmpeg_rows(home: Path, lock_path: Path) -> list[NoticeRow]:
         "with the zvbi stage disabled; "
         f"FFmpeg {lock['ffmpeg_ref']} at {lock['ffmpeg_commit'][:8]} "
         f"(parent repository: {parent['repository']}).",
-        *(f"Excluded {row['stage']}: {row['reason']}" for row in lock["excluded"]),
+        *(
+            f"{'Build stage' if row['status'] in {'BUILT', 'ENTRY'} else 'Excluded'} "
+            f"{row['stage']} ({row['status']}): {row['reason']}"
+            for row in lock["excluded"]
+        ),
     )
     rows = [
         NoticeRow(
@@ -1584,6 +1602,56 @@ def _ffmpeg_rows(home: Path, lock_path: Path) -> list[NoticeRow]:
                         (extra["licence_note"],),
                     )
                 )
+    for runtime in lock["toolchain_runtime"]:
+        title = (
+            f"FFmpeg toolchain runtime: {runtime['name']} {runtime['version']} "
+            f"({runtime['reached_via']})"
+        )
+        runtime_inputs = []
+        for text in runtime["texts"]:
+            path = FFMPEG_TOOLCHAIN_PATH / text["path"]
+            context = title + ": "
+            if not path.is_file() or path.is_symlink():
+                raise ValueError(f"notices: {context}missing/unsafe text {text['path']}")
+            data = path.read_bytes()
+            if not data or hashlib.sha256(data).hexdigest() != text["sha256"]:
+                raise ValueError(f"notices: {context}text hash differs: {text['path']}")
+            runtime_inputs.append(
+                LicenceInput(
+                    path,
+                    sha256=text["sha256"],
+                    size_bytes=len(data),
+                    context=context,
+                    provenance=(
+                        f"{title}; {runtime['repository']} @ {runtime['pin']}; "
+                        f"{runtime['source_url']}; text {text['path']}"
+                    ),
+                )
+            )
+        runtime_notes = [runtime["licence_note"]] if runtime["licence_note"] else []
+        if runtime["chosen"]:
+            runtime_notes.append("licence chosen: " + runtime["chosen"])
+        if runtime["licence"] == "MPL-2.0":
+            runtime_notes.append("MPL-2.0 (secondary licence: GPL-3.0 permitted, section 3.3)")
+        runtime_notes.extend(
+            (
+                "statically linked into ffmpeg.exe / ffprobe.exe by the fork build at "
+                + lock["build_repository_commit"],
+                f"Census basis: {runtime['basis']}; {runtime['basis_note']}",
+                "Source evidence: " + runtime["evidence"],
+            )
+        )
+        rows.append(
+            NoticeRow(
+                title,
+                runtime["version"],
+                runtime["licence"],
+                (f"{runtime['repository']} @ {runtime['pin']}", runtime["source_url"]),
+                entries,
+                tuple(runtime_inputs),
+                tuple(runtime_notes),
+            )
+        )
     return rows
 
 

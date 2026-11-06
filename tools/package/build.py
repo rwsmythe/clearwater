@@ -42,8 +42,9 @@ entries or GPL-incompatible bundled FFmpeg components fail the build.
 checks an existing artifact without rebuilding. It requires generated notices.
 
 ``--zip`` publishes a deterministic onedir ZIP and LF-terminated sha256 sidecar
-under ``--out`` after successful ``--notices --smoke``. Metadata uses the checked-out
-source commit's UTC time, rounded down to the ZIP format's two-second precision.
+under ``--out`` after successful ``--notices --smoke`` and a verified FFmpeg bundle.
+Metadata uses the checked-out source commit's UTC time, rounded down to the ZIP
+format's two-second precision.
 """
 
 from __future__ import annotations
@@ -759,6 +760,58 @@ class FFmpegParentProvider(TypedDict):
     commit: str
 
 
+class FFmpegGCC(TypedDict):
+    """The measured compiler version, crosstool build and source commit."""
+
+    version: str
+    build: str
+    commit: str
+
+
+class FFmpegRustc(TypedDict):
+    """The Rust compiler identity measured from the published asset and run."""
+
+    version: str
+    commit: str
+
+
+class FFmpegToolchain(TypedDict):
+    """Recorded toolchains and static-link flags of this asset, not future builds."""
+
+    gcc: FFmpegGCC
+    rustc: FFmpegRustc
+    static_link_flags: list[str]
+
+
+class FFmpegRuntimeText(TypedDict):
+    """A filename and byte hash in the dedicated FFmpeg runtime text directory."""
+
+    path: str
+    sha256: str
+
+
+class FFmpegRuntime(TypedDict):
+    """A census-bound static runtime or crate with its source and notice evidence."""
+
+    name: str
+    version: str
+    kind: str
+    reached_via: str
+    repository: str
+    pin: str
+    pin_kind: str
+    source_url: str
+    licence: str
+    licence_basis: str
+    gpl3_compatible: str
+    licence_note: str
+    texts: list[FFmpegRuntimeText]
+    evidence: str
+    basis: str
+    basis_note: str
+    chosen: str | None
+
+
 class FFmpegLock(TypedDict):
     """The verified archive identity and per-stage corresponding-source record."""
 
@@ -784,10 +837,212 @@ class FFmpegLock(TypedDict):
     retention_note: str
     components: list[FFmpegComponent]
     excluded: list[FFmpegExcluded]
+    toolchain: FFmpegToolchain
+    toolchain_runtime: list[FFmpegRuntime]
 
 
 FFMPEG_LOCK_PATH = Path(__file__).with_name("ffmpeg.lock.json")
 """The release pin; local PATH copies never substitute for this record."""
+
+
+FFMPEG_COMPATIBLE_LICENCES = frozenset(
+    {
+        "MIT",
+        "Apache-2.0",
+        "Apache-2.0 WITH LLVM-exception",
+        "BSD-2-Clause",
+        "BSD-3-Clause",
+        "0BSD",
+        "Zlib",
+        "ISC",
+        "Unicode-DFS-2016",
+        "Unicode-3.0",
+        "MPL-2.0",
+        "CC0-1.0",
+        "Unlicense",
+        "BSL-1.0",
+        "GPL-3.0-or-later WITH GCC-exception-3.1",
+    }
+)
+"""CHARC's complete GPL-3.0-compatible runtime atom list; unknown atoms refuse."""
+
+
+def _ffmpeg_licence_choices(expression: str) -> set[str]:
+    # Recursive descent preserves SPDX precedence: WITH, AND, then OR. Unknown
+    # atoms refuse even in an OR branch; a recorded alternative is never guessed.
+    tokens = re.findall(r"[A-Za-z0-9][A-Za-z0-9.+-]*|[()]", expression)
+    position = 0
+    choices: set[str] = set()
+    refusal = "FFmpeg lock: incompatible/invalid runtime licence expression"
+    if not tokens or "".join(tokens) != re.sub(r"\s+", "", expression):
+        raise ValueError(refusal)
+
+    def primary() -> tuple[bool, str]:
+        nonlocal position
+        if position >= len(tokens):
+            raise ValueError(refusal)
+        token = tokens[position]
+        position += 1
+        if token == "(":
+            compatible, label = either()
+            if position >= len(tokens) or tokens[position] != ")":
+                raise ValueError(refusal)
+            position += 1
+            return compatible, "(" + label + ")"
+        if token in {"AND", "OR", "WITH", ")"}:
+            raise ValueError(refusal)
+        if position < len(tokens) and tokens[position] == "WITH":
+            position += 1
+            if position >= len(tokens):
+                raise ValueError(refusal)
+            token += " WITH " + tokens[position]
+            position += 1
+        if token not in FFMPEG_COMPATIBLE_LICENCES:
+            raise ValueError(refusal)
+        return True, token
+
+    def both() -> tuple[bool, str]:
+        nonlocal position
+        compatible, label = primary()
+        while position < len(tokens) and tokens[position] == "AND":
+            position += 1
+            other, right = primary()
+            compatible = compatible and other
+            label += " AND " + right
+        return compatible, label
+
+    def either() -> tuple[bool, str]:
+        nonlocal position
+        compatible, label = both()
+        alternatives = [label]
+        while position < len(tokens) and tokens[position] == "OR":
+            position += 1
+            other, right = both()
+            compatible = compatible or other
+            alternatives.append(right)
+        if len(alternatives) > 1:
+            choices.update(alternatives)
+        return compatible, " OR ".join(alternatives)
+
+    compatible, _ = either()
+    if position != len(tokens) or not compatible:
+        raise ValueError(refusal)
+    return choices
+
+
+def _ffmpeg_runtime(data: dict[str, object], config: str) -> None:
+    toolchain = _ffmpeg_fields(data["toolchain"], set(FFmpegToolchain.__annotations__), "toolchain")
+    for key, fields in (("gcc", FFmpegGCC.__annotations__), ("rustc", FFmpegRustc.__annotations__)):
+        compiler = _ffmpeg_fields(toolchain[key], set(fields), f"toolchain {key}")
+        for field in fields:
+            text = _ffmpeg_text(compiler[field], f"toolchain {key} {field}")
+            if field == "commit" and not re.fullmatch(r"[0-9a-f]{40}", text):
+                raise ValueError(f"FFmpeg lock: invalid toolchain {key} commit")
+    flags = toolchain["static_link_flags"]
+    if (
+        not isinstance(flags, list)
+        or any(
+            not isinstance(flag, str)
+            or flag not in {"-static-libgcc", "-static-libstdc++", "-lgomp"}
+            for flag in flags
+        )
+        or len(set(flags)) != len(flags)
+    ):
+        raise ValueError("FFmpeg lock: invalid static_link_flags")
+    rows = data["toolchain_runtime"]
+    if not isinstance(rows, list):
+        raise ValueError("FFmpeg lock: toolchain_runtime must be a list")
+    seen: set[tuple[str, str, str]] = set()
+    checked: list[FFmpegRuntime] = []
+    for item in rows:
+        row = _ffmpeg_fields(item, set(FFmpegRuntime.__annotations__), "toolchain runtime")
+        for key in set(FFmpegRuntime.__annotations__) - {"texts", "chosen", "licence_note"}:
+            _ffmpeg_text(row[key], f"runtime {key}")
+        note = row["licence_note"]
+        if not isinstance(note, str) or any(c in note for c in "\r\n\x00"):
+            raise ValueError("FFmpeg lock: invalid runtime licence_note")
+        if row["kind"] not in {"rust-std", "cargo-crate", "gcc-runtime", "mingw-runtime"}:
+            raise ValueError("FFmpeg lock: invalid runtime kind")
+        if row["reached_via"] not in {"rav1e", "librsvg", "toolchain"}:
+            raise ValueError("FFmpeg lock: invalid runtime reached_via")
+        if row["pin_kind"] not in {"crate-sha256", "commit"}:
+            raise ValueError("FFmpeg lock: invalid runtime pin_kind")
+        length = 64 if row["pin_kind"] == "crate-sha256" else 40
+        if re.fullmatch(r"[0-9a-f]{" + str(length) + "}", cast(str, row["pin"])) is None:
+            raise ValueError("FFmpeg lock: invalid runtime pin")
+        if row["basis"] not in {"compile-log", "lock-graph", "binary"}:
+            raise ValueError("FFmpeg lock: invalid runtime basis")
+        if row["gpl3_compatible"] != "yes":
+            raise ValueError("FFmpeg lock: runtime gpl3_compatible must be yes")
+        choices = _ffmpeg_licence_choices(cast(str, row["licence"]))
+        if row["chosen"] is not None and (
+            not isinstance(row["chosen"], str) or row["chosen"] not in choices
+        ):
+            raise ValueError("FFmpeg lock: invalid runtime chosen licence")
+        identity = tuple(cast(str, row[key]) for key in ("name", "version", "reached_via"))
+        triple = (identity[0], identity[1], identity[2])
+        if triple in seen:
+            raise ValueError("FFmpeg lock: duplicate toolchain runtime")
+        seen.add(triple)
+        if row["kind"] == "cargo-crate":
+            if row["pin_kind"] != "crate-sha256":
+                raise ValueError("FFmpeg lock: cargo-crate requires crate-sha256")
+            if (
+                row["source_url"]
+                != f"https://static.crates.io/crates/{row['name']}/{row['name']}-{row['version']}.crate"
+            ):
+                raise ValueError("FFmpeg lock: cargo-crate source_url differs")
+        rustc = cast(dict[str, str], toolchain["rustc"])
+        gcc = cast(dict[str, str], toolchain["gcc"])
+        if row["kind"] == "rust-std":
+            if (
+                row["repository"] == "https://github.com/rust-lang/rust"
+                and row["pin"] != rustc["commit"]
+            ):
+                raise ValueError("FFmpeg lock: rust-std pin differs from toolchain")
+            if row["name"] == "rust-std" and row["version"] != rustc["version"]:
+                raise ValueError("FFmpeg lock: rust-std version differs from toolchain")
+        if row["kind"] == "gcc-runtime" and (
+            row["version"] != gcc["version"] or row["pin"] != gcc["commit"]
+        ):
+            raise ValueError("FFmpeg lock: gcc-runtime pin/version differs from toolchain")
+        texts = row["texts"]
+        if not isinstance(texts, list) or not texts:
+            raise ValueError("FFmpeg lock: runtime texts must be nonempty")
+        for item in texts:
+            text_record = _ffmpeg_fields(
+                item, set(FFmpegRuntimeText.__annotations__), "runtime text"
+            )
+            path = _ffmpeg_text(text_record["path"], "runtime text path")
+            if any(c in path for c in ("/", "\\", ":", "..")) or path == ".":
+                raise ValueError("FFmpeg lock: unsafe runtime text path")
+            if (
+                re.fullmatch(
+                    r"[0-9a-f]{64}", _ffmpeg_text(text_record["sha256"], "runtime text sha256")
+                )
+                is None
+            ):
+                raise ValueError("FFmpeg lock: invalid runtime text sha256")
+        checked.append(cast(FFmpegRuntime, row))
+    for stage, switch in (("rav1e", "--enable-librav1e"), ("librsvg", "--enable-librsvg")):
+        enabled = switch in config.split()
+        stage_rows = [r for r in checked if r["reached_via"] == stage]
+        if enabled and not (
+            any(r["kind"] == "cargo-crate" for r in stage_rows)
+            and any(r["kind"] == "rust-std" for r in checked)
+        ):
+            raise ValueError(f"FFmpeg lock: {stage} requires cargo-crate and rust-std")
+        if stage_rows and not enabled:
+            raise ValueError(f"FFmpeg lock: runtime stage {stage} is not enabled")
+    for flag, name in (
+        ("-static-libgcc", "libgcc"),
+        ("-static-libstdc++", "libstdc++"),
+        ("-lgomp", "libgomp"),
+    ):
+        if (flag in flags or (flag == "-lgomp" and flag in config)) and not any(
+            r["name"] == name and r["kind"] == "gcc-runtime" for r in checked
+        ):
+            raise ValueError(f"FFmpeg lock: static flags require gcc-runtime {name}")
 
 
 def _ffmpeg_fields(value: object, fields: set[str], context: str) -> dict[str, object]:
@@ -826,8 +1081,11 @@ def _ffmpeg_source(value: dict[str, object]) -> None:
 def validate_ffmpeg_lock(value: object) -> FFmpegLock:
     """Validate archive identity, source rows and two-way configure-flag coverage.
 
-    Every licence identity must be seat-verified. Incompatibility remains data:
-    a "no" row is accepted here and refused by artifact notices when bundled.
+    Stage licence identities must be seat-verified. Stage incompatibility remains
+    data: a "no" row is accepted here and refused by artifact notices when bundled.
+    Static runtime rows require compatible SPDX expressions, toolchain/source
+    bindings and nonempty text identities. This validator is pure; notices checks
+    runtime text files and their hashes at planning and again at rendering.
     ``configure_flag`` is null for dependencies or a list, since some stages
     contribute several switches (for example both opencore-amr codecs).
 
@@ -852,6 +1110,8 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
         "excluded",
         "extract_members",
         "parent_provider",
+        "toolchain",
+        "toolchain_runtime",
     }:
         _ffmpeg_text(data[key], key)
     parent = _ffmpeg_fields(
@@ -889,6 +1149,23 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
         raise ValueError("FFmpeg lock: invalid archive_root")
     if data["asset_name"] != root + ".zip":
         raise ValueError("FFmpeg lock: asset name must match archive_root")
+    asset_url = cast(str, data["asset_url"])
+    expected_url = f"https://github.com/{data['provider']}/releases/download/{data['release_tag']}/{data['asset_name']}"
+    if asset_url != expected_url and not (
+        _TEST_ALLOW_FILE_URLS and urlsplit(asset_url).scheme == "file"
+    ):
+        raise ValueError("FFmpeg lock: asset URL must match provider/release/asset")
+    if (
+        data["source_record_url"]
+        != f"https://github.com/{data['provider']}/tree/{data['build_repository_commit']}"
+    ):
+        raise ValueError(
+            "FFmpeg lock: source record URL must match provider/build commit tree root"
+        )
+    if commit[:8] not in cast(str, data["release_tag"]) or cast(
+        str, data["build_repository_commit"]
+    )[:7] not in cast(str, data["release_tag"]):
+        raise ValueError("FFmpeg lock: release tag must name FFmpeg and build commits")
     config = cast(str, data["configure_line"])
     if not config.startswith("configuration: "):
         raise ValueError("FFmpeg lock: configure_line must include its printed prefix")
@@ -899,10 +1176,23 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
         raise ValueError("FFmpeg lock: nonfree or libfdk-aac is forbidden")
     if "--disable-libzvbi" not in tokens or "--enable-libzvbi" in tokens:
         raise ValueError("FFmpeg lock: zvbi must be disabled")
+    dates = [
+        token.removeprefix("--extra-version=")
+        for token in config.split()
+        if token.startswith("--extra-version=")
+    ]
+    if dates != [cast(str, data["version"])[-8:]]:
+        raise ValueError("FFmpeg lock: version date must match --extra-version")
     components = data["components"]
     excluded = data["excluded"]
     if not isinstance(components, list) or not components or not isinstance(excluded, list):
         raise ValueError("FFmpeg lock: components/excluded must be lists")
+    if not any(
+        isinstance(row, dict) and row.get("stage") == "scripts.d/50-zvbi.sh" for row in excluded
+    ) or any(
+        isinstance(row, dict) and row.get("stage") == "scripts.d/50-zvbi.sh" for row in components
+    ):
+        raise ValueError("FFmpeg lock: zvbi must be present only in excluded")
     stages: set[str] = set()
     names: set[str] = set()
     covered: set[str] = set()
@@ -950,6 +1240,7 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
             f"FFmpeg lock: configure coverage differs; unmapped={sorted(external - covered)}, "
             f"absent={sorted(covered - external)}"
         )
+    _ffmpeg_runtime(data, config)
     return cast(FFmpegLock, data)
 
 
@@ -1164,11 +1455,14 @@ def bundle_ffmpeg(
         "\n".join(
             [
                 f"Provider: {lock['provider']}",
+                f"Parent provider: {lock['parent_provider']['repository']} @ "
+                f"{lock['parent_provider']['commit']}",
                 f"Release tag: {lock['release_tag']}",
                 f"Asset: {lock['asset_name']}",
                 f"SHA256: {lock['github_sha256']}",
                 f"FFmpeg version: {lock['version']}",
                 f"FFmpeg commit: {lock['ffmpeg_commit']}",
+                f"FFmpeg ref: {lock['ffmpeg_ref']}",
                 f"Build repository commit: {lock['build_repository_commit']}",
                 f"Per-component source recipes: {lock['source_record_url']}",
                 "Per-component pins and licence readings: "
@@ -2346,6 +2640,9 @@ def build(
     if zip_release and not (notices and smoke):
         print("FAILED: --zip requires --notices and --smoke")
         return 1
+    if zip_release and (ffmpeg_from is None or ffmpeg_sha256 is None):
+        print("FAILED: --zip requires --ffmpeg-from and --ffmpeg-sha256")
+        return 1
     if (ffmpeg_from is None) != (ffmpeg_sha256 is None):
         print("FAILED: --ffmpeg-from and --ffmpeg-sha256 must be provided together")
         return 1
@@ -2528,6 +2825,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         parser.error("--zip requires --form onedir")
     if options.zip_release and not (options.notices and options.smoke is True):
         parser.error("--zip requires --notices and --smoke")
+    if options.zip_release and (options.ffmpeg_from is None or options.ffmpeg_sha256 is None):
+        parser.error("--zip requires --ffmpeg-from and --ffmpeg-sha256")
     if (options.ffmpeg_from is None) != (options.ffmpeg_sha256 is None):
         parser.error("--ffmpeg-from and --ffmpeg-sha256 must be provided together")
     if options.ffmpeg_from is not None:

@@ -64,8 +64,18 @@ artifact is one folder, not an installer; it is unsigned. No PyPI release is pla
    lock; never add `ffmpeg_tag`. Repeat the source/licence audit, GPL-3.0
    licence check, zvbi exclusion and `hevc_nvenc` / `libx265` encoder checks.
    Recheck the floating toolchain/runtime inputs; preserve the patch and proof.
-   **STOP** for an unavailable asset, unresolved incompatible component,
-   missing native material or unreviewed interpreter change.
+   A fork rebuild re-runs the F-B1 toolchain census: the base image installs
+   an unpinned stable Rust, and the crate graphs follow the pinned rav1e /
+   librsvg commits. Re-record `toolchain` and `toolchain_runtime` from that
+   census before any draft. Re-export `tools/package/ffmpeg-fork.patch` from
+   the fork with `git format-patch --base=<parent commit> -1 <fork commit>`.
+   Re-run the lock validator and the five package test modules
+   (`test_tools_package_notices.py`, `test_tools_package_build.py`,
+   `test_tools_package_smoke.py`, `test_tools_package_ffmpeg.py` and
+   `test_release_workflow.py`).
+   **STOP** for a failed fork run, three SHA-256 readings that disagree,
+   a failed F3 or F3b check, an unavailable asset, unresolved incompatible
+   component, missing native material or unreviewed interpreter change.
 5. Complete the seat's local onedir build with the locked `--ffmpeg-from` and
    `--ffmpeg-sha256`, plus `--notices --smoke --zip --out work/release`.
    Inspect the REAL built-folder census against the generated notices in full:
@@ -146,7 +156,7 @@ artifact is one folder, not an installer; it is unsigned. No PyPI release is pla
     workflow URL/log archive, downloaded zip hash, notices census, bundled V4 /
     encoder proof and clean-account outcome. Record N13's artifact verdict only
     against the artifact notices and corresponding-source evidence. At package
-    accept CHARC also records AD-38, the checklist pointer and dated retention /
+    accept CHARC also records AD-38, the checklist pointer and
     indirect-source debt dispositions. **STOP** for missing proof or unresolved
     release debt requiring the owner's acknowledgement.
 13. The OWNER reviews the draft and clicks **Publish release**. The workflow and

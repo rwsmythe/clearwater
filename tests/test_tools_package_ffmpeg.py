@@ -26,6 +26,239 @@ def lock_data():
     return json.loads(LOCK.read_text(encoding="utf-8"))
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "refusal"),
+    [
+        # Removing the ref guard used to survive the entire test module.
+        ("ffmpeg_ref", "master", "FFmpeg ref must be release/9.0"),
+        ("ffmpeg_ref", "n9.0.2", "FFmpeg ref must be release/9.0"),
+        # re.match instead of fullmatch used to accept trailing version junk.
+        ("version", "n9.0.2-47-gb204e94e90-20261106-extra", "version hash differs"),
+        # Removing the combined-licence guard used to survive all tests.
+        ("licence", "MIT", "combined build must be GPL-3.0-or-later"),
+        # Removing the full build-commit guard used to survive all tests.
+        ("build_repository_commit", "d77b8352", "invalid build repository commit"),
+        # Removing the archive-name guard used to survive all tests.
+        ("asset_name", "other.zip", "asset name must match archive_root"),
+        ("provider", "evil/x", "asset URL must match provider/release/asset"),
+        ("asset_url", "https://example.org/other.zip", "asset URL must match"),
+        (
+            "asset_url",
+            "https://github.com/evil/x/releases/download/tag/other.zip",
+            "asset URL must match",
+        ),
+        (
+            "source_record_url",
+            "https://github.com/evil/x/tree/" + "0" * 40,
+            "source record URL must match",
+        ),
+        (
+            "source_record_url",
+            "https://github.com/rwsmythe/FFmpeg-Builds/tree/" + "0" * 40,
+            "source record URL must match",
+        ),
+    ],
+)
+def test_b_review_provenance_and_guard_mutations(field, value, refusal):
+    """The B-r1 mutations must reach their named guard, not a later refusal."""
+    data = lock_data()
+    data[field] = value
+    with pytest.raises(ValueError, match=re.escape(refusal)):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize(
+    "change", ["release-ffmpeg", "release-fork", "zvbi-missing", "zvbi-built", "date"]
+)
+def test_lock_cross_binds_release_exclusion_and_build_date(change):
+    """A byte pin must not conceal inconsistent source or exclusion claims."""
+    data = lock_data()
+    if change.startswith("release-"):
+        prefix = (
+            data["ffmpeg_commit"][:8]
+            if change == "release-ffmpeg"
+            else data["build_repository_commit"][:7]
+        )
+        data["release_tag"] = data["release_tag"].replace(prefix, "0" * len(prefix))
+        data["asset_url"] = (
+            f"https://github.com/{data['provider']}/releases/download/{data['release_tag']}/{data['asset_name']}"
+        )
+        refusal = "release tag must name FFmpeg and build commits"
+    elif change == "zvbi-missing":
+        data["excluded"] = [r for r in data["excluded"] if r["stage"] != "scripts.d/50-zvbi.sh"]
+        refusal = "zvbi must be present only in excluded"
+    elif change == "zvbi-built":
+        row = copy.deepcopy(data["components"][0])
+        row.update(stage="scripts.d/50-zvbi.sh", name="zvbi", configure_flag=None)
+        data["components"].append(row)
+        refusal = "zvbi must be present only in excluded"
+    else:
+        data["version"] = data["version"].replace("20261106", "20261107")
+        refusal = "version date must match --extra-version"
+    with pytest.raises(ValueError, match=re.escape(refusal)):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize(
+    ("change", "refusal"),
+    [
+        ("missing-toolchain", "invalid document fields"),
+        ("missing-runtime", "invalid document fields"),
+        ("toolchain-fields", "invalid toolchain fields"),
+        ("gcc-fields", "invalid toolchain gcc fields"),
+        ("rust-fields", "invalid toolchain rustc fields"),
+        ("toolchain-commit", "invalid toolchain rustc commit"),
+        ("flags-type", "invalid static_link_flags"),
+        ("flags-unknown", "invalid static_link_flags"),
+        ("runtime-type", "toolchain_runtime must be a list"),
+        ("row-fields", "invalid toolchain runtime fields"),
+        ("kind", "invalid runtime kind"),
+        ("via", "invalid runtime reached_via"),
+        ("pin-kind", "invalid runtime pin_kind"),
+        ("pin-length", "invalid runtime pin"),
+        ("commit-length", "invalid runtime pin"),
+        ("basis", "invalid runtime basis"),
+        ("no", "runtime gpl3_compatible must be yes"),
+        ("stop", "runtime gpl3_compatible must be yes"),
+        ("chosen", "invalid runtime chosen licence"),
+        ("chosen-no-or", "invalid runtime chosen licence"),
+        ("duplicate", "duplicate toolchain runtime"),
+        ("crate-commit", "cargo-crate requires crate-sha256"),
+        ("crate-source", "cargo-crate source_url differs"),
+        ("missing-rav1e", "rav1e requires cargo-crate and rust-std"),
+        ("missing-librsvg", "librsvg requires cargo-crate and rust-std"),
+        ("missing-std", "rav1e requires cargo-crate and rust-std"),
+        ("absent-rav1e", "runtime stage rav1e is not enabled"),
+        ("absent-librsvg", "runtime stage librsvg is not enabled"),
+        ("missing-libgcc", "static flags require gcc-runtime libgcc"),
+        ("missing-libstdc++", "static flags require gcc-runtime libstdc++"),
+        ("missing-libgomp", "static flags require gcc-runtime libgomp"),
+        ("rust-pin", "rust-std pin differs from toolchain"),
+        ("rust-version", "rust-std version differs from toolchain"),
+        ("gcc-pin", "gcc-runtime pin/version differs from toolchain"),
+        ("gcc-version", "gcc-runtime pin/version differs from toolchain"),
+        ("texts-empty", "runtime texts must be nonempty"),
+        ("text-fields", "invalid runtime text fields"),
+        ("text-path", "unsafe runtime text path"),
+        ("text-backslash", "unsafe runtime text path"),
+        ("text-dotdot", "unsafe runtime text path"),
+        ("text-hash", "invalid runtime text sha256"),
+    ],
+)
+def test_runtime_census_refuses_missing_or_inconsistent_obligations(change, refusal):
+    """Each mutation removes one required binding in the real runtime census."""
+    data = lock_data()
+    rows = data["toolchain_runtime"]
+    crate = next(r for r in rows if r["kind"] == "cargo-crate")
+    std = next(r for r in rows if r["name"] == "rust-std")
+    gcc = next(r for r in rows if r["name"] == "libgcc")
+    if change.startswith("missing-") and change[8:] in {"toolchain", "runtime"}:
+        del data["toolchain" if change == "missing-toolchain" else "toolchain_runtime"]
+    elif change == "toolchain-fields":
+        data["toolchain"]["unexpected"] = True
+    elif change in {"gcc-fields", "rust-fields"}:
+        data["toolchain"]["gcc" if change == "gcc-fields" else "rustc"]["unexpected"] = True
+    elif change == "toolchain-commit":
+        data["toolchain"]["rustc"]["commit"] = "short"
+    elif change == "flags-type":
+        data["toolchain"]["static_link_flags"] = "-static-libgcc"
+    elif change == "flags-unknown":
+        data["toolchain"]["static_link_flags"].append("unknown")
+    elif change == "runtime-type":
+        data["toolchain_runtime"] = {}
+    elif change == "row-fields":
+        crate["unexpected"] = True
+    elif change in {"kind", "via", "pin-kind", "basis", "chosen"}:
+        crate[{"via": "reached_via", "pin-kind": "pin_kind"}.get(change, change)] = "unknown"
+    elif change == "chosen-no-or":
+        crate.update(licence="Apache-2.0", chosen="MIT")
+    elif change in {"pin-length", "commit-length"}:
+        (crate if change == "pin-length" else std)["pin"] = "short"
+    elif change in {"no", "stop"}:
+        crate["gpl3_compatible"] = change
+    elif change == "duplicate":
+        rows.append(copy.deepcopy(crate))
+    elif change == "crate-commit":
+        crate.update(pin_kind="commit", pin="a" * 40)
+    elif change == "crate-source":
+        crate["source_url"] = "https://static.crates.io/crates/other/other-1.crate"
+    elif change in {"missing-rav1e", "missing-librsvg", "missing-std"}:
+        data["toolchain_runtime"] = [
+            r
+            for r in rows
+            if (
+                r["kind"] != "rust-std"
+                if change == "missing-std"
+                else r["reached_via"] != change[8:]
+            )
+        ]
+    elif change.startswith("absent-"):
+        stage = change[7:]
+        switch = "--enable-librav1e" if stage == "rav1e" else "--enable-librsvg"
+        data["configure_line"] = data["configure_line"].replace(switch, "")
+        data["components"] = [r for r in data["components"] if r["name"] != stage]
+    elif change.startswith("missing-lib"):
+        data["toolchain_runtime"] = [r for r in rows if r["name"] != change[8:]]
+    elif change in {"rust-pin", "gcc-pin"}:
+        (std if change == "rust-pin" else gcc)["pin"] = "a" * 40
+    elif change in {"rust-version", "gcc-version"}:
+        (std if change == "rust-version" else gcc)["version"] = "0.0.0"
+    elif change == "texts-empty":
+        crate["texts"] = []
+    elif change == "text-fields":
+        crate["texts"][0]["unexpected"] = True
+    elif change.startswith("text-"):
+        key, value = {
+            "text-path": ("path", "../other"),
+            "text-backslash": ("path", "other\\file"),
+            "text-dotdot": ("path", "a..b"),
+            "text-hash": ("sha256", "short"),
+        }[change]
+        crate["texts"][0][key] = value
+    with pytest.raises(ValueError, match=re.escape(refusal)):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "GPL-2.0-only",
+        "MIT OR Unknown",
+        "MIT AND GPL-2.0-only",
+        "MIT WITH Unknown",
+        "(MIT OR Apache-2.0",
+        "MIT AND",
+        "MIT Apache-2.0",
+        "MIT / Apache-2.0",
+        "()",
+        "MIT OR OR MIT",
+    ],
+)
+def test_runtime_licence_parser_refuses_unknown_atoms_and_invalid_grammar(expression):
+    """A compatible marker cannot launder an unknown or malformed SPDX expression."""
+    data = lock_data()
+    data["toolchain_runtime"][0]["licence"] = expression
+    with pytest.raises(ValueError, match="runtime licence expression"):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "MIT",
+        "(Apache-2.0 OR MIT) AND BSD-3-Clause",
+        "MIT AND Apache-2.0 WITH LLVM-exception AND (MIT OR Apache-2.0)",
+        "GPL-3.0-or-later WITH GCC-exception-3.1",
+        "Unicode-3.0",
+    ],
+)
+def test_runtime_licence_parser_accepts_ruled_compatible_expressions(expression):
+    """WITH and parenthesized AND/OR expressions retain their SPDX meaning."""
+    data = lock_data()
+    data["toolchain_runtime"][0]["licence"] = expression
+    assert build.validate_ffmpeg_lock(data) is data
+
+
 def test_committed_lock_covers_the_verified_source_stages():
     """Missing pin records and unmapped library flags must fail validation."""
     assert LOCK.is_file(), "the verified FFmpeg lock is missing"

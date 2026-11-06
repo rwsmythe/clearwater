@@ -1,12 +1,12 @@
 # WP6.3c - FFmpeg bundle
 
-Status: turn 14 folds Reviewer A r3 minors 1-5 and advisories 6-8,
-2026-11-06; acceptance pending. The seat resolved turn 13's stale checklist
-assertion in `749fd30b` and reports 695 passed, one skipped, including real Git.
-Turn 14 static checks pass; its targeted validation reports 693 passed,
-one skipped and only the five expected sandbox real-Git fixture failures.
-The real local build/smoke/zip, V4, encoder proof, final reviews, package gate
-and release remain the seat's work. The fork patch is the seat's r2 export.
+Status: turn 15 implements Reviewer B r1's F-B1 runtime census and the
+dispatched folds, 2026-11-06; acceptance pending. Its validation and remaining
+seat checks are recorded in the turn-15 section below. The seat's supplied
+baseline at `80914e17` is 698 passed / one skipped including real Git, with
+local build/smoke/notices/zip and bundled-worker export proofs green.
+Post-remediation reviews, seat verification, package gate and release remain
+the seat's work. The fork patch remains the seat's r2 export.
 
 ## Turn 2 - Fork preparation and PATH-copy retirement
 
@@ -2293,3 +2293,219 @@ in disposable local fixtures. Every runner output remains under this worktree.
 STOPPED ITEMS: none in the eight folds. The seat owns real-Git verification,
 review, real build/smoke/zip, V4/encoder proofs, gate, accept and release.
 `depth_input_tokens` is unavailable to the cell; dispatcher read is due at yield.
+
+## Turn 15 - Reviewer B r1 runtime notices and provenance remediation
+
+**Built (2026-11-06; dispatch 15).** Added the measured `toolchain` object
+and all 232 `toolchain_runtime` rows to schema 2 without a legacy-schema
+route. The 97 primary stages and five additional source records are unchanged;
+100 built stage/source rows plus 232 runtime rows and the aggregate make
+333 FFmpeg notice rows. The runtime kinds are 223 cargo-crate, four rust-std
+and five gcc-runtime; reached-via counts are librsvg 148, rav1e 65 and
+toolchain 19. The census bases remain compile-log 213, lock-graph 13 and
+binary six. There is no new mingw-runtime row: the existing mingw stage
+covers the statically linked CRT / winpthreads, per CHARC's ruling.
+
+**Input and copy evidence.** All three supplied input hashes matched:
+`fb1-rows.json` = `2e7d796ec3c4f1d81b545139766d8d7a7b33e72bd62425c85bf6625c6b8b31df`;
+`fb1-texts/index.json` = `faabab3691782a7f2be6c7fce839165e22d3d1f05e14d5282d7a1dab1e4a2c5b`;
+`fb1-census.md` = `fb9c94639c8b4428851767eb76840c7a11b0cf4e81c83341c49b87a8ab3adb4c`.
+`inputs.log`, `copy.log` and `data-verification.log` under
+`work/wp6.3c/turn15/` record 157 distinct texts copied once with
+`read_bytes` / `write_bytes`, named from the index's stored path by replacing
+separators with `--`. Every copy and all 441 row-to-text references re-hash
+correctly. The current, hash-pinned rows contain 441 references; the brief's
+older 408-text count is superseded by these verified input bytes. All row
+fields, row order and per-row hash order are unchanged except mapped paths;
+no row was invented or dropped. The list for the dispatcher is
+`work/c63c-15/copied-texts.txt` (also retained under the turn-15 log folder).
+
+**Validator and text checks.** `validate_ffmpeg_lock` remains pure. Its helper
+`_ffmpeg_runtime` enforces exact document/toolchain/runtime/text fields,
+enumerations, pin lengths, crate archive URLs, unique name/version/stage
+identities, chosen OR alternatives, compatible SPDX grammar, required Rust
+and GCC rows, converse stage coverage and compiler version/commit bindings.
+The compatible atom set is exactly CHARC's 15 expressions. Unknown atoms
+refuse even in an OR branch; WITH binds before AND, which binds before OR.
+The backtrace submodule keeps its own commit. Empty census licence notes are
+preserved, and quick-error's published HTTP repository pointer is preserved;
+its crate download URL remains the required HTTPS canonical URL.
+
+`notices.py::_ffmpeg_rows` checks every runtime text's existence, plain
+filename and SHA-256, then constructs contextual `LicenceInput`s with the
+recorded hash and measured size. Rendering rechecks those inputs before
+content deduplication, so changing a shared text after planning still refuses.
+Runtime rows use their own terms only; the renderer does not require the
+aggregate FFmpeg GPL input on each runtime row. The parent sentence appears
+once per runtime row, as do the source/census notes, the chosen Apache-2.0
+note on Ryu and MPL-2.0's section-3.3 statement on its five rows. Each distinct
+runtime text renders once. The native manifest reader recognizes only the
+`ffmpeg-toolchain` directory as separately locked; other undeclared files
+and directories still refuse.
+
+**Root notices.** The root file can carry 232 rows without changing its
+source-install audit schema. A generated runtime annex uses the existing
+`_ffmpeg_rows` / `render_notices` path, with the same 232 rows and links to
+the 157 byte-preserved text files used by artifact generation.
+`generate_root_notices.py` under the turn-15
+log folder records the offline recipe; its four temporary notice-input files
+were never executed. The runtime render test requires agreement between
+the root annex and the artifact renderer's runtime table/details, and checks
+all 157 text links and hashes. Artifact notices carry the full verbatim texts;
+the root annex links them because Git normalizes Markdown line endings on
+Windows and one upstream text (`approx-0.5.1/LICENSE`) contains CRLF bytes.
+Original audit blocks remain available under their existing anchors.
+
+| B r1 finding | Severity | Turn-15 disposition |
+| --- | --- | --- |
+| F-B1 | MAJOR | CONFIRMED / FIXED: runtime census, source and compiler bindings, byte-exact terms, artifact and root notice rows. Review/acceptance remains the seat's. |
+| F-B2 | MINOR | CONFIRMED / FIXED: each of the five guards has a named-refusal mutation case; both invalid refs are covered. An independent in-memory AST mutation check distinguishes all five guards. |
+| F-B3 | MINOR | CONFIRMED / FIXED: exact initial GitHub asset URL; fork tree-root source pointer; release tag contains FFmpeg's eight and fork's seven hex digits (the real tag satisfies both); required excluded-only zvbi; date equals exactly one extra-version value. The existing file-URL hook remains synthetic-test-only. |
+| F-B4 | MINOR | CHARC DEFERRED to DR-149; no expansion to non-host native census this turn. |
+| F-B5 | MINOR | CONFIRMED / FIXED: rebuild STOPs, patch re-export command, validator/five-module rerun, F-B1 re-census before a draft, and stale retention wording removed. |
+| F-B6 | ADVISORY | CONFIRMED / FIXED: parser and direct build refuse zip without both verified FFmpeg arguments; the existing build path verifies them and bundles before notices/smoke/zip. Workflow line 123 already supplies both; YAML untouched. |
+| F-B7 | ADVISORY | CONFIRMED / FIXED: `Excluded <stage> (<status>): <reason>`; BUILT / ENTRY instead use `Build stage`, avoiding a false exclusion claim. |
+| F-B8 | ADVISORY | CONFIRMED / FIXED: build record writes Parent provider and FFmpeg ref, notices requires each exact line, and source_record_url points at the fork commit's tree root. |
+| F-B9 | ADVISORY | NOTED per CHARC; exact scope note below. |
+| F-B10 | ADVISORY / OUT OF ENVELOPE | Recorded as the reproducibility limit below; fork workflow untouched. |
+
+B r1 F-B9 listed files outside the brief's Files-owned row (`docs/user-guide.md` sections 2 and 6, `tools/package/README.md`, `tests/test_tools_package_ffmpeg.py`, `.github/workflows/release.yml`, `tests/test_release_workflow.py`, `tests/test_tools_package_smoke.py`). CHARC NOTED it; each was granted in dispatches 3-11 (the seat's confirmation is in the accept record).
+
+**Reproducibility and limits (runtime amendment).** The asset and all existing
+stage source pins remain unchanged. The lock now records Rust 1.99.1 at
+`58cf8f9c35b355199727627d07ae34a4e2846d67` and GCC 16.2.0 at
+`78d4ac73dd391005b895a6148cd9831e28e1208b`, build
+`crosstool-NG 1.29.0.7_b1a94f6`, with the two static flags and resolved crate
+checksums. These are seat census facts copied offline, not a cell probe of
+real executables or a claim of a byte-reproducible recipe.
+
+- LIMITS: the fork workflow keeps BtbN's floating action tags at `5031c6f1`; the recorded asset is bound by run id plus the three-way digest, which a moved action cannot alter after the fact.
+- LIMITS: libgcc soft-fp contains glibc files under LGPL-2.1-or-later with glibc's unlimited-link exception; no row is carried, per CHARC's ruling.
+- LIMITS: header-only pstl is Apache-2.0 WITH LLVM-exception and enters a C++ dependency's own code only if that dependency uses parallel algorithms; no row is carried, per CHARC's ruling.
+- LIMITS: mingw-w64 v14.0.0 crosstool sysroot headers used to compile the GCC runtime archives are the same project and licence family as the existing mingw row; no separate row is carried, per CHARC's ruling.
+- LIMITS: the Rust toolchain is pinned by the recorded asset, not by the recipe; the base image installs unpinned stable Rust, and pinning it in the fork is out of envelope.
+
+The libm / libstdc++ (fast_float) supersets retain their lock-graph/no-linkage-proof
+notes. Ryu keeps `chosen: Apache-2.0`; libstdc++ includes the eight HP / SGI
+notice excerpts. Existing floating ubuntu/apt/crosstool inputs and the
+`cargo update cc` limit remain as recorded in turn 13. The checklist now
+requires a fresh F-B1 census on every fork rebuild.
+
+**Existing-case changes.** `release`'s synthetic FFmpeg lock now declares its
+extra-version date, keeps the zvbi exclusion, and empties runtime rows/static
+flags when both Rust stages are absent; `add_ffmpeg` writes the two provenance
+lines. `test_fork_ffmpeg_notices_render_all_built_sources_and_explain_exclusions`
+expects 333 FFmpeg rows and status-bearing stage text, preserving the single
+GPL block check for the aggregate/stage rows. `_make_native_surface` excludes
+the separately locked text directory from its file-only fixture;
+`omit_production_embedded_census` retains that directory while pruning its
+own file surface, fixing nine cases across
+`test_census_native_rows_validate_and_bind_synthetic_bytes` and
+`test_real_scipy_vendored_blocks_bind_module_inventory`. The three zip cases
+(option routing, post-smoke publication and smoke mutations) supply the
+required lock arguments; the latter two isolate zip behavior with a bundle
+stub while existing synthetic archive tests exercise real verification.
+No smoke or release-workflow test file changed.
+
+**Verification loop.** Initial RED (`red.log` / `.xml`) reported 70 failed,
+two passed and six fixture errors before production changes; the new
+subdirectory exposed the fixture's file-only cleanup assumption. After the
+fixture adjustment, `red-notices.log` / `.xml` reported all six new notices
+cases failing against the old behavior. The first GREEN exposed an unintended
+HTTPS-only repository guard and an incorrect librsvg switch spelling;
+independent input inspection confirmed quick-error's actual HTTP repository
+and the real `--enable-librsvg` spelling. Both were corrected without changing
+the census data. `green2.log` / `.xml` reports 78 passed. The first full run
+(`pytest-first.log` / `.xml`) reported 762 passed, 14 failed and one skipped:
+nine failures were the second file-only fixture cleanup, and five were the
+expected real-Git sandbox failures. The nine fixture cases are fixed;
+`regression.log` / `.xml` then reports 105 passed, including the additional
+chosen-without-OR control, root agreement, zip and census-fixture cases.
+Initial mypy's three errors were a reused local variable's inferred type;
+renaming it fixes the typing without changing behavior.
+
+`mutations.log` independently compiles five AST-mutated in-memory copies:
+removing ref/licence guards accepts the invalid data; removing build-commit,
+asset-name or fullmatch validation reaches a different refusal. Each therefore
+fails its new named-refusal test. `scope-audit.log` independently confirms that
+only toolchain, toolchain_runtime and source_record_url changed in the lock,
+all 102 stage/source records are unchanged, and all tracked/new paths are owned.
+An additional checkout check (`newline-audit.log`) confirmed that CRLF input
+and `core.autocrlf=true`; the root annex was changed to link exact text files
+instead of embedding a copy whose bytes would change on checkout.
+`root-agreement.log` / `.xml` reports the revised agreement case passing.
+The subsequent diff review found no further in-envelope defect; no false-positive
+review finding was silently dropped. No new review round or convergence claim
+is made: A delta and B r2 belong to the seat after this handoff.
+
+**Final validation (supersedes the intermediate runs).** All outputs are
+file-backed under `work/wp6.3c/turn15/`. No-sync static commands ran in the
+prescribed order on the final code/test state:
+
+- `ruff-check-final.log`: All checks passed! (exit 0).
+- `ruff-format-final.log`: 337 files already formatted (exit 0).
+- `mypy-win32-final.log` and `mypy-darwin-final.log`: each Success: no issues
+  found in 166 source files (exit 0).
+- `pytest.log` / `.xml`, exact requested basetemp `work/c63c-15`: 772 passed,
+  five expected sandbox failures, one skipped, 171.15 seconds (exit 1).
+- `pytest-final.log` / `.xml`, fresh `work/c63c-15-final` after the root
+  checkout adjustment: **772 passed, five expected sandbox failures, one
+  skipped in 171.12 seconds** (exit 1). The runner keeps the sandbox mkdir
+  shim, disables cacheprovider, excludes QUIT_SCRIPT and uses a bounded
+  300-second per-test timeout; it removes runner-only PYTHONPATH while
+  retaining scripts on sys.path.
+- `data-verification-final.log`: all 232 input rows preserved except mapped
+  paths; 441 references / 157 files verified; zero hash mismatches.
+- `scope-audit-final.log`: all changes in the owned envelope, stage rows
+  unchanged, no new tracked prefix requiring harness registration.
+- `diff-check-final.log`: exit 0.
+
+| Module | Final result |
+| --- | --- |
+| test_tools_package_notices.py | 397 passed |
+| test_tools_package_build.py | 131 passed |
+| test_tools_package_smoke.py | 34 passed, one unchanged skip |
+| test_tools_package_ffmpeg.py | 158 passed |
+| test_release_workflow.py | 52 passed, five sandbox fixture failures |
+
+The five failures are
+`test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`
+variants annotated, lightweight, wrong-commit, mismatched-name and
+deleted-origin. Each fails in its temporary local fixture's
+`git push origin HEAD:refs/heads/main --tags` with restricted-token
+CreateFileMapping / Win32 error 5, before exercising the tag gate.
+`test-summary.json` records every case and its sandbox classification.
+The sole unchanged skip is
+`test_non_windows_containment_never_silently_skips` (WP6.5 POSIX proof).
+Every other prescribed test passes; this is not a claim that pytest's exit
+status is zero or that the real-Git cases have been validated in the cell.
+
+`byte-preservation.log` additionally proves the CRLF licence file's raw and
+attribute-filtered Git blob hashes are identical under native-licences -text.
+A probe-only false positive was rejected: Windows backslashes in an initial
+`git hash-object --path` argument missed the attribute; the corrected
+forward-slash control reports the same blob `75b52484ea471f882c29e02693b4f02dba175b5e`.
+`desktop-input-audit-summary.log` finds no synthetic desktop-input call in
+any turn-15 scratch script. The final convergence read found no additional
+in-envelope issue after the checkout adjustment.
+
+**Handoff / STOPPED ITEMS.** None of dispatch 15's items 1-8 is stopped or
+left unimplemented. The root annex's external byte-preserved text links are
+a presentation choice within item 1(e), not a missing runtime notice.
+A delta, B r2, the five real-Git seat reruns, applicable seat artifact checks,
+harness/package gate, acceptance/debt entries and release are the dispatcher's
+next steps. F-B4 remains CHARC's DR-149 disposition. The supplied B-r1 ledger
+counts are one MAJOR, four MINOR and five ADVISORY (F-B10 out of envelope),
+all NEW, no REOPENED findings and no reverts; remediation changes both tool
+code and tests/data. No new reviewer round was run and no cumulative ledger
+file was owned or edited this turn.
+
+Only the nine tracked owned files and 157 new toolchain texts changed.
+The dispatcher file list is `work/c63c-15/copied-texts.txt` (157 lines).
+No dependency, product source, frozen interface, workflow, fork patch or fork
+clone changed. No network fetch, real build, frozen/GUI launch, Docker,
+synthetic desktop input, protected-profile/footage/evidence-folder write,
+repository Git write, remote push/tag/dispatch or mailbox post was performed.
+The prescribed tests alone attempt temporary local Git-fixture writes/pushes.
+The seat commits this one logical remediation turn; no commit was attempted.
+`depth_input_tokens` is unavailable to this cell; dispatcher read is due at yield.
