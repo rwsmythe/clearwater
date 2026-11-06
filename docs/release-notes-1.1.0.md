@@ -28,15 +28,16 @@ the repository with uv, as 1.0.0 did.
 - **Hardened frozen application.** Video exports run in an isolated worker
   process with its own standard input; an unexpected error in the frozen app
   is written to the log and reported in one message instead of a silent exit;
-  the GPU pack is loaded only after its manifest and file hashes check out.
+  the GPU pack is verified file by file when it is installed, and at every
+  start its manifest, RECORD hashes, file sizes and file ownership are checked.
 - **macOS groundwork.** The code paths for macOS (VideoToolbox encoding,
   Library folders, POSIX process handling) are in this release and run from a
   source install with uv. They have not yet been validated on a Mac, and there
   is no macOS download in 1.1.0.
 - **Tooling.** The environment report prints platform facts by default; the
   footage guard refuses writes into the footage folder by file identity; the
-  release workflow verifies the annotated tag, pins every action and tool
-  version, and publishes only a draft.
+  release workflow verifies the annotated tag, pins every action to a commit
+  and the build's uv and Python versions, and publishes only a draft.
 
 ## Known limitations
 
