@@ -2828,3 +2828,15 @@ remote push/tag/dispatch or mailbox post was performed. Only the mandated
 tests attempted temporary local Git-fixture writes/pushes. The seat
 commits. `depth_input_tokens` is unavailable to the cell; the dispatcher
 reads it at this yield.
+
+**Seat note (orchestrator gen 54, Reviewer A r5 F6).** The STOP above was
+resolved at the seat: the expected count at
+`tests/test_tools_package_smoke.py:403` was GRANTED from eight to ten
+component rows (the libx265 rule makes the shared synthetic fixture carry
+the libgcc and libstdc++ rows) and committed with turn 17 as `1623e3c6`,
+so the turn touched NINE tracked paths, not eight. Seat QA at `1623e3c6`
+with real git: the five package modules 827 passed, 1 skipped; the root
+annex `--check` exits 0. Reviewer A r5 (the final A round) returned
+NO_NEW_CRITICAL_MAJOR; its minor F1 and advisories F2-F5 are register row
+DR-150 (CHARC), which must close before the next FFmpeg re-pin or any
+1.1.x release; the checklist's re-pin step says so.

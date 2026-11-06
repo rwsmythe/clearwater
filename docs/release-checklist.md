@@ -73,6 +73,11 @@ artifact is one folder, not an installer; it is unsigned. No PyPI release is pla
    `THIRD_PARTY_NOTICES.md` toolchain-runtime annex with
    `uv run python tools/package/notices.py --root-annex --write`; require
    `uv run python tools/package/notices.py --root-annex --check` to exit 0.
+   Re-derive `toolchain.rustc.backtrace_commit` as the `library/backtrace`
+   gitlink at the new rustc commit, and re-record the combined-text hash at
+   `tools/package/build.py` (the `_ffmpeg_licence_choices` coverage map,
+   which fails closed on a rustc bump) from the same census. DR-150 closes
+   before this step is run.
    Re-export `tools/package/ffmpeg-fork.patch` from
    the fork with `git format-patch --base=<parent commit> -1 <fork commit>`.
    Re-run the lock validator and the five package test modules
