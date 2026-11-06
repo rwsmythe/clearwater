@@ -26,6 +26,119 @@ def lock_data():
     return json.loads(LOCK.read_text(encoding="utf-8"))
 
 
+@pytest.mark.parametrize("field", ["census_build_commit", "census_asset_sha256"])
+def test_runtime_census_is_bound_to_the_recorded_asset(field):
+    """Removing either census equality guard permits a stale rebuild census."""
+    data = lock_data()
+    data["toolchain"][field] = "0" * (40 if field.endswith("commit") else 64)
+    with pytest.raises(ValueError, match=field + " differs"):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("name", ["libgcc", "libstdc++"])
+def test_x265_requires_gcc_runtime_independently_of_static_flags(name):
+    """Dropping the x265 obligation must accept this otherwise valid census."""
+    data = lock_data()
+    data["toolchain"]["static_link_flags"] = [
+        "-static-libstdc++" if name == "libgcc" else "-static-libgcc"
+    ]
+    data["toolchain_runtime"] = [r for r in data["toolchain_runtime"] if r["name"] != name]
+    with pytest.raises(ValueError, match="libx265 requires gcc-runtime " + re.escape(name)):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("wrapper", ["evil-{}", "{}-x", "x-{}-y"])
+def test_release_tag_refuses_valid_body_inside_other_text(wrapper):
+    """Replacing fullmatch with search loses these three named refusals."""
+    data = lock_data()
+    data["release_tag"] = wrapper.format(data["release_tag"])
+    data["asset_url"] = (
+        f"https://github.com/{data['provider']}/releases/download/"
+        f"{data['release_tag']}/{data['asset_name']}"
+    )
+    with pytest.raises(ValueError, match="release tag must name FFmpeg and build commits"):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("status", ["BUILT", "ENTRY", "unknown"])
+def test_zvbi_exclusion_requires_disabled_status(status):
+    """Removing the status guard would print a false exclusion claim."""
+    data = lock_data()
+    next(r for r in data["excluded"] if r["stage"] == "scripts.d/50-zvbi.sh")["status"] = status
+    with pytest.raises(ValueError, match="zvbi exclusion status must be not-built"):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("name", ["compiler_builtins", "libm"])
+def test_std_components_cannot_escape_the_rust_tree_binding(name):
+    """The generic rust-std allowlist alone permits this repository substitution."""
+    data = lock_data()
+    row = next(
+        r for r in data["toolchain_runtime"] if r["kind"] == "rust-std" and r["name"] == name
+    )
+    row["repository"] = "https://github.com/rust-lang/backtrace-rs"
+    row["source_url"] = row["repository"] + "/tree/" + row["pin"]
+    with pytest.raises(ValueError, match=name + " requires rust-lang/rust repository"):
+        build.validate_ffmpeg_lock(data)
+
+
+def test_backtrace_pin_is_bound_to_the_recorded_std_gitlink():
+    """Removing the gitlink equality guard permits an unrelated backtrace tree."""
+    data = lock_data()
+    row = next(r for r in data["toolchain_runtime"] if r["name"] == "backtrace")
+    row["pin"] = "0" * 40
+    row["source_url"] = row["repository"] + "/tree/" + row["pin"]
+    with pytest.raises(ValueError, match="backtrace pin differs from toolchain gitlink"):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("valid", [False, True])
+def test_mingw_runtime_repository_is_bound_to_the_stage(valid):
+    """A synthetic MinGW runtime must use the stage's repository, not any URL."""
+    data = lock_data()
+    row = copy.deepcopy(next(r for r in data["toolchain_runtime"] if r["name"] == "libgcc"))
+    stage = next(r for r in data["components"] if r["name"] == "mingw")
+    row.update(
+        name="mingw-test",
+        kind="mingw-runtime",
+        repository=stage["repository"] if valid else "not a url",
+    )
+    row["source_url"] = row["repository"] + "/tree/" + row["pin"]
+    data["toolchain_runtime"].append(row)
+    if valid:
+        assert build.validate_ffmpeg_lock(data) is data
+    else:
+        with pytest.raises(ValueError, match="mingw-runtime repository differs from mingw stage"):
+            build.validate_ffmpeg_lock(data)
+
+
+def test_one_text_or_licence_requires_a_choice_unless_all_terms_are_known():
+    """Removing the one-text OR guard permits an unrecorded partial selection."""
+    data = lock_data()
+    row = next(r for r in data["toolchain_runtime"] if r["name"] == "language-tags")
+    row["chosen"] = None
+    with pytest.raises(ValueError, match="one-text OR licence requires chosen"):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("change", ["unknown", "missing", "compile-log"])
+def test_runtime_linkage_refuses_unknown_or_overclaimed_proof(change):
+    """Missing linkage or a compile-log superset cannot claim proven linkage."""
+    data = lock_data()
+    row = data["toolchain_runtime"][0]
+    if change == "missing":
+        row.pop("linkage", None)
+        refusal = "invalid toolchain runtime fields"
+    elif change == "unknown":
+        row["linkage"] = "unknown"
+        refusal = "invalid runtime linkage"
+    else:
+        row.update(linkage="superset", basis="compile-log")
+        refusal = "superset linkage cannot have compile-log basis"
+    with pytest.raises(ValueError, match=refusal):
+        build.validate_ffmpeg_lock(data)
+
+
 @pytest.mark.parametrize(
     ("field", "value", "refusal"),
     [
@@ -512,6 +625,8 @@ def synthetic_bundle(tmp_path, monkeypatch):
     members = {}
     for tool in ("ffmpeg", "ffprobe"):
         script = (
+            f"# /rustc/{data['toolchain']['rustc']['commit']}/\n"
+            f"# GCC: ({data['toolchain']['gcc']['build']}) {data['toolchain']['gcc']['version']}\n"
             "import json, os, sys\nfrom pathlib import Path\n"
             "Path('observed-' + Path(__file__).stem + '.json').write_text(json.dumps({"
             "'path': os.environ['PATH'], 'cwd': os.getcwd(), 'args': sys.argv[1:]}))\n"
@@ -543,6 +658,8 @@ def synthetic_bundle(tmp_path, monkeypatch):
         data["github_sha256"] = data["seat_sha256"] = hashlib.sha256(
             source.read_bytes()
         ).hexdigest()
+        if "census_asset_sha256" in data["toolchain"]:
+            data["toolchain"]["census_asset_sha256"] = data["github_sha256"]
         data["asset_url"] = source.as_uri()
         pin.write_text(json.dumps(data), encoding="utf-8")
 
@@ -575,6 +692,52 @@ def bundle(fixture, **kwargs):
         url=kwargs.get("url", data["asset_url"]),
         sha256=kwargs.get("sha256", data["github_sha256"]),
     )
+
+
+@pytest.mark.parametrize("marker", ["rustc", "gcc"])
+@pytest.mark.parametrize("damage", ["absent", "wrong", "split"])
+def test_bundle_checks_streamed_toolchain_markers(synthetic_bundle, marker, damage):
+    """Removing either marker check accepts stale bytes despite version output."""
+    data, _source, destination, out, members, write, _pin = synthetic_bundle
+    rust = f"/rustc/{data['toolchain']['rustc']['commit']}/".encode()
+    gcc = (
+        f"GCC: ({data['toolchain']['gcc']['build']}) {data['toolchain']['gcc']['version']}".encode()
+    )
+    wanted = rust if marker == "rustc" else gcc
+    name = data["archive_root"] + "/bin/ffmpeg.exe"
+    payload = members[name]
+    if damage == "split":
+        # Put the selected marker across the production 1 MiB read boundary.
+        offset = payload.index(wanted)
+        payload = b"#" + b"x" * (1024 * 1024 - offset - len(wanted) // 2 - 2) + b"\n" + payload
+    else:
+        replacement = (
+            b"missing"
+            if damage == "absent"
+            else (
+                wanted.replace(data["toolchain"]["rustc"]["commit"].encode(), b"0" * 40)
+                if marker == "rustc"
+                else wanted + b"0"
+            )
+        )
+        payload = payload.replace(wanted, replacement)
+    members[name] = payload
+    write()
+    if damage == "split":
+        assert len(bundle(synthetic_bundle)) == 2
+    else:
+        trusted = set()
+        with pytest.raises(
+            ValueError, match="ffmpeg.exe: missing " + ("/rustc/" if marker == "rustc" else "GCC:")
+        ):
+            build.bundle_ffmpeg(
+                destination,
+                out=out,
+                url=data["asset_url"],
+                sha256=data["github_sha256"],
+                verified_hashes=trusted,
+            )
+        assert trusted == set()
 
 
 def test_local_file_bundle_checks_both_tools_and_extracts_only_release_files(synthetic_bundle):

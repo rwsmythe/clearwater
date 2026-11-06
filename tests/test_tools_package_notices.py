@@ -249,7 +249,9 @@ version = "6.22.3"
     )
     ffmpeg["components"] = [next(c for c in ffmpeg["components"] if c["name"] == "x265")]
     ffmpeg["excluded"] = [r for r in ffmpeg["excluded"] if r["stage"] == "scripts.d/50-zvbi.sh"]
-    ffmpeg["toolchain_runtime"] = []
+    ffmpeg["toolchain_runtime"] = [
+        r for r in ffmpeg["toolchain_runtime"] if r["name"] in {"libgcc", "libstdc++"}
+    ]
     ffmpeg["toolchain"]["static_link_flags"] = []
     ffmpeg_path = tmp_path / "ffmpeg.lock.json"
     ffmpeg_path.write_text(json.dumps(ffmpeg))
@@ -584,15 +586,67 @@ def test_ffmpeg_toolchain_census_renders_every_row_and_deduplicates_terms(releas
         else:
             assert source["source_url"] in row.sources
             assert f"{source['repository']} @ {source['pin']}" in row.sources
-        assert (
+        parent = (
             "statically linked into ffmpeg.exe / ffprobe.exe by the fork build at "
             + lock["build_repository_commit"]
-            in row.notes
         )
+        if source.get("linkage") == "superset":
+            assert "carried as a superset of the static link; linkage not proven" in row.notes
+            assert parent not in row.notes
+        else:
+            assert parent in row.notes
         if source["chosen"]:
-            assert "licence chosen: Apache-2.0" in row.notes
+            assert "licence chosen: " + source["chosen"] in row.notes
         if source["licence"] == "MPL-2.0":
             assert "MPL-2.0 (secondary licence: GPL-3.0 permitted, section 3.3)" in row.notes
+
+
+def test_root_annex_generator_checks_committed_bytes_and_detects_a_changed_row(tmp_path, capsys):
+    """A renderer drift or stale root annex must make the committed check fail."""
+    module = load_notices()
+    assert module.main(["--root-annex", "--check"]) == 0
+    original = (ROOT / "THIRD_PARTY_NOTICES.md").read_bytes().replace(b"\r\n", b"\n")
+    audit = tmp_path / "THIRD_PARTY_NOTICES.md"
+    audit.write_bytes(original)
+    lock = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_bytes())
+    lock["toolchain_runtime"][0]["evidence"] += " changed evidence"
+    pin = tmp_path / "changed-lock.json"
+    pin.write_text(json.dumps(lock))
+    args = ["--root-annex", "--audit", str(audit), "--ffmpeg-lock", str(pin)]
+    assert module.main([*args, "--check"]) == 1
+    assert "root annex differs" in capsys.readouterr().err
+    assert audit.read_bytes() == original
+    assert module.main([*args, "--write"]) == 0
+    assert b"changed evidence" in audit.read_bytes()
+    assert module.main([*args, "--check"]) == 0
+    assert module.main([*args, "--write"]) == 0
+    regenerated = audit.read_bytes()
+    assert module.main([*args, "--write"]) == 0
+    assert audit.read_bytes() == regenerated
+
+
+def test_runtime_notice_wording_distinguishes_supersets_and_shared_texts(release):
+    """Unconditional linkage wording and misleading deduplication names regress."""
+    module = load_notices()
+    lock = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_bytes())
+    release["ffmpeg"] = lock
+    release["ffmpeg_path"].write_text(json.dumps(lock))
+    add_ffmpeg(release)
+    rows = module._ffmpeg_rows(release["folder"], release["ffmpeg_path"])
+    supersets = [
+        row
+        for row in rows
+        if "carried as a superset of the static link; linkage not proven" in row.notes
+    ]
+    assert {row.name for row in supersets} == {
+        "FFmpeg toolchain runtime: libm 0.2.16 (toolchain)",
+        "FFmpeg toolchain runtime: libstdc++ (fast_float) 16.2.0 (toolchain)",
+    }
+    output = module.render_notices(module.NoticePlan(rows[0].entries, tuple(rows), ())).decode()
+    assert (
+        "a representative file name from the census; "
+        "byte-identical texts are shared across components" in output
+    )
 
 
 @pytest.mark.parametrize("damage", ["missing", "hash", "after-plan"])
@@ -1057,7 +1111,14 @@ def test_complete_native_fixture_has_only_supported_rows_and_shared_upstream_blo
         "pillow-heif / MinGW runtime",
     }
     if ffmpeg:
-        expected.update({"FFmpeg / ffprobe", "FFmpeg component: x265"})
+        expected.update(
+            {
+                "FFmpeg / ffprobe",
+                "FFmpeg component: x265",
+                "FFmpeg toolchain runtime: libgcc 16.2.0 (toolchain)",
+                "FFmpeg toolchain runtime: libstdc++ 16.2.0 (toolchain)",
+            }
+        )
     assert names == expected
     assert {entry for row in result.rows for entry in row.entries} == set(result.entries)
     output = destination.read_bytes()

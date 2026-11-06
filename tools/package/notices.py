@@ -1602,6 +1602,14 @@ def _ffmpeg_rows(
                         (extra["licence_note"],),
                     )
                 )
+    rows.extend(_ffmpeg_runtime_rows(lock, entries, native_licences_path))
+    return rows
+
+
+def _ffmpeg_runtime_rows(
+    lock: dict[str, Any], entries: tuple[str, ...], native_licences_path: Path
+) -> list[NoticeRow]:
+    rows: list[NoticeRow] = []
     toolchain_path = native_licences_path / "ffmpeg-toolchain"
     expected_names = {t["path"] for r in lock["toolchain_runtime"] for t in r["texts"]}
     actual_names = (
@@ -1647,8 +1655,12 @@ def _ffmpeg_rows(
             runtime_notes.append("MPL-2.0 (secondary licence: GPL-3.0 permitted, section 3.3)")
         runtime_notes.extend(
             (
-                "statically linked into ffmpeg.exe / ffprobe.exe by the fork build at "
-                + lock["build_repository_commit"],
+                (
+                    "carried as a superset of the static link; linkage not proven"
+                    if runtime["linkage"] == "superset"
+                    else "statically linked into ffmpeg.exe / ffprobe.exe by the fork build at "
+                    + lock["build_repository_commit"]
+                ),
                 f"Census basis: {runtime['basis']}; {runtime['basis_note']}",
                 "Source evidence: " + runtime["evidence"],
             )
@@ -2467,6 +2479,11 @@ def render_notices(plan: NoticePlan) -> bytes:
             "The artifact is a combined work distributed under GPL-3.0 terms where",
             "FFmpeg requires them; Clearwater's or-later grant permits this combination.",
         ]
+    if any(row.name.startswith("FFmpeg toolchain runtime:") for row in rows):
+        header += [
+            "FFmpeg toolchain runtime texts use a representative file name from the census; "
+            "byte-identical texts are shared across components."
+        ]
     header += [
         "",
         *plan.user_obtained,
@@ -2659,22 +2676,141 @@ def write_notices(
     return path
 
 
+def render_root_annex(
+    *,
+    audit_path: Path = ROOT / "THIRD_PARTY_NOTICES.md",
+    ffmpeg_lock_path: Path = ROOT / "tools/package/ffmpeg.lock.json",
+    native_licences_path: Path = ROOT / "tools/package/native-licences",
+) -> bytes:
+    """Regenerate the root runtime annex using the artifact's checked row renderer.
+
+    The root links exact upstream text bytes; artifacts embed them. Existing root
+    audit material is preserved with LF line endings and a runtime-annex pointer
+    added to the aggregate FFmpeg row. No binary or product code is executed.
+
+    Args:
+        audit_path: Root audit document whose generated annex is replaced.
+        ffmpeg_lock_path: Source and runtime census lock.
+        native_licences_path: Surface containing the locked runtime texts.
+
+    Returns:
+        The complete root document with a deterministic, LF-encoded annex.
+
+    Raises:
+        ValueError: A lock, runtime text, aggregate row or annex marker is invalid.
+        OSError: An input cannot be read.
+    """
+    lock = cast(
+        dict[str, Any],
+        _build_tool().validate_ffmpeg_lock(
+            json.loads(ffmpeg_lock_path.read_text(encoding="utf-8"))
+        ),
+    )
+    entries = (
+        "file:ffmpeg.exe",
+        "file:ffprobe.exe",
+        "file:ffmpeg-BUILD.txt",
+        "file:ffmpeg-LICENSE.txt",
+    )
+    rows = tuple(_ffmpeg_runtime_rows(lock, entries, native_licences_path))
+    rendered = render_notices(NoticePlan(entries, rows, ()))
+    suffix = rendered.split(b"## Redistributed components\n", 1)[1]
+    # Four synthetic inventory labels support the shared renderer, but are not
+    # a root-source installation inventory and must not be printed as one.
+    suffix = re.sub(rb"\nInventory: [^\n]*\n", b"", suffix, count=1)
+    by_hash = {t["sha256"]: t["path"] for row in lock["toolchain_runtime"] for t in row["texts"]}
+    anchors = {
+        anchor.decode(): by_hash[digest.decode()]
+        for anchor, digest in re.findall(
+            rb'<a id="(licence-\d+)"></a>.*?SHA-256: `([a-f0-9]{64})`', rendered, re.S
+        )
+    }
+    suffix = suffix.split(b"## Full licence texts and provenance", 1)[0]
+    for anchor, name in anchors.items():
+        suffix = suffix.replace(
+            f"(#{anchor})".encode(),
+            f"(tools/package/native-licences/ffmpeg-toolchain/{name})".encode(),
+        )
+    suffix += (
+        b"## Runtime licence text files\n\n"
+        b"These links preserve exact upstream bytes independently of "
+        b"Markdown checkout line endings.\n\n"
+    )
+    for digest, name in sorted(by_hash.items()):
+        path = native_licences_path / "ffmpeg-toolchain" / name
+        suffix += (
+            f"- [{name}](tools/package/native-licences/ffmpeg-toolchain/{name}); "
+            f"SHA-256: `{digest}`; bytes: {path.stat().st_size}.\n"
+        ).encode()
+    marker = b"<!-- WP6.3c generated FFmpeg toolchain runtime census -->"
+    original = audit_path.read_bytes().replace(b"\r\n", b"\n")
+    if original.count(marker) != 1:
+        raise ValueError("notices: root annex marker must occur once")
+    prefix = original.split(marker, 1)[0].rstrip()
+    pointer = b"[Toolchain-runtime annex](#ffmpeg-toolchain-runtime-census)"
+    lines = prefix.splitlines()
+    indices = [i for i, line in enumerate(lines) if line.startswith(b"| FFmpeg / ffprobe |")]
+    if len(indices) != 1:
+        raise ValueError("notices: root FFmpeg row must occur once")
+    index = indices[0]
+    if pointer not in lines[index]:
+        lines[index] = lines[index].rstrip(b" |") + b"; " + pointer + b" |"
+    header = (
+        b"\n\n## FFmpeg toolchain runtime census\n\n"
+        b"This section applies to the bundled 1.1.0 Windows FFmpeg, not user-obtained tools.\n"
+        b"Rows and links to licence texts are generated by "
+        b"`python tools/package/notices.py --root-annex --write`\n"
+        b"using the artifact notices renderer and `tools/package/ffmpeg.lock.json`; "
+        b"the 102 stage source records remain separate.\n"
+        b"Over-inclusion is permitted: reached_via: toolchain rows retained "
+        b"with both Rust stages disabled produce extra notices.\n"
+        b"Shared texts use a representative file name from the census; "
+        b"byte-identical texts are shared across components.\n"
+    )
+    return b"\n".join(lines) + b"\n\n" + marker + header + suffix
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    """Generate notices from the command line without launching the artifact.
+    """Generate artifact notices or write/check the root annex without execution.
+
+    ``--root-annex`` defaults to checking; ``--write`` regenerates the root
+    document. The artifact mode requires a folder and writes its notices file.
 
     Args:
         argv: Arguments, or ``sys.argv[1:]`` when omitted.
 
     Returns:
-        Zero after writing, or one with a single ASCII-safe stderr line on failure.
+        Zero after writing/checking, or one with an ASCII-safe failure line.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
-    parser.add_argument("folder", type=Path)
+    parser.add_argument("folder", type=Path, nargs="?")
+    parser.add_argument(
+        "--root-annex",
+        action="store_true",
+        help="regenerate/check the root runtime annex (default: check)",
+    )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--write", action="store_true")
+    mode.add_argument("--check", action="store_true")
     parser.add_argument("--audit", type=Path, default=ROOT / "THIRD_PARTY_NOTICES.md")
     parser.add_argument("--uv-lock", type=Path, default=ROOT / "uv.lock")
     parser.add_argument("--ffmpeg-lock", type=Path, default=ROOT / "tools/package/ffmpeg.lock.json")
     options = parser.parse_args(argv)
+    if options.root_annex and options.folder is not None:
+        parser.error("--root-annex does not accept an artifact folder")
+    if not options.root_annex and (options.folder is None or options.write or options.check):
+        parser.error("artifact notices requires a folder; --write/--check require --root-annex")
     try:
+        if options.root_annex:
+            document = render_root_annex(
+                audit_path=options.audit, ffmpeg_lock_path=options.ffmpeg_lock
+            )
+            if options.write:
+                options.audit.write_bytes(document)
+            elif options.audit.read_bytes().replace(b"\r\n", b"\n") != document:
+                raise ValueError("root annex differs; run --root-annex --write")
+            print("root annex written" if options.write else "root annex matches")
+            return 0
         path = write_notices(
             options.folder,
             audit_path=options.audit,

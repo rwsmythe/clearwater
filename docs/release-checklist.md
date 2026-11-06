@@ -66,8 +66,14 @@ artifact is one folder, not an installer; it is unsigned. No PyPI release is pla
    Recheck the floating toolchain/runtime inputs; preserve the patch and proof.
    A fork rebuild re-runs the F-B1 toolchain census: the base image installs
    an unpinned stable Rust, and the crate graphs follow the pinned rav1e /
-   librsvg commits. Re-record `toolchain` and `toolchain_runtime` from that
-   census before any draft. Re-export `tools/package/ffmpeg-fork.patch` from
+   librsvg commits. Re-record `toolchain` and `toolchain_runtime`, including
+   `census_build_commit` and `census_asset_sha256`, from that fresh census
+   before any draft. Update the byte-preserved texts under
+   `tools/package/native-licences/ffmpeg-toolchain/` and regenerate the root
+   `THIRD_PARTY_NOTICES.md` toolchain-runtime annex with
+   `uv run python tools/package/notices.py --root-annex --write`; require
+   `uv run python tools/package/notices.py --root-annex --check` to exit 0.
+   Re-export `tools/package/ffmpeg-fork.patch` from
    the fork with `git format-patch --base=<parent commit> -1 <fork commit>`.
    Re-run the lock validator and the five package test modules
    (`test_tools_package_notices.py`, `test_tools_package_build.py`,

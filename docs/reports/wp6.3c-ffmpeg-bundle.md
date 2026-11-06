@@ -1,12 +1,12 @@
 # WP6.3c - FFmpeg bundle
 
-Status: turn 15 implements Reviewer B r1's F-B1 runtime census and the
-dispatched folds, 2026-11-06; acceptance pending. Its validation and remaining
-seat checks are recorded in the turn-15 section below. The seat's supplied
-baseline at `80914e17` is 698 passed / one skipped including real Git, with
-local build/smoke/notices/zip and bundled-worker export proofs green.
-Post-remediation reviews, seat verification, package gate and release remain
-the seat's work. The fork patch remains the seat's r2 export.
+Status: turn 17 implements Reviewer B r2's three MINOR and seven ADVISORY
+folds, 2026-11-06; acceptance pending. The turn-17 section records current
+validation and limits. The seat's supplied turn-16 baseline at `fb759249`
+is 800 passed / one skipped including real Git. Post-remediation reviews,
+the refreshed real-asset build/notices/zip proofs, real-Git validation,
+package gate and release remain the seat's work. The fork patch remains
+the seat's r2 export.
 
 ## Turn 2 - Fork preparation and PATH-copy retirement
 
@@ -2654,3 +2654,177 @@ prescribed tests attempted temporary local Git-fixture writes/pushes.
 The seat commits; the cell attempted no commit.
 `depth_input_tokens` is unavailable to the cell; the dispatcher reads it
 at this yield.
+
+## Turn 17 - Reviewer B r2 census bindings and reproducible root annex
+
+**Built (2026-11-06; dispatch 17).** Folded the three MINOR and seven
+ADVISORY findings from Reviewer B r2 (`NO_NEW_CRITICAL_MAJOR`, supplied
+review `C:/Users/rwsmy/clearwater-review-evidence/wp6.3c/B/r2/review.txt`).
+This is one logical review remediation, with eight tracked paths changed.
+No new review verdict or acceptance is claimed on the dispatcher's behalf.
+
+The runtime census now binds both the fork build commit and asset SHA-256
+through `toolchain.census_build_commit` and `census_asset_sha256`. A rebuild
+that updates the asset identity without updating its census refuses with a
+named re-census error. Enabled x265 independently requires `libgcc` and
+`libstdc++` runtime rows, even if the recorded static flags omit them.
+`bundle_ffmpeg` checks the verified extracted `ffmpeg.exe` for the measured
+Rust commit marker when a Rust stage is enabled, and the exact GCC build /
+version ident (with a delimiter after the version, so `16.2.00` is refused).
+The census's section (a) records `GCC: (crosstool-NG 1.29.0.7_b1a94f6) 16.2.0`.
+The check streams 1 MiB chunks with overlap; synthetic archives exercise
+present, absent, wrong and boundary-split markers. Origin hashes are not
+published when the marker check refuses. No real asset was run by the cell.
+
+The root annex generator is now in `notices.py`, using the same checked
+runtime-row builder and renderer as artifact notices, without temporary
+fake binaries. `python tools/package/notices.py --root-annex --write`
+regenerates the root document; `--check` refuses stale output and defaults
+when neither mode is supplied. It preserves the preceding audit material
+with LF normalization and adds the aggregate FFmpeg row's annex pointer.
+The root links byte-preserved texts; artifact notices embed them. Both
+explain the census's representative filenames for shared texts. The
+synthetic four-entry inventory line is absent from the root annex.
+The checklist names the fresh census, its two identity fields, the
+`ffmpeg-toolchain/` texts, the annex and both generator commands.
+
+Every runtime row now has `linkage`: 230 `proven`, and exactly libm 0.2.16
+and libstdc++ (fast_float) 16.2.0 `superset`. A superset cannot use a
+`compile-log` basis. Its notices explicitly say linkage is not proven,
+without the unconditional statically-linked claim. The disabled zvbi row's
+status is enforced. language-tags and fast_float now explicitly choose MIT.
+MinGW runtime repositories bind to the existing mingw stage, compiler_builtins
+and libm bind to the rust-lang/rust tree, and backtrace binds to the recorded
+`d902726a1dcdc1e1c66f73d1162181b5423c645b` std gitlink.
+
+**Licence-choice limit (dispatch item 7's permitted fallback).** There is no
+exact general atom-to-text map in the shared census filenames. The new
+choice requirement therefore applies to single-text OR rows only. The
+one verified combined compiler-builtins text (SHA-256
+`ab6eec6caf0fa5775e411c7a8bc6a45c4ef2956b0980b157ab74fc5cd62a928b`)
+explicitly contains MIT, Apache-2.0 and the LLVM exception and is recognized
+by that byte hash. An otherwise unmapped single-text OR row must record
+`chosen`. This is not a general licence/text semantic proof for multi-text
+rows; fast_float's two-text MIT choice is recorded as instructed. The
+existing licence-expression and source/text-integrity guards remain active.
+
+| B r2 item | Severity | Disposition |
+| --- | --- | --- |
+| 1 | MINOR | CONFIRMED / FIXED: two census identity bindings, x265 runtime obligation, streamed compiler marker checks, re-pin instructions. One shared smoke count needs the scope grant below. |
+| 2 | MINOR | CONFIRMED / FIXED: valid release-tag bodies with a prefix, suffix or embedding have named refusal tests; all kill `re.search`. |
+| 3 | MINOR | CONFIRMED / FIXED: typed root-annex mode in the committed package module; full-document agreement, stale-row refusal and idempotent writing tests; checklist updated. |
+| 4 | ADVISORY | CONFIRMED / FIXED: representative census filenames explained in root and artifact notices. |
+| 5 | ADVISORY | CONFIRMED / FIXED: required linkage field on all 232 rows, proof/basis guards and superset-specific rendering. |
+| 6 | ADVISORY | CONFIRMED / FIXED: zvbi status must equal not-built(disabled). |
+| 7 | ADVISORY | CONFIRMED / FIXED within the permitted single-text fallback; MIT choices on the two named rows. |
+| 8 | ADVISORY | CONFIRMED / FIXED: MinGW repository, Rust tree and backtrace gitlink bindings, each with named refusal tests. |
+| 9 | ADVISORY | CONFIRMED / FIXED: aggregate root row points to the annex. Refreshed real-asset build/notices/zip proofs remain the seat's, as dispatched. |
+| 10 | ADVISORY | CONFIRMED / FIXED: current report status, root text-link wording and no meaningless inventory line. Verified source texts unchanged. |
+
+Supplied B r2 ledger row: zero CRITICAL, zero MAJOR, three MINOR, seven
+ADVISORY, all NEW and in envelope; zero REOPENED, zero reverts. Fixes are
+tool code/data, tests and documentation, not test-only. No cumulative-ledger
+path was owned this turn; this row is for the dispatcher's cumulative ledger.
+No review finding was rejected as a false positive.
+
+**Verification loop.** All runner output is file-backed under
+`work/wp6.3c/turn17/`. `red-guards.log` reports 15 failed / four passed;
+`red-render.log` reports six failed / two passed. The already-correct tag
+fullmatch passed the new wrapper tests before implementation. The other
+new passing red cases are valid controls. `green-new.log` reports all
+27 new cases passing. Static validation initially found long string lines
+and one reused local variable with incompatible inferred types; both were
+fixed. The initial mutation scratch runner matched too many guards; its
+selector was narrowed before any results were claimed. Its repeat used a
+fresh fixture folder rather than reusing the first run's existing files.
+
+`mutations-final.py` runs the actual regression functions against in-memory
+production mutants: **17 killed, zero survived** (`mutations-final.log`).
+No mutant was written into a tracked tool file.
+
+| Dispatch item | Mutant killed |
+| --- | --- |
+| 1(a) | Remove the census-equality guard: each of the commit/hash refusal tests fails to raise. |
+| 1(b) | Remove the x265 runtime guard: missing libgcc or libstdc++ with its static flag omitted validates. |
+| 1(c) | Remove the bundle marker call: Rust-missing and GCC-missing synthetic archives incorrectly succeed. Boundary controls independently pass. |
+| 2 | Replace the release-tag `re.fullmatch` with `re.search`: prefix, suffix and embedding cases all incorrectly validate. |
+| 6 | Remove the zvbi-status guard: BUILT, ENTRY and unknown statuses incorrectly validate. |
+| 7 | Remove the single-text OR guard: language-tags without its chosen MIT incorrectly validates. |
+| 8 | Remove the Rust-name repository guard (compiler_builtins and libm), backtrace gitlink equality, or MinGW stage-repository equality: each named-refusal test fails. |
+
+`audit.log` independently compares the lock to HEAD after removing only the
+authorized new fields and restoring only the two named choices: exact
+agreement. It verifies 232 rows, 230 proven / two superset, 441 text
+references / 157 files and every text SHA-256. No source row, stage pin,
+asset identity, runtime source/text field or licence byte changed.
+`root-check.log` records the generator's committed-document check, exit 0.
+
+**Scope STOP (confirmed cheaply).** The stricter x265 contract requires the
+shared notices fixture to carry the libgcc and libstdc++ rows even when
+both Rust stages are disabled. Its owned complete-native assertion is
+updated. The smoke test imports this same fixture and still asserts eight
+rows for FFmpeg at `tests/test_tools_package_smoke.py:403`; the emitted
+inventory correctly has ten (six pre-existing rows, aggregate FFmpeg,
+x265 and the two GCC rows). The first full run reproduced exactly that
+assertion failure. Dispatch 17 does not own the smoke module and says to
+STOP on an item needing another file, so that assertion is untouched.
+The seat must grant/change that one conditional expectation from eight
+to ten. No production suppression or validator bypass was introduced to
+preserve the stale count. This is the only unresolved in-envelope finding
+from the cell's final convergence read; it prevents claiming a green gate.
+
+**Final validation (current code/test state).** All runners used
+`uv run --no-sync`; full logs remain under `work/wp6.3c/turn17/`.
+
+- `ruff-check-final.log`: `ruff check .`, All checks passed! (exit 0).
+- `ruff-format-final.log`: `ruff format --check .`, 337 files already formatted (exit 0).
+- `mypy-win32-final.log`: `mypy`, Success: no issues found in 166 source files (exit 0).
+- `mypy-darwin-final.log`: `mypy --platform darwin`, the same 166-file success (exit 0).
+- `root-check.log`: `python tools/package/notices.py --root-annex --check`, root annex matches (exit 0).
+- `mutations-final.log`: 17 checks killed, zero survived (exit 0).
+- `audit.log`: authorized lock-field changes only; all runtime text hashes and scope pass (exit 0).
+- `pytest-final.log` / `.xml`: **821 passed, six failed, one skipped in 176.37 seconds** (exit 1).
+- `test-summary.log` / `.json`: independently parsed XML confirms exactly the one unowned count failure plus the five expected real-Git fixture failures, no other failures/errors (exit 0).
+- `smoke-count-repro.log`: the failing smoke variant's saved transcript says `notices: PASS (17 entries; 10 component rows)`.
+- `diff-check-final.log`: `git diff --check` (exit 0).
+
+The five-module pytest command used the sandbox mkdir shim, disabled
+cacheprovider, excluded QUIT_SCRIPT, set a bounded 300-second per-test
+timeout and ran through the existing isolated runner (scripts on sys.path,
+runner-only PYTHONPATH removed). The first full run used requested
+`work/c63c-17`; the final rerun used fresh `work/c63c-17-final`. Existing
+entry-point smoke children block Qt and stub GUI/worker entry points,
+redirect APPDATA / LOCALAPPDATA / XDG roots and use a 15-second child timeout.
+The unchanged skip is the POSIX-containment proof. No cell GUI ran.
+
+| Module | Final result |
+| --- | --- |
+| test_tools_package_notices.py | 403 passed |
+| test_tools_package_build.py | 131 passed |
+| test_tools_package_smoke.py | 33 passed, one stopped count failure, one unchanged skip |
+| test_tools_package_ffmpeg.py | 202 passed |
+| test_release_workflow.py | 52 passed, five expected real-Git sandbox fixture failures |
+
+The real-Git variants are annotated, lightweight, wrong-commit,
+mismatched-name and deleted-origin. Each fails at fixture-local
+`git push origin HEAD:refs/heads/main --tags` (exit 128), before exercising
+the gate. They require the seat rerun; no green pytest exit or gate proof
+is claimed. The report's updated status and this section are the final
+text-only changes after static/code validation.
+
+**Handoff / STOPPED ITEMS.** One: the eight-to-ten expected count at
+`tests/test_tools_package_smoke.py:403`, outside dispatch-17 ownership.
+Every other dispatched fold is implemented, including the expressly
+permitted single-text licence-choice fallback. No further owned-code fix
+was identified by the final convergence read. The next seat actions are
+the row-count grant/fix, real-Git rerun, refreshed real-asset build/notices/
+zip proofs, reviews and package gate. The current turn is not gate-green.
+
+Eight tracked paths changed. No dependency, native-licence text, workflow,
+fork clone/patch, product source or frozen interface changed. No network
+fetch, real PyInstaller build, frozen/GUI launch, Docker, synthetic desktop
+input, footage/profile/evidence-folder write, repository Git write,
+remote push/tag/dispatch or mailbox post was performed. Only the mandated
+tests attempted temporary local Git-fixture writes/pushes. The seat
+commits. `depth_input_tokens` is unavailable to the cell; the dispatcher
+reads it at this yield.

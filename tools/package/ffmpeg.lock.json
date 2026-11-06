@@ -1678,12 +1678,15 @@
     },
     "rustc": {
       "version": "1.99.1",
-      "commit": "58cf8f9c35b355199727627d07ae34a4e2846d67"
+      "commit": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "backtrace_commit": "d902726a1dcdc1e1c66f73d1162181b5423c645b"
     },
     "static_link_flags": [
       "-static-libgcc",
       "-static-libstdc++"
-    ]
+    ],
+    "census_build_commit": "d77b8352f60bd180ebce585632846533aa60b183",
+    "census_asset_sha256": "3534afe300170f55521d78bad405f54def9d388abba30aee7620dc525e2e0c20"
   },
   "toolchain_runtime": [
     {
@@ -1716,7 +1719,8 @@
       "evidence": "log #158 'Compiling adler2 v2.0.1'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling adler2 v2.0.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "ahash",
@@ -1744,7 +1748,8 @@
       "evidence": "log #158 'Compiling ahash v0.8.12'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling ahash v0.8.12' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "aho-corasick",
@@ -1776,7 +1781,8 @@
       "evidence": "log #158 'Compiling aho-corasick v1.1.5'; resolver target graph; binary 99-librsvg/vendor path string x40/x40 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling aho-corasick v1.1.5' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "approx",
@@ -1800,7 +1806,8 @@
       "evidence": "log #158 'Compiling approx v0.5.1'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling approx v0.5.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "av-data",
@@ -1824,7 +1831,8 @@
       "evidence": "log #158 'Compiling av-data v0.4.4'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling av-data v0.4.4' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "bitflags",
@@ -1852,7 +1860,8 @@
       "evidence": "log #158 'Compiling bitflags v2.13.2'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling bitflags v2.13.2' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "bitreader",
@@ -1880,7 +1889,8 @@
       "evidence": "log #158 'Compiling bitreader v0.3.11'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling bitreader v0.3.11' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "byte-slice-cast",
@@ -1904,7 +1914,8 @@
       "evidence": "log #158 'Compiling byte-slice-cast v1.2.3'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling byte-slice-cast v1.2.3' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "bytemuck",
@@ -1936,7 +1947,8 @@
       "evidence": "log #158 'Compiling bytemuck v1.25.2'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling bytemuck v1.25.2' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "byteorder",
@@ -1968,7 +1980,8 @@
       "evidence": "log #158 'Compiling byteorder v1.5.0'; resolver target graph; binary 99-librsvg/vendor path string x2/x2 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling byteorder v1.5.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "byteorder-lite",
@@ -1996,7 +2009,8 @@
       "evidence": "log #158 'Compiling byteorder-lite v0.1.0'; resolver target graph; binary 99-librsvg/vendor path string x2/x2 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling byteorder-lite v0.1.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "bytes",
@@ -2020,7 +2034,8 @@
       "evidence": "log #158 'Compiling bytes v1.12.1'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling bytes v1.12.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "cairo-rs",
@@ -2048,7 +2063,8 @@
       "evidence": "log #158 'Compiling cairo-rs v0.22.9'; resolver target graph; binary 99-librsvg/vendor path string x19/x19 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling cairo-rs v0.22.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "cairo-sys-rs",
@@ -2072,7 +2088,8 @@
       "evidence": "log #158 'Compiling cairo-sys-rs v0.22.9'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling cairo-sys-rs v0.22.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "cast",
@@ -2100,7 +2117,8 @@
       "evidence": "log #158 'Compiling cast v0.3.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling cast v0.3.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "cfg-if",
@@ -2128,7 +2146,8 @@
       "evidence": "log #158 'Compiling cfg-if v1.0.5'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling cfg-if v1.0.5' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "color_quant",
@@ -2152,7 +2171,8 @@
       "evidence": "log #158 'Compiling color_quant v1.1.0'; resolver target graph; binary 99-librsvg/vendor path string x2/x2 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling color_quant v1.1.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "core_detect",
@@ -2180,7 +2200,8 @@
       "evidence": "log #158 'Compiling core_detect v1.0.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling core_detect v1.0.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "crc32fast",
@@ -2208,7 +2229,8 @@
       "evidence": "log #158 'Compiling crc32fast v1.5.3'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling crc32fast v1.5.3' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "crossbeam-deque",
@@ -2236,7 +2258,8 @@
       "evidence": "log #158 'Compiling crossbeam-deque v0.8.8'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling crossbeam-deque v0.8.8' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "crossbeam-epoch",
@@ -2264,7 +2287,8 @@
       "evidence": "log #158 'Compiling crossbeam-epoch v0.9.21'; resolver target graph; binary 99-librsvg/vendor path string x6/x6 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling crossbeam-epoch v0.9.21' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "crossbeam-utils",
@@ -2292,7 +2316,8 @@
       "evidence": "log #158 'Compiling crossbeam-utils v0.8.23'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling crossbeam-utils v0.8.23' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "cssparser",
@@ -2316,7 +2341,8 @@
       "evidence": "log #158 'Compiling cssparser v0.37.0'; resolver target graph; binary 99-librsvg/vendor path string x19/x19 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling cssparser v0.37.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "cssparser-color",
@@ -2340,7 +2366,8 @@
       "evidence": "log #158 'Compiling cssparser-color v0.5.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling cssparser-color v0.5.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "data-url",
@@ -2368,7 +2395,8 @@
       "evidence": "log #158 'Compiling data-url v0.3.2'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling data-url v0.3.2' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "dav1d",
@@ -2392,7 +2420,8 @@
       "evidence": "log #158 'Compiling dav1d v0.11.1'; resolver target graph; binary 99-librsvg/vendor path string x5/x5 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling dav1d v0.11.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "dav1d-sys",
@@ -2416,7 +2445,8 @@
       "evidence": "log #158 'Compiling dav1d-sys v0.8.3'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling dav1d-sys v0.8.3' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "derive_more",
@@ -2440,7 +2470,8 @@
       "evidence": "log #158 'Compiling derive_more v2.1.1'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling derive_more v2.1.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "dtoa",
@@ -2468,7 +2499,8 @@
       "evidence": "log #158 'Compiling dtoa v1.0.11'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling dtoa v1.0.11' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "dtoa-short",
@@ -2492,7 +2524,8 @@
       "evidence": "log #158 'Compiling dtoa-short v0.3.5'; resolver target graph; binary 99-librsvg/vendor path string x2/x2 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling dtoa-short v0.3.5' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "either",
@@ -2520,7 +2553,8 @@
       "evidence": "log #158 'Compiling either v1.19.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling either v1.19.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "encoding_rs",
@@ -2556,7 +2590,8 @@
       "evidence": "log #158 'Compiling encoding_rs v0.8.42'; resolver target graph; binary 99-librsvg/vendor path string x23/x23 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling encoding_rs v0.8.42' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "fallible_collections",
@@ -2584,7 +2619,8 @@
       "evidence": "log #158 'Compiling fallible_collections v0.4.9'; resolver target graph; binary 99-librsvg/vendor path string x5/x5 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling fallible_collections v0.4.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "fdeflate",
@@ -2612,7 +2648,8 @@
       "evidence": "log #158 'Compiling fdeflate v0.3.7'; resolver target graph; binary 99-librsvg/vendor path string x4/x4 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling fdeflate v0.3.7' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "flate2",
@@ -2640,7 +2677,8 @@
       "evidence": "log #158 'Compiling flate2 v1.1.10'; resolver target graph; binary 99-librsvg/vendor path string x4/x4 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling flate2 v1.1.10' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "float-cmp",
@@ -2664,7 +2702,8 @@
       "evidence": "log #158 'Compiling float-cmp v0.10.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling float-cmp v0.10.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "form_urlencoded",
@@ -2692,7 +2731,8 @@
       "evidence": "log #158 'Compiling form_urlencoded v1.2.2'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling form_urlencoded v1.2.2' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "futures-channel",
@@ -2720,7 +2760,8 @@
       "evidence": "log #158 'Compiling futures-channel v0.3.34'; resolver target graph; binary 99-librsvg/vendor path string x4/x4 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling futures-channel v0.3.34' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "futures-core",
@@ -2748,7 +2789,8 @@
       "evidence": "log #158 'Compiling futures-core v0.3.34'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling futures-core v0.3.34' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "futures-executor",
@@ -2776,7 +2818,8 @@
       "evidence": "log #158 'Compiling futures-executor v0.3.34'; resolver target graph; binary 99-librsvg/vendor path string x2/x2 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling futures-executor v0.3.34' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "futures-io",
@@ -2804,7 +2847,8 @@
       "evidence": "log #158 'Compiling futures-io v0.3.34'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling futures-io v0.3.34' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "futures-task",
@@ -2832,7 +2876,8 @@
       "evidence": "log #158 'Compiling futures-task v0.3.34'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling futures-task v0.3.34' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "futures-util",
@@ -2860,7 +2905,8 @@
       "evidence": "log #158 'Compiling futures-util v0.3.34'; resolver target graph; binary 99-librsvg/vendor path string x4/x4 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling futures-util v0.3.34' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "gif",
@@ -2888,7 +2934,8 @@
       "evidence": "log #158 'Compiling gif v0.14.2'; resolver target graph; binary 99-librsvg/vendor path string x5/x5 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling gif v0.14.2' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "gio",
@@ -2916,7 +2963,8 @@
       "evidence": "log #158 'Compiling gio v0.22.10'; resolver target graph; binary 99-librsvg/vendor path string x156/x156 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling gio v0.22.10' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "gio-sys",
@@ -2940,7 +2988,8 @@
       "evidence": "log #158 'Compiling gio-sys v0.22.9'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling gio-sys v0.22.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "glib",
@@ -2968,7 +3017,8 @@
       "evidence": "log #158 'Compiling glib v0.22.10'; resolver target graph; binary 99-librsvg/vendor path string x83/x83 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling glib v0.22.10' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "glib-sys",
@@ -2992,7 +3042,8 @@
       "evidence": "log #158 'Compiling glib-sys v0.22.9'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling glib-sys v0.22.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "gobject-sys",
@@ -3016,7 +3067,8 @@
       "evidence": "log #158 'Compiling gobject-sys v0.22.9'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling gobject-sys v0.22.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "hashbrown",
@@ -3044,7 +3096,8 @@
       "evidence": "log #158 'Compiling hashbrown v0.13.2'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling hashbrown v0.13.2' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "icu_collections",
@@ -3068,7 +3121,8 @@
       "evidence": "log #158 'Compiling icu_collections v2.4.0'; resolver target graph; binary 99-librsvg/vendor path string x3/x3 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling icu_collections v2.4.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "icu_locale_core",
@@ -3092,7 +3146,8 @@
       "evidence": "log #158 'Compiling icu_locale_core v2.4.0'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling icu_locale_core v2.4.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "icu_normalizer",
@@ -3116,7 +3171,8 @@
       "evidence": "log #158 'Compiling icu_normalizer v2.4.0'; resolver target graph; binary 99-librsvg/vendor path string x2/x2 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling icu_normalizer v2.4.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "icu_normalizer_data",
@@ -3140,7 +3196,8 @@
       "evidence": "log #158 'Compiling icu_normalizer_data v2.4.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling icu_normalizer_data v2.4.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "icu_properties",
@@ -3164,7 +3221,8 @@
       "evidence": "log #158 'Compiling icu_properties v2.4.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling icu_properties v2.4.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "icu_properties_data",
@@ -3188,7 +3246,8 @@
       "evidence": "log #158 'Compiling icu_properties_data v2.4.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling icu_properties_data v2.4.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "icu_provider",
@@ -3212,7 +3271,8 @@
       "evidence": "log #158 'Compiling icu_provider v2.4.0'; resolver target graph; binary 99-librsvg/vendor path string x2/x2 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling icu_provider v2.4.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "idna",
@@ -3240,7 +3300,8 @@
       "evidence": "log #158 'Compiling idna v1.1.0'; resolver target graph; binary 99-librsvg/vendor path string x3/x3 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling idna v1.1.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "idna_adapter",
@@ -3268,7 +3329,8 @@
       "evidence": "log #158 'Compiling idna_adapter v1.2.2'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling idna_adapter v1.2.2' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "image",
@@ -3296,7 +3358,8 @@
       "evidence": "log #158 'Compiling image v0.25.10'; resolver target graph; binary 99-librsvg/vendor path string x39/x39 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling image v0.25.10' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "image-webp",
@@ -3324,7 +3387,8 @@
       "evidence": "log #158 'Compiling image-webp v0.2.4'; resolver target graph; binary 99-librsvg/vendor path string x21/x21 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling image-webp v0.2.4' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "itertools",
@@ -3352,7 +3416,8 @@
       "evidence": "log #158 'Compiling itertools v0.15.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling itertools v0.15.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "itoa",
@@ -3380,7 +3445,8 @@
       "evidence": "log #158 'Compiling itoa v1.0.18'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling itoa v1.0.18' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "language-tags",
@@ -3404,7 +3470,8 @@
       "evidence": "log #158 'Compiling language-tags v0.3.2'; resolver target graph; binary 99-librsvg/vendor path string x2/x2 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling language-tags v0.3.2' (run 2) + target graph",
-      "chosen": null
+      "chosen": "MIT",
+      "linkage": "proven"
     },
     {
       "name": "lazy_static",
@@ -3432,7 +3499,8 @@
       "evidence": "log #158 'Compiling lazy_static v1.5.1'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling lazy_static v1.5.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "libc",
@@ -3460,7 +3528,8 @@
       "evidence": "log #158 'Compiling libc v0.2.191'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling libc v0.2.191' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "litemap",
@@ -3484,7 +3553,8 @@
       "evidence": "log #158 'Compiling litemap v0.8.3'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling litemap v0.8.3' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "locale_config",
@@ -3508,7 +3578,8 @@
       "evidence": "log #158 'Compiling locale_config v0.3.0'; resolver target graph; binary 99-librsvg/vendor path string x3/x3 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling locale_config v0.3.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "lock_api",
@@ -3536,7 +3607,8 @@
       "evidence": "log #158 'Compiling lock_api v0.4.14'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling lock_api v0.4.14' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "log",
@@ -3564,7 +3636,8 @@
       "evidence": "log #158 'Compiling log v0.4.34'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling log v0.4.34' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "markup5ever",
@@ -3592,7 +3665,8 @@
       "evidence": "log #158 'Compiling markup5ever v0.39.0'; resolver target graph; binary 99-librsvg/vendor path string x2/x2 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling markup5ever v0.39.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "matrixmultiply",
@@ -3620,7 +3694,8 @@
       "evidence": "log #158 'Compiling matrixmultiply v0.3.11'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling matrixmultiply v0.3.11' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "memchr",
@@ -3652,7 +3727,8 @@
       "evidence": "log #158 'Compiling memchr v2.8.3'; resolver target graph; binary 99-librsvg/vendor path string x11/x11 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling memchr v2.8.3' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "miniz_oxide",
@@ -3688,7 +3764,8 @@
       "evidence": "log #158 'Compiling miniz_oxide v0.8.9'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling miniz_oxide v0.8.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "miniz_oxide",
@@ -3724,7 +3801,8 @@
       "evidence": "log #158 'Compiling miniz_oxide v0.9.1'; resolver target graph; binary 99-librsvg/vendor path string x7/x7 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling miniz_oxide v0.9.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "moxcms",
@@ -3752,7 +3830,8 @@
       "evidence": "log #158 'Compiling moxcms v0.8.1'; resolver target graph; binary 99-librsvg/vendor path string x30/x30 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling moxcms v0.8.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "mp4parse",
@@ -3776,7 +3855,8 @@
       "evidence": "log #158 'Compiling mp4parse v0.17.0'; resolver target graph; binary 99-librsvg/vendor path string x6/x6 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling mp4parse v0.17.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "nalgebra",
@@ -3800,7 +3880,8 @@
       "evidence": "log #158 'Compiling nalgebra v0.35.0'; resolver target graph; binary 99-librsvg/vendor path string x3/x3 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling nalgebra v0.35.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "new_debug_unreachable",
@@ -3824,7 +3905,8 @@
       "evidence": "log #158 'Compiling new_debug_unreachable v1.0.6'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling new_debug_unreachable v1.0.6' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "num-bigint",
@@ -3852,7 +3934,8 @@
       "evidence": "log #158 'Compiling num-bigint v0.4.8'; resolver target graph; binary 99-librsvg/vendor path string x24/x24 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling num-bigint v0.4.8' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "num-complex",
@@ -3880,7 +3963,8 @@
       "evidence": "log #158 'Compiling num-complex v0.4.6'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling num-complex v0.4.6' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "num-integer",
@@ -3908,7 +3992,8 @@
       "evidence": "log #158 'Compiling num-integer v0.1.47'; resolver target graph; binary 99-librsvg/vendor path string x2/x2 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling num-integer v0.1.47' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "num-rational",
@@ -3936,7 +4021,8 @@
       "evidence": "log #158 'Compiling num-rational v0.4.2'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling num-rational v0.4.2' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "num-traits",
@@ -3964,7 +4050,8 @@
       "evidence": "log #158 'Compiling num-traits v0.2.19'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling num-traits v0.2.19' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "once_cell",
@@ -3992,7 +4079,8 @@
       "evidence": "log #158 'Compiling once_cell v1.21.4'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling once_cell v1.21.4' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "pango",
@@ -4020,7 +4108,8 @@
       "evidence": "log #158 'Compiling pango v0.22.9'; resolver target graph; binary 99-librsvg/vendor path string x41/x41 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling pango v0.22.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "pango-sys",
@@ -4044,7 +4133,8 @@
       "evidence": "log #158 'Compiling pango-sys v0.22.9'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling pango-sys v0.22.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "pangocairo",
@@ -4072,7 +4162,8 @@
       "evidence": "log #158 'Compiling pangocairo v0.22.9'; resolver target graph; binary 99-librsvg/vendor path string x2/x2 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling pangocairo v0.22.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "pangocairo-sys",
@@ -4096,7 +4187,8 @@
       "evidence": "log #158 'Compiling pangocairo-sys v0.22.9'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling pangocairo-sys v0.22.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "parking_lot",
@@ -4124,7 +4216,8 @@
       "evidence": "log #158 'Compiling parking_lot v0.12.5'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling parking_lot v0.12.5' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "parking_lot_core",
@@ -4152,7 +4245,8 @@
       "evidence": "log #158 'Compiling parking_lot_core v0.9.12'; resolver target graph; binary 99-librsvg/vendor path string x4/x4 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling parking_lot_core v0.9.12' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "percent-encoding",
@@ -4180,7 +4274,8 @@
       "evidence": "log #158 'Compiling percent-encoding v2.3.2'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling percent-encoding v2.3.2' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "phf",
@@ -4204,7 +4299,8 @@
       "evidence": "log #158 'Compiling phf v0.13.1'; resolver target graph; binary 99-librsvg/vendor path string x3/x3 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling phf v0.13.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "phf_shared",
@@ -4228,7 +4324,8 @@
       "evidence": "log #158 'Compiling phf_shared v0.13.1'; resolver target graph; binary 99-librsvg/vendor path string x5/x5 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling phf_shared v0.13.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "phf_shared",
@@ -4252,7 +4349,8 @@
       "evidence": "log #158 'Compiling phf_shared v0.14.0'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling phf_shared v0.14.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "pin-project-lite",
@@ -4280,7 +4378,8 @@
       "evidence": "log #158 'Compiling pin-project-lite v0.2.17'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling pin-project-lite v0.2.17' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "png",
@@ -4308,7 +4407,8 @@
       "evidence": "log #158 'Compiling png v0.18.1'; resolver target graph; binary 99-librsvg/vendor path string x21/x21 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling png v0.18.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "potential_utf",
@@ -4332,7 +4432,8 @@
       "evidence": "log #158 'Compiling potential_utf v0.1.6'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling potential_utf v0.1.6' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "precomputed-hash",
@@ -4356,7 +4457,8 @@
       "evidence": "log #158 'Compiling precomputed-hash v0.1.1'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling precomputed-hash v0.1.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "pxfm",
@@ -4384,7 +4486,8 @@
       "evidence": "log #158 'Compiling pxfm v0.1.30'; resolver target graph; binary 99-librsvg/vendor path string x54/x54 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling pxfm v0.1.30' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "quick-error",
@@ -4412,7 +4515,8 @@
       "evidence": "log #158 'Compiling quick-error v2.0.1'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling quick-error v2.0.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "rawpointer",
@@ -4440,7 +4544,8 @@
       "evidence": "log #158 'Compiling rawpointer v0.2.1'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling rawpointer v0.2.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "rayon",
@@ -4468,7 +4573,8 @@
       "evidence": "log #158 'Compiling rayon v1.12.0'; resolver target graph; binary 99-librsvg/vendor path string x3/x3 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling rayon v1.12.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "rayon-core",
@@ -4496,7 +4602,8 @@
       "evidence": "log #158 'Compiling rayon-core v1.13.0'; resolver target graph; binary 99-librsvg/vendor path string x12/x12 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling rayon-core v1.13.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "rctree",
@@ -4520,7 +4627,8 @@
       "evidence": "log #158 'Compiling rctree v0.6.0'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling rctree v0.6.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "regex",
@@ -4548,7 +4656,8 @@
       "evidence": "log #158 'Compiling regex v1.13.1'; resolver target graph; binary 99-librsvg/vendor path string x7/x7 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling regex v1.13.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "regex-automata",
@@ -4576,7 +4685,8 @@
       "evidence": "log #158 'Compiling regex-automata v0.4.18'; resolver target graph; binary 99-librsvg/vendor path string x80/x80 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling regex-automata v0.4.18' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "regex-syntax",
@@ -4604,7 +4714,8 @@
       "evidence": "log #158 'Compiling regex-syntax v0.8.11'; resolver target graph; binary 99-librsvg/vendor path string x14/x14 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling regex-syntax v0.8.11' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "rgb",
@@ -4628,7 +4739,8 @@
       "evidence": "log #158 'Compiling rgb v0.8.53'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling rgb v0.8.53' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "rustc-hash",
@@ -4656,7 +4768,8 @@
       "evidence": "log #158 'Compiling rustc-hash v2.1.3'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling rustc-hash v2.1.3' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "safe_arch",
@@ -4688,7 +4801,8 @@
       "evidence": "log #158 'Compiling safe_arch v1.2.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling safe_arch v1.2.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "scopeguard",
@@ -4716,7 +4830,8 @@
       "evidence": "log #158 'Compiling scopeguard v1.2.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling scopeguard v1.2.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "selectors",
@@ -4740,7 +4855,8 @@
       "evidence": "log #158 'Compiling selectors v0.40.0'; resolver target graph; binary 99-librsvg/vendor path string x8/x8 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling selectors v0.40.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "serde",
@@ -4768,7 +4884,8 @@
       "evidence": "log #158 'Compiling serde v1.0.229'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling serde v1.0.229' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "serde_core",
@@ -4796,7 +4913,8 @@
       "evidence": "log #158 'Compiling serde_core v1.0.229'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling serde_core v1.0.229' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "servo_arc",
@@ -4824,7 +4942,8 @@
       "evidence": "log #158 'Compiling servo_arc v0.4.3'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling servo_arc v0.4.3' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "simba",
@@ -4848,7 +4967,8 @@
       "evidence": "log #158 'Compiling simba v0.10.2'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling simba v0.10.2' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "simd-adler32",
@@ -4872,7 +4992,8 @@
       "evidence": "log #158 'Compiling simd-adler32 v0.3.10'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling simd-adler32 v0.3.10' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "simdutf8",
@@ -4900,7 +5021,8 @@
       "evidence": "log #158 'Compiling simdutf8 v0.1.5'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling simdutf8 v0.1.5' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "siphasher",
@@ -4932,7 +5054,8 @@
       "evidence": "log #158 'Compiling siphasher v1.0.4'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling siphasher v1.0.4' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "slab",
@@ -4956,7 +5079,8 @@
       "evidence": "log #158 'Compiling slab v0.4.12'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling slab v0.4.12' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "smallvec",
@@ -4984,7 +5108,8 @@
       "evidence": "log #158 'Compiling smallvec v1.16.4'; resolver target graph; binary 99-librsvg/vendor path string x8/x8 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling smallvec v1.16.4' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "stable_deref_trait",
@@ -5012,7 +5137,8 @@
       "evidence": "log #158 'Compiling stable_deref_trait v1.2.1'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling stable_deref_trait v1.2.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "static_assertions",
@@ -5040,7 +5166,8 @@
       "evidence": "log #158 'Compiling static_assertions v1.1.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling static_assertions v1.1.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "string_cache",
@@ -5068,7 +5195,8 @@
       "evidence": "log #158 'Compiling string_cache v0.10.0'; resolver target graph; binary 99-librsvg/vendor path string x3/x3 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling string_cache v0.10.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "string_cache",
@@ -5096,7 +5224,8 @@
       "evidence": "log #158 'Compiling string_cache v0.9.0'; resolver target graph; binary 99-librsvg/vendor path string x9/x9 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling string_cache v0.9.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "tendril",
@@ -5124,7 +5253,8 @@
       "evidence": "log #158 'Compiling tendril v0.5.1'; resolver target graph; binary 99-librsvg/vendor path string x10/x10 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling tendril v0.5.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "tinystr",
@@ -5148,7 +5278,8 @@
       "evidence": "log #158 'Compiling tinystr v0.8.5'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling tinystr v0.8.5' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "tinyvec",
@@ -5180,7 +5311,8 @@
       "evidence": "log #158 'Compiling tinyvec v1.13.3'; resolver target graph; binary 99-librsvg/vendor path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling tinyvec v1.13.3' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "typenum",
@@ -5212,7 +5344,8 @@
       "evidence": "log #158 'Compiling typenum v1.20.1'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling typenum v1.20.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "url",
@@ -5240,7 +5373,8 @@
       "evidence": "log #158 'Compiling url v2.5.8'; resolver target graph; binary 99-librsvg/vendor path string x12/x12 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling url v2.5.8' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "utf8_iter",
@@ -5272,7 +5406,8 @@
       "evidence": "log #158 'Compiling utf8_iter v1.0.4'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling utf8_iter v1.0.4' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "web_atoms",
@@ -5300,7 +5435,8 @@
       "evidence": "log #158 'Compiling web_atoms v0.2.6'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling web_atoms v0.2.6' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "weezl",
@@ -5328,7 +5464,8 @@
       "evidence": "log #158 'Compiling weezl v0.1.12'; resolver target graph; binary 99-librsvg/vendor path string x4/x4 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling weezl v0.1.12' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "wide",
@@ -5360,7 +5497,8 @@
       "evidence": "log #158 'Compiling wide v1.7.1'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling wide v1.7.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "winapi",
@@ -5388,7 +5526,8 @@
       "evidence": "log #158 'Compiling winapi v0.3.9'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling winapi v0.3.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "winapi-x86_64-pc-windows-gnu",
@@ -5416,7 +5555,8 @@
       "evidence": "log #158 'Compiling winapi-x86_64-pc-windows-gnu v0.4.0'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling winapi-x86_64-pc-windows-gnu v0.4.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "windows-link",
@@ -5444,7 +5584,8 @@
       "evidence": "log #158 'Compiling windows-link v0.2.1'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling windows-link v0.2.1' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "windows-sys",
@@ -5472,7 +5613,8 @@
       "evidence": "log #158 'Compiling windows-sys v0.61.2'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling windows-sys v0.61.2' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "writeable",
@@ -5496,7 +5638,8 @@
       "evidence": "log #158 'Compiling writeable v0.6.4'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling writeable v0.6.4' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "xml5ever",
@@ -5524,7 +5667,8 @@
       "evidence": "log #158 'Compiling xml5ever v0.39.0'; resolver target graph; binary 99-librsvg/vendor path string x4/x4 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling xml5ever v0.39.0' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "yoke",
@@ -5548,7 +5692,8 @@
       "evidence": "log #158 'Compiling yoke v0.8.4'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling yoke v0.8.4' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "zerocopy",
@@ -5580,7 +5725,8 @@
       "evidence": "log #158 'Compiling zerocopy v0.8.63'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling zerocopy v0.8.63' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "zerofrom",
@@ -5604,7 +5750,8 @@
       "evidence": "log #158 'Compiling zerofrom v0.1.8'; resolver target graph",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling zerofrom v0.1.8' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "zerotrie",
@@ -5628,7 +5775,8 @@
       "evidence": "log #158 'Compiling zerotrie v0.2.5'; resolver target graph; binary 99-librsvg/vendor path string x3/x3 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling zerotrie v0.2.5' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "zerovec",
@@ -5652,7 +5800,8 @@
       "evidence": "log #158 'Compiling zerovec v0.11.9'; resolver target graph; binary 99-librsvg/vendor path string x5/x5 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling zerovec v0.11.9' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "zune-core",
@@ -5684,7 +5833,8 @@
       "evidence": "log #158 'Compiling zune-core v0.5.3'; resolver target graph; binary 99-librsvg/vendor path string x4/x4 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling zune-core v0.5.3' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "zune-jpeg",
@@ -5716,7 +5866,8 @@
       "evidence": "log #158 'Compiling zune-jpeg v0.5.15'; resolver target graph; binary 99-librsvg/vendor path string x20/x20 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #158 line 'Compiling zune-jpeg v0.5.15' (run 2) + target graph",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "aligned",
@@ -5744,7 +5895,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling aligned v0.4.2' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "aligned-vec",
@@ -5768,7 +5920,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features); binary cargo registry path string x3/x3 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling aligned-vec v0.6.4' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "anstream",
@@ -5796,7 +5949,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (3 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling anstream v0.6.19' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "anstyle",
@@ -5824,7 +5978,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling anstyle v1.0.11' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "anstyle-parse",
@@ -5852,7 +6007,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling anstyle-parse v0.2.7' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "anstyle-query",
@@ -5880,7 +6036,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling anstyle-query v1.1.3' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "anstyle-wincon",
@@ -5908,7 +6065,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling anstyle-wincon v3.0.9' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "anyhow",
@@ -5936,7 +6094,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling anyhow v1.0.98' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "arrayvec",
@@ -5964,7 +6123,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features); binary cargo registry path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling arrayvec v0.7.6' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "as-slice",
@@ -5992,7 +6152,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling as-slice v0.2.1' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "av-metrics",
@@ -6016,7 +6177,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling av-metrics v0.9.1' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "av-scenechange",
@@ -6040,7 +6202,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (4 features); binary cargo registry path string x17/x17 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling av-scenechange v0.14.1' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "av1-grain",
@@ -6064,7 +6227,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (8 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling av1-grain v0.2.4' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "bitstream-io",
@@ -6092,7 +6256,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features); binary cargo registry path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling bitstream-io v4.2.0' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "cfg-if",
@@ -6120,7 +6285,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling cfg-if v1.0.1' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "clap",
@@ -6148,7 +6314,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (4 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling clap v4.5.40' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "clap_builder",
@@ -6176,7 +6343,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (4 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling clap_builder v4.5.40' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "clap_complete",
@@ -6204,7 +6372,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (1 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling clap_complete v4.5.54' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "clap_lex",
@@ -6232,7 +6401,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling clap_lex v0.7.5' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "colorchoice",
@@ -6260,7 +6430,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling colorchoice v1.0.4' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "console",
@@ -6284,7 +6455,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (3 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling console v0.15.11' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "core2",
@@ -6312,7 +6484,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (3 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling core2 v0.4.0' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "crossbeam",
@@ -6340,7 +6513,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (7 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling crossbeam v0.8.4' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "crossbeam-channel",
@@ -6372,7 +6546,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (1 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling crossbeam-channel v0.5.15' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "crossbeam-deque",
@@ -6400,7 +6575,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features); binary cargo registry path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling crossbeam-deque v0.8.6' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "crossbeam-epoch",
@@ -6428,7 +6604,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features); binary cargo registry path string x6/x6 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling crossbeam-epoch v0.9.18' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "crossbeam-queue",
@@ -6456,7 +6633,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling crossbeam-queue v0.3.12' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "crossbeam-utils",
@@ -6484,7 +6662,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling crossbeam-utils v0.8.21' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "either",
@@ -6512,7 +6691,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling either v1.15.0' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "encode_unicode",
@@ -6540,7 +6720,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling encode_unicode v1.0.0' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "equator",
@@ -6564,7 +6745,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features); binary cargo registry path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling equator v0.4.2' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "fern",
@@ -6588,7 +6770,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling fern v0.7.1' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "is_terminal_polyfill",
@@ -6616,7 +6799,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (1 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling is_terminal_polyfill v1.70.1' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "itertools",
@@ -6644,7 +6828,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (3 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling itertools v0.10.5' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "itertools",
@@ -6672,7 +6857,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (3 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling itertools v0.14.0' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "lab",
@@ -6696,7 +6882,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling lab v0.11.0' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "libc",
@@ -6724,7 +6911,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling libc v0.2.172' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "log",
@@ -6752,7 +6940,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling log v0.4.34' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "maybe-rayon",
@@ -6776,7 +6965,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling maybe-rayon v0.1.1' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "memchr",
@@ -6808,7 +6998,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling memchr v2.7.5' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "minimal-lexical",
@@ -6840,7 +7031,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (1 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling minimal-lexical v0.2.1' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "new_debug_unreachable",
@@ -6864,7 +7056,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling new_debug_unreachable v1.0.6' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "nom",
@@ -6888,7 +7081,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (3 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling nom v7.1.3' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "nom",
@@ -6912,7 +7106,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (3 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling nom v8.0.0' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "num-bigint",
@@ -6940,7 +7135,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (1 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling num-bigint v0.4.6' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "num-integer",
@@ -6968,7 +7164,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling num-integer v0.1.46' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "num-rational",
@@ -6996,7 +7193,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (3 features); binary cargo registry path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling num-rational v0.4.2' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "num-traits",
@@ -7024,7 +7222,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (3 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling num-traits v0.2.19' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "once_cell",
@@ -7052,7 +7251,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (4 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling once_cell v1.21.3' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "once_cell_polyfill",
@@ -7080,7 +7280,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (1 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling once_cell_polyfill v1.70.1' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "profiling",
@@ -7108,7 +7309,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (3 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling profiling v1.0.16' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "rayon",
@@ -7136,7 +7338,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features); binary cargo registry path string x5/x5 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling rayon v1.10.0' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "rayon-core",
@@ -7164,7 +7367,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features); binary cargo registry path string x13/x13 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling rayon-core v1.12.1' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "scan_fmt",
@@ -7188,7 +7392,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features); binary cargo registry path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling scan_fmt v0.2.6' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "stable_deref_trait",
@@ -7216,7 +7421,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling stable_deref_trait v1.2.0' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "terminal_size",
@@ -7244,7 +7450,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling terminal_size v0.4.2' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "thiserror",
@@ -7272,7 +7479,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling thiserror v1.0.69' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "thiserror",
@@ -7300,7 +7508,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling thiserror v2.0.12' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "unicode-width",
@@ -7332,7 +7541,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (2 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling unicode-width v0.2.1' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "utf8parse",
@@ -7360,7 +7570,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (1 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling utf8parse v0.2.2' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "v_frame",
@@ -7384,7 +7595,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features); binary cargo registry path string x1/x1 (ffmpeg/ffprobe)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling v_frame v0.3.9' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "windows-sys",
@@ -7412,7 +7624,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (10 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling windows-sys v0.59.0' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "windows-targets",
@@ -7440,7 +7653,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling windows-targets v0.52.6' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "windows_x86_64_gnu",
@@ -7468,7 +7682,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling windows_x86_64_gnu v0.52.6' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "y4m",
@@ -7492,7 +7707,8 @@
       "evidence": "log #87 rustc --target x86_64-pc-windows-gnu unit (0 features)",
       "basis": "compile-log",
       "basis_note": "log #87 rustc --target x86_64-pc-windows-gnu unit + line 'Compiling y4m v0.8.0' (run 2)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "addr2line",
@@ -7520,7 +7736,8 @@
       "evidence": "library/Cargo.lock @58cf8f9c; std target graph (backtrace, panic-unwind); binary name string 'addr2line'",
       "basis": "lock-graph",
       "basis_note": "prebuilt rust-std dependency: included from rust library/Cargo.lock @58cf8f9c target graph (std, backtrace + panic-unwind)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "adler2",
@@ -7552,7 +7769,8 @@
       "evidence": "library/Cargo.lock @58cf8f9c; std target graph (backtrace, panic-unwind)",
       "basis": "lock-graph",
       "basis_note": "prebuilt rust-std dependency: included from rust library/Cargo.lock @58cf8f9c target graph (std, backtrace + panic-unwind)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "backtrace",
@@ -7580,7 +7798,8 @@
       "evidence": "binary 'RUST_BACKTRACE' strings (x6); std 'backtrace' feature (gimli/addr2line names present)",
       "chosen": null,
       "basis": "binary",
-      "basis_note": "prebuilt toolchain component, no run-2 compile line and no lock: rests on the PE import table / binary strings in 'evidence' plus the toolchain facts (version, link flags)"
+      "basis_note": "prebuilt toolchain component, no run-2 compile line and no lock: rests on the PE import table / binary strings in 'evidence' plus the toolchain facts (version, link flags)",
+      "linkage": "proven"
     },
     {
       "name": "cfg-if",
@@ -7608,7 +7827,8 @@
       "evidence": "library/Cargo.lock @58cf8f9c; std target graph (backtrace, panic-unwind)",
       "basis": "lock-graph",
       "basis_note": "prebuilt rust-std dependency: included from rust library/Cargo.lock @58cf8f9c target graph (std, backtrace + panic-unwind)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "compiler_builtins",
@@ -7632,7 +7852,8 @@
       "evidence": "std dependency (alloc -> compiler_builtins) in library/Cargo.lock; every Rust staticlib carries it",
       "chosen": null,
       "basis": "lock-graph",
-      "basis_note": "path package of rust library/Cargo.lock @58cf8f9c (alloc -> compiler_builtins); no byte proof of its own"
+      "basis_note": "path package of rust library/Cargo.lock @58cf8f9c (alloc -> compiler_builtins); no byte proof of its own",
+      "linkage": "proven"
     },
     {
       "name": "gimli",
@@ -7660,7 +7881,8 @@
       "evidence": "library/Cargo.lock @58cf8f9c; std target graph (backtrace, panic-unwind); binary name string 'gimli'",
       "basis": "lock-graph",
       "basis_note": "prebuilt rust-std dependency: included from rust library/Cargo.lock @58cf8f9c target graph (std, backtrace + panic-unwind)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "hashbrown",
@@ -7688,7 +7910,8 @@
       "evidence": "library/Cargo.lock @58cf8f9c; std target graph (backtrace, panic-unwind); binary name string 'hashbrown'",
       "basis": "lock-graph",
       "basis_note": "prebuilt rust-std dependency: included from rust library/Cargo.lock @58cf8f9c target graph (std, backtrace + panic-unwind)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "libc",
@@ -7716,7 +7939,8 @@
       "evidence": "library/Cargo.lock @58cf8f9c; std target graph (backtrace, panic-unwind)",
       "basis": "lock-graph",
       "basis_note": "prebuilt rust-std dependency: included from rust library/Cargo.lock @58cf8f9c target graph (std, backtrace + panic-unwind)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "libgcc",
@@ -7744,7 +7968,8 @@
       "evidence": "always linked by the gcc driver (-static-libgcc in CFLAGS/LDFLAGS; libgcc + libgcc_eh); Rust std's unwind needs _Unwind_* (gcc_eh); no libgcc_s*.dll imported",
       "chosen": null,
       "basis": "binary",
-      "basis_note": "prebuilt toolchain component, no run-2 compile line and no lock: rests on the PE import table / binary strings in 'evidence' plus the toolchain facts (version, link flags)"
+      "basis_note": "prebuilt toolchain component, no run-2 compile line and no lock: rests on the PE import table / binary strings in 'evidence' plus the toolchain facts (version, link flags)",
+      "linkage": "proven"
     },
     {
       "name": "libgomp",
@@ -7772,7 +7997,8 @@
       "evidence": "FFmpeg configure --extra-libs=-lgomp; strings 'libgomp: fatal error: error directive encountered: ', '.../src/gcc/libgomp/task.c' (5 libgomp source paths); no libgomp*.dll imported",
       "chosen": null,
       "basis": "binary",
-      "basis_note": "prebuilt toolchain component, no run-2 compile line and no lock: rests on the PE import table / binary strings in 'evidence' plus the toolchain facts (version, link flags)"
+      "basis_note": "prebuilt toolchain component, no run-2 compile line and no lock: rests on the PE import table / binary strings in 'evidence' plus the toolchain facts (version, link flags)",
+      "linkage": "proven"
     },
     {
       "name": "libm",
@@ -7796,7 +8022,8 @@
       "evidence": "compiler_builtins includes libm via #[path]; no binary proof",
       "chosen": null,
       "basis": "lock-graph",
-      "basis_note": "no linkage proof (superset) (CHARC second addendum (c))"
+      "basis_note": "no linkage proof (superset) (CHARC second addendum (c))",
+      "linkage": "superset"
     },
     {
       "name": "libstdc++",
@@ -7856,7 +8083,8 @@
       "evidence": "-static-libstdc++; strings 'basic_string::_M_create' (x626 basic_string::*), 'vector::_M_realloc_append', '__gnu_cxx::__concurrence_lock_error', typeinfo 'std::bad_alloc'; no libstdc++*.dll imported",
       "chosen": null,
       "basis": "binary",
-      "basis_note": "prebuilt toolchain component, no run-2 compile line and no lock: rests on the PE import table / binary strings in 'evidence' plus the toolchain facts (version, link flags)"
+      "basis_note": "prebuilt toolchain component, no run-2 compile line and no lock: rests on the PE import table / binary strings in 'evidence' plus the toolchain facts (version, link flags)",
+      "linkage": "proven"
     },
     {
       "name": "libstdc++ (Ryu)",
@@ -7888,7 +8116,8 @@
       "evidence": "binary carries Ryu's DOUBLE_POW5_INV_SPLIT and DOUBLE_POW5_SPLIT tables (3 x 48-byte probes each, x1 per exe)",
       "chosen": "Apache-2.0",
       "basis": "binary",
-      "basis_note": "prebuilt toolchain component, no run-2 compile line and no lock: rests on the PE import table / binary strings in 'evidence' plus the toolchain facts (version, link flags)"
+      "basis_note": "prebuilt toolchain component, no run-2 compile line and no lock: rests on the PE import table / binary strings in 'evidence' plus the toolchain facts (version, link flags)",
+      "linkage": "proven"
     },
     {
       "name": "libstdc++ (fast_float)",
@@ -7914,9 +8143,10 @@
         }
       ],
       "evidence": "superset: no distinguishing byte evidence",
-      "chosen": null,
+      "chosen": "MIT",
       "basis": "lock-graph",
-      "basis_note": "no linkage proof (superset) (CHARC second addendum (c))"
+      "basis_note": "no linkage proof (superset) (CHARC second addendum (c))",
+      "linkage": "superset"
     },
     {
       "name": "memchr",
@@ -7948,7 +8178,8 @@
       "evidence": "library/Cargo.lock @58cf8f9c; std target graph (backtrace, panic-unwind)",
       "basis": "lock-graph",
       "basis_note": "prebuilt rust-std dependency: included from rust library/Cargo.lock @58cf8f9c target graph (std, backtrace + panic-unwind)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "miniz_oxide",
@@ -7984,7 +8215,8 @@
       "evidence": "library/Cargo.lock @58cf8f9c; std target graph (backtrace, panic-unwind); binary name string 'miniz_oxide'",
       "basis": "lock-graph",
       "basis_note": "prebuilt rust-std dependency: included from rust library/Cargo.lock @58cf8f9c target graph (std, backtrace + panic-unwind)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "object",
@@ -8012,7 +8244,8 @@
       "evidence": "library/Cargo.lock @58cf8f9c; std target graph (backtrace, panic-unwind)",
       "basis": "lock-graph",
       "basis_note": "prebuilt rust-std dependency: included from rust library/Cargo.lock @58cf8f9c target graph (std, backtrace + panic-unwind)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     },
     {
       "name": "rust-std",
@@ -8060,7 +8293,8 @@
       "evidence": "binary /rustc/58cf8f9c/library/{core,alloc,std,std_detect} panic paths (x314 per exe); log #158 'Program rustc found: YES 1.99.1'",
       "chosen": null,
       "basis": "binary",
-      "basis_note": "prebuilt toolchain component, no run-2 compile line and no lock: rests on the PE import table / binary strings in 'evidence' plus the toolchain facts (version, link flags)"
+      "basis_note": "prebuilt toolchain component, no run-2 compile line and no lock: rests on the PE import table / binary strings in 'evidence' plus the toolchain facts (version, link flags)",
+      "linkage": "proven"
     },
     {
       "name": "rustc-demangle",
@@ -8088,7 +8322,8 @@
       "evidence": "library/Cargo.lock @58cf8f9c; std target graph (backtrace, panic-unwind); binary name string 'rustc-demangle'",
       "basis": "lock-graph",
       "basis_note": "prebuilt rust-std dependency: included from rust library/Cargo.lock @58cf8f9c target graph (std, backtrace + panic-unwind)",
-      "chosen": null
+      "chosen": null,
+      "linkage": "proven"
     }
   ]
 }
