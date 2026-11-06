@@ -918,6 +918,25 @@ def _ffmpeg_licence_choices(
     atoms: frozenset[str] = FFMPEG_COMPATIBLE_LICENCES,
     population: str = "runtime",
 ) -> set[str]:
+    """Return compatible complete selections, preserving every AND obligation.
+
+    A non-null ``chosen`` must equal one returned selection exactly, for example
+    ``MIT AND BSD-3-Clause`` for ``(Apache-2.0 OR MIT) AND BSD-3-Clause``;
+    the single branch atom ``MIT`` is not a complete selection. AND takes a
+    cartesian product of alternatives, so repeated OR factors grow choices
+    exponentially. Non-OR expressions return no choices to select explicitly.
+
+    Args:
+        expression: The complete SPDX-style expression to parse.
+        atoms: Compatible atoms for this population.
+        population: Label used in refusal messages.
+
+    Returns:
+        Complete compatible selections when the expression contains OR.
+
+    Raises:
+        ValueError: The expression is malformed or has no compatible selection.
+    """
     # Parse every branch, even an unchosen one: OR-any cannot hide bad syntax.
     # Compatible selections distribute AND over OR, preserving every obligation.
     tokens = re.findall(r"[A-Za-z0-9][A-Za-z0-9.+-]*|[()]", expression)
@@ -1238,6 +1257,14 @@ def _ffmpeg_component_obligations(row: dict[str, object]) -> None:
 
 
 def _ffmpeg_component_texts(components: list[FFmpegComponent], folder: Path) -> None:
+    encodings: dict[str, str | None] = {}
+    for component in components:
+        for row in (component, *component["extra_repositories"]):
+            for text in row["texts"]:
+                name, encoding = text["path"], text.get("encoding")
+                if name in encodings and encodings[name] != encoding:
+                    raise ValueError(f"FFmpeg lock: conflicting component text encodings: {name}")
+                encodings[name] = encoding
     expected: set[str] = set()
     for component in components:
         for row in (component, *component["extra_repositories"]):
@@ -1248,6 +1275,16 @@ def _ffmpeg_component_texts(components: list[FFmpegComponent], folder: Path) -> 
                 data = path.read_bytes()
                 if hashlib.sha256(data).hexdigest() != text["sha256"]:
                     raise ValueError(f"FFmpeg lock: component text sha256 mismatch: {text['path']}")
+                if "encoding" in text:
+                    try:
+                        data.decode("utf-8")
+                    except UnicodeDecodeError:
+                        pass
+                    else:
+                        raise ValueError(
+                            "FFmpeg lock: component text encoding declared for strict UTF-8: "
+                            + text["path"]
+                        )
                 encoding = text.get("encoding", "utf-8")
                 try:
                     decoded = data.decode(encoding)
@@ -1262,6 +1299,11 @@ def _ffmpeg_component_texts(components: list[FFmpegComponent], folder: Path) -> 
                     raise ValueError(
                         f"FFmpeg lock: component text {refusal}: {text['path']}"
                     ) from error
+                if "encoding" in text and any("\u0080" <= c <= "\u009f" for c in decoded):
+                    raise ValueError(
+                        "FFmpeg lock: component text transcode contains C1 controls: "
+                        + text["path"]
+                    )
                 expected.add(text["path"])
     actual = {path.name for path in folder.iterdir()} if folder.is_dir() else set()
     if actual != expected:
@@ -1281,7 +1323,9 @@ def validate_ffmpeg_lock(
     Static runtime rows require compatible SPDX expressions, toolchain/source
     bindings and nonempty text identities. Component texts are byte-checked here
     against the dedicated directory, including exact filename set equality and
-    strict UTF-8 or a declared, lossless encoding from the closed set;
+    strict UTF-8 or a declared, lossless encoding from the closed set, with
+    consistent declarations across references and no C1 controls in transcodes.
+    Declarations on already-valid UTF-8 texts are refused;
     notices checks text identity again at rendering.
     ``configure_flag`` is null for dependencies or a list, since some stages
     contribute several switches (for example both opencore-amr codecs).

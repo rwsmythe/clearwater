@@ -1,8 +1,8 @@
 # WP6.3d - FFmpeg stage licence texts
 
-Turn 2, 2026-11-06. Reviewer A r1 folds implemented for the dispatcher's
-Claude A delta r2; Claude B, the seat rebuild and acceptance remain at the seat.
-This turn bundles the six ruled folds as one logical review-remediation change.
+Turn 3, 2026-11-06. Reviewer A r2 and Reviewer B r1 folds implemented for
+the dispatcher's verification; the seat rebuild and acceptance remain at the seat.
+This turn bundles the nine ruled folds as one logical review-remediation change.
 
 ## Built and evidence
 
@@ -73,7 +73,7 @@ annex links the exact source files. See the turn-2 design and controls below.
 | B S1; C1-C3 | Separate component allowlist = unchanged runtime 15 + B's 16 atoms + C's four. MPL-1.1 stays outside both lists. One parser uses OR-any, AND-all, atomic WITH and complete grammar validation. |
 | B C1/C2/C4/C5; C4 | Applied census corrections to openal, chromaprint, mingw and x265; shaderc stays Apache-2.0 because its three static sub-dependencies now have separate records. |
 | B S1 gnulib rewrite | Gnulib extra uses `GPL-3.0-or-later AND LGPL-2.1-or-later AND LicenseRef-gnulib-permissive`. |
-| B second-pass 1; C4 | Added glslang, spirv-tools and spirv-headers-shaderc immediately after shaderc, with the census's full pins, built status, null configure flag, empty extras and via relationship. Used the existing `commit` vocabulary instead of adding `git-commit`. The four test-only fetched dependencies stay excluded for the census's pinned CMake reasons. |
+| B second-pass 1; C4; turn-3 B2 | Added glslang, spirv-tools and spirv-headers-shaderc immediately after shaderc, with the census's full pins, built status, null configure flag, empty extras and via relationship. Used the existing `commit` vocabulary instead of adding `git-commit`. Excluded test-only googletest `52eb8108`, abseil-cpp `dbf88f93`, re2 `972a15ce` and effcee `f8e8a164`: shaderc third_party/CMakeLists.txt L28-30/L50-70 and SPIRV-Tools external/CMakeLists.txt L97-191, CMakeLists.txt L316-317 under BtbN's skip-test flags. Turn 3 records the exact reason durably in shaderc's lock note and both notice surfaces. |
 | B U5/P1-P7; C7 | Carried all ruled vendored texts and appended the literal vendored-subtree/compilation-undetermined note on every census row naming it. |
 | B U1; C7 | Both freetype rows choose GPL-2.0-or-later; both alternative texts remain carried. |
 | B U3 | Gnulib retains COPYING and the four FSF texts; its row note discloses that per-module notices are not enumerated. |
@@ -307,6 +307,96 @@ footage/profile access or worktree Git write. Only seven owned paths changed;
 scratch logs/instruments remain under `work/wp6.3d/turn2/`. No stopped item or
 implementation fold remains. Claude A delta r2, Claude B, the real-Git gate,
 the 478-row seat rebuild and CHARC acceptance remain at the dispatcher.
+
+## Turn 3 - Reviewer A r2 and Reviewer B r1 folds
+
+Dispatch 3 binds CHARC's 2026-11-06T19:37Z ruling on all four A advisories
+and the seat's disposition to fold all five B findings. Both reviewers returned
+**NO_NEW_CRITICAL_MAJOR** at `cd7faecb`. The reports are
+`work/wp6.3d/review-A-r2.md` and `work/wp6.3d/review-B-r1.md`.
+
+| Finding | Fold / current file:line | Test and mutation killed |
+|---|---|---|
+| R2-1 ADVISORY | `tools/package/build.py:1285`, `:1304`: a declared encoding on strict UTF-8 bytes refuses; a declared decode containing U+0080-U+009F refuses after exact-byte hash and round-trip checks. The three real declarations pass. | `tests/test_tools_package_ffmpeg.py:293`, `test_declared_latin1_cannot_turn_patent_quotes_into_c1_controls`, plants Latin-1 on rav1e PATENTS and matches the C1-control refusal. `:305`, `test_declared_encoding_is_refused_for_utf8_text`, plants each allowed encoding on UTF-8 bytes and matches the named refusal. Kills trusting round-trip alone and allowing unnecessary declarations. |
+| R2-2 ADVISORY, REQUIRED | `tools/package/notices.py:2626`, `:2659`: the complete joined document decodes as strict UTF-8 before return. Each emitted block retains its byte range and source/file label; failure becomes `ValueError` with the global byte offset and that source. There is no population filter. | `tests/test_tools_package_notices.py:694`, `test_whole_document_utf8_backstop_names_wheel_source_and_offset`, plants non-UTF-8 bytes in the synthetic numpy dist-info licence. `:711`, `test_whole_document_utf8_backstop_names_runtime_source_and_offset`, plants a runtime text and updates its exact-byte hash so integrity checks pass first. Both match the exact independently computed offset and their source/file. Kills returning the joined bytes without the backstop or reporting a local offset/wrong source. |
+| R2-3 ADVISORY | `tools/package/notices.py:2639`: declared transcodes label their metadata `Original SHA-256` and `Original bytes`; other blocks keep their existing labels. | `tests/test_tools_package_notices.py:614`, within the full-source notices test, pins the original digest and size labels for all three declarations. Kills describing the original identity as the displayed body's identity. Root hash-link extraction continues to resolve every source file. |
+| R2-4 ADVISORY | `tools/package/notices.py:1601`: missing/empty texts raise with the stage/extra title instead of silently skipping. | `tests/test_tools_package_notices.py:674`, `test_component_row_renderer_refuses_missing_texts_without_validator`, directly bypasses lock validation for missing/empty primary and extra texts and matches the record-specific refusal. Kills restoring `continue`. |
+| B1 MINOR | `tools/package/notices.py:2518`: any build-component or toolchain-runtime row emits the representative-file-name/shared-text disclaimer, naming both populations and explaining that a label may name another component's identical copy. | `tests/test_tools_package_notices.py:657`, `test_stage_only_notices_explain_representative_and_shared_text_labels`, renders 105 stage rows with no runtime rows and pins the full disclaimer. Kills the runtime-only condition and runtime-only wording. |
+| B2 MINOR | `tools/package/ffmpeg.lock.json:961`: shaderc retains its entire prior note, then appends exactly the ruled sentence naming googletest `52eb8108`, abseil-cpp `dbf88f93`, re2 `972a15ce`, effcee `f8e8a164`, the two BtbN flags and the pinned CMake line evidence. | `tests/test_tools_package_notices.py:644`, within the full-source notices test, pins the suffix, passes the entire note unchanged through artifact and root rendering, and checks the sentence has no Markdown-active characters. Kills dropping/changing any exclusion or omitting it from either notice surface. `audit.py` independently proves this sentence is the entire lock diff. The earlier ruling table now names all four exclusions too. |
+| B3 ADVISORY | `docs/release-checklist.md:71`, `:93`: names all five accepted drift cases, requires text verification at every new pin, equality of distinct component/excluded stages and the scripts' list, and a reviewed `via` change for new fetching stages. Uses the annex's new name. | Documentation verification against B's executed mutants and `build.py`'s byte/schema/configure checks and hard-coded shaderc relationship. No validator behavior change is claimed for these five residuals; the checklist supplies the required independent census procedure. |
+| B4 ADVISORY | `tools/package/build.py:1259`: a path-to-encoding map over all references refuses disagreements before decoding any reference, including declared-versus-absent. | `tests/test_tools_package_ffmpeg.py:318`, `test_shared_component_file_encoding_must_agree`, appends rav1e PATENTS under earlier-sorting aom. Latin-1 versus cp1252 and absent versus declared each match the conflict refusal; two cp1252 references pass. Kills per-reference-only validation and a check that ignores undeclared references. |
+| B5 ADVISORY | `tools/package/build.py:921` and `docs/release-checklist.md:81`: documents exact complete-selection `chosen` grammar, the compound example and cartesian/exponential growth. Parser behavior is unchanged. | Existing `test_chosen_preserves_and_obligations_and_requires_a_compatible_branch` pins complete versus partial selections for both populations; the shared parser tests pin AND/OR/WITH behavior. Documentation was checked against the parser's cartesian-product implementation and both chosen-membership checks. |
+
+Only the eight owned paths are changed this turn. The root annex was regenerated
+only by `uv run --no-sync python tools/package/notices.py --root-annex --write`.
+No file under `native-licences/` changed. The stage/runtime source population and
+all hashes, pins and lock provenance are unchanged. F8's whitespace-tolerance
+limitation remains record-only as ruled; the real rebuild target remains 478 rows.
+
+### Turn-3 cumulative round ledger
+
+| Review | Verdict | Critical / major / minor / advisory | In / out | NEW / REOPENED | Reverts | Disposition / fix surface | Depth |
+|---|---|---|---|---|---|---|---|
+| A r1, Claude | NO_NEW_CRITICAL_MAJOR | 0 / 0 / 3 / 5 | 7 introduced in envelope; F8 pre-existing | 8 / 0 | 0 | Six folds in turn 2; F5 count and F8 limitation recorded. Product, lock/notices, tests/report. | Turn 1 207K, dispatcher figure |
+| A r2, Claude, delta | NO_NEW_CRITICAL_MAJOR | 0 / 0 / 0 / 4 | 4 in / 0 out | 4 / 0 | 0 | All four confirmed and folded this turn. Product renderer/validator, tests/report. | No new dispatcher figure supplied |
+| B r1, Claude, whole package | NO_NEW_CRITICAL_MAJOR | 0 / 0 / 2 / 3 | 5 in / 0 out | 5 / 0 | 0 | All five confirmed and folded this turn. Product, lock/generated notices, tests, checklist/report; no test-only remediation round. | No new dispatcher figure supplied |
+
+The owned report carries these cumulative rows for the seat's ledger transfer;
+there is no cell-spawned review and no edit under `docs/proofs/`.
+
+### Turn-3 validation and owner verification loop
+
+Logs, instruments and disposable profiles are under `work/wp6.3d/turn3/`.
+The copied isolated runner retains redirected APPDATA/LOCALAPPDATA/XDG roots,
+the PySide6/shiboken6 import block, plugin auto-load disabled, explicit
+pytest-timeout (120 seconds), `sandbox_mkdir_shim`, cache provider disabled,
+and the required `-k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`.
+The existing entry-point child retains GUI stubs/block, redirected roots and
+its 15-second timeout; no GUI/frozen executable/build was run.
+
+- Pre-fold RED (`red.log`, exit 1): **13 failed, 1 passed in 4.54 s**, on the
+  stable turn-2 implementation before any turn-3 product edit. The passing
+  control is repeated matching cp1252 declarations. The new refusal and notice-rendering
+  tests fail on the pre-fold behavior.
+- Focused GREEN (`focused.log`, exit 0): **14 passed in 4.27 s** on the fold.
+- Independent audit (`audit.log`): the exact shaderc sentence is the entire
+  lock diff; 282 component and 157 runtime source hashes match; original bytes
+  decode/re-encode exactly; synthetic stage/runtime output and regenerated
+  root are strict UTF-8; all three original labels exist; the note is intact
+  on both surfaces; 105 + 232 rows and no broken native links. An additional
+  planted wheel block after all three transcodes checks its exact global
+  error offset and provenance. Only owned paths changed.
+
+- `ruff-final.log`: `uv run --no-sync ruff check .` - **All checks passed!** (exit 0).
+- `format-final.log`: `uv run --no-sync ruff format --check .` - **337 files already formatted** (exit 0).
+- `mypy-final.log`: `uv run --no-sync mypy` - **Success: no issues found in 166 source files** (exit 0).
+- `mypy-darwin-final.log`: `uv run --no-sync mypy --platform darwin` - **Success: no issues found in 166 source files** (exit 0).
+- `annex-final.log`: `uv run --no-sync python tools/package/notices.py --root-annex` - **root annex matches** (exit 0).
+- `pytest-final.log` / `pytest-final-exit.txt`: **922 passed, 1 skipped, 5 failed in 226.21 s** (exit 1).
+  Command: `uv run --no-sync python work/wp6.3d/turn3/run_tests.py final tests/test_tools_package_notices.py tests/test_tools_package_build.py tests/test_tools_package_smoke.py tests/test_tools_package_ffmpeg.py tests/test_release_workflow.py -q -rs --basetemp=work/c63d-3`.
+  Every failure is `tests/test_release_workflow.py::test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`,
+  cases `annotated`, `lightweight`, `wrong-commit`, `mismatched-name`,
+  `deleted-origin`. Each fails at its disposable fixture's local Git push,
+  before the gate, with exit 128 and Git sh.exe's `CreateFileMapping` error
+  under the restricted token. Every other selected test passes.
+  The exact skip line is `tests\test_tools_package_smoke.py:754: POSIX process-group native proof belongs to WP6.5`.
+- `diff-check-final.log`: `git diff --check` exits **0**; only the existing
+  checkout-policy warnings for Markdown/JSON. All runner output is file-backed.
+
+| Verification pass | Suspected / independently confirmed | Fixed / final outcome |
+|---|---|---|
+| 1 | A r2 and B r1 findings: reproduced the new refusal/output gaps on stable pre-fold code (13 failures, one positive control), checked the census's pinned exclusion evidence and actual validator/parser limits. | All nine findings confirmed; none rejected as false positive. Implemented the exact ruling; no scope deviation. |
+| 2 | Offset attribution after earlier transcodes, source-byte drift, shared declarations, note/metadata loss, or stale root links. | Focused controls pass; independent audit proves exact global offset after three transcodes, exact shaderc-only lock diff, 439 unchanged text identities and intact links/labels. No further defect found. |
+| 3 | Final selected suite, static checks or completion claims could disagree with the files. | 922 passes plus only the five confirmed sandbox Git failures and existing POSIX skip; Ruff/format, both mypy targets, root check and audit pass. Final changes after pytest were only adjacent string-literal wrapping for E501 and validator documentation; emitted strings and test regexes are unchanged. No new in-envelope finding in the final verification pass. |
+
+No implementation fold remains. The seat owns QA of the final candidate,
+the real-Git cases, any subsequent review disposition, the real rebuild
+(478 rows) and acceptance. No dependency, frozen interface, source text,
+asset, pin, lock provenance or parser behavior changed. No network fetch,
+GUI/frozen run, real PyInstaller build, synthetic desktop input, real profile /
+footage access, role-mailbox action or worktree Git write was performed.
+The required tests attempted only local pushes in disposable fixture repositories;
+no command stages, commits, pushes or tags the worktree or a real remote.
 
 ## STOPPED ITEMS and remaining work
 

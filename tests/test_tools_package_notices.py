@@ -611,6 +611,7 @@ def test_fork_ffmpeg_notices_render_all_built_sources_and_explain_exclusions(rel
         raw = (release["native_surface"] / "ffmpeg-components" / name).read_bytes()
         digest = hashlib.sha256(raw).hexdigest()
         note = f"transcoded from {encoding}; original file sha256 {digest}"
+        assert f"Original SHA-256: `{digest}`. Original bytes: {len(raw)}." in output
         match = re.search(
             r"^### [^\n]*"
             + re.escape(name)
@@ -639,6 +640,100 @@ def test_fork_ffmpeg_notices_render_all_built_sources_and_explain_exclusions(rel
     assert "Build stage scripts.d/55-rustdedup.sh (BUILT):" in output
     assert "Build stage scripts.d/zz-final.sh (ENTRY):" in output
     assert 'owner ruling 2026-11-05 "self-build is fine"' in output
+    excluded = (
+        "Test-only DEPS not built (BtbN -DSHADERC_SKIP_TESTS=ON, "
+        "-DSPIRV_SKIP_EXECUTABLES=ON): googletest 52eb8108 "
+        "(shaderc third_party/CMakeLists.txt L28-30), abseil-cpp dbf88f93, "
+        "re2 972a15ce, effcee f8e8a164 (shaderc third_party/CMakeLists.txt L50-70; "
+        "SPIRV-Tools external/CMakeLists.txt L97-191, CMakeLists.txt L316-317)."
+    )
+    shaderc = sources["FFmpeg component: shaderc"]["licence_note"]
+    assert shaderc.endswith(" " + excluded)
+    assert shaderc in output
+    assert shaderc in module.render_root_annex().decode("utf-8")
+    assert not any(character in excluded for character in "|`<>[]\\\r\n")
+
+
+def test_stage_only_notices_explain_representative_and_shared_text_labels():
+    """Stage-only surfaces need the shared-label disclaimer even without runtimes."""
+    module = load_notices()
+    lock = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_bytes())
+    entries = ("file:ffmpeg.exe",)
+    rows = module._ffmpeg_component_rows(lock, entries, ROOT / "tools/package/native-licences")
+    assert not any(r.name.startswith("FFmpeg toolchain runtime:") for r in rows)
+    output = module.render_notices(module.NoticePlan(entries, tuple(rows), ())).decode("utf-8")
+    assert (
+        "FFmpeg build-component and toolchain-runtime texts are labelled with "
+        "a representative file name from the census; byte-identical texts are "
+        "shared across components, so a label may name another component's copy of the same text."
+    ) in output
+
+
+@pytest.mark.parametrize("slot", ["primary", "extra"])
+@pytest.mark.parametrize("damage", ["missing", "empty"])
+def test_component_row_renderer_refuses_missing_texts_without_validator(slot, damage):
+    """A bypassed validator must not silently omit a stage or an extra source."""
+    module = load_notices()
+    lock = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_bytes())
+    title = "FFmpeg component: mingw-std-threads"
+    row = lock["components"][0]
+    if slot == "extra":
+        component = next(c for c in lock["components"] if c["extra_repositories"])
+        row = component["extra_repositories"][0]
+        title = f"FFmpeg component: {component['name']} / repository 2"
+    if damage == "missing":
+        row.pop("texts")
+    else:
+        row["texts"] = []
+    with pytest.raises(ValueError, match=re.escape(title) + ".*missing component texts"):
+        module._ffmpeg_component_rows(
+            lock, ("file:ffmpeg.exe",), ROOT / "tools/package/native-licences"
+        )
+
+
+def test_whole_document_utf8_backstop_names_wheel_source_and_offset(release):
+    """A future non-UTF-8 wheel licence must fail with its source and global offset."""
+    module = load_notices()
+    path = release["site"] / "numpy-2.5.4.dist-info/licenses/LICENSE.txt"
+    good = b"wheel copyright ? holder\n"
+    path.write_bytes(good)
+    expected = module.render_notices(plan(module, release))
+    offset = expected.index(good) + good.index(b"?")
+    path.write_bytes(good.replace(b"?", b"\xa9"))
+    with pytest.raises(
+        ValueError,
+        match=rf"not strict UTF-8 at byte offset {offset}; source: Installed wheel: numpy "
+        r".*numpy-2.5.4.dist-info/licenses/LICENSE.txt",
+    ):
+        module.render_notices(plan(module, release))
+
+
+def test_whole_document_utf8_backstop_names_runtime_source_and_offset(release):
+    """Runtime byte/hash validation must not let unreadable terms reach the artifact."""
+    module = load_notices()
+    add_ffmpeg(release)
+    text = release["ffmpeg"]["toolchain_runtime"][0]["texts"][0]
+    path = release["native_surface"] / "ffmpeg-toolchain" / text["path"]
+    good = b"runtime copyright ? holder\n"
+
+    def replace(body):
+        path.write_bytes(body)
+        for row in release["ffmpeg"]["toolchain_runtime"]:
+            for item in row["texts"]:
+                if item["path"] == path.name:
+                    item["sha256"] = hashlib.sha256(body).hexdigest()
+        release["ffmpeg_path"].write_text(json.dumps(release["ffmpeg"]))
+
+    replace(good)
+    expected = module.render_notices(plan(module, release))
+    offset = expected.index(good) + good.index(b"?")
+    replace(good.replace(b"?", b"\xa9"))
+    with pytest.raises(
+        ValueError,
+        match=rf"not strict UTF-8 at byte offset {offset}; source: FFmpeg toolchain runtime: "
+        rf".*{re.escape(path.name)}",
+    ):
+        module.render_notices(plan(module, release))
 
 
 def test_ffmpeg_toolchain_census_renders_every_row_and_deduplicates_terms(release):

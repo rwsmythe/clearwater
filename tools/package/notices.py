@@ -1598,7 +1598,7 @@ def _ffmpeg_component_rows(
         )
         for title, record in sources:
             if not record.get("texts"):
-                continue
+                raise ValueError(f"notices: {title}: missing component texts")
             source = f"{record['repository']} @ {record['pin']}"
             inputs = []
             for text in record["texts"]:
@@ -2496,7 +2496,8 @@ def render_notices(plan: NoticePlan) -> bytes:
 
     Raises:
         ValueError: Coverage/materials are missing, commercial Qt terms are
-            requested, or an audited upstream block fails integrity checks.
+            requested, an audited upstream block fails integrity checks, or the
+            complete document is not strict UTF-8 (with byte offset and source).
         OSError: A licence input cannot be read.
     """
     validate_coverage(plan.entries, plan.rows)
@@ -2516,10 +2517,12 @@ def render_notices(plan: NoticePlan) -> bytes:
             "The artifact is a combined work distributed under GPL-3.0 terms where",
             "FFmpeg requires them; Clearwater's or-later grant permits this combination.",
         ]
-    if any(row.name.startswith("FFmpeg toolchain runtime:") for row in rows):
+    if any(row.name.startswith(("FFmpeg component:", "FFmpeg toolchain runtime:")) for row in rows):
         header += [
-            "FFmpeg toolchain runtime texts use a representative file name from the census; "
-            "byte-identical texts are shared across components."
+            "FFmpeg build-component and toolchain-runtime texts are labelled with "
+            "a representative file name from the census; byte-identical texts are "
+            "shared across components, so a label may name another component's copy "
+            "of the same text."
         ]
     header += [
         "",
@@ -2619,6 +2622,8 @@ def render_notices(plan: NoticePlan) -> bytes:
             ]
     header += ["## Full licence texts and provenance", ""]
     output = ["\n".join(header).encode("utf-8")]
+    offset = len(output[0])
+    emitted_blocks: list[tuple[int, int, str]] = []
     for item, (label, data) in materials.items():
         heading = "### " + label
         if item.encoding:
@@ -2631,19 +2636,37 @@ def render_notices(plan: NoticePlan) -> bytes:
         # A fence longer than any backtick run keeps copied Markdown licence files intact.
         longest = max((len(run) for run in re.findall(rb"`+", data)), default=0)
         fence = b"`" * max(4, longest + 1)
+        hash_label = "Original SHA-256" if item.encoding else "SHA-256"
+        size_label = "Original bytes" if item.encoding else "Bytes"
         prefix = (
             f'\n<a id="{references[item]}"></a>\n\n{heading}\n\n'
-            f"Source: {label}. SHA-256: `{hashlib.sha256(data).hexdigest()}`. "
-            f"Bytes: {len(data)}.\n\n"
+            f"Source: {label}. {hash_label}: `{hashlib.sha256(data).hexdigest()}`. "
+            f"{size_label}: {len(data)}.\n\n"
         ).encode()
-        output += [
+        block = [
             prefix,
             fence + b"text\n",
             data.decode(item.encoding).encode("utf-8") if item.encoding else data,
             b"" if data.endswith(b"\n") else b"\n",
             fence + b"\n",
         ]
-    return b"".join(output)
+        output += block
+        end = offset + sum(map(len, block))
+        emitted_blocks.append((offset, end, f"{label}; file {item.path.name}"))
+        offset = end
+    rendered = b"".join(output)
+    try:
+        rendered.decode("utf-8")
+    except UnicodeDecodeError as error:
+        source = next(
+            (label for start, end, label in emitted_blocks if start <= error.start < end),
+            "document header",
+        )
+        raise ValueError(
+            f"notices: rendered document is not strict UTF-8 at byte offset {error.start}; "
+            f"source: {source}"
+        ) from error
+    return rendered
 
 
 def write_notices(

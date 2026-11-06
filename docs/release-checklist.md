@@ -68,13 +68,29 @@ artifact is one folder, not an installer; it is unsigned. No PyPI release is pla
    under `tools/package/native-licences/ffmpeg-components/`: a stage's own fetch
    step (git-sync-deps, DEPS, cargo, submodules) pulls sub-dependencies into the
    static library; the census follows every fetch step.
+   Re-verify texts at every new source pin, even when their bytes are unchanged.
+   The validator binds texts to bytes, not to source pins or the scripts' stage
+   list. It cannot catch a new stage reusing another stage's texts, a pin change
+   with texts unchanged, a replacement text with a new SHA-256 the census never
+   saw, a removed row with no configure flag and only shared texts, or a built
+   stage relabelled downloaded-not-built. Compare the distinct stages in
+   `components[]` plus `excluded[]` against the scripts' complete stage list;
+   the sets must be equal. A new fetching stage (another git-sync-deps-like
+   step) needs a reviewed `via` change: `build.py` currently hard-codes the
+   shaderc fetch relationship.
+   A non-null `chosen` must be one complete selection exactly as the parser
+   returns it, for example `MIT AND BSD-3-Clause` for
+   `(Apache-2.0 OR MIT) AND BSD-3-Clause`, rather than the single branch atom
+   `MIT`. The parser takes the cartesian product of AND factors' alternatives;
+   choices grow exponentially with repeated OR factors, so review that growth
+   when adding compound expressions.
    A fork rebuild re-runs the F-B1 toolchain census: the base image installs
    an unpinned stable Rust, and the crate graphs follow the pinned rav1e /
    librsvg commits. Re-record `toolchain` and `toolchain_runtime`, including
    `census_build_commit` and `census_asset_sha256`, from that fresh census
    before any draft. Update the byte-preserved texts under
    `tools/package/native-licences/ffmpeg-toolchain/` and regenerate the root
-   `THIRD_PARTY_NOTICES.md` toolchain-runtime annex with
+   `THIRD_PARTY_NOTICES.md` build-component and toolchain-runtime annex with
    `uv run python tools/package/notices.py --root-annex --write`; require
    `uv run python tools/package/notices.py --root-annex --check` to exit 0.
    Re-derive `toolchain.rustc.backtrace_commit` as the `library/backtrace`

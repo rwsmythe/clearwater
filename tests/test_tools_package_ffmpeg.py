@@ -290,6 +290,51 @@ def test_component_text_encoding_refusals(tmp_path, slot, encoding, body, refusa
         build.validate_ffmpeg_lock(data, component_texts_path=folder)
 
 
+def test_declared_latin1_cannot_turn_patent_quotes_into_c1_controls():
+    """Round-trip alone cannot distinguish cp1252 quotes from Latin-1 controls."""
+    data = lock_data()
+    text = next(t for c in data["components"] for t in c["texts"] if t["path"] == "rav1e--PATENTS")
+    text["encoding"] = "latin-1"
+    with pytest.raises(
+        ValueError, match="component text transcode contains C1 controls: rav1e--PATENTS"
+    ):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("encoding", ["latin-1", "cp1252"])
+def test_declared_encoding_is_refused_for_utf8_text(encoding):
+    """A declaration on an already-readable source could otherwise cause mojibake."""
+    data = lock_data()
+    text = data["components"][0]["texts"][0]
+    text["encoding"] = encoding
+    with pytest.raises(
+        ValueError,
+        match="component text encoding declared for strict UTF-8: " + re.escape(text["path"]),
+    ):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("encoding", ["latin-1", None, "cp1252"])
+def test_shared_component_file_encoding_must_agree(encoding):
+    """One filename cannot acquire a different decode through an earlier row."""
+    data = lock_data()
+    text = copy.deepcopy(
+        next(t for c in data["components"] for t in c["texts"] if t["path"] == "rav1e--PATENTS")
+    )
+    if encoding is None:
+        text.pop("encoding")
+    else:
+        text["encoding"] = encoding
+    next(c for c in data["components"] if c["name"] == "aom")["texts"].append(text)
+    if encoding == "cp1252":
+        assert build.validate_ffmpeg_lock(data) is data
+    else:
+        with pytest.raises(
+            ValueError, match="conflicting component text encodings: rav1e--PATENTS"
+        ):
+            build.validate_ffmpeg_lock(data)
+
+
 @pytest.mark.parametrize("field", ["census_build_commit", "census_asset_sha256"])
 def test_runtime_census_is_bound_to_the_recorded_asset(field):
     """Removing either census equality guard permits a stale rebuild census."""
