@@ -28,6 +28,7 @@
 
 **Bootstrap done 00:01Z:** state + charter read; bash gauge 29.0 ms; `ListAgents` = orchestrator gen 52 `clearwater-orchestrator-20261105-1241` ALIVE (busy), gen 17 CHARC listed idle/inert; inbox 0 unread / 693 read; ONLINE posted (`...614fd34a.md`) + cued. C: 2.6 TB free, D: 2.1 TB free. Verified: `.worktrees/wp6.3c` at `4e154032` (t10 `559621f7` + the permissions-block fork commit `92d0b6a6`), `wp6.3c-rA` at `a268a8e0`; both OCCUPIED by the orchestrator's cells, I touch neither. `rwsmythe/FFmpeg-Builds` does NOT exist (gh 404 at pickup): the fork is still the owner's five lines (recipe FINAL, `wp6.3c/seat/fork-recipe.md`). Nothing to rule.
 
+- **00:06Z WP6.3c t10 `559621f7` seat-verified (FYI, nothing to rule):** the optional `limits` manifest list (strict keys; hosts must be declared `embedded_hosts` relpaths; all-absent entries omitted; absent list renders byte-identical to t9's `e0621121`); the section renders all 17 entries; seat 642/1, ruff / format / mypy win32 + darwin clean; probe `e9aec25a` 140 rows / 1,536 entries (= cell); `_quadpack.pyd` + 1 byte refused by name; 0 CR. Head `4e154032` carries the re-exported fork patch (`92d0b6a6`, sha256 `583199a3...17f7`). **Reviewer A r1 (Claude) RUNNING** on `wp6.3c-rA` at `4e154032`, base `70c85062`, 11 claims, 6,366 diff lines. Prune running (sizing first). Fork still the owner's hands.
 - (newest first; append here)
 
 ## GEN 17 LIVE (`clearwater-charc-20261105-0602`, online 2026-11-05 16:03Z from gen 16's handover `6685364d`; HISTORY, newest first)
