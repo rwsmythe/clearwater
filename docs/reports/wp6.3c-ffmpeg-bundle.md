@@ -1,10 +1,10 @@
 # WP6.3c - FFmpeg bundle
 
-Status: turn 13 re-pins the seat-verified zvbi-free fork asset under strict
-schema 2 and completes its notices, unknown-parent guard and FFmpeg documentation,
-2026-11-06; acceptance pending. Static checks pass; final targeted validation
-reports 689 passed, one skipped and six failures: five sandbox real-Git fixture
-failures plus the stale, out-of-turn-ownership checklist expiry assertion.
+Status: turn 14 folds Reviewer A r3 minors 1-5 and advisories 6-8,
+2026-11-06; acceptance pending. The seat resolved turn 13's stale checklist
+assertion in `749fd30b` and reports 695 passed, one skipped, including real Git.
+Turn 14 static checks pass; its targeted validation reports 693 passed,
+one skipped and only the five expected sandbox real-Git fixture failures.
 The real local build/smoke/zip, V4, encoder proof, final reviews, package gate
 and release remain the seat's work. The fork patch is the seat's r2 export.
 
@@ -2072,9 +2072,7 @@ host is absent. Known parents not carried still retain the prior omission rule.
 **Reproducibility and limits.** Pinned: the fork commit, every `SCRIPT_COMMIT`
 recorded by its pinned recipes, and FFmpeg's full `release/9.0` commit, plus the
 published asset's bytes by size and SHA-256. Per CHARC:
-"component scripts under `scripts.d/` byte-identical to `5031c6f1` except
-`50-zvbi.sh`; `build.sh` carries exactly one added checkout line; `addins/`
-untouched; the workflow trimmed as in r1."
+"component scripts under `scripts.d/` byte-identical to `5031c6f1` except `50-zvbi.sh`; `build.sh` carries exactly one added checkout line; `addins/`, `variants/`, `images/`, `util/` untouched; the workflow trimmed as in r1 plus the TAGNAME."
 
 Floating inputs remain `ubuntu:26.04`, apt packages, the Rust toolchain
 (`images/base/Dockerfile:41-42` uses rustup without a version and unversioned
@@ -2135,7 +2133,8 @@ while keeping `scripts` on sys.path. The first prescribed full five-module run,
 1 skipped in 178.41s**. After replacing the acceptance-only test with the two
 refusal cases, the final complete run used fresh `work/c63c-13-final`:
 `pytest-final.log` / `.xml`, exit 1, **6 failed, 689 passed, 1 skipped in 278.19s**.
-`test-summary.json` names every failure and skip.
+`test-summary.json` names every failure and skip. These are the cell's historical
+turn-13 results; the seat's resolution and superseding validation follow below.
 
 | Module | Final result |
 | --- | --- |
@@ -2158,10 +2157,17 @@ containment belongs to WP6.5).
 `tests/test_release_workflow.py:639` still asserts `2028-10` occurs in the
 checklist. The required removal of the retired BtbN expiry date confirms this
 failure independently in both complete runs. Turn 13 does not own that module;
-it is untouched. The seat must update/grant this assertion to require the
-fork's no-retention-policy/rebuild rule instead. The checklist intentionally
+it was untouched by the cell. The seat was asked to update/grant this assertion
+to require the fork's no-retention-policy/rebuild rule instead. The checklist intentionally
 keeps its correct new guidance. This is the only non-sandbox failure; the
-turn's target of every other test passing is therefore not claimed.
+turn's target of every other test passing was therefore not claimed by the cell.
+
+**Seat resolution (supersedes the STOP above).** The seat GRANTED turn 13's STOP:
+the assertion at `tests/test_release_workflow.py:639` moved from `"2028-10"` to
+`"rebuild FFmpeg in the fork"` in seat commit `749fd30b`. The seat reports
+**695 passed, 1 skipped**, including the real-Git cases, at that commit. The
+release-workflow test module was changed by the seat; the workflow YAML itself
+remained untouched. Turn 14's own validation appears below.
 
 **Handoff / remaining work.** No new review round or package acceptance is
 claimed. The seat owns the stale test disposition, real-Git reruns, review,
@@ -2175,3 +2181,115 @@ was performed. Prescribed tests alone attempt temporary local Git-fixture
 pushes; every runner output stays inside this worktree. No review ledger edit
 was owned this turn. `depth_input_tokens` is unavailable to the cell;
 dispatcher read is due at yield.
+
+## Turn 14 - Reviewer A r3 cleanup
+
+**Built / adjudication (2026-11-06).** Applied the eight dispatched folds in
+the five owned files. No additional review round or package acceptance is
+claimed. Reviewer A r3's supplied verdict is `NO_NEW_CRITICAL_MAJOR`.
+
+| Finding | Severity | Disposition / evidence |
+| --- | --- | --- |
+| 1 | MINOR | CONFIRMED / FIXED: every refusal case matches its own message. Enabled zvbi now has a covered component and no excluded-stage collision. Removing only the zvbi guard accepts that fixture, proving the coverage check no longer masks it. |
+| 2 | MINOR | CONFIRMED / FIXED: the turn-13 CHARC quote includes `variants/`, `images/`, `util/` and "plus the TAGNAME", verbatim from the amendment. |
+| 3 | MINOR | CONFIRMED / FIXED: header and turn-13 seat note supersede the historical stale-assertion STOP with seat commit `749fd30b` and its 695 passed / 1 skipped result, including real Git. |
+| 4 | MINOR | CONFIRMED / FIXED: future rebuild guidance updates hard-coded `TAGNAME` and requires a reviewed validator change before changing `release/9.0` or pinning exactly at a tag without `-g`. |
+| 5 | MINOR | CONFIRMED / FIXED: checklist step 10 names the sidecar's `# source-commit:` and draft body's Source commit comparisons against the gated commit. Chose to DROP the undefined local content-census comparison; no CI/local byte-identity claim remains. |
+| 6 | ADVISORY | CONFIRMED / FIXED: full version-token match rejects a second `-g` suffix; matching 7-, 10- and 40-hex abbreviations still pass. |
+| 7 | ADVISORY | CONFIRMED / FIXED: parent repository must equal `BtbN/FFmpeg-Builds`; existing full lowercase-hex commit validation is retained and tested with short and uppercase refusals. |
+| 8 | ADVISORY | CONFIRMED / FIXED: excluded zvbi uses `not-built(disabled)`. The full tool/notices tests check for dependencies on the prior status. |
+
+**Refusal controls / mutation reasoning.** Each parameter below mutates a valid
+lock. Its `match=` names the intended refusing guard, so removing that guard
+cannot be masked by a later refusal with another message. The `basis` case now
+changes only `licence_basis`, leaving a valid licence so the seat-verification
+guard is reached.
+
+| Mutation(s) | Guard / expected refusal |
+| --- | --- |
+| `schema` | Unsupported schema version. |
+| `unknown`, `ffmpeg-tag`, `missing` | Exact document fields reject an extra key, retired field or absent provider. |
+| `short-commit`, `uppercase-commit` | FFmpeg commit must be 40 lowercase hex. |
+| `version-commit` | A well-shaped but unrelated abbreviation fails the commit-prefix comparison. |
+| `short-version-commit`, `double-version-commit` | Whole-token grammar refuses six hex digits or an extra `-g` suffix. |
+| `missing-disable-zvbi` | Explicit disable switch is required. |
+| `enable-zvbi` | Enable switch is forbidden even with complete configure coverage; a synthetic compatible source row covers it and the excluded zvbi row is removed. |
+| `parent-unknown`, `parent-missing` | Exact parent fields reject an extra or absent key. |
+| `parent-repository` | `evil/x` fails exact parent repository identity. |
+| `parent-short-commit`, `parent-uppercase-commit` | Parent commit must be 40 lowercase hex. |
+| `digest-length`, `digest-mismatch` | SHA-256 must be 64 hex digits and both readings equal. |
+| `missing-gpl`, `missing-x265` | Required configure switches must be present. |
+| `nonfree`, `fdk` | Forbidden enabled configure switches are refused. |
+| `extract` | Member allowlist refuses ffplay. |
+| `duplicate-stage`, `duplicate-name` | Component identities must be unique. |
+| `unmapped`, `reverse-map` | Two-way configure coverage refuses an unmapped enable or absent mapped switch. |
+| `major` | The pre-existing FFmpeg-major guard still refuses n8. |
+| `component-schema` | Exact component fields require repository. |
+| `pin` | A moving-branch string fails the component's commit-pin grammar. |
+| `basis` | Every licence must be seat-verified. |
+| `extra-source` | An incomplete extra source fails exact source fields. |
+
+**RED -> GREEN.** Logs and XML are under `work/wp6.3c/turn14/`.
+`red.log` / `red.xml`, fresh `work/c63c-14-red`, reports **2 failed, 30 passed,
+54 deselected** against the old validator: the double-`-g` and wrong-parent
+cases were accepted. After the validator change, `green.log` / `green.xml`,
+fresh `work/c63c-14-green`, reports **35 passed, 51 deselected**, including all
+32 refusal cases and the three valid abbreviation lengths.
+`zvbi-mutation.log` independently reports PASS after compiling an in-memory copy
+of the current validator with only the zvbi guard removed: the enabled-zvbi
+fixture is then accepted with configure coverage intact. No source file was
+changed for that mutation.
+
+**Validation.** The prescribed commands use `uv run --no-sync`; logs are in the
+same turn-14 folder:
+
+- `ruff-check.log`: **All checks passed!** (exit 0).
+- `ruff-format.log`: **337 files already formatted** (exit 0).
+- `mypy-win32.log`, `mypy-darwin.log`: each **Success: no issues found in
+  166 source files** (both exit 0).
+- `pytest.log` / `pytest.xml`, exact fresh `work/c63c-14`: **5 failed,
+  693 passed, 1 skipped in 156.66s**, exit 1. All five failures are the expected
+  real-Git fixture cases (`annotated`, `lightweight`, `wrong-commit`,
+  `mismatched-name`, `deleted-origin`): fixture setup's local push exits 128
+  with `CreateFileMapping` under the restricted token, before the tag gate.
+  Every other test passes. The unchanged skip is the POSIX containment proof
+  assigned to WP6.5. `test-summary.json` / `summary.log` confirm this from XML.
+- `scope-audit.log`: PASS, lock differs only in excluded zvbi status and
+  `build.py` differs only in `validate_ffmpeg_lock` (exit 0).
+- `diff-check.log`: `git diff --check`, exit 0.
+
+The unchanged isolated runner is `work/wp6.3c/turn13/run_tests.py`: launched with
+`PYTHONPATH=scripts`, it removes that environment variable before pytest while
+retaining the shim import path, loads `sandbox_mkdir_shim`, disables cacheprovider,
+sets timeout 300 and excludes QUIT_SCRIPT. Exact full selection:
+
+```text
+uv run --no-sync python work/wp6.3c/turn13/run_tests.py tests/test_tools_package_notices.py tests/test_tools_package_build.py tests/test_tools_package_smoke.py tests/test_tools_package_ffmpeg.py tests/test_release_workflow.py --basetemp=work/c63c-14 --junitxml=work/wp6.3c/turn14/pytest.xml -q -rs
+```
+
+`entry-audit.log` records the entry-point grep. The source-entry smoke child
+redirects APPDATA, LOCALAPPDATA and all four XDG roots, blocks Qt/shiboken imports,
+stubs app/worker effects and has a 15-second timeout; native smoke execution is
+substituted with the existing bounded Python stubs. No old revision was executed.
+
+**Round-ledger transfer / verification loop.** A r3 cleanup: zero new critical
+or major, five MINOR and three ADVISORY findings folded, all in-envelope and
+NEW; zero reopened findings, reverts or false-positive rejections. Fixes touch
+validator product code, tests/controls, one lock status and docs. Advisories 9
+(seat trailer) and 10 (CHARC wording) are outside this turn as dispatched. Earlier
+rounds' dispositions remain in this report and the dispatcher's cumulative
+ledger; no unowned ledger file was edited. Suspected validator gaps were
+independently confirmed by RED tests; the coverage-masking defect was confirmed
+by the guard-removal mutation; all eight folds were fixed. Final diff review
+and the completed validation found no new in-envelope defect. The expected
+sandbox real-Git failures remain seat verification work.
+
+**Scope / handoff.** No interface, dependency, source pin or asset identity
+changed. The version remains the printed token. The only lock edit is zvbi's
+status. No network, real PyInstaller build, frozen/GUI launch, Docker, synthetic
+desktop input, protected-folder write, repository Git write, push/tag/dispatch
+or mailbox post was performed. Prescribed real-Git tests alone attempt writes
+in disposable local fixtures. Every runner output remains under this worktree.
+STOPPED ITEMS: none in the eight folds. The seat owns real-Git verification,
+review, real build/smoke/zip, V4/encoder proofs, gate, accept and release.
+`depth_input_tokens` is unavailable to the cell; dispatcher read is due at yield.

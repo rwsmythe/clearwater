@@ -1666,7 +1666,7 @@
     },
     {
       "stage": "scripts.d/50-zvbi.sh",
-      "status": "disabled",
+      "status": "not-built(disabled)",
       "reason": "GPL-2.0-only src/packet-830.* / src/pdc.* cannot be combined into the GPL-3.0 binary; owner ruling 2026-11-05 \"self-build is fine\"; stage disabled in fork commit d77b8352f60bd180ebce585632846533aa60b183"
     }
   ]

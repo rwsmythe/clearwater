@@ -45,7 +45,13 @@ artifact is one folder, not an installer; it is unsigned. No PyPI release is pla
    on the selected BtbN build-script commit, disabling zvbi and retaining the
    dispatch-only win64 / gpl 9.0 workflow. Pin FFmpeg with a full 40-hex
    `git checkout --detach <commit>` in `build.sh` after `cd ffmpeg`; keep
-   `addins/9.0.sh` unchanged. A release tag can lag BtbN's dependency pins:
+   `addins/9.0.sh` unchanged. Update the fork workflow's hard-coded `TAGNAME`
+   (`ffmpeg-9.0-g<sha>-nozvbi-...`) to name the new FFmpeg commit.
+   `build.py`'s validator requires `ffmpeg_ref` to be `release/9.0` and the
+   version token to carry a matching `-g` commit abbreviation. A different
+   ref, or a commit exactly at a tag (where FFmpeg's `version.sh` prints
+   `n9.0.x` without `-g`), is refused; either bump needs a reviewed validator
+   change first. A release tag can lag BtbN's dependency pins:
    the first WP6.3c run at `n9.0.2` failed against openapv >= 1.1, requiring
    the pinned `release/9.0` backport commit instead.
    Push and dispatch once only on the owner's authorization. Archive the run
@@ -117,12 +123,11 @@ artifact is one folder, not an installer; it is unsigned. No PyPI release is pla
 10. Download the three assets from the draft release. Compare the downloaded
     zip's SHA-256 against the sidecar (PowerShell `Get-FileHash -Algorithm SHA256`),
     list its single top-level folder and compare the attached notices with the
-    copy inside. Compare the sidecar's source-commit comment and the draft body's
-    Source commit with the gated commit and workflow github.sha.
-    Compare the downloaded zip's source record and content census against the
-    local release-gate build. A force-moved and re-pushed annotated tag can pass
-    the workflow's annotated-tag gate; this comparison must still identify the
-    gated source, and a changed source commit is a refusal.
+    copy inside. Require the sidecar's `# source-commit:` line and the draft
+    body's Source commit to equal the gated commit and workflow github.sha.
+    A force-moved and re-pushed annotated tag can pass the workflow's
+    annotated-tag gate; this explicit source-commit comparison refuses a
+    changed source commit even when that gate passes.
     **STOP** on commit/hash/content/layout disagreement; preserve the
     downloaded evidence rather than substituting the local build.
 11. Test that DOWNLOADED artifact in a CLEAN Windows user account on this laptop:

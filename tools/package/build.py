@@ -858,7 +858,7 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
         data["parent_provider"], set(FFmpegParentProvider.__annotations__), "parent_provider"
     )
     repository = _ffmpeg_text(parent["repository"], "parent repository")
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
+    if repository != "BtbN/FFmpeg-Builds":
         raise ValueError("FFmpeg lock: invalid parent repository")
     if not re.fullmatch(r"[0-9a-f]{40}", _ffmpeg_text(parent["commit"], "parent commit")):
         raise ValueError("FFmpeg lock: invalid parent commit")
@@ -873,7 +873,9 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
         raise ValueError("FFmpeg lock: invalid FFmpeg commit")
     if not re.match(r"n9\.", cast(str, data["version"])):
         raise ValueError("FFmpeg lock: FFmpeg major must be 9")
-    version_commit = re.search(r"-g([0-9a-f]{7,40})(?=-|$)", cast(str, data["version"]))
+    version_commit = re.fullmatch(
+        r"n9\.\d+\.\d+-\d+-g([0-9a-f]{7,40})-\d{8}", cast(str, data["version"])
+    )
     if version_commit is None or not commit.startswith(version_commit.group(1)):
         raise ValueError("FFmpeg lock: version hash differs from the FFmpeg commit")
     if data["ffmpeg_ref"] != "release/9.0":

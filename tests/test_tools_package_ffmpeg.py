@@ -65,40 +65,43 @@ def test_committed_lock_covers_the_verified_source_stages():
 
 
 @pytest.mark.parametrize(
-    "change",
+    ("change", "refusal"),
     [
-        "schema",
-        "unknown",
-        "ffmpeg-tag",
-        "short-commit",
-        "uppercase-commit",
-        "version-commit",
-        "short-version-commit",
-        "missing-disable-zvbi",
-        "enable-zvbi",
-        "parent-unknown",
-        "parent-missing",
-        "parent-short-commit",
-        "missing",
-        "digest-length",
-        "digest-mismatch",
-        "missing-gpl",
-        "missing-x265",
-        "nonfree",
-        "fdk",
-        "extract",
-        "duplicate-stage",
-        "duplicate-name",
-        "unmapped",
-        "reverse-map",
-        "major",
-        "component-schema",
-        "pin",
-        "basis",
-        "extra-source",
+        ("schema", "unsupported schema_version"),
+        ("unknown", "invalid document fields"),
+        ("ffmpeg-tag", "invalid document fields"),
+        ("short-commit", "invalid FFmpeg commit"),
+        ("uppercase-commit", "invalid FFmpeg commit"),
+        ("version-commit", "version hash differs from the FFmpeg commit"),
+        ("short-version-commit", "version hash differs from the FFmpeg commit"),
+        ("double-version-commit", "version hash differs from the FFmpeg commit"),
+        ("missing-disable-zvbi", "zvbi must be disabled"),
+        ("enable-zvbi", "zvbi must be disabled"),
+        ("parent-unknown", "invalid parent_provider fields"),
+        ("parent-missing", "invalid parent_provider fields"),
+        ("parent-repository", "invalid parent repository"),
+        ("parent-short-commit", "invalid parent commit"),
+        ("parent-uppercase-commit", "invalid parent commit"),
+        ("missing", "invalid document fields"),
+        ("digest-length", "sha256 readings differ or are not 64 hex digits"),
+        ("digest-mismatch", "sha256 readings differ or are not 64 hex digits"),
+        ("missing-gpl", "GPL, version3 and libx265 are required"),
+        ("missing-x265", "GPL, version3 and libx265 are required"),
+        ("nonfree", "nonfree or libfdk-aac is forbidden"),
+        ("fdk", "nonfree or libfdk-aac is forbidden"),
+        ("extract", "extract_members must name only the two tools and licence"),
+        ("duplicate-stage", "duplicate component stage or name"),
+        ("duplicate-name", "duplicate component stage or name"),
+        ("unmapped", "configure coverage differs; unmapped="),
+        ("reverse-map", "configure coverage differs; unmapped="),
+        ("major", "FFmpeg major must be 9"),
+        ("component-schema", "invalid component fields"),
+        ("pin", "invalid source commit"),
+        ("basis", "every licence must be seat-verified"),
+        ("extra-source", "invalid extra source fields"),
     ],
 )
-def test_lock_rejects_inconsistent_or_unsafe_data(change):
+def test_lock_rejects_inconsistent_or_unsafe_data(change, refusal):
     data = copy.deepcopy(lock_data())
     if change == "schema":
         data["schema_version"] = 1
@@ -116,10 +119,21 @@ def test_lock_rejects_inconsistent_or_unsafe_data(change):
             + ("0" * 10 if change == "version-commit" else data["ffmpeg_commit"][:6])
             + "-20261106"
         )
+    elif change == "double-version-commit":
+        data["version"] = data["version"].replace("-20261106", "-g0000000-20261106")
     elif change == "missing-disable-zvbi":
         data["configure_line"] = data["configure_line"].replace("--disable-libzvbi", "")
     elif change == "enable-zvbi":
         data["configure_line"] += " --enable-libzvbi"
+        # Keep coverage valid so only the explicit zvbi guard refuses this lock.
+        component = copy.deepcopy(data["components"][0])
+        component.update(
+            stage="scripts.d/50-zvbi.sh", name="zvbi", configure_flag=["--enable-libzvbi"]
+        )
+        data["components"].append(component)
+        data["excluded"] = [
+            row for row in data["excluded"] if row["stage"] != "scripts.d/50-zvbi.sh"
+        ]
     elif change.startswith("parent-"):
         data["parent_provider"] = {
             "repository": "BtbN/FFmpeg-Builds",
@@ -129,6 +143,10 @@ def test_lock_rejects_inconsistent_or_unsafe_data(change):
             data["parent_provider"]["extra"] = "value"
         elif change == "parent-missing":
             del data["parent_provider"]["repository"]
+        elif change == "parent-repository":
+            data["parent_provider"]["repository"] = "evil/x"
+        elif change == "parent-uppercase-commit":
+            data["parent_provider"]["commit"] = data["parent_provider"]["commit"].upper()
         else:
             data["parent_provider"]["commit"] = "5031c6f1"
     elif change == "missing":
@@ -160,11 +178,10 @@ def test_lock_rejects_inconsistent_or_unsafe_data(change):
     elif change == "pin":
         data["components"][0]["pin"] = "moving-branch"
     elif change == "basis":
-        data["components"][0]["licence"] = None
         data["components"][0]["licence_basis"] = "cell-read"
     elif change == "extra-source":
         data["components"][0]["extra_repositories"] = [{"repository": "https://example.invalid"}]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=re.escape(refusal)):
         build.validate_ffmpeg_lock(data)
 
 
