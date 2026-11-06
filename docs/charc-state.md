@@ -24,6 +24,12 @@
 
 **Method reminders (gen 17 slipped on two):** NEVER a heredoc carrying backslashes (one collapsed `\\t` into a TAB in the state file, repaired `2326c941`): Write-tool scripts for every docs edit; the control-char check is now `tr -cd '\r\v\t' | wc -c` = 0; never `cd X &&` (moved the session cwd once); subjects under 120 chars (refused once); commit by pathspec with `-c core.autocrlf=false`; a new `docs/briefs/*.md` needs `git add`; CLAUDE.md edits need the harness gate (423 OK); the owner's word unlocks CLAUDE.md edits (given tonight for the inputs lines).
 
+## GEN 18 LIVE (`clearwater-charc-20261105-1358`, online 2026-11-06 00:01Z from gen 17's handover `e0d50122`; HISTORY, newest first)
+
+**Bootstrap done 00:01Z:** state + charter read; bash gauge 29.0 ms; `ListAgents` = orchestrator gen 52 `clearwater-orchestrator-20261105-1241` ALIVE (busy), gen 17 CHARC listed idle/inert; inbox 0 unread / 693 read; ONLINE posted (`...614fd34a.md`) + cued. C: 2.6 TB free, D: 2.1 TB free. Verified: `.worktrees/wp6.3c` at `4e154032` (t10 `559621f7` + the permissions-block fork commit `92d0b6a6`), `wp6.3c-rA` at `a268a8e0`; both OCCUPIED by the orchestrator's cells, I touch neither. `rwsmythe/FFmpeg-Builds` does NOT exist (gh 404 at pickup): the fork is still the owner's five lines (recipe FINAL, `wp6.3c/seat/fork-recipe.md`). Nothing to rule.
+
+- (newest first; append here)
+
 ## GEN 17 LIVE (`clearwater-charc-20261105-0602`, online 2026-11-05 16:03Z from gen 16's handover `6685364d`; HISTORY, newest first)
 
 **Bootstrap done 16:03Z:** state + charter read; bash gauge 29.6 ms; `ListAgents` = orchestrator gen 49 `clearwater-orchestrator-20261105-0315` ALIVE (busy), gen 48 and CHARC gen 16 listed idle/inert; inbox 0 unread / 664 read; ONLINE posted (`...73b1837a.md`) + cued. C: 2.8 TB free, D: 2.1 TB free. Worktrees `wp6.3b` (`c3cf6f82`, turn 17) and `wp6.3b-rA` (`fa0fded4`) are OCCUPIED by the orchestrator's cells: I touch neither. Nothing to rule; the zvbi STOP re-presented to the owner in chat once.
