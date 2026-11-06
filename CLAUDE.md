@@ -52,7 +52,7 @@ Both go into the uncommitted `clearwater.local.toml` (template: `clearwater.loca
 - Dependencies are added only through `pyproject.toml` and the lock file; a dependency not named in the architecture document needs the chief architect's approval (license check, spec N13).
 - Keep code portable; nothing specific to one operating system without approval (spec N1).
 - The footage folder is never written to, renamed in, or deleted from. All outputs go to the working folder. `tests/conftest.py` refuses to start pytest when its temp root (`--basetemp`, `PYTEST_DEBUG_TEMPROOT`, or the derived TMP/TEMP root) lies inside the configured footage folder (WP-T1, DR-21 closed; limits in DR-22). Never point a temp root there; `work/` is the legitimate basetemp.
-- No CI service, installer or packaged executable is planned. Raise it if wanted.
+- Distribution since 1.1.0 (owner's word 2026-11-06): a PyInstaller ONE-FOLDER Windows build (`tools/package/build.py`, CP6a = onedir, spec N14) and the tag-driven GitHub Actions release workflow `.github/workflows/release.yml` (a DRAFT release the owner publishes; AD-38; `docs/release-checklist.md` v2). No installer and no signing. The test gate still runs on the laptop; the workflow runs the parallel leg only.
 - Commit by pathspec (`git commit -m "..." -- <paths>`); every role shares the main tree's index. Conventional commits carrying the work-package id.
 
 ## Definition of done (plan §4.5)

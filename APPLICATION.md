@@ -87,8 +87,10 @@ task). Everything below summarizes those documents for the harness; they govern.
   exclusive -- one at a time, nothing else heavy running, timed on a full clip.
 - **Only the orchestrator merges to main.** Implementers work in worktrees and
   change only the files their brief owns.
-- **No CI service, installer or packaged executable** is planned; checks run on
-  the laptop.
+- **Distribution (from 1.1.0):** a PyInstaller one-folder Windows build and a
+  tag-driven GitHub Actions release workflow that drafts a release the owner
+  publishes (`docs/release-checklist.md`). No installer, no signing. The test
+  gate still runs on the laptop.
 
 ## Harness-to-plan role mapping
 
