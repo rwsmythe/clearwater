@@ -279,6 +279,12 @@ def plan(module, release, **kwargs):
 
 def add_ffmpeg(release):
     folder, pin = release["folder"], release["ffmpeg"]
+    texts = release["native_surface"] / "ffmpeg-toolchain"
+    texts.mkdir(exist_ok=True)
+    for filename in {t["path"] for r in pin["toolchain_runtime"] for t in r["texts"]}:
+        shutil.copyfile(
+            ROOT / "tools/package/native-licences/ffmpeg-toolchain" / filename, texts / filename
+        )
     for name in ["ffmpeg.exe", "ffprobe.exe"]:
         (folder / name).write_bytes(b"synthetic tool; never executed")
     (folder / "ffmpeg-LICENSE.txt").write_text("synthetic GPL-3.0 licence")
@@ -529,6 +535,26 @@ def test_ffmpeg_toolchain_census_renders_every_row_and_deduplicates_terms(releas
         if line.startswith("| FFmpeg toolchain runtime:")
     ]
     assert root_table == artifact_table
+    # Artifact anchors name deduplicated text blocks; root links name the exact
+    # byte-preserved files. Compare per-row sets through the block SHA-256.
+    files_by_hash = {t["sha256"]: t["path"] for r in lock["toolchain_runtime"] for t in r["texts"]}
+    files_by_anchor = {
+        anchor: files_by_hash[digest]
+        for anchor, digest in re.findall(
+            r'<a id="(licence-\d+)"></a>.*?SHA-256: `([a-f0-9]{64})`', artifact, re.S
+        )
+    }
+    root_texts = [
+        set(re.findall(r"\(tools/package/native-licences/ffmpeg-toolchain/([^)]*)\)", line))
+        for line in root_annex.splitlines()
+        if line.startswith("| FFmpeg toolchain runtime:")
+    ]
+    artifact_texts = [
+        {files_by_anchor[anchor] for anchor in re.findall(r"\(#(licence-\d+)\)", line)}
+        for line in artifact.splitlines()
+        if line.startswith("| FFmpeg toolchain runtime:")
+    ]
+    assert root_texts == artifact_texts
     details = "## Component details and coverage\n"
     root_details = root_annex.split(details, 1)[1].split("## Runtime licence text files", 1)[0]
     artifact_details = artifact.split(details, 1)[1].split(
@@ -550,8 +576,14 @@ def test_ffmpeg_toolchain_census_renders_every_row_and_deduplicates_terms(releas
         assert row.version == source["version"]
         assert row.licence == source["licence"]
         assert row.entries == rows[0].entries
-        assert source["source_url"] in row.sources
-        assert f"{source['repository']} @ {source['pin']}" in row.sources
+        if source["pin_kind"] == "crate-sha256":
+            assert row.sources == (
+                f"{source['source_url']} (crate archive sha256 {source['pin']})",
+                source["repository"],
+            )
+        else:
+            assert source["source_url"] in row.sources
+            assert f"{source['repository']} @ {source['pin']}" in row.sources
         assert (
             "statically linked into ffmpeg.exe / ffprobe.exe by the fork build at "
             + lock["build_repository_commit"]
@@ -564,19 +596,18 @@ def test_ffmpeg_toolchain_census_renders_every_row_and_deduplicates_terms(releas
 
 
 @pytest.mark.parametrize("damage", ["missing", "hash", "after-plan"])
-def test_ffmpeg_toolchain_text_identity_fails_closed(release, monkeypatch, tmp_path, damage):
+def test_ffmpeg_toolchain_text_identity_fails_closed(release, tmp_path, damage):
     """Runtime text integrity is checked both at planning and at rendering."""
     module = load_notices()
     lock = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_bytes())
     release["ffmpeg"] = lock
     release["ffmpeg_path"].write_text(json.dumps(lock))
     add_ffmpeg(release)
-    texts = tmp_path / "runtime-texts"
+    texts = tmp_path / "runtime-texts/ffmpeg-toolchain"
     shutil.copytree(ROOT / "tools/package/native-licences/ffmpeg-toolchain", texts)
-    monkeypatch.setattr(module, "FFMPEG_TOOLCHAIN_PATH", texts, raising=False)
     path = texts / lock["toolchain_runtime"][0]["texts"][0]["path"]
     if damage == "after-plan":
-        rows = module._ffmpeg_rows(release["folder"], release["ffmpeg_path"])
+        rows = module._ffmpeg_rows(release["folder"], release["ffmpeg_path"], texts.parent)
     if damage == "missing":
         path.unlink()
     else:
@@ -585,7 +616,47 @@ def test_ffmpeg_toolchain_text_identity_fails_closed(release, monkeypatch, tmp_p
         if damage == "after-plan":
             module.render_notices(module.NoticePlan(rows[0].entries, tuple(rows), ()))
         else:
-            module._ffmpeg_rows(release["folder"], release["ffmpeg_path"])
+            module._ffmpeg_rows(release["folder"], release["ffmpeg_path"], texts.parent)
+
+
+@pytest.mark.parametrize("damage", ["extra-file", "extra-directory", "upper-case"])
+def test_ffmpeg_toolchain_text_directory_is_exact(release, damage):
+    """Unreferenced entries and Windows filename aliases cannot hide census drift."""
+    module = load_notices()
+    lock = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_bytes())
+    release["ffmpeg"] = lock
+    release["ffmpeg_path"].write_text(json.dumps(lock))
+    add_ffmpeg(release)
+    texts = release["native_surface"] / "ffmpeg-toolchain"
+    if damage == "extra-file":
+        (texts / "unreferenced-LICENSE").write_bytes(b"unreferenced terms")
+    elif damage == "extra-directory":
+        (texts / "unreferenced-directory").mkdir()
+    else:
+        lock["toolchain_runtime"][0]["texts"][0]["path"] = lock["toolchain_runtime"][0]["texts"][0][
+            "path"
+        ].upper()
+        release["ffmpeg_path"].write_text(json.dumps(lock))
+    with pytest.raises(ValueError, match="FFmpeg toolchain runtime text directory differs"):
+        plan(module, release)
+
+
+def test_ffmpeg_toolchain_texts_follow_native_surface_override(release):
+    """The public planner uses runtime texts from the caller's native surface."""
+    module = load_notices()
+    lock = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_bytes())
+    release["ffmpeg"] = lock
+    release["ffmpeg_path"].write_text(json.dumps(lock))
+    add_ffmpeg(release)
+    result = plan(module, release)
+    runtime = [r for r in result.rows if r.name.startswith("FFmpeg toolchain runtime:")]
+    assert runtime
+    texts = release["native_surface"] / "ffmpeg-toolchain"
+    assert {t.path.parent for r in runtime for t in r.licence_inputs} == {texts}
+    path = texts / lock["toolchain_runtime"][0]["texts"][0]["path"]
+    path.write_bytes(path.read_bytes() + b"changed override")
+    with pytest.raises(ValueError, match=r"FFmpeg toolchain runtime.*text hash differs"):
+        plan(module, release)
 
 
 @pytest.mark.parametrize("field", ["Parent provider", "FFmpeg ref"])

@@ -874,7 +874,11 @@ def _ffmpeg_licence_choices(expression: str) -> set[str]:
     position = 0
     choices: set[str] = set()
     refusal = "FFmpeg lock: incompatible/invalid runtime licence expression"
-    if not tokens or "".join(tokens) != re.sub(r"\s+", "", expression):
+    if (
+        not tokens
+        or any(c.isspace() and c != " " for c in expression)
+        or "".join(tokens) != "".join(expression.split(" "))
+    ):
         raise ValueError(refusal)
 
     def primary() -> tuple[bool, str]:
@@ -985,6 +989,8 @@ def _ffmpeg_runtime(data: dict[str, object], config: str) -> None:
             raise ValueError("FFmpeg lock: duplicate toolchain runtime")
         seen.add(triple)
         if row["kind"] == "cargo-crate":
+            if not cast(str, row["repository"]).startswith(("https://", "http://")):
+                raise ValueError("FFmpeg lock: cargo-crate repository must use HTTP(S)")
             if row["pin_kind"] != "crate-sha256":
                 raise ValueError("FFmpeg lock: cargo-crate requires crate-sha256")
             if (
@@ -995,6 +1001,11 @@ def _ffmpeg_runtime(data: dict[str, object], config: str) -> None:
         rustc = cast(dict[str, str], toolchain["rustc"])
         gcc = cast(dict[str, str], toolchain["gcc"])
         if row["kind"] == "rust-std":
+            if row["repository"] not in {
+                "https://github.com/rust-lang/rust",
+                "https://github.com/rust-lang/backtrace-rs",
+            }:
+                raise ValueError("FFmpeg lock: invalid rust-std repository")
             if (
                 row["repository"] == "https://github.com/rust-lang/rust"
                 and row["pin"] != rustc["commit"]
@@ -1002,10 +1013,16 @@ def _ffmpeg_runtime(data: dict[str, object], config: str) -> None:
                 raise ValueError("FFmpeg lock: rust-std pin differs from toolchain")
             if row["name"] == "rust-std" and row["version"] != rustc["version"]:
                 raise ValueError("FFmpeg lock: rust-std version differs from toolchain")
-        if row["kind"] == "gcc-runtime" and (
-            row["version"] != gcc["version"] or row["pin"] != gcc["commit"]
-        ):
-            raise ValueError("FFmpeg lock: gcc-runtime pin/version differs from toolchain")
+        if row["kind"] == "gcc-runtime":
+            if row["repository"] != "https://github.com/gcc-mirror/gcc":
+                raise ValueError("FFmpeg lock: invalid gcc-runtime repository")
+            if row["version"] != gcc["version"] or row["pin"] != gcc["commit"]:
+                raise ValueError("FFmpeg lock: gcc-runtime pin/version differs from toolchain")
+        if row["kind"] != "cargo-crate":
+            base = f"{row['repository']}/tree/{row['pin']}"
+            source_url = cast(str, row["source_url"])
+            if source_url != base and not source_url.startswith(base + "/"):
+                raise ValueError("FFmpeg lock: runtime source_url differs from repository/pin")
         texts = row["texts"]
         if not isinstance(texts, list) or not texts:
             raise ValueError("FFmpeg lock: runtime texts must be nonempty")
@@ -1014,7 +1031,10 @@ def _ffmpeg_runtime(data: dict[str, object], config: str) -> None:
                 item, set(FFmpegRuntimeText.__annotations__), "runtime text"
             )
             path = _ffmpeg_text(text_record["path"], "runtime text path")
-            if any(c in path for c in ("/", "\\", ":", "..")) or path == ".":
+            if (
+                any(c in path for c in ("/", "\\", ":", ".."))
+                or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]*[A-Za-z0-9]", path) is None
+            ):
                 raise ValueError("FFmpeg lock: unsafe runtime text path")
             if (
                 re.fullmatch(
@@ -1026,6 +1046,8 @@ def _ffmpeg_runtime(data: dict[str, object], config: str) -> None:
         checked.append(cast(FFmpegRuntime, row))
     for stage, switch in (("rav1e", "--enable-librav1e"), ("librsvg", "--enable-librsvg")):
         enabled = switch in config.split()
+        if enabled and not flags:
+            raise ValueError("FFmpeg lock: Rust stages require nonempty static_link_flags")
         stage_rows = [r for r in checked if r["reached_via"] == stage]
         if enabled and not (
             any(r["kind"] == "cargo-crate" for r in stage_rows)
@@ -1162,9 +1184,13 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
         raise ValueError(
             "FFmpeg lock: source record URL must match provider/build commit tree root"
         )
-    if commit[:8] not in cast(str, data["release_tag"]) or cast(
-        str, data["build_repository_commit"]
-    )[:7] not in cast(str, data["release_tag"]):
+    if (
+        re.fullmatch(
+            rf"ffmpeg-9\.0-g{commit[:8]}-nozvbi-{cast(str, data['build_repository_commit'])[:7]}",
+            cast(str, data["release_tag"]),
+        )
+        is None
+    ):
         raise ValueError("FFmpeg lock: release tag must name FFmpeg and build commits")
     config = cast(str, data["configure_line"])
     if not config.startswith("configuration: "):

@@ -2509,3 +2509,148 @@ repository Git write, remote push/tag/dispatch or mailbox post was performed.
 The prescribed tests alone attempt temporary local Git-fixture writes/pushes.
 The seat commits this one logical remediation turn; no commit was attempted.
 `depth_input_tokens` is unavailable to this cell; dispatcher read is due at yield.
+
+## Turn 16 - Reviewer A r4 validator and notices folds
+
+**Built (2026-11-06; dispatch 16).** Applied the five MINOR findings and
+ADVISORY findings 6-12 and 14 from Reviewer A r4, whose supplied verdict is
+`NO_NEW_CRITICAL_MAJOR`. Finding 13 retains the existing consecutive-notes
+Markdown pattern, as explicitly ruled. This is one logical review remediation;
+no fork, workflow, lock, native-licence data, product source or frozen interface
+changed. The review record is
+`C:/Users/rwsmy/clearwater-review-evidence/wp6.3c/A/r4/review.txt` (read only).
+
+| A r4 finding | Severity | Turn-16 disposition |
+| --- | --- | --- |
+| 1 | MINOR | CONFIRMED / FIXED: runtime text directory entries must equal the lock's exact-case filename set; extra files, directories and missing texts refuse. |
+| 2 | MINOR | CONFIRMED / FIXED: rust-std and gcc-runtime repositories are allowlisted; every non-crate source URL is the exact pinned tree or a member below it; crate repositories require HTTP(S). |
+| 3 | MINOR | CONFIRMED / FIXED: a real synthetic-archive `bundle_ffmpeg` test asserts the written Parent provider and FFmpeg ref lines. |
+| 4 | MINOR | CONFIRMED / FIXED: enabled Rust stages require nonempty static-link flags; the census-data limitation is stated below. |
+| 5 | MINOR | CONFIRMED / FIXED: parser refusal cases include `MIT;` and `MIT OR Apache-2.0.`; text-path refusal includes `.`. |
+| 6 | ADVISORY | CONFIRMED / FIXED: the parser strips ASCII spaces only and refuses every other whitespace character, including tab and NBSP. |
+| 7 | ADVISORY | CONFIRMED / FIXED: release tag fullmatches the named FFmpeg/fork commit pattern, with a literal dot in `9.0`. |
+| 8 | ADVISORY | CONFIRMED / FIXED: runtime text basenames must fullmatch the specified portable pattern and exactly match directory-entry case; trailing-dot, trailing-space and uppercase aliases refuse. |
+| 9 | ADVISORY | CONFIRMED / FIXED: crate sources name the archive URL first and explicitly label its SHA-256, followed by the declared repository; full-text provenance uses the same source labels. |
+| 10 | ADVISORY | CONFIRMED / FIXED: root/artifact agreement compares each runtime table row's linked filename set as well as its other columns and details. |
+| 11 | ADVISORY | CONFIRMED / FIXED: runtime texts derive from `native_licences_path / ffmpeg-toolchain`; the public-planner override test verifies both selection and corruption refusal. |
+| 12 | ADVISORY | CONFIRMED / DISCLOSED: permissive over-inclusion errs towards extra notices; no binding expansion was commissioned. |
+| 13 | ADVISORY | NO CHANGE per dispatch: consecutive note lines use the existing renderer pattern. |
+| 14 | ADVISORY | CONFIRMED / DISCLOSED: generated root annex explains first-user filenames for shared, SHA-256-deduplicated texts. |
+
+All 14 findings are NEW and in envelope: zero CRITICAL, zero MAJOR, five
+MINOR and nine ADVISORY; none REOPENED, no reverts. Fixes affect tool code
+and tests, with regenerated root notice text. No new reviewer round ran in
+this turn and no cumulative-ledger file was owned or edited; this table
+records the supplied round for the dispatcher's ledger.
+
+**Limits.** The static flags are census data recorded from fork run 2's BtbN
+environment, not derived from the configure line; only `-lgomp` is detected
+in that line (not `-fopenmp` or alternative linker spellings). Over-inclusion
+is not refused: unbound `mingw-runtime` rows and `reached_via: toolchain`
+rows retained with both Rust stages disabled produce extra notices. The
+generated root annex also discloses this limit and explains that shared
+texts, deduplicated by SHA-256, use the first user's filename. None of these
+sentences changes the recorded census or claims additional linkage proof.
+
+**Root regeneration and input preservation.** The existing offline generation
+recipe was adapted in `work/wp6.3c/turn16/generate_root_notices.py`; its header
+generates both limits sentences, and its rows still use `_ffmpeg_rows` and
+`render_notices`. The four synthetic input files are notice inputs only and
+were never executed. `root-notices-final.log` reports 232 runtime rows and
+157 byte-preserved linked texts. `audit-final.log` verifies every text hash,
+441 references, exact directory membership, the unchanged pre-annex root
+notice bytes, and no lock/native-licence diff. No census text or lock row was added,
+removed, renamed or rewritten. Synthetic notices fixtures copy the runtime
+texts named by their own lock into their disposable override surface; an
+empty runtime list has an empty text surface.
+
+**Verification loop.** All runner outputs are under
+`work/wp6.3c/turn16/`. `red.log` / `.xml` reported 20 failed and 67 passed
+before tool changes. Failures reproduced directory drift, missing provenance
+guards, empty static flags, whitespace and filename aliases, the tag shape,
+source rendering and the native-path override. Existing guards already
+refused the new punctuation and `.` controls. `green.log` / `.xml` then
+reported 87 passed. Initial ruff caught a non-raw regex in one new test;
+it was corrected. The initial mutation runner caught the writer regression
+but its diagnostic formatter failed on an empty AssertionError message;
+only the scratch formatter was corrected, then the checks were rerun.
+
+The final diff read suspected that an unescaped regex dot could accept
+`ffmpeg-9x0-...`. `tag-red.log` confirms that with a failed named-refusal
+case; the literal-dot fix passes in `tag-green.log`. The final in-memory
+mutation run (`mutation_verify.py`, `mutations-verified.log`, exit 0) checks
+the actual regression functions against 19 guard/writer mutations; every
+one is distinguished by a failed assertion or the named refusal failing.
+No mutated tool file was written to the repository.
+
+| Dispatch item | Mutant killed by the regression test |
+| --- | --- |
+| 1 | Remove exact directory-set guard: extra-file and extra-directory cases fail to raise. |
+| 2 | Remove rust-std allowlist, gcc-runtime allowlist, non-crate source binding (Rust and GCC), or HTTP(S) crate-repository guard. All five named-refusal checks fail; the GCC repository mutant reaches the later source refusal instead. |
+| 3 | Remove Parent provider or FFmpeg ref writer line: each synthetic-bundle assertion fails. |
+| 4 | Remove the Rust/nonempty-static-flags guard: the empty-flags/drop-libgcc-and-libstdc++ case fails to raise. |
+| 5 | Remove token rejoin: `MIT;` is accepted; remove basename-pattern guard: `.` is accepted. |
+| 6 | Restore whitespace stripping with `\s+`: both tab and NBSP expressions are accepted. |
+| 7 | Restore substring-only tag matching: the crafted `x-<ffmpeg><fork>` tag is accepted; restore wildcard dot: the `9x0` case is accepted. |
+| 8 | Remove basename-pattern guard: trailing-dot and trailing-space aliases are accepted; remove directory-set guard: the uppercase alias is accepted. |
+
+The first full five-module run (`pytest.log` / `.xml`, requested
+`work/c63c-16`) returned 794 passed, five expected real-Git sandbox fixture
+failures and one unchanged skip in 173.14 seconds (exit 1). The final run
+uses a fresh basetemp after the provenance wording and literal-dot fix.
+
+**Final validation.** The static commands ran in the required order on the
+final code/test state, all with `uv run --no-sync`:
+
+- `ruff-check-final.log`: `ruff check .`, All checks passed! (exit 0).
+- `ruff-format-final.log`: `ruff format --check .`, 337 files already formatted (exit 0).
+- `mypy-win32-final.log`: `mypy`, Success: no issues found in 166 source files (exit 0).
+- `mypy-darwin-final.log`: `mypy --platform darwin`, the same 166-file success (exit 0).
+- `pytest-final.log` / `.xml`: **795 passed, five expected sandbox failures,
+  one skipped in 173.20 seconds** (exit 1). The requested five modules ran
+  with the sandbox mkdir shim, no cacheprovider, QUIT_SCRIPT excluded,
+  a bounded 300-second per-test timeout and fresh `work/c63c-16-final`.
+  The isolated runner removes runner-only PYTHONPATH while keeping scripts
+  on sys.path. The entry-point audit confirms the existing smoke routing
+  child blocks Qt, stubs GUI/worker entry points, redirects APPDATA,
+  LOCALAPPDATA and XDG roots, and uses a 15-second child timeout.
+- `test-summary.log` / `.json`: exactly the five known real-Git fixture
+  failures, no other failure/error, and the unchanged POSIX-containment skip.
+- `mutations-verified.log`: 19/19 checks distinguish their in-memory mutant (exit 0).
+- `audit-final.log`: scope and byte-integrity assertions pass (exit 0).
+- `diff-check-final.log`: `git diff --check` passes (exit 0).
+
+| Module | Final result |
+| --- | --- |
+| test_tools_package_notices.py | 401 passed |
+| test_tools_package_build.py | 131 passed |
+| test_tools_package_smoke.py | 34 passed, one unchanged skip |
+| test_tools_package_ffmpeg.py | 177 passed |
+| test_release_workflow.py | 52 passed, five sandbox fixture failures |
+
+The five real-Git variants (annotated, lightweight, wrong-commit,
+mismatched-name and deleted-origin) fail in their local fixture's
+`git push origin HEAD:refs/heads/main --tags`, with restricted-token
+CreateFileMapping failures, before the tag gate runs. They require the
+seat's real-Git rerun; this report does not claim pytest exit 0 or validation
+of those cases inside the cell. The unchanged skip is
+`test_non_windows_containment_never_silently_skips` (WP6.5 POSIX proof).
+
+The final convergence read after the literal-dot fix found no further
+in-envelope issue. No review finding was rejected as a false positive;
+finding 13 is unchanged by an explicit ruling. No new review/convergence
+verdict is claimed on the dispatcher's behalf.
+
+**Handoff / STOPPED ITEMS.** None. Every dispatch-16 item is implemented or
+disclosed as ruled; no owned work remains undone. Reviewer B r2, the
+real-Git seat cases, harness/package gate, acceptance and release remain
+with the dispatcher. Six literal tracked paths changed; no native-licence
+folder belongs in this turn's commit list. No dependency, lock, licence
+data, product source, workflow, fork clone or fork patch changed. No
+network fetch, real PyInstaller build, frozen/GUI launch, Docker, synthetic
+desktop input, footage/profile/evidence-folder write, repository Git
+write, remote push/tag/dispatch or mailbox post was performed. Only the
+prescribed tests attempted temporary local Git-fixture writes/pushes.
+The seat commits; the cell attempted no commit.
+`depth_input_tokens` is unavailable to the cell; the dispatcher reads it
+at this yield.

@@ -68,7 +68,16 @@ def test_b_review_provenance_and_guard_mutations(field, value, refusal):
 
 
 @pytest.mark.parametrize(
-    "change", ["release-ffmpeg", "release-fork", "zvbi-missing", "zvbi-built", "date"]
+    "change",
+    [
+        "release-ffmpeg",
+        "release-fork",
+        "release-shape",
+        "release-series",
+        "zvbi-missing",
+        "zvbi-built",
+        "date",
+    ],
 )
 def test_lock_cross_binds_release_exclusion_and_build_date(change):
     """A byte pin must not conceal inconsistent source or exclusion claims."""
@@ -79,7 +88,14 @@ def test_lock_cross_binds_release_exclusion_and_build_date(change):
             if change == "release-ffmpeg"
             else data["build_repository_commit"][:7]
         )
-        data["release_tag"] = data["release_tag"].replace(prefix, "0" * len(prefix))
+        if change == "release-shape":
+            data["release_tag"] = (
+                "x-" + data["ffmpeg_commit"][:8] + data["build_repository_commit"][:7]
+            )
+        elif change == "release-series":
+            data["release_tag"] = data["release_tag"].replace("9.0", "9x0")
+        else:
+            data["release_tag"] = data["release_tag"].replace(prefix, "0" * len(prefix))
         data["asset_url"] = (
             f"https://github.com/{data['provider']}/releases/download/{data['release_tag']}/{data['asset_name']}"
         )
@@ -110,6 +126,7 @@ def test_lock_cross_binds_release_exclusion_and_build_date(change):
         ("toolchain-commit", "invalid toolchain rustc commit"),
         ("flags-type", "invalid static_link_flags"),
         ("flags-unknown", "invalid static_link_flags"),
+        ("flags-empty-rust", "Rust stages require nonempty static_link_flags"),
         ("runtime-type", "toolchain_runtime must be a list"),
         ("row-fields", "invalid toolchain runtime fields"),
         ("kind", "invalid runtime kind"),
@@ -142,6 +159,9 @@ def test_lock_cross_binds_release_exclusion_and_build_date(change):
         ("text-path", "unsafe runtime text path"),
         ("text-backslash", "unsafe runtime text path"),
         ("text-dotdot", "unsafe runtime text path"),
+        ("text-dot", "unsafe runtime text path"),
+        ("text-trailing-dot", "unsafe runtime text path"),
+        ("text-trailing-space", "unsafe runtime text path"),
         ("text-hash", "invalid runtime text sha256"),
     ],
 )
@@ -164,6 +184,9 @@ def test_runtime_census_refuses_missing_or_inconsistent_obligations(change, refu
         data["toolchain"]["static_link_flags"] = "-static-libgcc"
     elif change == "flags-unknown":
         data["toolchain"]["static_link_flags"].append("unknown")
+    elif change == "flags-empty-rust":
+        data["toolchain"]["static_link_flags"] = []
+        data["toolchain_runtime"] = [r for r in rows if r["name"] not in {"libgcc", "libstdc++"}]
     elif change == "runtime-type":
         data["toolchain_runtime"] = {}
     elif change == "row-fields":
@@ -212,6 +235,9 @@ def test_runtime_census_refuses_missing_or_inconsistent_obligations(change, refu
             "text-path": ("path", "../other"),
             "text-backslash": ("path", "other\\file"),
             "text-dotdot": ("path", "a..b"),
+            "text-dot": ("path", "."),
+            "text-trailing-dot": ("path", crate["texts"][0]["path"] + "."),
+            "text-trailing-space": ("path", crate["texts"][0]["path"] + " "),
             "text-hash": ("sha256", "short"),
         }[change]
         crate["texts"][0][key] = value
@@ -232,6 +258,10 @@ def test_runtime_census_refuses_missing_or_inconsistent_obligations(change, refu
         "MIT / Apache-2.0",
         "()",
         "MIT OR OR MIT",
+        "MIT;",
+        "MIT OR Apache-2.0.",
+        "MIT\tOR Apache-2.0",
+        "MIT\xa0OR Apache-2.0",
     ],
 )
 def test_runtime_licence_parser_refuses_unknown_atoms_and_invalid_grammar(expression):
@@ -256,6 +286,48 @@ def test_runtime_licence_parser_accepts_ruled_compatible_expressions(expression)
     """WITH and parenthesized AND/OR expressions retain their SPDX meaning."""
     data = lock_data()
     data["toolchain_runtime"][0]["licence"] = expression
+    assert build.validate_ffmpeg_lock(data) is data
+
+
+@pytest.mark.parametrize(
+    ("kind", "field", "value", "refusal"),
+    [
+        ("rust-std", "repository", "https://github.com/rust-lang/rust.git", "rust-std repository"),
+        ("gcc-runtime", "repository", "https://example.org/gcc", "gcc-runtime repository"),
+        (
+            "rust-std",
+            "source_url",
+            "https://github.com/rust-lang/rust/tree/" + "0" * 40,
+            "runtime source_url differs from repository/pin",
+        ),
+        (
+            "gcc-runtime",
+            "source_url",
+            "https://github.com/gcc-mirror/gcc/tree/" + "0" * 40 + "/libgcc",
+            "runtime source_url differs from repository/pin",
+        ),
+        ("cargo-crate", "repository", "not a url", "cargo-crate repository must use HTTP"),
+        ("rust-std", "source_url", "pin-suffix", "runtime source_url differs from repository/pin"),
+    ],
+)
+def test_runtime_source_provenance_is_bound(kind, field, value, refusal):
+    """Printed source claims must identify the permitted repository and exact pin."""
+    data = lock_data()
+    row = next(r for r in data["toolchain_runtime"] if r["kind"] == kind)
+    row[field] = value if value != "pin-suffix" else f"{row['repository']}/tree/{row['pin']}extra"
+    if field == "repository" and kind == "rust-std":
+        row["pin"] = "a" * 40
+        row["source_url"] = f"{value}/tree/{row['pin']}"
+    with pytest.raises(ValueError, match=re.escape(refusal)):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("suffix", ["", "/library"])
+def test_noncrate_source_allows_tree_root_or_member(suffix):
+    """Both the pinned tree itself and paths within it are valid source pointers."""
+    data = lock_data()
+    row = next(r for r in data["toolchain_runtime"] if r["kind"] == "rust-std")
+    row["source_url"] = f"{row['repository']}/tree/{row['pin']}{suffix}"
     assert build.validate_ffmpeg_lock(data) is data
 
 
@@ -529,6 +601,16 @@ def test_local_file_bundle_checks_both_tools_and_extracts_only_release_files(syn
         "source_record_url",
     ):
         assert data[field] in text
+
+
+def test_verified_bundle_writes_parent_and_ffmpeg_ref(synthetic_bundle):
+    """The archive bundler itself must write the two required provenance lines."""
+    data, _source, destination, *_ = synthetic_bundle
+    bundle(synthetic_bundle)
+    lines = (destination / "ffmpeg-BUILD.txt").read_text(encoding="utf-8").splitlines()
+    parent = data["parent_provider"]
+    assert f"Parent provider: {parent['repository']} @ {parent['commit']}" in lines
+    assert f"FFmpeg ref: {data['ffmpeg_ref']}" in lines
 
 
 @pytest.mark.parametrize("kind", ["argument", "lock", "download"])

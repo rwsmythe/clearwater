@@ -1501,11 +1501,11 @@ def _is_python_binary(relative: str, stdlib: dict[str, str], path: Path) -> bool
     return filename in stdlib and hashlib.sha256(path.read_bytes()).hexdigest() == stdlib[filename]
 
 
-FFMPEG_TOOLCHAIN_PATH = ROOT / "tools/package/native-licences/ffmpeg-toolchain"
-"""Byte-exact, deduplicated runtime texts indexed by the FFmpeg lock."""
-
-
-def _ffmpeg_rows(home: Path, lock_path: Path) -> list[NoticeRow]:
+def _ffmpeg_rows(
+    home: Path,
+    lock_path: Path,
+    native_licences_path: Path = ROOT / "tools/package/native-licences",
+) -> list[NoticeRow]:
     tools = [home / "ffmpeg.exe", home / "ffprobe.exe"]
     material = [home / "ffmpeg-BUILD.txt", home / "ffmpeg-LICENSE.txt"]
     if not any(path.exists() for path in tools):
@@ -1602,14 +1602,29 @@ def _ffmpeg_rows(home: Path, lock_path: Path) -> list[NoticeRow]:
                         (extra["licence_note"],),
                     )
                 )
+    toolchain_path = native_licences_path / "ffmpeg-toolchain"
+    expected_names = {t["path"] for r in lock["toolchain_runtime"] for t in r["texts"]}
+    actual_names = (
+        {path.name for path in toolchain_path.iterdir()} if toolchain_path.is_dir() else set()
+    )
+    if actual_names != expected_names:
+        raise ValueError("notices: FFmpeg toolchain runtime text directory differs from lock")
     for runtime in lock["toolchain_runtime"]:
         title = (
             f"FFmpeg toolchain runtime: {runtime['name']} {runtime['version']} "
             f"({runtime['reached_via']})"
         )
+        sources = (
+            (
+                f"{runtime['source_url']} (crate archive sha256 {runtime['pin']})",
+                runtime["repository"],
+            )
+            if runtime["pin_kind"] == "crate-sha256"
+            else (f"{runtime['repository']} @ {runtime['pin']}", runtime["source_url"])
+        )
         runtime_inputs = []
         for text in runtime["texts"]:
-            path = FFMPEG_TOOLCHAIN_PATH / text["path"]
+            path = toolchain_path / text["path"]
             context = title + ": "
             if not path.is_file() or path.is_symlink():
                 raise ValueError(f"notices: {context}missing/unsafe text {text['path']}")
@@ -1622,10 +1637,7 @@ def _ffmpeg_rows(home: Path, lock_path: Path) -> list[NoticeRow]:
                     sha256=text["sha256"],
                     size_bytes=len(data),
                     context=context,
-                    provenance=(
-                        f"{title}; {runtime['repository']} @ {runtime['pin']}; "
-                        f"{runtime['source_url']}; text {text['path']}"
-                    ),
+                    provenance=(f"{title}; {'; '.join(sources)}; text {text['path']}"),
                 )
             )
         runtime_notes = [runtime["licence_note"]] if runtime["licence_note"] else []
@@ -1646,7 +1658,7 @@ def _ffmpeg_rows(home: Path, lock_path: Path) -> list[NoticeRow]:
                 title,
                 runtime["version"],
                 runtime["licence"],
-                (f"{runtime['repository']} @ {runtime['pin']}", runtime["source_url"]),
+                sources,
                 entries,
                 tuple(runtime_inputs),
                 tuple(runtime_notes),
@@ -1726,7 +1738,7 @@ def plan_notices(
     """
     _build_tool().check_build_environment()
     entries, home = _inventory(folder)
-    ffmpeg = _ffmpeg_rows(home, ffmpeg_lock_path)
+    ffmpeg = _ffmpeg_rows(home, ffmpeg_lock_path, native_licences_path)
     audit = _audit_rows(audit_path)
     versions = _locked_versions(uv_lock_path)
     if distribution is None:
