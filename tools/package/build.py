@@ -727,7 +727,7 @@ class FFmpegSource(TypedDict):
     licence_basis: str
     gpl3_compatible: str
     licence_note: str
-    texts: NotRequired[list[FFmpegRuntimeText]]
+    texts: list[FFmpegComponentText]
     chosen: NotRequired[str | None]
 
 
@@ -745,7 +745,7 @@ class FFmpegComponent(TypedDict):
     licence_basis: str
     gpl3_compatible: str
     licence_note: str
-    texts: list[FFmpegRuntimeText]
+    texts: list[FFmpegComponentText]
     chosen: NotRequired[str | None]
     status: NotRequired[str]
     via: NotRequired[str]
@@ -797,6 +797,12 @@ class FFmpegRuntimeText(TypedDict):
 
     path: str
     sha256: str
+
+
+class FFmpegComponentText(FFmpegRuntimeText):
+    """Exact source bytes with an optional, lossless artifact display encoding."""
+
+    encoding: NotRequired[str]
 
 
 class FFmpegRuntime(TypedDict):
@@ -1196,7 +1202,7 @@ def _ffmpeg_component_fields(item: object, *, extra: bool = False) -> dict[str, 
     return cast(dict[str, object], item)
 
 
-def _ffmpeg_component_obligations(row: dict[str, object], *, extra: bool = False) -> None:
+def _ffmpeg_component_obligations(row: dict[str, object]) -> None:
     status = row.get("status", "built")
     if not isinstance(status, str) or status not in {"built", "downloaded-not-built"}:
         raise ValueError("FFmpeg lock: invalid component status")
@@ -1207,12 +1213,17 @@ def _ffmpeg_component_obligations(row: dict[str, object], *, extra: bool = False
     if chosen is not None and (not isinstance(chosen, str) or chosen not in choices):
         raise ValueError("FFmpeg lock: invalid component chosen licence")
     texts = row.get("texts")
-    if texts is None and extra and status != "built":
-        return
     if not isinstance(texts, list) or not texts:
         raise ValueError("FFmpeg lock: component texts must be nonempty")
     for item in texts:
-        text = _ffmpeg_fields(item, set(FFmpegRuntimeText.__annotations__), "component text")
+        fields = set(FFmpegRuntimeText.__annotations__)
+        if not isinstance(item, dict) or not fields <= set(item) <= fields | {"encoding"}:
+            raise ValueError("FFmpeg lock: invalid component text fields")
+        text = cast(dict[str, object], item)
+        if "encoding" in text and (
+            not isinstance(text["encoding"], str) or text["encoding"] not in {"latin-1", "cp1252"}
+        ):
+            raise ValueError("FFmpeg lock: invalid component text encoding")
         path = _ffmpeg_text(text["path"], "component text path")
         if (
             any(c in path for c in ("/", "\\", ":", ".."))
@@ -1230,12 +1241,27 @@ def _ffmpeg_component_texts(components: list[FFmpegComponent], folder: Path) -> 
     expected: set[str] = set()
     for component in components:
         for row in (component, *component["extra_repositories"]):
-            for text in cast(list[FFmpegRuntimeText], row.get("texts", [])):
+            for text in row["texts"]:
                 path = folder / text["path"]
                 if not path.is_file() or path.is_symlink():
                     raise ValueError(f"FFmpeg lock: component text missing/unsafe: {text['path']}")
-                if hashlib.sha256(path.read_bytes()).hexdigest() != text["sha256"]:
+                data = path.read_bytes()
+                if hashlib.sha256(data).hexdigest() != text["sha256"]:
                     raise ValueError(f"FFmpeg lock: component text sha256 mismatch: {text['path']}")
+                encoding = text.get("encoding", "utf-8")
+                try:
+                    decoded = data.decode(encoding)
+                    if decoded.encode(encoding) != data:
+                        raise ValueError("encoding does not round-trip")
+                except (UnicodeError, ValueError) as error:
+                    refusal = (
+                        "encoding cannot round-trip"
+                        if "encoding" in text
+                        else "is not strict UTF-8"
+                    )
+                    raise ValueError(
+                        f"FFmpeg lock: component text {refusal}: {text['path']}"
+                    ) from error
                 expected.add(text["path"])
     actual = {path.name for path in folder.iterdir()} if folder.is_dir() else set()
     if actual != expected:
@@ -1249,11 +1275,13 @@ def validate_ffmpeg_lock(
 ) -> FFmpegLock:
     """Validate archive identity, source rows and two-way configure-flag coverage.
 
-    Stage licence identities must be seat-verified. Stage incompatibility remains
-    data: a "no" row is accepted here and refused by artifact notices when bundled.
+    Stage licence identities must be seat-verified and their expressions must
+    have a compatible selection. An explicit "no" compatibility verdict is
+    refused by artifact notices when bundled.
     Static runtime rows require compatible SPDX expressions, toolchain/source
     bindings and nonempty text identities. Component texts are byte-checked here
-    against the dedicated directory, including exact filename set equality;
+    against the dedicated directory, including exact filename set equality and
+    strict UTF-8 or a declared, lossless encoding from the closed set;
     notices checks text identity again at rendering.
     ``configure_flag`` is null for dependencies or a list, since some stages
     contribute several switches (for example both opencore-amr codecs).
@@ -1413,7 +1441,7 @@ def validate_ffmpeg_lock(
         for extra in extras:
             source = _ffmpeg_component_fields(extra, extra=True)
             _ffmpeg_source(source)
-            _ffmpeg_component_obligations(source, extra=True)
+            _ffmpeg_component_obligations(source)
     for item in excluded:
         row = _ffmpeg_fields(item, set(FFmpegExcluded.__annotations__), "excluded stage")
         for key in row:

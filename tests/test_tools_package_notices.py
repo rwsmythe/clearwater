@@ -524,8 +524,14 @@ def test_root_annex_has_the_same_component_rows_and_text_hashes_as_artifacts(rel
     release["ffmpeg_path"].write_text(json.dumps(release["ffmpeg"]))
     add_ffmpeg(release)
     result = plan(module, release)
-    artifact = module.render_notices(result).decode(errors="backslashreplace")
+    artifact = module.render_notices(result).decode("utf-8")
     root = module.render_root_annex().decode()
+    assert "## FFmpeg build components and toolchain runtime census" in root
+    assert (
+        "[Build-component and toolchain-runtime annex]"
+        "(#ffmpeg-build-components-and-toolchain-runtime-census)" in root
+    )
+    assert "(#ffmpeg-toolchain-runtime-census)" not in root
     rows = [r for r in result.rows if r.name.startswith("FFmpeg component:")]
     assert len(rows) == 105
     for row in rows:
@@ -570,13 +576,55 @@ def test_fork_ffmpeg_notices_render_all_built_sources_and_explain_exclusions(rel
         "FFmpeg component: ffnvcodec / repository 3",
     ]
     assert all(r.licence_inputs for r in downloaded)
+    assert all(
+        r.verdict == "Source fetched by the build; not compiled into this artifact "
+        "(notice carried by over-inclusion)"
+        for r in downloaded
+    )
+    assert next(r for r in stage_rows if r.name == "FFmpeg component: x265").verdict == (
+        "Redistributed in this artifact"
+    )
     assert rows[0].licence_inputs[0].path.name == "ffmpeg-LICENSE.txt"
     assert not any(row.name == "FFmpeg component: zvbi" for row in rows)
     rendered = module.render_notices(result)
     for item in {item for row in stage_rows for item in row.licence_inputs}:
-        assert item.path.read_bytes() in rendered
+        text = item.path.read_bytes()
+        source = next(
+            t for r in sources.values() for t in r["texts"] if t["path"] == item.path.name
+        )
+        if "encoding" in source:
+            text = text.decode(source["encoding"]).encode("utf-8")
+        assert text in rendered
         assert rendered.count(f"SHA-256: `{item.sha256}`".encode()) == 1
-    output = rendered.decode(errors="backslashreplace")
+    output = rendered.decode("utf-8")
+    encodings = {
+        "openjpeg--src--bin--wx--OPJViewer--source--license.txt": "latin-1",
+        "rav1e--PATENTS": "cp1252",
+        "openmpt--include--premake--binmodules--luasocket--LICENSE": "cp1252",
+    }
+    declared = {
+        t["path"]: t["encoding"] for r in sources.values() for t in r["texts"] if "encoding" in t
+    }
+    assert declared == encodings
+    assert output.count("transcoded from ") == 3
+    for name, encoding in encodings.items():
+        raw = (release["native_surface"] / "ffmpeg-components" / name).read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        note = f"transcoded from {encoding}; original file sha256 {digest}"
+        match = re.search(
+            r"^### [^\n]*"
+            + re.escape(name)
+            + r"\n"
+            + re.escape(note)
+            + r"\n\nSource: [^\n]*\n\n(`{4,})text\n(.*?)^\1$",
+            output,
+            re.M | re.S,
+        )
+        assert match is not None, name
+        body = match[2]
+        if not raw.endswith(b"\n"):
+            body = body.removesuffix("\n")
+        assert body.encode(encoding) == raw
     assert output.count("### Bundled FFmpeg GPL-3.0") == 1
     assert output.count("synthetic GPL-3.0 licence") == 1
     assert "Provider: rwsmythe/FFmpeg-Builds @ d77b8352" in output

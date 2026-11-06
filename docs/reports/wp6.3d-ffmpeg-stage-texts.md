@@ -1,8 +1,8 @@
 # WP6.3d - FFmpeg stage licence texts
 
-Turn 1, 2026-11-06. Implementation candidate for the dispatcher's Claude A
-delta review; Claude B, the seat rebuild and acceptance remain at the seat.
-One logical change bundles the ruled census, validation, notices and controls.
+Turn 2, 2026-11-06. Reviewer A r1 folds implemented for the dispatcher's
+Claude A delta r2; Claude B, the seat rebuild and acceptance remain at the seat.
+This turn bundles the six ruled folds as one logical review-remediation change.
 
 ## Built and evidence
 
@@ -58,10 +58,10 @@ The existing `.gitattributes:2` rule `tools/package/native-licences/** -text`
 covers every new file, so no attributes change or checkout conversion is needed.
 
 Three upstream files are not UTF-8: openjpeg's OPJViewer license, openmpt's
-luasocket license and rav1e's PATENTS. Their bytes are preserved, including
-inside artifact notices under the existing verbatim renderer. Display-oriented
-test comparisons use backslash replacement when decoding; integrity assertions
-compare raw bytes and SHA-256. The root annex links the exact source files.
+luasocket license and rav1e's PATENTS. Their repository bytes remain exact.
+Turn 2 implements CHARC's option (b): declared, lossless UTF-8 transcodes in
+artifact notices, annotated with their original encoding and SHA-256. The root
+annex links the exact source files. See the turn-2 design and controls below.
 
 ## Ruling application
 
@@ -194,7 +194,119 @@ footage or owner-profile access, worktree Git metadata write, PyInstaller build,
 desktop input or workflow action. The required real-Git fixture creates only
 disposable repositories under its basetemp and attempts local-only pushes there;
 no cell command stages, commits, pushes or tags this worktree or any real remote.
-Review rounds: none yet; A/B belong to the dispatcher's seam-3 process.
+Turn-1 review status: A/B were pending; the turn-2 round ledger below records A r1.
+
+## Turn 2 - Reviewer A r1 folds
+
+Binding dispositions are dispatch 2, Appendix D (CHARC `5a293802`) and Appendix
+E. All six folds are in envelope. No finding was rejected as a false positive.
+The seven owned paths suffice; no native-licence file was edited.
+
+| Finding | Fold, mechanic and surface | Test / mutation killed |
+|---|---|---|
+| F1 MINOR | `tools/package/notices.py:1632`: every non-built stage/extra receives the exact fetched/not-compiled verdict. Both ffnvcodec downloads display it in artifact and regenerated root rows; built rows keep the default. | `tests/test_tools_package_notices.py:551`, `test_fork_ffmpeg_notices_render_all_built_sources_and_explain_exclusions`, pins both download verdicts and built x265. Kills restoring the unconditional default verdict. `audit.py` independently reproduces both false pre-fold verdicts. |
+| F2 MINOR | `tests/test_tools_package_ffmpeg.py:205`: the case-change refusal accepts `component text (directory differs|missing/unsafe)`. Case-sensitive filesystems refuse at existence; case-insensitive filesystems refuse at set equality. | `test_component_text_files_fail_closed[case]` still kills accepting case-changed paths, while accepting either valid refusal path. This host exercised the case-insensitive path; no Linux execution is claimed. |
+| F3 MINOR | `tools/package/build.py:802`, `:1205`, `:1240`: component-only optional encoding, closed schema/values, strict decoding and exact re-encoding after original-byte SHA-256 verification. `tools/package/notices.py:1613`, `:2626` carries the declaration and renders the annotated transcode. | `tests/test_tools_package_ffmpeg.py:270`, `test_component_text_encoding_refusals`, covers primary/extra undeclared non-UTF-8, undefined cp1252 bytes, unapproved encoding, case alias and wrong type with named `match=` refusals. Kills default replacement decoding, ignoring declarations or permitting arbitrary codecs. The full-source notices test pins all three encodings, note lines/digests and exact reverse transcodes, and strictly decodes the complete artifact. Kills raw-byte rendering, missing/wrong annotations or lossy transcoding. |
+| F4 ADVISORY | `tools/package/build.py:1216`: texts are nonempty on every record regardless of status; the downloaded-extra bypass is removed. | `tests/test_tools_package_ffmpeg.py:233`, `test_downloaded_extra_requires_texts_even_when_files_are_removed`, removes an extra's texts and its now-unreferenced files. Kills the accepted A mutant; refusal matches `component texts must be nonempty`. `audit.py` confirms the pre-fold validator accepts this same mutation and the fixed validator refuses it. |
+| F6 ADVISORY | `tools/package/ffmpeg.lock.json:63`, `:321`, `:1187`, `:1275`, `:1927`, `:2135`: removed only the duplicate pass-1 phrase from mingw, libpng, aom, chromaprint, glib and libvpx; retained every U5 path list. | `tests/test_tools_package_ffmpeg.py:177`, `test_shaderc_fetched_records_and_ruled_census_counts`, pins one occurrence per named row. Kills reintroducing the duplicate suffix. Independent normalized-lock comparison proves these six suffix removals and three encoding additions are the entire lock diff. |
+| F7 ADVISORY | `tools/package/build.py:1271` corrects the validator docstring. `tools/package/notices.py:2801`, `:2815`, `:2820` migrates the in-file pointer, names both populations in the heading and uses one grammatical sentence. Root regenerated only with `--root-annex --write` (`THIRD_PARTY_NOTICES.md:8989`). | `tests/test_tools_package_notices.py:520`, `test_root_annex_has_the_same_component_rows_and_text_hashes_as_artifacts`, pins the heading/new pointer and rejects the stale pointer. Kills stale heading/anchor generation. Existing root-generator check also kills a stale committed annex; independent link audit checks every linked native text exists. Docstring and sentence were checked against the implementation. |
+
+F5 ADVISORY is a seat count only: **478** expected real artifact rows (473 + 3
+new records + 2 downloads). No implementation change or real rebuild this turn.
+F8 ADVISORY, pre-existing limitation: the expression tokenizer tolerates doubled,
+leading and trailing spaces; record only under CHARC's ruling, with no parser edit.
+
+### F3 design and source-byte evidence
+
+Only these three text entries declare `encoding` in the lock:
+
+| Text | Encoding | Original file SHA-256 |
+|---|---|---|
+| `openjpeg--src--bin--wx--OPJViewer--source--license.txt` | `latin-1` | `8081c33f6953950dcf424aa844714658b73ada0fcaea16e4487f5fa07ef0960d` |
+| `rav1e--PATENTS` | `cp1252` | `7b14a70c194b19dbd0625e7eac839a63200f67484521ce5e8d8244b127e8907a` |
+| `openmpt--include--premake--binmodules--luasocket--LICENSE` | `cp1252` | `8e8c6314d9e78fe452ee355167f2c40cfbee8207e14dcb5ddd4a2655cb5c6aad` |
+
+No encoding means strict UTF-8. A declaration permits only `latin-1` or
+`cp1252`, and decode/re-encode must reproduce the exact bytes. Undefined cp1252
+bytes therefore refuse rather than becoming replacement characters. The
+runtime text schema stays unchanged. Hash, byte-count checks and deduplication
+use original bytes; only the final artifact body becomes UTF-8. Directly under
+each affected heading is exactly one line of the form
+`transcoded from <encoding>; original file sha256 <64-hex>`.
+
+Adjusted `test_fork_ffmpeg_notices_render_all_built_sources_and_explain_exclusions`:
+its turn-1 assertion that every raw file appears in the artifact now compares
+the declared UTF-8 transcode for these three files, while preserving exact raw
+assertions for all others. It extracts each emitted fenced body and re-encodes
+to the original bytes, including original CRLF and final-newline state. This
+test and the root/artifact comparison now use strict UTF-8 decoding instead of
+`errors="backslashreplace"`.
+
+`work/wp6.3d/turn2/audit.py` reads the pre-fold modules from HEAD and executes
+them only in memory; neither module calls a product entry point. Its
+`audit.log` confirms: only the permitted lock edits; **282/282** native texts
+equal their committed blobs and SHA-256; every declared/default decode is
+lossless; both old download verdicts differ from the fix; old artifact bytes
+fail strict UTF-8 while new bytes pass with exactly three notes; the root is
+strict UTF-8 and matches regeneration; **105 + 232** root rows and no broken
+native-file links; F4's texts-plus-files mutant accepted before/refused after.
+The synthetic stage notice artifact is retained alongside that log.
+
+### Round ledger and verification loop
+
+| Round | Verdict | Critical / major / minor / advisory | In / out | NEW / REOPENED | Reverts | Fix surface | Depth |
+|---|---|---|---|---|---|---|---|
+| A r1, Claude at seat; report `work/wp6.3d/review-A-r1.md` | NO_NEW_CRITICAL_MAJOR | 0 / 0 / 3 / 5 | 7 introduced in envelope; F8 pre-existing | 8 / 0 | 0 | Product code, lock/generated notices, tests and report; F5/F8 record only | Turn 1 ended at 207K (dispatcher); turn 2 fresh, no later figure supplied |
+
+The cumulative row is carried in this owned report for the seat's ledger
+transfer; `docs/proofs/` is outside this turn's edit ownership. A delta r2 and
+B are dispatcher-run Claude processes, not cell-spawned reviews.
+
+| Pass | Suspected / independently confirmed | Fixed / outcome |
+|---|---|---|
+| 1 | F1/F3/F4 reachable on the actual committed records; confirmed with pre-fold versus fixed modules in `audit.py`. | Truthful verdicts, declared transcodes and unconditional text obligation. |
+| 2 | Encoding and row controls could accept drift; focused run exercises all new refusals, both verdicts, three reverse transcodes and root pointer. | `focused.log`: 18 passed. F2 test portable by accepting both correct refusal paths. |
+| 3 | Lock edit scope, source bytes or root links could drift. | `audit.log`: all checks pass; no native text changes. Required final suite/static checks below provide the final validation. |
+
+### Turn-2 validation
+
+All logs and the isolated runner are under `work/wp6.3d/turn2/`. The runner
+redirects APPDATA, LOCALAPPDATA and XDG roots to disposable worktree paths,
+blocks PySide6/shiboken6 imports, disables plugin auto-loading, explicitly loads
+pytest-timeout (120 seconds) and `sandbox_mkdir_shim`, disables the cache
+provider and excludes `test_python_m_clearwater_starts_the_shell_and_exits_0`.
+The sole headless-entry child retains its own GUI stubs/block, redirected roots
+and 15-second timeout. No real GUI, frozen executable or build ran.
+
+- `ruff-final.log`: `uv run --no-sync ruff check .` - **All checks passed!**
+- `format-final.log`: `uv run --no-sync ruff format --check .` - **337 files already formatted**.
+- `mypy-final.log`: `uv run --no-sync mypy` - **Success: no issues found in 166 source files**.
+- `mypy-darwin-final.log`: `uv run --no-sync mypy --platform darwin` - **Success: no issues found in 166 source files**.
+- `annex-final.log`: `uv run --no-sync python tools/package/notices.py --root-annex` - **root annex matches**.
+- `pytest-final.log`: **909 passed, 1 skipped, 5 failed in 221.65 s**. Command:
+  `uv run --no-sync python work/wp6.3d/turn2/run_tests.py final tests/test_tools_package_notices.py tests/test_tools_package_build.py tests/test_tools_package_smoke.py tests/test_tools_package_ffmpeg.py tests/test_release_workflow.py -q --basetemp=work/c63d-2`.
+  Every failure is `tests/test_release_workflow.py::test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`, cases
+  `annotated`, `lightweight`, `wrong-commit`, `mismatched-name`, `deleted-origin`.
+  All five fail at the disposable fixture's local Git push, before the gate,
+  with exit 128 and sh.exe `CreateFileMapping` under the restricted token.
+  The skip remains `test_non_windows_containment_never_silently_skips` (Windows
+  host; POSIX native proof belongs to WP6.5). Every other selected test passes.
+- `diff-check-final.log`: `git diff --check` exits **0**; only existing
+  checkout-policy warnings for Markdown/JSON. The native text folder is untouched.
+
+Final verification pass: code comments/docstrings now describe the encoding
+exception and per-record texts accurately; the final source-byte/root audit
+and static checks pass. No new in-envelope defect remains. The initial
+development run (`red.log`) was not a stable pre-fold baseline (implementation
+edits began while it ran); before/after claims above rely on the separate
+in-memory HEAD comparisons in `audit.log`, not that run.
+
+No scope deviation, new dependency, frozen-interface change or lock identity /
+provenance change. No network, real build, frozen/GUI run, desktop input,
+footage/profile access or worktree Git write. Only seven owned paths changed;
+scratch logs/instruments remain under `work/wp6.3d/turn2/`. No stopped item or
+implementation fold remains. Claude A delta r2, Claude B, the real-Git gate,
+the 478-row seat rebuild and CHARC acceptance remain at the dispatcher.
 
 ## STOPPED ITEMS and remaining work
 

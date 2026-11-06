@@ -107,6 +107,7 @@ class LicenceInput(NamedTuple):
     excerpt: _TextExcerpt | None = None
     git_blob_sha1: str = ""
     reference: bool = False
+    encoding: str = ""
 
 
 class NativeFile(NamedTuple):
@@ -1609,6 +1610,7 @@ def _ffmpeg_component_rows(
                         size_bytes=path.stat().st_size,
                         context=title + ": ",
                         provenance=f"{title}; {source}; text {text['path']}",
+                        encoding=text.get("encoding", ""),
                     )
                 )
             notes = [record["licence_note"]]
@@ -1627,6 +1629,12 @@ def _ffmpeg_component_rows(
                     entries,
                     tuple(inputs),
                     tuple(notes),
+                    verdict=(
+                        "Redistributed in this artifact"
+                        if record.get("status", "built") == "built"
+                        else "Source fetched by the build; not compiled into this artifact "
+                        "(notice carried by over-inclusion)"
+                    ),
                 )
             )
     return rows
@@ -2466,12 +2474,14 @@ def _cell(value: str) -> str:
 
 
 def render_notices(plan: NoticePlan) -> bytes:
-    """Render coverage, provenance and verbatim licence bytes deterministically.
+    """Render coverage, provenance and byte-checked licence texts deterministically.
 
     Installed wheel files retain even their embedded GPL texts unchanged. All
-    FFmpeg rows share one dedicated FFmpeg licence block; it is absent when the
-    release folder carries no FFmpeg. Audited upstream blocks are UTF-8/LF
-    copies checked against both recorded integrity fields before use.
+    FFmpeg stage/runtime rows carry their own texts; the aggregate row carries
+    the dedicated FFmpeg licence block. Declared stage encodings are losslessly
+    transcoded to UTF-8 with the original encoding and hash directly under the
+    heading. Audited upstream blocks are UTF-8/LF copies checked against both
+    recorded integrity fields before use.
     Embedded rows share one block per distinct text hash/size, but each input is
     rechecked before sharing and each row retains its own source attribution.
     Carried limits follow the component details in component/host order, with
@@ -2481,7 +2491,8 @@ def render_notices(plan: NoticePlan) -> bytes:
         plan: An inventory-backed component plan from :func:`plan_notices`.
 
     Returns:
-        The complete Markdown document, encoded as UTF-8 with unchanged input bytes.
+        The complete Markdown document with declared stage encodings transcoded
+        to UTF-8 and other input bytes unchanged.
 
     Raises:
         ValueError: Coverage/materials are missing, commercial Qt terms are
@@ -2610,6 +2621,11 @@ def render_notices(plan: NoticePlan) -> bytes:
     output = ["\n".join(header).encode("utf-8")]
     for item, (label, data) in materials.items():
         heading = "### " + label
+        if item.encoding:
+            heading += (
+                f"\ntranscoded from {item.encoding}; original file sha256 "
+                + hashlib.sha256(data).hexdigest()
+            )
         if item.path.name == "ffmpeg-LICENSE.txt" and not item.block_id:
             heading = "### Bundled FFmpeg GPL-3.0"
         # A fence longer than any backtick run keeps copied Markdown licence files intact.
@@ -2623,7 +2639,7 @@ def render_notices(plan: NoticePlan) -> bytes:
         output += [
             prefix,
             fence + b"text\n",
-            data,
+            data.decode(item.encoding).encode("utf-8") if item.encoding else data,
             b"" if data.endswith(b"\n") else b"\n",
             fence + b"\n",
         ]
@@ -2710,8 +2726,8 @@ def render_root_annex(
 ) -> bytes:
     """Regenerate stage/runtime annexes using the artifact's checked row renderer.
 
-    The root links exact upstream text bytes; artifacts embed them. Existing root
-    audit material is preserved with LF line endings and a runtime-annex pointer
+    The root links exact upstream bytes; artifacts transcode declared encodings.
+    Existing root audit material is preserved with LF line endings and an annex pointer
     added to the aggregate FFmpeg row. No binary or product code is executed.
 
     Args:
@@ -2782,21 +2798,26 @@ def render_root_annex(
     if original.count(marker) != 1:
         raise ValueError("notices: root annex marker must occur once")
     prefix = original.split(marker, 1)[0].rstrip()
-    pointer = b"[Toolchain-runtime annex](#ffmpeg-toolchain-runtime-census)"
+    old_pointer = b"[Toolchain-runtime annex](#ffmpeg-toolchain-runtime-census)"
+    pointer = (
+        b"[Build-component and toolchain-runtime annex]"
+        b"(#ffmpeg-build-components-and-toolchain-runtime-census)"
+    )
     lines = prefix.splitlines()
     indices = [i for i, line in enumerate(lines) if line.startswith(b"| FFmpeg / ffprobe |")]
     if len(indices) != 1:
         raise ValueError("notices: root FFmpeg row must occur once")
     index = indices[0]
+    lines[index] = lines[index].replace(old_pointer, pointer)
     if pointer not in lines[index]:
         lines[index] = lines[index].rstrip(b" |") + b"; " + pointer + b" |"
     header = (
-        b"\n\n## FFmpeg toolchain runtime census\n\n"
+        b"\n\n## FFmpeg build components and toolchain runtime census\n\n"
         b"This section applies to the bundled 1.1.0 Windows FFmpeg, not user-obtained tools.\n"
         b"Rows and links to licence texts are generated by "
         b"`python tools/package/notices.py --root-annex --write`\n"
-        b"using the artifact notices renderer and `tools/package/ffmpeg.lock.json`; "
-        b"including every stage source record carrying texts.\n"
+        b"using the artifact notices renderer and `tools/package/ffmpeg.lock.json` "
+        b"and include every stage source record carrying texts.\n"
         b"Over-inclusion is permitted: reached_via: toolchain rows retained "
         b"with both Rust stages disabled produce extra notices.\n"
         b"Shared texts use a representative file name from the census; "

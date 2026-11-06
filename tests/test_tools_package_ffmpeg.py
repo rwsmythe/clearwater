@@ -193,6 +193,9 @@ def test_shaderc_fetched_records_and_ruled_census_counts():
     assert len({t["path"] for r in sources for t in r["texts"]}) == 282
     assert len(build.FFMPEG_COMPATIBLE_LICENCES) == 15
     assert len(build.FFMPEG_COMPONENT_COMPATIBLE_LICENCES) == 35
+    for name in ("mingw", "libpng", "aom", "chromaprint", "glib", "libvpx"):
+        note = next(r["licence_note"] for r in rows if r["name"] == name)
+        assert note.count("vendored subtree; compilation not determined at the seat") == 1
     fetched[0]["via"] = "unruled fetch"
     with pytest.raises(ValueError, match="invalid component via"):
         build.validate_ffmpeg_lock(data)
@@ -216,13 +219,73 @@ def test_component_text_files_fail_closed(tmp_path, damage):
         refusal = "component text sha256 mismatch"
     elif damage == "case":
         text["path"] = text["path"].upper()
-        refusal = "component text directory differs"
+        refusal = "component text (directory differs|missing/unsafe)"
     else:
         if damage == "directory":
             (folder / "orphan").mkdir()
         else:
             (folder / "orphan").write_bytes(b"orphan")
         refusal = "component text directory differs"
+    with pytest.raises(ValueError, match=refusal):
+        build.validate_ffmpeg_lock(data, component_texts_path=folder)
+
+
+def test_downloaded_extra_requires_texts_even_when_files_are_removed(tmp_path):
+    """Removing the download's texts and unique files cannot hide its notice."""
+    import shutil
+
+    data = lock_data()
+    folder = tmp_path / "ffmpeg-components"
+    shutil.copytree(ROOT / "tools/package/native-licences/ffmpeg-components", folder)
+    row = next(
+        e
+        for c in data["components"]
+        for e in c["extra_repositories"]
+        if e["status"] == "downloaded-not-built"
+    )
+    removed = {t["path"] for t in row.pop("texts")}
+    retained = {
+        t["path"]
+        for c in data["components"]
+        for r in (c, *c["extra_repositories"])
+        for t in r.get("texts", [])
+    }
+    for name in removed - retained:
+        (folder / name).unlink()
+    with pytest.raises(ValueError, match="component texts must be nonempty"):
+        build.validate_ffmpeg_lock(data, component_texts_path=folder)
+
+
+@pytest.mark.parametrize("slot", ["primary", "extra"])
+@pytest.mark.parametrize(
+    ("encoding", "body", "refusal"),
+    [
+        (None, b"copyright \xa9", "component text is not strict UTF-8"),
+        ("cp1252", b"undefined \x81", "component text encoding cannot round-trip"),
+        ("utf-8", b"text", "invalid component text encoding"),
+        ("Latin-1", b"text", "invalid component text encoding"),
+        ([], b"text", "invalid component text encoding"),
+    ],
+)
+def test_component_text_encoding_refusals(tmp_path, slot, encoding, body, refusal):
+    """Undeclared bytes, lossy declarations and encodings outside the set refuse."""
+    import shutil
+
+    data = lock_data()
+    folder = tmp_path / "ffmpeg-components"
+    shutil.copytree(ROOT / "tools/package/native-licences/ffmpeg-components", folder)
+    row = (
+        data["components"][0]
+        if slot == "primary"
+        else next(e for c in data["components"] for e in c["extra_repositories"])
+    )
+    text = row["texts"][0]
+    (folder / text["path"]).write_bytes(body)
+    text["sha256"] = hashlib.sha256(body).hexdigest()
+    if encoding is not None:
+        text["encoding"] = encoding
+    if encoding in (None, "cp1252"):
+        refusal += ": " + re.escape(text["path"])
     with pytest.raises(ValueError, match=refusal):
         build.validate_ffmpeg_lock(data, component_texts_path=folder)
 
