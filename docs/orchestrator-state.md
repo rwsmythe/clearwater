@@ -5,17 +5,14 @@
 
 ### Generation
 
-- **Generation 53** (session `clearwater-orchestrator-20261105-1458`). LIVE 2026-11-06 ~01:00Z. ROLLED at the 400K cap at about 10:44Z, clean: nothing it started is running (no cell, no subagent, no review, no gate, no fork run; `tasklist` shows no pytest / pyinstaller / codex exec / Clearwater.exe of ours).
+- **Generation 54** (session `clearwater-orchestrator-20261106-0045`). LIVE 2026-11-06 ~10:45Z. ROLLED at ~390K (the 400K cap's last clean boundary, CHARC-sanctioned: "hand over to gen 55 only at the rebuild's clean return with nothing running") at about 13:45Z. Nothing it started is running: no cell, no subagent (the `fb1-census` subagent returned and is idle), no review, no build, no gate (`tasklist`: no pytest / pyinstaller / codex exec / Clearwater.exe of ours; the two `codex.exe` are the owner's desktop app).
 - **CHARC is gen 18, `clearwater-charc-20261105-1358`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
-- **Seat folder `work/orch-g53/`:**
-  - `gate.sh` (copied from g52), `watchrun.sh` / `watchrun2.sh` (the fork-run watchers);
-  - `make-r2.py` (built the r2 fork commit in the clone with every binding of CHARC's ruling asserted; exported the patch);
-  - `build_uia.py` (the FULL local release build under the read-only UIA window watch: `uv run --no-sync python work/orch-g53/build_uia.py <worktree> <NEW out> <uia_watch.ps1> <evidence dir>`; reads the URL and sha256 from the lock);
-  - `export_proof.seat.py` (the bundled-FFmpeg proof: capability probe + one export through the FROZEN worker + encoder tag + V4; written by a Claude subagent, read in full by the seat, run from this copy: `( cd .worktrees/wp6.3c && uv run --no-sync python <abs>\export_proof.seat.py <Clearwater.exe> <source> <NEW out> --worktree <abs> --timeout 1200 --v4-timeout 1200 )`);
-  - `seat-facts-r2.py` / `append-run2.py` (the asset facts), `crcheck.py` (CR bytes per blob: `python -I work/orch-g53/crcheck.py <repo> <rev...> -- <paths...>`);
-  - dispatch-13 / 14 parts, prompts, drains 1-4, posts.
-- **State worktree:** `.worktrees/orch-state-g53` (remove it; add your own). **Review copy:** `.worktrees/wp6.3c-rA` (detached at `80914e17`, `.venv` synced, local toml copied).
-- **Seat outputs (prune candidates after accept + 1.1.0, the owner's word only):** `work/wp6.3c-seat1` (build 1, ~800 MB), `work/wp6.3c-seat-export1`, `work/orch-g53/r2-asset` + `r2-extract` (~550 MB), `.worktrees/wp6.3c/work/seat63c-13`, `seat63c-14`.
+- **Seat folder `work/orch-g54/`:**
+  - `gate.sh` (L = `work/orch-g54/gate-<run>`), `watch2.sh` (repointed to orch-g54), `build_uia.py` (gen 53's, unchanged);
+  - `review63c-g54.py` (the review wrapper: excludes `native-licences`, `THIRD_PARTY_NOTICES.md` and `ffmpeg.lock.json` from the appended diff; the prompts tell the reviewer to read them on disk);
+  - `fb1-census-prompt.md` (the census subagent's brief), dispatch-15/16/17 parts + prompts, commit-15/17/f6 messages, drains 1-8, posts, qa15/16/17 logs, build2 driver log.
+- **State worktree:** `.worktrees/orch-state-g54` (remove it; add your own). **Review copy:** `.worktrees/wp6.3c-rA` (detached at `1623e3c6`, `.venv` synced).
+- **Seat outputs (prune candidates after accept + 1.1.0, the owner's word only):** `work/wp6.3c-seat2` (build 2, ~800 MB; the one of record now), `work/wp6.3c-seat1` + `work/wp6.3c-seat-export1` (superseded build 1), `work/orch-g54/fb1/` (305 crate archives + extractions), `work/orch-g53/r2-asset` + `r2-extract`, `.worktrees/wp6.3c/work/seat63c-13..17`, `.worktrees/wp6.3c/work/c63c-*`.
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
 
@@ -29,7 +26,7 @@
 - **NO ROLLOVER WHILE A JOB RUNS (OWNER, 2026-11-02).**
 - **NO PYTEST DURING A SERIAL OR FULLCLIP LEG** or a window; one heavy job at a time (gate, build, seat run). **Never edit a worktree a gate is running from** (gen 47 held two granted test edits until p64-s ended).
 - **TWO CODEX SESSIONS ARE ALLOWED** (CHARC `a6934b58`), on disjoint files.
-- **Codex turns:**
+- **Codex turns** (FILES CHANGED must be one literal path per line, or `codex_cell.py commit` refuses; commit by pathspec in the worktree then):
   - Run a turn with `uv run python scripts/codex_cell.py turn --worktree <ABS> --prompt <p> --evidence <dir> --turn N [--session=<id>] > <dir>\turn-N.driver.stdout 2>&1`, with run_in_background.
   - Commit with `codex_cell.py commit --worktree <ABS> --return-file <return-N.md>`.
   - Depth = the footer's `depth_input_tokens`; evaluate at about 200K, STOP near 250K.
@@ -40,49 +37,48 @@
 - **Claude review of a Codex cell:** `codex_cell.py review --worktree <DETACHED copy> --base <sha> --prompt <p> --out <dir>`, in the background at the seat. Forms: `wp6.3a\B\r1\review-prompt-B.md` (full B), `wp6.3a\B\delta2\review-prompt-delta2.md` (a delta).
 - **Gates:** `bash work/<seat>/gate.sh <worktree> <run-id> <legs...>` (background), plus a Monitor on `watch2.sh <run-id> <summary line count>`. Re-arm the Monitor at its 30-minute expiry. gate.sh's static leg runs win32 mypy only: run `uv run mypy --platform darwin` beside it (W-STATIC since WP6.4's accept).
 - **Backslash-bearing Python is written with the Write tool**, never a heredoc or `sed -i` (gen 47's `sed` edit of a `\r` assert silently did nothing).
-- **A bare `cd` moves the session's cwd.** Use ONLY `( cd X && ... )`, `git -C` and absolute paths. It slipped in every generation 47-53 (gen 53: four times); each was restored in the next call.
+- **A bare `cd` moves the session's cwd.** Use ONLY `( cd X && ... )`, `git -C` and absolute paths. It slipped in every generation 47-54 (gen 54: three times); each was restored in the next call.
 - **QUIT_SCRIPT exception (owner's word, CLAUDE.md `1a38c935`):** `tests/test_app_startup.py::test_python_m_clearwater_starts_the_shell_and_exits_0` runs at the SEAT in gate legs and seat re-runs only. Every cell run keeps `-k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`.
 - **No `rm -rf` on a command-substituted path** (the safety check refuses it). Use fixed paths under `work/`, or leave the folder.
 - **Running downloaded build scripts is refused** by the auto-mode classifier ("code from external"). Read them as text (gen 48's `scriptsd_static.py`).
 
 ### Live board (RESUME HERE)
 
-**WP6.3c IN FLIGHT (Codex lane, BOTH NETS CLAUDE, brief line 8). Head `80914e17` (t14 `990f3cf5` + main merge), clean. Seat QA: five package modules 698 passed / 1 skipped with real git; ruff / format / mypy win32 + darwin clean; harness 423 OK.** Brief `docs/briefs/wp6.3c-brief.md` FINAL + tails, incl. the amendment after fork run 1 (`357a1fc2`, `34c2362a`). Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp6.3c\` (`cell\`, `seat\`, `A\r1-r3\`, `B\r1\`).
+**WP6.3c: ALL REVIEW NETS CONVERGED; SEAT BUILD 2 GREEN; GATE NOT YET RUN. Gate head `165acbdb`** (`.worktrees/wp6.3c`, branch `wp6.3c`, clean) = turn 17 `1623e3c6` + the seat's F6 docs `51b90eb0` + main `5801371d` (DR-150) merged. Codex lane, both nets Claude. Brief `docs/briefs/wp6.3c-brief.md` with its last sections "Reviewer B r1 rulings" and "F-B1 census rulings". Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp6.3c\` (`cell\`, `seat\`, `A\r1-r5\`, `B\r1-r2\`).
 
-| Step | Commit / id | Content |
+| Step | Commit / record | Content |
 | --- | --- | --- |
-| fork run 1 | run `42156511472`, fork `92d0b6a6` (branch `wp6.3c-nozvbi`, KEPT) | FAILED: the `n9.0.2` tag vs BtbN's openapv >= 1.1 (`oapvm_create`); FFmpeg's fix `a7502e5f` is on `release/9.0` after the tag. `seat\fork-run.md` |
-| r2 patch (SEAT-made, Claude) | `40b8ae3b`, trailer `4687ff19`; fork commit `d77b8352` (branch `wp6.3c-nozvbi-r2`, the fork's default) | CHARC ruling d5893fca (option A): `build.sh` + ONE `git checkout --detach b204e94e90fca64045e9ca7dd44c65678c7eb29e`; addins upstream; TAGNAME `ffmpeg-9.0-gb204e94e-nozvbi-<sha7>` |
-| fork run 2 | run `42180812511` | SUCCESS. Asset `ffmpeg-n9.0.2-47-gb204e94e90-win64-gpl-9.0.zip` 194,771,780 B, sha256 `3534afe3...0c20` three-way equal; F3 (lightweight tag on `d77b8352`) and F3b PASS. `seat\fork-run.md` "Run 2", `seat\fork-acts.md`, `seat\fork-recipe-r2.md`, `seat\actionlint.md` (clean) |
-| t13 | `749fd30b` | lock schema 2 (fork asset; `ffmpeg_ref` + `ffmpeg_commit`; no `ffmpeg_tag`), strict validator, notices from the lock, minor 1, checklist / guide / report; seat-granted test line (`2028-10` -> "rebuild FFmpeg in the fork"). Depth 150K |
-| A r3 | `A\r3\review.txt` | delta `5ecec475..f5658a05`: NO_NEW_CRITICAL_MAJOR; minors 1-5 + advisories 6-8 folded in t14; advisory 9 at the seat (`4687ff19`); advisory 10 CHARC (`34c2362a`). **CHARC: no A r4; A r3 is A's final verdict unless B hits the five t14 files** |
-| t14 | `990f3cf5` | the A r3 folds (non-vacuous zvbi test + `match=`; F3b fullmatch; `parent_provider` exact; zvbi status; checklist TAGNAME + validator limits; step 10 names the source-commit refusal, census dropped) |
-| seat build 1 | `seat\build1\record.md` | `--form onedir --ffmpeg-from <lock> --ffmpeg-sha256 <lock> --notices --smoke --zip` under the UIA watch: exit 0, 194.5 s; origin PASS; notices 241 rows (100 FFmpeg component rows, none zvbi); every smoke row PASS incl. encoders; NO window; zip `52c53256...` = sidecar |
-| seat export proof | `seat\export1\record.md` | the bundled binary: capability `hevc_nvenc` 8 / 10 bit, auto -> hevc_nvenc; FROZEN worker export of `Phone\IMG_6702.MOV` ok (CPU backend), encoder `Lavc63.1.102 hevc_nvenc`; V4 MANDATORY + REQUIRED all SAME; no child left |
+| B r1 (gen 53) | `B\r1\review.txt` | NEW_CRITICAL_MAJOR: F-B1 (Rust std, rav1e / librsvg crates, GCC runtime statically linked, no notice rows) + F-B2..F-B10. CHARC ruling `395c5c12`: option A, fix before accept; new lock list `toolchain_runtime` |
+| F-B1 census | `seat\fb1-census.md` `fb9c9463...`, `seat\fb1-rows.json` `2e7d796e...`, `seat\fb1-texts\index.json` `faabab36...` | Seat subagent (Claude). 232 rows (rust-std 4, cargo-crate 223, gcc-runtime 5; toolchain 19 / rav1e 65 / librsvg 148; basis compile-log 213 / lock-graph 13 / binary 6), 157 distinct texts, 305 / 305 crate archives = lock checksums; Rust 1.99.1 `58cf8f9c`, GCC 16.2.0 crosstool-NG 1.29.0.7 `78d4ac73`; MinGW CRT = the `mingw` stage row. CHARC reviewed: no finding; Unicode-3.0 COMPATIBLE; HP / SGI `stl_*` notices carried; host-only `cc` / `find-msvc-tools` / `shlex` excluded |
+| t15 | `175b241c` (seat-committed by pathspec; `codex_cell.py commit` refused the cell's free-text folder line) | the `toolchain` object + 232 `toolchain_runtime` rows + 157 texts in `tools/package/native-licences/ffmpeg-toolchain/`; fail-closed validator (SPDX atom list, stage / flag coverage, pins); notices rows; F-B2/3/5/6/7/8 folds; F-B10 + census limits sentences. Seat: texts = census index, rows = census rows field by field. QA 777 / 1 |
+| A r4 | `A\r4\review.txt` | NO_NEW_CRITICAL_MAJOR, 5 minors + 9 adv, folded in t16 (seat ruling; CHARC concurred, no A r5 over t16) |
+| t16 | `fb759249` | the A r4 folds (directory set equality, non-crate provenance binding, writer test, non-empty static flags, ASCII-space parser, release-tag fullmatch, strict text names, crate source label, agreement test, path override). QA 800 / 1 |
+| B r2 | `B\r2\review.txt` | NO_NEW_CRITICAL_MAJOR; **F-B1..F-B10 CLOSED** (F-B4 = DR-149); 3 minors + 7 adv; CHARC: fold all in t17 (register-row alternative declined), then A r5 over t17 only = A's FIFTH and final round |
+| t17 | `1623e3c6` (+ seat-GRANTED `tests/test_tools_package_smoke.py:403` "8" -> "10 component rows") | census bound to the asset (`toolchain.census_build_commit` / `census_asset_sha256`); libgcc + libstdc++ required on `--enable-libx265`; bundle-time `/rustc/<commit>/` + GCC version byte check on the verified `ffmpeg.exe`; release-tag anchoring tests; `notices.py --root-annex [--write|--check]`; `linkage` {proven, superset}; `chosen: MIT` on language-tags + fast_float; backtrace gitlink `d902726a` bound. Seat: lock diff = exactly the permitted fields. QA **827 / 1**, annex `--check` 0 |
+| A r5 (FINAL) | `A\r5\review.txt` | **NO_NEW_CRITICAL_MAJOR** (converged in five rounds). F1 minor (`chosen` not bound to the carried texts) + F2-F5 adv -> **DR-150** (CHARC, main `5801371d`: MUST close before the next FFmpeg re-pin or any 1.1.x; non-blocking for 1.1.0); F6 docs -> seat `51b90eb0` |
+| seat build 2 | `seat\build2\record.md` | at `1623e3c6` under the UIA watch: exit 0, 184.6 s, no window; origin PASS; **notices PASS (1540 entries; 473 component rows)**; every smoke row PASS (ffmpeg / ffprobe version, `hevc_nvenc; libx265`); zip `19eaf7d8...a758` = sidecar. Supersedes build 1. Export proof `seat\export1` stands (FFmpeg bytes unchanged) |
 
-**Reviewer B r1** (Claude, `codex_cell.py review` via `work/orch-g52/review63c.py`, copy at `80914e17`, base `34c2362a`, prompt `B\r1\review-prompt-B.md`): **NEW_CRITICAL_MAJOR_FOUND** (Claude opus, 36 turns, copy clean; `B\r1\review.txt`). CHECKs: supply chain PASS, `--zip` PASS, r2 patch PASS, scope / regressions PASS (698 / 1 at B's seat); lock / validator PARTIAL; checklist PARTIAL; **notices (N13) FAIL**.
-- **F-B1 MAJOR:** code statically linked into `ffmpeg.exe` has no notice row: the Rust std + the Cargo crate sets of rav1e (`31435de9`) and librsvg (`0c074d0a`), and the GCC runtime (libgcc / libstdc++ via `-static-libgcc` / `-static-libstdc++`; libgomp via `--extra-libs=-lgomp`). DR-144's class. The brief's line 37 premise ("already the lock's 102 rows") is contradicted. **ROUTED to CHARC as a QUERY at the roll** (post `work/orch-g53/post-br1.md`): seat recommends fixing now (census subagent for the crate / runtime licences + texts; a fresh Codex turn adding the rows with tests; the minors in the same turn; then A delta + B r2 delta, gate, accept); alternative = `limits` + a register row that closes before the 1.1.0 draft.
-- **Minors:** F-B2 five validator guards untested (mutation-proven: `ffmpeg_ref`, `licence`, `build_repository_commit`, `asset_name`, fullmatch vs match) -- in `tests/test_tools_package_ffmpeg.py`, a t14 file, so CHARC's A-delta condition IS met; F-B3 provenance fields not cross-bound (asset_url = provider / release_tag / asset_name; source_record_url names provider + commit; release_tag carries both short shas; zvbi required in `excluded`; version date = `--extra-version`; the INITIAL URL host is unconstrained); F-B4 non-host natives not censused (seat: register row, not this package); F-B5 checklist step-4 STOP misses digest / F3 / F3b / failed run, no patch re-export step, step 12 still says retention.
-- **Advisories:** F-B6 `--zip` should require the verified FFmpeg (fold); F-B7 excluded lines should render their status (fold); F-B8 `ffmpeg-BUILD.txt` should carry `parent_provider` / `ffmpeg_ref`, source URL at the tree root (fold); F-B9 scope list (confirm each against dispatches 3-11); F-B10 floating action tags in the fork workflow (out of envelope).
-
-**Codex read of the r2 patch** (CHARC ruling: cross-model by design; read-only; a finding = STOP; `seat\r2-codex-read\`): **VERDICT: CLEAN** (`gpt-6.1-sol` / high; ERROR 0; tokens 1). Checks 1-6 PASS: one commit + base trailer, three files; the checkout line is emitted LITERALLY by the unquoted heredoc, full sha, fail-closed; zvbi only; the workflow's permissions exactly F5's; no `n9.0.2`. It cited web docs (the prompt did not forbid the network): state "no network" in future cross-model reads.
-
-**NEXT, in order:**
-1. **Drain CHARC's ruling on F-B1** (and the minors' disposition). If FIX NOW (the seat's recommendation): (a) a seat census subagent (gen 51's form: blob-verified texts) over rav1e `31435de9` and librsvg `0c074d0a` `Cargo.lock` crate sets, Rust std, libgcc / libstdc++ / libgomp (GPL-3.0-or-later WITH GCC-exception-3.1); spot-check 3-4 claims; (b) a FRESH Codex turn 15 (form `work/orch-g53/dispatch-14*.md`) adding the rows / texts + tests, with F-B2, F-B3, F-B5, F-B6, F-B7, F-B8 folded; (c) seat QA (five modules with real git, static) + a seat REBUILD (`build_uia.py`, new out folder) + re-read the notices; the export proof need not repeat unless FFmpeg bytes change (they do not); (d) A delta (Claude, `review63c.py`, base `80914e17`) and B r2 delta (Claude); (e) harness; (f) gate (`gate.sh`: static + darwin mypy, collect, parallel, serial, harness; no fullclip); accept; then the 1.1.0 release per `docs/release-checklist.md`.
-2. If LIMITS: fold only the minors CHARC names, A delta on the t14 file, B r2 delta, gate, accept; the register row blocks the 1.1.0 draft.
-3. F-B4 -> a register row (CHARC's), not this package.
-
-**Dispatch notes:**
-- Every WP6.3c turn is a FRESH session (t13 150K, t14 small).
-- Dispatches are assembled as head + `work/orch-g52/rules-block.md` + body, then the prompt = cell definition + the brief at the worktree's HEAD + dispatch, with `tr -d '\r'` (`work/orch-g53/dispatch-14*.md` is the latest form).
-- The seat re-runs `( cd .worktrees/wp6.3c && unset PYTEST_ADDOPTS && uv run --no-sync pytest -q -rs --timeout 600 <five modules> --basetemp=work/seat63c-N )`; the real-git cases pass only outside the sandbox.
+**NEXT, in order (gen 55):**
+1. **Harness on the gate head:** `( cd .worktrees/wp6.3c && uv run --no-sync python -m unittest discover -s tests/harness > <log> 2>&1 )`. New tracked files since the last harness run: `tools/package/native-licences/ffmpeg-toolchain/*` (under `tools/`, an instance prefix; t15's scope audit said no registration needed): CONFIRM with this run.
+2. **The gate** on `165acbdb` (copy `work/orch-g54/gate.sh` to your seat folder and repoint `L`; `.worktrees/wp6.3c/clearwater.local.toml` is present (seat-checked at roll)): `bash work/<seat>/gate.sh wp6.3c <run-id> static collect parallel serial harness` (background, Bash `run_in_background`) + a Monitor on `watch2.sh <run-id>`, re-armed at its 30-minute expiry; `uv run mypy --platform darwin` beside it (W-STATIC). No fullclip. The serial leg runs the QUIT_SCRIPT test at the seat (recorded exception). No pytest elsewhere while serial runs.
+3. **Cue CHARC** with the gate legs + harness; CHARC writes the accept. Then the merge to main (orchestrator), and the 1.1.0 release per `docs/release-checklist.md` (owner's word for tag / push).
 
 **Other standing items:**
-- WP6.5 (Mac details recorded in the brief `7c99e6b0`); WP7.1 (Insta360 validation) after WP6.3c + 1.1.0.
-- Push: CHARC batches the owner's push (Clearwater's own pushes and tags stay the owner's word; the fork exception covers the fork only).
-- DR-148 (review-copy Job Object test leaked stub children): before releasing a review copy, check for live processes under it.
-- Worktrees: main, `orch-state-g53` (remove it), `wp6.3c` (live), `wp6.3c-rA` (review copy), `wp6.3b`, `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.4`.
-- **Prunes owed (the owner's word only; CHARC batches):** gate basetemps `.worktrees/wp-dr125/work/g43-*`, `.worktrees/wp6.1/work/g43-*`; `work/orch-g51/*` (gate-p63b2, seat63c, bzip2, dr144*), the main-tree clone `work/wp6.3c/FFmpeg-Builds`; `work/orch-g52/seat63c/`, `work/orch-g52/us1/`; `.worktrees/wp6.3b/work/g43-p63b*`; after WP6.3c's accept, `work/wp6.3b-stage1d` and the gen-53 seat outputs above. The 2026-11-05 batch is DONE (`docs/proofs/prune-2026-11-05.md`, 38.3 GB).
+- WP6.5 (Mac validation; brief `7c99e6b0` has the Mac's details); WP7.1 (Insta360 validation) after WP6.3c + 1.1.0.
+- Register rows of this package: DR-149 (F-B4, non-host natives of a carried parent), DR-150 (A r5 residuals). Both listed on the accept record.
+- Push: CHARC batches the owner's push (Clearwater's own pushes and tags stay the owner's word).
+- DR-148: before releasing a review copy, check for live processes under it.
+- Worktrees: main, `orch-state-g54` (remove it), `wp6.3c` (gate head), `wp6.3c-rA` (review copy at `1623e3c6`), `wp6.3b`, `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.4`.
+- **Prunes owed (the owner's word only; CHARC batches):** as gen 53's list (gate basetemps under `wp-dr125`, `wp6.1`, `wp6.3b`; `work/orch-g51/*`; the main-tree clone `work/wp6.3c/FFmpeg-Builds`; `work/orch-g52/seat63c/`, `us1/`), plus after WP6.3c's accept: `work/wp6.3b-stage1d`, the seat outputs listed above.
+
+### Gen-54 lessons
+
+- **A heredoc collapsed the backslashes in a Python string literal holding a Windows path** (`'C:\Users\...'` -> a `\U` escape SyntaxError): the dispatch-17 head fix failed, and because the Write of the fix and the turn launch went out in ONE parallel batch, turn 17 launched with a stale pointer (killed seconds in, relaunched; `cell\turn-17-aborted.*`). Fix dispatch text with the Write tool, and never launch a turn in the same batch as the edit it depends on.
+- **`codex_cell.py commit` refuses a FILES CHANGED line that is not a literal path** (t15 wrote "folder/ -- 157 new texts;"; nothing was committed). Dispatches now say "one literal repository-relative path per line, nothing else". When it refuses, commit by pathspec inside the worktree (its own index).
+- **A census subagent can finish before a mid-run addendum lands, then pick it up as a SECOND pass** (its first return lacked the `basis` field; the queued message re-woke it). Check every binding against the returned files, not the report's prose.
+- **A cell that appends to a report with PowerShell `Add-Content` leaves a few CRLFs in an otherwise-LF file**: anchors built for one line-ending style miss. Inspect the tail bytes before a scripted edit; git normalises on commit (blob CR 0).
+- **Ask whether a review finding needs a NEW field before ruling "key it on the existing one"**: B r2 adv 5 wanted the sentence "basis-dependent", but `basis: lock-graph` covered 11 linked std crates; t17 added `linkage`.
+- **The bare-`cd` slip recurred three times in gen 54** (each restored in the next call or the same one). Only `( cd X && ... )`, `git -C` and absolute paths.
 
 ### Gen-53 lessons
 
