@@ -13,8 +13,9 @@ the repository with uv, as 1.0.0 did.
   commit; the zip's `.sha256` sidecar names the source commit.
 - **GPU support as an optional install.** The download runs on the CPU. In the
   app, **Tools > Install GPU support...** downloads the NVIDIA CUDA runtime and
-  CuPy wheels (about 2 to 3 GB) into your user profile after showing their
-  terms and size and verifies every file; restart Clearwater to use the GPU.
+  CuPy wheels (about 1.7 GB to download, 2.5 GB installed) into your user
+  profile after showing their terms and size and verifies every file; restart
+  Clearwater to use the GPU.
   **Tools > Remove GPU support** removes it. Headless equivalents:
   `Clearwater.exe --install-gpu-pack` and `--remove-gpu-pack`. Requires an
   NVIDIA graphics card with a current driver.
@@ -22,9 +23,10 @@ the repository with uv, as 1.0.0 did.
   FFmpeg 9.0 (release branch, GPL build with x265 and NVENC), built from
   BtbN's build scripts in the maintainer's fork with the zvbi stage removed so
   that every component is GPL-3.0 compatible. `THIRD_PARTY_NOTICES.md` inside
-  the folder lists every bundled component, including code compiled into the
-  carried native libraries and into the FFmpeg binary itself (the Rust and GCC
-  runtimes), with the licence texts.
+  the folder lists every bundled component with its licence and source,
+  including code compiled into the carried native libraries and into the FFmpeg
+  binary itself (its build components and the Rust and GCC runtimes), and
+  carries their licence texts, with the exceptions it names.
 - **Hardened frozen application.** Video exports run in an isolated worker
   process with its own standard input; an unexpected error in the frozen app
   is written to the log and reported in one message instead of a silent exit;
@@ -34,7 +36,7 @@ the repository with uv, as 1.0.0 did.
   Library folders, POSIX process handling) are in this release and run from a
   source install with uv. They have not yet been validated on a Mac, and there
   is no macOS download in 1.1.0.
-- **Tooling.** The environment report prints platform facts by default; the
+- **Tooling.** The environment report includes platform facts by default; the
   footage guard refuses writes into the footage folder by file identity; the
   release workflow verifies the annotated tag, pins every action to a commit
   and the build's uv and Python versions, and publishes only a draft.
