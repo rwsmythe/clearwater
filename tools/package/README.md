@@ -27,9 +27,9 @@ output to a file; it is long.
 Each build first deletes its own release folder (`dist-<form>/Clearwater-<version>-...`), so
 nothing from an earlier build survives into it. PyInstaller's cache goes to
 `<out>/pyinstaller-config` (`PYINSTALLER_CONFIG_DIR`), so `--clean` cleans nothing outside the
-output folder. FFmpeg is copied under the names `ffmpeg.exe` / `ffprobe.exe` and each copy
-must run `-version` from the release folder, with only that folder on PATH; the build prints
-the version line.
+output folder. FFmpeg is extracted from the verified archive under the names
+`ffmpeg.exe` / `ffprobe.exe`. Each tool must run `-version` from the release folder,
+with only that folder on PATH; the build prints the version line.
 
 ## Outputs
 

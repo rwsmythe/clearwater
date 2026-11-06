@@ -1466,6 +1466,17 @@ def test_zip_is_published_only_after_successful_notices_and_smoke(
     _fake_pyinstaller(monkeypatch, out, ["graphlib"], {})
     root = build.release_dir(out, "onedir", build.app_version())
     monkeypatch.setattr(build, "release_dir", lambda *a: root)
+    stale = out / (root.name + ".zip")
+    out.mkdir(parents=True, exist_ok=True)
+    stale.write_bytes(b"previous release")
+    stale.with_suffix(".zip.sha256").write_bytes(b"previous checksum\n")
+    original_sources = build.pack_sources
+
+    def checked_sources():
+        assert not stale.exists() and not stale.with_suffix(".zip.sha256").exists()
+        return original_sources()
+
+    monkeypatch.setattr(build, "pack_sources", checked_sources)
     order = []
 
     def notices(folder):
@@ -1500,6 +1511,59 @@ def test_zip_is_published_only_after_successful_notices_and_smoke(
             assert root.name + "/THIRD_PARTY_NOTICES.md" in packed.namelist()
     if failure == "timestamp":
         assert "FAILED: release zip: planted source timestamp failure" in capsys.readouterr().out
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows junction regression")
+def test_release_zip_refuses_junctions(tmp_path):
+    """A junction must never import another directory's bytes into the release."""
+    import _winapi
+
+    root = tree(tmp_path / "release", ["Clearwater/Clearwater.exe"])
+    outside = tree(tmp_path / "outside", ["secret.txt"])
+    junction = root / "Clearwater/j"
+    _winapi.CreateJunction(str(outside), str(junction))
+    assert junction.is_junction() and not junction.is_symlink()
+    with pytest.raises(ValueError, match=r"(junction|linked|outside)"):
+        build.write_release_zip(root, out=tmp_path, source_epoch=1793908801)
+    assert not list(tmp_path.glob("*.zip*"))
+    assert (outside / "secret.txt").is_file()
+
+
+@pytest.mark.parametrize("mutation", ["added", "removed", "changed"])
+def test_release_zip_refuses_smoke_mutations(tmp_path, monkeypatch, capsys, mutation):
+    """The published file set and identities must equal the pre-smoke inventory."""
+    out = tmp_path / "out"
+    monkeypatch.setattr(build, "pack_sources", lambda: [])
+    _fake_pyinstaller(monkeypatch, out, ["graphlib"], {})
+    root = build.release_dir(out, "onedir", build.app_version())
+    monkeypatch.setattr(build, "release_dir", lambda *a: root)
+
+    def notices(folder):
+        target = folder / "THIRD_PARTY_NOTICES.md"
+        target.write_bytes(b"covered bytes\n")
+        return target
+
+    def smoke(folder, *, out):
+        target = folder / "THIRD_PARTY_NOTICES.md"
+        assert target.read_bytes() == b"covered bytes\n"
+        if mutation == "added":
+            (folder / "new-file.txt").write_bytes(b"uncovered bytes")
+        elif mutation == "removed":
+            target.unlink()
+        else:
+            # Same size, so a path/size-only snapshot would fail this control.
+            target.write_bytes(b"altered bytes\n")
+        return 0
+
+    monkeypatch.setattr(build, "write_artifact_notices", notices)
+    monkeypatch.setattr(build, "smoke_artifact", smoke)
+    monkeypatch.setattr(build, "source_commit_epoch", lambda: 1793908801)
+    assert build.build("onedir", out=out, notices=True, smoke=True, zip_release=True) == 1
+    message = capsys.readouterr().out
+    assert "release zip" in message and mutation in message
+    assert ("new-file.txt" if mutation == "added" else "THIRD_PARTY_NOTICES.md") in message
+    assert not (out / (root.name + ".zip")).exists()
+    assert not (out / (root.name + ".zip.sha256")).exists()
 
 
 @pytest.mark.parametrize("mutation", ["none", "changed-tool", "unknown", "unextracted"])

@@ -732,6 +732,12 @@ def test_writer_validation_failure_preserves_previous_notice_bytes(release):
 @pytest.mark.parametrize("fails", [False, True])
 def test_cli_writes_notices_or_returns_one_line_failure(release, monkeypatch, capsys, fails):
     module = load_notices()
+    write = module.write_notices
+    monkeypatch.setattr(
+        module,
+        "write_notices",
+        lambda *a, **kw: write(*a, native_licences_path=release["native_surface"], **kw),
+    )
     monkeypatch.setattr(
         module._build_tool(), "trusted_distributions", lambda versions: release["distributions"]
     )
@@ -927,6 +933,20 @@ def _make_native_surface(destination):
     ]
     path.write_text(json.dumps(document))
     return destination
+
+
+def omit_production_embedded_census(surface):
+    """Keep real standalone/vendored texts for a synthetic, non-census folder."""
+    path = surface / "manifest.json"
+    document = json.loads(path.read_text())
+    document["components"] = [row for row in document["components"] if "embedded_in" not in row]
+    document.pop("embedded_hosts", None)
+    document.pop("limits", None)
+    keep = {"manifest.json", *(name for name, _sha, _size in native_surface_inputs(document))}
+    for item in surface.iterdir():
+        if item.name not in keep:
+            item.unlink()
+    path.write_text(json.dumps(document))
 
 
 def change_native_row(surface, field, value):
@@ -1712,6 +1732,7 @@ def test_census_native_rows_validate_and_bind_synthetic_bytes(release, tmp_path,
     module = load_notices()
     surface = tmp_path / "real-native-surface"
     shutil.copytree(ROOT / "tools/package/native-licences", surface)
+    omit_production_embedded_census(surface)
     document = json.loads((surface / "manifest.json").read_text())
     row = next((r for r in document["components"] if r["component"] == component), None)
     assert row is not None, f"missing census row: {component}"
@@ -1900,6 +1921,7 @@ def test_real_scipy_vendored_blocks_bind_module_inventory(release, tmp_path, com
     module = load_notices()
     surface = tmp_path / "vendored-real-surface"
     shutil.copytree(ROOT / "tools/package/native-licences", surface)
+    omit_production_embedded_census(surface)
     records = module.load_native_licences(surface)
     record = next((r for r in records if r.component == component), None)
     assert record is not None, f"missing SciPy component: {component}"
@@ -2178,6 +2200,14 @@ def embedded_host_fixture(release, *, parent="python", carried=True):
             "sha256": hashlib.sha256(body).hexdigest(),
             "size_bytes": len(body),
             "parent": parent,
+            "parent_version": (
+                ".".join(map(str, sys.version_info[:3]))
+                + " (python-build-standalone "
+                + (Path(sys.base_prefix) / "BUILD").read_text().strip()
+                + ")"
+                if parent == "python"
+                else release["distributions"][parent].version
+            ),
             "components": [{"component": name, "source": copy.deepcopy(source)} for name in names],
         }
     ]
@@ -2202,6 +2232,13 @@ def embedded_host_fixture(release, *, parent="python", carried=True):
                 "embedded_in": [relative],
             }
         )
+    for reference in document["embedded_hosts"][0]["components"]:
+        row = next(
+            row for row in document["components"] if row["component"] == reference["component"]
+        )
+        reference["source"].update(
+            {key: row[key] for key in ("text_file", "text_sha256", "text_size_bytes")}
+        )
     if not carried:
         host.unlink()
     save_embedded_fixture(release, document)
@@ -2211,6 +2248,180 @@ def embedded_host_fixture(release, *, parent="python", carried=True):
 def save_embedded_fixture(release, document):
     """Write only the test copy's manifest after a negative-control mutation."""
     (release["native_surface"] / "manifest.json").write_text(json.dumps(document))
+
+
+@pytest.mark.parametrize("change", ["renamed", "moved", "duplicate"])
+def test_embedded_renamed_or_moved_host_requires_recensus(release, change):
+    """Wheel ownership at a new path must not drop the embedded census."""
+    _document, host, _text = embedded_host_fixture(release, parent="numpy")
+    new = host.with_name("test-newhash.pyd")
+    new.write_bytes(b"new wheel build" if change == "renamed" else host.read_bytes())
+    if change != "duplicate":
+        host.unlink()
+    installed_old = release["site"] / "numpy/_core/test.pyd"
+    installed_new = installed_old.with_name(new.name)
+    installed_new.write_bytes(new.read_bytes())
+    if change != "duplicate":
+        installed_old.unlink()
+    record = release["site"] / "numpy-2.5.4.dist-info/RECORD"
+    old_record = record.read_text()
+    record.write_text(
+        old_record.replace("numpy/_core/test.pyd", "numpy/_core/test-newhash.pyd")
+        if change != "duplicate"
+        else old_record + "numpy/_core/test-newhash.pyd,,\n"
+    )
+    release["distributions"]["numpy"] = importlib.metadata.PathDistribution(record.parent)
+    with pytest.raises(ValueError) as error:
+        plan(load_notices(), release)
+    message = str(error.value)
+    assert host.name in message and "re-census required" in message
+    assert (
+        ("moved" in message and new.name in message) if change != "renamed" else "numpy" in message
+    )
+
+
+def test_embedded_absent_host_with_carried_parent_requires_recensus(release):
+    """Missing native bytes cannot disappear when the parent still ships modules."""
+    _document, host, _text = embedded_host_fixture(release, parent="numpy", carried=False)
+    with pytest.raises(ValueError, match=re.escape(host.name) + r".*numpy.*re-census required"):
+        plan(load_notices(), release)
+
+
+def test_embedded_parent_upgrade_requires_recensus(release):
+    """A legitimate lock/audit/installed upgrade still needs fresh host evidence."""
+    _document, host, _text = embedded_host_fixture(release, parent="numpy")
+    for path in (
+        release["site"] / "numpy-2.5.4.dist-info/METADATA",
+        release["uv_lock"],
+        release["audit"],
+    ):
+        path.write_text(path.read_text().replace("2.5.4", "2.5.5"))
+    with pytest.raises(ValueError, match=host.name + ".*numpy.*2.5.4.*2.5.5.*re-census required"):
+        plan(load_notices(), release)
+
+
+@pytest.mark.parametrize("value", [None, "", " version", "version\nforged", 1])
+def test_embedded_parent_census_version_is_required(release, value):
+    """Host declarations must pin a single nonempty parent build identity."""
+    document, _host, _text = embedded_host_fixture(release)
+    if value is None:
+        document["embedded_hosts"][0].pop("parent_version")
+    else:
+        document["embedded_hosts"][0]["parent_version"] = value
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError, match="embedded host"):
+        plan(load_notices(), release)
+
+
+def test_embedded_whole_text_swap_requires_independent_host_pin(release):
+    """Updating the component text alone must not update the host's independent pin."""
+    document, host, _text = embedded_host_fixture(release)
+    row = document["components"][-1]
+    terms = b"Different, self-consistently hashed terms.\n"
+    (release["native_surface"] / "new-terms.txt").write_bytes(terms)
+    row.update(
+        text_file="new-terms.txt",
+        text_sha256=hashlib.sha256(terms).hexdigest(),
+        text_size_bytes=len(terms),
+    )
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError, match=host.name + ".*Embedded beta.*source pin"):
+        plan(load_notices(), release)
+
+
+@pytest.mark.parametrize("key", ["component", "statement"])
+@pytest.mark.parametrize("control", ["\n", "\r", "\t", "\0", "\x1b", "\x7f", "\x85"])
+def test_limits_refuse_control_characters(release, key, control):
+    """A limits value cannot inject another Markdown section or console control."""
+    document, _host = limits_fixture(release)
+    document["limits"][0][key] = "before" + control + "## forged"
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError, match="limits"):
+        plan(load_notices(), release)
+
+
+def test_git_excerpt_counts_only_lf_as_a_line_boundary(release):
+    """A lone CR is source content, not a second line in Git's numbering."""
+    document, _host, _terms = git_excerpt_fixture(release)
+    blob = b"header\rcontinued\nnext\n"
+    terms = b"header\rcontinued\n"
+    surface = release["native_surface"]
+    (surface / "source-blob.c").write_bytes(blob)
+    (surface / "header-excerpt.txt").write_bytes(terms)
+    row = document["components"][-1]
+    row.update(text_sha256=hashlib.sha256(terms).hexdigest(), text_size_bytes=len(terms))
+    row["text_lines"].update(
+        lines=[1, 1],
+        sha256=hashlib.sha256(blob).hexdigest(),
+        size_bytes=len(blob),
+        git_blob_sha1=hashlib.sha1(b"blob " + str(len(blob)).encode() + b"\0" + blob).hexdigest(),
+    )
+    document["embedded_hosts"][0]["components"][-1]["source"].update(
+        **{key: row[key] for key in ("text_sha256", "text_size_bytes", "text_lines")}
+    )
+    save_embedded_fixture(release, document)
+    module = load_notices()
+    assert terms in module.render_notices(plan(module, release))
+
+
+@pytest.mark.parametrize(
+    "reference_name,original_name,audit",
+    [
+        ("GCC runtime (SciPy static)", "scipy", True),
+        ("MinGW", "pillow-heif", False),
+        ("libsharpyuv/libyuv (Pillow)", "pillow", False),
+    ],
+)
+def test_shared_reference_preserves_original_heading(
+    tmp_path, reference_name, original_name, audit
+):
+    """Reference sort order must not replace the source wheel/audit provenance label."""
+    module = load_notices()
+    terms = b"Synthetic original terms\n"
+    digest = hashlib.sha256(terms).hexdigest()
+    path = tmp_path / "original.txt"
+    if audit:
+        path.write_text(
+            '<a id="terms"></a>\nSource: `https://example.org/terms`. '
+            f"SHA-256: `{digest}`. UTF-8/LF bytes: {len(terms)}.\n"
+            "````text\n" + terms.decode() + "````\n"
+        )
+        item = module.LicenceInput(path, block_id="terms")
+        label = f"{original_name} 1; https://example.org/terms; the 1.0.0 audit's upstream copy"
+    else:
+        path.write_bytes(terms)
+        item = module.LicenceInput(path)
+        label = f"Installed wheel: {original_name} 1; original.txt"
+    original = module.NoticeRow(
+        original_name, "1", "MIT", ("https://example.org",), ("file:host.pyd",), (item,)
+    )
+    record = {
+        "component": reference_name,
+        "upstream_version": "runtime",
+        "spdx": "MIT",
+        "embedded_in": ["host.pyd"],
+        "version_evidence": {"method": "embedded_string", "value": "fixture"},
+        "carried_notice": {
+            "row": original_name,
+            "inputs": [{"sha256": digest, "size_bytes": len(terms)}],
+        },
+    }
+    reused = module._carried_notice_rows(
+        {"components": [record]}, {reference_name: [("file:host.pyd", "a" * 64)]}, [original]
+    )
+    rendered = module.render_notices(module.NoticePlan(original.entries, (*reused, original), ()))
+    assert rendered.count(terms) == 1
+    assert ("### " + label + "\n").encode() in rendered
+    assert ("Source: " + label + ". SHA-256:").encode() in rendered
+
+
+def omit_parent(release, parent):
+    """Remove carried parent entries while retaining installed build metadata."""
+    if parent == "numpy":
+        make_executable(release["folder"], ["clearwater", "json"])
+    elif parent == "python":
+        (release["folder"] / "_internal/python312.dll").unlink(missing_ok=True)
+        make_executable(release["folder"], ["clearwater", "numpy", "numpy.linalg"])
 
 
 LIMITS_HEADING = b"## Components with no carried licence text, and limits\n\n"
@@ -2347,6 +2558,7 @@ def test_limits_absent_hosts_follow_embedded_claims_and_only_name_carried_hosts(
     host.update(
         relpath=relative,
         parent="numpy",
+        parent_version="2.5.4",
         sha256=hashlib.sha256(second.read_bytes()).hexdigest(),
         size_bytes=second.stat().st_size,
     )
@@ -2357,8 +2569,10 @@ def test_limits_absent_hosts_follow_embedded_claims_and_only_name_carried_hosts(
         entry["hosts"] = sorted([relative, first.relative_to(release["folder"]).as_posix()])
     if carried < 2:
         second.unlink()
+        omit_parent(release, "numpy")
     if carried == 0:
         first.unlink()
+        make_executable(release["folder"], ["clearwater"])
     save_embedded_fixture(release, document)
     module = load_notices()
     rendered = module.render_notices(plan(module, release))
@@ -2374,11 +2588,12 @@ def test_limits_absent_hosts_follow_embedded_claims_and_only_name_carried_hosts(
 
 
 def test_limits_only_component_cannot_weaken_host_identity_check(release):
-    """A textless component still uses the existing census guard before parent coverage."""
-    _document, host = limits_fixture(release)
-    host.write_bytes(host.read_bytes() + b"x")
-    relative = host.relative_to(release["folder"]).as_posix()
-    with pytest.raises(ValueError, match=re.escape(relative) + ".*re-census required"):
+    """A limits-only dangling binding cannot be silently omitted during selection."""
+    document, _host = limits_fixture(release)
+    # The absent textless host has no embedded rows for _embedded_claims to check.
+    document["limits"][0]["hosts"] = ["_internal/undeclared-textless.pyd"]
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError, match=r"limits.*Textless algorithm.*undeclared-textless"):
         plan(load_notices(), release)
 
 
@@ -2437,7 +2652,9 @@ def git_excerpt_fixture(release):
     # Git's header includes the decimal byte length (54 for this literal blob).
     assert len(blob) == 54
     document["embedded_hosts"][0]["components"][-1]["source"].update(
-        text_kind="excerpt", text_lines=copy.deepcopy(row["text_lines"])
+        text_kind="excerpt",
+        text_lines=copy.deepcopy(row["text_lines"]),
+        **{key: row[key] for key in ("text_file", "text_sha256", "text_size_bytes")},
     )
     save_embedded_fixture(release, document)
     return document, host, terms
@@ -2636,8 +2853,9 @@ def test_embedded_tampered_text_names_host_and_component(release, damage):
 
 
 def test_embedded_absent_host_emits_no_component_claim_or_text(release):
-    """Declarations describe possible carriage, never redistribution by themselves."""
-    _document, _host, text = embedded_host_fixture(release, carried=False)
+    """An absent parent and host create no redistribution claim from declarations."""
+    _document, _host, text = embedded_host_fixture(release, parent="numpy", carried=False)
+    omit_parent(release, "numpy")
     module = load_notices()
     result = plan(module, release)
     assert not any(row.name.startswith("Embedded ") for row in result.rows)
@@ -2741,6 +2959,7 @@ def test_embedded_component_may_bind_several_independently_measured_hosts(releas
     second.update(
         relpath=relative,
         parent="numpy",
+        parent_version="2.5.4",
         sha256=hashlib.sha256(host.read_bytes()).hexdigest(),
         size_bytes=host.stat().st_size,
     )
@@ -2749,6 +2968,7 @@ def test_embedded_component_may_bind_several_independently_measured_hosts(releas
         row["embedded_in"].append(relative)
     if not carried:
         host.unlink()
+        omit_parent(release, "numpy")
     save_embedded_fixture(release, document)
     module = load_notices()
     result = plan(module, release)
@@ -2756,7 +2976,7 @@ def test_embedded_component_may_bind_several_independently_measured_hosts(releas
     for name in ("Embedded alpha", "Embedded beta", "Embedded gamma"):
         assert ("file:" + relative in rows[name].entries) == carried
         assert "file:_internal/python312.dll" in rows[name].entries
-    assert ("file:" + relative in rows["numpy"].entries) == carried
+    assert ("numpy" in rows) == carried
     module.validate_coverage(result.entries, result.rows)
 
 
@@ -2764,6 +2984,7 @@ def test_embedded_parent_declaration_must_match_actual_owner(release):
     """The source census cannot invent a parent attribution to another package."""
     document, host, _text = embedded_host_fixture(release)
     document["embedded_hosts"][0]["parent"] = "numpy"
+    document["embedded_hosts"][0]["parent_version"] = "2.5.4"
     save_embedded_fixture(release, document)
     with pytest.raises(
         ValueError, match="embedded.*" + re.escape(host.name) + ".*parent attribution"
@@ -2777,6 +2998,7 @@ def test_embedded_shared_text_is_rechecked_for_each_component_at_render(release)
     duplicate = release["native_surface"] / "beta-terms.txt"
     duplicate.write_bytes(text)
     document["components"][-1]["text_file"] = duplicate.name
+    document["embedded_hosts"][0]["components"][-1]["source"]["text_file"] = duplicate.name
     save_embedded_fixture(release, document)
     module = load_notices()
     result = plan(module, release)
@@ -2808,6 +3030,7 @@ def carried_notice_fixture(release):
             "sha256": hashlib.sha256(body).hexdigest(),
             "size_bytes": len(body),
             "parent": "numpy",
+            "parent_version": "2.5.4",
             "components": [
                 {"component": "Carried runtime", "source": {"carried_notice": reference}}
             ],
@@ -2836,6 +3059,10 @@ def test_embedded_carried_notice_reuses_existing_text_without_copy(release):
     output = module.render_notices(result)
     assert output.count(terms) == 1
     assert b"Carried runtime" in output and b"Reused carried notice: numpy" in output
+    assert (
+        b"### Installed wheel: numpy 2.5.4; numpy-2.5.4.dist-info/licenses/LICENSE.txt\n" in output
+    )
+    assert b"### Reused carried notice:" not in output
 
 
 @pytest.mark.parametrize("damage", ["hash", "size", "missing-row", "extra-field", "source-pin"])
@@ -2958,6 +3185,7 @@ def test_carried_notice_absent_host_adds_no_claim(release):
     """A declared but absent host cannot redistribute a runtime reference."""
     module, _document, _terms = carried_notice_fixture(release)
     (release["folder"] / "_internal/numpy/_core/test.pyd").unlink()
+    omit_parent(release, "numpy")
     assert not any(row.name == "Carried runtime" for row in plan(module, release).rows)
 
 
@@ -3104,6 +3332,7 @@ def test_original_obligations_render_verbatim_with_canonical_sources_and_citatio
         {
             "relpath": relative,
             "parent": "numpy",
+            "parent_version": "2.5.4",
             "sha256": hashlib.sha256(data).hexdigest(),
             "size_bytes": len(data),
             "components": [

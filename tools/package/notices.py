@@ -78,6 +78,9 @@ _PROVENANCE_FIELDS = frozenset(
         "text_lines",
         "attribution",
         "carried_notice",
+        "text_file",
+        "text_sha256",
+        "text_size_bytes",
     }
 )
 
@@ -103,6 +106,7 @@ class LicenceInput(NamedTuple):
     context: str = ""
     excerpt: _TextExcerpt | None = None
     git_blob_sha1: str = ""
+    reference: bool = False
 
 
 class NativeFile(NamedTuple):
@@ -195,6 +199,7 @@ class _EmbeddedHost(NamedTuple):
     sha256: str
     size_bytes: int
     parent: str
+    parent_version: str
     components: tuple[tuple[str, str], ...]
 
 
@@ -271,11 +276,27 @@ def _licence_bytes(item: LicenceInput) -> bytes:
         digest = hashlib.sha1(b"blob " + str(len(blob)).encode("ascii") + b"\0" + blob)
         if digest.hexdigest() != source.git_blob_sha1:
             raise ValueError(f"notices: {item.context}source Git blob SHA-1 differs")
-        lines = blob.splitlines(keepends=True)
+        lines = _lf_lines(blob)
         first, last = source.lines
         if last > len(lines) or b"".join(lines[first - 1 : last]) != data:
             raise ValueError(f"notices: {item.context}excerpt differs from source line range")
     return data
+
+
+def _lf_lines(data: bytes) -> list[bytes]:
+    parts = data.split(b"\n")
+    return [part + b"\n" for part in parts[:-1]] + ([parts[-1]] if parts[-1] else [])
+
+
+def _single_line_text(value: object) -> bool:
+    return bool(
+        isinstance(value, str)
+        and value
+        and value == value.strip()
+        and not any(
+            ord(char) < 32 or 127 <= ord(char) <= 159 or char in "\u2028\u2029" for char in value
+        )
+    )
 
 
 def _attribution_spec(row: dict[str, Any]) -> dict[str, Any] | None:
@@ -320,7 +341,8 @@ def _embedded_declarations(document: dict[str, Any]) -> tuple[_EmbeddedHost, ...
     for item in values:
         if (
             not isinstance(item, dict)
-            or set(item) != {"relpath", "sha256", "size_bytes", "parent", "components"}
+            or set(item)
+            != {"relpath", "sha256", "size_bytes", "parent", "parent_version", "components"}
             or not _exact_host_path(item.get("relpath"))
             or not isinstance(item.get("sha256"), str)
             or re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) is None
@@ -328,6 +350,7 @@ def _embedded_declarations(document: dict[str, Any]) -> tuple[_EmbeddedHost, ...
             or item["size_bytes"] <= 0
             or not isinstance(item.get("parent"), str)
             or re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", item["parent"]) is None
+            or not _single_line_text(item.get("parent_version"))
             or not isinstance(item.get("components"), list)
             or not item["components"]
         ):
@@ -367,6 +390,7 @@ def _embedded_declarations(document: dict[str, Any]) -> tuple[_EmbeddedHost, ...
                 item["sha256"],
                 item["size_bytes"],
                 item["parent"],
+                item["parent_version"],
                 tuple(components),
             )
         )
@@ -386,12 +410,7 @@ def _limit_declarations(
         if (
             not isinstance(item, dict)
             or set(item) != {"component", "hosts", "statement"}
-            or any(
-                not isinstance(item.get(key), str)
-                or not item[key]
-                or item[key] != item[key].strip()
-                for key in ("component", "statement")
-            )
+            or any(not _single_line_text(item.get(key)) for key in ("component", "statement"))
             or not isinstance(item.get("hosts"), list)
             or not item["hosts"]
             or any(not _exact_host_path(host) for host in item["hosts"])
@@ -514,6 +533,25 @@ def _embedded_claims(
         else {}
     )
     inventory = {entry.name.casefold(): entry for entry in entries if entry.kind == "file"}
+    identities: dict[tuple[str, int], list[_EmbeddedHost]] = defaultdict(list)
+    for host in hosts:
+        identities[(host.sha256, host.size_bytes)].append(host)
+    sizes = {size for _digest, size in identities}
+    for candidate in inventory.values():
+        path = home / candidate.name
+        size = path.stat().st_size
+        if size not in sizes:
+            continue
+        with path.open("rb") as stream:
+            digest = hashlib.file_digest(stream, "sha256").hexdigest()
+        matching = identities.get((digest, size), [])
+        if matching and candidate.name.casefold() not in {
+            host.relpath.casefold() for host in matching
+        }:
+            raise ValueError(
+                f"notices: embedded {matching[0].relpath} moved to undeclared path "
+                f"{candidate.name}; re-census required"
+            )
     for host in hosts:
         entry = inventory.get(host.relpath.casefold())
         if entry is None:
@@ -544,6 +582,36 @@ def _embedded_claims(
             claims[component].append((entry.label, digest))
         carried[entry.label] = host
     return claims, carried
+
+
+def _check_embedded_parents(
+    hosts: tuple[_EmbeddedHost, ...],
+    carried: dict[str, _EmbeddedHost],
+    selected: dict[str, list[str]],
+    installed: dict[str, importlib.metadata.Distribution],
+) -> None:
+    carried_paths = {host.relpath for host in carried.values()}
+    for host in hosts:
+        if not selected.get(host.parent):
+            continue
+        if host.parent == "python":
+            marker = Path(sys.base_prefix) / "BUILD"
+            release = marker.read_text(encoding="utf-8").strip() if marker.is_file() else "unknown"
+            version = (
+                ".".join(map(str, sys.version_info[:3])) + f" (python-build-standalone {release})"
+            )
+        else:
+            version = installed[host.parent].version
+        if version != host.parent_version:
+            raise ValueError(
+                f"notices: embedded {host.relpath} parent {host.parent} version differs: "
+                f"expected {host.parent_version}; actual {version}; re-census required"
+            )
+        if host.relpath not in carried_paths:
+            raise ValueError(
+                f"notices: embedded {host.relpath} absent while parent {host.parent} "
+                "is carried; re-census required"
+            )
 
 
 def _https_url(value: object) -> bool:
@@ -1712,6 +1780,7 @@ def plan_notices(
         ):
             owner += "-runtime"
         selected[owner].append(entry.label)
+    _check_embedded_parents(embedded_hosts, carried_hosts, selected, installed)
     if unknown:
         raise ValueError("notices: " + "; ".join(unknown))
     result: list[NoticeRow] = [*ffmpeg, *native_rows]
@@ -1882,6 +1951,7 @@ def _carried_notice_rows(
                 )
             inputs.append(
                 matches[0]._replace(
+                    reference=True,
                     sha256=expected["sha256"],
                     size_bytes=expected["size_bytes"],
                     context=context,
@@ -2043,7 +2113,7 @@ def _check_proprietary_source(record: NativeLicence) -> None:
             "notices: proprietary text source differs from build interpreter"
         ) from error
     first, last = record.text_source_lines
-    excerpt = b"".join(data.splitlines(keepends=True)[first - 1 : last])
+    excerpt = b"".join(_lf_lines(data)[first - 1 : last])
     if excerpt != record.licence_input.path.read_bytes():
         raise ValueError("notices: proprietary excerpt differs from build interpreter text source")
 
@@ -2348,6 +2418,11 @@ def render_notices(plan: NoticePlan) -> bytes:
                 raise ValueError(f"notices: {item.context}text identity differs")
             previous = embedded_texts.get(identity)
             if previous is not None and (item.context or previous.context):
+                if previous.reference and not item.reference:
+                    # Keep the existing anchor/order but restore the original
+                    # wheel/audit label when a reference sorted before it.
+                    materials[previous] = (label, data)
+                    embedded_texts[identity] = item
                 references[item] = references[previous]
                 continue
             embedded_texts[identity] = item

@@ -3936,7 +3936,10 @@
             "source_commit": "03087864cf4bea6abb0d28f95cf7843511413d8f",
             "source_path": "PATENTS",
             "source_tag": "v3.14.1",
-            "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998"
+            "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998",
+            "text_file": "dr144-final-aom--PATENTS",
+            "text_sha256": "661fb8e504744e95587b556b94a58343448300606a41bea8c7a9b97125696e61",
+            "text_size_bytes": 5701
           }
         },
         {
@@ -3945,7 +3948,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/videolan/dav1d",
             "source_commit": "b546257f770768b2c88258c533da38b91a06f737",
-            "source_path": "COPYING"
+            "source_path": "COPYING",
+            "text_file": "dr144-wheels-dav1d-COPYING",
+            "text_sha256": "dd92c3c2247c5651606fc23a5e2d6a1ebc5ace9a3e49cbde0e12f05ad1cb1ee5",
+            "text_size_bytes": 1317
           }
         },
         {
@@ -3956,7 +3962,10 @@
             "source_commit": "03087864cf4bea6abb0d28f95cf7843511413d8f",
             "source_path": "third_party/fastfeat/LICENSE",
             "source_tag": "v3.14.1",
-            "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998"
+            "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998",
+            "text_file": "dr144-final-aom--third_party--fastfeat--LICENSE",
+            "text_sha256": "499041ddee5227b6f29ca06c17803e5fe24d60f243c69635cd76b7ba08d0ddd5",
+            "text_size_bytes": 1504
           }
         },
         {
@@ -3965,7 +3974,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/python-pillow/Pillow",
             "source_commit": "bb1d8e8ab8d29048624d96e3ee53cecf7c13d13d",
-            "source_path": "wheels/dependency_licenses/AOM.txt"
+            "source_path": "wheels/dependency_licenses/AOM.txt",
+            "text_file": "dr144-wheels-Pillow-wheels--dependency_licenses--AOM.txt",
+            "text_sha256": "60f3f7e003a4a7736aad7c008380fbfbcd3bf19544c589efebba824a2b9e145b",
+            "text_size_bytes": 1315
           }
         },
         {
@@ -4002,7 +4014,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://chromium.googlesource.com/libyuv/libyuv",
             "source_commit": "644251f252a84bf8ce91ff0aca86a9b16b069ab8",
-            "source_path": "PATENTS"
+            "source_path": "PATENTS",
+            "text_file": "dr144-final-libyuv--PATENTS",
+            "text_sha256": "4da84211f947c6f9f7dd8fbce513e1522e01833407ae732b8c9a2bbb75fed495",
+            "text_size_bytes": 1387
           }
         },
         {
@@ -4022,7 +4037,10 @@
                 1,
                 15
               ]
-            }
+            },
+            "text_file": "dr144-wheels-Pillow-src--thirdparty--pythoncapi_compat.h-L1-15.txt",
+            "text_sha256": "1e68503df04236d9761084e4ec66828fff22ab2b0d33ac0a3a341e96645096f3",
+            "text_size_bytes": 553
           }
         },
         {
@@ -4033,7 +4051,10 @@
             "source_commit": "03087864cf4bea6abb0d28f95cf7843511413d8f",
             "source_path": "third_party/vector/LICENSE",
             "source_tag": "v3.14.1",
-            "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998"
+            "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998",
+            "text_file": "dr144-final-aom--third_party--vector--LICENSE",
+            "text_sha256": "ff6c857ce2708e87701323078aef115c1872a1f80a9649f86dc899b48083bc60",
+            "text_size_bytes": 1084
           }
         },
         {
@@ -4053,7 +4074,10 @@
                 1,
                 22
               ]
-            }
+            },
+            "text_file": "dr144-wheels-dav1d-src--ext--x86--x86inc.asm-L1-22.txt",
+            "text_sha256": "28e1d08c3aab06bb2a0bf15365261cf8b371fe1ba8c4427b351e57429dd80e06",
+            "text_size_bytes": 1241
           }
         },
         {
@@ -4064,10 +4088,14 @@
             "source_commit": "03087864cf4bea6abb0d28f95cf7843511413d8f",
             "source_path": "third_party/x86inc/LICENSE",
             "source_tag": "v3.14.1",
-            "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998"
+            "source_tag_object": "33c921efad52392d6c7047a6768a1337cd106998",
+            "text_file": "dr144-final-aom--third_party--x86inc--LICENSE",
+            "text_sha256": "719d8fa235f2068e0ae6d6a7dceb0a7720d7840f0f0ebed29957989e6ded3cd8",
+            "text_size_bytes": 936
           }
         }
-      ]
+      ],
+      "parent_version": "12.3.0"
     },
     {
       "relpath": "_internal/PIL/_imaging.cp312-win_amd64.pyd",
@@ -4106,10 +4134,14 @@
                 1,
                 15
               ]
-            }
+            },
+            "text_file": "dr144-wheels-Pillow-src--thirdparty--pythoncapi_compat.h-L1-15.txt",
+            "text_sha256": "1e68503df04236d9761084e4ec66828fff22ab2b0d33ac0a3a341e96645096f3",
+            "text_size_bytes": 553
           }
         }
-      ]
+      ],
+      "parent_version": "12.3.0"
     },
     {
       "relpath": "_internal/PIL/_imagingcms.cp312-win_amd64.pyd",
@@ -4134,10 +4166,14 @@
                 1,
                 15
               ]
-            }
+            },
+            "text_file": "dr144-wheels-Pillow-src--thirdparty--pythoncapi_compat.h-L1-15.txt",
+            "text_sha256": "1e68503df04236d9761084e4ec66828fff22ab2b0d33ac0a3a341e96645096f3",
+            "text_size_bytes": 553
           }
         }
-      ]
+      ],
+      "parent_version": "12.3.0"
     },
     {
       "relpath": "_internal/PIL/_imagingmath.cp312-win_amd64.pyd",
@@ -4162,10 +4198,14 @@
                 1,
                 15
               ]
-            }
+            },
+            "text_file": "dr144-wheels-Pillow-src--thirdparty--pythoncapi_compat.h-L1-15.txt",
+            "text_sha256": "1e68503df04236d9761084e4ec66828fff22ab2b0d33ac0a3a341e96645096f3",
+            "text_size_bytes": 553
           }
         }
-      ]
+      ],
+      "parent_version": "12.3.0"
     },
     {
       "relpath": "_internal/PIL/_imagingtk.cp312-win_amd64.pyd",
@@ -4190,10 +4230,14 @@
                 1,
                 15
               ]
-            }
+            },
+            "text_file": "dr144-wheels-Pillow-src--thirdparty--pythoncapi_compat.h-L1-15.txt",
+            "text_sha256": "1e68503df04236d9761084e4ec66828fff22ab2b0d33ac0a3a341e96645096f3",
+            "text_size_bytes": 553
           }
         }
-      ]
+      ],
+      "parent_version": "12.3.0"
     },
     {
       "relpath": "_internal/PIL/_webp.cp312-win_amd64.pyd",
@@ -4232,10 +4276,14 @@
                 1,
                 15
               ]
-            }
+            },
+            "text_file": "dr144-wheels-Pillow-src--thirdparty--pythoncapi_compat.h-L1-15.txt",
+            "text_sha256": "1e68503df04236d9761084e4ec66828fff22ab2b0d33ac0a3a341e96645096f3",
+            "text_size_bytes": 553
           }
         }
-      ]
+      ],
+      "parent_version": "12.3.0"
     },
     {
       "relpath": "_internal/PySide6/Qt6Core.dll",
@@ -4258,7 +4306,10 @@
               "size_bytes": 731,
               "git_blob_sha1": "d550c40ac61c2ab7acb92429566750ce1157a9fa",
               "source_path": "src/3rdparty/zlib/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--zlib--LICENSE",
+            "text_sha256": "d7e3139972874dc8abdbbfce27ec1e6f942b28279dd7d27453630a8b4610e080",
+            "text_size_bytes": 1465
           }
         },
         {
@@ -4276,7 +4327,10 @@
               "size_bytes": 1829,
               "git_blob_sha1": "dccf6d1145e91c0eecf66ff77e8e13cdf73fba48",
               "source_path": "src/3rdparty/pcre2/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--pcre2--LICENCE.md",
+            "text_sha256": "197d8a73ffee0d6b09adba2f9c677b5f5aede24edf89258a68e48248d010d811",
+            "text_size_bytes": 4011
           }
         },
         {
@@ -4294,7 +4348,10 @@
               "size_bytes": 1829,
               "git_blob_sha1": "dccf6d1145e91c0eecf66ff77e8e13cdf73fba48",
               "source_path": "src/3rdparty/pcre2/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--pcre2--LICENSE-SLJIT",
+            "text_sha256": "5f216505c0f6ea3273caec89e766eef93cdeb7bbb0c429f9360116d7c938feeb",
+            "text_size_bytes": 1444
           }
         },
         {
@@ -4312,7 +4369,10 @@
               "size_bytes": 771,
               "git_blob_sha1": "468a309d6f16c4a3a3de976b0c04812f6670346e",
               "source_path": "src/3rdparty/double-conversion/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--double-conversion--LICENSE",
+            "text_sha256": "4af93c12062c58058378de2397dc1c92bbff9ddfb1d583a01c84127557ce97ca",
+            "text_size_bytes": 1527
           }
         },
         {
@@ -4330,7 +4390,10 @@
               "size_bytes": 926,
               "git_blob_sha1": "8b14922f2e6bd4e9eb51d1f587d17a53332154ad",
               "source_path": "src/3rdparty/blake2/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--blake2--COPYING",
+            "text_sha256": "4103f471877ed0bae500752c5fcd7ecca409d4a4a8dc2ad40437daba60f1a2bc",
+            "text_size_bytes": 17914
           }
         },
         {
@@ -4348,7 +4411,10 @@
               "size_bytes": 574,
               "git_blob_sha1": "757c7996ab700adda4ededf6d2b02f1c3d8bbbf9",
               "source_path": "src/3rdparty/md4/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-LICENSES--CC0-1.0.txt",
+            "text_sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+            "text_size_bytes": 7048
           }
         },
         {
@@ -4366,7 +4432,10 @@
               "size_bytes": 446,
               "git_blob_sha1": "0c2f5feda8a32df8e058f7b5b272c8033e0180f2",
               "source_path": "src/3rdparty/md5/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-LICENSES--CC0-1.0.txt",
+            "text_sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+            "text_size_bytes": 7048
           }
         },
         {
@@ -4384,7 +4453,10 @@
               "size_bytes": 618,
               "git_blob_sha1": "04933a27005d467e8496a674c75252d1c6b07501",
               "source_path": "src/3rdparty/sha1/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-LICENSES--LicenseRef-SHA1-Public-Domain.txt",
+            "text_sha256": "65d86b8ec6b1cd8b8f6e64fd8710274ba00d6a3c520e00dfdcd1c3d2071f3305",
+            "text_size_bytes": 144
           }
         },
         {
@@ -4402,7 +4474,10 @@
               "size_bytes": 2322,
               "git_blob_sha1": "6c6a44e1b6b4c254cfc30dba6113174ec022d6e4",
               "source_path": "src/3rdparty/sha3/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--sha3--CC0_LICENSE",
+            "text_sha256": "1f2786e2c5befeb4dcba6638db6528bf96ef5d2cf24bc85ab5a81ef00abef59d",
+            "text_size_bytes": 7013
           }
         },
         {
@@ -4420,7 +4495,10 @@
               "size_bytes": 2322,
               "git_blob_sha1": "6c6a44e1b6b4c254cfc30dba6113174ec022d6e4",
               "source_path": "src/3rdparty/sha3/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--sha3--BRG_ENDIAN_LICENSE",
+            "text_sha256": "2fed6f252ca4a7e813811de3cd3cd08183edd4138bdee909410ef6eee394e82c",
+            "text_size_bytes": 645
           }
         },
         {
@@ -4438,7 +4516,10 @@
               "size_bytes": 660,
               "git_blob_sha1": "282590da0baca0829fdc75ebb2027a81b8cdb4e4",
               "source_path": "src/3rdparty/rfc6234/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--rfc6234--LICENSE",
+            "text_sha256": "7ccebd514aaabc86192f957d773cebf06577c12fe9f25ecd419c6cac5da7a14c",
+            "text_size_bytes": 1568
           }
         },
         {
@@ -4456,7 +4537,10 @@
               "size_bytes": 793,
               "git_blob_sha1": "1687742f03f9a605f3cf0f8c05060d9b4458563d",
               "source_path": "src/3rdparty/siphash/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-LICENSES--CC0-1.0.txt",
+            "text_sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+            "text_size_bytes": 7048
           }
         },
         {
@@ -4474,7 +4558,10 @@
               "size_bytes": 471,
               "git_blob_sha1": "154d7a06038e13d3e1dae7b67240900339763b13",
               "source_path": "src/3rdparty/easing/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--easing--LICENSE",
+            "text_sha256": "92fac99458f1754b73edf50f9c9983e0efaa06ad96e2afd5e538c79f45b4b191",
+            "text_size_bytes": 1505
           }
         },
         {
@@ -4492,7 +4579,10 @@
               "size_bytes": 685,
               "git_blob_sha1": "04e566013f3a89bf8f861f8e8bfe8deb92dd2dc0",
               "source_path": "src/3rdparty/tinycbor/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--tinycbor--LICENSE",
+            "text_sha256": "3c6ba0b5bfa7830505301ffb336a17b0748e0d61c4d34216e9dc98f10e40395e",
+            "text_size_bytes": 1074
           }
         },
         {
@@ -4510,7 +4600,10 @@
               "size_bytes": 814,
               "git_blob_sha1": "22379e261913af86c9ec3fe6837cb5fb7d38b53b",
               "source_path": "src/corelib/global/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-LICENSES--CC0-1.0.txt",
+            "text_sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+            "text_size_bytes": 7048
           }
         },
         {
@@ -4528,7 +4621,10 @@
               "size_bytes": 2170,
               "git_blob_sha1": "5bc5e3f58f60febeb87ff12d745210a31496ba77",
               "source_path": "src/corelib/text/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-LICENSES--Unicode-3.0.txt",
+            "text_sha256": "80bb6294022d8764adb36a9d65ebb6bd94efb1865918a71e31e6c247607d7634",
+            "text_size_bytes": 1995
           }
         },
         {
@@ -4546,7 +4642,10 @@
               "size_bytes": 2170,
               "git_blob_sha1": "5bc5e3f58f60febeb87ff12d745210a31496ba77",
               "source_path": "src/corelib/text/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-LICENSES--Unicode-3.0.txt",
+            "text_sha256": "80bb6294022d8764adb36a9d65ebb6bd94efb1865918a71e31e6c247607d7634",
+            "text_size_bytes": 1995
           }
         },
         {
@@ -4564,10 +4663,14 @@
               "size_bytes": 1383,
               "git_blob_sha1": "b30d70417529fef3e12a3cf615e919d748ec7968",
               "source_path": "src/corelib/mimetypes/3rdparty/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-LICENSES--Apache-2.0.txt",
+            "text_sha256": "e3ba223bb1423f0aad8c3dfce0fe3148db48926d41e6fbc3afbbf5ff9e1c89cb",
+            "text_size_bytes": 10398
           }
         }
-      ]
+      ],
+      "parent_version": "6.12.0"
     },
     {
       "relpath": "_internal/PySide6/Qt6Gui.dll",
@@ -4590,7 +4693,10 @@
               "size_bytes": 5328,
               "git_blob_sha1": "427ecb1f7db74bca1bde87962f5f12348342441d",
               "source_path": "src/3rdparty/freetype/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--freetype--LICENSE.txt",
+            "text_sha256": "bf543cdda11864477b8d2ca2aa9afc2aaa8f9133461b4d962ed6ec73646256a1",
+            "text_size_bytes": 26234
           }
         },
         {
@@ -4608,7 +4714,10 @@
               "size_bytes": 5328,
               "git_blob_sha1": "427ecb1f7db74bca1bde87962f5f12348342441d",
               "source_path": "src/3rdparty/freetype/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--freetype--BDF-LICENSE.txt",
+            "text_sha256": "e4e792f29e66750f2e410fd7b50a567652c180f6ee15e1a4dfa0bb5cde524537",
+            "text_size_bytes": 2305
           }
         },
         {
@@ -4626,7 +4735,10 @@
               "size_bytes": 5328,
               "git_blob_sha1": "427ecb1f7db74bca1bde87962f5f12348342441d",
               "source_path": "src/3rdparty/freetype/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--freetype--PCF-LICENSE.txt",
+            "text_sha256": "6938597bfdeca0db191a8f9ede52eaf2482c2c71a0094c084747a1235f9958fe",
+            "text_size_bytes": 2218
           }
         },
         {
@@ -4644,7 +4756,10 @@
               "size_bytes": 2256,
               "git_blob_sha1": "f238cb56733c712fd2d7a47c858c5c96aeabd9cc",
               "source_path": "src/gui/painting/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--freetype--LICENSE.txt",
+            "text_sha256": "bf543cdda11864477b8d2ca2aa9afc2aaa8f9133461b4d962ed6ec73646256a1",
+            "text_size_bytes": 26234
           }
         },
         {
@@ -4662,7 +4777,10 @@
               "size_bytes": 1646,
               "git_blob_sha1": "f5d5d42ff236a41c32e03fde119ebdee99230b08",
               "source_path": "src/3rdparty/harfbuzz-ng/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--harfbuzz-ng--COPYING",
+            "text_sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+            "text_size_bytes": 1971
           }
         },
         {
@@ -4680,7 +4798,10 @@
               "size_bytes": 1763,
               "git_blob_sha1": "1c932936219bb83aa841c3d49459a1e28b7289d7",
               "source_path": "src/3rdparty/libpng/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--libpng--LICENSE",
+            "text_sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526",
+            "text_size_bytes": 5345
           }
         },
         {
@@ -4698,7 +4819,10 @@
               "size_bytes": 673,
               "git_blob_sha1": "5e78ab1d10e4ee13f996c6eb95772fcb8e29498c",
               "source_path": "src/3rdparty/md4c/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--md4c--LICENSE.md",
+            "text_sha256": "d30937367d5413e7eaa218b1640b8946ff76fd34d97152f6979fd96169d5d0fc",
+            "text_size_bytes": 1096
           }
         },
         {
@@ -4716,7 +4840,10 @@
               "size_bytes": 682,
               "git_blob_sha1": "91dca1f4620a6258ff82f8695c26bdd053f8fa45",
               "source_path": "src/3rdparty/emoji-segmenter/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-LICENSES--Apache-2.0.txt",
+            "text_sha256": "e3ba223bb1423f0aad8c3dfce0fe3148db48926d41e6fbc3afbbf5ff9e1c89cb",
+            "text_size_bytes": 10398
           }
         },
         {
@@ -4734,7 +4861,10 @@
               "size_bytes": 693,
               "git_blob_sha1": "41faca527e97d1249664f95905a29c485e637622",
               "source_path": "src/3rdparty/D3D12MemoryAllocator/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--D3D12MemoryAllocator--LICENSE.txt",
+            "text_sha256": "5478a2f36b736e13dd3250b9c71a4ab521bc327fb9d112a92c647bf3e69ddb68",
+            "text_size_bytes": 1099
           }
         },
         {
@@ -4752,7 +4882,10 @@
               "size_bytes": 699,
               "git_blob_sha1": "605f5c1bfb3afa014e9cf330e6d611aa1cd3c25f",
               "source_path": "src/3rdparty/VulkanMemoryAllocator/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--VulkanMemoryAllocator--LICENSE.txt",
+            "text_sha256": "846d97c8b74ccaa92b9ad031140a04363b3b3985f318094552f297b8bda1c68e",
+            "text_size_bytes": 1099
           }
         },
         {
@@ -4770,7 +4903,10 @@
               "size_bytes": 775,
               "git_blob_sha1": "b99b9ce12272d4a73318ce2a98ed1e80c34e459c",
               "source_path": "src/3rdparty/icc/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--icc--LICENSE.txt",
+            "text_sha256": "9e34ff47b3a44814e183342e7e198d127a6740e29d20e8381fba7688dafc79dd",
+            "text_size_bytes": 463
           }
         },
         {
@@ -4788,7 +4924,10 @@
               "size_bytes": 2256,
               "git_blob_sha1": "f238cb56733c712fd2d7a47c858c5c96aeabd9cc",
               "source_path": "src/gui/painting/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--gui--painting--LICENSE.QIMAGETRANSFORM.txt",
+            "text_sha256": "46b3cbfa2f2946b93291506351e9be1dd0a28d2a53260f5aa488abd36fbeca9d",
+            "text_size_bytes": 3004
           }
         },
         {
@@ -4806,7 +4945,10 @@
               "size_bytes": 2256,
               "git_blob_sha1": "f238cb56733c712fd2d7a47c858c5c96aeabd9cc",
               "source_path": "src/gui/painting/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--gui--painting--LICENSE.XCONSORTIUM.txt",
+            "text_sha256": "a216b01291eb38fc1af93cfccf1fc67b48d9923612e517c2a695e95b3f03c22c",
+            "text_size_bytes": 2294
           }
         },
         {
@@ -4824,7 +4966,10 @@
               "size_bytes": 837,
               "git_blob_sha1": "b700fe05a0d53eb00676b734ce2cba064feba907",
               "source_path": "src/gui/text/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--gui--text--LICENSE.AGLFN.txt",
+            "text_sha256": "40818155548ff41c67d3a40edf355e9658992b292c227f4c1147425cedc746c6",
+            "text_size_bytes": 1425
           }
         },
         {
@@ -4842,7 +4987,10 @@
               "size_bytes": 547,
               "git_blob_sha1": "02f9b0b02b380379269d6492f8eb7a6cfc1dd4b0",
               "source_path": "src/gui/util/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--gui--util--LICENSE.XSVG.txt",
+            "text_sha256": "3a946598a9f674d44df764279ca0b85b5d6faba08f3bc75d8e0fcf6cd729a9bd",
+            "text_size_bytes": 1185
           }
         },
         {
@@ -4860,7 +5008,10 @@
               "size_bytes": 596,
               "git_blob_sha1": "c6bd57462490aab12442bd983ee6bbf1e674038c",
               "source_path": "util/gradientgen/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-util--gradientgen--LICENSE.WEBGRADIENTS.txt",
+            "text_sha256": "9be732e45b638c74f9c0e5248541dd54dc7e8e9a5545df96b5c4b7c9ac0c68ba",
+            "text_size_bytes": 1062
           }
         },
         {
@@ -4878,7 +5029,10 @@
               "size_bytes": 1526,
               "git_blob_sha1": "e346e262862650816e54d4c61c75e86af0828f76",
               "source_path": "src/gui/opengl/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--gui--opengl--LICENSE.KHRONOS.txt",
+            "text_sha256": "2e484f3c26ff5008c704a3ca9dd809d43f24a004a1abb6c202660fbff0d19715",
+            "text_size_bytes": 1084
           }
         },
         {
@@ -4896,7 +5050,10 @@
               "size_bytes": 1526,
               "git_blob_sha1": "e346e262862650816e54d4c61c75e86af0828f76",
               "source_path": "src/gui/opengl/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--gui--opengl--LICENSE.KHRONOS.txt",
+            "text_sha256": "2e484f3c26ff5008c704a3ca9dd809d43f24a004a1abb6c202660fbff0d19715",
+            "text_size_bytes": 1084
           }
         },
         {
@@ -4914,7 +5071,10 @@
               "size_bytes": 801,
               "git_blob_sha1": "acc66a8210efe3591e1c1212d698723fe47d5571",
               "source_path": "src/gui/vulkan/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--gui--vulkan--LICENSE.txt",
+            "text_sha256": "5f618873b0cdd1e84c611c5529212c2524bfc887bdfd7d1f3b568bad3c649612",
+            "text_size_bytes": 11473
           }
         },
         {
@@ -4932,10 +5092,14 @@
               "size_bytes": 782,
               "git_blob_sha1": "e1094396af24ddbfaeee533b2e50791b1aea4c92",
               "source_path": "src/gui/rhi/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--gui--rhi--LICENSE.MiniEngine.txt",
+            "text_sha256": "cf248820bf1178370bb4f1670a59f8748d46bc96d0f64080cd631511c6046409",
+            "text_size_bytes": 1077
           }
         }
-      ]
+      ],
+      "parent_version": "6.12.0"
     },
     {
       "relpath": "_internal/PySide6/Qt6Network.dll",
@@ -4958,7 +5122,10 @@
               "size_bytes": 2458,
               "git_blob_sha1": "b283b66973bae9521b6c460885e3b724ae3668f7",
               "source_path": "src/3rdparty/libpsl/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--libpsl--src--LICENSE.chromium",
+            "text_sha256": "1d7f52747a9169751cdf2641a8299c0098e9ecdf9429296ffd55bdb14c9ed5b3",
+            "text_size_bytes": 1664
           }
         },
         {
@@ -4976,10 +5143,14 @@
               "size_bytes": 2458,
               "git_blob_sha1": "b283b66973bae9521b6c460885e3b724ae3668f7",
               "source_path": "src/3rdparty/libpsl/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--libpsl--PSL-LICENSE.txt",
+            "text_sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
+            "text_size_bytes": 16726
           }
         }
-      ]
+      ],
+      "parent_version": "6.12.0"
     },
     {
       "relpath": "_internal/PySide6/Qt6Svg.dll",
@@ -5002,10 +5173,14 @@
               "size_bytes": 269,
               "git_blob_sha1": "2a98a0fc891340e7e287cdb900d2a7d10123705a",
               "source_path": "src/svg/REUSE.toml"
-            }
+            },
+            "text_file": "dr144-qtsvg-LICENSES--HPND-sell-variant.txt",
+            "text_sha256": "3a946598a9f674d44df764279ca0b85b5d6faba08f3bc75d8e0fcf6cd729a9bd",
+            "text_size_bytes": 1185
           }
         }
-      ]
+      ],
+      "parent_version": "6.12.0"
     },
     {
       "relpath": "_internal/PySide6/plugins/imageformats/qjpeg.dll",
@@ -5028,7 +5203,10 @@
               "size_bytes": 859,
               "git_blob_sha1": "82a65bcfd4bdb9a7dcc59496f554cadf0673b341",
               "source_path": "src/3rdparty/libjpeg/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--libjpeg--LICENSE",
+            "text_sha256": "ba6bceebcba0fdd35488477c2cca8c4632ce82c74dbfbc87d886ce6fc4433579",
+            "text_size_bytes": 6077
           }
         },
         {
@@ -5046,10 +5224,14 @@
               "size_bytes": 859,
               "git_blob_sha1": "82a65bcfd4bdb9a7dcc59496f554cadf0673b341",
               "source_path": "src/3rdparty/libjpeg/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--libjpeg--ijg-license.txt",
+            "text_sha256": "1cb448f5e2e6d3aca60943f4eee1a04675628dc0266a074a42bc1560ebc28d61",
+            "text_size_bytes": 1815
           }
         }
-      ]
+      ],
+      "parent_version": "6.12.0"
     },
     {
       "relpath": "_internal/PySide6/plugins/imageformats/qtiff.dll",
@@ -5072,7 +5254,10 @@
               "size_bytes": 859,
               "git_blob_sha1": "82a65bcfd4bdb9a7dcc59496f554cadf0673b341",
               "source_path": "src/3rdparty/libjpeg/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--libjpeg--LICENSE",
+            "text_sha256": "ba6bceebcba0fdd35488477c2cca8c4632ce82c74dbfbc87d886ce6fc4433579",
+            "text_size_bytes": 6077
           }
         },
         {
@@ -5090,7 +5275,10 @@
               "size_bytes": 859,
               "git_blob_sha1": "82a65bcfd4bdb9a7dcc59496f554cadf0673b341",
               "source_path": "src/3rdparty/libjpeg/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-src--3rdparty--libjpeg--ijg-license.txt",
+            "text_sha256": "1cb448f5e2e6d3aca60943f4eee1a04675628dc0266a074a42bc1560ebc28d61",
+            "text_size_bytes": 1815
           }
         },
         {
@@ -5108,10 +5296,14 @@
               "size_bytes": 758,
               "git_blob_sha1": "2b29cebea418da58fe06593a751057addb3a4d21",
               "source_path": "src/3rdparty/libtiff/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtimageformats-src--3rdparty--libtiff--COPYRIGHT",
+            "text_sha256": "fbd6fed7938541d2c809c0826225fc85e551fdbfa8732b10f0c87e0847acafd7",
+            "text_size_bytes": 1146
           }
         }
-      ]
+      ],
+      "parent_version": "6.12.0"
     },
     {
       "relpath": "_internal/PySide6/plugins/imageformats/qwebp.dll",
@@ -5134,7 +5326,10 @@
               "size_bytes": 880,
               "git_blob_sha1": "8e7008d2a907be5515b463ada36ddc45405ab6c0",
               "source_path": "src/3rdparty/libwebp/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtimageformats-src--3rdparty--libwebp--COPYING",
+            "text_sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf",
+            "text_size_bytes": 1496
           }
         },
         {
@@ -5152,10 +5347,14 @@
               "size_bytes": 880,
               "git_blob_sha1": "8e7008d2a907be5515b463ada36ddc45405ab6c0",
               "source_path": "src/3rdparty/libwebp/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtimageformats-src--3rdparty--libwebp--PATENTS",
+            "text_sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c",
+            "text_size_bytes": 1436
           }
         }
-      ]
+      ],
+      "parent_version": "6.12.0"
     },
     {
       "relpath": "_internal/PySide6/plugins/platforms/qdirect2d.dll",
@@ -5178,10 +5377,14 @@
               "size_bytes": 602,
               "git_blob_sha1": "6c3a0ef6fe687facbc4c1a3fc9d0383fb47e0f8b",
               "source_path": "src/3rdparty/wintab/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-LICENSES--LicenseRef-Lcs-Telegraphics.txt",
+            "text_sha256": "c10225ebbd5191bfdd761b0d7752c785f2453ab665d6c454473fb12d254668aa",
+            "text_size_bytes": 139
           }
         }
-      ]
+      ],
+      "parent_version": "6.12.0"
     },
     {
       "relpath": "_internal/PySide6/plugins/platforms/qwindows.dll",
@@ -5204,10 +5407,14 @@
               "size_bytes": 602,
               "git_blob_sha1": "6c3a0ef6fe687facbc4c1a3fc9d0383fb47e0f8b",
               "source_path": "src/3rdparty/wintab/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-LICENSES--LicenseRef-Lcs-Telegraphics.txt",
+            "text_sha256": "c10225ebbd5191bfdd761b0d7752c785f2453ab665d6c454473fb12d254668aa",
+            "text_size_bytes": 139
           }
         }
-      ]
+      ],
+      "parent_version": "6.12.0"
     },
     {
       "relpath": "_internal/_bz2.pyd",
@@ -5226,10 +5433,14 @@
             "source_path": "LICENSE",
             "source_archive_url": "https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz",
             "source_archive_sha256": "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269",
-            "source_archive_size_bytes": 810029
+            "source_archive_size_bytes": 810029,
+            "text_file": "dr144-bzip2-1.0.8-LICENSE.txt",
+            "text_sha256": "c6dbbf828498be844a89eaa3b84adbab3199e342eb5cb2ed2f0d4ba7ec0f38a3",
+            "text_size_bytes": 1896
           }
         }
-      ]
+      ],
+      "parent_version": "3.12.13 (python-build-standalone 20260303)"
     },
     {
       "relpath": "_internal/_decimal.pyd",
@@ -5256,10 +5467,14 @@
                 978,
                 1008
               ]
-            }
+            },
+            "text_file": "dr144-cpython-Doc--license.rst-L978-1008.txt",
+            "text_sha256": "e59cc21ee1f03744ecd930d930886aa36a0d51f6a3735d297416fb99cf6af16a",
+            "text_size_bytes": 1550
           }
         }
-      ]
+      ],
+      "parent_version": "3.12.13 (python-build-standalone 20260303)"
     },
     {
       "relpath": "_internal/_elementtree.pyd",
@@ -5286,10 +5501,14 @@
                 847,
                 873
               ]
-            }
+            },
+            "text_file": "dr144-cpython-Doc--license.rst-L847-873.txt",
+            "text_sha256": "cd5c3fdc602671f1b2f06d35550c64797571660243d9404a25acbeceaa0a9acc",
+            "text_size_bytes": 1349
           }
         }
-      ]
+      ],
+      "parent_version": "3.12.13 (python-build-standalone 20260303)"
     },
     {
       "relpath": "_internal/_lzma.pyd",
@@ -5305,10 +5524,14 @@
             "source_tag": "v5.8.1",
             "source_tag_object": "802ddd955d81f9c83eb4e25f6c3f950845929fcb",
             "source_commit": "a522a226545730551f7e7c2685fab27cf567746c",
-            "source_path": "COPYING.0BSD"
+            "source_path": "COPYING.0BSD",
+            "text_file": "dr144-xz-COPYING.0BSD",
+            "text_sha256": "0b01625d853911cd0e2e088dcfb743261034a091bb379246cb25a14cc4c74bf1",
+            "text_size_bytes": 607
           }
         }
-      ]
+      ],
+      "parent_version": "3.12.13 (python-build-standalone 20260303)"
     },
     {
       "relpath": "_internal/libde265-0-da04b6b2448c39c0b7f218769dedb2f1.dll",
@@ -5333,10 +5556,14 @@
                 1,
                 36
               ]
-            }
+            },
+            "text_file": "dr144-wheels-libde265-libde265--md5.cc-L1-36.txt",
+            "text_sha256": "c7cf010490872c2fc0de69a68dcd729a4659aec4eef96a92be9d6b0098baa434",
+            "text_size_bytes": 1626
           }
         }
-      ]
+      ],
+      "parent_version": "1.8.1"
     },
     {
       "relpath": "_internal/libstdc++-6-e4d43a335d57132a6ec3004cece76b4f.dll",
@@ -5361,7 +5588,10 @@
                 1,
                 16
               ]
-            }
+            },
+            "text_file": "dr144-wheels-gcc-libstdc++-v3--src--c++17--ryu--common.h-L1-16.txt",
+            "text_sha256": "9d9e6a10dd8395e18688b61ef492c862560f1ef590135f33bbed392d1695c552",
+            "text_size_bytes": 652
           }
         },
         {
@@ -5381,10 +5611,14 @@
                 11,
                 39
               ]
-            }
+            },
+            "text_file": "dr144-wheels-gcc-libstdc++-v3--src--c++17--fast_float--fast_float.h-L11-39.txt",
+            "text_sha256": "8cb34f377be3ab9f48658a1daee306e14016a2e2277cc8c00940f64973abbc3b",
+            "text_size_bytes": 1266
           }
         }
-      ]
+      ],
+      "parent_version": "1.8.1"
     },
     {
       "relpath": "_internal/libx265-217-276e7d75772a32bd086b54d54e01fd11.dll",
@@ -5398,7 +5632,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/Multicorewareinc/x265",
             "source_commit": "e9b88125dc21393b3fd8d68e98083bdfb89778a8",
-            "source_path": "source/dynamicHDR10/json11/LICENSE.txt"
+            "source_path": "source/dynamicHDR10/json11/LICENSE.txt",
+            "text_file": "dr144-wheels-x265-source--dynamicHDR10--json11--LICENSE.txt",
+            "text_sha256": "950e288a2548cb33f6a90d23958806b0803f510ab17c600d661619a73ae3a6c8",
+            "text_size_bytes": 1057
           }
         },
         {
@@ -5418,10 +5655,14 @@
                 1,
                 24
               ]
-            }
+            },
+            "text_file": "dr144-wheels-x265-source--common--x86--x86inc.asm-L1-24.txt",
+            "text_sha256": "c101b9c6c9f101d40d2e00442ab60fc65152ae77429076cf0196a7b8be81d4a7",
+            "text_size_bytes": 1332
           }
         }
-      ]
+      ],
+      "parent_version": "1.8.1"
     },
     {
       "relpath": "_internal/numpy.libs/libscipy_openblas64_-ed4f167a5330424524f45258e7ca2c8d.dll",
@@ -5447,7 +5688,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "2.5.4"
     },
     {
       "relpath": "_internal/pyexpat.pyd",
@@ -5474,10 +5716,14 @@
                 847,
                 873
               ]
-            }
+            },
+            "text_file": "dr144-cpython-Doc--license.rst-L847-873.txt",
+            "text_sha256": "cd5c3fdc602671f1b2f06d35550c64797571660243d9404a25acbeceaa0a9acc",
+            "text_size_bytes": 1349
           }
         }
-      ]
+      ],
+      "parent_version": "3.12.13 (python-build-standalone 20260303)"
     },
     {
       "relpath": "_internal/python312.dll",
@@ -5493,7 +5739,10 @@
             "source_tag": "v1.3.1",
             "source_tag_object": "925af44f3cde53c6b076611c297850091b5dc7bb",
             "source_commit": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-zlib-LICENSE",
+            "text_sha256": "845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243",
+            "text_size_bytes": 1002
           }
         },
         {
@@ -5515,7 +5764,10 @@
                 1,
                 23
               ]
-            }
+            },
+            "text_file": "dr144-cpython-Modules--_hacl--Hacl_Hash_MD5.c-L1-23.txt",
+            "text_sha256": "998ce04fb8ad9dedb0bc1b44938f8c3dcf1089780fa105ce1c8c30fb5554d78c",
+            "text_size_bytes": 1207
           }
         },
         {
@@ -5537,7 +5789,10 @@
                 1,
                 12
               ]
-            }
+            },
+            "text_file": "dr144-cpython-Modules--_blake2--impl--blake2.h-L1-12.txt",
+            "text_sha256": "a27d7169aa4b7db350c5e46da87184c4b7a8ac8e4d86dce38845fdffd789d7b5",
+            "text_size_bytes": 519
           }
         },
         {
@@ -5559,7 +5814,10 @@
                 305,
                 352
               ]
-            }
+            },
+            "text_file": "dr144-cpython-Doc--license.rst-L305-352.txt",
+            "text_sha256": "56f6444da8ffc5a7403e934e85c5458b28b8281a8dbcb30c8f033efc28aab264",
+            "text_size_bytes": 2235
           }
         },
         {
@@ -5581,7 +5839,10 @@
                 599,
                 625
               ]
-            }
+            },
+            "text_file": "dr144-cpython-Doc--license.rst-L599-625.txt",
+            "text_sha256": "f0a5a3b6400f8c73ab033ebff8abdd4415429f17207955a9744756949c11dd3d",
+            "text_size_bytes": 1113
           }
         },
         {
@@ -5603,7 +5864,10 @@
                 937,
                 975
               ]
-            }
+            },
+            "text_file": "dr144-cpython-Doc--license.rst-L937-975.txt",
+            "text_sha256": "8aaa94145b2ad55fceb0eb9cc1eb42fde5465ca80e0c5fb4f5927d7571b9daa3",
+            "text_size_bytes": 1742
           }
         },
         {
@@ -5625,7 +5889,10 @@
                 628,
                 655
               ]
-            }
+            },
+            "text_file": "dr144-cpython-Doc--license.rst-L628-655.txt",
+            "text_sha256": "67b560eeb6711cf6431080091951c9fb1ed49608d7c59226e6c55266e79f5168",
+            "text_size_bytes": 1341
           }
         },
         {
@@ -5647,10 +5914,14 @@
                 1048,
                 1076
               ]
-            }
+            },
+            "text_file": "dr144-cpython-Doc--license.rst-L1048-1076.txt",
+            "text_sha256": "1cadd6c0eb034c6eaf0d2e8f06aec6fc9546b16d395902d7adf8a3f642d0f15e",
+            "text_size_bytes": 1204
           }
         }
-      ]
+      ],
+      "parent_version": "3.12.13 (python-build-standalone 20260303)"
     },
     {
       "relpath": "_internal/scipy.libs/libscipy_openblas-197ee2fc9b4d071f7e048078cac74115.dll",
@@ -5676,7 +5947,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/_cyutility.cp312-win_amd64.pyd",
@@ -5716,7 +5988,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/_lib/_ccallback_c.cp312-win_amd64.pyd",
@@ -5756,7 +6029,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/_lib/_fpumode.cp312-win_amd64.pyd",
@@ -5796,7 +6070,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/_lib/_uarray/_uarray.cp312-win_amd64.pyd",
@@ -5836,7 +6111,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/_lib/messagestream.cp312-win_amd64.pyd",
@@ -5876,7 +6152,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/fft/_duccfft/pyduccfft.cp312-win_amd64.pyd",
@@ -5933,10 +6210,14 @@
                 111,
                 140
               ]
-            }
+            },
+            "text_file": "dr144-wheels-scipy-LICENSES_bundled.txt-L111-140.txt",
+            "text_sha256": "71b3972f2c3d7c3c5a5fdc82608d38b2f4726177a30ba1c904b17901053f1fea",
+            "text_size_bytes": 1720
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/integrate/_dop.cp312-win_amd64.pyd",
@@ -5976,7 +6257,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/integrate/_odepack.cp312-win_amd64.pyd",
@@ -6016,7 +6298,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/integrate/_quadpack.cp312-win_amd64.pyd",
@@ -6056,7 +6339,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/integrate/_vode.cp312-win_amd64.pyd",
@@ -6096,7 +6380,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/interpolate/_dierckx.cp312-win_amd64.pyd",
@@ -6136,7 +6421,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/interpolate/_fitpack.cp312-win_amd64.pyd",
@@ -6176,7 +6462,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/interpolate/_interpnd.cp312-win_amd64.pyd",
@@ -6216,7 +6503,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/interpolate/_ppoly.cp312-win_amd64.pyd",
@@ -6256,7 +6544,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/interpolate/_rbfinterp_pythran.cp312-win_amd64.pyd",
@@ -6270,7 +6559,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/boostorg/math",
             "source_commit": "c114cf4a6ae958ce87ed6db4d55c1db4ec0a9c74",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-boost-math-LICENSE",
+            "text_sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+            "text_size_bytes": 1338
           }
         },
         {
@@ -6311,10 +6603,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/serge-sans-paille/pythran",
             "source_commit": "580c5abea7bdaf949cd55c99b26969befca04c7f",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-pythran-LICENSE",
+            "text_sha256": "0be9f14c66a9a3cb66d5263a6495437862ce0c9cdf60d4a6c36d1e51b1244c6e",
+            "text_size_bytes": 1506
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/interpolate/_rgi_cython.cp312-win_amd64.pyd",
@@ -6354,7 +6650,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/linalg/_batched_linalg.cp312-win_amd64.pyd",
@@ -6394,7 +6691,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/linalg/_cythonized_array_utils.cp312-win_amd64.pyd",
@@ -6434,7 +6732,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/linalg/_decomp_interpolative.cp312-win_amd64.pyd",
@@ -6475,7 +6774,10 @@
                 31,
                 74
               ]
-            }
+            },
+            "text_file": "dr144-final-id_dist--doc.tex-L31-74.txt",
+            "text_sha256": "d49f6f31635740cc9f3737dfa99833789dd9eb6c25d3e0bcb4f7234ea541d6e3",
+            "text_size_bytes": 1759
           }
         },
         {
@@ -6496,7 +6798,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/linalg/_decomp_update.cp312-win_amd64.pyd",
@@ -6536,7 +6839,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/linalg/_fblas.cp312-win_amd64.pyd",
@@ -6598,7 +6902,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/linalg/_flapack.cp312-win_amd64.pyd",
@@ -6660,7 +6965,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/linalg/_internal_matfuncs.cp312-win_amd64.pyd",
@@ -6700,7 +7006,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/linalg/_linalg_pythran.cp312-win_amd64.pyd",
@@ -6714,7 +7021,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/boostorg/math",
             "source_commit": "c114cf4a6ae958ce87ed6db4d55c1db4ec0a9c74",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-boost-math-LICENSE",
+            "text_sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+            "text_size_bytes": 1338
           }
         },
         {
@@ -6755,10 +7065,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/serge-sans-paille/pythran",
             "source_commit": "580c5abea7bdaf949cd55c99b26969befca04c7f",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-pythran-LICENSE",
+            "text_sha256": "0be9f14c66a9a3cb66d5263a6495437862ce0c9cdf60d4a6c36d1e51b1244c6e",
+            "text_size_bytes": 1506
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/linalg/_matfuncs_sqrtm_triu.cp312-win_amd64.pyd",
@@ -6798,7 +7112,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/linalg/_solve_toeplitz.cp312-win_amd64.pyd",
@@ -6838,7 +7153,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/linalg/cython_blas.cp312-win_amd64.pyd",
@@ -6878,7 +7194,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/linalg/cython_lapack.cp312-win_amd64.pyd",
@@ -6918,7 +7235,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/ndimage/_nd_image.cp312-win_amd64.pyd",
@@ -6964,10 +7282,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/scipy",
             "source_commit": "e4e854eaa8f18d807cd3496028e257e36caa93cc",
-            "source_path": "scipy/ndimage/LICENSE.txt"
+            "source_path": "scipy/ndimage/LICENSE.txt",
+            "text_file": "dr144-wheels-scipy-scipy--ndimage--LICENSE.txt",
+            "text_sha256": "606209a000716c5f66e33e180ce08434b96ed17db4975ab9723c6b5fbcc89609",
+            "text_size_bytes": 1389
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/ndimage/_ni_label.cp312-win_amd64.pyd",
@@ -7007,7 +7329,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/ndimage/_rank_filter_1d.cp312-win_amd64.pyd",
@@ -7047,7 +7370,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_bglu_dense.cp312-win_amd64.pyd",
@@ -7087,7 +7411,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_direct.cp312-win_amd64.pyd",
@@ -7101,7 +7426,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/scipy",
             "source_commit": "e4e854eaa8f18d807cd3496028e257e36caa93cc",
-            "source_path": "scipy/optimize/_direct/COPYING"
+            "source_path": "scipy/optimize/_direct/COPYING",
+            "text_file": "dr144-wheels-scipy-scipy--optimize--_direct--COPYING",
+            "text_sha256": "a7669da81aac1b0539f161cf93d6a94956d24ff476537e0b0579925997eec3f0",
+            "text_size_bytes": 1543
           }
         },
         {
@@ -7136,7 +7464,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_group_columns.cp312-win_amd64.pyd",
@@ -7150,7 +7479,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/boostorg/math",
             "source_commit": "c114cf4a6ae958ce87ed6db4d55c1db4ec0a9c74",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-boost-math-LICENSE",
+            "text_sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+            "text_size_bytes": 1338
           }
         },
         {
@@ -7191,10 +7523,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/serge-sans-paille/pythran",
             "source_commit": "580c5abea7bdaf949cd55c99b26969befca04c7f",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-pythran-LICENSE",
+            "text_sha256": "0be9f14c66a9a3cb66d5263a6495437862ce0c9cdf60d4a6c36d1e51b1244c6e",
+            "text_size_bytes": 1506
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_highspy/_core.cp312-win_amd64.pyd",
@@ -7208,7 +7544,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/HiGHs",
             "source_commit": "4f96ee8f40b2d3a46e00d6137d5eb31044680776",
-            "source_path": "LICENSE.txt"
+            "source_path": "LICENSE.txt",
+            "text_file": "dr144-wheels-HiGHs-LICENSE.txt",
+            "text_sha256": "10b39dba7b7731175f0705398b6db4320b64add1bd2ed9f9ec5b512a9ef1bd95",
+            "text_size_bytes": 1062
           }
         },
         {
@@ -7228,7 +7567,10 @@
                 1,
                 6
               ]
-            }
+            },
+            "text_file": "dr144-wheels-HiGHs-highs--ipm--basiclu--basiclu_factorize.c-L1-6.txt",
+            "text_sha256": "dfd2c68d9ff9f7bdc90d3932eca3e04c7c099151ef41ea2c02f9b3345cdc55e6",
+            "text_size_bytes": 74
           }
         },
         {
@@ -7251,7 +7593,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/HiGHs",
             "source_commit": "4f96ee8f40b2d3a46e00d6137d5eb31044680776",
-            "source_path": "LICENSE.txt"
+            "source_path": "LICENSE.txt",
+            "text_file": "dr144-wheels-HiGHs-LICENSE.txt",
+            "text_sha256": "10b39dba7b7731175f0705398b6db4320b64add1bd2ed9f9ec5b512a9ef1bd95",
+            "text_size_bytes": 1062
           }
         },
         {
@@ -7278,7 +7623,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/HiGHs",
             "source_commit": "4f96ee8f40b2d3a46e00d6137d5eb31044680776",
-            "source_path": "LICENSE.txt"
+            "source_path": "LICENSE.txt",
+            "text_file": "dr144-wheels-HiGHs-LICENSE.txt",
+            "text_sha256": "10b39dba7b7731175f0705398b6db4320b64add1bd2ed9f9ec5b512a9ef1bd95",
+            "text_size_bytes": 1062
           }
         },
         {
@@ -7287,7 +7635,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/HiGHs",
             "source_commit": "4f96ee8f40b2d3a46e00d6137d5eb31044680776",
-            "source_path": "extern/filereaderlp/LICENSE"
+            "source_path": "extern/filereaderlp/LICENSE",
+            "text_file": "dr144-wheels-HiGHs-extern--filereaderlp--LICENSE",
+            "text_sha256": "4374bb8064e5302f5ac6b82fd3e153a36670f04d0a6ee1bc55b3dc3faee923cc",
+            "text_size_bytes": 1061
           }
         },
         {
@@ -7296,7 +7647,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/HiGHs",
             "source_commit": "4f96ee8f40b2d3a46e00d6137d5eb31044680776",
-            "source_path": "extern/pdqsort/license.txt"
+            "source_path": "extern/pdqsort/license.txt",
+            "text_file": "dr144-wheels-HiGHs-extern--pdqsort--license.txt",
+            "text_sha256": "323fc18e35fcf058d69d684022ef844f206cb8fefb2bac1298fa1767e0b9ae38",
+            "text_size_bytes": 874
           }
         },
         {
@@ -7316,10 +7670,14 @@
                 111,
                 140
               ]
-            }
+            },
+            "text_file": "dr144-wheels-scipy-LICENSES_bundled.txt-L111-140.txt",
+            "text_sha256": "71b3972f2c3d7c3c5a5fdc82608d38b2f4726177a30ba1c904b17901053f1fea",
+            "text_size_bytes": 1720
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_highspy/_highs_options.cp312-win_amd64.pyd",
@@ -7333,7 +7691,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/HiGHs",
             "source_commit": "4f96ee8f40b2d3a46e00d6137d5eb31044680776",
-            "source_path": "LICENSE.txt"
+            "source_path": "LICENSE.txt",
+            "text_file": "dr144-wheels-HiGHs-LICENSE.txt",
+            "text_sha256": "10b39dba7b7731175f0705398b6db4320b64add1bd2ed9f9ec5b512a9ef1bd95",
+            "text_size_bytes": 1062
           }
         },
         {
@@ -7353,7 +7714,10 @@
                 1,
                 6
               ]
-            }
+            },
+            "text_file": "dr144-wheels-HiGHs-highs--ipm--basiclu--basiclu_factorize.c-L1-6.txt",
+            "text_sha256": "dfd2c68d9ff9f7bdc90d3932eca3e04c7c099151ef41ea2c02f9b3345cdc55e6",
+            "text_size_bytes": 74
           }
         },
         {
@@ -7376,7 +7740,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/HiGHs",
             "source_commit": "4f96ee8f40b2d3a46e00d6137d5eb31044680776",
-            "source_path": "LICENSE.txt"
+            "source_path": "LICENSE.txt",
+            "text_file": "dr144-wheels-HiGHs-LICENSE.txt",
+            "text_sha256": "10b39dba7b7731175f0705398b6db4320b64add1bd2ed9f9ec5b512a9ef1bd95",
+            "text_size_bytes": 1062
           }
         },
         {
@@ -7403,7 +7770,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/HiGHs",
             "source_commit": "4f96ee8f40b2d3a46e00d6137d5eb31044680776",
-            "source_path": "LICENSE.txt"
+            "source_path": "LICENSE.txt",
+            "text_file": "dr144-wheels-HiGHs-LICENSE.txt",
+            "text_sha256": "10b39dba7b7731175f0705398b6db4320b64add1bd2ed9f9ec5b512a9ef1bd95",
+            "text_size_bytes": 1062
           }
         },
         {
@@ -7412,7 +7782,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/HiGHs",
             "source_commit": "4f96ee8f40b2d3a46e00d6137d5eb31044680776",
-            "source_path": "extern/filereaderlp/LICENSE"
+            "source_path": "extern/filereaderlp/LICENSE",
+            "text_file": "dr144-wheels-HiGHs-extern--filereaderlp--LICENSE",
+            "text_sha256": "4374bb8064e5302f5ac6b82fd3e153a36670f04d0a6ee1bc55b3dc3faee923cc",
+            "text_size_bytes": 1061
           }
         },
         {
@@ -7421,7 +7794,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/HiGHs",
             "source_commit": "4f96ee8f40b2d3a46e00d6137d5eb31044680776",
-            "source_path": "extern/pdqsort/license.txt"
+            "source_path": "extern/pdqsort/license.txt",
+            "text_file": "dr144-wheels-HiGHs-extern--pdqsort--license.txt",
+            "text_sha256": "323fc18e35fcf058d69d684022ef844f206cb8fefb2bac1298fa1767e0b9ae38",
+            "text_size_bytes": 874
           }
         },
         {
@@ -7441,10 +7817,14 @@
                 111,
                 140
               ]
-            }
+            },
+            "text_file": "dr144-wheels-scipy-LICENSES_bundled.txt-L111-140.txt",
+            "text_sha256": "71b3972f2c3d7c3c5a5fdc82608d38b2f4726177a30ba1c904b17901053f1fea",
+            "text_size_bytes": 1720
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_lbfgsb.cp312-win_amd64.pyd",
@@ -7485,7 +7865,10 @@
                 15,
                 38
               ]
-            }
+            },
+            "text_file": "dr144-final-lbfgsb--README-L15-38.txt",
+            "text_sha256": "283efcb76166e067a3d17d1156f548456318cb7850f67409fa7d96f59a5dfe1d",
+            "text_size_bytes": 1192
           }
         },
         {
@@ -7496,7 +7879,10 @@
             "source_commit": "bcb0ddc71ae1afdf5715ededaf9453aa704c2384",
             "source_path": "License.txt",
             "source_tag": "1.0.0",
-            "source_tag_object": "3ec3a438f6295c5e991a0d95a3f78088b2255102"
+            "source_tag_object": "3ec3a438f6295c5e991a0d95a3f78088b2255102",
+            "text_file": "dr144-final-lbfgsb--License.txt",
+            "text_sha256": "919e78c1c48cc7d179efe63075590cfb5942e6ae1da2bf373dd754fe795139b5",
+            "text_size_bytes": 4557
           }
         },
         {
@@ -7517,7 +7903,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_lsap.cp312-win_amd64.pyd",
@@ -7556,7 +7943,10 @@
                 1,
                 41
               ]
-            }
+            },
+            "text_file": "dr144-wheels-scipy-scipy--optimize--rectangular_lsap--rectangular_lsap.cpp-L1-41.txt",
+            "text_sha256": "afd21dbd9ad187388df7130f1c8387924020e690fb20860fa7804e118a4f5a49",
+            "text_size_bytes": 1848
           }
         },
         {
@@ -7577,7 +7967,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_lsq/givens_elimination.cp312-win_amd64.pyd",
@@ -7617,7 +8008,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_minpack.cp312-win_amd64.pyd",
@@ -7647,7 +8039,10 @@
             "source_commit": "c8c53ad6a1fc4a524cc35f972fa5591255093eaf",
             "source_path": "src/minpack/DISCLAIMER",
             "source_tag": "v1.9.1",
-            "source_tag_object": "04df15420b6c0b2b86c79990a061cdeb5942b585"
+            "source_tag_object": "04df15420b6c0b2b86c79990a061cdeb5942b585",
+            "text_file": "dr144-final-minpack--DISCLAIMER",
+            "text_sha256": "f5b330efdad110cdd84d585ec61220b0650461fa599e36b13e1726c9346dcfb9",
+            "text_size_bytes": 2246
           }
         },
         {
@@ -7668,7 +8063,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_moduleTNC.cp312-win_amd64.pyd",
@@ -7725,7 +8121,10 @@
                 27,
                 47
               ]
-            }
+            },
+            "text_file": "dr144-wheels-scipy-scipy--optimize--tnc--tnc.c-L27-47.txt",
+            "text_sha256": "c35a0c1b185b6408b50817b40b9b3e576be8d36546fc3bb598797d102ee38168",
+            "text_size_bytes": 736
           }
         },
         {
@@ -7734,10 +8133,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/scipy",
             "source_commit": "e4e854eaa8f18d807cd3496028e257e36caa93cc",
-            "source_path": "scipy/optimize/tnc/LICENSE"
+            "source_path": "scipy/optimize/tnc/LICENSE",
+            "text_file": "dr144-wheels-scipy-scipy--optimize--tnc--LICENSE",
+            "text_sha256": "3df9207af2fdb861af0ae3b22026f163b9bcfab4e525dc4943afe2ffa3f77624",
+            "text_size_bytes": 1085
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_pava_pybind.cp312-win_amd64.pyd",
@@ -7794,10 +8197,14 @@
                 111,
                 140
               ]
-            }
+            },
+            "text_file": "dr144-wheels-scipy-LICENSES_bundled.txt-L111-140.txt",
+            "text_sha256": "71b3972f2c3d7c3c5a5fdc82608d38b2f4726177a30ba1c904b17901053f1fea",
+            "text_size_bytes": 1720
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_slsqplib.cp312-win_amd64.pyd",
@@ -7856,7 +8263,10 @@
                 1,
                 30
               ]
-            }
+            },
+            "text_file": "dr144-final-slsqp--slsqp_optmz.f-L1-30.txt",
+            "text_sha256": "f1d9aa03a6a8d5bafc0b6bd20b64a86ec622fe9b3cde2052fbf5ccdbda69e843",
+            "text_size_bytes": 1004
           }
         },
         {
@@ -7878,10 +8288,14 @@
                 215,
                 215
               ]
-            }
+            },
+            "text_file": "dr144-final-slsqp--slsqp_optmz.f-L215-215.txt",
+            "text_sha256": "98de00e1b3ce1545541a39e2b2e57d7edd0101e52b7ddfa6346943cff227b2d2",
+            "text_size_bytes": 73
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_trlib/_trlib.cp312-win_amd64.pyd",
@@ -7938,10 +8352,14 @@
                 1,
                 23
               ]
-            }
+            },
+            "text_file": "dr144-wheels-scipy-scipy--optimize--_trlib--trlib_krylov.c-L1-23.txt",
+            "text_sha256": "2d54d45e581c12b96d1c991429d6a083f91356112e6c76cb0a86555245c95017",
+            "text_size_bytes": 1142
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/optimize/_zeros.cp312-win_amd64.pyd",
@@ -7981,7 +8399,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/sparse/_csparsetools.cp312-win_amd64.pyd",
@@ -8021,7 +8440,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/sparse/_sparsetools.cp312-win_amd64.pyd",
@@ -8061,7 +8481,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/sparse/csgraph/_flow.cp312-win_amd64.pyd",
@@ -8101,7 +8522,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/sparse/csgraph/_matching.cp312-win_amd64.pyd",
@@ -8140,7 +8562,10 @@
                 33,
                 66
               ]
-            }
+            },
+            "text_file": "dr144-wheels-scipy-LICENSES_bundled.txt-L33-66.txt",
+            "text_sha256": "5e9ceb55daecacc06bb6c26d387537d78b139ef2c55b2c42735c3d83202a1273",
+            "text_size_bytes": 1754
           }
         },
         {
@@ -8161,7 +8586,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/sparse/csgraph/_min_spanning_tree.cp312-win_amd64.pyd",
@@ -8201,7 +8627,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/sparse/csgraph/_reordering.cp312-win_amd64.pyd",
@@ -8241,7 +8668,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/sparse/csgraph/_shortest_path.cp312-win_amd64.pyd",
@@ -8281,7 +8709,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/sparse/csgraph/_tools.cp312-win_amd64.pyd",
@@ -8321,7 +8750,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/sparse/csgraph/_traversal.cp312-win_amd64.pyd",
@@ -8361,7 +8791,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/sparse/linalg/_dsolve/_superlu.cp312-win_amd64.pyd",
@@ -8386,7 +8817,10 @@
                 62,
                 68
               ]
-            }
+            },
+            "text_file": "dr144-wheels-scipy-scipy--sparse--linalg--_dsolve--SuperLU--SRC--colamd.c-L62-68.txt",
+            "text_sha256": "76291bd4f013a998a78746b09b6480f67e2bed155b95701ab6c787f1b64b64bb",
+            "text_size_bytes": 229
           }
         },
         {
@@ -8427,10 +8861,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/scipy",
             "source_commit": "e4e854eaa8f18d807cd3496028e257e36caa93cc",
-            "source_path": "scipy/sparse/linalg/_dsolve/SuperLU/License.txt"
+            "source_path": "scipy/sparse/linalg/_dsolve/SuperLU/License.txt",
+            "text_file": "dr144-wheels-scipy-scipy--sparse--linalg--_dsolve--SuperLU--License.txt",
+            "text_sha256": "f0cedf52503b2d42b83411a0a16e6fefac346dfad8fddc66f50050150123470c",
+            "text_size_bytes": 1681
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/sparse/linalg/_eigen/arpack/_arpacklib.cp312-win_amd64.pyd",
@@ -8455,7 +8893,10 @@
                 52,
                 91
               ]
-            }
+            },
+            "text_file": "dr144-wheels-scipy-scipy--sparse--linalg--_eigen--arpack--arnaud--ARPACK_LICENSE.txt-L52-91.txt",
+            "text_sha256": "7f6ba8aea2aa8a90bd41d6e531ad0b4321829b89e3738ffc9cb57acc4e9ec58a",
+            "text_size_bytes": 1773
           }
         },
         {
@@ -8496,10 +8937,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/scipy",
             "source_commit": "e4e854eaa8f18d807cd3496028e257e36caa93cc",
-            "source_path": "scipy/sparse/linalg/_eigen/arpack/arnaud/LICENSE"
+            "source_path": "scipy/sparse/linalg/_eigen/arpack/arnaud/LICENSE",
+            "text_file": "dr144-wheels-scipy-scipy--sparse--linalg--_eigen--arpack--arnaud--LICENSE",
+            "text_sha256": "f49da99252dee2c12dbd5c71762b0724063f4531de193fbcece550ad9a3b6354",
+            "text_size_bytes": 1466
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/sparse/linalg/_propack.cp312-win_amd64.pyd",
@@ -8545,7 +8990,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/scipy",
             "source_commit": "e4e854eaa8f18d807cd3496028e257e36caa93cc",
-            "source_path": "scipy/sparse/linalg/_propack/PROPACK/PROPACK_LICENSE.txt"
+            "source_path": "scipy/sparse/linalg/_propack/PROPACK/PROPACK_LICENSE.txt",
+            "text_file": "dr144-wheels-scipy-scipy--sparse--linalg--_propack--PROPACK--PROPACK_LICENSE.txt",
+            "text_sha256": "7f961824c2570a623cb1420269cd4336807776379ac161771aacbecfdcf176c0",
+            "text_size_bytes": 2061
           }
         },
         {
@@ -8554,10 +9002,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/scipy",
             "source_commit": "e4e854eaa8f18d807cd3496028e257e36caa93cc",
-            "source_path": "scipy/sparse/linalg/_eigen/arpack/arnaud/LICENSE"
+            "source_path": "scipy/sparse/linalg/_eigen/arpack/arnaud/LICENSE",
+            "text_file": "dr144-wheels-scipy-scipy--sparse--linalg--_eigen--arpack--arnaud--LICENSE",
+            "text_sha256": "f49da99252dee2c12dbd5c71762b0724063f4531de193fbcece550ad9a3b6354",
+            "text_size_bytes": 1466
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/spatial/_ckdtree.cp312-win_amd64.pyd",
@@ -8597,7 +9049,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/spatial/_distance_pybind.cp312-win_amd64.pyd",
@@ -8654,10 +9107,14 @@
                 111,
                 140
               ]
-            }
+            },
+            "text_file": "dr144-wheels-scipy-LICENSES_bundled.txt-L111-140.txt",
+            "text_sha256": "71b3972f2c3d7c3c5a5fdc82608d38b2f4726177a30ba1c904b17901053f1fea",
+            "text_size_bytes": 1720
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/spatial/_distance_wrap.cp312-win_amd64.pyd",
@@ -8697,7 +9154,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/spatial/_hausdorff.cp312-win_amd64.pyd",
@@ -8737,7 +9195,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/spatial/_qhull.cp312-win_amd64.pyd",
@@ -8777,7 +9236,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/spatial/_voronoi.cp312-win_amd64.pyd",
@@ -8817,7 +9277,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/spatial/transform/_rigid_transform_cy.cp312-win_amd64.pyd",
@@ -8857,7 +9318,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/spatial/transform/_rotation_cy.cp312-win_amd64.pyd",
@@ -8897,7 +9359,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/special/_comb.cp312-win_amd64.pyd",
@@ -8937,7 +9400,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/special/_ellip_harm_2.cp312-win_amd64.pyd",
@@ -8962,7 +9426,10 @@
                 1,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--amos--amos.h-L1-37.txt",
+            "text_sha256": "9f717425eaca42949f2787705dcba18004a79798e46519f1247327cad5475ec2",
+            "text_size_bytes": 1608
           }
         },
         {
@@ -8982,7 +9449,10 @@
                 3,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L3-37.txt",
+            "text_sha256": "22a61f607c6e902629b7eb8d53210a0830ac3da203fd3673b510305872ffea2e",
+            "text_size_bytes": 1926
           }
         },
         {
@@ -9002,7 +9472,10 @@
                 39,
                 61
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L39-61.txt",
+            "text_sha256": "566fe5f3d2c3a837e2231905058d979f3993768ec9eb348f8bfc266201abfc8b",
+            "text_size_bytes": 1173
           }
         },
         {
@@ -9054,7 +9527,10 @@
                 63,
                 114
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L63-114.txt",
+            "text_sha256": "ca476e634d2a6285d6e1c3ecca994518bff4482238db47755aafa2f31cac8cfd",
+            "text_size_bytes": 2766
           }
         },
         {
@@ -9074,7 +9550,10 @@
                 1,
                 20
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--specfun--specfun.h-L1-20.txt",
+            "text_sha256": "8c18ffe8751682cc74e629b7b26c6545848f378ce860b99da6b9d4752ebe8d61",
+            "text_size_bytes": 665
           }
         },
         {
@@ -9083,10 +9562,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/xsf",
             "source_commit": "f7b85f505a94fd398024478d2e747b01dd2d7a6d",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-xsf-LICENSE",
+            "text_sha256": "632f86f8bd24a264ac49c002f39866f407a38e8cbd8a6568df7596cc7fbe0048",
+            "text_size_bytes": 1492
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/special/_gufuncs.cp312-win_amd64.pyd",
@@ -9111,7 +9594,10 @@
                 1,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--amos--amos.h-L1-37.txt",
+            "text_sha256": "9f717425eaca42949f2787705dcba18004a79798e46519f1247327cad5475ec2",
+            "text_size_bytes": 1608
           }
         },
         {
@@ -9131,7 +9617,10 @@
                 3,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L3-37.txt",
+            "text_sha256": "22a61f607c6e902629b7eb8d53210a0830ac3da203fd3673b510305872ffea2e",
+            "text_size_bytes": 1926
           }
         },
         {
@@ -9151,7 +9640,10 @@
                 39,
                 61
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L39-61.txt",
+            "text_sha256": "566fe5f3d2c3a837e2231905058d979f3993768ec9eb348f8bfc266201abfc8b",
+            "text_size_bytes": 1173
           }
         },
         {
@@ -9203,7 +9695,10 @@
                 63,
                 114
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L63-114.txt",
+            "text_sha256": "ca476e634d2a6285d6e1c3ecca994518bff4482238db47755aafa2f31cac8cfd",
+            "text_size_bytes": 2766
           }
         },
         {
@@ -9223,7 +9718,10 @@
                 1,
                 20
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--specfun--specfun.h-L1-20.txt",
+            "text_sha256": "8c18ffe8751682cc74e629b7b26c6545848f378ce860b99da6b9d4752ebe8d61",
+            "text_size_bytes": 665
           }
         },
         {
@@ -9232,10 +9730,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/xsf",
             "source_commit": "f7b85f505a94fd398024478d2e747b01dd2d7a6d",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-xsf-LICENSE",
+            "text_sha256": "632f86f8bd24a264ac49c002f39866f407a38e8cbd8a6568df7596cc7fbe0048",
+            "text_size_bytes": 1492
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/special/_specfun.cp312-win_amd64.pyd",
@@ -9260,7 +9762,10 @@
                 1,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--amos--amos.h-L1-37.txt",
+            "text_sha256": "9f717425eaca42949f2787705dcba18004a79798e46519f1247327cad5475ec2",
+            "text_size_bytes": 1608
           }
         },
         {
@@ -9280,7 +9785,10 @@
                 3,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L3-37.txt",
+            "text_sha256": "22a61f607c6e902629b7eb8d53210a0830ac3da203fd3673b510305872ffea2e",
+            "text_size_bytes": 1926
           }
         },
         {
@@ -9300,7 +9808,10 @@
                 39,
                 61
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L39-61.txt",
+            "text_sha256": "566fe5f3d2c3a837e2231905058d979f3993768ec9eb348f8bfc266201abfc8b",
+            "text_size_bytes": 1173
           }
         },
         {
@@ -9352,7 +9863,10 @@
                 63,
                 114
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L63-114.txt",
+            "text_sha256": "ca476e634d2a6285d6e1c3ecca994518bff4482238db47755aafa2f31cac8cfd",
+            "text_size_bytes": 2766
           }
         },
         {
@@ -9372,7 +9886,10 @@
                 1,
                 20
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--specfun--specfun.h-L1-20.txt",
+            "text_sha256": "8c18ffe8751682cc74e629b7b26c6545848f378ce860b99da6b9d4752ebe8d61",
+            "text_size_bytes": 665
           }
         },
         {
@@ -9381,10 +9898,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/xsf",
             "source_commit": "f7b85f505a94fd398024478d2e747b01dd2d7a6d",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-xsf-LICENSE",
+            "text_sha256": "632f86f8bd24a264ac49c002f39866f407a38e8cbd8a6568df7596cc7fbe0048",
+            "text_size_bytes": 1492
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/special/_special_ufuncs.cp312-win_amd64.pyd",
@@ -9409,7 +9930,10 @@
                 1,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--amos--amos.h-L1-37.txt",
+            "text_sha256": "9f717425eaca42949f2787705dcba18004a79798e46519f1247327cad5475ec2",
+            "text_size_bytes": 1608
           }
         },
         {
@@ -9429,7 +9953,10 @@
                 3,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L3-37.txt",
+            "text_sha256": "22a61f607c6e902629b7eb8d53210a0830ac3da203fd3673b510305872ffea2e",
+            "text_size_bytes": 1926
           }
         },
         {
@@ -9449,7 +9976,10 @@
                 39,
                 61
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L39-61.txt",
+            "text_sha256": "566fe5f3d2c3a837e2231905058d979f3993768ec9eb348f8bfc266201abfc8b",
+            "text_size_bytes": 1173
           }
         },
         {
@@ -9501,7 +10031,10 @@
                 63,
                 114
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L63-114.txt",
+            "text_sha256": "ca476e634d2a6285d6e1c3ecca994518bff4482238db47755aafa2f31cac8cfd",
+            "text_size_bytes": 2766
           }
         },
         {
@@ -9521,7 +10054,10 @@
                 1,
                 20
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--specfun--specfun.h-L1-20.txt",
+            "text_sha256": "8c18ffe8751682cc74e629b7b26c6545848f378ce860b99da6b9d4752ebe8d61",
+            "text_size_bytes": 665
           }
         },
         {
@@ -9530,10 +10066,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/xsf",
             "source_commit": "f7b85f505a94fd398024478d2e747b01dd2d7a6d",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-xsf-LICENSE",
+            "text_sha256": "632f86f8bd24a264ac49c002f39866f407a38e8cbd8a6568df7596cc7fbe0048",
+            "text_size_bytes": 1492
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/special/_ufuncs.cp312-win_amd64.pyd",
@@ -9558,7 +10098,10 @@
                 1,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--amos--amos.h-L1-37.txt",
+            "text_sha256": "9f717425eaca42949f2787705dcba18004a79798e46519f1247327cad5475ec2",
+            "text_size_bytes": 1608
           }
         },
         {
@@ -9578,7 +10121,10 @@
                 3,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L3-37.txt",
+            "text_sha256": "22a61f607c6e902629b7eb8d53210a0830ac3da203fd3673b510305872ffea2e",
+            "text_size_bytes": 1926
           }
         },
         {
@@ -9600,7 +10146,10 @@
                 168,
                 205
               ]
-            }
+            },
+            "text_file": "dr144-final-cdflib--README-L168-205.txt",
+            "text_sha256": "d1afd8036f0b6c60b7fa8f912b91298e7e47cc350146ad30d1bad23577c8568c",
+            "text_size_bytes": 1978
           }
         },
         {
@@ -9620,7 +10169,10 @@
                 39,
                 61
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L39-61.txt",
+            "text_sha256": "566fe5f3d2c3a837e2231905058d979f3993768ec9eb348f8bfc266201abfc8b",
+            "text_size_bytes": 1173
           }
         },
         {
@@ -9672,7 +10224,10 @@
                 63,
                 114
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L63-114.txt",
+            "text_sha256": "ca476e634d2a6285d6e1c3ecca994518bff4482238db47755aafa2f31cac8cfd",
+            "text_size_bytes": 2766
           }
         },
         {
@@ -9692,7 +10247,10 @@
                 1,
                 20
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--specfun--specfun.h-L1-20.txt",
+            "text_sha256": "8c18ffe8751682cc74e629b7b26c6545848f378ce860b99da6b9d4752ebe8d61",
+            "text_size_bytes": 665
           }
         },
         {
@@ -9701,10 +10259,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/xsf",
             "source_commit": "f7b85f505a94fd398024478d2e747b01dd2d7a6d",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-xsf-LICENSE",
+            "text_sha256": "632f86f8bd24a264ac49c002f39866f407a38e8cbd8a6568df7596cc7fbe0048",
+            "text_size_bytes": 1492
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/special/_ufuncs_cxx.cp312-win_amd64.pyd",
@@ -9729,7 +10291,10 @@
                 1,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--amos--amos.h-L1-37.txt",
+            "text_sha256": "9f717425eaca42949f2787705dcba18004a79798e46519f1247327cad5475ec2",
+            "text_size_bytes": 1608
           }
         },
         {
@@ -9738,7 +10303,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/boostorg/math",
             "source_commit": "c114cf4a6ae958ce87ed6db4d55c1db4ec0a9c74",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-boost-math-LICENSE",
+            "text_sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+            "text_size_bytes": 1338
           }
         },
         {
@@ -9758,7 +10326,10 @@
                 3,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L3-37.txt",
+            "text_sha256": "22a61f607c6e902629b7eb8d53210a0830ac3da203fd3673b510305872ffea2e",
+            "text_size_bytes": 1926
           }
         },
         {
@@ -9778,7 +10349,10 @@
                 39,
                 61
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L39-61.txt",
+            "text_sha256": "566fe5f3d2c3a837e2231905058d979f3993768ec9eb348f8bfc266201abfc8b",
+            "text_size_bytes": 1173
           }
         },
         {
@@ -9830,7 +10404,10 @@
                 21,
                 51
               ]
-            }
+            },
+            "text_file": "dr144-wheels-scipy-scipy--special--wright.cc-L21-51.txt",
+            "text_sha256": "cc17ba1d99117ba80f33640ef959e600ffd4af1234bfea685310770cc3611edc",
+            "text_size_bytes": 1598
           }
         },
         {
@@ -9850,7 +10427,10 @@
                 63,
                 114
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L63-114.txt",
+            "text_sha256": "ca476e634d2a6285d6e1c3ecca994518bff4482238db47755aafa2f31cac8cfd",
+            "text_size_bytes": 2766
           }
         },
         {
@@ -9870,7 +10450,10 @@
                 1,
                 20
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--specfun--specfun.h-L1-20.txt",
+            "text_sha256": "8c18ffe8751682cc74e629b7b26c6545848f378ce860b99da6b9d4752ebe8d61",
+            "text_size_bytes": 665
           }
         },
         {
@@ -9879,10 +10462,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/xsf",
             "source_commit": "f7b85f505a94fd398024478d2e747b01dd2d7a6d",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-xsf-LICENSE",
+            "text_sha256": "632f86f8bd24a264ac49c002f39866f407a38e8cbd8a6568df7596cc7fbe0048",
+            "text_size_bytes": 1492
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/special/cython_special.cp312-win_amd64.pyd",
@@ -9907,7 +10494,10 @@
                 1,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--amos--amos.h-L1-37.txt",
+            "text_sha256": "9f717425eaca42949f2787705dcba18004a79798e46519f1247327cad5475ec2",
+            "text_size_bytes": 1608
           }
         },
         {
@@ -9927,7 +10517,10 @@
                 3,
                 37
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L3-37.txt",
+            "text_sha256": "22a61f607c6e902629b7eb8d53210a0830ac3da203fd3673b510305872ffea2e",
+            "text_size_bytes": 1926
           }
         },
         {
@@ -9949,7 +10542,10 @@
                 168,
                 205
               ]
-            }
+            },
+            "text_file": "dr144-final-cdflib--README-L168-205.txt",
+            "text_sha256": "d1afd8036f0b6c60b7fa8f912b91298e7e47cc350146ad30d1bad23577c8568c",
+            "text_size_bytes": 1978
           }
         },
         {
@@ -9969,7 +10565,10 @@
                 39,
                 61
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L39-61.txt",
+            "text_sha256": "566fe5f3d2c3a837e2231905058d979f3993768ec9eb348f8bfc266201abfc8b",
+            "text_size_bytes": 1173
           }
         },
         {
@@ -10021,7 +10620,10 @@
                 63,
                 114
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-LICENSES_bundled.txt-L63-114.txt",
+            "text_sha256": "ca476e634d2a6285d6e1c3ecca994518bff4482238db47755aafa2f31cac8cfd",
+            "text_size_bytes": 2766
           }
         },
         {
@@ -10041,7 +10643,10 @@
                 1,
                 20
               ]
-            }
+            },
+            "text_file": "dr144-wheels-xsf-include--xsf--specfun--specfun.h-L1-20.txt",
+            "text_sha256": "8c18ffe8751682cc74e629b7b26c6545848f378ce860b99da6b9d4752ebe8d61",
+            "text_size_bytes": 665
           }
         },
         {
@@ -10050,10 +10655,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/xsf",
             "source_commit": "f7b85f505a94fd398024478d2e747b01dd2d7a6d",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-xsf-LICENSE",
+            "text_sha256": "632f86f8bd24a264ac49c002f39866f407a38e8cbd8a6568df7596cc7fbe0048",
+            "text_size_bytes": 1492
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/stats/_ansari_swilk_statistics.cp312-win_amd64.pyd",
@@ -10093,7 +10702,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/stats/_biasedurn.cp312-win_amd64.pyd",
@@ -10107,7 +10717,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/scipy/scipy",
             "source_commit": "e4e854eaa8f18d807cd3496028e257e36caa93cc",
-            "source_path": "scipy/stats/biasedurn/license.txt"
+            "source_path": "scipy/stats/biasedurn/license.txt",
+            "text_file": "dr144-wheels-scipy-scipy--stats--biasedurn--license.txt",
+            "text_sha256": "c2bf3b1e5a5cde539b9f8e38b5c870f49db0b5f01c7f9cdd1d1291bafc81d22f",
+            "text_size_bytes": 1217
           }
         },
         {
@@ -10164,7 +10777,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/stats/_levy_stable/levyst.cp312-win_amd64.pyd",
@@ -10204,7 +10818,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/stats/_qmc_cy.cp312-win_amd64.pyd",
@@ -10244,7 +10859,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/stats/_qmvnt_cy.cp312-win_amd64.pyd",
@@ -10284,7 +10900,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/stats/_rcont/rcont.cp312-win_amd64.pyd",
@@ -10346,7 +10963,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/stats/_sobol.cp312-win_amd64.pyd",
@@ -10386,7 +11004,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/stats/_stats.cp312-win_amd64.pyd",
@@ -10426,7 +11045,8 @@
             }
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/scipy/stats/_stats_pythran.cp312-win_amd64.pyd",
@@ -10440,7 +11060,10 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/boostorg/math",
             "source_commit": "c114cf4a6ae958ce87ed6db4d55c1db4ec0a9c74",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-boost-math-LICENSE",
+            "text_sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+            "text_size_bytes": 1338
           }
         },
         {
@@ -10481,10 +11104,14 @@
             "provenance_kind": "git-tree",
             "source_repository": "https://github.com/serge-sans-paille/pythran",
             "source_commit": "580c5abea7bdaf949cd55c99b26969befca04c7f",
-            "source_path": "LICENSE"
+            "source_path": "LICENSE",
+            "text_file": "dr144-wheels-pythran-LICENSE",
+            "text_sha256": "0be9f14c66a9a3cb66d5263a6495437862ce0c9cdf60d4a6c36d1e51b1244c6e",
+            "text_size_bytes": 1506
           }
         }
-      ]
+      ],
+      "parent_version": "1.18.1"
     },
     {
       "relpath": "_internal/shiboken6/shiboken6.abi3.dll",
@@ -10507,10 +11134,14 @@
               "size_bytes": 610,
               "git_blob_sha1": "984549b5cadbd7319304a20f8ce4355637dc795c",
               "source_path": "sources/shiboken6/libshiboken/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-pyside-setup-sources--shiboken6--shibokenmodule--files.dir--shibokensupport--signature--PSF-3.7.0.txt",
+            "text_sha256": "e5bdc4b568f0016df16652c4769bafde76641b61409149100ee53b708c8f1219",
+            "text_size_bytes": 2445
           }
         }
-      ]
+      ],
+      "parent_version": "6.12.0"
     },
     {
       "relpath": "_internal/unicodedata.pyd",
@@ -10533,10 +11164,14 @@
               "size_bytes": 2170,
               "git_blob_sha1": "5bc5e3f58f60febeb87ff12d745210a31496ba77",
               "source_path": "src/corelib/text/qt_attribution.json"
-            }
+            },
+            "text_file": "dr144-qtbase-LICENSES--Unicode-3.0.txt",
+            "text_sha256": "80bb6294022d8764adb36a9d65ebb6bd94efb1865918a71e31e6c247607d7634",
+            "text_size_bytes": 1995
           }
         }
-      ]
+      ],
+      "parent_version": "3.12.13 (python-build-standalone 20260303)"
     }
   ],
   "limits": [

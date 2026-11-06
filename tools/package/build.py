@@ -2157,6 +2157,55 @@ def source_commit_epoch() -> int:
         raise ValueError(f"cannot read source commit time: {error}") from error
 
 
+def _release_files(folder: Path) -> list[Path]:
+    if folder.is_symlink() or folder.is_junction() or not folder.is_dir():
+        raise ValueError("release ZIP requires a physical release folder without junctions")
+    resolved = folder.resolve()
+    pending = [folder]
+    files = []
+    while pending:
+        for path in pending.pop().iterdir():
+            if (
+                path.is_symlink()
+                or path.is_junction()
+                or not path.resolve().is_relative_to(resolved)
+            ):
+                raise ValueError(
+                    "release ZIP refuses linked/junction/outside member: "
+                    f"{path.relative_to(folder)}"
+                )
+            if path.is_dir():
+                pending.append(path)
+            elif path.is_file():
+                files.append(path)
+            else:
+                raise ValueError(f"release ZIP refuses special file: {path.relative_to(folder)}")
+    return sorted(files, key=lambda path: path.relative_to(folder).as_posix())
+
+
+def _release_snapshot(folder: Path) -> dict[str, tuple[str, int]]:
+    snapshot = {}
+    for path in _release_files(folder):
+        with path.open("rb") as stream:
+            digest = hashlib.file_digest(stream, "sha256").hexdigest()
+        snapshot[path.relative_to(folder).as_posix()] = (digest, path.stat().st_size)
+    return snapshot
+
+
+def _check_release_snapshot(folder: Path, expected: dict[str, tuple[str, int]]) -> None:
+    actual = _release_snapshot(folder)
+    for name in sorted(expected.keys() | actual.keys()):
+        if name not in expected:
+            change = "added"
+        elif name not in actual:
+            change = "removed"
+        elif actual[name] != expected[name]:
+            change = "changed"
+        else:
+            continue
+        raise ValueError(f"release folder {change} after pre-smoke snapshot: {name}")
+
+
 def write_release_zip(folder: Path, *, out: Path, source_epoch: int) -> Path:
     """Archive a release wrapper with sorted files and fixed source-commit metadata.
 
@@ -2188,12 +2237,7 @@ def write_release_zip(folder: Path, *, out: Path, source_epoch: int) -> Path:
         stamp.minute,
         stamp.second // 2 * 2,
     )
-    if folder.is_symlink() or not folder.is_dir():
-        raise ValueError("release ZIP requires a physical release folder")
-    paths = sorted(folder.rglob("*"), key=lambda path: path.relative_to(folder).as_posix())
-    if any(path.is_symlink() or not (path.is_file() or path.is_dir()) for path in paths):
-        raise ValueError("release ZIP refuses linked or special files")
-    files = [path for path in paths if path.is_file()]
+    files = _release_files(folder)
     if not files:
         raise ValueError("release ZIP requires a nonempty release folder")
     target = out / (folder.name + ".zip")
@@ -2258,8 +2302,14 @@ def build(
         0 when the build succeeded and the bundle holds nothing forbidden, else 1.
     """
     try:
+        if zip_release:
+            target = out / (release_dir(out, form, app_version()).name + ".zip")
+            for path in (target, target.with_suffix(".zip.sha256")):
+                if not path.resolve().is_relative_to(out.resolve()):
+                    raise ValueError("release ZIP cleanup must stay inside --out")
+                path.unlink(missing_ok=True)
         check_build_environment()
-    except ValueError as error:
+    except (OSError, ValueError) as error:
         print(f"FAILED: {error}")
         return 1
     if (notices or smoke or zip_release) and form != "onedir":
@@ -2378,12 +2428,21 @@ def build(
             )
             print(f"FAILED: artifact notices: {message}")
             return 1
+    snapshot = None
+    if zip_release:
+        try:
+            snapshot = _release_snapshot(root)
+        except (OSError, ValueError) as error:
+            print(f"FAILED: release zip: {error}")
+            return 1
     if smoke:
         status = smoke_artifact(executable.parent, out=out)
         if status:
             return status
     if zip_release:
         try:
+            assert snapshot is not None
+            _check_release_snapshot(root, snapshot)
             print(f"wrote {write_release_zip(root, out=out, source_epoch=source_commit_epoch())}")
         except (OSError, ValueError, zipfile.BadZipFile, zipfile.LargeZipFile) as error:
             message = (

@@ -210,9 +210,13 @@ def test_tag_gate_git_failures_are_named_refusals(
         if args[-len(command) :] == command:
             reached.append(True)
             if error == "exit":
-                raise subprocess.CalledProcessError(128, args, stderr="fatal: planted failure")
+                raise subprocess.CalledProcessError(
+                    128, args, stderr="earlier diagnostic\nfatal: planted failure\n \n"
+                )
             if error == "timeout":
-                raise subprocess.TimeoutExpired(args, 30)
+                raise subprocess.TimeoutExpired(
+                    args, 30, stderr=b"earlier diagnostic\nfatal: planted timeout\n \n"
+                )
             raise OSError("planted launch failure")
         return subprocess.CompletedProcess(args, 0, _git_stdout(args), "")
 
@@ -222,8 +226,30 @@ def test_tag_gate_git_failures_are_named_refusals(
         exec(code, {})
     assert reached == [True]
     assert str(refused.value).startswith(failure)
+    if error != "os-error":
+        assert str(refused.value).endswith(
+            "fatal: planted " + ("failure" if error == "exit" else "timeout")
+        )
+        assert "earlier diagnostic" not in str(refused.value)
+        assert "\n" not in str(refused.value)
     assert refused.value.__suppress_context__
     assert not output.exists()
+
+
+def test_tag_gate_bounds_git_stderr_line(workflow, tmp_path, monkeypatch):
+    """A large Git diagnostic keeps the final line within a bounded refusal."""
+    monkeypatch.setenv("GITHUB_REF", "refs/tags/v1.1.0")
+    monkeypatch.setitem(sys.modules, "clearwater", SimpleNamespace(__version__="1.1.0"))
+
+    def git(args, **kwargs):
+        raise subprocess.CalledProcessError(128, args, stderr="older\n" + "x" * 1000 + " END\n\n")
+
+    monkeypatch.setattr(subprocess, "run", git)
+    with pytest.raises(SystemExit) as error:
+        exec(compile(script(workflow, "Check release version"), "release-stderr", "exec"), {})
+    message = str(error.value)
+    assert "could not be fetched" in message and message.endswith(" END")
+    assert len(message) < 700 and "older" not in message and "\n" not in message
 
 
 @pytest.mark.parametrize(

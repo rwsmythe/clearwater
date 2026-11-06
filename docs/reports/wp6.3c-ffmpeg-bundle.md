@@ -1,6 +1,8 @@
 # WP6.3c - FFmpeg bundle
 
-Status: turn 10 shipped DR-144 limits complete, 2026-11-05; acceptance pending. The dispatch records the seat's fork
+Status: turn 11 implements Reviewer A r1's commissioned remediations, 2026-11-06;
+acceptance pending. Validation is blocked by an out-of-grant smoke-fixture update
+(details below); five real-Git cases also require the seat. The dispatch records the seat's fork
 commit/export and clean actionlint result; Dockerfile generation was refused by
 the seat's tool policy and a static proof recorded instead. The real asset,
 lock re-pin, remaining package work, review, package gate and release are pending.
@@ -1499,7 +1501,7 @@ the new plan field defaults to an empty tuple for existing callers.
 `_embedded_claims` census preflight, never an independent weaker identity check.
 A carried host with different bytes refuses by name with expected/actual hash
 and size and `re-census required`, before package coverage or notice publication.
-An absent declared host contributes no embedded claim and no limits host;
+Turn-10 absence decision (superseded by turn 11 below): an absent declared host contributes no embedded claim and no limits host;
 an entry whose hosts are ALL legitimately absent is omitted, matching embedded
 rows' absence rule. Partial carriage renders only actual carried paths, sorted.
 Both a text row and a limits entry for one component render independently.
@@ -1692,3 +1694,223 @@ remaining package/release work, independent reviews and gates remain with
 later dispatches/seat. The cell does not close DR-144 or assert N13/release
 completion. One logical change this turn. `depth_input_tokens` is unavailable
 to the fresh cell; dispatcher read due at the boundary, no estimate supplied.
+
+## Turn 11 - Reviewer A round 1 remediation
+
+**Status: commissioned fixes implemented; YIELD with a scope finding.** All
+eleven FIX dispositions below are implemented. Static checks and the 64-case
+focused selection pass. The prescribed five-module selection is NOT green:
+15 smoke-fixture setup errors require a fixture edit outside this turn's grant;
+five real-Git cases fail at the sandbox's local fixture push and need the seat.
+Neither a passing package gate nor Reviewer A convergence is claimed.
+
+**Adjudication and RED -> GREEN.** Logs, XML and instruments in this section
+are under `work/wp6.3c/turn11/`; all basetemps are fresh. F3/F5 remain with CHARC,
+as dispatched, and the fork patch is unchanged.
+
+| Finding / severity | Disposition and implementation | RED evidence -> GREEN evidence |
+| --- | --- | --- |
+| F1 MAJOR | FIXED. Strict `parent_version` on every host; compare against the carried parent's installed version (and the lock/audit's existing version checks). Python binds CPython version plus the PBS `BUILD` release. A missing declared host with its parent carried refuses by host and parent. Every carried file matching a declared SHA-256/size at an undeclared path refuses as moved, including an additional copy with the original still present. | Final behavior baseline: five failures (rename, move, duplicate, missing host, legitimate parent upgrade). Current focused selection passes all five and five strict-version schema cases. Fresh production rename/move probes refuse below. |
+| F2 minor | FIXED. A `LicenceInput.reference` marker distinguishes a reused input. The renderer checks each input as before and retains the original non-reference heading/provenance while preserving the shared anchor/order. | Four baseline heading failures -> four passes, including GCC/SciPy audit, MinGW/pillow-heif and libsharpyuv-libyuv/Pillow shapes. Exactly four production blocks change labels; listed below. |
+| F3 minor | HELD by CHARC; not commissioned this turn. | No patch edit or new claim. |
+| F4 minor | FIXED. A `--zip` invocation removes its exact zip and sidecar at entry, before environment/scan/build work; resolved targets must stay inside `--out`. | Four stale-output build cases fail before the scan on the old module -> all pass, including subsequent notices, smoke and timestamp refusals. |
+| F5 advisory | HELD by CHARC; not commissioned this turn. | No fork permissions edit. |
+| F6 advisory | FIXED. Physical-tree traversal refuses a junction/symlink before descending, every member resolving outside the root, and special files. The writer and snapshots use that traversal. | Real `_winapi.CreateJunction` control packs outside bytes on the old writer -> current writer refuses and preserves the outside file. The case ran on Windows; no junction skip. |
+| F7 advisory | FIXED. Snapshot sorted relative paths, SHA-256 and sizes after notices immediately before smoke; compare after smoke and before publication, naming the first added/removed/changed file. | Three corrected-fixture baseline builds return success after smoke mutates covered files -> all three refuse now. The changed-file case keeps the same size, proving hashing is required. |
+| F8 advisory | FIXED in the gate step only. Each named Git refusal appends the last nonempty stderr line, limited to its final 400 characters; byte stderr on timeout is decoded. Timeout structure/argv are unchanged. | Eight exit/timeout diagnostic assertions and one long-line assertion fail -> all nine pass; the four no-stderr launch-error controls also pass. |
+| F9 advisory | DECLINED as ruled: the full tag peel is already checked against `GITHUB_SHA`. | No extra nested-tag restriction. |
+| F10 advisory | FIXED. Independent host source pins also include `text_file`, `text_sha256`, `text_size_bytes`. Re-derived all 175 local-text host source references; references to already-carried material retain their separately pinned input identities. | A self-consistent component-only whole-text swap is accepted by the behavior baseline -> current planner refuses by host/component/source pin. |
+| F11 advisory | FIXED. Excerpt line splitting uses LF only and preserves every byte, including lone CR and a missing final LF. The interpreter-text excerpt uses the same primitive. | A valid lone-CR-containing line is rejected by the old splitter -> current plan/render accepts it. All 34 production slices independently match LF numbering. |
+| F12 advisory | FIXED. README says FFmpeg is extracted from the verified archive. | `manifest-audit.log` verifies HEAD's copy wording and the current extraction wording. |
+| F13 advisory | FIXED. Limits component/statement values refuse CR, LF, all C0/C1 controls and Unicode line/paragraph separators. | Fourteen control-character baseline cases accept injected strings -> all fourteen refuse now. |
+| F14 advisory | FIXED, test-only. Replace the vacuous shared byte-change control with a textless undeclared-host binding control that `_embedded_claims` cannot catch. | `limits-mutant.log`: disabling only `_limit_declarations` causes the new test to fail (`DID NOT RAISE`); the unmutated case passes in `focused-final.log` and the full selection. Rename/move controls independently cover F1. |
+
+The final behavior baseline is `notices-red-valid-record.log` / `.xml`:
+**25 failed, 362 deselected**. `red_legacy_schema.py` executes the unmodified
+HEAD notices source from `notices-before.py`, adapting ONLY new host declaration
+keys (strip `parent_version` and the three new text-pin fields) so the old
+behavior is tested past its old strict schema. No runtime behavior is patched.
+For rename/move tests the synthetic installed wheel file AND its RECORD change,
+so metadata enumeration sees a genuine rebuilt/moved file. Earlier exploratory
+RED runs that hit the old schema or a nonexistent repointed RECORD target are
+not the behavior proof. The separate new parent-version schema controls still
+exercise the current strict schema without adaptation.
+
+`build-red-final.log` / `.xml` executes the old HEAD build source with corrected
+regression fixtures: **8 failed, 122 deselected** (F4 four, F6 one, F7 three).
+The initial combined `build-red.log` also records F8's nine diagnostic failures
+(its first F7 fixture attempts did not reach the intended behavior; the final
+eight-case baseline replaces that part). No production file was reverted for
+these controls. `focused-final.log` / `.xml` is **64 passed, 510 deselected** on
+the final unmodified production files. The F14 mutant is deliberately RED,
+**1 failed, 386 deselected**, and is never loaded by a normal run.
+
+**Absent-host decision, superseding turn 10.** A declaration alone still does
+not assert redistribution. Omitting a component/limits entry because all its
+hosts are absent is valid ONLY when those hosts' parents are not carried.
+If a parent row is carried, each of its declared hosts must be present with the
+census identity and parent version. Missing/renamed hosts require re-census;
+identical bytes moved to an undeclared path refuse even if the original remains.
+The partial/all-absent fixture controls now remove actual parent carriage as
+well as the absent host. Installed build metadata alone is not carriage.
+
+**Production generation and audit.** `prepare_manifest.py` derives parent
+versions from the production plan on a fresh stage-1d copy, with existing
+installed/lock/audit agreement, and verifies every declared host's measured
+bytes. The Python identity also checks the interpreter's `BUILD` marker against
+the manifest's PBS release. `parent-identities.json` is the seat-reviewable
+110-host table. Parent counts/versions:
+
+| Parent | Census identity | Hosts |
+| --- | --- | --- |
+| python | `3.12.13 (python-build-standalone 20260303)` | 7 |
+| pyside6-essentials | `6.12.0` | 9 |
+| shiboken6 | `6.12.0` | 1 |
+| numpy | `2.5.4` | 1 |
+| scipy | `1.18.1` | 83 |
+| pillow | `12.3.0` | 6 |
+| pillow-heif | `1.8.1` | 3 |
+
+`manifest-generation-final.log` and `manifest-audit.log` prove 110 parent
+versions and 175 source text pins; independent removal of only those added
+fields reconstructs the entire previous manifest object. Every component,
+source/version-evidence row, host byte identity, path and limits statement is
+unchanged. Generated JSON uses literal LF, retaining the existing byte
+discipline. Manifest SHA-256:
+`1a3d3bba9fad9617dae0a966212de27322077c4c6922c35ec5ea46425d01bf9e`.
+The loader, independent slice audit and full notices-module selection all pass.
+
+**Fresh-copy production probes.** `notices_probe.py`, `probe-final.log` and
+`probe-results.json` operate on `work/c63c-11/probes-final/` copies only. They
+never execute a copied native/executable. The unchanged pre-fix renderer first
+reproduced the exact supplied turn-10 hash; `notices-before.md` records it.
+
+- POSITIVE: **140 rows, 1,536 entries, 17 limits**. New notices SHA-256
+  `a50bc116ceee98dc23275bd62fde5cba51bdcb5ffe5d4474c8d16794ff79a2be`.
+  Planning/rendering equals the written bytes. A scratch renderer with only
+  F2's heading restoration removed reproduces the entire previous document
+  byte-for-byte: `e9aec25af81312d48221b59abbc42e8778d575c6d3ad6ea891e65ecd5db8df22`.
+  Thus F1/F10/F11/F13 do not change the valid artifact's rendered bytes.
+- RENAME: rename `_internal/libx265-217-276e7d75772a32bd086b54d54e01fd11.dll`
+  to a new hash-like name, change its bytes, and repoint an actual COPY of
+  pillow-heif's RECORD. A distribution adapter reads that copied RECORD and
+  resolves its renamed native to the copied file; installed metadata/licences
+  and the original RECORD remain read-only. Refusal:
+  `notices: embedded _internal/libx265-217-276e7d75772a32bd086b54d54e01fd11.dll absent while parent pillow-heif is carried; re-census required`.
+- MOVE: copy unchanged `_internal/scipy/integrate/_quadpack.cp312-win_amd64.pyd`
+  to `_quadpack_moved.cp312-win_amd64.pyd`, then remove only the original in
+  that copy. Refusal names both paths and says `moved to undeclared path` and
+  `re-census required`.
+- Both negative copies preserve their previous notices. Original stage-1d
+  notices before/after remain
+  `3afe913e26ecd6fe65765943fef798450687bebf7df926d1f720da9b8e999d8c`.
+  The original stage folder and installed wheel RECORD are never written.
+
+`notices.diff` contains ONLY four headings and their corresponding `Source:`
+labels; anchors, order, terms bytes and the rest of the document are unchanged:
+
+| Shared block | Before | After |
+| --- | --- | --- |
+| `licence-45`, SciPy aggregate | `Reused carried notice: scipy; scipy-1.18.1.dist-info/LICENSE.txt` | `Installed wheel: scipy 1.18.1; scipy-1.18.1.dist-info/LICENSE.txt` |
+| `licence-65`, Pillow aggregate | `Reused carried notice: pillow; pillow-12.3.0.dist-info/licenses/LICENSE` | `Installed wheel: pillow 12.3.0; pillow-12.3.0.dist-info/licenses/LICENSE` |
+| MinGW CRT audit `COPYING` | `MinGW-w64 CRT and winpthreads (static wheels) not established by wheels` prefix | `pillow-heif / MinGW runtime not named by wheel` prefix |
+| MinGW winpthreads audit `COPYING` | same reference prefix | same original pillow-heif prefix |
+
+The latter two retain their respective upstream URL and
+`; the 1.0.0 audit's upstream copy` suffix exactly. No licence text is dropped.
+
+**Final validation.** The isolated runner is `run_tests.py` (unchanged from
+turn 10): launch with `PYTHONPATH=scripts`, remove only that environment
+variable before `pytest.main`, keep `sandbox_mkdir_shim`, disable cacheprovider,
+timeout 300 and the QUIT_SCRIPT exclusion. No production environment check is
+bypassed. The smoke source-entry child was inspected before execution: redirected
+APPDATA/LOCALAPPDATA/XDG roots, blocked Qt imports, stubbed GUI/worker effects,
+15-second timeout. No QUIT_SCRIPT integration test ran.
+
+- `ruff-check-final.log`: `All checks passed!`.
+- `ruff-format-final.log`: `337 files already formatted`.
+- `mypy-win32-final.log`, `mypy-darwin-final.log`: each
+  `Success: no issues found in 166 source files`.
+- `static-exits-final.json`: all four exit codes 0.
+- Exact requested `work/c63c-11` run, `pytest.log` / `.xml`:
+  **5 failed, 656 passed, 1 skipped, 15 errors in 131.79s**.
+- Final fresh `work/c63c-11-final` run, `pytest-final.log` / `.xml`:
+  **5 failed, 656 passed, 1 skipped, 15 errors in 130.75s**.
+- `test-summary.json` independently tabulates every result and names every
+  failed/error case; `diff-check.log` records clean read-only `git diff --check`.
+
+| Module | Final result |
+| --- | --- |
+| `test_tools_package_notices.py` | 387 passed |
+| `test_tools_package_build.py` | 130 passed |
+| `test_tools_package_ffmpeg.py` | 68 passed |
+| `test_release_workflow.py` | 52 passed, 5 failed in local Git fixture setup |
+| `test_tools_package_smoke.py` | 19 passed, 15 setup errors, 1 unchanged skip |
+
+Five real-Git failures are
+`test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`
+for `annotated`, `lightweight`, `wrong-commit`, `mismatched-name`, `deleted-origin`.
+All fail at the fixture's `git push origin HEAD:refs/heads/main --tags`, exit 128,
+with Git's restricted-token/CreateFileMapping failure. None reaches the gate.
+As commissioned, these are COMMISSIONED to the seat outside the sandbox.
+The unchanged skip is `test_non_windows_containment_never_silently_skips`:
+`POSIX process-group native proof belongs to WP6.5`.
+
+**[MINOR, in envelope, test-only, CONFIRMED; scope STOP]** The `synthetic` fixture
+in `tests/test_tools_package_smoke.py` calls `real_plan` without the synthetic
+`release["native_surface"]` at lines 262-269. It therefore combines a tiny
+synthetic folder with the complete production census. Under F1 the first absent
+Python host correctly refuses:
+`notices: embedded _internal/_bz2.pyd absent while parent python is carried; re-census required`.
+All 15 setup errors share this exact cause. A production absent-host exemption
+would undo F1 and is not introduced. This turn owns that module for row counts
+ONLY, so the fixture is not edited. Requested narrow follow-on grant: pass
+`native_licences_path=release["native_surface"]` in that fixture's `real_plan`
+call, then align its two expected notices row counts with the explicit synthetic
+surface (6/8 rather than the inherited production-host 14/16). The seat must
+authorize/implement the fixture change before the five-module selection can be
+called green. F1's production success and negative controls already pass.
+
+Affected setup cases (all in that fixture):
+
+- `test_refusal_status_and_extra_stderr_fail_by_row_name`: `wrong-status`,
+  `two-lines`, `stdout`.
+- `test_timeout_and_surviving_child_fail_and_are_reaped`: `hang`, `leftover`,
+  `fast-leftover`.
+- `test_complete_smoke_preserves_shipping_bytes_and_checks_conditional_tools`:
+  `False`, `True`.
+- `test_bad_configuration_capabilities_or_missing_exception_log_fail`:
+  `configure`, `version`, `encoders`, `no-log`.
+- `test_static_checks_reread_artifact_and_refuse_before_entry_launch`:
+  `cuda`, `hidden`, `notices`.
+
+**Verification loop / cumulative round ledger.** The independent pre-change
+behavior runs confirm every fixed finding; final focused controls, copied-folder
+probes, manifest/slice audit and static checks find no further product issue.
+The full run confirms the synthetic-fixture scope finding above; it remains
+COMMISSIONED to the dispatcher for a narrow grant, not hidden with a test hook.
+Initial invalid RECORD-fixture targeting and a type-variable reuse were fixed;
+the corrected RED and final GREEN evidence are the results claimed here.
+
+| Round | Critical / major / minor / advisory | In / out of envelope | NEW / REOPENED | Reverts | Dispositions | Fix type | Depth |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A r1 | 0 / 1 / 3 / 10 (seat classification) | 10 / 4 | 14 / 0 | 0 | 11 fixed; F3/F5 held by CHARC; F9 declined | 9 product-code, 1 test-only, 1 documentation | dispatcher supplies `depth_input_tokens` |
+
+This row is the transfer for the dispatcher's cumulative ledger; no unowned
+proof/ledger file was edited. The new fixture scope finding is an implementer
+verification finding, not a new Reviewer A round. Reviewer A r2, Reviewer B and
+the package gate remain the dispatcher's work. No five-round continuation gate
+is reached in this turn.
+
+**Scope / handoff.** Nine owned tracked files changed; `tests/test_tools_package_smoke.py`
+is untouched. The manifest changes only `parent_version` and F10's pin fields.
+The workflow changes only the tag gate's stderr handling, preserving its timeout
+structure. No fork patch, FFmpeg lock, root notices, dependency, frozen interface
+or `src/` change; no network, real PyInstaller build, frozen/GUI launch, Docker,
+desktop input, protected-folder write, repository Git write, push, tag, workflow
+dispatch or mailbox post. The prescribed real-Git tests create only their own
+temporary fixture repositories before their sandbox push fails. Scratch files
+and copied artifacts stay in this worktree. The real fork/asset/re-pin, release
+work and CHARC-held F3/F5 remain later/seat work. This turn bundles the single
+commissioned r1 remediation set; the seat commits. `depth_input_tokens` is
+unavailable to the cell; dispatcher read due at this boundary, no estimate.
