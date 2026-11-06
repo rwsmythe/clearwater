@@ -26,6 +26,207 @@ def lock_data():
     return json.loads(LOCK.read_text(encoding="utf-8"))
 
 
+@pytest.mark.parametrize("slot", ["primary", "extra"])
+@pytest.mark.parametrize("damage", ["missing", "empty", "chosen", "status"])
+def test_component_obligations_fail_closed(slot, damage):
+    """Removing a row obligation must lose its specific refusal."""
+    data = lock_data()
+    row = (
+        data["components"][0]
+        if slot == "primary"
+        else next(
+            e for c in data["components"] for e in c["extra_repositories"] if e["status"] == "built"
+        )
+    )
+    if damage == "missing":
+        row.pop("texts", None)
+        refusal = "component texts must be nonempty"
+    elif damage == "empty":
+        row["texts"] = []
+        refusal = "component texts must be nonempty"
+    elif damage == "chosen":
+        row["chosen"] = "Unknown"
+        refusal = "invalid component chosen licence"
+    else:
+        row["status"] = "unknown"
+        refusal = "invalid component status"
+    with pytest.raises(ValueError, match=refusal):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("slot", ["primary", "extra"])
+@pytest.mark.parametrize("expression", ["MPL-1.1", "Unknown OR MPL-1.1", "MIT AND Unknown"])
+def test_component_incompatible_expressions_refuse(slot, expression):
+    """An unknown bare atom, all-unknown OR or partial AND must fail closed."""
+    data = lock_data()
+    row = (
+        data["components"][0]
+        if slot == "primary"
+        else next(e for c in data["components"] for e in c["extra_repositories"])
+    )
+    row["licence"] = expression
+    with pytest.raises(ValueError, match="component licence expression"):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("population", ["runtime", "component"])
+@pytest.mark.parametrize(
+    ("expression", "passes"),
+    [
+        ("MIT OR Unknown", True),
+        ("Unknown OR MIT", True),
+        ("Unknown", False),
+        ("Unknown OR Other", False),
+        ("MIT AND Unknown", False),
+        ("MIT WITH Unknown OR Apache-2.0", True),
+        ("MIT WITH Unknown", False),
+        ("Apache-2.0 WITH LLVM-exception", True),
+        ("MIT OR (Unknown AND Apache-2.0)", True),
+        ("(MIT OR Unknown) AND Apache-2.0", True),
+        ("MIT OR", False),
+        ("MIT OR (", False),
+        ("MIT WITH OR Apache-2.0", False),
+        ("MIT WITH ( OR Apache-2.0", False),
+        ("MIT OR Apache-2.0.", False),
+        ("MIT OR OR MIT", False),
+    ],
+)
+def test_shared_licence_parser_semantics(population, expression, passes):
+    """Both allowlists use OR-any, AND-all, atomic WITH and complete syntax checks."""
+    atoms = (
+        build.FFMPEG_COMPATIBLE_LICENCES
+        if population == "runtime"
+        else build.FFMPEG_COMPONENT_COMPATIBLE_LICENCES
+    )
+    if passes:
+        build._ffmpeg_licence_choices(expression, atoms, population)
+    else:
+        with pytest.raises(ValueError, match=population + " licence expression"):
+            build._ffmpeg_licence_choices(expression, atoms, population)
+
+
+def test_component_absent_status_means_built():
+    """Omitting status must retain the text obligation on existing component rows."""
+    data = lock_data()
+    row = data["components"][0]
+    assert "status" not in row
+    assert build.validate_ffmpeg_lock(data) is data
+    row["texts"] = []
+    with pytest.raises(ValueError, match="component texts must be nonempty"):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("population", ["component", "runtime"])
+@pytest.mark.parametrize("chosen", ["Unknown", "MIT", "MIT AND BSD-3-Clause"])
+def test_chosen_preserves_and_obligations_and_requires_a_compatible_branch(population, chosen):
+    """A partial or incompatible selection cannot satisfy a compound expression."""
+    data = lock_data()
+    row = data["components"][0] if population == "component" else data["toolchain_runtime"][0]
+    row.update(licence="(MIT OR Unknown) AND BSD-3-Clause", chosen=chosen)
+    if chosen == "MIT AND BSD-3-Clause":
+        assert build.validate_ffmpeg_lock(data) is data
+    else:
+        with pytest.raises(ValueError, match="invalid " + population + " chosen licence"):
+            build.validate_ffmpeg_lock(data)
+
+
+def test_cairo_or_accepts_only_the_ruled_component_branch():
+    """LGPL-2.1-only is compatible for components; MPL-1.1 cannot be chosen."""
+    data = lock_data()
+    row = next(r for r in data["components"] if r["name"] == "cairo")
+    row["chosen"] = "LGPL-2.1-only"
+    assert build.validate_ffmpeg_lock(data) is data
+    row["chosen"] = "MPL-1.1"
+    with pytest.raises(ValueError, match="invalid component chosen licence"):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("slot", ["primary", "extra"])
+@pytest.mark.parametrize(
+    ("damage", "refusal"),
+    [
+        ("text-fields", "invalid component text fields"),
+        ("path", "unsafe component text path"),
+        ("digest", "invalid component text sha256"),
+        ("extra-field", "invalid .* fields"),
+        ("status-type", "invalid component status"),
+    ],
+)
+def test_component_text_schema_refusals(slot, damage, refusal):
+    """Text identities and row fields remain closed and cannot escape the folder."""
+    data = lock_data()
+    row = (
+        data["components"][0]
+        if slot == "primary"
+        else next(e for c in data["components"] for e in c["extra_repositories"])
+    )
+    if damage == "text-fields":
+        row["texts"][0]["unruled"] = "value"
+    elif damage == "path":
+        row["texts"][0]["path"] = "../escape"
+    elif damage == "digest":
+        row["texts"][0]["sha256"] = "not-a-digest"
+    elif damage == "extra-field":
+        row["unruled"] = "value"
+    else:
+        row["status"] = []
+    with pytest.raises(ValueError, match=refusal):
+        build.validate_ffmpeg_lock(data)
+
+
+def test_shaderc_fetched_records_and_ruled_census_counts():
+    """The new records share shaderc's stage without replacing any existing source."""
+    data = build.validate_ffmpeg_lock(lock_data())
+    rows = data["components"]
+    index = next(i for i, row in enumerate(rows) if row["name"] == "shaderc")
+    fetched = rows[index + 1 : index + 4]
+    assert [r["name"] for r in fetched] == ["glslang", "spirv-tools", "spirv-headers-shaderc"]
+    assert all(
+        r["via"] == "shaderc git-sync-deps"
+        and r["status"] == "built"
+        and r["stage"] == rows[index]["stage"]
+        for r in fetched
+    )
+    assert rows[index]["licence"] == "Apache-2.0"
+    sources = [r for c in rows for r in (c, *c["extra_repositories"])]
+    assert sum(len(r["texts"]) for r in sources) == 352
+    assert len({t["path"] for r in sources for t in r["texts"]}) == 282
+    assert len(build.FFMPEG_COMPATIBLE_LICENCES) == 15
+    assert len(build.FFMPEG_COMPONENT_COMPATIBLE_LICENCES) == 35
+    fetched[0]["via"] = "unruled fetch"
+    with pytest.raises(ValueError, match="invalid component via"):
+        build.validate_ffmpeg_lock(data)
+
+
+@pytest.mark.parametrize("damage", ["missing", "hash", "orphan", "directory", "case"])
+def test_component_text_files_fail_closed(tmp_path, damage):
+    """Removing byte checks or either side of set equality permits census drift."""
+    import shutil
+
+    data = lock_data()
+    folder = tmp_path / "ffmpeg-components"
+    shutil.copytree(ROOT / "tools/package/native-licences/ffmpeg-components", folder)
+    text = data["components"][0]["texts"][0]
+    path = folder / text["path"]
+    if damage == "missing":
+        path.unlink()
+        refusal = "component text missing/unsafe"
+    elif damage == "hash":
+        path.write_bytes(path.read_bytes() + b"changed")
+        refusal = "component text sha256 mismatch"
+    elif damage == "case":
+        text["path"] = text["path"].upper()
+        refusal = "component text directory differs"
+    else:
+        if damage == "directory":
+            (folder / "orphan").mkdir()
+        else:
+            (folder / "orphan").write_bytes(b"orphan")
+        refusal = "component text directory differs"
+    with pytest.raises(ValueError, match=refusal):
+        build.validate_ffmpeg_lock(data, component_texts_path=folder)
+
+
 @pytest.mark.parametrize("field", ["census_build_commit", "census_asset_sha256"])
 def test_runtime_census_is_bound_to_the_recorded_asset(field):
     """Removing either census equality guard permits a stale rebuild census."""
@@ -362,7 +563,6 @@ def test_runtime_census_refuses_missing_or_inconsistent_obligations(change, refu
     "expression",
     [
         "GPL-2.0-only",
-        "MIT OR Unknown",
         "MIT AND GPL-2.0-only",
         "MIT WITH Unknown",
         "(MIT OR Apache-2.0",
@@ -389,6 +589,8 @@ def test_runtime_licence_parser_refuses_unknown_atoms_and_invalid_grammar(expres
     "expression",
     [
         "MIT",
+        "MIT OR Unknown",
+        "Unknown OR MIT",
         "(Apache-2.0 OR MIT) AND BSD-3-Clause",
         "MIT AND Apache-2.0 WITH LLVM-exception AND (MIT OR Apache-2.0)",
         "GPL-3.0-or-later WITH GCC-exception-3.1",
@@ -459,7 +661,7 @@ def test_committed_lock_covers_the_verified_source_stages():
     assert result["ffmpeg_ref"] == "release/9.0"
     assert result["ffmpeg_commit"] == "b204e94e90fca64045e9ca7dd44c65678c7eb29e"
     assert "ffmpeg_tag" not in result
-    assert len(result["components"]) == 97
+    assert len(result["components"]) == 100
     assert result["asset_url"].startswith(
         "https://github.com/rwsmythe/FFmpeg-Builds/releases/download/"
     )
@@ -909,7 +1111,7 @@ def test_short_archive_is_rejected_without_extraction(synthetic_bundle):
 def test_lock_records_compatible_sources_and_explains_the_zvbi_exclusion():
     data = build.validate_ffmpeg_lock(lock_data())
     sources = [source for c in data["components"] for source in (c, *c["extra_repositories"])]
-    assert len(sources) == 102
+    assert len(sources) == 105
     for source in sources:
         assert source["licence"]
         assert source["licence_basis"] == "seat-verified"

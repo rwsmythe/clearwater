@@ -64,6 +64,10 @@ artifact is one folder, not an installer; it is unsigned. No PyPI release is pla
    lock; never add `ffmpeg_tag`. Repeat the source/licence audit, GPL-3.0
    licence check, zvbi exclusion and `hevc_nvenc` / `libx265` encoder checks.
    Recheck the floating toolchain/runtime inputs; preserve the patch and proof.
+   A scripts change re-runs the stage census and updates the byte-preserved texts
+   under `tools/package/native-licences/ffmpeg-components/`: a stage's own fetch
+   step (git-sync-deps, DEPS, cargo, submodules) pulls sub-dependencies into the
+   static library; the census follows every fetch step.
    A fork rebuild re-runs the F-B1 toolchain census: the base image installs
    an unpinned stable Rust, and the crate graphs follow the pinned rav1e /
    librsvg commits. Re-record `toolchain` and `toolchain_runtime`, including

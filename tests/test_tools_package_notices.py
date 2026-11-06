@@ -287,6 +287,17 @@ def add_ffmpeg(release):
         shutil.copyfile(
             ROOT / "tools/package/native-licences/ffmpeg-toolchain" / filename, texts / filename
         )
+    texts = release["native_surface"] / "ffmpeg-components"
+    texts.mkdir(exist_ok=True)
+    for filename in {
+        t["path"]
+        for c in pin["components"]
+        for r in (c, *c["extra_repositories"])
+        for t in r.get("texts", [])
+    }:
+        shutil.copyfile(
+            ROOT / "tools/package/native-licences/ffmpeg-components" / filename, texts / filename
+        )
     for name in ["ffmpeg.exe", "ffprobe.exe"]:
         (folder / name).write_bytes(b"synthetic tool; never executed")
     (folder / "ffmpeg-LICENSE.txt").write_text("synthetic GPL-3.0 licence")
@@ -433,10 +444,12 @@ def test_ffmpeg_refusal_names_every_incompatible_repository_in_one_line(release)
             "pin": "a" * 40,
             "pin_kind": "commit",
             "status": "built",
-            "licence": "GPL-2.0-only",
+            "licence": "GPL-2.0-or-later",
             "licence_basis": "seat-verified",
             "licence_note": "synthetic conflict",
             "gpl3_compatible": "no",
+            "texts": copy.deepcopy(c["texts"]),
+            "chosen": None,
         }
     ]
     release["ffmpeg_path"].write_text(json.dumps(release["ffmpeg"]))
@@ -475,21 +488,95 @@ def test_compatible_ffmpeg_rows_require_matching_build_provenance(release):
         plan(notices, release)
 
 
+@pytest.mark.parametrize("damage", ["missing", "hash", "orphan", "after-plan"])
+def test_ffmpeg_component_text_integrity_uses_the_selected_surface(release, damage):
+    """A component text may not disappear, drift, be orphaned or change after planning."""
+    module = load_notices()
+    add_ffmpeg(release)
+    texts = release["native_surface"] / "ffmpeg-components"
+    path = texts / release["ffmpeg"]["components"][0]["texts"][0]["path"]
+    if damage == "after-plan":
+        result = plan(module, release)
+    if damage == "missing":
+        path.unlink()
+        refusal = "component text missing/unsafe"
+    elif damage == "orphan":
+        (texts / "orphan-LICENSE").write_bytes(b"orphan")
+        refusal = "component text directory differs"
+    else:
+        path.write_bytes(path.read_bytes() + b"changed")
+        refusal = (
+            "component: x265.*text byte count differs"
+            if damage == "after-plan"
+            else "component text sha256 mismatch"
+        )
+    with pytest.raises(ValueError, match=refusal):
+        if damage == "after-plan":
+            module.render_notices(result)
+        else:
+            plan(module, release)
+
+
+def test_root_annex_has_the_same_component_rows_and_text_hashes_as_artifacts(release):
+    """A root annex must not omit a stage, an unbuilt download or a text reference."""
+    module = load_notices()
+    release["ffmpeg"] = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_bytes())
+    release["ffmpeg_path"].write_text(json.dumps(release["ffmpeg"]))
+    add_ffmpeg(release)
+    result = plan(module, release)
+    artifact = module.render_notices(result).decode(errors="backslashreplace")
+    root = module.render_root_annex().decode()
+    rows = [r for r in result.rows if r.name.startswith("FFmpeg component:")]
+    assert len(rows) == 105
+    for row in rows:
+        assert f"| {row.name} |" in artifact
+        root_row = next(line for line in root.splitlines() if line.startswith(f"| {row.name} |"))
+        for item in row.licence_inputs:
+            links = re.findall(r"\(tools/package/native-licences/([^)]*)\)", root_row)
+            assert any(
+                hashlib.sha256(
+                    (ROOT / "tools/package/native-licences" / link).read_bytes()
+                ).hexdigest()
+                == item.sha256
+                for link in links
+            )
+
+
 def test_fork_ffmpeg_notices_render_all_built_sources_and_explain_exclusions(release):
-    """The real schema-2 pin renders provenance and 100 built rows with one text."""
+    """The pin renders all 105 stage records with their own exact texts."""
     module = load_notices()
     release["ffmpeg"] = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_text())
     release["ffmpeg_path"].write_text(json.dumps(release["ffmpeg"]))
     add_ffmpeg(release)
     result = plan(module, release)
     rows = [row for row in result.rows if row.name.startswith("FFmpeg")]
-    assert len(rows) == 333
-    assert (
-        len({row.licence_inputs for row in rows if not row.name.startswith("FFmpeg toolchain")})
-        == 1
-    )
+    assert len(rows) == 338
+    stage_rows = [r for r in rows if r.name.startswith("FFmpeg component:")]
+    assert len(stage_rows) == 105
+    sources = {}
+    for component in release["ffmpeg"]["components"]:
+        sources["FFmpeg component: " + component["name"]] = component
+        for index, extra in enumerate(component["extra_repositories"], 2):
+            sources[f"FFmpeg component: {component['name']} / repository {index}"] = extra
+    for row in stage_rows:
+        source = sources[row.name]
+        assert {(t.path.name, t.sha256) for t in row.licence_inputs} == {
+            (t["path"], t["sha256"]) for t in source["texts"]
+        }
+        assert all(t.path.parent.name == "ffmpeg-components" for t in row.licence_inputs)
+    downloaded = [r for r in stage_rows if "Source status: downloaded-not-built" in r.notes]
+    assert [r.name for r in downloaded] == [
+        "FFmpeg component: ffnvcodec / repository 2",
+        "FFmpeg component: ffnvcodec / repository 3",
+    ]
+    assert all(r.licence_inputs for r in downloaded)
+    assert rows[0].licence_inputs[0].path.name == "ffmpeg-LICENSE.txt"
     assert not any(row.name == "FFmpeg component: zvbi" for row in rows)
-    output = module.render_notices(result).decode()
+    rendered = module.render_notices(result)
+    for item in {item for row in stage_rows for item in row.licence_inputs}:
+        assert item.path.read_bytes() in rendered
+        assert rendered.count(f"SHA-256: `{item.sha256}`".encode()) == 1
+    output = rendered.decode(errors="backslashreplace")
     assert output.count("### Bundled FFmpeg GPL-3.0") == 1
     assert output.count("synthetic GPL-3.0 licence") == 1
     assert "Provider: rwsmythe/FFmpeg-Builds @ d77b8352" in output
@@ -558,11 +645,16 @@ def test_ffmpeg_toolchain_census_renders_every_row_and_deduplicates_terms(releas
     ]
     assert root_texts == artifact_texts
     details = "## Component details and coverage\n"
-    root_details = root_annex.split(details, 1)[1].split("## Runtime licence text files", 1)[0]
+    root_details = root_annex.split(details, 1)[1].split(
+        "## Stage and runtime licence text files", 1
+    )[0]
+    root_details = (
+        "### FFmpeg toolchain runtime:" + root_details.split("### FFmpeg toolchain runtime:", 1)[1]
+    )
     artifact_details = artifact.split(details, 1)[1].split(
         "## Full licence texts and provenance", 1
     )[0]
-    assert root_details == artifact_details
+    assert root_details.lstrip("\n") == artifact_details.lstrip("\n")
     expected_hashes = {t["sha256"] for r in lock["toolchain_runtime"] for t in r["texts"]}
     assert len(expected_hashes) == 157
     for digest in expected_hashes:
@@ -642,7 +734,9 @@ def test_runtime_notice_wording_distinguishes_supersets_and_shared_texts(release
         "FFmpeg toolchain runtime: libm 0.2.16 (toolchain)",
         "FFmpeg toolchain runtime: libstdc++ (fast_float) 16.2.0 (toolchain)",
     }
-    output = module.render_notices(module.NoticePlan(rows[0].entries, tuple(rows), ())).decode()
+    output = module.render_notices(module.NoticePlan(rows[0].entries, tuple(rows), ())).decode(
+        errors="backslashreplace"
+    )
     assert (
         "a representative file name from the census; "
         "byte-identical texts are shared across components" in output
@@ -659,6 +753,9 @@ def test_ffmpeg_toolchain_text_identity_fails_closed(release, tmp_path, damage):
     add_ffmpeg(release)
     texts = tmp_path / "runtime-texts/ffmpeg-toolchain"
     shutil.copytree(ROOT / "tools/package/native-licences/ffmpeg-toolchain", texts)
+    shutil.copytree(
+        ROOT / "tools/package/native-licences/ffmpeg-components", texts.parent / "ffmpeg-components"
+    )
     path = texts / lock["toolchain_runtime"][0]["texts"][0]["path"]
     if damage == "after-plan":
         rows = module._ffmpeg_rows(release["folder"], release["ffmpeg_path"], texts.parent)
@@ -1190,7 +1287,7 @@ def _make_native_surface(destination):
     shutil.copytree(
         ROOT / "tools/package/native-licences",
         destination,
-        ignore=shutil.ignore_patterns("ffmpeg-toolchain"),
+        ignore=shutil.ignore_patterns("ffmpeg-toolchain", "ffmpeg-components"),
     )
     # Existing OpenSSL tests carry synthetic bytes, so bind their copied input
     # surface to those bytes rather than the seat-measured production DLLs.
@@ -1225,7 +1322,7 @@ def omit_production_embedded_census(surface):
     keep = {"manifest.json", *(name for name, _sha, _size in native_surface_inputs(document))}
     for item in surface.iterdir():
         # This subdirectory is checked separately against the FFmpeg lock.
-        if item.name == "ffmpeg-toolchain" and item.is_dir():
+        if item.name in {"ffmpeg-toolchain", "ffmpeg-components"} and item.is_dir():
             continue
         if item.name not in keep:
             item.unlink()

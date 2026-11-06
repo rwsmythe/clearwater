@@ -72,7 +72,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from datetime import UTC, datetime
 from http.client import HTTPMessage
 from pathlib import Path
-from typing import IO, Literal, NamedTuple, Protocol, TypedDict, cast
+from typing import IO, Literal, NamedTuple, NotRequired, Protocol, TypedDict, cast
 from urllib.parse import urlsplit
 
 _TEST_ALLOW_FILE_URLS = False
@@ -727,10 +727,12 @@ class FFmpegSource(TypedDict):
     licence_basis: str
     gpl3_compatible: str
     licence_note: str
+    texts: NotRequired[list[FFmpegRuntimeText]]
+    chosen: NotRequired[str | None]
 
 
 class FFmpegComponent(TypedDict):
-    """One source-pinned build stage; multiple configure flags belong to one stage."""
+    """A source-pinned component; a stage may also fetch additional components."""
 
     stage: str
     name: str
@@ -743,6 +745,10 @@ class FFmpegComponent(TypedDict):
     licence_basis: str
     gpl3_compatible: str
     licence_note: str
+    texts: list[FFmpegRuntimeText]
+    chosen: NotRequired[str | None]
+    status: NotRequired[str]
+    via: NotRequired[str]
 
 
 class FFmpegExcluded(TypedDict):
@@ -787,7 +793,7 @@ class FFmpegToolchain(TypedDict):
 
 
 class FFmpegRuntimeText(TypedDict):
-    """A filename and byte hash in the dedicated FFmpeg runtime text directory."""
+    """A filename and byte hash in the corresponding FFmpeg text directory."""
 
     path: str
     sha256: str
@@ -848,6 +854,9 @@ class FFmpegLock(TypedDict):
 FFMPEG_LOCK_PATH = Path(__file__).with_name("ffmpeg.lock.json")
 """The release pin; local PATH copies never substitute for this record."""
 
+FFMPEG_COMPONENT_TEXTS_PATH = Path(__file__).with_name("native-licences") / "ffmpeg-components"
+"""The byte-preserved component texts, covered exactly by the release lock."""
+
 
 FFMPEG_COMPATIBLE_LICENCES = frozenset(
     {
@@ -868,16 +877,47 @@ FFMPEG_COMPATIBLE_LICENCES = frozenset(
         "GPL-3.0-or-later WITH GCC-exception-3.1",
     }
 )
-"""CHARC's complete GPL-3.0-compatible runtime atom list; unknown atoms refuse."""
+"""CHARC's runtime atoms; every expression requires a compatible selection."""
 
 
-def _ffmpeg_licence_choices(expression: str) -> set[str]:
-    # Recursive descent preserves SPDX precedence: WITH, AND, then OR. Unknown
-    # atoms refuse even in an OR branch; a recorded alternative is never guessed.
+FFMPEG_COMPONENT_COMPATIBLE_LICENCES = FFMPEG_COMPATIBLE_LICENCES | frozenset(
+    {
+        "GPL-2.0-or-later",
+        "GPL-3.0-or-later",
+        "LGPL-2.0-or-later",
+        "LGPL-2.1-or-later",
+        "LGPL-2.1-only",
+        "LGPL-3.0-or-later",
+        "BSD-3-Clause-Clear",
+        "BSD-2-Clause-Patent",
+        "FTL",
+        "Libpng-2.0",
+        "MIT-Modern-Variant",
+        "WTFPL",
+        "ZPL-2.1",
+        "LicenseRef-mingw-w64-public-domain",
+        "LicenseRef-gnulib-permissive",
+        "GPL-3.0-or-later WITH Bison-exception-2.2",
+        "AML-glslang",
+        "MIT-Khronos-old",
+        "LicenseRef-PFFFT-modified-BSD",
+        "ISC-Veillard",
+    }
+)
+"""CHARC's component atoms (rulings B S1 and C1-C2); the runtime list is separate."""
+
+
+def _ffmpeg_licence_choices(
+    expression: str,
+    atoms: frozenset[str] = FFMPEG_COMPATIBLE_LICENCES,
+    population: str = "runtime",
+) -> set[str]:
+    # Parse every branch, even an unchosen one: OR-any cannot hide bad syntax.
+    # Compatible selections distribute AND over OR, preserving every obligation.
     tokens = re.findall(r"[A-Za-z0-9][A-Za-z0-9.+-]*|[()]", expression)
     position = 0
-    choices: set[str] = set()
-    refusal = "FFmpeg lock: incompatible/invalid runtime licence expression"
+    has_or = False
+    refusal = f"FFmpeg lock: incompatible/invalid {population} licence expression"
     if (
         not tokens
         or any(c.isspace() and c != " " for c in expression)
@@ -885,57 +925,56 @@ def _ffmpeg_licence_choices(expression: str) -> set[str]:
     ):
         raise ValueError(refusal)
 
-    def primary() -> tuple[bool, str]:
+    def identifier(token: str) -> bool:
+        return (
+            token not in {"AND", "OR", "WITH"}
+            and re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9.+-]*[A-Za-z0-9])?", token) is not None
+        )
+
+    def primary() -> set[str]:
         nonlocal position
         if position >= len(tokens):
             raise ValueError(refusal)
         token = tokens[position]
         position += 1
         if token == "(":
-            compatible, label = either()
+            selections = either()
             if position >= len(tokens) or tokens[position] != ")":
                 raise ValueError(refusal)
             position += 1
-            return compatible, "(" + label + ")"
-        if token in {"AND", "OR", "WITH", ")"}:
+            return selections
+        if not identifier(token):
             raise ValueError(refusal)
         if position < len(tokens) and tokens[position] == "WITH":
             position += 1
-            if position >= len(tokens):
+            if position >= len(tokens) or not identifier(tokens[position]):
                 raise ValueError(refusal)
             token += " WITH " + tokens[position]
             position += 1
-        if token not in FFMPEG_COMPATIBLE_LICENCES:
-            raise ValueError(refusal)
-        return True, token
+        return {token} if token in atoms else set()
 
-    def both() -> tuple[bool, str]:
+    def both() -> set[str]:
         nonlocal position
-        compatible, label = primary()
+        selections = primary()
         while position < len(tokens) and tokens[position] == "AND":
             position += 1
-            other, right = primary()
-            compatible = compatible and other
-            label += " AND " + right
-        return compatible, label
+            other = primary()
+            selections = {left + " AND " + right for left in selections for right in other}
+        return selections
 
-    def either() -> tuple[bool, str]:
-        nonlocal position
-        compatible, label = both()
-        alternatives = [label]
+    def either() -> set[str]:
+        nonlocal position, has_or
+        selections = both()
         while position < len(tokens) and tokens[position] == "OR":
             position += 1
-            other, right = both()
-            compatible = compatible or other
-            alternatives.append(right)
-        if len(alternatives) > 1:
-            choices.update(alternatives)
-        return compatible, " OR ".join(alternatives)
+            has_or = True
+            selections.update(both())
+        return selections
 
-    compatible, _ = either()
-    if position != len(tokens) or not compatible:
+    selections = either()
+    if position != len(tokens) or not selections:
         raise ValueError(refusal)
-    return choices
+    return selections if has_or else set()
 
 
 def _ffmpeg_runtime(data: dict[str, object], config: str) -> None:
@@ -1085,7 +1124,8 @@ def _ffmpeg_runtime(data: dict[str, object], config: str) -> None:
         }
         if len(texts) == 1 and choices and row["chosen"] is None:
             carried = cast(dict[str, str], texts[0])
-            if not choices <= combined_terms.get(carried["sha256"], set()):
+            terms = {term for choice in choices for term in choice.split(" AND ")}
+            if not terms <= combined_terms.get(carried["sha256"], set()):
                 raise ValueError("FFmpeg lock: one-text OR licence requires chosen")
         checked.append(cast(FFmpegRuntime, row))
     for stage, switch in (("rav1e", "--enable-librav1e"), ("librsvg", "--enable-librsvg")):
@@ -1148,19 +1188,79 @@ def _ffmpeg_source(value: dict[str, object]) -> None:
     _ffmpeg_text(value["licence_note"], "licence note")
 
 
-def validate_ffmpeg_lock(value: object) -> FFmpegLock:
+def _ffmpeg_component_fields(item: object, *, extra: bool = False) -> dict[str, object]:
+    fields = set(FFmpegSource.__annotations__ if extra else FFmpegComponent.__annotations__)
+    optional = {"texts", "chosen"} if extra else {"texts", "chosen", "status", "via"}
+    if not isinstance(item, dict) or not fields - optional <= set(item) <= fields:
+        raise ValueError(f"FFmpeg lock: invalid {'extra source' if extra else 'component'} fields")
+    return cast(dict[str, object], item)
+
+
+def _ffmpeg_component_obligations(row: dict[str, object], *, extra: bool = False) -> None:
+    status = row.get("status", "built")
+    if not isinstance(status, str) or status not in {"built", "downloaded-not-built"}:
+        raise ValueError("FFmpeg lock: invalid component status")
+    choices = _ffmpeg_licence_choices(
+        cast(str, row["licence"]), FFMPEG_COMPONENT_COMPATIBLE_LICENCES, "component"
+    )
+    chosen = row.get("chosen")
+    if chosen is not None and (not isinstance(chosen, str) or chosen not in choices):
+        raise ValueError("FFmpeg lock: invalid component chosen licence")
+    texts = row.get("texts")
+    if texts is None and extra and status != "built":
+        return
+    if not isinstance(texts, list) or not texts:
+        raise ValueError("FFmpeg lock: component texts must be nonempty")
+    for item in texts:
+        text = _ffmpeg_fields(item, set(FFmpegRuntimeText.__annotations__), "component text")
+        path = _ffmpeg_text(text["path"], "component text path")
+        if (
+            any(c in path for c in ("/", "\\", ":", ".."))
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]*[A-Za-z0-9]", path) is None
+        ):
+            raise ValueError("FFmpeg lock: unsafe component text path")
+        if (
+            re.fullmatch(r"[0-9a-f]{64}", _ffmpeg_text(text["sha256"], "component text sha256"))
+            is None
+        ):
+            raise ValueError("FFmpeg lock: invalid component text sha256")
+
+
+def _ffmpeg_component_texts(components: list[FFmpegComponent], folder: Path) -> None:
+    expected: set[str] = set()
+    for component in components:
+        for row in (component, *component["extra_repositories"]):
+            for text in cast(list[FFmpegRuntimeText], row.get("texts", [])):
+                path = folder / text["path"]
+                if not path.is_file() or path.is_symlink():
+                    raise ValueError(f"FFmpeg lock: component text missing/unsafe: {text['path']}")
+                if hashlib.sha256(path.read_bytes()).hexdigest() != text["sha256"]:
+                    raise ValueError(f"FFmpeg lock: component text sha256 mismatch: {text['path']}")
+                expected.add(text["path"])
+    actual = {path.name for path in folder.iterdir()} if folder.is_dir() else set()
+    if actual != expected:
+        raise ValueError("FFmpeg lock: component text directory differs from lock")
+
+
+def validate_ffmpeg_lock(
+    value: object,
+    *,
+    component_texts_path: Path = FFMPEG_COMPONENT_TEXTS_PATH,
+) -> FFmpegLock:
     """Validate archive identity, source rows and two-way configure-flag coverage.
 
     Stage licence identities must be seat-verified. Stage incompatibility remains
     data: a "no" row is accepted here and refused by artifact notices when bundled.
     Static runtime rows require compatible SPDX expressions, toolchain/source
-    bindings and nonempty text identities. This validator is pure; notices checks
-    runtime text files and their hashes at planning and again at rendering.
+    bindings and nonempty text identities. Component texts are byte-checked here
+    against the dedicated directory, including exact filename set equality;
+    notices checks text identity again at rendering.
     ``configure_flag`` is null for dependencies or a list, since some stages
     contribute several switches (for example both opencore-amr codecs).
 
     Args:
         value: The decoded lock document.
+        component_texts_path: Directory containing exactly the component texts.
 
     Returns:
         The same document, with its complete schema validated.
@@ -1278,11 +1378,24 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
     names: set[str] = set()
     covered: set[str] = set()
     for item in components:
-        component = _ffmpeg_fields(item, set(FFmpegComponent.__annotations__), "component")
+        component = _ffmpeg_component_fields(item)
         _ffmpeg_source(component)
+        _ffmpeg_component_obligations(component)
         stage = _ffmpeg_text(component["stage"], "component stage")
         name = _ffmpeg_text(component["name"], "component name")
-        if stage in stages or name in names:
+        via = component.get("via")
+        if via is not None and (
+            via != "shaderc git-sync-deps"
+            or stage != "scripts.d/47-vulkan/50-shaderc.sh"
+            or not any(
+                isinstance(parent, dict)
+                and parent.get("name") == "shaderc"
+                and parent.get("stage") == stage
+                for parent in components
+            )
+        ):
+            raise ValueError("FFmpeg lock: invalid component via")
+        if (stage in stages and via is None) or name in names:
             raise ValueError("FFmpeg lock: duplicate component stage or name")
         stages.add(stage)
         names.add(name)
@@ -1298,13 +1411,9 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
         if not isinstance(extras, list):
             raise ValueError("FFmpeg lock: extra_repositories must be a list")
         for extra in extras:
-            source = _ffmpeg_fields(extra, set(FFmpegSource.__annotations__), "extra source")
+            source = _ffmpeg_component_fields(extra, extra=True)
             _ffmpeg_source(source)
-            if not isinstance(source["status"], str) or source["status"] not in {
-                "built",
-                "downloaded-not-built",
-            }:
-                raise ValueError("FFmpeg lock: invalid extra source status")
+            _ffmpeg_component_obligations(source, extra=True)
     for item in excluded:
         row = _ffmpeg_fields(item, set(FFmpegExcluded.__annotations__), "excluded stage")
         for key in row:
@@ -1322,6 +1431,7 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
             f"absent={sorted(covered - external)}"
         )
     _ffmpeg_runtime(data, config)
+    _ffmpeg_component_texts(cast(list[FFmpegComponent], components), component_texts_path)
     return cast(FFmpegLock, data)
 
 

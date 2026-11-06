@@ -1113,12 +1113,12 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
             raise ValueError(
                 "notices: native manifest has duplicate file claim without co-licensing"
             )
-    # FFmpeg runtime texts have their own lock and integrity checks in
+    # FFmpeg stage/runtime texts have their own lock and integrity checks in
     # _ffmpeg_rows. Other unclaimed files/directories still fail closed here.
     actual = {
         path.name
         for path in folder.iterdir()
-        if not (path.name == "ffmpeg-toolchain" and path.is_dir())
+        if not (path.name in {"ffmpeg-toolchain", "ffmpeg-components"} and path.is_dir())
     }
     if actual != files:
         raise ValueError(
@@ -1517,7 +1517,10 @@ def _ffmpeg_rows(
         raise ValueError("notices: FFmpeg missing " + ", ".join(missing))
     lock = cast(
         dict[str, Any],
-        _build_tool().validate_ffmpeg_lock(json.loads(lock_path.read_text(encoding="utf-8"))),
+        _build_tool().validate_ffmpeg_lock(
+            json.loads(lock_path.read_text(encoding="utf-8")),
+            component_texts_path=native_licences_path / "ffmpeg-components",
+        ),
     )
     incompatible: list[str] = []
     for component in lock["components"]:
@@ -1577,32 +1580,55 @@ def _ffmpeg_rows(
             notes,
         )
     ]
+    rows.extend(_ffmpeg_component_rows(lock, entries, native_licences_path))
+    rows.extend(_ffmpeg_runtime_rows(lock, entries, native_licences_path))
+    return rows
+
+
+def _ffmpeg_component_rows(
+    lock: dict[str, Any], entries: tuple[str, ...], native_licences_path: Path
+) -> list[NoticeRow]:
+    rows: list[NoticeRow] = []
     for component in lock["components"]:
-        rows.append(
-            NoticeRow(
-                "FFmpeg component: " + component["name"],
-                component["pin"],
-                component["licence"],
-                (f"{component['repository']} @ {component['pin']}",),
-                entries,
-                inputs,
-                (component["licence_note"],),
-            )
+        sources = [("FFmpeg component: " + component["name"], component)]
+        sources.extend(
+            (f"FFmpeg component: {component['name']} / repository {index}", extra)
+            for index, extra in enumerate(component["extra_repositories"], 2)
         )
-        for index, extra in enumerate(component["extra_repositories"], 2):
-            if extra["status"] == "built":
-                rows.append(
-                    NoticeRow(
-                        f"FFmpeg component: {component['name']} / repository {index}",
-                        extra["pin"],
-                        extra["licence"],
-                        (f"{extra['repository']} @ {extra['pin']}",),
-                        entries,
-                        inputs,
-                        (extra["licence_note"],),
+        for title, record in sources:
+            if not record.get("texts"):
+                continue
+            source = f"{record['repository']} @ {record['pin']}"
+            inputs = []
+            for text in record["texts"]:
+                path = native_licences_path / "ffmpeg-components" / text["path"]
+                inputs.append(
+                    LicenceInput(
+                        path,
+                        sha256=text["sha256"],
+                        size_bytes=path.stat().st_size,
+                        context=title + ": ",
+                        provenance=f"{title}; {source}; text {text['path']}",
                     )
                 )
-    rows.extend(_ffmpeg_runtime_rows(lock, entries, native_licences_path))
+            notes = [record["licence_note"]]
+            if record.get("chosen"):
+                notes.append("licence chosen: " + record["chosen"])
+            if record.get("status", "built") != "built":
+                notes.append("Source status: " + record["status"])
+            if record.get("via"):
+                notes.append("Fetched via: " + record["via"])
+            rows.append(
+                NoticeRow(
+                    title,
+                    record["pin"],
+                    record["licence"],
+                    (source,),
+                    entries,
+                    tuple(inputs),
+                    tuple(notes),
+                )
+            )
     return rows
 
 
@@ -2682,7 +2708,7 @@ def render_root_annex(
     ffmpeg_lock_path: Path = ROOT / "tools/package/ffmpeg.lock.json",
     native_licences_path: Path = ROOT / "tools/package/native-licences",
 ) -> bytes:
-    """Regenerate the root runtime annex using the artifact's checked row renderer.
+    """Regenerate stage/runtime annexes using the artifact's checked row renderer.
 
     The root links exact upstream text bytes; artifacts embed them. Existing root
     audit material is preserved with LF line endings and a runtime-annex pointer
@@ -2703,7 +2729,8 @@ def render_root_annex(
     lock = cast(
         dict[str, Any],
         _build_tool().validate_ffmpeg_lock(
-            json.loads(ffmpeg_lock_path.read_text(encoding="utf-8"))
+            json.loads(ffmpeg_lock_path.read_text(encoding="utf-8")),
+            component_texts_path=native_licences_path / "ffmpeg-components",
         ),
     )
     entries = (
@@ -2712,13 +2739,21 @@ def render_root_annex(
         "file:ffmpeg-BUILD.txt",
         "file:ffmpeg-LICENSE.txt",
     )
-    rows = tuple(_ffmpeg_runtime_rows(lock, entries, native_licences_path))
+    rows = tuple(
+        _ffmpeg_component_rows(lock, entries, native_licences_path)
+        + _ffmpeg_runtime_rows(lock, entries, native_licences_path)
+    )
     rendered = render_notices(NoticePlan(entries, rows, ()))
     suffix = rendered.split(b"## Redistributed components\n", 1)[1]
     # Four synthetic inventory labels support the shared renderer, but are not
     # a root-source installation inventory and must not be printed as one.
     suffix = re.sub(rb"\nInventory: [^\n]*\n", b"", suffix, count=1)
-    by_hash = {t["sha256"]: t["path"] for row in lock["toolchain_runtime"] for t in row["texts"]}
+    # Runtime aliases win shared hashes, retaining the existing runtime links.
+    by_hash = {
+        item.sha256: item.path.relative_to(native_licences_path).as_posix()
+        for row in rows
+        for item in row.licence_inputs
+    }
     anchors = {
         anchor.decode(): by_hash[digest.decode()]
         for anchor, digest in re.findall(
@@ -2729,17 +2764,17 @@ def render_root_annex(
     for anchor, name in anchors.items():
         suffix = suffix.replace(
             f"(#{anchor})".encode(),
-            f"(tools/package/native-licences/ffmpeg-toolchain/{name})".encode(),
+            f"(tools/package/native-licences/{name})".encode(),
         )
     suffix += (
-        b"## Runtime licence text files\n\n"
+        b"## Stage and runtime licence text files\n\n"
         b"These links preserve exact upstream bytes independently of "
         b"Markdown checkout line endings.\n\n"
     )
     for digest, name in sorted(by_hash.items()):
-        path = native_licences_path / "ffmpeg-toolchain" / name
+        path = native_licences_path / name
         suffix += (
-            f"- [{name}](tools/package/native-licences/ffmpeg-toolchain/{name}); "
+            f"- [{Path(name).name}](tools/package/native-licences/{name}); "
             f"SHA-256: `{digest}`; bytes: {path.stat().st_size}.\n"
         ).encode()
     marker = b"<!-- WP6.3c generated FFmpeg toolchain runtime census -->"
@@ -2761,7 +2796,7 @@ def render_root_annex(
         b"Rows and links to licence texts are generated by "
         b"`python tools/package/notices.py --root-annex --write`\n"
         b"using the artifact notices renderer and `tools/package/ffmpeg.lock.json`; "
-        b"the 102 stage source records remain separate.\n"
+        b"including every stage source record carrying texts.\n"
         b"Over-inclusion is permitted: reached_via: toolchain rows retained "
         b"with both Rust stages disabled produce extra notices.\n"
         b"Shared texts use a representative file name from the census; "

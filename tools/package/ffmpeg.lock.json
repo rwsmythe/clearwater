@@ -38,7 +38,14 @@
       "licence": "BSD-2-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "mingw-std-threads--LICENSE",
+          "sha256": "86c148320eb0acc26607ed347e0fde9f49a236d0ec5291d36dc6a7e0e1d26b9f"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/10-mingw.sh",
@@ -50,10 +57,57 @@
       "configure_flag": [
         "--enable-pthreads"
       ],
-      "licence": "ZPL-2.1 AND LicenseRef-mingw-w64-public-domain AND BSD-3-Clause AND LGPL-2.1-or-later",
+      "licence": "ZPL-2.1 AND LicenseRef-mingw-w64-public-domain AND BSD-3-Clause AND LGPL-2.1-or-later AND MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "COPYING.MinGW-w64-runtime: ZPL 2.1 except parts marked PD/BSD/LGPL; FSF: ZPL-2.1 GPL-compatible"
+      "licence_note": "COPYING.MinGW-w64-runtime: ZPL 2.1 except parts marked PD/BSD/LGPL; FSF: ZPL-2.1 GPL-compatible; vendored subtree; compilation not determined at the seat: mingw-w64-crt/profile/COPYING, mingw-w64-libraries/libmangle/COPYING, mingw-w64-libraries/pseh/COPYING, mingw-w64-libraries/winstorecompat/COPYING, mingw-w64-tools/gendef/COPYING; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "mingw--COPYING",
+          "sha256": "99a69660981156c21336fdb5661f89341b013c94e4bf9e1c7467b4745718397f"
+        },
+        {
+          "path": "mingw--COPYING.MinGW-w64-runtime--COPYING.MinGW-w64-runtime.txt",
+          "sha256": "1db8da07b436c68833c0673ffee3d9fcb2526047f3820b81661865dfedc79a1f"
+        },
+        {
+          "path": "mingw--COPYING.MinGW-w64--COPYING.MinGW-w64.txt",
+          "sha256": "f38e6194bd3bfa1b654f118e5acefe0aead437bbe669eee43957ccc65a7127f1"
+        },
+        {
+          "path": "mingw--DISCLAIMER",
+          "sha256": "039ed6b4f31bb7fb97e733170b58cc435335352e4745734fcfd113877fdaf340"
+        },
+        {
+          "path": "mingw--DISCLAIMER.PD",
+          "sha256": "87f33608570312a0f2a9745edcb2527275df813b13982e8c3b3f893d88a4141a"
+        },
+        {
+          "path": "mingw--mingw-w64-crt--profile--COPYING",
+          "sha256": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa"
+        },
+        {
+          "path": "mingw--mingw-w64-libraries--libmangle--COPYING",
+          "sha256": "ae7a4090983e6ea0780c60c454016fd5e93b414b0de26ad041608ec66fbb54bb"
+        },
+        {
+          "path": "mingw--mingw-w64-libraries--pseh--COPYING",
+          "sha256": "5ece225da0c7f0dba84dc64d773b5231075e8fee61cbeceb9f774e939918e638"
+        },
+        {
+          "path": "mingw--mingw-w64-libraries--winpthreads--COPYING",
+          "sha256": "63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177"
+        },
+        {
+          "path": "mingw--mingw-w64-libraries--winstorecompat--COPYING",
+          "sha256": "fa7368d1f93d890c173177475d8ec7aff265a7d08f1f364d66f74d138978ce36"
+        },
+        {
+          "path": "libiconv--COPYING",
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/20-libiconv.sh",
@@ -67,10 +121,41 @@
           "pin": "5df606bbd0ef54a8f150c3303c870b9381a661f0",
           "pin_kind": "commit",
           "status": "built",
-          "licence": "LicenseRef-gnulib-per-file (GPL-3.0-or-later / LGPL-2.1-or-later / permissive)",
+          "licence": "GPL-3.0-or-later AND LGPL-2.1-or-later AND LicenseRef-gnulib-permissive",
           "licence_basis": "seat-verified",
           "gpl3_compatible": "yes",
-          "licence_note": "gnulib README: licence stated per file/module; build infrastructure for libiconv"
+          "licence_note": "gnulib README: licence stated per file/module; build infrastructure for libiconv; vendored subtree; compilation not determined at the seat: doc/licenses-texi.texi, modules/COPYING; gnulib per-module notices are not enumerated; COPYING and the four FSF texts are carried.",
+          "texts": [
+            {
+              "path": "gnulib--COPYING",
+              "sha256": "438610ba3d10f492dff9e17f7d53a5316e3f4b4adc5f79a33ac7110d5a5ee210"
+            },
+            {
+              "path": "libiconv--COPYING.LIB",
+              "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95"
+            },
+            {
+              "path": "gnulib--doc--COPYING.LESSERv3",
+              "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+            },
+            {
+              "path": "gnulib--doc--COPYINGv2",
+              "sha256": "edaef632cbb643e4e7a221717a6c441a4c1a7c918e6e4d56debc3d8739b233f6"
+            },
+            {
+              "path": "gnulib--doc--COPYINGv3",
+              "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+            },
+            {
+              "path": "gnulib--doc--licenses-texi.texi",
+              "sha256": "e2978abebf7cbcae3ee0c8794e660dd7b8a1508b1b347357fd235e5c83347436"
+            },
+            {
+              "path": "gnulib--modules--COPYING",
+              "sha256": "f530fec34a348cd8ad9cab66d0672f40406b07c3a4b995a2a5f31c483a9221d7"
+            }
+          ],
+          "chosen": null
         }
       ],
       "configure_flag": [
@@ -79,7 +164,18 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "libiconv--COPYING",
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+        },
+        {
+          "path": "libiconv--COPYING.LIB",
+          "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/20-zlib.sh",
@@ -94,7 +190,22 @@
       "licence": "Zlib",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: contrib/dotzlib/LICENSE_1_0.txt, contrib/minizip/LICENSE.Info-Zip",
+      "texts": [
+        {
+          "path": "zlib--LICENSE",
+          "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2"
+        },
+        {
+          "path": "zlib--contrib--dotzlib--LICENSE_1_0.txt",
+          "sha256": "36266a8fd073568394cb81cdb2b124f7fdae2c64c1a7ed09db34b4d22efa2951"
+        },
+        {
+          "path": "zlib--contrib--minizip--LICENSE.Info-Zip",
+          "sha256": "fc686023047ce5ce3a18a9b8a777156f0e475929d3de06bac279f3c025d2b2ca"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/25-fftw3.sh",
@@ -107,7 +218,22 @@
       "licence": "GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: doc/license.texi",
+      "texts": [
+        {
+          "path": "fftw3--COPYING",
+          "sha256": "231f7edcc7352d7734a96eef0b8030f77982678c516876fcb81e25b32d68564c"
+        },
+        {
+          "path": "fftw3--COPYRIGHT",
+          "sha256": "8a74b35d541d93fdf58a22a3d3baa48ae3edbf6d715edfeb6457c21968ae43ac"
+        },
+        {
+          "path": "fftw3--doc--license.texi",
+          "sha256": "68f733830a3b4dbf66815ca54b5637015517848c5f32f38f1ea2057782161a77"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/25-fribidi.sh",
@@ -122,7 +248,14 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libiconv--COPYING.LIB",
+          "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/25-gmp.sh",
@@ -137,7 +270,22 @@
       "licence": "LGPL-3.0-or-later OR GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "gmp--COPYING.LESSERv3",
+          "sha256": "a853c2ffec17057872340eee242ae4d96cbf2b520ae27d903e1b2fef1a5f9d1c"
+        },
+        {
+          "path": "gmp--COPYINGv2",
+          "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+        },
+        {
+          "path": "gmp--COPYINGv3",
+          "sha256": "e6037104443f9a7829b2aa7c5370d0789a7bda3ca65a0b904cdc0c2e285d9195"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/25-libogg.sh",
@@ -150,7 +298,14 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libogg--COPYING",
+          "sha256": "d2ab5758336489da61c12cc5bb757da5339c4ae9001f9bb0562b4370249af814"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/25-libpng.sh",
@@ -163,7 +318,34 @@
       "licence": "Libpng-2.0",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: contrib/gregbook/COPYING, contrib/gregbook/LICENSE, contrib/pngminus/LICENSE.txt; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "libpng--LICENSE.md",
+          "sha256": "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526"
+        },
+        {
+          "path": "libpng--LICENSES--MIT-0.txt",
+          "sha256": "8876cdca96eb380d16d5ea32bf4529d85e87dedc7765ae2861a9bec7f34acbed"
+        },
+        {
+          "path": "libpng--LICENSES--MIT.txt",
+          "sha256": "508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1"
+        },
+        {
+          "path": "libdvdread--COPYING",
+          "sha256": "d6cb0e9e560f51085556949a84af12b79a00f10ab8b66c752537faf7cd665572"
+        },
+        {
+          "path": "libpng--contrib--gregbook--LICENSE",
+          "sha256": "b6a03c1803eb58ffb1f1278d5c7d4096c4c116e66dce8a7553e8c77d163c3438"
+        },
+        {
+          "path": "libpng--contrib--pngminus--LICENSE.txt",
+          "sha256": "1806f1f10d393e9e377b3a8d1b968452b54f1a90378f14eeef45426946ace330"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/25-libxml2.sh",
@@ -175,10 +357,37 @@
       "configure_flag": [
         "--enable-libxml2"
       ],
-      "licence": "MIT",
+      "licence": "MIT AND ISC-Veillard",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: result/html-tokenizer/NOTICE; dict.c and list.c ISC-Veillard notices and whole source blobs are carried.",
+      "texts": [
+        {
+          "path": "libxml2--Copyright",
+          "sha256": "5d4873884a890122a4b9b20ad56ac6f7da1d796a5bfcf04a427970ac96217626"
+        },
+        {
+          "path": "libxml2--dict.c",
+          "sha256": "2663392f29dd45eb7ad802c471e146d4f6f509e317a4938b496920b4ea0228b4"
+        },
+        {
+          "path": "libxml2--list.c",
+          "sha256": "8a04740bfd8a37f3006bfc0404aa31429e56ef991cddcd47707ce2a9b1d98506"
+        },
+        {
+          "path": "libxml2--result--html-tokenizer--NOTICE",
+          "sha256": "d6a2cb265a0a249a234b89eeffa7f316ebe5bff546672a0a2b1a861dd2238460"
+        },
+        {
+          "path": "libxml2--dict.c-L1-17.txt",
+          "sha256": "ea9e97f88bf4ef8ad1142e12d0e6da003968420aa38094f74b9b51206675438a"
+        },
+        {
+          "path": "libxml2--list.c-L1-16.txt",
+          "sha256": "2fdb83809864852d236c64fffa74054699e61887b736e18724d4a8ac0e9684f8"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/25-openssl.sh",
@@ -191,7 +400,18 @@
       "licence": "Apache-2.0",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: external/perl/Text-Template-1.56/LICENSE, util/perl/OpenSSL/copyright.pm",
+      "texts": [
+        {
+          "path": "openssl--LICENSE.txt",
+          "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+        },
+        {
+          "path": "openssl--external--perl--Text-Template-1.56--LICENSE",
+          "sha256": "9837f05336ef3cbacb6a96e1672a0426d81ad01191f214b8d48e22ca62338181"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/25-xz.sh",
@@ -206,7 +426,30 @@
       "licence": "0BSD",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "COPYING: liblzma is 0BSD (the GPL/LGPL files are the CLI tools and getopt, not linked)"
+      "licence_note": "COPYING: liblzma is 0BSD (the GPL/LGPL files are the CLI tools and getopt, not linked); vendored subtree; compilation not determined at the seat: build-aux/license-check.sh",
+      "texts": [
+        {
+          "path": "xz--COPYING",
+          "sha256": "616a3ad264ce29b8f1cb97e53037b139d406899ca8d1f799651e17bfa09830b8"
+        },
+        {
+          "path": "xz--COPYING.0BSD",
+          "sha256": "0b01625d853911cd0e2e088dcfb743261034a091bb379246cb25a14cc4c74bf1"
+        },
+        {
+          "path": "gnulib--doc--COPYINGv2",
+          "sha256": "edaef632cbb643e4e7a221717a6c441a4c1a7c918e6e4d56debc3d8739b233f6"
+        },
+        {
+          "path": "gnulib--doc--COPYINGv3",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+        },
+        {
+          "path": "libiconv--COPYING.LIB",
+          "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-brotli.sh",
@@ -219,7 +462,14 @@
       "licence": "MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "brotli--LICENSE",
+          "sha256": "3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-fonts/25-freetype.sh",
@@ -232,7 +482,30 @@
       "licence": "FTL OR GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "LICENSE.TXT: two mutually exclusive licences; GPL-2.0-or-later chosen"
+      "licence_note": "LICENSE.TXT: two mutually exclusive licences; GPL-2.0-or-later chosen; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "freetype--LICENSE.TXT",
+          "sha256": "bd36c8b474855fa294c2ec5c184544478ef3720aad37d65a6296a4f264fd2d3b"
+        },
+        {
+          "path": "freetype--docs--FTL.TXT",
+          "sha256": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f"
+        },
+        {
+          "path": "freetype--docs--GPLv2.TXT",
+          "sha256": "c4120c6752c910c299e3bd9cb3a46ff262c268303ca2069b61f92f10a5656c18"
+        },
+        {
+          "path": "freetype--src--bdf--README",
+          "sha256": "7984455e7e5a9faba3797c8bf095fbe10cc846316b7320aff8c58402e22b82fe"
+        },
+        {
+          "path": "freetype--src--pcf--README",
+          "sha256": "18d9782898d9eac04476e2f744678137b2a889689ed3e923e052fc396a86f86b"
+        }
+      ],
+      "chosen": "GPL-2.0-or-later"
     },
     {
       "stage": "scripts.d/45-fonts/35-fontconfig.sh",
@@ -247,7 +520,14 @@
       "licence": "MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "fontconfig--COPYING",
+          "sha256": "51a51aa9823704fd90bccc616cdd17ebabb5b2b3e9cbde886ca02c7002288067"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-fonts/45-harfbuzz.sh",
@@ -262,7 +542,22 @@
       "licence": "MIT-Modern-Variant",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "COPYING: 'Old MIT' licence (cell read MIT: corrected identifier)"
+      "licence_note": "COPYING: 'Old MIT' licence (cell read MIT: corrected identifier); vendored subtree; compilation not determined at the seat: perf/texts/COPYING, src/ms-use/COPYING",
+      "texts": [
+        {
+          "path": "harfbuzz--COPYING",
+          "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64"
+        },
+        {
+          "path": "harfbuzz--perf--texts--COPYING",
+          "sha256": "cf977e70247d5fa9d44955e4d8ed23b503c31f78570f62136756278c2cfcb3c3"
+        },
+        {
+          "path": "harfbuzz--src--ms-use--COPYING",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-fonts/50-freetype.sh",
@@ -277,7 +572,30 @@
       "licence": "FTL OR GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "as 25-freetype (same pin)"
+      "licence_note": "as 25-freetype (same pin); vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "freetype--LICENSE.TXT",
+          "sha256": "bd36c8b474855fa294c2ec5c184544478ef3720aad37d65a6296a4f264fd2d3b"
+        },
+        {
+          "path": "freetype--docs--FTL.TXT",
+          "sha256": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f"
+        },
+        {
+          "path": "freetype--docs--GPLv2.TXT",
+          "sha256": "c4120c6752c910c299e3bd9cb3a46ff262c268303ca2069b61f92f10a5656c18"
+        },
+        {
+          "path": "freetype--src--bdf--README",
+          "sha256": "7984455e7e5a9faba3797c8bf095fbe10cc846316b7320aff8c58402e22b82fe"
+        },
+        {
+          "path": "freetype--src--pcf--README",
+          "sha256": "18d9782898d9eac04476e2f744678137b2a889689ed3e923e052fc396a86f86b"
+        }
+      ],
+      "chosen": "GPL-2.0-or-later"
     },
     {
       "stage": "scripts.d/45-lcms2.sh",
@@ -292,7 +610,22 @@
       "licence": "MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: plugins/fast_float/COPYING.GPL3, utils/jpgicc/LICENSE_iccjpeg",
+      "texts": [
+        {
+          "path": "lcms2--LICENSE",
+          "sha256": "6dbd60437f8ef91d8de1f08ad75882547fd4931bfcc3566a0735f28db1484d31"
+        },
+        {
+          "path": "lcms2--plugins--fast_float--COPYING.GPL3",
+          "sha256": "c53a65c2fd561c87eaabf1072ef5dcab8653042bc15308465f52413585eb6271"
+        },
+        {
+          "path": "lcms2--utils--jpgicc--LICENSE_iccjpeg",
+          "sha256": "8baac37d14eed89b82ffcb041677dd701164eb5cc0f26e165fe47eb11afa0dca"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-libffi.sh",
@@ -305,7 +638,18 @@
       "licence": "MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libffi--LICENSE",
+          "sha256": "17b64dc60f3b6897a60f971e288b973f655c2edcdf08b25f3c3dd5549857881c"
+        },
+        {
+          "path": "libffi--LICENSE-BUILDTOOLS",
+          "sha256": "e67978cd18816c0cb7d29aaaacde7b7447402c2fb321a051698890a8eaedda94"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-libsamplerate.sh",
@@ -318,7 +662,18 @@
       "licence": "BSD-2-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: docs/license.md",
+      "texts": [
+        {
+          "path": "libsamplerate--COPYING",
+          "sha256": "2c1f76ce2effdddb425018405d5690c0b1ab4e6976e35296b0a6db65c5e1a55d"
+        },
+        {
+          "path": "libsamplerate--docs--license.md",
+          "sha256": "9722032e4b5684f0ecd399480183a9029623636add1e9515621defaf8dbcf3ed"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-libudfread.sh",
@@ -331,7 +686,14 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libudfread--COPYING",
+          "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-libunibreak.sh",
@@ -344,7 +706,14 @@
       "licence": "Zlib",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libunibreak--LICENCE",
+          "sha256": "0c57e2ec42ece17791a75d2f9b2f8e0663181be008667a507f765b3ef22522db"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-libvorbis.sh",
@@ -359,7 +728,18 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: debian/copyright",
+      "texts": [
+        {
+          "path": "libvorbis--COPYING",
+          "sha256": "ec1815db59fcd302846df949d7424876cb2e2dc5ed1606c5fb0b36787b1cf43a"
+        },
+        {
+          "path": "libvorbis--debian--copyright",
+          "sha256": "1f6c6b6397d86d20968d7856d6945591b89e4cb64e5fc1ec8b992811f6a65ed8"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-opencl.sh",
@@ -376,7 +756,14 @@
           "licence": "Apache-2.0",
           "licence_basis": "seat-verified",
           "gpl3_compatible": "yes",
-          "licence_note": "LICENSE Apache-2.0"
+          "licence_note": "LICENSE Apache-2.0",
+          "texts": [
+            {
+              "path": "opencl-icd-loader--LICENSE",
+              "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+            }
+          ],
+          "chosen": null
         }
       ],
       "configure_flag": [
@@ -385,7 +772,14 @@
       "licence": "Apache-2.0",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "opencl--LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-pcre2.sh",
@@ -398,7 +792,18 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: cmake/COPYING-CMAKE-SCRIPTS",
+      "texts": [
+        {
+          "path": "pcre2--LICENCE.md",
+          "sha256": "197d8a73ffee0d6b09adba2f9c677b5f5aede24edf89258a68e48248d010d811"
+        },
+        {
+          "path": "pcre2--cmake--COPYING-CMAKE-SCRIPTS",
+          "sha256": "c666ec2313dba24523ccad88f4c04ea4b24fad6545263a35b1d4ab2b08efe50a"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-pixman.sh",
@@ -411,7 +816,14 @@
       "licence": "MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "pixman--COPYING",
+          "sha256": "fac9270f0987b96ff4533fca3548c633e02083cbba4a0172a3b149b2e4019793"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-vmaf.sh",
@@ -426,7 +838,14 @@
       "licence": "BSD-2-Clause-Patent",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "vmaf--LICENSE",
+          "sha256": "a6fdb51d02b9dfe198e55534bb8047fe6d756eda117f4ff83de98f92c1952710"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/45-xxhash.sh",
@@ -439,7 +858,18 @@
       "licence": "BSD-2-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: cli/COPYING",
+      "texts": [
+        {
+          "path": "xxhash--LICENSE",
+          "sha256": "6ffedbc0f7878612d2b23589f1ff2ab15633e1df7963a5d9fc750ec5500c7e7a"
+        },
+        {
+          "path": "gmp--COPYINGv2",
+          "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/47-vulkan/40-vulkan-headers.sh",
@@ -452,7 +882,22 @@
       "licence": "Apache-2.0 OR MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "LICENSE.md + every header SPDX 'Apache-2.0 OR MIT' (cell read Apache-2.0)"
+      "licence_note": "LICENSE.md + every header SPDX 'Apache-2.0 OR MIT' (cell read Apache-2.0)",
+      "texts": [
+        {
+          "path": "vulkan-headers--LICENSE.md",
+          "sha256": "95ad366d23fadf701d355bc45fb8b82ae2d700239471d35d41286ac3b08ff903"
+        },
+        {
+          "path": "opencl--LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "vulkan-headers--LICENSES--MIT.txt",
+          "sha256": "1ca3502222d967f3be5751c55f6b7ee735b5383909c3b501495f54b216dbf227"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/47-vulkan/45-vulkan-loader.sh",
@@ -469,7 +914,22 @@
           "licence": "Apache-2.0 OR MIT",
           "licence_basis": "seat-verified",
           "gpl3_compatible": "yes",
-          "licence_note": "same repository/tag as 40-vulkan-headers"
+          "licence_note": "same repository/tag as 40-vulkan-headers",
+          "texts": [
+            {
+              "path": "vulkan-headers--LICENSE.md",
+              "sha256": "95ad366d23fadf701d355bc45fb8b82ae2d700239471d35d41286ac3b08ff903"
+            },
+            {
+              "path": "opencl--LICENSE",
+              "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+            },
+            {
+              "path": "vulkan-headers--LICENSES--MIT.txt",
+              "sha256": "1ca3502222d967f3be5751c55f6b7ee735b5383909c3b501495f54b216dbf227"
+            }
+          ],
+          "chosen": null
         }
       ],
       "configure_flag": [
@@ -478,7 +938,14 @@
       "licence": "MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "BtbN Vulkan-Shim-Loader LICENSE: MIT"
+      "licence_note": "BtbN Vulkan-Shim-Loader LICENSE: MIT",
+      "texts": [
+        {
+          "path": "vulkan-loader--LICENSE",
+          "sha256": "8d4d279343d72e5b9e06bbe38c1ad8660fa8eabc217164a5b482ddf4ab0dba9d"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/47-vulkan/50-shaderc.sh",
@@ -491,7 +958,128 @@
       "licence": "Apache-2.0",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "statically links glslang, SPIRV-Tools and SPIRV-Headers at shaderc's DEPS revisions (records follow); vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept); AML-glslang is GPL-3.0-compatible: its only conditions are notice retention and no endorsement by NVIDIA's name or marks (GPL-3.0 section 7 (b) / (d)); redistribution in source or binary, with or without modification, is granted. There is no patent grant (like BSD-3-Clause-Clear); the personal, non-exclusive grant accepted by use binds each recipient directly to NVIDIA and restricts nothing in Clearwater's redistribution.",
+      "texts": [
+        {
+          "path": "opencl-icd-loader--LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        },
+        {
+          "path": "shaderc--third_party--LICENSE.glslang",
+          "sha256": "b5a00e94f058edc87e05978329b55730d8689abe61205d9018443d03de4f07da"
+        },
+        {
+          "path": "shaderc--third_party--LICENSE.spirv-tools",
+          "sha256": "47e20ce182bc68fab1a0cfb129b03c326aaf4f2b6b7905aa9d376d31018bd29f"
+        }
+      ],
+      "chosen": null
+    },
+    {
+      "stage": "scripts.d/47-vulkan/50-shaderc.sh",
+      "name": "glslang",
+      "repository": "https://github.com/KhronosGroup/glslang.git",
+      "pin": "73b25650df6dc4545966674531e6b7cc8f5d2407",
+      "pin_kind": "commit",
+      "status": "built",
+      "via": "shaderc git-sync-deps",
+      "extra_repositories": [],
+      "configure_flag": null,
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "New record (CHARC ruling 1): fetched by shaderc's utils/git-sync-deps at the DEPS revision (shaderc DEPS 'glslang_revision') and built into libshaderc_combined (libshaderc/CMakeLists.txt links glslang and SPIRV). Texts: LICENSE.txt (the project's combined statement: BSD-3-Clause core, BSD-2-Clause, MIT, Apache-2.0, the NVIDIA preprocessor licence, GPL-3.0-or-later with the Bison exception for the generated grammar, MIT-Khronos-old headers) + the REUSE LICENSES/ set (8 texts). Expression = the LICENSES/ set; the NVIDIA text is LICENSES/AML-glslang.txt, SPDX identifier AML-glslang.; AML-glslang is GPL-3.0-compatible: its only conditions are notice retention and no endorsement by NVIDIA's name or marks (GPL-3.0 section 7 (b) / (d)); redistribution in source or binary, with or without modification, is granted. There is no patent grant (like BSD-3-Clause-Clear); the personal, non-exclusive grant accepted by use binds each recipient directly to NVIDIA and restricts nothing in Clearwater's redistribution.",
+      "licence": "Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND MIT AND MIT-Khronos-old AND AML-glslang AND GPL-3.0-or-later WITH Bison-exception-2.2",
+      "texts": [
+        {
+          "path": "glslang--LICENSE.txt",
+          "sha256": "17e70c676e1521ff3e4686f04a2053d93a7e28a33be8de7ec37ab0ff72feb677"
+        },
+        {
+          "path": "glslang--LICENSES--AML-glslang.txt",
+          "sha256": "cc8ea571129dbee2997e52a54d1f715f8b0159a22f28f985a9b2b31708a48620"
+        },
+        {
+          "path": "glslang--LICENSES--Apache-2.0.txt",
+          "sha256": "b22c5c23f3d598370ef51d7e539d5d5074207344fd86e41433f413e116f6a4f7"
+        },
+        {
+          "path": "glslang--LICENSES--BSD-2-Clause.txt",
+          "sha256": "789daa57a2ebb49cfc3e67cd1a1f994d5dc221138a8c3cd1934b2ed47b86d356"
+        },
+        {
+          "path": "glslang--LICENSES--BSD-3-Clause.txt",
+          "sha256": "5a93d5831e1297ab10fe643e1a631e83be392896da14ee2951285a79012df69d"
+        },
+        {
+          "path": "glslang--LICENSES--Bison-exception-2.2.txt",
+          "sha256": "218a0cdacd4059d01e2ccff5b31d3e968a6a9c8ee7e4e0fc231c47d7fbf422c3"
+        },
+        {
+          "path": "gnulib--doc--COPYINGv3",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+        },
+        {
+          "path": "spirv-cross--LICENSES--LicenseRef-KhronosFreeUse.txt",
+          "sha256": "fbeaca472f4f70e276dd1106ca5097435967a22ad6c1d8200aef7ad9f70aaf3f"
+        },
+        {
+          "path": "spdx--text--MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "chosen": null
+    },
+    {
+      "stage": "scripts.d/47-vulkan/50-shaderc.sh",
+      "name": "spirv-tools",
+      "repository": "https://github.com/KhronosGroup/SPIRV-Tools.git",
+      "pin": "71f287f18ed78d496e724fbfb1c3feae3a2af75a",
+      "pin_kind": "commit",
+      "status": "built",
+      "via": "shaderc git-sync-deps",
+      "extra_repositories": [],
+      "configure_flag": null,
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "New record (CHARC ruling 1): fetched by shaderc's utils/git-sync-deps at the DEPS revision (shaderc DEPS 'spirv_tools_revision'), built statically (-DSPIRV_TOOLS_BUILD_STATIC=ON) and linked into libshaderc_combined. LICENSE (Apache-2.0); no NOTICE file in the tree.",
+      "licence": "Apache-2.0",
+      "texts": [
+        {
+          "path": "opencl--LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "chosen": null
+    },
+    {
+      "stage": "scripts.d/47-vulkan/50-shaderc.sh",
+      "name": "spirv-headers-shaderc",
+      "repository": "https://github.com/KhronosGroup/SPIRV-Headers.git",
+      "pin": "86f980c731e62ae4eaf383d320449d71687936bf",
+      "pin_kind": "commit",
+      "status": "built",
+      "via": "shaderc git-sync-deps",
+      "extra_repositories": [],
+      "configure_flag": null,
+      "licence_basis": "seat-verified",
+      "gpl3_compatible": "yes",
+      "licence_note": "New record (CHARC ruling 1): fetched by shaderc's utils/git-sync-deps at the DEPS revision (shaderc DEPS 'spirv_headers_revision'); headers and grammar tables compiled into SPIRV-Tools / glslang / shaderc. A different pin from the scripts.d/47-vulkan/60-spirv-headers.sh row (fbf86836). LICENSE (per-file statement, MIT-style for the headers) + LICENSES/CC-BY-4.0.txt and MIT.txt.",
+      "licence": "MIT",
+      "texts": [
+        {
+          "path": "spirv-headers--LICENSE",
+          "sha256": "ea43b1de38a6f90c488800d66dec1ed671e68cda530266bc96951fb5b6307613"
+        },
+        {
+          "path": "spirv-headers--LICENSES--CC-BY-4.0.txt",
+          "sha256": "9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94"
+        },
+        {
+          "path": "spirv-headers--LICENSES--MIT.txt",
+          "sha256": "6d7c9e9d7d12c8d3753bdb24417b84819ba4d6c2f025c37948113d86dc81eef9"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/47-vulkan/55-spirv-cross.sh",
@@ -504,7 +1092,30 @@
       "licence": "Apache-2.0",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "opencl--LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "spirv-cross--LICENSES--Apache-2.0.txt",
+          "sha256": "44b0a56e80b41a1b0a6bd1292515e806539fd97b30be54c2719e6c763190ab57"
+        },
+        {
+          "path": "spirv-cross--LICENSES--CC-BY-4.0.txt",
+          "sha256": "b89aeb7c2a164a0576786dd2a8b57f2fb628b23981f0a06bd77e2f99a9befa0f"
+        },
+        {
+          "path": "spirv-cross--LICENSES--LicenseRef-KhronosFreeUse.txt",
+          "sha256": "fbeaca472f4f70e276dd1106ca5097435967a22ad6c1d8200aef7ad9f70aaf3f"
+        },
+        {
+          "path": "spirv-cross--LICENSES--MIT.txt",
+          "sha256": "8f25018489d6fe0dec34a352314c38dc146247b7de65735790f4398a92afa84b"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/47-vulkan/60-spirv-headers.sh",
@@ -517,7 +1128,22 @@
       "licence": "MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "spirv-headers--LICENSE",
+          "sha256": "ea43b1de38a6f90c488800d66dec1ed671e68cda530266bc96951fb5b6307613"
+        },
+        {
+          "path": "spirv-headers--LICENSES--CC-BY-4.0.txt",
+          "sha256": "9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94"
+        },
+        {
+          "path": "spirv-headers--LICENSES--MIT.txt",
+          "sha256": "6d7c9e9d7d12c8d3753bdb24417b84819ba4d6c2f025c37948113d86dc81eef9"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-amf.sh",
@@ -532,7 +1158,18 @@
       "licence": "MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: Thirdparty/amd/AmdDxExt/LICENSE.txt",
+      "texts": [
+        {
+          "path": "amf--LICENSE.txt",
+          "sha256": "eb297397aaa455b5668ab67d216b83828466152dab123fa92384c6ec16b74170"
+        },
+        {
+          "path": "amf--Thirdparty--amd--AmdDxExt--LICENSE.txt",
+          "sha256": "d8b1b7b1757e8b44ac9cd55cc41736523dd355523900af5f7c0187b485ac62c7"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-aom.sh",
@@ -547,7 +1184,46 @@
       "licence": "BSD-2-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "LICENSE BSD-2-Clause; separate PATENTS = AOM Patent License 1.0 (patent grant, not a copyright term)"
+      "licence_note": "LICENSE BSD-2-Clause; separate PATENTS = AOM Patent License 1.0 (patent grant, not a copyright term); vendored subtree; compilation not determined at the seat: third_party/googletest/src/LICENSE, third_party/highway/LICENSE-BSD3, third_party/libwebm/LICENSE.TXT, third_party/libwebm/PATENTS.TXT, third_party/libyuv/LICENSE; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "aom--LICENSE",
+          "sha256": "4764a286d8b2faeaf42f4418e7d7a28d58fc8fd4d00a3d0a7f44b0a4099de7f2"
+        },
+        {
+          "path": "aom--PATENTS",
+          "sha256": "661fb8e504744e95587b556b94a58343448300606a41bea8c7a9b97125696e61"
+        },
+        {
+          "path": "aom--third_party--fastfeat--LICENSE",
+          "sha256": "499041ddee5227b6f29ca06c17803e5fe24d60f243c69635cd76b7ba08d0ddd5"
+        },
+        {
+          "path": "aom--third_party--googletest--src--LICENSE",
+          "sha256": "9702de7e4117a8e2b20dafab11ffda58c198aede066406496bef670d40a22138"
+        },
+        {
+          "path": "aom--third_party--highway--LICENSE-BSD3",
+          "sha256": "d25e82e26acd42ca3ccc9993622631163425b869b9e16284226d534cff6470f2"
+        },
+        {
+          "path": "libwebp--COPYING",
+          "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf"
+        },
+        {
+          "path": "libvpx--PATENTS",
+          "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c"
+        },
+        {
+          "path": "aom--third_party--libyuv--LICENSE",
+          "sha256": "2b2cc1180c7e6988328ad2033b04b80117419db9c4c584918bbb3cfec7e9364f"
+        },
+        {
+          "path": "aom--third_party--x86inc--LICENSE",
+          "sha256": "719d8fa235f2068e0ae6d6a7dceb0a7720d7840f0f0ebed29957989e6ded3cd8"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-avisynth.sh",
@@ -562,7 +1238,26 @@
       "licence": "GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: distrib/docs/english/source/avisynthdoc/license.rst; Pass 2 (U6): the grant in avs_core/include/avisynth_c.h L23-35 adds a C-interface linking exception ('As a special exception, I give you permission to link to the Avisynth C interface with independent modules that communicate with the Avisynth C interface solely through the interfaces defined in avisynth_c.h ...'); the expression stays GPL-2.0-or-later (CHARC). Pass 2 (U10): the whole avisynth_c.h blob is carried beside its excerpt.",
+      "texts": [
+        {
+          "path": "avisynth--avs_core--include--avisynth_c.h",
+          "sha256": "b8ae46ec8757ce6c836f4103e03bbcfc3f82d5d32b1971357e6f9545a9b73043"
+        },
+        {
+          "path": "avisynth--distrib--docs--english--source--avisynthdoc--license.rst",
+          "sha256": "6a52c5ef39b34ffc93f7391b4257a84d0a30f147b1b9b3273df0e7bfc9a039cf"
+        },
+        {
+          "path": "avisynth--avs_core--include--avisynth_c.h-L1-35.txt",
+          "sha256": "f606ca417e07423b05eeed755db9caa41b1877e07d368f84a4f34d43a06a1ae9"
+        },
+        {
+          "path": "spdx--text--GPL-2.0-or-later.txt",
+          "sha256": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-chromaprint.sh",
@@ -574,10 +1269,37 @@
       "configure_flag": [
         "--enable-chromaprint"
       ],
-      "licence": "MIT AND LGPL-2.1-or-later",
+      "licence": "MIT AND LGPL-2.1-or-later AND BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "LICENSE.md: own code MIT, includes FFmpeg LGPL-2.1 parts; 'as a whole LGPL 2.1'"
+      "licence_note": "LICENSE.md: own code MIT, includes FFmpeg LGPL-2.1 parts; 'as a whole LGPL 2.1'; vendored subtree; compilation not determined at the seat: src/3rdparty/googletest/LICENSE; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "chromaprint--LICENSE.md",
+          "sha256": "562cfe59627e0c4e8e3b066f3ff2e9736f83811ffe4c6c2c7796595aa7595ebd"
+        },
+        {
+          "path": "aom--third_party--googletest--src--LICENSE",
+          "sha256": "9702de7e4117a8e2b20dafab11ffda58c198aede066406496bef670d40a22138"
+        },
+        {
+          "path": "chromaprint--src--3rdparty--kissfft--COPYING",
+          "sha256": "a2840585f8411be8e6826a31ef15ae65c950bd74a2437a73b013398a934ad0c6"
+        },
+        {
+          "path": "chromaprint--src--3rdparty--kissfft--LICENSES--BSD-3-Clause",
+          "sha256": "4d6bcab46f27d6d0c878e8305d4bdcfe040d52bf6656b9771f04c9fb9902c0ed"
+        },
+        {
+          "path": "chromaprint--src--3rdparty--kissfft--LICENSES--Unlicense",
+          "sha256": "c543dab3c100d8741a83b02f397746b1e10fc0046f30b942f308191a68e99407"
+        },
+        {
+          "path": "spdx--text--LGPL-2.1-or-later.txt",
+          "sha256": "5749785c8bdefafcb5d798270ed0a967036fe2ca63dcedade1627565dfef81d2"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-dav1d.sh",
@@ -592,7 +1314,18 @@
       "licence": "BSD-2-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "dav1d--COPYING",
+          "sha256": "dd92c3c2247c5651606fc23a5e2d6a1ebc5ace9a3e49cbde0e12f05ad1cb1ee5"
+        },
+        {
+          "path": "dav1d--doc--PATENTS",
+          "sha256": "335eca574598bf4ca181b12f708d6669e5a5e78c8e1513e5b35fa1f03901484b"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-davs2.sh",
@@ -607,7 +1340,14 @@
       "licence": "GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "davs2--COPYING",
+          "sha256": "971f09fd8dedc915472df12845fb7c653563689672fb1a658e28004887ba4a07"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-dvd/30-libdvdcss.sh",
@@ -620,7 +1360,14 @@
       "licence": "GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "gmp--COPYINGv2",
+          "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-dvd/40-libdvdread.sh",
@@ -635,7 +1382,14 @@
       "licence": "GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libdvdread--COPYING",
+          "sha256": "d6cb0e9e560f51085556949a84af12b79a00f10ab8b66c752537faf7cd665572"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-dvd/50-libdvdnav.sh",
@@ -650,7 +1404,14 @@
       "licence": "GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libdvdnav--COPYING",
+          "sha256": "32b1062f7da84967e7019d01ab805935caa7ab7321a7ced0e30ebe75e5df1670"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-ffnvcodec.sh",
@@ -667,7 +1428,30 @@
           "licence": "MIT",
           "licence_basis": "seat-verified",
           "gpl3_compatible": "yes",
-          "licence_note": "downloaded, not built at FFVER 900; headers MIT"
+          "licence_note": "downloaded, not built at FFVER 900; headers MIT",
+          "texts": [
+            {
+              "path": "ffnvcodec-sdk13.0--include--ffnvcodec--dynlink_loader.h",
+              "sha256": "dfbee3396c3fa92bff8a47ca600a698dea9f7bbad84a77343762fea362c35dd0"
+            },
+            {
+              "path": "ffnvcodec-sdk13.0--include--ffnvcodec--nvEncodeAPI.h",
+              "sha256": "4fe4094541ef0f8a13249d97a8692dc5f835a6e9dd42eeadb3e2f7321d54dc7e"
+            },
+            {
+              "path": "ffnvcodec-sdk13.0--include--ffnvcodec--nvEncodeAPI.h-L1-26.txt",
+              "sha256": "72b60be67644d841bfd54a042875b5846294d357040dd7ac8e38bde20d9e8f97"
+            },
+            {
+              "path": "ffnvcodec--include--ffnvcodec--dynlink_loader.h-L1-26.txt",
+              "sha256": "6f0d5ad2609c6fda3e0fb07fa286e7b46c2ea7b87ab12d926ab7a82c69ffe09d"
+            },
+            {
+              "path": "spdx--text--MIT.txt",
+              "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+            }
+          ],
+          "chosen": null
         },
         {
           "repository": "https://github.com/FFmpeg/nv-codec-headers.git",
@@ -677,7 +1461,30 @@
           "licence": "MIT",
           "licence_basis": "seat-verified",
           "gpl3_compatible": "yes",
-          "licence_note": "downloaded, not built at FFVER 900; headers MIT"
+          "licence_note": "downloaded, not built at FFVER 900; headers MIT",
+          "texts": [
+            {
+              "path": "ffnvcodec-sdk13.0--include--ffnvcodec--dynlink_loader.h",
+              "sha256": "dfbee3396c3fa92bff8a47ca600a698dea9f7bbad84a77343762fea362c35dd0"
+            },
+            {
+              "path": "ffnvcodec-sdk11.1--include--ffnvcodec--nvEncodeAPI.h",
+              "sha256": "be0c29a41ae3260fd016a9001fd959e747bac93ad21411759736abba4ffdea86"
+            },
+            {
+              "path": "ffnvcodec-sdk11.1--include--ffnvcodec--nvEncodeAPI.h-L1-26.txt",
+              "sha256": "d513d306639f4511a54494dbed295f7a1234d4ad55ca48ac9662f4ad543d6fc3"
+            },
+            {
+              "path": "ffnvcodec--include--ffnvcodec--dynlink_loader.h-L1-26.txt",
+              "sha256": "6f0d5ad2609c6fda3e0fb07fa286e7b46c2ea7b87ab12d926ab7a82c69ffe09d"
+            },
+            {
+              "path": "spdx--text--MIT.txt",
+              "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+            }
+          ],
+          "chosen": null
         }
       ],
       "configure_flag": [
@@ -687,7 +1494,30 @@
       "licence": "MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "ffnvcodec--include--ffnvcodec--dynlink_loader.h",
+          "sha256": "6dcf1ede1f38e91467fb8c06fa39894b8447f199446d6a4f008b083d7d0db9bf"
+        },
+        {
+          "path": "ffnvcodec--include--ffnvcodec--nvEncodeAPI.h",
+          "sha256": "8776fddcb8febc6aec4d73989b1f21831eb30306bc583da55b4bf0c14a1dc228"
+        },
+        {
+          "path": "ffnvcodec--include--ffnvcodec--nvEncodeAPI.h-L1-26.txt",
+          "sha256": "8f115901902ad05ce3a1ba48ae15393a1853ac0a3e7835ebe986cc80e1039b19"
+        },
+        {
+          "path": "ffnvcodec--include--ffnvcodec--dynlink_loader.h-L1-26.txt",
+          "sha256": "6f0d5ad2609c6fda3e0fb07fa286e7b46c2ea7b87ab12d926ab7a82c69ffe09d"
+        },
+        {
+          "path": "spdx--text--MIT.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-frei0r.sh",
@@ -702,7 +1532,14 @@
       "licence": "GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "fftw3--COPYING",
+          "sha256": "231f7edcc7352d7734a96eef0b8030f77982678c516876fcb81e25b32d68564c"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-gme.sh",
@@ -717,7 +1554,22 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: gme/ext/LICENSE",
+      "texts": [
+        {
+          "path": "gme--gme--ext--LICENSE",
+          "sha256": "8fb093f26ed0d78c8ca033bbec7063ac5b34c5d2475e6bd121d03ccfaaf2355f"
+        },
+        {
+          "path": "gmp--COPYINGv2",
+          "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+        },
+        {
+          "path": "gme--license.txt",
+          "sha256": "d2efc89fbb7533572a472d34e07964951810a3a4f8d3159ecc2dcaa1452c5c26"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-kvazaar.sh",
@@ -732,7 +1584,22 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: src/threadwrapper/LICENSE",
+      "texts": [
+        {
+          "path": "kvazaar--LICENSE",
+          "sha256": "3c1dc3d7f8a3d08c14f4fbe9942f45764d8a21a3296e8d83446f33fd65f21c38"
+        },
+        {
+          "path": "kvazaar--LICENSE.EXT.greatest",
+          "sha256": "16f569c87d5ec20b7474b55ee0a8877b8f8b4dc13f9567ebe0b8fe8afdeb34d2"
+        },
+        {
+          "path": "kvazaar--src--threadwrapper--LICENSE",
+          "sha256": "e4c9f82e9970cded92135cdc88f8a2f8e35b6d2fdb5fd879ea713cadfd6fbac3"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-lcevcdec.sh",
@@ -747,7 +1614,50 @@
       "licence": "BSD-3-Clause-Clear",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "LICENSE.md: The Clear BSD License; expressly grants NO patent rights (LCEVC is patented: a patent-only note)"
+      "licence_note": "LICENSE.md: The Clear BSD License; expressly grants NO patent rights (LCEVC is patented: a patent-only note); vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "lcevcdec--COPYING",
+          "sha256": "3afa5369b4fb44e18280b6e0e275971f78bc6eaf5f53553f41f2483fd8b1267e"
+        },
+        {
+          "path": "lcevcdec--LICENSE.md",
+          "sha256": "14358b0ecf6e7036c211c10f0f25563c94483dee7b8c7c954e09e10f3771d0af"
+        },
+        {
+          "path": "lcevcdec--licenses--FFmpeg--LICENSE.md",
+          "sha256": "cb48bf09a11f5fb576cddb0431c8f5ed0a60157a9ec942adffc13907cbe083f2"
+        },
+        {
+          "path": "lcevcdec--licenses--conan-center-index--LICENSE.txt",
+          "sha256": "b35b9e39a7900cbd38190afff863f5a4eb2f04c8f9ceaff7afdb0523185f57c9"
+        },
+        {
+          "path": "lcevcdec--licenses--emscripten--licence.txt",
+          "sha256": "06f2e6c024612605fc3c803b192983a26f19404eb54d78e399190d90ed32ac78"
+        },
+        {
+          "path": "lcevcdec--licenses--fmt--LICENSE",
+          "sha256": "07580f2a3b35709ce703d523f447b242f6dfec7582a8c0df102c7fa2849375f8"
+        },
+        {
+          "path": "lcevcdec--licenses--gradle--LICENSE",
+          "sha256": "cf234c4188d773406f640bf89be680d9288f40ff96901c70d643fcea96ad46df"
+        },
+        {
+          "path": "lcevcdec--licenses--ios-cmake--license.md",
+          "sha256": "0b85f7cda17eeba9d545455874ede53b54efb3ec8a9ae381250d1183c98efea0"
+        },
+        {
+          "path": "lcevcdec--licenses--nlohmann_json--LICENSE.MIT",
+          "sha256": "c0d068392ea65358b798b8c165103560f06e9e3b38c4ab4e2d8810a7b931af86"
+        },
+        {
+          "path": "lcevcdec--licenses--vma--LICENSE.txt",
+          "sha256": "52df2c03d6cfc9ffec13c9d3626c530fc9ce0cbe41d5ea3d10cd46edeb1aeb38"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libaribb24.sh",
@@ -762,7 +1672,14 @@
       "licence": "LGPL-3.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libaribb24--COPYING",
+          "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libaribcaption.sh",
@@ -777,7 +1694,14 @@
       "licence": "MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "LICENSE: MIT (cell read ISC: CORRECTED)"
+      "licence_note": "LICENSE: MIT (cell read ISC: CORRECTED)",
+      "texts": [
+        {
+          "path": "libaribcaption--LICENSE",
+          "sha256": "5149f1ce4fe89190d86bfb440456701a3a7406fc2b19ef0d8b57661f62b32c04"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libass.sh",
@@ -792,7 +1716,14 @@
       "licence": "ISC",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libass--COPYING",
+          "sha256": "f7e30699d02798351e7f839e3d3bfeb29ce65e44efa7735c225464c4fd7dfe9c"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libbluray.sh",
@@ -807,7 +1738,18 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: contrib/asm/LICENSE.txt",
+      "texts": [
+        {
+          "path": "libbluray--COPYING",
+          "sha256": "b3aa400aca6d2ba1f0bd03bd98d03d1fe7489a3bbb26969d72016360af8a5c9d"
+        },
+        {
+          "path": "libbluray--contrib--asm--LICENSE.txt",
+          "sha256": "293b6af371eee28b0ff16f0334ea19e20a3d5522143faa4b95b346855507879a"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libjxl/50-libjxl.sh",
@@ -822,7 +1764,30 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "LICENSE BSD-3-Clause; separate PATENTS grant"
+      "licence_note": "LICENSE BSD-3-Clause; separate PATENTS grant; vendored subtree; compilation not determined at the seat: debian/copyright, lib/extras/LICENSE.apngdis, third_party/HEVCSoftware/cfg/LICENSE",
+      "texts": [
+        {
+          "path": "libjxl--LICENSE",
+          "sha256": "8405932022a556380c2d8c272eff154a923feb197233f348ce5f7334fb0a5ede"
+        },
+        {
+          "path": "libjxl--PATENTS",
+          "sha256": "91915f8ae056a68a3c5bdf05d9f6f78bb6903e27a8ca3a8434c9e4ac87300575"
+        },
+        {
+          "path": "libjxl--debian--copyright",
+          "sha256": "ec6f5bc1043fba8ffa648157b5beee8915865a54f25c5f3201b0e910cd09ebde"
+        },
+        {
+          "path": "libjxl--lib--extras--LICENSE.apngdis",
+          "sha256": "4319c422c3bf10168877a83cd9ff848684b9e53dce9a68de0a3f454a825933f6"
+        },
+        {
+          "path": "libjxl--third_party--HEVCSoftware--cfg--LICENSE",
+          "sha256": "44a2c5f2ce34d00a30554a44d3e51377852f84bc183dc1b9fb2b48ece976ebef"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libmp3lame.sh",
@@ -837,7 +1802,18 @@
       "licence": "LGPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libmp3lame--COPYING",
+          "sha256": "e64f9c5a18f56828c10a575df13ade641aa3af4512a7afe6c411256943b57aaf"
+        },
+        {
+          "path": "libmp3lame--LICENSE",
+          "sha256": "5c1f8d44f1eacbea3e1c31ff6ee11a4e1690ccbed4ee4af16de3b6eb61dc69a8"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libopus.sh",
@@ -852,7 +1828,18 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libopus--COPYING",
+          "sha256": "01e1167d54a096d123cf6dfbbeb19587278845c6481d2d66d545669846079551"
+        },
+        {
+          "path": "libopus--LICENSE_PLEASE_READ.txt",
+          "sha256": "7efb4989e0cd1b256229bdf2f09300c5d14e35db0e7476bfb87fac243498273d"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libplacebo.sh",
@@ -867,7 +1854,18 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: demos/LICENSE",
+      "texts": [
+        {
+          "path": "libbluray--COPYING",
+          "sha256": "b3aa400aca6d2ba1f0bd03bd98d03d1fe7489a3bbb26969d72016360af8a5c9d"
+        },
+        {
+          "path": "glib--LICENSES--CC0-1.0.txt",
+          "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-librist/40-mbedtls.sh",
@@ -880,7 +1878,14 @@
       "licence": "Apache-2.0 OR GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "mbedtls--LICENSE",
+          "sha256": "9b405ef4c89342f5eae1dd828882f931747f71001cfba7d114801039b52ad09b"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-librist/50-librist.sh",
@@ -895,7 +1900,18 @@
       "licence": "BSD-2-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: contrib/mbedtls/LICENSE",
+      "texts": [
+        {
+          "path": "librist--COPYING",
+          "sha256": "b9841591a3452ee30033d8e3586c7b1244a0b2fc1dc6cb04576957c313cb2792"
+        },
+        {
+          "path": "opencl--LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-librsvg/10-glib.sh",
@@ -908,7 +1924,54 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: docs/reference/COPYING; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "glib--LICENSES--AFL-2.0.txt",
+          "sha256": "7ecc7db84298adb05d2cf10339c63a5315a1c5c270a68d97d7d40a53b508ccde"
+        },
+        {
+          "path": "glib--LICENSES--Apache-2.0.txt",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+        },
+        {
+          "path": "glib--LICENSES--CC-BY-SA-3.0.txt",
+          "sha256": "3f941b3b89cf7b8370ceb83cc76d2120d471b58735d8ca60238a751a48d7f72f"
+        },
+        {
+          "path": "glib--LICENSES--CC0-1.0.txt",
+          "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+        },
+        {
+          "path": "spdx--text--GPL-2.0-or-later.txt",
+          "sha256": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3"
+        },
+        {
+          "path": "glib--LICENSES--LGPL-2.1-only.txt",
+          "sha256": "fa6f36630bb1e0c571d34b2bbdf188d08495c9dbf58f28cac112f303fc1f58fb"
+        },
+        {
+          "path": "glib--LICENSES--LLVM-exception.txt",
+          "sha256": "e34c58338bd89d43e709e226610d8f32b3e3c47f4ad9a99a8dc1d4ac7842488e"
+        },
+        {
+          "path": "glib--LICENSES--LicenseRef-old-glib-tests.txt",
+          "sha256": "fb261b2d5dbe76c4850f90da763210bc385e52428df6bbfd7b06295ac8a32914"
+        },
+        {
+          "path": "glib--LICENSES--MIT.txt",
+          "sha256": "b85dcd3e453d05982552c52b5fc9e0bdd6d23c6f8e844b984a88af32570b0cc0"
+        },
+        {
+          "path": "glib--LICENSES--MPL-1.1.txt",
+          "sha256": "6214f8b1300bb9f37b16ebc146f8f61af0187e0025042ff95c8b3030744a8795"
+        },
+        {
+          "path": "glib--docs--reference--COPYING",
+          "sha256": "b1ec1d0e5947f81e815d8771f7d4d90671a94bb10a42dc687fb566de461a57aa"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-librsvg/20-cairo.sh",
@@ -921,7 +1984,42 @@
       "licence": "LGPL-2.1-only OR MPL-1.1",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: perf/COPYING, util/COPYING, util/cairo-script/COPYING, util/cairo-trace/COPYING, util/cairo-trace/COPYING-GPL-3",
+      "texts": [
+        {
+          "path": "cairo--COPYING",
+          "sha256": "67228a9f7c5f9b67c58f556f1be178f62da4d9e2e6285318d8c74d567255abdf"
+        },
+        {
+          "path": "cairo--COPYING-LGPL-2.1",
+          "sha256": "9e9e8608c4cdda51a78cc3a385f4ec9a2e4c96d5ecad74ac8bca5fca3e563b7d"
+        },
+        {
+          "path": "cairo--COPYING-MPL-1.1",
+          "sha256": "53692a2ed6c6a2c6ec9b32dd0b820dfae91e0a1fcdf625ca9ed0bdf8705fcc4f"
+        },
+        {
+          "path": "cairo--perf--COPYING",
+          "sha256": "6f93b45ea874706058ae35bc02df79c3f9daf00948672eea8394cc25d1327d49"
+        },
+        {
+          "path": "cairo--util--COPYING",
+          "sha256": "008e976b6e5e7155ee24322073f42cab7cd6daf90bc2322f1d5c3aacab94111c"
+        },
+        {
+          "path": "cairo--util--cairo-script--COPYING",
+          "sha256": "25f4d4ce651b1ee6aff713ff986275d6c190a8537e36437886f8bf1497b0a174"
+        },
+        {
+          "path": "cairo--util--cairo-trace--COPYING",
+          "sha256": "421158645572270264a980b8b130dd988138e4dae20144e22455446e0ef90902"
+        },
+        {
+          "path": "libiconv--COPYING",
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-librsvg/30-pango.sh",
@@ -934,7 +2032,14 @@
       "licence": "LGPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "COPYING is the GNU Library GPL 2 text (cell read LGPL-2.1-or-later; sources not sampled; either is GPL-3.0-compatible)"
+      "licence_note": "COPYING is the GNU Library GPL 2 text (cell read LGPL-2.1-or-later; sources not sampled; either is GPL-3.0-compatible)",
+      "texts": [
+        {
+          "path": "pango--COPYING",
+          "sha256": "d245807f90032872d1438d741ed21e2490e1175dc8aa3afa5ddb6c8e529b58e5"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-librsvg/99-librsvg.sh",
@@ -949,7 +2054,18 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: librsvg-rebind/LICENSE",
+      "texts": [
+        {
+          "path": "libudfread--COPYING",
+          "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551"
+        },
+        {
+          "path": "librsvg--librsvg-rebind--LICENSE",
+          "sha256": "f9c4c77baa3828004ee54b8a4f2db2e88ed44a6237a493965bf551fac0fcb62d"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libssh.sh",
@@ -964,7 +2080,18 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: cmake/Modules/COPYING-CMAKE-SCRIPTS",
+      "texts": [
+        {
+          "path": "libssh--COPYING",
+          "sha256": "1656186e951db1c010a8485481fa94587f7e53a26d24976bef97945ad0c4df5a"
+        },
+        {
+          "path": "libssh--cmake--Modules--COPYING-CMAKE-SCRIPTS",
+          "sha256": "46cde7dc11e64c78d650b4851b88f6704b4665ff60f22a1caf68ceb15e217e5b"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libtheora.sh",
@@ -979,7 +2106,18 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libtheora--COPYING",
+          "sha256": "8417fad7da775735564e209484a2e011e0fa201e94f01fdbee6e4977e478e6fc"
+        },
+        {
+          "path": "libtheora--LICENSE",
+          "sha256": "2c902950c73a63cd285dc0c36573de9c5fefe66d49312949c51d941f33e92932"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libvpx.sh",
@@ -994,7 +2132,38 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: third_party/googletest/src/LICENSE, third_party/libwebm/LICENSE.TXT, third_party/libyuv/LICENSE, third_party/nalloc/LICENSE; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "libvpx--LICENSE",
+          "sha256": "8267348d5af1262c11d1a08de2f5afc77457755f1ac658627dd9acf71011d615"
+        },
+        {
+          "path": "libvpx--PATENTS",
+          "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c"
+        },
+        {
+          "path": "aom--third_party--googletest--src--LICENSE",
+          "sha256": "9702de7e4117a8e2b20dafab11ffda58c198aede066406496bef670d40a22138"
+        },
+        {
+          "path": "libwebp--COPYING",
+          "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf"
+        },
+        {
+          "path": "aom--third_party--libyuv--LICENSE",
+          "sha256": "2b2cc1180c7e6988328ad2033b04b80117419db9c4c584918bbb3cfec7e9364f"
+        },
+        {
+          "path": "libvpx--third_party--nalloc--LICENSE",
+          "sha256": "d7dd0396ec46975e1bf9093680068ef301bc0ed204603e623a6f7073ab922ab1"
+        },
+        {
+          "path": "aom--third_party--x86inc--LICENSE",
+          "sha256": "719d8fa235f2068e0ae6d6a7dceb0a7720d7840f0f0ebed29957989e6ded3cd8"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libwebp.sh",
@@ -1009,7 +2178,18 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libwebp--COPYING",
+          "sha256": "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf"
+        },
+        {
+          "path": "libvpx--PATENTS",
+          "sha256": "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-libzmq.sh",
@@ -1024,7 +2204,30 @@
       "licence": "MPL-2.0",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "LICENSE = MPL-2.0 text; sampled sources SPDX MPL-2.0, no Exhibit B 'Incompatible With Secondary Licenses' notice"
+      "licence_note": "LICENSE = MPL-2.0 text; sampled sources SPDX MPL-2.0, no Exhibit B 'Incompatible With Secondary Licenses' notice; vendored subtree; compilation not determined at the seat: external/sha1/license.txt, external/unity/license.txt, external/wepoll/license.txt, packaging/debian/copyright",
+      "texts": [
+        {
+          "path": "libzmq--LICENSE",
+          "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5"
+        },
+        {
+          "path": "libzmq--external--sha1--license.txt",
+          "sha256": "cb1a4e594fc67ecde3e6d704b94d6ac4385a6027d0605702c675d182f186eeb6"
+        },
+        {
+          "path": "libzmq--external--unity--license.txt",
+          "sha256": "3ed9b51da86f52c729c96cc99fdde6444b2297c788a9cf4ad1d3649dc34c4985"
+        },
+        {
+          "path": "libzmq--external--wepoll--license.txt",
+          "sha256": "3e56262d2c0e9492f113089916ed624e98f88b31dfd6acae24ede59cdfda5a69"
+        },
+        {
+          "path": "libzmq--packaging--debian--copyright",
+          "sha256": "0a9b32db52765d7d0dd53eac99c373ef830ced0e859d1e6e62acc2fb590dbc9e"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-lilv/96-lv2.sh",
@@ -1037,7 +2240,42 @@
       "licence": "ISC",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "lv2--COPYING",
+          "sha256": "1e6bb175e193608b767ff25a4ed68b82c4db599491cf0d2694435cf60e9a4841"
+        },
+        {
+          "path": "lv2--LICENSES--0BSD.txt",
+          "sha256": "66461c6911980791fa5dd6a97e455a91fdcb1313db01a3c451fce04da8c85256"
+        },
+        {
+          "path": "opencl-icd-loader--LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        },
+        {
+          "path": "lv2--LICENSES--CC-BY-1.0.txt",
+          "sha256": "f6f4064295ea3adf266856073eeec20da5a15e8d0c7912947e0d73993ef620a3"
+        },
+        {
+          "path": "lv2--LICENSES--CC-BY-4.0.txt",
+          "sha256": "f5b745ef98087f531e719ee8ca6a96809444573ecc7173c6fa68eaad39b3cc3f"
+        },
+        {
+          "path": "lv2--LICENSES--MIT.txt",
+          "sha256": "91276db973f25602d1aa43491f59cbc84cb88e6f151e1d0cc82a755563ce0195"
+        },
+        {
+          "path": "lv2--LICENSES--W3C-19980720.txt",
+          "sha256": "f864e27c1dd0529e0ec865df09a5908df15a9371c1bd12b12563aec5c5e848aa"
+        },
+        {
+          "path": "lv2--LICENSES--W3C-20150513.txt",
+          "sha256": "a9aace21e4e1d68bed3ec1b2fa47ad7d277255f8a70ec3a2638f783911d0515d"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-lilv/96-serd.sh",
@@ -1050,7 +2288,22 @@
       "licence": "ISC",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "serd--COPYING",
+          "sha256": "ae223adebe7cc1ee0716e0f926d1ecc8e42c6e4da7e1d7418c9c07fae244bbde"
+        },
+        {
+          "path": "serd--LICENSES--0BSD.txt",
+          "sha256": "342bbffadbda3058b5b59fb9cf25d940e1c353b1181b892dc8a473f213a0440d"
+        },
+        {
+          "path": "serd--LICENSES--BSD-3-Clause.txt",
+          "sha256": "de3b5841bb0f65f13d96328006e025f63f117c564b268886b43602d05ce763aa"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-lilv/96-zix.sh",
@@ -1063,7 +2316,22 @@
       "licence": "ISC",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "zix--COPYING",
+          "sha256": "1314cc14fb947491491c517c533ac7de4f6798585f922a472358082c25ac1881"
+        },
+        {
+          "path": "zix--LICENSES--0BSD.txt",
+          "sha256": "ed2b2a2319139765407c37b7a1a082e88f9b3667392b29f59b1e6c2f4c497087"
+        },
+        {
+          "path": "zix--LICENSES--ISC.txt",
+          "sha256": "010c7513fdccf856edda08d42d2c46ae393e67b3acf97f9e428980cca2f94b7d"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-lilv/97-sord.sh",
@@ -1076,7 +2344,26 @@
       "licence": "ISC",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "serd--COPYING",
+          "sha256": "ae223adebe7cc1ee0716e0f926d1ecc8e42c6e4da7e1d7418c9c07fae244bbde"
+        },
+        {
+          "path": "lv2--LICENSES--0BSD.txt",
+          "sha256": "66461c6911980791fa5dd6a97e455a91fdcb1313db01a3c451fce04da8c85256"
+        },
+        {
+          "path": "serd--LICENSES--BSD-3-Clause.txt",
+          "sha256": "de3b5841bb0f65f13d96328006e025f63f117c564b268886b43602d05ce763aa"
+        },
+        {
+          "path": "sord--LICENSES--ISC.txt",
+          "sha256": "f04f124b8814edb03cd64fa82d38cc1c1aa32195fabd33c196b02968e466ba32"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-lilv/98-sratom.sh",
@@ -1089,7 +2376,18 @@
       "licence": "ISC",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "sratom--COPYING",
+          "sha256": "1d968c655ecad113e128dbf4d4deabd9e30b931b42943b6a681c9cf11d7da5d4"
+        },
+        {
+          "path": "sratom--LICENSES--0BSD.txt",
+          "sha256": "7be8d0a9263cdc6ee30484b086606c231df81e227ae7a42ad4e04bf0c7213fd2"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-lilv/99-lilv.sh",
@@ -1104,7 +2402,18 @@
       "licence": "ISC",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "serd--COPYING",
+          "sha256": "ae223adebe7cc1ee0716e0f926d1ecc8e42c6e4da7e1d7418c9c07fae244bbde"
+        },
+        {
+          "path": "zix--LICENSES--0BSD.txt",
+          "sha256": "ed2b2a2319139765407c37b7a1a082e88f9b3667392b29f59b1e6c2f4c497087"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-onevpl.sh",
@@ -1119,7 +2428,22 @@
       "licence": "MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: examples/api1x_core/legacy-decode/License.txt, libvpl/test/ext/googletest/LICENSE",
+      "texts": [
+        {
+          "path": "onevpl--LICENSE",
+          "sha256": "bf1cfac2e2792b6e1e995ce103d70796aecaf2ec7e4c5fe5474f7acec7b4a677"
+        },
+        {
+          "path": "onevpl--examples--api1x_core--legacy-decode--License.txt",
+          "sha256": "2e35006c345787f7205bdaa86920c8fac86abd19b95d7b4c1ba5531853ea3938"
+        },
+        {
+          "path": "aom--third_party--googletest--src--LICENSE",
+          "sha256": "9702de7e4117a8e2b20dafab11ffda58c198aede066406496bef670d40a22138"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-openal.sh",
@@ -1131,10 +2455,37 @@
       "configure_flag": [
         "--enable-openal"
       ],
-      "licence": "LGPL-2.0-or-later",
+      "licence": "LGPL-2.0-or-later AND BSD-3-Clause AND LicenseRef-PFFFT-modified-BSD AND Apache-2.0 AND MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "openal--COPYING",
+          "sha256": "d808ce217e5b611854da622b57ec29fe545584c48bc5352fae72a4b6e5074a15"
+        },
+        {
+          "path": "openal--LICENSE-pffft",
+          "sha256": "64056328b3e7bc104e24ef96accc1a7abead156f0c02d1b87c97e3f3a28030de"
+        },
+        {
+          "path": "opencl--LICENSE",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "openal--LICENSE.BSD-3-Clause.txt",
+          "sha256": "b5a08cf98996dd83aa906a72c163600f6cb17a65ce546a553815a1267abd43ff"
+        },
+        {
+          "path": "lcevcdec--licenses--fmt--LICENSE",
+          "sha256": "07580f2a3b35709ce703d523f447b242f6dfec7582a8c0df102c7fa2849375f8"
+        },
+        {
+          "path": "openal--gsl--LICENSE",
+          "sha256": "4c21dc82a1c7186ea754fd59d504c00947953a3401fe8e24eaa44109ef8e2555"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-openapv.sh",
@@ -1149,7 +2500,14 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "openapv--LICENSE",
+          "sha256": "7ad8e53c0c3e24e7ba64dbcad5e7706108f3dc67cf6515ef761adac0a39dab25"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-opencore-amr.sh",
@@ -1165,7 +2523,18 @@
       "licence": "Apache-2.0",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "opencore-amr--LICENSE",
+          "sha256": "8b3f1762349248d444ab9acbafe73941254e36e1064954da56bb9ddbd5873ddb"
+        },
+        {
+          "path": "opencore-amr--opencore--NOTICE",
+          "sha256": "d106802b5e406073c1d10fbe9f638234c6973ebce37df71773179642085eb489"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-openh264.sh",
@@ -1180,7 +2549,14 @@
       "licence": "BSD-2-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "openh264--LICENSE",
+          "sha256": "dd5c1c9668512530fa5a96e4c29ac4033d70a7eeb0eed7a42fddb6dd794ebdbb"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-openjpeg.sh",
@@ -1195,7 +2571,30 @@
       "licence": "BSD-2-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: src/bin/wx/OPJViewer/source/license.txt, thirdparty/astyle/LICENSE.md, thirdparty/liblcms2/COPYING, thirdparty/libpng/LICENSE",
+      "texts": [
+        {
+          "path": "openjpeg--LICENSE",
+          "sha256": "a6af136f3e15038a666b61f376612a07d9a4e48cb7c01adbf3e33b3f14ab49b6"
+        },
+        {
+          "path": "openjpeg--src--bin--wx--OPJViewer--source--license.txt",
+          "sha256": "8081c33f6953950dcf424aa844714658b73ada0fcaea16e4487f5fa07ef0960d"
+        },
+        {
+          "path": "openjpeg--thirdparty--astyle--LICENSE.md",
+          "sha256": "2e8480e753b7a1d100c80920f4250b1bc9f93a18c6a5953c42b11445218cd0fb"
+        },
+        {
+          "path": "openjpeg--thirdparty--liblcms2--COPYING",
+          "sha256": "c725daac91a9259ce5e195683c0eeb797d345035c36ac5ba114c9fa80e11639a"
+        },
+        {
+          "path": "openjpeg--thirdparty--libpng--LICENSE",
+          "sha256": "7317e078e2d3b5d7ba5a6159e650945153262b44b76f6700f8e9edb261c5143e"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-openmpt.sh",
@@ -1210,7 +2609,154 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: include/SignalsmithStretch/SignalsmithStretch/LICENSE.txt, include/SignalsmithStretch/signalsmith-linear/LICENSE.txt, include/ancient/LICENSE, include/ancient/LICENSE.bzip2, include/cryptopp/License.txt, include/flac/COPYING.Xiph, include/lame/COPYING, include/lhasa/COPYING.md, include/minimp3/LICENSE, include/miniz/LICENSE, include/mpg123/COPYING, include/nlohmann-json/LICENSE.MIT, include/ogg/COPYING, include/opus/COPYING, include/opusenc/COPYING, include/opusfile/COPYING, include/portaudio/LICENSE.txt, include/portaudio/bindings/cpp/COPYING, include/premake/LICENSE.txt, include/premake/binmodules/luasocket/LICENSE, include/premake/contrib/mbedtls/LICENSE, include/premake/contrib/zlib/LICENSE, include/premake/modules/xcode/LICENSE.TXT, include/premake/packages/debian/copyright, include/pthread-win32/docs/COPYING.FSF.md, include/pthread-win32/docs/COPYING.md, include/pugixml/LICENSE.md, include/r8brain/LICENSE, include/rtaudio/LICENSE, include/rtmidi/LICENSE, include/unrar/license.txt, include/vorbis/COPYING, include/zlib/contrib/minizip/LICENSE.Info-Zip, src/mpt/LICENSE.BSD-3-Clause.txt, src/mpt/LICENSE.BSL-1.0.txt",
+      "texts": [
+        {
+          "path": "openmpt--LICENSE",
+          "sha256": "2c999e99533c10a347916a72e075bacf10fcedeff793bd90d41d812b46161da2"
+        },
+        {
+          "path": "openmpt--include--SignalsmithStretch--SignalsmithStretch--LICENSE.txt",
+          "sha256": "ee2ef82481ffb445ecdd4b3a4c1f82c0cddb2da8fe39d8e8dc384fffb3e7f06f"
+        },
+        {
+          "path": "openmpt--include--SignalsmithStretch--signalsmith-linear--LICENSE.txt",
+          "sha256": "072b5e9eb5b22880bdf6256324654cf3ce53dba828edb911921121e1be09d9c3"
+        },
+        {
+          "path": "openmpt--include--ancient--LICENSE",
+          "sha256": "92b1bae3691d85f84908a3f3eaf3a46ddadd603b2bf90f9e787177adceb9cc77"
+        },
+        {
+          "path": "openmpt--include--ancient--LICENSE.bzip2",
+          "sha256": "eeaa743b773d4fd56f5955fbf7da0ee2fb2082cd4efa7e9d4af95204907a23a4"
+        },
+        {
+          "path": "openmpt--include--cryptopp--License.txt",
+          "sha256": "9f3af322ff503edfa605f8559a704b6e2f0ea78227841917a3729ec0fbeb42f4"
+        },
+        {
+          "path": "openmpt--include--flac--COPYING.Xiph",
+          "sha256": "7866ee98760fc1f0156b4fe6bf530257e02be487ab3fd94e2b63799dd32d6b2c"
+        },
+        {
+          "path": "libmp3lame--COPYING",
+          "sha256": "e64f9c5a18f56828c10a575df13ade641aa3af4512a7afe6c411256943b57aaf"
+        },
+        {
+          "path": "openmpt--include--lhasa--COPYING.md",
+          "sha256": "bf7b055c63205cfc1fea175ea7638f7e7f237bab3eabf2a9fd2bb5c8872edefb"
+        },
+        {
+          "path": "openmpt--include--minimp3--LICENSE",
+          "sha256": "6a1ee543e5282cd9061881edf462e6fdab181f328da71fc2c9a6950a80e94d01"
+        },
+        {
+          "path": "openmpt--include--miniz--LICENSE",
+          "sha256": "0115478d567121238cf6cc1c0c361926cf07a49d9e4c9e66da97fac6a01646b3"
+        },
+        {
+          "path": "openmpt--include--mpg123--COPYING",
+          "sha256": "c22482728a634a8dfdb4ff72a96d4c1ed64cd8f3e79335c401751ac591609366"
+        },
+        {
+          "path": "openmpt--include--nlohmann-json--LICENSE.MIT",
+          "sha256": "46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603"
+        },
+        {
+          "path": "libogg--COPYING",
+          "sha256": "d2ab5758336489da61c12cc5bb757da5339c4ae9001f9bb0562b4370249af814"
+        },
+        {
+          "path": "libopus--COPYING",
+          "sha256": "01e1167d54a096d123cf6dfbbeb19587278845c6481d2d66d545669846079551"
+        },
+        {
+          "path": "openmpt--include--opusenc--COPYING",
+          "sha256": "93b17ab56b8230127fea532be0dcb4e6d71e66ab5e8ce5d6ae8785d7288b164f"
+        },
+        {
+          "path": "openmpt--include--opusfile--COPYING",
+          "sha256": "0267ae795ab744c4e0f9c45e249440fdf2e75dac8c804f36066b28649bf74aaf"
+        },
+        {
+          "path": "openmpt--include--portaudio--LICENSE.txt",
+          "sha256": "ec52a1952d701f94e5135719a47376da4ee0b4a0201f1cafb49f61db6480ac3d"
+        },
+        {
+          "path": "openmpt--include--portaudio--bindings--cpp--COPYING",
+          "sha256": "3ec8d97acf149e39aa440f39eb1126a6ec5089e2864cbecdf2d2952bc0a5ed83"
+        },
+        {
+          "path": "openmpt--include--premake--LICENSE.txt",
+          "sha256": "e95a86849e468c3db4611acee90c788c6d5a5b4ba8cf50c27024dd880e17c66d"
+        },
+        {
+          "path": "openmpt--include--premake--binmodules--luasocket--LICENSE",
+          "sha256": "8e8c6314d9e78fe452ee355167f2c40cfbee8207e14dcb5ddd4a2655cb5c6aad"
+        },
+        {
+          "path": "mbedtls--LICENSE",
+          "sha256": "9b405ef4c89342f5eae1dd828882f931747f71001cfba7d114801039b52ad09b"
+        },
+        {
+          "path": "zlib--LICENSE",
+          "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2"
+        },
+        {
+          "path": "openmpt--include--premake--modules--xcode--LICENSE.TXT",
+          "sha256": "0ba7252324e5aa82440f966ba7adafae7a1ce09a54667569f7c090cfd6f964e4"
+        },
+        {
+          "path": "openmpt--include--premake--packages--debian--copyright",
+          "sha256": "22bb324973ed458997c09bb6f69fd297cc114e2e687b88b7cf38fb5dbe1a6867"
+        },
+        {
+          "path": "openmpt--include--pthread-win32--docs--COPYING.FSF.md",
+          "sha256": "a190dc9c8043755d90f8b0a75fa66b9e42d4af4c980bf5ddc633f0124db3cee7"
+        },
+        {
+          "path": "openmpt--include--pthread-win32--docs--COPYING.md",
+          "sha256": "1cf9a1551401d708d96d869aa0a20bbb7d4fdb93c22da835b0366c27a4c4c4d8"
+        },
+        {
+          "path": "openmpt--include--pugixml--LICENSE.md",
+          "sha256": "90974fbb120e966b452654eaae3ba6ee55f3647db3b28918a7649733ee99da97"
+        },
+        {
+          "path": "openmpt--include--r8brain--LICENSE",
+          "sha256": "7c5a4a097ede04a72f3fd444cfe9c788433f46c2b539b152de8921521eeac877"
+        },
+        {
+          "path": "openmpt--include--rtaudio--LICENSE",
+          "sha256": "73eb32613a621c134b33fbe3c661562dcf5f81f0558af13d483fc241eb21be7b"
+        },
+        {
+          "path": "openmpt--include--rtmidi--LICENSE",
+          "sha256": "7fa091d9c1aa492ebfcafa9f919d27bbce61e4f048ece2dfc3b7f93181e9e364"
+        },
+        {
+          "path": "openmpt--include--unrar--license.txt",
+          "sha256": "6ecc1687808b7d66b24f874755abfed7464d9751ed0001cd4e8e5d9bf397ff8a"
+        },
+        {
+          "path": "libvorbis--COPYING",
+          "sha256": "ec1815db59fcd302846df949d7424876cb2e2dc5ed1606c5fb0b36787b1cf43a"
+        },
+        {
+          "path": "zlib--contrib--minizip--LICENSE.Info-Zip",
+          "sha256": "fc686023047ce5ce3a18a9b8a777156f0e475929d3de06bac279f3c025d2b2ca"
+        },
+        {
+          "path": "openmpt--src--mpt--LICENSE.BSD-3-Clause.txt",
+          "sha256": "ceabc562c8cfb3af0d51e94182947c23bde6c18274e2b21585bdde22d2031e9d"
+        },
+        {
+          "path": "openmpt--src--mpt--LICENSE.BSL-1.0.txt",
+          "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-rav1e.sh",
@@ -1225,7 +2771,22 @@
       "licence": "BSD-2-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: ivf/LICENSE",
+      "texts": [
+        {
+          "path": "rav1e--LICENSE",
+          "sha256": "2dd0a109751e939dec3f80ddcfbc1ba91553f18c574399e85c159632182a2c0a"
+        },
+        {
+          "path": "rav1e--PATENTS",
+          "sha256": "7b14a70c194b19dbd0625e7eac839a63200f67484521ce5e8d8244b127e8907a"
+        },
+        {
+          "path": "rav1e--ivf--LICENSE",
+          "sha256": "5d3c397a3aeeecbc417962e4df8e8432af8219fda8a56ebe601a638a1e76c522"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-rubberband.sh",
@@ -1240,7 +2801,22 @@
       "licence": "GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: src/ext/kissfft/COPYING, src/ext/speex/COPYING",
+      "texts": [
+        {
+          "path": "rubberband--COPYING",
+          "sha256": "cedd4c1885d75991bf1077cc6e33359103cf04fbc996f20d30ab043d5fc5fcc5"
+        },
+        {
+          "path": "chromaprint--src--3rdparty--kissfft--COPYING",
+          "sha256": "a2840585f8411be8e6826a31ef15ae65c950bd74a2437a73b013398a934ad0c6"
+        },
+        {
+          "path": "rubberband--src--ext--speex--COPYING",
+          "sha256": "b3da65c2cff5522b5a22438afb1fa99873e6567a2aebb17b198c58b15b09d5f3"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-sdl.sh",
@@ -1255,7 +2831,46 @@
       "licence": "Zlib",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: Xcode-iOS/Demos/data/bitmapfont/license.txt, Xcode/SDL/pkg-support/resources/License.txt, src/hidapi/LICENSE-bsd.txt, src/hidapi/LICENSE-gpl3.txt, src/hidapi/LICENSE-orig.txt, src/hidapi/LICENSE.txt, src/video/yuv2rgb/LICENSE, visualtest/COPYING.txt",
+      "texts": [
+        {
+          "path": "sdl--LICENSE.txt",
+          "sha256": "1c040b8271b37e5076359f8fd54240e371114112924d2df81ef87c7d6a1dfdfd"
+        },
+        {
+          "path": "sdl--Xcode-iOS--Demos--data--bitmapfont--license.txt",
+          "sha256": "5059bc9c2f37b7e7a557685ae9330ecfd798537bdfde94de63a9c721c92a8856"
+        },
+        {
+          "path": "sdl--Xcode--SDL--pkg-support--resources--License.txt",
+          "sha256": "30e349158ffdcb06b9bb2ec406df66758161ad1efa75a368243a6d0b50b43784"
+        },
+        {
+          "path": "sdl--src--hidapi--LICENSE-bsd.txt",
+          "sha256": "30eb1bef29b46f8ba7ab8b416035dbd93cb034a45481dd97815b944284582cd2"
+        },
+        {
+          "path": "libiconv--COPYING",
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+        },
+        {
+          "path": "sdl--src--hidapi--LICENSE-orig.txt",
+          "sha256": "fb5436aa63d1b71a8dfbf74ecaf1a5b4e1ec4df7f80074d11fec99284f69ca5f"
+        },
+        {
+          "path": "sdl--src--hidapi--LICENSE.txt",
+          "sha256": "7d3b087c34f35d4d538e3bcddd1ff8f66e92f9ef336881999482800ddf840913"
+        },
+        {
+          "path": "sdl--src--video--yuv2rgb--LICENSE",
+          "sha256": "f7d74004cc75778cae46c5f0139f244d67c07ef64cf51937e8272352197dcb18"
+        },
+        {
+          "path": "sdl--visualtest--COPYING.txt",
+          "sha256": "dae65ccf728227eff8e10194437078a5628047b9f55d796039688e7ca8e3aa4e"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-snappy.sh",
@@ -1270,7 +2885,18 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "snappy--COPYING",
+          "sha256": "55172044f7e241207117448a4d9d6ba1d0925c8ad66b5d4c08c70adfa9cc3de6"
+        },
+        {
+          "path": "snappy--COPYING.notestdata",
+          "sha256": "5221a36a801b981fbdfda7b87db64cff231a3b88223a066c325411b539df796f"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-soxr.sh",
@@ -1285,7 +2911,22 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat: lsr-tests/COPYING",
+      "texts": [
+        {
+          "path": "soxr--COPYING.LGPL",
+          "sha256": "f2f118b9029ec1871b953639ecc46651b2fc7b62e295e6cf3ef2ac4c9a058b33"
+        },
+        {
+          "path": "soxr--LICENCE",
+          "sha256": "dc98676341fdcd29d9f279c9679d6a75288785b174ded8d1b2e316c366166135"
+        },
+        {
+          "path": "libdvdnav--COPYING",
+          "sha256": "32b1062f7da84967e7019d01ab805935caa7ab7321a7ced0e30ebe75e5df1670"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-srt.sh",
@@ -1300,7 +2941,14 @@
       "licence": "MPL-2.0",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "srt--LICENSE",
+          "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-svtav1.sh",
@@ -1315,7 +2963,30 @@
       "licence": "BSD-3-Clause-Clear AND BSD-2-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "LICENSE.md Clear BSD + LICENSE-BSD2.md for older files; PATENTS.md AOM patent licence"
+      "licence_note": "LICENSE.md Clear BSD + LICENSE-BSD2.md for older files; PATENTS.md AOM patent licence; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "svtav1--LICENSE-BSD2.md",
+          "sha256": "c582fcbeb9cf972a60d298bfaf41dc5adff2dd14208946edcb9bb56a281e8438"
+        },
+        {
+          "path": "svtav1--LICENSE.md",
+          "sha256": "0acc2fcb27472bdc9aaf8b71f37055bbdac4f54671b7d922f241bd7fcd0dd3e6"
+        },
+        {
+          "path": "svtav1--PATENTS.md",
+          "sha256": "20678ab10402659106dc4c147c97b2a6e94b5c0695415e15a8f195ebc3547922"
+        },
+        {
+          "path": "svtav1--third_party--fastfeat--LICENSE",
+          "sha256": "043dcfd059386f9facd376351b2bd79325778744aa442177390cdfcca54babed"
+        },
+        {
+          "path": "svtav1--third_party--safestringlib--LICENSE",
+          "sha256": "c0f99a208799ca20c9ccf31a30533d49334eb458dca5a3d14f9afe3e884e5d7d"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-twolame.sh",
@@ -1330,7 +3001,14 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "twolame--COPYING",
+          "sha256": "257a842724705950b07da76ce0e22ffa80ec77b3e9dfc6702522ac342409da0f"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-uavs3d.sh",
@@ -1345,7 +3023,14 @@
       "licence": "BSD-3-Clause",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "uavs3d--COPYING",
+          "sha256": "5a8dcb7da222df8a81b6e334000f859248196335e2d28e1db9f3c552827d7cdf"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-vaapi/50-libva.sh",
@@ -1360,7 +3045,14 @@
       "licence": "MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libva--COPYING",
+          "sha256": "c86a782ee845b52472dae9b9d79fb915d333628ac0efe49cdce63644814931de"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-vapoursynth.sh",
@@ -1375,7 +3067,14 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "vapoursynth--COPYING.LESSER",
+          "sha256": "b634ab5640e258563c536e658cad87080553df6f34f62269a21d554844e58bfe"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-vidstab.sh",
@@ -1390,7 +3089,18 @@
       "licence": "LGPL-2.1-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "LICENSE at the pin: relicensed to LGPL-2.1-or-later after v1.1.2 (cell read GPL-2.0-or-later: CORRECTED)"
+      "licence_note": "LICENSE at the pin: relicensed to LGPL-2.1-or-later after v1.1.2 (cell read GPL-2.0-or-later: CORRECTED)",
+      "texts": [
+        {
+          "path": "libudfread--COPYING",
+          "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551"
+        },
+        {
+          "path": "vidstab--LICENSE",
+          "sha256": "71c1072d2c2597bbe25f7defc01f9082f4bae9b54ba73a8c5c7ca423fef92e8d"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-vvenc.sh",
@@ -1405,7 +3115,22 @@
       "licence": "BSD-3-Clause-Clear",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "LICENSE.txt: The Clear BSD License"
+      "licence_note": "LICENSE.txt: The Clear BSD License; vendored subtree; compilation not determined at the seat: thirdparty/nlohmann_json/LICENSE.MIT, thirdparty/simde/COPYING",
+      "texts": [
+        {
+          "path": "vvenc--LICENSE.txt",
+          "sha256": "88330a2cc59b9dd90674f8759900bc9c06e9efc8799dadda067609addefb49d1"
+        },
+        {
+          "path": "vvenc--thirdparty--nlohmann_json--LICENSE.MIT",
+          "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14"
+        },
+        {
+          "path": "vvenc--thirdparty--simde--COPYING",
+          "sha256": "75ce0a8c5a7bff42fbd6f8f3b469b518132132c4f4948fb8d02b1ccb5d0df9d8"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-x264.sh",
@@ -1420,7 +3145,14 @@
       "licence": "GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "libdvdnav--COPYING",
+          "sha256": "32b1062f7da84967e7019d01ab805935caa7ab7321a7ced0e30ebe75e5df1670"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-x265.sh",
@@ -1432,10 +3164,25 @@
       "configure_flag": [
         "--enable-libx265"
       ],
-      "licence": "GPL-2.0-or-later",
+      "licence": "GPL-2.0-or-later AND MIT",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read; vendored subtree; compilation not determined at the seat (pass-1 P / vendored texts kept)",
+      "texts": [
+        {
+          "path": "x265--COPYING",
+          "sha256": "d8afb1bcc7a2cfc603683b168d6987ef0a48e59e0da3693bf55c5d33b67e2b49"
+        },
+        {
+          "path": "x265--source--dynamicHDR10--LICENSE.txt",
+          "sha256": "47f15d63e82eb8a4de6e46471d5f96cf6d052fd5355944a002c3157880248b69"
+        },
+        {
+          "path": "x265--source--dynamicHDR10--json11--LICENSE.txt",
+          "sha256": "950e288a2548cb33f6a90d23958806b0803f510ab17c600d661619a73ae3a6c8"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-xavs2.sh",
@@ -1450,7 +3197,14 @@
       "licence": "GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "davs2--COPYING",
+          "sha256": "971f09fd8dedc915472df12845fb7c653563689672fb1a658e28004887ba4a07"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-xvid.sh",
@@ -1465,7 +3219,14 @@
       "licence": "GPL-2.0-or-later",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "xvid--LICENSE",
+          "sha256": "2ab06d2335f9781f1a485c78a557e6c61b6c24e118caad4d4210c46426bbce95"
+        }
+      ],
+      "chosen": null
     },
     {
       "stage": "scripts.d/50-zimg.sh",
@@ -1480,7 +3241,14 @@
       "licence": "WTFPL",
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
-      "licence_note": "seat licence file(s) at the pin agree with the cell read"
+      "licence_note": "seat licence file(s) at the pin agree with the cell read",
+      "texts": [
+        {
+          "path": "zimg--COPYING",
+          "sha256": "7637386b5f81e8a719ca336233149005e5fa28b5e6054ea7b67de49355b0ad40"
+        }
+      ],
+      "chosen": null
     }
   ],
   "excluded": [
