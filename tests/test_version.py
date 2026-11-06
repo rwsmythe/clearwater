@@ -17,9 +17,9 @@ from clearwater.interfaces.stubs import StubProgress
 from clearwater.jobs.export_seam import ExportRequest
 
 
-def test_release_version_is_1_0_0() -> None:
+def test_release_version_is_1_1_0() -> None:
     """Pin the release advertised by the application to the approved version."""
-    assert clearwater.__version__ == "1.0.0"
+    assert clearwater.__version__ == "1.1.0"
 
 
 def test_release_version_matches_project_and_installed_metadata() -> None:

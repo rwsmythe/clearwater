@@ -1,8 +1,10 @@
 # Clearwater, the application
 
 Clearwater corrects colour cast, contrast loss and haze in underwater photos and
-video. Version 1.0.0 installs from this repository with uv; there is no installer
-or packaged executable. Start with the [installation and user guide](docs/user-guide.md).
+video. Version 1.1.0 ships as a Windows one-folder download (a zip, unsigned, not an
+installer) on the GitHub release page, and installs from this repository with uv on any
+platform. The macOS code paths are in 1.1.0 but not yet validated on a Mac; there is no
+macOS download. Start with the [installation and user guide](docs/user-guide.md).
 See [third-party notices](THIRD_PARTY_NOTICES.md) and [LICENSE](LICENSE) for the
 GPL-2.0-or-later licence and component terms.
 

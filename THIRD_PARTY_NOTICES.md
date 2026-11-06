@@ -1,4 +1,4 @@
-# Third-party notices - Clearwater 1.0.0
+# Third-party notices - Clearwater 1.1.0
 
 Clearwater's own code is licensed under **GNU GPL version 2 or any later version
 (GPL-2.0-or-later)**; see [LICENSE](LICENSE). The 'or later' grant allows the

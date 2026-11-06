@@ -1,6 +1,6 @@
 [project]
 name = "clearwater"
-version = "1.0.0"
+version = "1.1.0"
 description = "Desktop tool that corrects color cast, contrast loss and haze in amateur underwater photos and video."
 readme = "APPLICATION.md"
 requires-python = ">=3.12,<3.13"
