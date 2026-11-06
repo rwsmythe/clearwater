@@ -2280,6 +2280,80 @@ def test_embedded_renamed_or_moved_host_requires_recensus(release, change):
     )
 
 
+@pytest.mark.parametrize("change", ["renamed", "same-name"])
+def test_embedded_content_hashed_wheel_dll_requires_recensus(release, change):
+    """A rebuilt DLL needs re-census even when its wheel parent version is unchanged."""
+    document, _host, _text = embedded_host_fixture(release, parent="numpy")
+    add_heif(release, native=False)
+    name = "libx265-217-276e7d75772a32bd086b54d54e01fd11.dll"
+    relative = "_internal/" + name
+    wheel_relative = "pillow_heif.libs/" + name
+    body = b"synthetic pillow-heif x265 census build"
+    host = release["folder"] / relative
+    host.write_bytes(body)
+    wheel_host = release["site"] / wheel_relative
+    wheel_host.parent.mkdir()
+    wheel_host.write_bytes(body)
+    record = release["site"] / "pillow_heif-1.8.1.dist-info/RECORD"
+
+    def record_line(path, data):
+        digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
+        return f"{path},sha256={digest},{len(data)}\n"
+
+    with record.open("a") as stream:
+        stream.write(record_line(wheel_relative, body))
+    declared = document["embedded_hosts"][0]
+    declared.update(
+        relpath=relative,
+        sha256=hashlib.sha256(body).hexdigest(),
+        size_bytes=len(body),
+        parent="pillow-heif",
+        parent_version="1.8.1",
+    )
+    for row in document["components"]:
+        if "embedded_in" in row:
+            row["embedded_in"] = [relative]
+    save_embedded_fixture(release, document)
+    release["distributions"]["pillow-heif"] = importlib.metadata.PathDistribution(record.parent)
+    result = plan(load_notices(), release)
+    parent = next(row for row in result.rows if row.name == "pillow-heif")
+    assert parent.version == "1.8.1"
+    embedded = next(row for row in result.rows if row.name == "Embedded alpha")
+    assert "file:" + relative in embedded.entries
+    metadata = record.with_name("METADATA").read_bytes()
+
+    new_name = "libx265-217-0123456789abcdef0123456789abcdef.dll" if change == "renamed" else name
+    new_body = b"different pillow-heif x265 build bytes"
+    new_host = host.with_name(new_name)
+    new_wheel_host = wheel_host.with_name(new_name)
+    host.unlink()
+    wheel_host.unlink()
+    new_host.write_bytes(new_body)
+    new_wheel_host.write_bytes(new_body)
+    record.write_text(
+        record.read_text().replace(
+            record_line(wheel_relative, body),
+            record_line("pillow_heif.libs/" + new_name, new_body),
+        )
+    )
+    release["distributions"]["pillow-heif"] = importlib.metadata.PathDistribution(record.parent)
+    assert record.with_name("METADATA").read_bytes() == metadata
+    assert release["distributions"]["pillow-heif"].version == "1.8.1"
+    assert record_line("pillow_heif.libs/" + new_name, new_body) in record.read_text()
+    assert record_line(wheel_relative, body) not in record.read_text()
+    assert (release["site"] / "pillow_heif.libs" / new_name).is_file()
+    with pytest.raises(ValueError) as error:
+        plan(load_notices(), release)
+    message = str(error.value)
+    assert relative in message and "re-census required" in message
+    if change == "renamed":
+        assert "pillow-heif" in message and "absent" in message
+    else:
+        assert "identity differs" in message
+        assert declared["sha256"] in message
+        assert hashlib.sha256(new_body).hexdigest() in message
+
+
 def test_embedded_absent_host_with_carried_parent_requires_recensus(release):
     """Missing native bytes cannot disappear when the parent still ships modules."""
     _document, host, _text = embedded_host_fixture(release, parent="numpy", carried=False)

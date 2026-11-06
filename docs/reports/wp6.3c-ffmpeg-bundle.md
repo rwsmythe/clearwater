@@ -1,8 +1,9 @@
 # WP6.3c - FFmpeg bundle
 
-Status: turn 11 implements Reviewer A r1's commissioned remediations, 2026-11-06;
-acceptance pending. Validation is blocked by an out-of-grant smoke-fixture update
-(details below); five real-Git cases also require the seat. The dispatch records the seat's fork
+Status: turn 12 completes the granted smoke-fixture repair and content-hashed-DLL
+regression controls, 2026-11-06; acceptance pending. Static checks pass; the
+five-module run has 673 passed, 1 skipped and five real-Git fixture failures that
+require the seat. The dispatch records the seat's fork
 commit/export and clean actionlint result; Dockerfile generation was refused by
 the seat's tool policy and a static proof recorded instead. The real asset,
 lock re-pin, remaining package work, review, package gate and release are pending.
@@ -1914,3 +1915,73 @@ and copied artifacts stay in this worktree. The real fork/asset/re-pin, release
 work and CHARC-held F3/F5 remain later/seat work. This turn bundles the single
 commissioned r1 remediation set; the seat commits. `depth_input_tokens` is
 unavailable to the cell; dispatcher read due at this boundary, no estimate.
+
+## Turn 12 - Synthetic smoke surface and content-hashed DLL controls
+
+**Built (test-only).** The smoke fixture now passes its explicit
+`release["native_surface"]` to `real_plan`. Expected counts are **6** component
+rows without FFmpeg and **8** with FFmpeg, confirmed by the complete smoke
+transcripts (13 / 17 entries). No production absent-host exemption.
+
+The new parametrized notices test declares the production-shaped host
+`_internal/libx265-217-276e7d75772a32bd086b54d54e01fd11.dll` through wheel path
+`pillow_heif.libs/`, parent `pillow-heif` **1.8.1**. A positive plan establishes
+parent/component carriage. Both negatives change wheel/bundle bytes and repoint
+the actual RECORD path/hash/size, preserving METADATA and parent version.
+Renaming to `libx265-217-0123456789abcdef0123456789abcdef.dll` refuses by
+declared host and parent with `re-census required`; keeping the name refuses
+with `identity differs`, expected/actual hashes and `re-census required`.
+
+**RED -> GREEN.** Evidence is under `work/wp6.3c/turn12/`. `run_head_red.py`
+loads the exact `git show 559621f7:tools/package/notices.py` bytes into a scratch
+module. As in turn 11, its declaration adapter strips ONLY `parent_version` and
+the three new source-text-pin keys to pass turn 10's strict schema; runtime
+behavior is unchanged and no tracked production file is replaced.
+`red-final.log` / `.xml`, fresh `work/c63c-12-red-final`: **1 failed, 1 passed,
+387 deselected**. Rename fails `DID NOT RAISE`; same-name identity refusal
+already passes. Current-code `green.log` / `.xml`, fresh `work/c63c-12-green`:
+**2 passed, 387 deselected**.
+
+**Validation.** Requested `uv run --no-sync` commands ran in order;
+`static-exits.json` records four exit codes 0:
+
+- `ruff-check.log`: `All checks passed!`.
+- `ruff-format.log`: `337 files already formatted`.
+- `mypy-win32.log`, `mypy-darwin.log`: each
+  `Success: no issues found in 166 source files`.
+
+The isolated `run_tests.py` retains `sandbox_mkdir_shim`, disables cacheprovider,
+enforces timeout 300 and the QUIT_SCRIPT exclusion, and removes runner-only
+`PYTHONPATH` before pytest while retaining `scripts` on `sys.path`.
+`pytest.log` / `.xml`, exact fresh `--basetemp=work/c63c-12`, exit 1:
+**5 failed, 673 passed, 1 skipped in 159.78s**. `test-summary.json` enumerates
+every result.
+
+| Module | Result |
+| --- | --- |
+| `test_tools_package_notices.py` | 389 passed |
+| `test_tools_package_build.py` | 130 passed |
+| `test_tools_package_smoke.py` | 34 passed, 1 unchanged skip |
+| `test_tools_package_ffmpeg.py` | 68 passed |
+| `test_release_workflow.py` | 52 passed, 5 sandbox fixture failures |
+
+All five failures are
+`test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`
+(`annotated`, `lightweight`, `wrong-commit`, `mismatched-name`, `deleted-origin`).
+Each fails at local fixture `git push origin HEAD:refs/heads/main --tags`, exit
+128, with restricted-token `CreateFileMapping`; none reaches the gate. Seat
+reruns remain commissioned. The skip is
+`test_non_windows_containment_never_silently_skips` (WP6.5 POSIX proof).
+
+**Verification / handoff.** The granted smoke-fixture defect is CONFIRMED and
+FIXED; baseline rename refusal is missing and same-name identity refusal is
+preserved. Every other selected test passes; final owned-diff review finds no
+new issue. No new review round or package acceptance is claimed. Only the two
+granted test edits and this report change. Source-entry smoke isolation was
+inspected: disposable profile/XDG roots, Qt import block, stubbed GUI/worker,
+15-second timeout. No production/dependency/frozen-interface change, network,
+real build, frozen/GUI launch, Docker, desktop input, protected-folder write,
+repository Git write, push/tag/dispatch or mailbox post. Scratch evidence stays
+in this worktree; only prescribed tests attempt temporary local Git fixture
+pushes. No new scope question; real-Git reruns and review remain seat work.
+`depth_input_tokens` is unavailable to the cell; dispatcher read due at yield.
