@@ -1,24 +1,34 @@
-From 92d0b6a63034510ce553ae88ec13228ee766ddd3 Mon Sep 17 00:00:00 2001
+From d77b8352f60bd180ebce585632846533aa60b183 Mon Sep 17 00:00:00 2001
 From: Reid Smythe <rwsmythe@gmail.com>
-Date: Thu, 5 Nov 2026 10:50:43 -1000
-Subject: [PATCH] feat(wp6.3c): build win64 GPL FFmpeg n9.0.2 without zvbi
+Date: Thu, 5 Nov 2026 20:52:03 -1000
+Subject: [PATCH] feat(wp6.3c): build win64 GPL FFmpeg release/9.0 at b204e94e
+ without zvbi
 
-Clearwater WP6.3c (docs/briefs/wp6.3c-brief.md in rwsmythe/clearwater):
+Clearwater WP6.3c (docs/briefs/wp6.3c-brief.md in rwsmythe/clearwater), r2.
+r1 (branch wp6.3c-nozvbi, 92d0b6a) pinned FFmpeg to the tag n9.0.2 and
+failed to compile: BtbN's openapv pin (b4ff698, openapv >= 1.1) changed
+oapvm_create to two arguments, and FFmpeg fixed liboapvenc.c on release/9.0
+only after the tag (a7502e5, "avcodec/liboapvenc: fix build with openapv
+>= 1.1"). r2 pins the release/9.0 commit b204e94e (n9.0.2 + 47 backports).
 - scripts.d/50-zvbi.sh: ffbuild_enabled returns 1, so generate.sh emits
   --disable-libzvbi and never builds the stage (zvbi's packet-830.* and
   pdc.* are GPL-2.0-only and cannot be combined into the GPL-3.0 binary).
-- addins/9.0.sh: GIT_BRANCH pinned to the release tag n9.0.2.
+- build.sh: one added line after the release/9.0 clone,
+  git checkout --detach b204e94e90fca64045e9ca7dd44c65678c7eb29e
+  (clone --branch cannot take a commit; set -xe fails the build if the
+  commit is missing). addins/9.0.sh stays upstream (release/9.0).
 - .github/workflows/build.yml: workflow_dispatch only; repository guard
   for this fork; win64 / gpl 9.0 only; release tagged
-  ffmpeg-n9.0.2-nozvbi-<commit>; no Latest / Wiki / Prune / ghcr cleanup.
+  ffmpeg-9.0-gb204e94e-nozvbi-<commit>; no Latest / Wiki / Prune / ghcr
+  cleanup.
 ---
  .github/workflows/build.yml | 150 +++++-------------------------------
- addins/9.0.sh               |   2 +-
+ build.sh                    |   1 +
  scripts.d/50-zvbi.sh        |   2 +-
- 3 files changed, 20 insertions(+), 134 deletions(-)
+ 3 files changed, 20 insertions(+), 133 deletions(-)
 
 diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
-index 49cb761..de2ae18 100644
+index 49cb761..ffb3f3a 100644
 --- a/.github/workflows/build.yml
 +++ b/.github/workflows/build.yml
 @@ -1,10 +1,6 @@
@@ -228,7 +238,7 @@ index 49cb761..de2ae18 100644
            RELDATE="$(date +'%Y-%m-%d %H:%M')"
            NAME="Auto-Build $RELDATE"
 -          TAGNAME="autobuild-$(date +'%Y-%m-%d-%H-%M')"
-+          TAGNAME="ffmpeg-n9.0.2-nozvbi-${GITHUB_SHA:0:7}"
++          TAGNAME="ffmpeg-9.0-gb204e94e-nozvbi-${GITHUB_SHA:0:7}"
            (cd artifacts && sha256sum *.{zip,tar.xz} > checksums.sha256)
            ./util/release_body.sh "$TAGNAME" artifacts/*.{zip,tar.xz} > release_body.md
 -          gh release create "$TAGNAME" --target "master" --title "$NAME" --notes-file release_body.md artifacts/*.{zip,tar.xz} artifacts/checksums.*
@@ -261,14 +271,18 @@ index 49cb761..de2ae18 100644
 -        run: ./util/prunetags.sh
 -        env:
 -          GITHUB_TOKEN: ${{ github.token }}
-diff --git a/addins/9.0.sh b/addins/9.0.sh
-index 3dda257..282f774 100644
---- a/addins/9.0.sh
-+++ b/addins/9.0.sh
-@@ -1,2 +1,2 @@
- #!/bin/bash
--GIT_BRANCH="release/9.0"
-+GIT_BRANCH="n9.0.2"
+diff --git a/build.sh b/build.sh
+index a97e55c..e397312 100755
+--- a/build.sh
++++ b/build.sh
+@@ -39,6 +39,7 @@ cat <<EOF >"$BUILD_SCRIPT"
+ 
+     git clone --filter=blob:none --branch='$GIT_BRANCH' '$FFMPEG_REPO' ffmpeg
+     cd ffmpeg
++    git checkout --detach b204e94e90fca64045e9ca7dd44c65678c7eb29e
+ 
+     ./configure --prefix=/ffbuild/prefix --pkg-config-flags="--static" \$FFBUILD_TARGET_FLAGS \$FF_CONFIGURE \
+         --extra-cflags="\$FF_CFLAGS" --extra-cxxflags="\$FF_CXXFLAGS" --extra-libs="\$FF_LIBS" \
 diff --git a/scripts.d/50-zvbi.sh b/scripts.d/50-zvbi.sh
 index 1324910..47dae47 100755
 --- a/scripts.d/50-zvbi.sh
