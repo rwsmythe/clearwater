@@ -1,26 +1,31 @@
 {
-  "schema_version": 1,
-  "provider": "BtbN/FFmpeg-Builds",
-  "release_tag": "autobuild-2026-10-31-12-59",
-  "build_repository_commit": "5031c6f1082414e53688d39e521849905071070d",
-  "asset_name": "ffmpeg-n9.0.2-39-g7adfbe40dc-win64-gpl-9.0.zip",
-  "asset_url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-n9.0.2-39-g7adfbe40dc-win64-gpl-9.0.zip",
-  "size_bytes": 195110184,
-  "github_sha256": "693f3e224bc184b40524a62ca47526cfebaf2504414021b92fe75f677ad868b9",
-  "seat_sha256": "693f3e224bc184b40524a62ca47526cfebaf2504414021b92fe75f677ad868b9",
-  "ffmpeg_commit": "7adfbe40dc",
+  "schema_version": 2,
+  "provider": "rwsmythe/FFmpeg-Builds",
+  "parent_provider": {
+    "repository": "BtbN/FFmpeg-Builds",
+    "commit": "5031c6f1082414e53688d39e521849905071070d"
+  },
+  "release_tag": "ffmpeg-9.0-gb204e94e-nozvbi-d77b835",
+  "build_repository_commit": "d77b8352f60bd180ebce585632846533aa60b183",
+  "asset_name": "ffmpeg-n9.0.2-47-gb204e94e90-win64-gpl-9.0.zip",
+  "asset_url": "https://github.com/rwsmythe/FFmpeg-Builds/releases/download/ffmpeg-9.0-gb204e94e-nozvbi-d77b835/ffmpeg-n9.0.2-47-gb204e94e90-win64-gpl-9.0.zip",
+  "size_bytes": 194771780,
+  "github_sha256": "3534afe300170f55521d78bad405f54def9d388abba30aee7620dc525e2e0c20",
+  "seat_sha256": "3534afe300170f55521d78bad405f54def9d388abba30aee7620dc525e2e0c20",
+  "ffmpeg_ref": "release/9.0",
+  "ffmpeg_commit": "b204e94e90fca64045e9ca7dd44c65678c7eb29e",
   "ffmpeg_repository": "https://github.com/FFmpeg/FFmpeg.git",
-  "version": "n9.0.2-39-g7adfbe40dc-20261031",
-  "configure_line": "configuration: --prefix=/ffbuild/prefix --pkg-config-flags=--static --pkg-config=pkg-config --cross-prefix=x86_64-w64-mingw32- --arch=x86_64 --target-os=mingw32 --enable-gpl --enable-version3 --disable-debug --disable-w32threads --enable-pthreads --enable-iconv --enable-zlib --enable-libxml2 --enable-libvmaf --disable-libxcb --disable-xlib --enable-fontconfig --enable-libharfbuzz --enable-libfreetype --enable-libfribidi --enable-lcms2 --enable-vulkan --enable-libdav1d --enable-libvorbis --enable-librav1e --enable-librsvg --disable-libpulse --enable-gmp --enable-lzma --enable-liblcevc-dec --enable-opencl --enable-amf --enable-libaom --enable-avisynth --enable-chromaprint --enable-libdavs2 --enable-libdvdread --enable-libdvdnav --disable-libfdk-aac --enable-ffnvcodec --enable-cuda-llvm --enable-frei0r --enable-libgme --enable-libkvazaar --enable-libaribb24 --enable-libaribcaption --enable-libass --enable-libbluray --enable-libjxl --enable-libmp3lame --enable-libopus --enable-libplacebo --enable-librist --enable-libssh --enable-libtheora --enable-libvpx --enable-libwebp --enable-libzmq --enable-lv2 --enable-libvpl --enable-openal --enable-liboapv --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenh264 --enable-libopenjpeg --enable-libopenmpt --enable-librubberband --enable-schannel --enable-sdl2 --enable-libsnappy --enable-libsoxr --enable-libsrt --enable-libsvtav1 --enable-libtwolame --enable-libuavs3d --disable-libdrm --enable-vaapi --enable-vapoursynth --enable-libvidstab --enable-libvvenc --disable-whisper --enable-libx264 --enable-libx265 --enable-libxavs2 --enable-libxvid --enable-libzimg --enable-libzvbi --extra-cflags=-DLIBTWOLAME_STATIC --extra-cxxflags= --extra-libs=-lgomp --extra-ldflags=-pthread --extra-ldexeflags= --cc=x86_64-w64-mingw32-gcc --cxx=x86_64-w64-mingw32-g++ --ar=x86_64-w64-mingw32-gcc-ar --ranlib=x86_64-w64-mingw32-gcc-ranlib --nm=x86_64-w64-mingw32-gcc-nm --extra-version=20261031",
+  "version": "n9.0.2-47-gb204e94e90-20261106",
+  "configure_line": "configuration: --prefix=/ffbuild/prefix --pkg-config-flags=--static --pkg-config=pkg-config --cross-prefix=x86_64-w64-mingw32- --arch=x86_64 --target-os=mingw32 --enable-gpl --enable-version3 --disable-debug --disable-w32threads --enable-pthreads --enable-iconv --enable-zlib --enable-libxml2 --enable-libvmaf --disable-libxcb --disable-xlib --enable-fontconfig --enable-libharfbuzz --enable-libfreetype --enable-libfribidi --enable-lcms2 --enable-vulkan --enable-libdav1d --enable-libvorbis --enable-librav1e --enable-librsvg --disable-libpulse --enable-gmp --enable-lzma --enable-liblcevc-dec --enable-opencl --enable-amf --enable-libaom --enable-avisynth --enable-chromaprint --enable-libdavs2 --enable-libdvdread --enable-libdvdnav --disable-libfdk-aac --enable-ffnvcodec --enable-cuda-llvm --enable-frei0r --enable-libgme --enable-libkvazaar --enable-libaribb24 --enable-libaribcaption --enable-libass --enable-libbluray --enable-libjxl --enable-libmp3lame --enable-libopus --enable-libplacebo --enable-librist --enable-libssh --enable-libtheora --enable-libvpx --enable-libwebp --enable-libzmq --enable-lv2 --enable-libvpl --enable-openal --enable-liboapv --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenh264 --enable-libopenjpeg --enable-libopenmpt --enable-librubberband --enable-schannel --enable-sdl2 --enable-libsnappy --enable-libsoxr --enable-libsrt --enable-libsvtav1 --enable-libtwolame --enable-libuavs3d --disable-libdrm --enable-vaapi --enable-vapoursynth --enable-libvidstab --enable-libvvenc --disable-whisper --enable-libx264 --enable-libx265 --enable-libxavs2 --enable-libxvid --enable-libzimg --disable-libzvbi --extra-cflags=-DLIBTWOLAME_STATIC --extra-cxxflags= --extra-libs=-lgomp --extra-ldflags=-pthread --extra-ldexeflags= --cc=x86_64-w64-mingw32-gcc --cxx=x86_64-w64-mingw32-g++ --ar=x86_64-w64-mingw32-gcc-ar --ranlib=x86_64-w64-mingw32-gcc-ranlib --nm=x86_64-w64-mingw32-gcc-nm --extra-version=20261106",
   "licence": "GPL-3.0-or-later",
-  "archive_root": "ffmpeg-n9.0.2-39-g7adfbe40dc-win64-gpl-9.0",
+  "archive_root": "ffmpeg-n9.0.2-47-gb204e94e90-win64-gpl-9.0",
   "extract_members": [
     "bin/ffmpeg.exe",
     "bin/ffprobe.exe",
     "LICENSE.txt"
   ],
-  "source_record_url": "https://github.com/BtbN/FFmpeg-Builds/tree/5031c6f1082414e53688d39e521849905071070d/scripts.d",
-  "retention_note": "Month-end assets are retained about two years; re-pin before about 2028-10.",
+  "source_record_url": "https://github.com/rwsmythe/FFmpeg-Builds/tree/d77b8352f60bd180ebce585632846533aa60b183/scripts.d",
+  "retention_note": "the asset is a release of the owner's fork; no retention policy applies; rebuild in the fork for an FFmpeg bump (checklist step)",
   "components": [
     {
       "stage": "scripts.d/10-mingw-std-threads.sh",
@@ -1476,21 +1481,6 @@
       "licence_basis": "seat-verified",
       "gpl3_compatible": "yes",
       "licence_note": "seat licence file(s) at the pin agree with the cell read"
-    },
-    {
-      "stage": "scripts.d/50-zvbi.sh",
-      "name": "zvbi",
-      "repository": "https://github.com/zapping-vbi/zvbi",
-      "pin": "34bb6f660c5c1bacd4a66cc7b22311e4ca3c1ab5",
-      "pin_kind": "commit",
-      "extra_repositories": [],
-      "configure_flag": [
-        "--enable-libzvbi"
-      ],
-      "licence": "GPL-2.0-or-later AND LGPL-2.0-or-later AND LGPL-2.1-or-later AND GPL-2.0-only AND MIT AND BSD-2-Clause",
-      "licence_basis": "seat-verified",
-      "gpl3_compatible": "no",
-      "licence_note": "COPYING.md: src/* LGPL-2+, BUT src/pdc.* and src/packet-830.* 'GPL-2' = GPL-2.0-only (their headers: 'GNU General Public License version 2 as published'); both in libzvbi_la_SOURCES; packet.c calls into packet-830.c; see the STOP section"
     }
   ],
   "excluded": [
@@ -1673,6 +1663,11 @@
       "stage": "scripts.d/zz-final.sh",
       "status": "ENTRY",
       "reason": "SCRIPT_SKIP"
+    },
+    {
+      "stage": "scripts.d/50-zvbi.sh",
+      "status": "disabled",
+      "reason": "GPL-2.0-only src/packet-830.* / src/pdc.* cannot be combined into the GPL-3.0 binary; owner ruling 2026-11-05 \"self-build is fine\"; stage disabled in fork commit d77b8352f60bd180ebce585632846533aa60b183"
     }
   ]
 }

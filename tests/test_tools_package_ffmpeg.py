@@ -31,8 +31,29 @@ def test_committed_lock_covers_the_verified_source_stages():
     assert LOCK.is_file(), "the verified FFmpeg lock is missing"
     data = lock_data()
     result = build.validate_ffmpeg_lock(data)
-    assert result["version"] == "n9.0.2-39-g7adfbe40dc-20261031"
-    assert len(result["components"]) == 98
+    assert result["schema_version"] == 2
+    assert result["version"] == "n9.0.2-47-gb204e94e90-20261106"
+    assert result["provider"] == "rwsmythe/FFmpeg-Builds"
+    assert result["parent_provider"] == {
+        "repository": "BtbN/FFmpeg-Builds",
+        "commit": "5031c6f1082414e53688d39e521849905071070d",
+    }
+    assert result["ffmpeg_ref"] == "release/9.0"
+    assert result["ffmpeg_commit"] == "b204e94e90fca64045e9ca7dd44c65678c7eb29e"
+    assert "ffmpeg_tag" not in result
+    assert len(result["components"]) == 97
+    assert result["asset_url"].startswith(
+        "https://github.com/rwsmythe/FFmpeg-Builds/releases/download/"
+    )
+    assert result["asset_name"] == result["archive_root"] + ".zip"
+    flags = set(result["configure_line"].split())
+    assert {
+        "--disable-libzvbi",
+        "--disable-libfdk-aac",
+        "--enable-gpl",
+        "--enable-libx265",
+    } <= flags
+    assert not {"--enable-libzvbi", "--enable-nonfree", "--enable-libfdk-aac"} & flags
     assert sum(c["pin_kind"] == "tag" for c in result["components"]) == 4
     assert sum(c["pin_kind"] == "svn-rev" for c in result["components"]) == 2
     nv = next(c for c in result["components"] if c["name"] == "ffnvcodec")
@@ -47,6 +68,17 @@ def test_committed_lock_covers_the_verified_source_stages():
     "change",
     [
         "schema",
+        "unknown",
+        "ffmpeg-tag",
+        "short-commit",
+        "uppercase-commit",
+        "version-commit",
+        "short-version-commit",
+        "missing-disable-zvbi",
+        "enable-zvbi",
+        "parent-unknown",
+        "parent-missing",
+        "parent-short-commit",
         "missing",
         "digest-length",
         "digest-mismatch",
@@ -69,7 +101,36 @@ def test_committed_lock_covers_the_verified_source_stages():
 def test_lock_rejects_inconsistent_or_unsafe_data(change):
     data = copy.deepcopy(lock_data())
     if change == "schema":
-        data["schema_version"] = 2
+        data["schema_version"] = 1
+    elif change == "unknown":
+        data["unknown"] = "value"
+    elif change == "ffmpeg-tag":
+        data["ffmpeg_tag"] = "n9.0.2"
+    elif change == "short-commit":
+        data["ffmpeg_commit"] = data["ffmpeg_commit"][:10]
+    elif change == "uppercase-commit":
+        data["ffmpeg_commit"] = data["ffmpeg_commit"].upper()
+    elif change in {"version-commit", "short-version-commit"}:
+        data["version"] = (
+            "n9.0.2-47-g"
+            + ("0" * 10 if change == "version-commit" else data["ffmpeg_commit"][:6])
+            + "-20261106"
+        )
+    elif change == "missing-disable-zvbi":
+        data["configure_line"] = data["configure_line"].replace("--disable-libzvbi", "")
+    elif change == "enable-zvbi":
+        data["configure_line"] += " --enable-libzvbi"
+    elif change.startswith("parent-"):
+        data["parent_provider"] = {
+            "repository": "BtbN/FFmpeg-Builds",
+            "commit": "5031c6f1082414e53688d39e521849905071070d",
+        }
+        if change == "parent-unknown":
+            data["parent_provider"]["extra"] = "value"
+        elif change == "parent-missing":
+            del data["parent_provider"]["repository"]
+        else:
+            data["parent_provider"]["commit"] = "5031c6f1"
     elif change == "missing":
         del data["provider"]
     elif change == "digest-length":
@@ -107,6 +168,14 @@ def test_lock_rejects_inconsistent_or_unsafe_data(change):
         build.validate_ffmpeg_lock(data)
 
 
+@pytest.mark.parametrize("length", [7, 10, 40])
+def test_lock_version_accepts_only_a_matching_commit_prefix(length):
+    """FFmpeg's printed abbreviation may vary, but it must identify the pinned commit."""
+    data = lock_data()
+    data["version"] = f"n9.0.2-47-g{data['ffmpeg_commit'][:length]}-20261106"
+    assert build.validate_ffmpeg_lock(data) is data
+
+
 @pytest.fixture
 def synthetic_bundle(tmp_path, monkeypatch):
     """Use real ZIP/file transport and Python tool stubs, never a real binary."""
@@ -126,6 +195,7 @@ def synthetic_bundle(tmp_path, monkeypatch):
             "'path': os.environ['PATH'], 'cwd': os.getcwd(), 'args': sys.argv[1:]}))\n"
             f"print({tool + ' version ' + data['version'] + ' Copyright test'!r})\n"
             f"print({data['configure_line']!r})\n"
+            "print('Exiting with exit code 0')\n"
         )
         members[root + "/bin/" + tool + ".exe"] = script.encode()
     members[root + "/LICENSE.txt"] = b"synthetic GPL-3.0 text\n"
@@ -341,17 +411,21 @@ def test_short_archive_is_rejected_without_extraction(synthetic_bundle):
     assert list(destination.iterdir()) == []
 
 
-def test_lock_records_seat_verified_licences_and_preserves_the_zvbi_stop():
+def test_lock_records_compatible_sources_and_explains_the_zvbi_exclusion():
     data = build.validate_ffmpeg_lock(lock_data())
     sources = [source for c in data["components"] for source in (c, *c["extra_repositories"])]
-    assert len(sources) == 103
+    assert len(sources) == 102
     for source in sources:
         assert source["licence"]
         assert source["licence_basis"] == "seat-verified"
-        assert source["gpl3_compatible"] in {"yes", "no"}
+        assert source["gpl3_compatible"] == "yes"
         assert source["licence_note"]
-    bad = [c["name"] for c in data["components"] if c["gpl3_compatible"] == "no"]
-    assert bad == ["zvbi"]
+    assert not any(c["name"] == "zvbi" for c in data["components"])
+    excluded = next(c for c in data["excluded"] if c["stage"] == "scripts.d/50-zvbi.sh")
+    assert "GPL-2.0-only" in excluded["reason"]
+    assert "src/packet-830.*" in excluded["reason"]
+    assert "src/pdc.*" in excluded["reason"]
+    assert data["build_repository_commit"] in excluded["reason"]
 
 
 @pytest.mark.parametrize("slot", ["primary", "extra"])
@@ -374,14 +448,35 @@ def test_lock_refuses_unverified_licences_even_on_extra_repositories(slot, chang
         build.validate_ffmpeg_lock(data)
 
 
-def test_lock_accepts_incompatibility_as_data_for_the_release_refusal():
-    data = lock_data()
-    for component in data["components"]:
-        for source in (component, *component["extra_repositories"]):
-            source["licence_basis"] = "seat-verified"
-            source["gpl3_compatible"] = "no"
-            source["licence_note"] = "synthetic incompatible licence"
-    assert build.validate_ffmpeg_lock(data)["components"][0]["gpl3_compatible"] == "no"
+@pytest.mark.parametrize("slot", ["primary", "extra"])
+def test_bundled_incompatible_source_is_still_refused_by_notices(
+    synthetic_bundle, monkeypatch, slot
+):
+    """A schema-2 fork pin must not bypass notices' incompatible-source refusal."""
+    data, _source, destination, _out, _members, write, pin = synthetic_bundle
+    source = (
+        data["components"][0]
+        if slot == "primary"
+        else next(
+            extra
+            for component in data["components"]
+            for extra in component["extra_repositories"]
+            if extra["status"] == "built"
+        )
+    )
+    source["gpl3_compatible"] = "no"
+    source["licence_note"] = "synthetic incompatible licence"
+    write()
+    bundle(synthetic_bundle)
+    spec = importlib.util.spec_from_file_location(
+        "wp63c_ffmpeg_notices", ROOT / "tools/package/notices.py"
+    )
+    assert spec is not None and spec.loader is not None
+    notices = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(notices)
+    monkeypatch.setattr(notices, "_build_tool", lambda: build)
+    with pytest.raises(ValueError, match=r"FFmpeg GPL-3\.0-incompatible"):
+        notices._ffmpeg_rows(destination, pin)
 
 
 def test_lock_refuses_http_asset_url():

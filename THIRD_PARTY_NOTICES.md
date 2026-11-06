@@ -14,12 +14,14 @@ source-delivery and other licence obligations. No third-party licence is changed
 
 The 1.1.0 release zip carries its own generated `THIRD_PARTY_NOTICES.md` beside
 `Clearwater.exe`; that file is the notice of record for the artifact. This root
-file remains the 1.0.0 source-install audit and its preserved licence inputs.
+file preserves the 1.0.0 source-install audit and its licence inputs, with the
+FFmpeg row updated for the 1.1.0 bundle.
 
 ## Runtime dependency audit
 
 Versions below are pinned by `uv.lock` and matched installed metadata in the
-Windows AMD64 / Python 3.12 audit. Python and FFmpeg are external tools.
+Windows AMD64 / Python 3.12 audit. Python and FFmpeg are external tools in a
+source install; the 1.1.0 Windows artifact bundles both.
 The 18 runtime distributions include the optional gpu extra and every selected
 transitive dependency. Native component notices, including the platform runtimes
 and software OpenGL renderer, are provided separately below.
@@ -46,7 +48,7 @@ The verdicts and any conditions are stated for each component below.
 | scipy | 1.18.1 | BSD-3-Clause; bundled library terms | **COMPATIBLE-WITH-CONDITION**: Retain aggregate OpenBLAS/LAPACK/GCC notices plus uarray, duccfft, DOP and Qhull texts below. For array-api-compat, array-api-extra, cobyqa, prima (pyprima) and packaging.version, see THIRD_PARTY_NOTICES.md inside the packaged artifact. | [Source](https://github.com/scipy/scipy); [text](#text-30), [text](#text-31), [text](#text-32), [text](#text-33), [text](#text-34) |
 | shiboken6 | 6.12.0 | LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only (metadata) | **COMPATIBLE-WITH-CONDITION**: LGPL-3.0 binding runtime, dynamically linked and replaceable; Qt notice below. | [Source](https://code.qt.io/cgit/pyside/pyside-setup.git/); see notices below |
 | tifffile | 2026.10.15 | BSD-3-Clause | **COMPATIBLE**: Retain Christoph Gohlke/contributors' copyright, conditions and disclaimer below. | [Source](https://github.com/cgohlke/tifffile); [text](#text-35) |
-| FFmpeg / ffprobe | 9.0.2-full_build-www.gyan.dev (outside lock) | GPL-3.0-or-later | COMPATIBLE-WITH-CONDITION: separate process, not redistributed, located on PATH. User obtains its licence and corresponding source from the build publisher. | [Tested build/source](https://www.gyan.dev/ffmpeg/builds/); [licensing](https://ffmpeg.org/legal.html) |
+| FFmpeg / ffprobe | n9.0.2-47-gb204e94e90 (release/9.0 at b204e94e90fca64045e9ca7dd44c65678c7eb29e; build 20261106) | GPL-3.0-or-later | COMPATIBLE-WITH-CONDITION: bundled in the 1.1.0 Windows artifact as separate processes; provider rwsmythe/FFmpeg-Builds at d77b8352f60bd180ebce585632846533aa60b183, built from parent BtbN/FFmpeg-Builds at 5031c6f1 (5031c6f1082414e53688d39e521849905071070d) with zvbi excluded because src/packet-830.* / src/pdc.* are GPL-2.0-only. Preserve the artifact notices, GPL-3.0 text and corresponding-source records. A source install obtains FFmpeg and ffprobe separately on PATH, with terms/source from its chosen publisher. | [Fork build/source](https://github.com/rwsmythe/FFmpeg-Builds/tree/d77b8352f60bd180ebce585632846533aa60b183); [FFmpeg source](https://github.com/FFmpeg/FFmpeg/tree/b204e94e90fca64045e9ca7dd44c65678c7eb29e); [lock](tools/package/ffmpeg.lock.json); [licensing](https://ffmpeg.org/legal.html) |
 
 ### Native components and conditions
 

@@ -636,7 +636,7 @@ def test_checklist_names_release_authority_build_inputs_and_stop_boundaries():
     text = (ROOT / "docs/release-checklist.md").read_text(encoding="utf-8")
     assert "checklist v2" in text
     assert "20260303" in text and "3.12.13" in text and "3.5.5" in text
-    assert "native-licences/" in text and "2028-10" in text
+    assert "native-licences/" in text and "rebuild FFmpeg in the fork" in text
     assert "CLEAN Windows user account" in text and "DRAFT" in text
     assert "The OWNER pushes" in text and "clicks **Publish release**" in text
     numbered = re.split(r"^\d+\. ", text, flags=re.MULTILINE)[1:]

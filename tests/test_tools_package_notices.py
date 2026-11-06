@@ -243,7 +243,9 @@ name = "pyinstaller"
 version = "6.22.3"
 """)
     ffmpeg = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_text())
-    ffmpeg["configure_line"] = "configuration: --enable-gpl --enable-version3 --enable-libx265"
+    ffmpeg["configure_line"] = (
+        "configuration: --enable-gpl --enable-version3 --enable-libx265 --disable-libzvbi"
+    )
     ffmpeg["components"] = [next(c for c in ffmpeg["components"] if c["name"] == "x265")]
     ffmpeg["excluded"] = []
     ffmpeg_path = tmp_path / "ffmpeg.lock.json"
@@ -457,6 +459,29 @@ def test_compatible_ffmpeg_rows_require_matching_build_provenance(release):
     record.write_text(record.read_text().replace(release["ffmpeg"]["version"], "wrong-version"))
     with pytest.raises(ValueError, match=r"FFmpeg.*provenance"):
         plan(notices, release)
+
+
+def test_fork_ffmpeg_notices_render_all_built_sources_and_explain_exclusions(release):
+    """The real schema-2 pin renders provenance and 100 built rows with one text."""
+    module = load_notices()
+    release["ffmpeg"] = json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_text())
+    release["ffmpeg_path"].write_text(json.dumps(release["ffmpeg"]))
+    add_ffmpeg(release)
+    result = plan(module, release)
+    rows = [row for row in result.rows if row.name.startswith("FFmpeg")]
+    assert len(rows) == 101
+    assert len({row.licence_inputs for row in rows}) == 1
+    assert not any(row.name == "FFmpeg component: zvbi" for row in rows)
+    output = module.render_notices(result).decode()
+    assert output.count("### Bundled FFmpeg GPL-3.0") == 1
+    assert output.count("synthetic GPL-3.0 licence") == 1
+    assert "Provider: rwsmythe/FFmpeg-Builds @ d77b8352" in output
+    assert (
+        "built from BtbN's scripts at 5031c6f1 with the zvbi stage disabled; "
+        "FFmpeg release/9.0 at b204e94e"
+    ) in output
+    assert "Excluded scripts.d/50-zvbi.sh: GPL-2.0-only src/packet-830.* / src/pdc.*" in output
+    assert 'owner ruling 2026-11-05 "self-build is fine"' in output
 
 
 @pytest.mark.parametrize("missing", ["ffprobe.exe", "ffmpeg-BUILD.txt", "ffmpeg-LICENSE.txt"])
@@ -2372,6 +2397,18 @@ def test_embedded_parent_upgrade_requires_recensus(release):
         path.write_text(path.read_text().replace("2.5.4", "2.5.5"))
     with pytest.raises(ValueError, match=host.name + ".*numpy.*2.5.4.*2.5.5.*re-census required"):
         plan(load_notices(), release)
+
+
+def test_embedded_unknown_parent_requires_recensus_even_when_host_is_absent(release):
+    """A misspelled census parent must not silently omit all embedded rows."""
+    document, host, _text = embedded_host_fixture(release, parent="numpy", carried=False)
+    document["embedded_hosts"][0]["parent"] = "numpy-typo"
+    save_embedded_fixture(release, document)
+    with pytest.raises(ValueError) as error:
+        plan(load_notices(), release)
+    message = str(error.value)
+    assert host.name in message and "numpy-typo" in message
+    assert "declared parent unknown to this build; re-census required" in message
 
 
 @pytest.mark.parametrize("value", [None, "", " version", "version\nforged", 1])

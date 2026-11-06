@@ -1,12 +1,12 @@
 # WP6.3c - FFmpeg bundle
 
-Status: turn 12 completes the granted smoke-fixture repair and content-hashed-DLL
-regression controls, 2026-11-06; acceptance pending. Static checks pass; the
-five-module run has 673 passed, 1 skipped and five real-Git fixture failures that
-require the seat. The dispatch records the seat's fork
-commit/export and clean actionlint result; Dockerfile generation was refused by
-the seat's tool policy and a static proof recorded instead. The real asset,
-lock re-pin, remaining package work, review, package gate and release are pending.
+Status: turn 13 re-pins the seat-verified zvbi-free fork asset under strict
+schema 2 and completes its notices, unknown-parent guard and FFmpeg documentation,
+2026-11-06; acceptance pending. Static checks pass; final targeted validation
+reports 689 passed, one skipped and six failures: five sandbox real-Git fixture
+failures plus the stale, out-of-turn-ownership checklist expiry assertion.
+The real local build/smoke/zip, V4, encoder proof, final reviews, package gate
+and release remain the seat's work. The fork patch is the seat's r2 export.
 
 ## Turn 2 - Fork preparation and PATH-copy retirement
 
@@ -1985,3 +1985,193 @@ repository Git write, push/tag/dispatch or mailbox post. Scratch evidence stays
 in this worktree; only prescribed tests attempt temporary local Git fixture
 pushes. No new scope question; real-Git reruns and review remain seat work.
 `depth_input_tokens` is unavailable to the cell; dispatcher read due at yield.
+
+## Turn 13 - Real fork asset re-pin and schema-2 notices
+
+**Built.** The lock now names `rwsmythe/FFmpeg-Builds` at
+`d77b8352f60bd180ebce585632846533aa60b183`, release
+`ffmpeg-9.0-gb204e94e-nozvbi-d77b835`. Schema 2 adds `parent_provider` as
+`{repository, commit}` (BtbN/FFmpeg-Builds at
+`5031c6f1082414e53688d39e521849905071070d`) and `ffmpeg_ref: release/9.0`,
+with FFmpeg's full commit `b204e94e90fca64045e9ca7dd44c65678c7eb29e`.
+No `ffmpeg_tag`, schema-1 route or legacy-schema bypass remains. Unknown/missing
+keys, malformed parent records, short/uppercase FFmpeg commits and mismatched
+version abbreviations refuse. GPL/version3/x265 and disabled zvbi are required;
+enabled zvbi, nonfree and enabled fdk-aac refuse. Disabled fdk-aac remains correct.
+The 97 primary rows and five extra source records are unchanged except removal
+of zvbi: 102 compatible source records, two downloaded-not-built, yielding 100
+built-component notice rows plus the aggregate FFmpeg row. The excluded zvbi
+entry names GPL-2.0-only `src/packet-830.*` / `src/pdc.*`, the owner's
+2026-11-05 "self-build is fine" ruling and the full fork commit.
+
+The existing lock convention stores `version` as the printed version TOKEN,
+`n9.0.2-47-gb204e94e90-20261106`, rather than the entire first line; the field
+remains directly consumable by `_pinned_ffmpeg_version`. Configuration keeps the
+printed `configuration: ` prefix, verbatim. The synthetic executable now prints
+`Exiting with exit code 0` after its version/configuration lines: the existing
+probe accepts this without a production probe change. Its first-line and exact
+configuration checks remain in force.
+
+**Run 1 and r2 ruling (dispatch facts, not a cell fetch).** Run `42156511472`
+at fork commit `92d0b6a6` failed because the `n9.0.2` FFmpeg tag calls
+`oapvm_create` with one argument while BtbN's pinned openapv >= 1.1 requires two.
+CHARC ruling `d5893fca` pins `release/9.0` commit
+`b204e94e90fca64045e9ca7dd44c65678c7eb29e` instead: n9.0.2 plus 47 backports,
+including `a7502e5f`'s openapv fix. The seat made the r2 commit/export; neither
+the fork clone nor `tools/package/ffmpeg-fork.patch` was edited this turn.
+
+**Seat provenance accepted from dispatch 13.** Successful run
+[42180812511](https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/42180812511),
+branch `wp6.3c-nozvbi-r2`; seat record
+`clearwater-review-evidence/wp6.3c/seat/fork-run.md`, SHA-256
+`6fc40deda4b43c1ef6602821ceb657a1940d95fedbf48c37e886196bae094ead`.
+Asset `ffmpeg-n9.0.2-47-gb204e94e90-win64-gpl-9.0.zip` is 194,771,780 bytes;
+GitHub's per-asset digest, the seat's computed SHA-256 and `checksums.sha256`
+all equal `3534afe300170f55521d78bad405f54def9d388abba30aee7620dc525e2e0c20`.
+F3: the lightweight release tag peels to the fork commit above, equal to the
+run's `head_sha`. F3b: the run log records
+`+ git checkout --detach b204e94e90fca64045e9ca7dd44c65678c7eb29e` then
+`HEAD is now at b204e94e90`; the binary's `-gb204e94e90` abbreviation is a
+prefix of the full pin. The validator now enforces that relationship with at
+least seven lowercase hex digits.
+
+The seat's first lines, preserved here verbatim:
+
+```text
+ffmpeg version n9.0.2-47-gb204e94e90-20261106 Copyright (c) 2000-2026 the FFmpeg developers
+ffprobe version n9.0.2-47-gb204e94e90-20261106 Copyright (c) 2007-2026 the FFmpeg developers
+```
+
+The seat records 48 archive entries, the expected two executable members and
+`LICENSE.txt` (GPL-3.0, 35,147 bytes, SHA-256
+`8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903`).
+Encoder output contains `libx265` and `hevc_nvenc` and no fdk encoder. The only
+configuration changes from WP6.3b are enabled -> disabled zvbi and the date
+20261031 -> 20261106. These are seat facts; no live download, real executable
+probe or archive inspection was performed by this cell.
+
+**Notices and docs.** FFmpeg rows share the existing single GPL-3.0 text block;
+the aggregate notes now identify fork/parent provenance, the full fork commit,
+FFmpeg ref/commit and every excluded stage's reason. The full-lock synthetic
+render test proves 101 rows, one text block and the zvbi exclusion line. The
+root notice's FFmpeg row now describes the bundle; its source-install sentence
+keeps user-obtained tools on PATH without prescribing gyan.dev. The guide's
+FFmpeg sentences describe the bundle and BtbN scripts without zvbi. The
+checklist removes the obsolete HOLD/expiry and describes future fork rebuilds,
+the full detached checkout, one dispatch, three-way digest, F3/F3b and re-audit.
+The checked-in step 10 had no explicit force-moved-tag sentence; it now states
+why the downloaded source/content census must match the local gated build.
+No workflow field names changed; `release.yml` is untouched.
+
+Reviewer A r2 minor 1: CONFIRMED and FIXED. A census parent must be `python`
+or a runtime distribution present in the lock/audit runtime set, before the
+absent-parent early return. Unknown `numpy-typo` refuses with the host, parent
+and "declared parent unknown to this build; re-census required", even when its
+host is absent. Known parents not carried still retain the prior omission rule.
+
+**Reproducibility and limits.** Pinned: the fork commit, every `SCRIPT_COMMIT`
+recorded by its pinned recipes, and FFmpeg's full `release/9.0` commit, plus the
+published asset's bytes by size and SHA-256. Per CHARC:
+"component scripts under `scripts.d/` byte-identical to `5031c6f1` except
+`50-zvbi.sh`; `build.sh` carries exactly one added checkout line; `addins/`
+untouched; the workflow trimmed as in r1."
+
+Floating inputs remain `ubuntu:26.04`, apt packages, the Rust toolchain
+(`images/base/Dockerfile:41-42` uses rustup without a version and unversioned
+`cargo install cargo-c`), and crosstool-ng HEAD/download/patch recipes
+(`images/base-win64/Dockerfile:6-11`). The checked-in ct-ng config names GCC
+16.2.0, mingw-w64 v14.0.0 and binutils 2.47, but crosstool-ng itself is not pinned.
+These prevent a byte-reproducible rebuild claim. They can also affect carried
+runtime code: Rust's standard library is statically linked through rav1e
+(`scripts.d/50-rav1e.sh:16-17,40`), so a future Rust toolchain can change that
+bundled component's version; crosstool-ng's moving recipes/download set can
+change the compiler/MinGW runtime inputs linked via `-static-libgcc` /
+`-static-libstdc++` (`images/base-win64/Dockerfile:56-58`). None of this changes
+the 102 recorded library source pins. Do not characterize all floats as
+"toolchain only": CHARC's accept must open the prescribed register row for
+floating Rust/compiler runtime inputs. Resolved runtime versions beyond the
+seat's supplied facts are not asserted here. The rav1e recipe also runs
+`cargo update cc` (line 26), an additional floating build dependency; its
+transitive effects have not been proved toolchain-only.
+
+the fork workflow grants contents + packages write at the top level, not per job; one-shot dispatch in the owner's fork
+
+**RED -> GREEN and verification.** Logs/XML stay under
+`work/wp6.3c/turn13/`. Before production/lock changes, `red.log` / `red.xml`,
+fresh `work/c63c-13-red`, reported **9 failed, 23 passed, 437 deselected**:
+schema-1 acceptance, old pin/source counts, short/mismatched hashes, enabled or
+missing-disabled zvbi, and the absent-host unknown-parent omission were exposed.
+After the changes, `green.log` / `green.xml`, fresh `work/c63c-13-green`,
+reported **92 passed, 381 deselected**. The selected tests also cover the full
+notices render, enabled fdk refusal, disabled fdk acceptance, exact configure
+and tool-version matching, and the new trailing output line.
+
+The old acceptance-only incompatibility test is replaced by two executed
+bundle-to-notices refusal controls, for primary and built extra sources. The
+synthetic file transport must share the fixture's explicitly enabled build-tool
+hook with notices; that fixture boundary was corrected without a production
+bypass. `refusal-fixed.log` reports three passed (including the full render);
+`refusal-final.log` / `.xml`, fresh `work/c63c-13-final-refusal`, reports
+**2 passed, 81 deselected** after the final regex/format cleanup.
+`lock-audit.log` independently compares the current lock with `git show HEAD`:
+all 102 remaining source records byte-equivalent as decoded records, prior
+exclusions unchanged, exact dispatched digest and only the two dispatched
+configuration substitutions. No new in-envelope product defect remained in the
+final diff pass; the test-only stale-expiry issue below remains open.
+
+**Final validation.** Requested no-sync static commands ran in order. Initial
+ruff line-length/raw-regex findings were fixed; final files are:
+
+- `ruff-check-final3.log`: **All checks passed!** (exit 0).
+- `ruff-format-final3.log`: **337 files already formatted** (exit 0).
+- `mypy-win32-final.log`, `mypy-darwin-final.log`: each
+  **Success: no issues found in 166 source files** (both exit 0).
+- `diff-check-final.log`: exit 0.
+
+The isolated runner retains `sandbox_mkdir_shim`, no cacheprovider, per-test
+300-second timeout, QUIT_SCRIPT exclusion and removal of runner-only PYTHONPATH
+while keeping `scripts` on sys.path. The first prescribed full five-module run,
+`pytest.log` / `.xml`, exact fresh `work/c63c-13`, reported **6 failed, 688 passed,
+1 skipped in 178.41s**. After replacing the acceptance-only test with the two
+refusal cases, the final complete run used fresh `work/c63c-13-final`:
+`pytest-final.log` / `.xml`, exit 1, **6 failed, 689 passed, 1 skipped in 278.19s**.
+`test-summary.json` names every failure and skip.
+
+| Module | Final result |
+| --- | --- |
+| `test_tools_package_notices.py` | 391 passed |
+| `test_tools_package_build.py` | 130 passed |
+| `test_tools_package_smoke.py` | 34 passed, 1 unchanged skip |
+| `test_tools_package_ffmpeg.py` | 83 passed |
+| `test_release_workflow.py` | 51 passed, 6 failed |
+
+Five failures are the prescribed real-Git cases
+`test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`
+(`annotated`, `lightweight`, `wrong-commit`, `mismatched-name`, `deleted-origin`).
+All fail at the local fixture's `git push origin HEAD:refs/heads/main --tags`,
+exit 128 with the restricted-token `CreateFileMapping` error, before exercising
+the tag gate; seat reruns remain required. The
+unchanged skip is `test_non_windows_containment_never_silently_skips` (POSIX
+containment belongs to WP6.5).
+
+**STOPPED ITEMS / out-of-envelope finding [MINOR, test-only].**
+`tests/test_release_workflow.py:639` still asserts `2028-10` occurs in the
+checklist. The required removal of the retired BtbN expiry date confirms this
+failure independently in both complete runs. Turn 13 does not own that module;
+it is untouched. The seat must update/grant this assertion to require the
+fork's no-retention-policy/rebuild rule instead. The checklist intentionally
+keeps its correct new guidance. This is the only non-sandbox failure; the
+turn's target of every other test passing is therefore not claimed.
+
+**Handoff / remaining work.** No new review round or package acceptance is
+claimed. The seat owns the stale test disposition, real-Git reruns, review,
+real local build + smoke + zip, bundled V4 / encoder proofs, gate and release.
+CHARC's floating-runtime register row remains due at accept. Only the nine
+tracked paths named in this turn's return are changed; neither the patch,
+workflow nor any `src/` file changed. No dependency or frozen interface change,
+network, real PyInstaller build, frozen/GUI launch, Docker, desktop input,
+protected-folder write, repository Git write, push/tag/dispatch or mailbox post
+was performed. Prescribed tests alone attempt temporary local Git-fixture
+pushes; every runner output stays inside this worktree. No review ledger edit
+was owned this turn. `depth_input_tokens` is unavailable to the cell;
+dispatcher read is due at yield.

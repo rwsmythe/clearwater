@@ -6,11 +6,6 @@ pushes the tag and publishes the draft. The local release gate runs on this lapt
 BEFORE the tag (N14). The workflow builds from that tagged commit. The Windows
 artifact is one folder, not an installer; it is unsigned. No PyPI release is planned.
 
-**Current HOLD:** the pinned FFmpeg build's zvbi licence incompatibility is with
-the owner, and `build.py --zip` is pending that ruling. This checklist describes
-the release path after those items are resolved. STOP before any release attempt
-while either remains open; workflow presence is not release readiness.
-
 1. Confirm Reviewer A converged and Reviewer B is clean or its permitted bounded
    remediation is dispositioned under [the review/gate fill](review-gate-clearwater.md).
    Check ownership, the root-only lockfile diff, the guide walkthrough, artifact
@@ -44,10 +39,26 @@ while either remains open; workflow presence is not release readiness.
    The build sanitizes PATH and its native origin check must pass; investigate
    any named PATH source on failure, never allow it into the artifact.
    Read the FFmpeg URL/hash from `tools/package/ffmpeg.lock.json`, verify every
-   linked component's source/licence evidence and re-pin the FFmpeg asset before
-   the retention expiry (about **2028-10**). Re-pinning requires repeating the
-   hash, configuration, source and encoder audit, not just replacing the URL.
-   **STOP** for an expired/unavailable asset, unresolved incompatible component,
+   linked component's source/licence evidence. The asset is a release of the
+   owner's fork; no retention policy applies.
+   For a future FFmpeg bump, **rebuild FFmpeg in the fork**: prepare one commit
+   on the selected BtbN build-script commit, disabling zvbi and retaining the
+   dispatch-only win64 / gpl 9.0 workflow. Pin FFmpeg with a full 40-hex
+   `git checkout --detach <commit>` in `build.sh` after `cd ffmpeg`; keep
+   `addins/9.0.sh` unchanged. A release tag can lag BtbN's dependency pins:
+   the first WP6.3c run at `n9.0.2` failed against openapv >= 1.1, requiring
+   the pinned `release/9.0` backport commit instead.
+   Push and dispatch once only on the owner's authorization. Archive the run
+   and require GitHub's per-asset digest, the downloaded asset's SHA-256 and
+   its `checksums.sha256` line to agree. Require the release tag to peel to
+   the run's `head_sha` (F3); verify the full checkout line in the run log and
+   that the binary version's `-g` abbreviation matches the pinned commit (F3b).
+   Then re-pin schema 2's fork/parent commits, `ffmpeg_ref`, full
+   `ffmpeg_commit`, asset identity and verbatim version/configuration in the
+   lock; never add `ffmpeg_tag`. Repeat the source/licence audit, GPL-3.0
+   licence check, zvbi exclusion and `hevc_nvenc` / `libx265` encoder checks.
+   Recheck the floating toolchain/runtime inputs; preserve the patch and proof.
+   **STOP** for an unavailable asset, unresolved incompatible component,
    missing native material or unreviewed interpreter change.
 5. Complete the seat's local onedir build with the locked `--ffmpeg-from` and
    `--ffmpeg-sha256`, plus `--notices --smoke --zip --out work/release`.
@@ -108,6 +119,10 @@ while either remains open; workflow presence is not release readiness.
     list its single top-level folder and compare the attached notices with the
     copy inside. Compare the sidecar's source-commit comment and the draft body's
     Source commit with the gated commit and workflow github.sha.
+    Compare the downloaded zip's source record and content census against the
+    local release-gate build. A force-moved and re-pushed annotated tag can pass
+    the workflow's annotated-tag gate; this comparison must still identify the
+    gated source, and a changed source commit is a refusal.
     **STOP** on commit/hash/content/layout disagreement; preserve the
     downloaded evidence rather than substituting the local build.
 11. Test that DOWNLOADED artifact in a CLEAN Windows user account on this laptop:

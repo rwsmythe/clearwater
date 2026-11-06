@@ -752,11 +752,19 @@ class FFmpegExcluded(TypedDict):
     reason: str
 
 
+class FFmpegParentProvider(TypedDict):
+    """The upstream build-script repository and its full pinned commit."""
+
+    repository: str
+    commit: str
+
+
 class FFmpegLock(TypedDict):
     """The verified archive identity and per-stage corresponding-source record."""
 
     schema_version: int
     provider: str
+    parent_provider: FFmpegParentProvider
     release_tag: str
     build_repository_commit: str
     asset_name: str
@@ -765,6 +773,7 @@ class FFmpegLock(TypedDict):
     github_sha256: str
     seat_sha256: str
     ffmpeg_commit: str
+    ffmpeg_ref: str
     ffmpeg_repository: str
     version: str
     configure_line: str
@@ -832,7 +841,7 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
         ValueError: The schema, pin, hashes or configure coverage is inconsistent.
     """
     data = _ffmpeg_fields(value, set(FFmpegLock.__annotations__), "document")
-    if type(data["schema_version"]) is not int or data["schema_version"] != 1:
+    if type(data["schema_version"]) is not int or data["schema_version"] != 2:
         raise ValueError("FFmpeg lock: unsupported schema_version")
     if type(data["size_bytes"]) is not int or data["size_bytes"] <= 0:
         raise ValueError("FFmpeg lock: invalid size_bytes")
@@ -842,18 +851,33 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
         "components",
         "excluded",
         "extract_members",
+        "parent_provider",
     }:
         _ffmpeg_text(data[key], key)
+    parent = _ffmpeg_fields(
+        data["parent_provider"], set(FFmpegParentProvider.__annotations__), "parent_provider"
+    )
+    repository = _ffmpeg_text(parent["repository"], "parent repository")
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
+        raise ValueError("FFmpeg lock: invalid parent repository")
+    if not re.fullmatch(r"[0-9a-f]{40}", _ffmpeg_text(parent["commit"], "parent commit")):
+        raise ValueError("FFmpeg lock: invalid parent commit")
     _check_ffmpeg_asset_url(cast(str, data["asset_url"]))
     digest = cast(str, data["github_sha256"])
     if not re.fullmatch(r"[0-9a-f]{64}", digest) or digest != data["seat_sha256"]:
         raise ValueError("FFmpeg lock: sha256 readings differ or are not 64 hex digits")
     if not re.fullmatch(r"[0-9a-f]{40}", cast(str, data["build_repository_commit"])):
         raise ValueError("FFmpeg lock: invalid build repository commit")
-    if not re.fullmatch(r"[0-9a-f]{10,40}", cast(str, data["ffmpeg_commit"])):
+    commit = cast(str, data["ffmpeg_commit"])
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("FFmpeg lock: invalid FFmpeg commit")
     if not re.match(r"n9\.", cast(str, data["version"])):
         raise ValueError("FFmpeg lock: FFmpeg major must be 9")
+    version_commit = re.search(r"-g([0-9a-f]{7,40})(?=-|$)", cast(str, data["version"]))
+    if version_commit is None or not commit.startswith(version_commit.group(1)):
+        raise ValueError("FFmpeg lock: version hash differs from the FFmpeg commit")
+    if data["ffmpeg_ref"] != "release/9.0":
+        raise ValueError("FFmpeg lock: FFmpeg ref must be release/9.0")
     if data["licence"] != "GPL-3.0-or-later":
         raise ValueError("FFmpeg lock: combined build must be GPL-3.0-or-later")
     if data["extract_members"] != ["bin/ffmpeg.exe", "bin/ffprobe.exe", "LICENSE.txt"]:
@@ -871,6 +895,8 @@ def validate_ffmpeg_lock(value: object) -> FFmpegLock:
         raise ValueError("FFmpeg lock: GPL, version3 and libx265 are required")
     if {"--enable-nonfree", "--enable-libfdk-aac"} & tokens:
         raise ValueError("FFmpeg lock: nonfree or libfdk-aac is forbidden")
+    if "--disable-libzvbi" not in tokens or "--enable-libzvbi" in tokens:
+        raise ValueError("FFmpeg lock: zvbi must be disabled")
     components = data["components"]
     excluded = data["excluded"]
     if not isinstance(components, list) or not components or not isinstance(excluded, list):

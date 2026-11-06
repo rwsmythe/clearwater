@@ -589,9 +589,15 @@ def _check_embedded_parents(
     carried: dict[str, _EmbeddedHost],
     selected: dict[str, list[str]],
     installed: dict[str, importlib.metadata.Distribution],
+    runtime: set[str],
 ) -> None:
     carried_paths = {host.relpath for host in carried.values()}
     for host in hosts:
+        if host.parent != "python" and host.parent not in runtime:
+            raise ValueError(
+                f"notices: embedded {host.relpath} parent {host.parent}: "
+                "declared parent unknown to this build; re-census required"
+            )
         if not selected.get(host.parent):
             continue
         if host.parent == "python":
@@ -1533,6 +1539,15 @@ def _ffmpeg_rows(home: Path, lock_path: Path) -> list[NoticeRow]:
         raise ValueError("notices: FFmpeg missing licence material")
     entries = tuple("file:" + path.name for path in (*tools, *material))
     inputs = (LicenceInput(material[1]),)
+    parent = lock["parent_provider"]
+    notes = (
+        f"Provider: {lock['provider']} @ {lock['build_repository_commit']}; "
+        f"built from {parent['repository'].split('/')[0]}'s scripts at {parent['commit'][:8]} "
+        "with the zvbi stage disabled; "
+        f"FFmpeg {lock['ffmpeg_ref']} at {lock['ffmpeg_commit'][:8]} "
+        f"(parent repository: {parent['repository']}).",
+        *(f"Excluded {row['stage']}: {row['reason']}" for row in lock["excluded"]),
+    )
     rows = [
         NoticeRow(
             "FFmpeg / ffprobe",
@@ -1541,6 +1556,7 @@ def _ffmpeg_rows(home: Path, lock_path: Path) -> list[NoticeRow]:
             (f"{lock['ffmpeg_repository']} @ {lock['ffmpeg_commit']}", lock["source_record_url"]),
             entries,
             inputs,
+            notes,
         )
     ]
     for component in lock["components"]:
@@ -1780,7 +1796,9 @@ def plan_notices(
         ):
             owner += "-runtime"
         selected[owner].append(entry.label)
-    _check_embedded_parents(embedded_hosts, carried_hosts, selected, installed)
+    _check_embedded_parents(
+        embedded_hosts, carried_hosts, selected, installed, set(runtime) & set(versions)
+    )
     if unknown:
         raise ValueError("notices: " + "; ".join(unknown))
     result: list[NoticeRow] = [*ffmpeg, *native_rows]
