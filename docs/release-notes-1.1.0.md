@@ -14,8 +14,8 @@ the repository with uv, as 1.0.0 did.
 - **GPU support as an optional install.** The download runs on the CPU. In the
   app, **Tools > Install GPU support...** downloads the NVIDIA CUDA runtime and
   CuPy wheels (about 2 to 3 GB) into your user profile after showing their
-  terms and size, verifies every file, and restarts into GPU mode. **Tools >
-  Remove GPU support...** removes it. Headless equivalents:
+  terms and size and verifies every file; restart Clearwater to use the GPU.
+  **Tools > Remove GPU support** removes it. Headless equivalents:
   `Clearwater.exe --install-gpu-pack` and `--remove-gpu-pack`. Requires an
   NVIDIA graphics card with a current driver.
 - **Bundled FFmpeg with full provenance.** The download carries its own
