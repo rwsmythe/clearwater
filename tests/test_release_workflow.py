@@ -720,8 +720,8 @@ def test_readme_gpu_recipe_names_split_streams_and_matches_guide_commands():
 
 def test_guide_leads_with_artifact_and_retains_gpu_terminal_outcomes():
     text = (ROOT / "docs/user-guide.md").read_text(encoding="utf-8")
-    install = text.split("## 2. Install on Windows 11 (from 1.1.0)\n", 1)[1].split("\n## 3.", 1)[0]
-    assert "Clearwater-1.1.0-windows-onedir.zip" in install
+    install = text.split("## 2. Install on Windows 11 (from 1.1.1)\n", 1)[1].split("\n## 3.", 1)[0]
+    assert "Clearwater-1.1.1-windows-onedir.zip" in install
     assert install.index("Clearwater.exe") < install.index("uv sync")
     assert "Get-FileHash" in install and "More info" in install and "Run anyway" in install
     assert "unsigned" in install and "NVIDIA" in install and "restart" in install

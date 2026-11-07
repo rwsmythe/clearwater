@@ -13,12 +13,12 @@ Clearwater does not support. Record in standard (SDR) mode instead." PQ shows
 "PQ (HDR10)" in place of "HLG". Use your camera's standard/SDR recording mode
 for future clips. See [accepted inputs and refusals](underwater-correction-spec.md).
 
-## 2. Install on Windows 11 (from 1.1.0)
+## 2. Install on Windows 11 (from 1.1.1)
 
-The 1.1.0 Windows artifact bundles FFmpeg and ffprobe beside `Clearwater.exe`;
+The 1.1.1 Windows artifact bundles FFmpeg and ffprobe beside `Clearwater.exe`;
 its artifact notices identify their versions, terms and corresponding sources.
 
-Download **Clearwater-1.1.0-windows-onedir.zip** from the
+Download **Clearwater-1.1.1-windows-onedir.zip** from the
 [Clearwater release page](https://github.com/rwsmythe/clearwater/releases).
 This one-folder application includes Python, so Python needs no separate install.
 Allow space for the unpacked folder, output files and video cache.
@@ -26,7 +26,7 @@ Allow space for the unpacked folder, output files and video cache.
 Optionally download the matching `.zip.sha256` file and compare its hash with:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\Clearwater-1.1.0-windows-onedir.zip
+Get-FileHash -Algorithm SHA256 .\Clearwater-1.1.1-windows-onedir.zip
 ```
 
 The hash must match the sidecar's 64 hexadecimal characters. If it differs, do
@@ -120,7 +120,7 @@ hardware probes. Clearwater's own graphics-card state confirms GPU processing.
 
 ## 3. First run: open, compare, adjust and export
 
-From 1.1.0, run **Clearwater.exe** from the unpacked release folder.
+From 1.1.1, run **Clearwater.exe** from the unpacked release folder.
 
 For a developer/source install, start from the repository folder with
 `uv run --no-sync python -m clearwater`. With the full developer environment,
@@ -245,9 +245,9 @@ it does not copy arbitrary incompatible camera metadata blindly. Keep the source
 as your original. See [D22/D53 and the photo rules](underwater-correction-spec.md)
 and [the EXIF verification report](reports/wp4.5-exif-bytes.md).
 
-## 6. When something goes wrong (from 1.1.0)
+## 6. When something goes wrong (from 1.1.1)
 
-The 1.1.0 Windows artifact bundles FFmpeg and ffprobe beside `Clearwater.exe`; if you moved it, put it back
+The 1.1.1 Windows artifact bundles FFmpeg and ffprobe beside `Clearwater.exe`; if you moved it, put it back
 with the rest of the extracted folder. For a source install, or as a fallback when
 the adjacent tools are absent, both tools must be on PATH; open a new terminal
 after changing PATH. Keep the bundled versions together rather than mixing builds.
@@ -320,7 +320,7 @@ to keep from `~/.config/clearwater/presets` into the new `presets` folder (or
 use Import... in the Presets panel), and remove the old folders when you no
 longer need them.
 
-## 8. Licence (from 1.1.0)
+## 8. Licence (from 1.1.1)
 
 The bundled FFmpeg is built from BtbN's scripts in `rwsmythe/FFmpeg-Builds`
 without zvbi.
