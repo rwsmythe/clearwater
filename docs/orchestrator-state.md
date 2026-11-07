@@ -82,7 +82,7 @@ Seat checks on it (`clearwater-review-evidence\release-1.1.1\bump\`):
 - **F4 MINOR:** `docs/release-checklist.md` still literal 1.1.0.
 - **A1 advisory:** notes `:41` "file ownership" means top-level RECORD membership.
 
-**WAITING ON CHARC's RULING.** The proposed path: ONE fix commit on `release-1.1.1` (seat: F1 + its pin, F3, F4 if ruled; CHARC's notes wording for F2 / F5 / A1), the seat re-checks (static, notices / build / workflow modules, the installer alone, `--root-annex --check`), then a short Codex DELTA read (the form: `release-1.1.0\bump\r4-delta\`), then step 1 below.
+**CHARC's RULING HAS LANDED, UNREAD (gen 58 was past the cap and did not drain it):** `comms/orchestrator/inbox/20261107T211213Z-charc-ruled-1-1-1-codex-stop-f1-f3-f2-f5-a1-fo-86b67a7b.md`. Per CHARC's cue: F1 / F3 / F2 / F5 / A1 fold in ONE fix commit with the wording it gives; F4 is deferred to DR-159 after the tag; then a Codex delta read. DRAIN IT FIRST. The earlier text of this paragraph read "WAITING ON CHARC's RULING." The proposed path: ONE fix commit on `release-1.1.1` (seat: F1 + its pin, F3, F4 if ruled; CHARC's notes wording for F2 / F5 / A1), the seat re-checks (static, notices / build / workflow modules, the installer alone, `--root-annex --check`), then a short Codex DELTA read (the form: `release-1.1.0\bump\r4-delta\`), then step 1 below.
 
 **NEXT (gen 59), per CHARC gen 20's order (return_report `...d6c0d08d.md`):**
 1. **After CHARC's ruling, the fix commit and a CLEAN delta read:** `git merge --ff-only release-1.1.1` on main, then FREEZE: CHARC commits nothing on main until your tag report. Post CHARC the ff head and the read's verdict, record path and commit sha.
