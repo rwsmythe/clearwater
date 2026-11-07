@@ -1,11 +1,15 @@
 # WP6.3e - Release workflow fresh-tree fix
 
-Status: turn 5 candidate, 2026-11-07, adding two conditional reviewpack guards
-from the seat's spy run on turn 4 (`d6db4a0f`). Reviewer A r3 on turn 4
-CONVERGED with no findings (seat-supplied). The final-head spy run and
-runner-PATH seat rehearsal, actionlint, review of this delta, Reviewer B,
-the package gate and the 1.1.1 release remain pending.
-Product code, build tools and version are unchanged.
+Status: final package report, 2026-11-07. Turn 5 (`f3de8b0c`) added two
+conditional reviewpack guards found by the seat's spy run on turn 4
+(`d6db4a0f`). Reviewer A r3 on turn 4 CONVERGED with no findings. The second
+spy run (zero (b)) and the runner-PATH rehearsal of record on `f3de8b0c` PASSED
+(below). `actionlint` 1.7.12 is clean on `9d4d0258` (seat). Reviewer B (Claude,
+the whole package, on `9d4d0258`) returned NO_NEW_CRITICAL_MAJOR. This seat
+commit folds B's two report-text MINORs (F-1 this line; F-2 the line citations
+in `### Seat record and prediction comparison`) and its F-6 advisory (the spy's
+limit, below). The package gate and accept record, and the 1.1.1 release, are
+seat work. Product code, build tools and version are unchanged.
 
 ## Failure and fix
 
@@ -69,7 +73,7 @@ The prediction and its test-module line references describe the turn-1 snapshot.
 | `test_the_page_links_only_a_verified_clip_of_the_current_deepest_frame` | :931 | `_deep_roots()` :559-561; FAIL. |
 
 Outside the workflow's marker expression,
-`tests/test_lookcheck_deep.py:1040` (turn-2 line; formerly :988)
+`tests/test_lookcheck_deep.py:1042` (final-head line; :1040 at turn 2, formerly :988)
 `test_the_deep_clip_is_staged_smoothed_encoded_checked_and_pruned` is `gpu` +
 `slow` and now inherits the stand-in through `_deep_roots()`.
 `tests/test_noise_experiments.py:553`
@@ -176,9 +180,9 @@ it creates and returns an empty `tmp_path/footage-stand-in`, with parents and
 `exist_ok=True`. Outputs stay in sibling synthetic-output folders; nothing is
 written inside the stand-in after its creation.
 
-The four readers now use this helper: the interrupted scan at :458,
-`_write_cache()` at :515, the stale interrupted scan at :590, and
-`_deep_roots()` at :613. Both existing root helpers already accept the
+The four readers now use this helper (its call lines at the final head): the
+interrupted scan at :459, `_write_cache()` at :516, the stale interrupted scan
+at :591, and `_deep_roots()` at :614. Both existing root helpers already accept the
 temporary-root argument they need, so their signatures are unchanged.
 The real-chapter scan, its footage marker and lookup/skip logic are untouched.
 No marker, conftest, workflow, product-code or build-tool change was made.
@@ -597,7 +601,13 @@ The earlier run at `seat\spy\d6db4a0\` is INVALID: it set PYTHONPATH to load
 the plugin, and `tools/package/build.py` refuses a set PYTHONPATH. Its 253
 instrument failures are not package failures. Limit: the plugin sees spawns
 made in pytest processes (controller and xdist workers) only, not spawns by a
-child Python process a test starts.
+child Python process a test starts. Nor does a spawn record cover code that
+looks a tool up with `shutil.which` (for example `find_tool`,
+`src/clearwater/io/video/probe.py:114`), gets None and raises before any spawn.
+Reviewer B closed both by execution on `9d4d0258`. Its own spy logs `which`
+misses as well as spawns; under runner PATH, 0 passing nodes had an ffmpeg /
+ffprobe `which` miss, and the same 15 passing nodes spawned. B traced every
+subprocess-spawning parallel-leg module and found no child-process candidate.
 
 | # | Node | Tool | Disp. | Evidence |
 |---|---|---|---|---|
