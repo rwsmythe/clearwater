@@ -15,7 +15,13 @@ from typing import Any
 import numpy as np
 import pytest
 
-from local_config import FootageLookupError, find_footage_file, load_local_config
+from local_config import (
+    FootageLookupError,
+    LocalConfig,
+    LocalConfigError,
+    find_footage_file,
+    load_local_config,
+)
 from lookcheck import frames, pack, scan
 from lookcheck.frames import OutputRoots
 from prototype.backend import CPU
@@ -23,6 +29,52 @@ from prototype.params import Params
 
 WIDTH, HEIGHT = 64, 48
 TIME_BASE = Fraction(1, 30000)
+
+
+def _footage_root(tmp_path: Path) -> Path:
+    """Use configured footage for the guard, or an empty disposable stand-in.
+
+    Args:
+        tmp_path: This test's temporary root, outside its synthetic output folder.
+
+    Returns:
+        The configured read-only root, or an existing empty stand-in beneath tmp_path.
+    """
+    try:
+        return load_local_config().footage_path
+    except LocalConfigError:
+        footage = tmp_path / "footage-stand-in"
+        footage.mkdir(parents=True, exist_ok=True)
+        return footage
+
+
+def test_footage_root_preserves_the_configured_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A valid config supplies the guard root without creating any footage folder."""
+    footage = tmp_path / "configured-footage"
+    config = LocalConfig(footage_path=footage, working_path=tmp_path / "work")
+    monkeypatch.setitem(globals(), "load_local_config", lambda: config)
+    assert _footage_root(tmp_path) == footage
+    assert not footage.exists()
+    assert not (tmp_path / "footage-stand-in").exists()
+
+
+def test_footage_root_without_config_creates_an_empty_stand_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Missing config supplies an empty guard root under this test's temp folder."""
+
+    def unavailable() -> LocalConfig:
+        raise LocalConfigError("no local config in this synthetic test")
+
+    monkeypatch.setitem(globals(), "load_local_config", unavailable)
+    root = tmp_path / "nested"
+    footage = _footage_root(root)
+    assert footage == root / "footage-stand-in"
+    assert footage.is_dir()
+    assert list(footage.iterdir()) == []
+    assert _footage_root(root) == footage
 
 
 def _flat(colour: tuple[float, float, float], width: int = WIDTH) -> np.ndarray[Any, Any]:
@@ -403,7 +455,7 @@ def _synthetic_clip(path: Path, seconds: int) -> None:
 def test_an_interrupted_chapter_scan_resumes_and_matches_an_uninterrupted_one(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    footage = load_local_config().footage_path
+    footage = _footage_root(tmp_path)
     roots = OutputRoots(allowed=tmp_path / "wp1.3d", footage=footage)
     clip = tmp_path / "wp1.3d" / "GXSYN.mp4"
     _synthetic_clip(clip, 36)  # scan timestamps 5, 15, 25 and 35
@@ -460,7 +512,7 @@ def _cache_document(**changes: Any) -> dict[str, Any]:
 
 
 def _write_cache(tmp_path: Path, document: dict[str, Any]) -> tuple[OutputRoots, Path]:
-    roots = OutputRoots(allowed=tmp_path / "wp1.3d", footage=load_local_config().footage_path)
+    roots = OutputRoots(allowed=tmp_path / "wp1.3d", footage=_footage_root(tmp_path))
     scan_dir = roots.allowed / "scan"
     roots.write_text(scan_dir / "GXSYN.json", json.dumps(document))
     return roots, scan_dir
@@ -535,7 +587,7 @@ def test_discard_cache_removes_the_cache_and_the_interrupted_run_file(tmp_path: 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not on PATH")
 def test_an_interrupted_run_file_from_other_rules_is_discarded_not_resumed(tmp_path: Path) -> None:
-    footage = load_local_config().footage_path
+    footage = _footage_root(tmp_path)
     roots = OutputRoots(allowed=tmp_path / "wp1.3d", footage=footage)
     clip = tmp_path / "wp1.3d" / "GXSYN.mp4"
     _synthetic_clip(clip, 6)  # one scan timestamp, 5 s
@@ -557,8 +609,8 @@ def _deep_entry(rank: int, serves: list[str]) -> dict[str, Any]:
 
 
 def _deep_roots(root: Path) -> OutputRoots:
-    """Roots whose allowed folder is ``root/work/wp1.3d``, with the real footage folder."""
-    return OutputRoots(allowed=root / "work" / "wp1.3d", footage=load_local_config().footage_path)
+    """Roots for synthetic output with configured footage or a disposable guard root."""
+    return OutputRoots(allowed=root / "work" / "wp1.3d", footage=_footage_root(root))
 
 
 @pytest.fixture(scope="module")

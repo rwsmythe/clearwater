@@ -1,6 +1,7 @@
 # WP6.3e - Release workflow fresh-tree fix
 
-Status: turn 1 candidate, 2026-11-07, based on `d14a09c1`. Reviewer A,
+Status: turn 2 candidate, 2026-11-07, folding the seat rehearsal of turn 1
+(`e9cde49d`, based on `d14a09c1`). Reviewer A,
 actionlint, the seat rehearsal, Reviewer B, the package gate and the 1.1.1
 release remain pending. Product code, build tools and version are unchanged.
 
@@ -47,6 +48,7 @@ TEN failures and TWO setup errors in the workflow's parallel leg, all in
 `tests/test_lookcheck_deep.py`, assuming FFmpeg/ffprobe are available. Each is
 unmarked for footage and reaches an unguarded `load_local_config()`; absent
 `clearwater.local.toml` raises `LocalConfigError` before synthetic work begins.
+The prediction and its test-module line references describe the turn-1 snapshot.
 
 | Test (all in `tests/test_lookcheck_deep.py`) | Definition line | Config dependency / expected result |
 |---|---|---|
@@ -78,11 +80,10 @@ fixtures reach config at :760 / :854 but their real-footage consumers carry
 `footage`. `tests/fixture_plugin.py` supplies committed/generated synthetic
 samples without local config or footage. Other inspected config-dependent
 helpers either use disposable config, catch missing config and skip/return,
-or belong to footage-marked tests. None of these predicted defects was changed:
-the seat supplies the rehearsal findings and CHARC rules any fixture fold.
-Prediction-versus-rehearsal comparison: pending the seat's record.
+or belong to footage-marked tests. Turn 1 left these predicted defects unchanged.
+The rehearsal below confirms the prediction and records CHARC's ruled fold.
 
-## Pins and validation
+## Turn 1 - pins and validation
 
 `test_parallel_tests_create_basetemp_parent_before_pytest` at
 `tests/test_release_workflow.py:460` parses the step's `run:` block, derives
@@ -143,3 +144,93 @@ moving the parent mkdir after pytest. This final pass found nothing new.
 `git diff --check` also exited 0 (`diff-check.log`).
 
 ## Rehearsal
+
+### Seat record and prediction comparison
+
+The seat supplied the rehearsal record for `e9cde49d` in dispatch 2; the cell
+has not read the external evidence directory. Record location:
+`clearwater-review-evidence/wp6.3e/seat/rehearsal/e9cde49/`.
+The clone had no `work/`, local TOML or footage path and used the workflow's
+own run blocks. Run 1 reached the seat's 30-minute sync limit downloading
+CUDA wheels; this was an infrastructure limit, not a code finding. Run 2
+resumed the same clone and synced successfully (exit 0).
+
+Run 2 parallel tests exited 1 in 588 s:
+`10 failed, 8353 passed, 210 skipped, 5 warnings, 2 errors`.
+The ten failures and two setup errors are EXACTLY the twelve identities and
+classifications in the round-0 prediction table above. Each reached
+`tools/local_config.py:108` with the clone's local TOML absent. No prediction
+mismatch and no additional test failure. Build/staging evidence was not supplied
+with this turn; the seat continues that work independently.
+
+**[MAJOR] R-F1, confirmed, fixed in tests:** twelve synthetic tests depended on
+the owner's local config for a guard root. CHARC ruling `a0df6f36`
+(`a0df6f3668e4d109`, 2026-11-07T16:05Z) requires a stand-in rather than a skip.
+One `_footage_root(tmp_path)` helper at `tests/test_lookcheck_deep.py:34`
+returns the configured footage path unchanged; on `LocalConfigError` only,
+it creates and returns an empty `tmp_path/footage-stand-in`, with parents and
+`exist_ok=True`. Outputs stay in sibling synthetic-output folders; nothing is
+written inside the stand-in after its creation.
+
+The four readers now use this helper: the interrupted scan at :458,
+`_write_cache()` at :515, the stale interrupted scan at :590, and
+`_deep_roots()` at :613. Both existing root helpers already accept the
+temporary-root argument they need, so their signatures are unchanged.
+The real-chapter scan, its footage marker and lookup/skip logic are untouched.
+No marker, conftest, workflow, product-code or build-tool change was made.
+Both existing GPU/slow test bodies are unchanged.
+
+### Turn 2 proofs and validation
+
+Proof (a), local TOML present: the isolated cell run of deep-lookcheck plus
+release-workflow tests reports `5 failed, 98 passed, 2 deselected`, exit 1,
+in `work/wp6.3e/turn2-pytest.log` (`--basetemp=work/c63e-2`). All 44 selected
+deep-lookcheck cases passed, as did 54 release-workflow cases. Only the same
+five sandbox real-Git cases failed (local fixture push, exit 128,
+`CreateFileMapping` fatal error). The `gpu`/`slow` case and real-chapter scan
+were deselected: the latter is excluded explicitly from the cell's `-k` to
+honor the no-footage-read rule. This is synthetic coverage with the owner's
+TOML present; the whole-module proof including real footage remains at the seat.
+
+Proof (b), sandbox form: a scratch pytest plugin replaces ONLY this test
+module's `load_local_config` with a function raising `LocalConfigError`.
+There is no supported config environment override; the actual local TOML was
+never renamed, moved or edited. The same synthetic module selection reports
+`44 passed, 2 deselected`, exit 0, in `work/wp6.3e/turn2-missing.log`
+(`--basetemp=work/c63e-2-missing`). Session-end inspection confirmed all
+27 stand-in folders remained empty. This simulates missing config at every
+synthetic reader; actual fresh-clone absence is proved by the seat's final rerun.
+
+The two new helper tests at :51 and :63 were first RED with the helper absent
+(`2 failed, 44 deselected`, exit 1, `turn2-red.log`), then GREEN in both runs.
+Their assertions kill these mutations:
+
+| Assertion | Mutation caught |
+|---|---|
+| Configured result equals the supplied path | Always return a fallback or another root. |
+| Configured folder remains absent | Create/write the configured footage root. |
+| No stand-in exists for valid config | Create an unnecessary fallback on the configured branch. |
+| Missing-config result equals the nested root's `footage-stand-in` | Use another name or a root outside the supplied temp folder. |
+| Fallback `is_dir()` | Return a nonexistent path without creating the directory. |
+| Fallback contents are empty | Plant an output in the guard root. |
+| Repeated fallback call returns the same root | Omit `exist_ok=True`; the nested input also exercises parent creation. |
+
+Static checks all exited 0: `ruff check .` (all checks passed),
+`ruff format --check .` (337 files formatted), `mypy` and
+`mypy --platform darwin` (166 source files each). Logs and exit-code files:
+`work/wp6.3e/turn2-{ruff,format,mypy,mypy-darwin}.*`.
+The runner retains redirected profiles, blocked GUI imports, explicit timeout
+plugin, the startup-test exclusion, sandbox mkdir shim and disabled cache provider.
+Commands remain offline and no-sync using the existing shared environment.
+
+Verification loop: the seat independently confirmed the predicted config
+dependency; the ruled test-only fix preserves configured behavior and passes
+the missing-config simulation without dropping synthetic coverage. No further
+in-scope failure was found. `turn2-verification.log` (exit 0) confirms the two-file
+envelope, exactly four changed existing function bodies, and unchanged existing
+markers, real-chapter body and GPU/slow body. `git diff --check` also exited 0
+(`turn2-diff-check.log`). Reviewer A has not run yet. No STOP item or scope
+deviation; full-module real-footage proof, unrestricted Git, actionlint,
+final-head rehearsal and both reviews remain seat work.
+
+Seat re-run on the final head: (the seat fills)
