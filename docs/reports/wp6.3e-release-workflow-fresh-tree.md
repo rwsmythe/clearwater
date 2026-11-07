@@ -237,7 +237,8 @@ markers, real-chapter body and GPU/slow body. `git diff --check` also exited 0
 deviation; full-module real-footage proof, unrestricted Git, actionlint,
 final-head rehearsal and both reviews remain seat work.
 
-Seat re-run on the final head: (the seat fills)
+Seat re-run on the final head: superseded by the runner-PATH rehearsal of record on
+`f3de8b0c` (below, `## Runner PATH`), which has no toml, no `work/` and no footage: PASS.
 
 ## Runner PATH (Reviewer A F-1)
 
@@ -410,7 +411,20 @@ seat by this dispatch. No network fetch, build, GUI launch, footage read/write,
 owner-profile write, evidence-folder write, project Git write, tag, push or
 mailbox operation was performed. The failed `v1.1.0` tag is untouched.
 
-Seat runner-path rehearsal on the final head: (the seat fills)
+Seat runner-path rehearsal on the final head: the rehearsal of record ran on
+`f3de8b0c` (turn 5; the later seat commit changes only this report) from a NEW
+fresh clone (`work/ci-rehearsal/f3de8b0`: no `work/`, no toml, no footage),
+with `--runner-path` for every step (every PATH entry holding `ffmpeg.exe` /
+`ffprobe.exe` dropped, `CUDA_VISIBLE_DEVICES=-1`). The workflow's `run:` blocks
+were extracted from the clone's own `release.yml`. Result: PASS.
+- Sync: exit 0, 1,040.7 s.
+- Run parallel tests: exit 0, `7517 passed, 1060 skipped, 5 warnings in 241.29s (0:04:01)`.
+- Build, under the UIA watch: exit 0, 239.7 s, no window seen (13 Clearwater pids sampled).
+- Stage release assets: exit 0, with the zip, its `.sha256` and `THIRD_PARTY_NOTICES.md`.
+
+Record: `C:\Users\rwsmy\clearwater-review-evidence\wp6.3e\seat\rehearsal\f3de8b0-runnerpath\`
+(`summary.json`, `step-*.log`). Limit: the step blocks run in Windows
+PowerShell 5.1, while the runner runs pwsh 7.
 
 ### Reviewer A r2
 
@@ -474,7 +488,7 @@ changed, and the empty spy section. `git diff --check` exits 0
 (`turn4-diff-check.log`). The final delta/outcome pass finds no additional issue.
 
 The seat's rehearsal on `8a30d6d4` is retained as the pre-fold record
-(record path: the seat fills). The rehearsal of record requires a NEW fresh
+(record path: `C:\Users\rwsmy\clearwater-review-evidence\wp6.3e\seat\rehearsal\8a30d6d-runnerpath\`). The rehearsal of record requires a NEW fresh
 clone on the final turn-4 head, or turn 5 if the spy finds more false passes.
 The whole-selection spy, its plugin/record paths and node dispositions are
 recorded below from the seat's dispatch; the cell does not run it. Reviewer A
@@ -598,4 +612,8 @@ child Python process a test starts.
 The other parameters, `[probe]` and `[zero_rate]`, made no spawn and remain
 unguarded. None of the report's tool-absent controls appears in the spawn list.
 
-Spy run on the final head: (the seat fills)
+Spy run on the final head: the spy ran again on `f3de8b0c` (turn 5), in the same
+form (record `C:\Users\rwsmy\clearwater-review-evidence\wp6.3e\seat\spy\f3de8b0-r1\`).
+The leg read exit 0, `7517 passed, 1060 skipped, 5 warnings in 214.04s`, 0 failed.
+15 passing nodes attempted a spawn: exactly rows 1-15 above, all (a). The two (b)
+nodes now skip. ZERO (b) remain; CHARC's condition is met.
