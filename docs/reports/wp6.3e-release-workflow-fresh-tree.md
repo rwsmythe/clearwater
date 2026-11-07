@@ -1,10 +1,11 @@
 # WP6.3e - Release workflow fresh-tree fix
 
-Status: turn 4 candidate, 2026-11-07, folding Reviewer A r2's two MINORs on
-turn 3 (`8a30d6d4`, after `c66af644` and `e9cde49d`, based on `d14a09c1`).
-The whole-selection spy run, final runner-PATH seat rehearsal, actionlint,
-Reviewer A r3 (FINAL), Reviewer B, the package gate and
-the 1.1.1 release remain pending. Product code, build tools and version are unchanged.
+Status: turn 5 candidate, 2026-11-07, adding two conditional reviewpack guards
+from the seat's spy run on turn 4 (`d6db4a0f`). Reviewer A r3 on turn 4
+CONVERGED with no findings (seat-supplied). The final-head spy run and
+runner-PATH seat rehearsal, actionlint, review of this delta, Reviewer B,
+the package gate and the 1.1.1 release remain pending.
+Product code, build tools and version are unchanged.
 
 ## Failure and fix
 
@@ -275,14 +276,14 @@ policy is `tests/fixture_plugin.py:274-277`: skip with `SKIP_NO_FFMPEG` when
 | `test_io_video_spawn.py` | 2 | 1 per-test fixture mark | :302 spawns each real tool to prove FFREPORT suppression. |
 | `test_lookcheck_deep.py` | 4 | 2 per-test existing-style `skipif`; 1 fixture dependency | :174 calls `scan.scan_document()` (tool versions); :618 `deep_pack` generates/extracts a clip before its two consumers; :710 generates/extracts a clip. |
 | `test_photo_verify.py` | 24 | 11 per-test fixture marks; 1 conditional fixture guard | :98 onward use the FFmpeg orientation oracle; :122 guards all orientation cases; :1571 guards only `compare_poses`; :1741 guards both larger-size-difference cases, which call real FFmpeg before corrupting its output. |
-| `test_reviewpack.py` | 24 | 17 per-test fixture marks; 2 conditional fixture guards | :539 onward probe/copy/extract/render real media, including failure tests that first probe; :1663 guards only video, :1908 only non-photo failures. |
+| `test_reviewpack.py` | 26 | 17 per-test fixture marks; 4 conditional fixture guards (21 sites) | :539 onward probe/copy/extract/render real media, including failure tests that first probe; :1663 guards only video, :1908 only non-photo failures. Turn 5 adds guards in `test_clip_item_probe_or_prepare_fault_is_a_row_and_later_group_runs` for `prepare` only (:2184) and `test_zero_timecode_rate_or_runner_timeout_is_an_item_error_and_continues` for `timeout` only (:2694). |
 | `test_wp321_bench.py` | 2 | 2 per-test fixture marks | :64 and :95 run the CPU video bench's real probe/decode. |
 | `test_wp321_device_frames.py` | 7 | 5 per-test fixture marks | :184, :196, :300, :331, :361 decode or open/close a real video sink; other cases are mocked/device-selected. |
 | `test_wp321_fft_release.py` | 4 | 4 per-test fixture marks | :228, :240, :249, :263 run real video jobs through release boundaries. |
 | `test_wp42_composition.py` | 1 | 1 per-test fixture mark | :151 expects a cache-folder refusal after the real probe succeeds. |
 | `test_wp44_mov_input.py` | 1 | 1 fixture dependency | :98 `qt_mov` generates the synthetic QuickTime source; routing and command-assembly cases stay unguarded. |
 
-Total after turn 4: 155 guarded node IDs, 94 added guard sites (turn 3: 152 IDs,
+Total after turn 5: 157 guarded node IDs, 96 added guard sites (turn 3: 152 IDs,
 93 sites). Conditional guards request the
 existing fixture through `request.getfixturevalue("ffmpeg_tools")`; they change
 no existing assertion or test operation. `deep_pack` and `qt_mov` request the
@@ -435,8 +436,8 @@ and unchanged full parallel collection of 8,577. These are seat-supplied results
 CHARC ruling `616c87d6c5d8b47a` grants the two new in-envelope MINOR folds.
 No product code, assertions, test operations, parameter sets or selection
 markers change; no tests are added/removed, reverts or reopened findings.
-The photo row now covers 24 cases at 12 sites; package totals are 155 guarded
-cases at 94 sites.
+The photo row covers 24 cases at 12 sites; with turn 5's reviewpack fold,
+package totals are 157 guarded cases at 96 sites.
 
 Turn 4 validation, logs/exit codes under `work/wp6.3e/turn4-*`:
 
@@ -475,11 +476,126 @@ changed, and the empty spy section. `git diff --check` exits 0
 The seat's rehearsal on `8a30d6d4` is retained as the pre-fold record
 (record path: the seat fills). The rehearsal of record requires a NEW fresh
 clone on the final turn-4 head, or turn 5 if the spy finds more false passes.
-The whole-selection spy, its plugin/record paths and node dispositions belong
-below; the cell does not run it. Spy, final-head rehearsal, A r3 FINAL, B,
-laptop floor and release gates remain COMMISSIONED to the seat. No stopped
+The whole-selection spy, its plugin/record paths and node dispositions are
+recorded below from the seat's dispatch; the cell does not run it. Reviewer A
+r3 on turn 4 CONVERGED with no findings. Final-head spy/rehearsal, review of
+turn 5, B, laptop floor and release gates remain COMMISSIONED to the seat. No stopped
 cell item or scope deviation; no network fetch, build, GUI launch, footage
 access, owner-profile/evidence-folder write, project Git write, tag, push or
 mailbox action.
 
-## Spy run (runner PATH, the seat fills)
+### Turn 5
+
+**[MINOR] Spy #16 and #17 confirmed, fixed in tests.** Two conditional guards
+in `tests/test_reviewpack.py` request `ffmpeg_tools` as the first statement
+after the docstring, before any media is touched: `fault == "prepare"` at
+:2183-2184 and `fault == "timeout"` at :2693-2694. Each test gains only the
+`request: pytest.FixtureRequest` argument and that guard. No assertion, test
+operation, parameter set or selection marker changes; no other module edit.
+
+The other parameters need no guard. In `[probe]`, the test's `_video` stub
+raises at :2193-2195 before excerpt preparation; the later V-R item goes
+through `_fake_product` (:1629-1658), which handles `uv` entirely in-process.
+In `[zero_rate]`, :2700-2722 stub `_video`, `_probe` and `_packet_facts`;
+`prepare_excerpt` reaches the zero-rate timecode error before `run_tool`
+(`tools/reviewpack/build.py:672`, before `run_tool` at :673), and the later V-R item again uses the
+stubbed product. V-R bypasses the video probe at `build.py:1199`. Neither
+parameter makes a real FFmpeg/ffprobe call, consistent with the seat's spy.
+
+Validation logs and exit-code files are under `work/wp6.3e/turn5-*`:
+
+- `ruff check .`: exit 0, `All checks passed!` (`turn5-ruff.log`).
+- `ruff format --check .`: exit 0, `337 files already formatted`
+  (`turn5-format.log`).
+- `mypy` and `mypy --platform darwin`: exit 0 each,
+  `Success: no issues found in 166 source files`
+  (`turn5-mypy.log`, `turn5-mypy-darwin.log`).
+- Reviewpack whole parallel selection, FFmpeg present (`work/c63e-5p`): exit 0,
+  `174 passed, 3 deselected in 38.10s` (`turn5-present.log`).
+- Same selection, FFmpeg absent (`work/c63e-5a`): exit 0,
+  `148 passed, 26 skipped, 3 deselected in 22.92s` (`turn5-absent.log`).
+  Both tools are asserted absent before importing pytest. Both runs have
+  zero failures/errors; all 26 skips have the fixture's `SKIP_NO_FFMPEG` reason.
+
+The XML records name all four reviewed parameter nodes:
+
+| Node under `tests/test_reviewpack.py` | FFmpeg present | FFmpeg absent |
+|---|---|---|
+| `test_clip_item_probe_or_prepare_fault_is_a_row_and_later_group_runs[probe]` | PASSED | PASSED |
+| `test_clip_item_probe_or_prepare_fault_is_a_row_and_later_group_runs[prepare]` | PASSED | SKIPPED, `SKIP_NO_FFMPEG` |
+| `test_zero_timecode_rate_or_runner_timeout_is_an_item_error_and_continues[zero_rate]` | PASSED | PASSED |
+| `test_zero_timecode_rate_or_runner_timeout_is_an_item_error_and_continues[timeout]` | PASSED | SKIPPED, `SKIP_NO_FFMPEG` |
+
+Parallel collection is unchanged at 8,577 unique nodes: exit 0,
+`8577/9921 tests collected (1344 deselected) in 4.62s`
+(`turn5-collect-safe.log`, `work/c63e-5c-safe`). The first collection attempt
+with the execution runner returned exit 2 with 27 Qt import errors
+(`turn5-collect.log`); these were caused by the scratch GUI import block,
+not the package. The corrected collection-only runner stubs
+`clearwater.app.main.main` and `build_application` before importing pytest,
+permits Qt imports for collection, retains redirected roots and the startup
+exclusion, and has a 120-second outer timeout. It runs no test or GUI.
+
+All runs are offline/no-sync using the existing shared environment. The
+isolated execution runner keeps the sandbox mkdir shim, disabled cache provider and
+plugin autoload, explicit timeout plugin, 600-second test bound and seat-only
+startup-test exclusion. APPDATA, LOCALAPPDATA and every XDG root are redirected
+to disposable `turn5-profiles`; GUI imports are blocked in-process and in
+inheriting children by the existing scratch sitecustomize. Absent mode strips
+all executable-holding PATH entries and asserts both tools absent.
+
+Verification loop: the seat's spy confirmed both false passes; static call
+order confirms each missing-tool exception masks the injected fault. The
+guards fix only those two cases. The final present/absent XML and independent
+delta check (`turn5-verification.log`, exit 0) confirm all four outcomes,
+26 standard skip reasons, the exact six added lines, unchanged original AST
+after removing the guards/arguments, unchanged collection and the two-file
+envelope. `git diff --check` exits 0 (`turn5-diff-check.log`);
+`CR bytes in the diff = 0`. The final pass finds no further issue. No reverted
+or reopened finding and no scope deviation. The scratch collection errors
+were corrected without a tracked-code change.
+
+STOPPED cell items: none. Final-head spy and fresh-clone rehearsal, review of
+this delta, Reviewer B, the package gate and release remain COMMISSIONED to
+the seat. Reviewer A r3's converged verdict applies to `d6db4a0f`, not this
+unreviewed delta. No network fetch, build, GUI launch, footage access,
+owner-profile/evidence-folder write, project Git write, push, tag, `gh` or
+mailbox action was performed.
+
+## Spy run (runner PATH)
+
+Seat-supplied run on `d6db4a0f`: runner PATH with both tools absent,
+`CUDA_VISIBLE_DEVICES=-1`, no local TOML, the workflow's pytest line plus
+`-p ffspy`. Exit 0:
+`7519 passed, 1058 skipped, 5 warnings in 217.74s`.
+Seventeen passing nodes attempted FFmpeg/ffprobe spawns: fifteen are legitimate
+(a), and two need conditional guards (b), applied in turn 5 below.
+
+Instrument: seat tooling `work/orch-g58/spy/ffspy.py`, adapted from Reviewer A
+r2's spy, NOT committed. The seat copied it into the rehearsal clone venv's
+site-packages for the run and removed it afterward; PYTHONPATH was not set.
+Record:
+`C:\Users\rwsmy\clearwater-review-evidence\wp6.3e\seat\spy\d6db4a0-r2\`
+(`spy-parallel.log`, `spy-report.md`, `dispositions.md`, `ffspy-out\`).
+The cell did not run the spy or read the external evidence directory.
+
+The earlier run at `seat\spy\d6db4a0\` is INVALID: it set PYTHONPATH to load
+the plugin, and `tools/package/build.py` refuses a set PYTHONPATH. Its 253
+instrument failures are not package failures. Limit: the plugin sees spawns
+made in pytest processes (controller and xdist workers) only, not spawns by a
+child Python process a test starts.
+
+| # | Node | Tool | Disp. | Evidence |
+|---|---|---|---|---|
+| 1 | `test_container_spike_compare_equivalences.py::test_pcm_two_tracks_keep_distinct_record_notes` | ffprobe | (a) | The only spawn is `ffprobe -version` for the record's version field (`tools/container_spike/compare.py:1730-1743`, `""` when it cannot run); the test asserts PCM notes / items only, never `record["ffprobe"]`. |
+| 2-12 | `test_inventory.py::TestScan::{test_tree, test_scan_returns_the_records, test_bad_video_does_not_abort, test_unexpected_failure_becomes_a_row, test_file_that_vanishes_is_skipped, test_extension_case_is_ignored, test_leaves_the_root_untouched}`, `::TestMain::{test_end_to_end, test_config_is_not_read_when_both_paths_are_given, test_config_supplies_the_missing_path, test_running_twice_keeps_both_reports}` | ffprobe | (a) | Every video in the `tree` fixture is fake bytes (`tests/test_inventory.py:92` `b"not really media"`; `:724-726` `b"x"`), so each video row is a probe-ERROR row with or without ffprobe: absent -> `FileNotFoundError`, present -> non-zero exit, both raised as `_ProbeError` (`tools/inventory.py:546-554`) and turned into a row at `:582`. The asserts are walk / classification / sidecar / report / row-count facts and `error is not None`, true either way. |
+| 13 | `test_photo_memory.py::test_photo_memory_two_legs_have_5d_keys` | ffmpeg | (a) | The spawn is `ffmpeg -version` in `_decoder_versions()` (`tools/photo_verify.py:523-538`, `lru_cache`, `None` when absent), stored in the memory record (`:1439`); the runner, sampler and device are stubbed and the test never asserts `decoder_versions`. |
+| 14 | `test_photo_verify.py::test_r1_decoder_versions_are_safe_and_reproducible` | ffmpeg | (a) | Asserts the key SET `{ffmpeg, pillow_heif, libheif}` (always present: `_decoder_versions` initialises `"ffmpeg": None`, `tools/photo_verify.py:524-528`), the two pillow-heif values, and that `summarise` drops an INJECTED sentinel; no assert reads the ffmpeg value or the orientation verdict. |
+| 15 | `test_photo_verify.py::test_r1_real_thumbnail_item_is_decoded` | ffmpeg | (a) | Asserts only the thumbnail witness, which is pillow-heif (`thumbnail_decode`, `tools/photo_verify.py:497-510`) compared with the product pixels and computed independently of the FFmpeg oracle's outcome (`:780-791`); the oracle failing sets only `failure_code`, which the test does not read. |
+| 16 | `test_reviewpack.py::test_clip_item_probe_or_prepare_fault_is_a_row_and_later_group_runs[prepare]` | ffprobe | **(b)** | The injected fault is the stubbed `_packet_facts` (no `pts_time`), but `prepare_excerpt` first calls the REAL `_probe(source, "-show_streams")` (`tools/reviewpack/build.py:649`); with ffprobe absent that raises first and is caught at `:718-730` as `excerpt_failed`, the expected status, so the packet-facts fault is never reached. R2-2's class. |
+| 17 | `test_reviewpack.py::test_zero_timecode_rate_or_runner_timeout_is_an_item_error_and_continues[timeout]` | ffprobe | **(b)** | The `timeout` case stubs only `run_tool` (the product run raising `TimeoutExpired`); `_video(source)` at `tools/reviewpack/build.py:1200` is the REAL ffprobe, so with it absent the item fails at `:1220-1238` as `failed`, the expected status, before the timeout path runs. R2-2's class. |
+
+The other parameters, `[probe]` and `[zero_rate]`, made no spawn and remain
+unguarded. None of the report's tool-absent controls appears in the spawn list.
+
+Spy run on the final head: (the seat fills)

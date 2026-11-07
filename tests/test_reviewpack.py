@@ -2174,11 +2174,14 @@ def test_photo_source_or_icc_aid_failure_keeps_product_and_continues(
 
 @pytest.mark.parametrize("fault", ["probe", "prepare"])
 def test_clip_item_probe_or_prepare_fault_is_a_row_and_later_group_runs(
+    request: pytest.FixtureRequest,
     roots: OutputRoots,
     monkeypatch: pytest.MonkeyPatch,
     fault: str,
 ) -> None:
     """One malformed item's probe or packet facts must not abort later selected items."""
+    if fault == "prepare":
+        request.getfixturevalue("ffmpeg_tools")
     first = _item("GX011604", "V-S", "video")
     later = _item("IMG_6704", "V-R", "video", "refused")
     args = _selection_args(roots, [first, later])
@@ -2681,11 +2684,14 @@ def test_missing_video_duration_type_error_is_caught_by_group_boundary(
 
 @pytest.mark.parametrize("fault", ["zero_rate", "timeout"])
 def test_zero_timecode_rate_or_runner_timeout_is_an_item_error_and_continues(
+    request: pytest.FixtureRequest,
     roots: OutputRoots,
     monkeypatch: pytest.MonkeyPatch,
     fault: str,
 ) -> None:
     """A zero-rate tmcd or raw subprocess timeout must not lose this or later groups."""
+    if fault == "timeout":
+        request.getfixturevalue("ffmpeg_tools")
     first, later = _item("GX011604", "V-S", "video"), _item("IMG_6704", "V-R", "video")
     for item in (first, later):
         shutil.copyfile(
