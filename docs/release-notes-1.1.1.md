@@ -38,9 +38,8 @@ repository as history.
 - **Hardened frozen application.** Video exports run in an isolated worker
   process with its own standard input; an unexpected error in the frozen app
   is written to the log and reported in one message instead of a silent exit;
-  the GPU pack is verified file by file when it is installed, and at every
-  start its manifest, each RECORD file's hash, the presence and size of every
-  listed file, and its top-level folders are checked.
+  the GPU pack is verified file by file when it is installed, and a shorter
+  check of its files runs at every start.
 - **macOS groundwork.** The code paths for macOS (VideoToolbox encoding,
   Library folders, POSIX process handling) are in this release and run from a
   source install with uv. They have not yet been validated on a Mac, and there
