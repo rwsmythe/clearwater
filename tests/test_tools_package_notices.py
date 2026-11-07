@@ -1639,8 +1639,8 @@ def test_openssl_rows_and_verbatim_text_follow_only_carried_dlls(release, names)
         in output
     )
     assert b"b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89" in output
-    assert b"1.1.0 redistributes the interpreter's native libraries" in output
-    assert b"1.0.0 did not" in output
+    assert b"The Windows download redistributes the interpreter's native libraries" in output
+    assert b"the 1.0.0 source install did not" in output
     assert b"fetched by seat" in output
     assert b"Installed wheel: OpenSSL" not in output
 

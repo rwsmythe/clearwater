@@ -12,16 +12,16 @@ These notices preserve the audited installed wheels' notices and identify
 corresponding sources; any future binary redistributor must independently meet
 source-delivery and other licence obligations. No third-party licence is changed.
 
-The 1.1.0 release zip carries its own generated `THIRD_PARTY_NOTICES.md` beside
+The Windows release zip carries its own generated `THIRD_PARTY_NOTICES.md` beside
 `Clearwater.exe`; that file is the notice of record for the artifact. This root
 file preserves the 1.0.0 source-install audit and its licence inputs, with the
-FFmpeg row updated for the 1.1.0 bundle.
+FFmpeg row updated for the bundled FFmpeg.
 
 ## Runtime dependency audit
 
 Versions below are pinned by `uv.lock` and matched installed metadata in the
 Windows AMD64 / Python 3.12 audit. Python and FFmpeg are external tools in a
-source install; the 1.1.0 Windows artifact bundles both.
+source install; the Windows download bundles both.
 The 18 runtime distributions include the optional gpu extra and every selected
 transitive dependency. Native component notices, including the platform runtimes
 and software OpenGL renderer, are provided separately below.

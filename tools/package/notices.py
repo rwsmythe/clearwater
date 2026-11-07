@@ -2188,8 +2188,8 @@ def _native_rows(
                 "and source pin bind these terms."
                 if record.embedded_in
                 else (
-                    "Clearwater 1.1.0 redistributes the interpreter's native libraries; "
-                    "1.0.0 did not."
+                    "The Windows download redistributes the interpreter's native libraries; "
+                    "the 1.0.0 source install did not."
                 )
                 if record.bundled_version_source
                 else "Redistributed vendored component; inventory below binds the source pin. "

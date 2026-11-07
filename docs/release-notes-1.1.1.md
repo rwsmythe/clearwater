@@ -8,8 +8,9 @@ the repository with uv, as 1.0.0 did.
 1.1.1 carries the same product code as the tag `v1.1.0`. That tag was pushed,
 but its release workflow failed on the fresh GitHub checkout before building
 anything (the test step wrote under a folder the checkout does not have), so no
-1.1.0 release exists. 1.1.1 fixes the workflow and nothing else. The `v1.1.0`
-tag stays in the repository as history.
+1.1.0 release exists. 1.1.1 repairs the release workflow and its test setup;
+the application's behaviour is unchanged. The `v1.1.0` tag stays in the
+repository as history.
 
 ## What is new since 1.0.0
 
@@ -38,7 +39,8 @@ tag stays in the repository as history.
   process with its own standard input; an unexpected error in the frozen app
   is written to the log and reported in one message instead of a silent exit;
   the GPU pack is verified file by file when it is installed, and at every
-  start its manifest, RECORD hashes, file sizes and file ownership are checked.
+  start its manifest, RECORD hashes, file sizes and the set of installed files
+  are checked.
 - **macOS groundwork.** The code paths for macOS (VideoToolbox encoding,
   Library folders, POSIX process handling) are in this release and run from a
   source install with uv. They have not yet been validated on a Mac, and there
@@ -52,8 +54,9 @@ tag stays in the repository as history.
 
 - Halos at strong edges in some photos (recorded, fix deferred).
 - GoPro chapter joining is not supported; open clips individually.
-- Insta360: Studio exports (ProRes `.mov`, HEVC `.mp4`) are the intended input
-  and are being validated; native `.insv` files are not supported.
+- Insta360: Studio exports (ProRes `.mov`, HEVC `.mp4`) are the intended input;
+  their validation on real exports is planned and not yet done. Native `.insv`
+  files are not supported.
 - The Windows download is unsigned.
 
 ## Installing from source
