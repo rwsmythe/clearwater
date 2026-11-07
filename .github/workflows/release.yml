@@ -114,6 +114,7 @@ jobs:
       - name: Run parallel tests
         run: |
           Remove-Item Env:PYTEST_ADDOPTS -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path work | Out-Null
           uv run pytest -q -n 4 --timeout 600 -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/ci-parallel
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -139,7 +140,7 @@ jobs:
             }
           }
           Add-Content -LiteralPath "work/release/$name.zip.sha256" -Value "# source-commit: $env:GITHUB_SHA" -Encoding ascii
-          New-Item -ItemType Directory -Path "work/release-assets" | Out-Null
+          New-Item -ItemType Directory -Force -Path "work/release-assets" | Out-Null
           foreach ($file in $files) {
             Copy-Item -LiteralPath $file -Destination "work/release-assets"
           }

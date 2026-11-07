@@ -159,6 +159,9 @@ artifact is one folder, not an installer; it is unsigned. No PyPI release is pla
    to a **DRAFT** release; notes come from `docs/release-notes-1.1.0.md` if present.
    **STOP** for a failed/incomplete job, wrong commit/version, missing asset or
    non-draft release. Do not publish to work around a workflow failure.
+   A workflow-only failure AFTER a tag is pushed requires a new patch version
+   on a fixed commit; the failed tag stays on origin with no release and is
+   named in the next release notes.
    **STOP:** never re-run the release job after publication; its guard refuses
    an existing non-draft release before any asset attachment.
 10. Download the three assets from the draft release. Compare the downloaded

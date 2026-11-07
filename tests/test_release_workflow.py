@@ -457,6 +457,46 @@ def test_triggers_permissions_concurrency_and_release_are_bounded(workflow):
     assert not re.search(r"\bgit\s+(?:push|tag)\b|\bgh\s+workflow\s+run\b", workflow)
 
 
+def test_parallel_tests_create_basetemp_parent_before_pytest(workflow):
+    """A fresh checkout must create pytest's parent directory idempotently."""
+    lines = script(workflow, "Run parallel tests").splitlines()
+    pytest_index = next(i for i, line in enumerate(lines) if line.startswith("uv run pytest"))
+    args = shlex.split(lines[pytest_index])
+    basetemp = next(
+        arg.removeprefix("--basetemp=") for arg in args if arg.startswith("--basetemp=")
+    )
+    parent = Path(basetemp).parent.as_posix()
+    create_parent = [
+        "New-Item",
+        "-ItemType",
+        "Directory",
+        "-Force",
+        "-Path",
+        parent,
+        "|",
+        "Out-Null",
+    ]
+    assert create_parent in [shlex.split(line) for line in lines[:pytest_index]], (
+        f"create {parent} with -Force before pytest uses --basetemp={basetemp}"
+    )
+
+
+def test_release_asset_staging_creates_directory_with_force(workflow):
+    """Staging must also succeed when its destination directory already exists."""
+    lines = script(workflow, "Stage release assets").splitlines()
+    copy_index = next(i for i, line in enumerate(lines) if line.strip().startswith("Copy-Item"))
+    assert [
+        "New-Item",
+        "-ItemType",
+        "Directory",
+        "-Force",
+        "-Path",
+        "work/release-assets",
+        "|",
+        "Out-Null",
+    ] in [shlex.split(line) for line in lines[:copy_index]]
+
+
 def test_order_parallel_marker_and_build_flags_match_local_contract(workflow):
     names = re.findall(r"^      - name: (.+)", workflow, re.MULTILINE)
     assert names[:8] == [
