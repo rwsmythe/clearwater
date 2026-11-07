@@ -254,6 +254,7 @@ INSTANCE_SURFACE_RELPATHS: tuple[str, ...] = (
     ".github/workflows/release.yml",
     # the 1.1.0 release notes (the release workflow's draft body, 2026-11-06).
     "docs/release-notes-1.1.0.md",
+    "docs/release-notes-1.1.1.md",
 ) + INSTANCE_STUB_RELPATHS
 INSTANCE_SURFACE_PREFIXES: tuple[str, ...] = (
     "docs/briefs/",
