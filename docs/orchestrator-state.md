@@ -5,17 +5,17 @@
 
 ### Generation
 
-- **Generation 58** (session `clearwater-orchestrator-20261107-0831`). LIVE 2026-11-07 ~18:31Z; ROLLED 2026-11-07 ~21:12Z past the 400K cap at a clean boundary (nothing running: no cell, rehearsal, review, gate or build). Bash gauge 47 ms.
-- **CHARC is gen 20, `clearwater-charc-20261107-0949`** (gen 19 rolled ~19:50Z). Re-verify the name in `comms/.launch-sessions.json` before every cue.
-- **Seat folder `work/orch-g58/`:**
-  - `gate.sh` + `watch2.sh` (repointed to orch-g58).
-  - `rehearsal.py`: the CI-shaped rehearsal (`<full sha> <evidence> [--from-step N] [--to-step N] [--reuse-clone] [--runner-path]`).
-  - `spy/ffspy.py`, `spy/run_spy.py`, `spy/spy_report.py`: the ffmpeg-spawn spy, seat tooling only, never committed. The plugin is installed by COPY into the clone venv; never PYTHONPATH.
-  - `cause_split.py`; `classify_fail.py`; `bump111.py`, `pin111.py`, `annex111*.py` (the bump edits); `fill_accept.py`; posts and drains.
-- **State worktree:** `.worktrees/orch-state-g58` (branch `orch-state-g58`; remove it and add your own).
-- **Bump worktree:** `.worktrees/release-1.1.1` (branch `release-1.1.1`, HEAD `d6d1d259`, its `.venv` SYNCED).
-- **Review copy:** `.worktrees/release-1.1.1-rv` (detached at `d6d1d259`, no venv needed: Codex read-only).
-- **Old copies kept until the owner's prune:** `.worktrees/wp6.3e` (synced venv), `.worktrees/wp6.3e-rA`, `work/ci-rehearsal/{e9cde49,c66af64,8a30d6d,f3de8b0}`.
+- **Generation 59** (session `clearwater-orchestrator-20261107-1113`). LIVE 2026-11-07 ~21:13Z. Bash gauge 28 ms.
+- **CHARC is gen 20, `clearwater-charc-20261107-0949`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
+- **Seat folder `work/orch-g59/`:**
+  - `gate.sh` + `watch2.sh` (repointed to orch-g59); gate run `gate-r111/`.
+  - `build_uia.py` (= gen 56's, md5 `48ae19ef`); `gpu_proof.seat.py` (gen 56's with ONLY the `:989` label changed to 1.1.1, sha256 `9f5c7eda...`); `check_build.py` (zip / sidecar / member / notices census).
+  - `fix111.py`, `fix111b.py`, `fix111c.py` (the three ruled fix commits' edits); posts and drains.
+  - The CI-shaped rehearsal is still gen 58's `work/orch-g58/rehearsal.py` (md5 `b93db3bf`).
+- **State worktree:** `.worktrees/orch-state-g59` (branch `orch-state-g59`; remove it and add your own).
+- **Release worktree:** `.worktrees/release-1.1.1` (branch `release-1.1.1` = main = `c5ed8517`, venv SYNCED, toml copied in).
+- **Review copy:** `.worktrees/release-1.1.1-rv` (detached at `bc14bc98`, the pre-rebase twin of `c5ed8517`).
+- **Old copies kept until the owner's prune:** `.worktrees/wp6.3e`, `.worktrees/wp6.3e-rA`, `.worktrees/release-1.1.0`, `work/ci-rehearsal/{e9cde49,c66af64,8a30d6d,f3de8b0,c5ed851}`, `work/release` (1.1.0 build), `work/release-1.1.1`, `work/release-1.1.1-proof-cpu`.
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
 
@@ -27,7 +27,7 @@
 - **Launch a Codex turn or review ONLY with the Bash tool's `run_in_background`, never a shell `&`.**
 - **ROLLOVER TIMING (OWNER-RULED).** Below 400K a seat starts the next unit WHATEVER ITS SIZE; it rolls at the first clean boundary after 400K with nothing it started still running. At or past the cap, dispatch nothing new.
 - **NO ROLLOVER WHILE A JOB RUNS (OWNER, 2026-11-02).**
-- **NO PYTEST DURING A SERIAL OR FULLCLIP LEG** or a window; one heavy job at a time (gate, build, seat run). **Never edit a worktree a gate is running from** (gen 47 held two granted test edits until p64-s ended).
+- **NO PYTEST DURING A SERIAL OR FULLCLIP LEG** or a window; one heavy job at a time (gate, build, seat run). **Never edit a worktree a gate is running from.**
 - **TWO CODEX SESSIONS ARE ALLOWED** (CHARC `a6934b58`), on disjoint files.
 - **Codex turns** (FILES CHANGED must be one literal path per line, or `codex_cell.py commit` refuses; commit by pathspec in the worktree then):
   - Run a turn with `uv run python scripts/codex_cell.py turn --worktree <ABS> --prompt <p> --evidence <dir> --turn N [--session=<id>] > <dir>\turn-N.driver.stdout 2>&1`, with run_in_background.
@@ -39,76 +39,49 @@
 - **Claude cells (Agent tool):** read depth with `uv run --no-sync python scripts/cell_depth.py --live 3 <name>` at dispatch, every yield and before any ruling; about 250K = evaluate, about 400K = STOP. Their reviewer is CODEX. Reviewer A: `cat review-prompt.md review-diff.txt | tr -d '\r' | codex exec -p strong -s read-only --skip-git-repo-check -o review.txt - > review.out 2>&1` from the DETACHED copy (`( cd <copy> && ... )`). Assertions: banner `gpt-6.1-sol` / `high`, `grep -ac '^ERROR'` = 0, `grep -ac '^tokens used'` = 1, the verdict.
 - **Claude review of a Codex cell:** `codex_cell.py review --worktree <DETACHED copy> --base <sha> --prompt <p> --out <dir>`, in the background at the seat. Forms: `wp6.3a\B\r1\review-prompt-B.md` (full B), `wp6.3a\B\delta2\review-prompt-delta2.md` (a delta).
 - **Gates:** `bash work/<seat>/gate.sh <worktree> <run-id> <legs...>` (background), plus a Monitor on `watch2.sh <run-id> <summary line count>`. Re-arm the Monitor at its 30-minute expiry. gate.sh's static leg runs win32 mypy only: run `uv run mypy --platform darwin` beside it (W-STATIC since WP6.4's accept).
-- **Backslash-bearing Python is written with the Write tool**, never a heredoc or `sed -i` (gen 47's `sed` edit of a `\r` assert silently did nothing).
-- **A bare `cd` moves the session's cwd.** Use ONLY `( cd X && ... )`, `git -C` and absolute paths. It slipped in every generation 47-54 (gen 54: three times); each was restored in the next call.
+- **Backslash-bearing Python is written with the Write tool**, never a heredoc or `sed -i`.
+- **A bare `cd` moves the session's cwd.** Use ONLY `( cd X && ... )`, `git -C` and absolute paths.
 - **QUIT_SCRIPT exception (owner's word, CLAUDE.md `1a38c935`):** `tests/test_app_startup.py::test_python_m_clearwater_starts_the_shell_and_exits_0` runs at the SEAT in gate legs and seat re-runs only. Every cell run keeps `-k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`.
 - **No `rm -rf` on a command-substituted path** (the safety check refuses it). Use fixed paths under `work/`, or leave the folder.
-- **Running downloaded build scripts is refused** by the auto-mode classifier ("code from external"). Read them as text (gen 48's `scriptsd_static.py`).
-- **CI-SHAPED REHEARSAL BEFORE EVERY TAG (gen 57; CHARC rulings on WP6.3e).** A fresh `git clone` with no `work/`, no toml, no footage; the runner's PATH (no ffmpeg / ffprobe) and no GPU (`CUDA_VISIBLE_DEVICES=-1`); the workflow's own `run:` blocks extracted, not retyped: `work/orch-g58/rehearsal.py --runner-path`. The proof binds the head that gets tagged.
-- **A NEW WORKTREE'S `.venv` IS AN EMPTY SHELL (gen 58).** Run `uv sync --frozen` in it (about 6 s from the warm cache) BEFORE any seat mypy, pytest or gate there. `uv run --no-sync` against the empty venv silently picks up a tool from elsewhere: 81 bogus mypy errors.
-- **THE RELEASE SWEEP (gen 58, CHARC rulings on the 1.1.1 bump).** A version bump greps `1\.1\.0` (the old version) over README, `docs/user-guide.md`, the notes, `tests`, `src`, `tools` and `.github`, and settles EVERY hit before the Codex read:
-  - Hits CHANGED at 1.1.1: README, the guide's eight lines, the guide-text pin in `test_release_workflow.py`, and `notices.py`'s root-annex header (now version-neutral).
-  - Hits KEPT: test fixtures, the notices' Python history rows, and FFmpeg component versions.
-  - A test may pin GUIDE text: run `test_release_workflow.py` after any guide edit.
+- **Running downloaded build scripts is refused** by the auto-mode classifier ("code from external"). Read them as text.
+- **CI-SHAPED REHEARSAL BEFORE EVERY TAG (gen 57).** A fresh `git clone` with no `work/`, no toml, no footage; the runner's PATH (no ffmpeg / ffprobe) and no GPU; the workflow's own `run:` blocks extracted: `work/orch-g58/rehearsal.py <full sha> <ev> --runner-path`. The proof binds the head that gets tagged.
+- **A NEW WORKTREE'S `.venv` IS AN EMPTY SHELL (gen 58).** Run `uv sync --frozen` in it BEFORE any seat mypy, pytest or gate there.
+- **THE RELEASE SWEEP (gen 58).** A version bump greps the old version over README, `docs/user-guide.md`, the notes, `THIRD_PARTY_NOTICES.md`, `tests`, `src`, `tools` and `.github`, and settles EVERY hit before the Codex read; version-bearing PROSE that renders into the artifact counts, not only pins.
+- **RELEASE NOTES STATE BEHAVIOUR BY SHAPE (CHARC gen 20, 2026-11-07).** A clause list of what a check covers invites a false clause; three reads in a row found one. The clause-level truth lives in docstrings and tests.
 
 ### Live board (RESUME HERE)
 
-**WP6.3e is ACCEPTED and MERGED.** CHARC gen 20 accepted it on the final head `48b08d91`. Main was ff'd to `e4f0cb6f`: CHARC's accept writes `3dc61671` (AD-38 (17), DR-154..DR-158), the record `docs/proofs/wp6.3e-accept.md` (`4c591c2a`), and harness 423 OK. Gate p63e:
-- parallel `8370 / 207`;
-- serial `1 failed / 1317 / 19`. The one failure is the DR-158 WATCH transient `test_app_v8_v18.py::test_v8_video_pre_encode_through_the_harness_on_the_shells_frame`, 3/3 alone. **A second failure of that node in ANY gate is a STOP: bisect first.**
+**`v1.1.1` IS TAGGED; NOTHING IS PUSHED.** Annotated tag object `85cd0017` peels to **`c5ed85172b32fee474ddb4fb3b54f30eadf9adf4`** (= main = `release-1.1.1`), message "Clearwater 1.1.1" (record `clearwater-review-evidence\release-1.1.1\tag\tag.txt`). `v1.1.0` is unchanged (`0127e1a2` -> `356f2e4d`) and is NEVER moved. TAG REPORT posted to CHARC (`f0e184e1`, 2026-11-07T23:30Z) with the owner's two push lines (`git push origin main`, `git push origin v1.1.1`); CHARC relays them.
 
-The rehearsal of record ran on `f3de8b0c`, runner PATH: `7517 / 1060`, build 0, no window. The spy showed zero (b). B: NO_NEW_CRITICAL_MAJOR.
+How it got here (gen 59, all evidence under `clearwater-review-evidence\release-1.1.1\`):
+- Three ruled fix commits on top of the bump `d6d1d259` (CHARC rulings `86b67a7b`, `4c58fa63`, `8d7e91d7`): F1 notices.py artifact history sentence version-neutral (+ pin); F3 / N2 six root-notice lines version-neutral; F2 / F5 notes wording; the GPU-pack start-up sentence ended in its SHORT form. F4 (`docs/release-checklist.md`) -> DR-159 after the tag (CHARC's).
+- Codex reads: r1 (`d6d1d259`) 1 CRITICAL + 4 MINOR + 1 ADV; r2 (`c1625e55`, `fix\r2-delta`) 1 MAJOR + 1 MINOR; r3 (`6105f1f1`, `fix2\r3-delta`) 1 MAJOR; **r4 (`bc14bc98`, `fix3\r4-delta`) NO_NEW_CRITICAL_MAJOR**.
+- Rebased onto main `867a9f8d`: range-diff all four "=" (`ff\range-diff.txt`); main ff'd to `c5ed8517`; FREEZE posted (`74f99ae9`).
+- Build (`build\`): exit 0, no window, notices PASS 1540 / 478, smoke all PASS; zip sha256 `361a9301b53e396ebc744ed983b1443fac95534069c3baa79b7fb349a9d7ef53` = sidecar; 306 members = built, byte-identical; artifact notices sha256 `69a6837e...7c7d` (4,697,437 B); actionlint clean.
+- CPU proof (`proofs\cpu\`): all True, V4 0 / 0, 9 BEST-EFFORT. GPU proof not repeated (limit).
+- Rehearsal (`rehearsal\c5ed851-runnerpath\`): PASS, parallel 7517 / 1060, staged `Clearwater-1.1.1-windows-onedir.zip`.
+- FULL gate r111 (`gate\`): static clean + darwin; identity 9921; parallel 8370 / 207; serial 1318 / 19, 0 failed (DR-158's node passed); fullclip 7; harness 423; installer alone 113.
 
-**The release is 1.1.1.** The owner said "tag 1.1.1" (2026-11-07 ~16:05Z, relayed by CHARC `9678e40f`, restated by gen 20). It authorises everything through the annotated tag `v1.1.1`, made by the orchestrator. It does NOT authorise a push: the owner's two push lines come from CHARC after the tag report. `v1.1.0` (tag object `0127e1a2` -> `356f2e4d`) is on origin with no release and is NEVER moved.
-
-**THE BUMP:** branch `release-1.1.1` (`.worktrees/release-1.1.1`) off main `e4f0cb6f`, ONE commit **`d6d1d259`** (10 files, every blob 0 CR). It carries:
-- the five places (`pyproject.toml`, `__init__.py`, the `uv.lock` root, the notices title, `test_version.py`, renamed `_1_1_1`);
-- the UA pin (`test_gpu_pack_install.py:340`);
-- README `:4` / `:6`;
-- the user guide's EIGHT 1.1.0 lines (CHARC ruling (b));
-- the guide-text pin `test_release_workflow.py:723-724`;
-- `tools/package/notices.py:2839`'s root-annex header made version-neutral ("This section applies to the FFmpeg bundled in the Windows download, not to user-obtained tools.", split over two literals for E501), with the annex regenerated (CHARC ruling (b)).
-
-Seat checks on it (`clearwater-review-evidence\release-1.1.1\bump\`):
-- ruff 0; format 0; mypy and darwin mypy `Success`; `uv lock --check` clean; `--root-annex --check` "root annex matches";
-- `test_gpu_pack_install.py` alone `113 passed`; version / workflow / notices / build modules `608 passed`; harness 423 OK.
-- Sweep: only the notes' `:8` / `:11` history lines still say 1.1.0 in README, the guide and the notes.
-
-**THE CODEX READ** (ONE read-only pass; `release-1.1.1\bump\r1\`, run from `.worktrees/release-1.1.1-rv`): **`VERDICT: NEW_CRITICAL_MAJOR_FOUND` -> STOP to CHARC posted** (query `c1888024`, 2026-11-07T21:10Z; record `clearwater-review-evidence\release-1.1.1\bump\r1\review.txt`). The read confirmed the version wiring, the asset name, the UA, the workflow gate, all 194 sweep lines and every notes claim except F2 and F5. Findings:
-- **F1 CRITICAL:** `tools/package/notices.py:2191` renders "Clearwater 1.1.0 redistributes the interpreter's native libraries; 1.0.0 did not." into the 1.1.1 ARTIFACT notices (pinned at `tests/test_tools_package_notices.py:1642`). Seat recommendation: version-neutral history.
-- **F3 MINOR:** root `THIRD_PARTY_NOTICES.md:15`, `:24` (and `:18`) name the 1.1.0 zip / artifact under the 1.1.1 title.
-- **F2 MINOR:** notes `:11` "fixes the workflow and nothing else".
-- **F5 MINOR:** notes `:55-56` Insta360 "being validated".
-- **F4 MINOR:** `docs/release-checklist.md` still literal 1.1.0.
-- **A1 advisory:** notes `:41` "file ownership" means top-level RECORD membership.
-
-**CHARC's RULING HAS LANDED, UNREAD (gen 58 was past the cap and did not drain it):** `comms/orchestrator/inbox/20261107T211213Z-charc-ruled-1-1-1-codex-stop-f1-f3-f2-f5-a1-fo-86b67a7b.md`. Per CHARC's cue: F1 / F3 / F2 / F5 / A1 fold in ONE fix commit with the wording it gives; F4 is deferred to DR-159 after the tag; then a Codex delta read. DRAIN IT FIRST. The earlier text of this paragraph read "WAITING ON CHARC's RULING." The proposed path: ONE fix commit on `release-1.1.1` (seat: F1 + its pin, F3, F4 if ruled; CHARC's notes wording for F2 / F5 / A1), the seat re-checks (static, notices / build / workflow modules, the installer alone, `--root-annex --check`), then a short Codex DELTA read (the form: `release-1.1.0\bump\r4-delta\`), then step 1 below.
-
-**NEXT (gen 59), per CHARC gen 20's order (return_report `...d6c0d08d.md`):**
-1. **After CHARC's ruling, the fix commit and a CLEAN delta read:** `git merge --ff-only release-1.1.1` on main, then FREEZE: CHARC commits nothing on main until your tag report. Post CHARC the ff head and the read's verdict, record path and commit sha.
-   - **On ANY finding: STOP to CHARC** before anything else (fix on `release-1.1.1`, a delta read, then ff).
-2. **The release build + proofs at the new head** (form: `clearwater-review-evidence\release-1.1.0\build\` and `proofs\`; gen 56's tooling `work/orch-g56/build_uia.py`, md5 `48ae19ef`):
-   - `build.py --form onedir --ffmpeg-from <lock url> --ffmpeg-sha256 <lock sha> --notices --smoke --zip` under the UIA watch: notices check, smoke all PASS, zip + sidecar;
-   - the CPU export V4 proof (`release-1.1.0\proofs\cpu\`);
-   - the GPU proof is NOT repeated: state it as a limit (FFmpeg bytes and the shipped Python unchanged).
-3. **The CI-shaped rehearsal on the bump head from a NEW fresh clone, runner PATH, every step** (`uv run --no-sync python work/orch-g58/rehearsal.py <full sha> '<ev>\release-1.1.1\rehearsal\<sha7>-runnerpath' --runner-path`).
-   - Sync about 17 min. Expected parallel `7517 passed, 1060 skipped`; build 0 with no window; staging 0.
-   - The staged asset must now read `Clearwater-1.1.1-windows-onedir.zip`.
-4. **The FULL step-6 gate** on the bump head, with the toml copied into the worktree and `uv sync --frozen` done:
-   - legs: static + darwin mypy, collect, parallel, serial, fullclip, harness, and `test_gpu_pack_install.py` alone;
-   - `bash work/orch-g58/gate.sh release-1.1.1 r111 static collect parallel serial fullclip harness` + the `watch2.sh` Monitor (re-arm at 30 min);
-   - expected parallel `8370 / 207` (laptop, toml present) and serial `1318 / 19`;
-   - **DR-158's node failing again = STOP.**
-5. **The annotated tag `v1.1.1` at the MAIN checkout on the gated commit** (form: `release-1.1.0\tag\tag.txt`: message `Clearwater 1.1.1`; record the tag object, the peeled commit and `git cat-file tag`). Then the tag report to CHARC. NO push.
-6. Then the owner's push (CHARC relays the lines), and checklist steps 8-10:
-   - watch the run;
-   - the draft's assets: zip sha256 = the runner's OWN sidecar; member SET vs the local build (builds are NOT byte-reproducible, DR-156); notices byte-equal; `# source-commit:` = the tagged commit = `github.sha`;
-   - the clean-account check; CHARC's `docs/proofs/release-1.1.1.md`; Publish (the owner's).
+**NEXT:**
+1. On CHARC's relay of the owner's push: checklist steps 8-10 (mine):
+   - watch the `release.yml` run (`gh run list --workflow release.yml`, `gh run watch`);
+   - the draft's assets: zip sha256 = the runner's OWN sidecar; member SET vs the local build `work\release-1.1.1` (DR-156: not byte-reproducible); notices byte-equal to `69a6837e...`; `# source-commit:` = `c5ed8517` = `github.sha`;
+   - the clean-account check (form: the 1.1.0 checklist v2 step 10);
+   - report to CHARC for `docs/proofs/release-1.1.1.md`; Publish is the owner's.
+2. On ANY run failure: STOP to CHARC; `v1.1.1` is never moved.
+3. Then WP6.5 (Mac) and WP7.1 (Insta360), CHARC's commissions.
 
 **Other standing items:**
-- Prunes owed on the owner's word only: `.worktrees/wp6.3e`, `.worktrees/wp6.3e-rA`, `work/ci-rehearsal/*`, `.worktrees/release-1.1.0`, `work/release` (the 1.1.0 local build).
-- WP6.5 (Mac) and WP7.1 (Insta360) come after 1.1.1.
-- Open rows DR-148..DR-153, DR-155, DR-157, DR-158.
+- Prunes owed on the owner's word only: the "Old copies" list above.
+- Open rows DR-148..DR-153, DR-155, DR-157, DR-158 (passed in r111), DR-159 (CHARC's, after the tag).
+
+### Gen-59 lessons
+
+- **A ruling's wording can itself be false:** CHARC's A1 phrase ("the set of installed files") went into the fix commit, and the next read found it false. Verify a director's supplied wording against the code BEFORE committing it, the same as your own.
+- **A clause list in release notes is a magnet for findings:** three successive reads each found one false clause in one sentence. Propose the shape-only form as soon as a second round finds a clause.
+- **Main moves under a release branch** (CHARC's state commits): rebase onto main, record `git range-diff` (all "=") and the tree diff (state docs only), then ff. The reviewed sha and the tagged sha differ; the range-diff binds them.
+- **A harness run's tail can print "acked 1 message(s); moved inbox -> read."** It is fixture output from temp mailboxes; check the real inbox listing before worrying.
+- **The bare-`cd` slip recurred twice in gen 59** (`cd .worktrees/... &&` at the start of a command). Each was restored in the next call; nothing was written while moved.
 
 ### Gen-58 lessons
 
