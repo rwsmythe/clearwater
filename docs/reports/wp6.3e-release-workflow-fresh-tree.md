@@ -1,8 +1,9 @@
 # WP6.3e - Release workflow fresh-tree fix
 
-Status: turn 3 candidate, 2026-11-07, folding Reviewer A r1 on turn 2
-(`c66af644`, after `e9cde49d`, based on `d14a09c1`). The final runner-PATH
-seat rehearsal, actionlint, Reviewer A r2, Reviewer B, the package gate and
+Status: turn 4 candidate, 2026-11-07, folding Reviewer A r2's two MINORs on
+turn 3 (`8a30d6d4`, after `c66af644` and `e9cde49d`, based on `d14a09c1`).
+The whole-selection spy run, final runner-PATH seat rehearsal, actionlint,
+Reviewer A r3 (FINAL), Reviewer B, the package gate and
 the 1.1.1 release remain pending. Product code, build tools and version are unchanged.
 
 ## Failure and fix
@@ -273,7 +274,7 @@ policy is `tests/fixture_plugin.py:274-277`: skip with `SKIP_NO_FFMPEG` when
 | `test_io_video_probe.py` | 71 | 36 per-test fixture marks | :88 onward probe real samples or check the real locator (:542); parser/filter and missing-tool tests stay unguarded. |
 | `test_io_video_spawn.py` | 2 | 1 per-test fixture mark | :302 spawns each real tool to prove FFREPORT suppression. |
 | `test_lookcheck_deep.py` | 4 | 2 per-test existing-style `skipif`; 1 fixture dependency | :174 calls `scan.scan_document()` (tool versions); :618 `deep_pack` generates/extracts a clip before its two consumers; :710 generates/extracts a clip. |
-| `test_photo_verify.py` | 21 | 9 per-test fixture marks; 2 conditional fixture guards | :98 onward use the FFmpeg orientation oracle; :121 guards only non-`exif-only` cases, :1574 only `compare_poses`, preserving the other parameter cases. |
+| `test_photo_verify.py` | 24 | 11 per-test fixture marks; 1 conditional fixture guard | :98 onward use the FFmpeg orientation oracle; :122 guards all orientation cases; :1571 guards only `compare_poses`; :1741 guards both larger-size-difference cases, which call real FFmpeg before corrupting its output. |
 | `test_reviewpack.py` | 24 | 17 per-test fixture marks; 2 conditional fixture guards | :539 onward probe/copy/extract/render real media, including failure tests that first probe; :1663 guards only video, :1908 only non-photo failures. |
 | `test_wp321_bench.py` | 2 | 2 per-test fixture marks | :64 and :95 run the CPU video bench's real probe/decode. |
 | `test_wp321_device_frames.py` | 7 | 5 per-test fixture marks | :184, :196, :300, :331, :361 decode or open/close a real video sink; other cases are mocked/device-selected. |
@@ -281,7 +282,8 @@ policy is `tests/fixture_plugin.py:274-277`: skip with `SKIP_NO_FFMPEG` when
 | `test_wp42_composition.py` | 1 | 1 per-test fixture mark | :151 expects a cache-folder refusal after the real probe succeeds. |
 | `test_wp44_mov_input.py` | 1 | 1 fixture dependency | :98 `qt_mov` generates the synthetic QuickTime source; routing and command-assembly cases stay unguarded. |
 
-Total: 152 node IDs, 93 added guard sites. Conditional guards request the
+Total after turn 4: 155 guarded node IDs, 94 added guard sites (turn 3: 152 IDs,
+93 sites). Conditional guards request the
 existing fixture through `request.getfixturevalue("ffmpeg_tools")`; they change
 no existing assertion or test operation. `deep_pack` and `qt_mov` request the
 fixture before generating any media. There are no changes to conftest,
@@ -301,8 +303,7 @@ The adjacent mocked capability controls
 `test_an_encoder_missing_from_the_build_is_named` and
 `test_a_failed_listing_makes_every_encoder_unavailable` also stay unguarded.
 The existing `ffmpeg_decode` failure parameter in photo verification remains
-unguarded; the EXIF-only orientation case and both photo aid cases retain their
-previous behavior. Assertions expecting unsupported/unreadable/parse results
+unguarded, as do both photo aid cases. Assertions expecting unsupported/unreadable/parse results
 are preserved, never widened to accept missing-tool errors.
 
 **Visibility and advisories:** the workflow's pytest argv now reads
@@ -366,9 +367,9 @@ in-process and in inheriting children through scratch `sitecustomize`.
   fatal error, before any gate assertion. Both fresh-tree pins and the updated
   `-rs` argv pin pass. The seat must run the five Git cases unrestricted.
 - Absent-tools controls, `work/c63e-3-controls`: exit 0,
-  `11 passed in 1.06s` (`turn3-controls.log`). This proves that the five
-  tool-absence controls listed above, the two mocked capability controls and
-  the four deliberately unguarded parameter cases still execute without tools.
+  `11 passed in 1.06s` (`turn3-controls.log`). This historical run covered the
+  five tool-absence controls listed above, the two mocked capability controls,
+  three valid unguarded parameter cases and the false pass fixed in R2-1 below.
 - Collection before and after: the touched modules retain exactly the same
   1,402 node IDs. Their disjoint legs are 1,365 parallel + 37 serial + 0 fullclip
   = 1,402 all (`turn3-collection.log`, exit 0). The empty scoped fullclip
@@ -409,3 +410,76 @@ owner-profile write, evidence-folder write, project Git write, tag, push or
 mailbox operation was performed. The failed `v1.1.0` tag is untouched.
 
 Seat runner-path rehearsal on the final head: (the seat fills)
+
+### Reviewer A r2
+
+The seat's Claude review of `8a30d6d4` returned `NO_NEW_CRITICAL_MAJOR`;
+F-1 is CLOSED by execution. The seat reports the 152 pass/skip proof, the six
+cell-only failures passing, all 59 workflow tests passing (including real Git),
+and unchanged full parallel collection of 8,577. These are seat-supplied results.
+
+- **[MINOR] R2-1 confirmed, fixed:** all orientation parameters call the real
+  FFmpeg oracle, including `exif-only`. A missing executable produced
+  `oracle_failed` and the expected `orientation_ok=False`, masking the intended
+  size/pose check. The guard is now unconditional `usefixtures("ffmpeg_tools")`;
+  the conditional and added `request` argument are removed. EXIF-only is no
+  longer a tool-absent control.
+- **[MINOR] R2-2 confirmed, fixed:** both `two-pixels` and `tile` call
+  `pv.verify_orientation()`. Their `corrupted()` wrapper unconditionally calls
+  the saved real `subprocess.run` before editing the decoded PNG in either
+  damage branch. Missing FFmpeg therefore satisfied `oracle_failed` before the
+  size gate ran. Both parameters now have the unconditional fixture guard.
+- **R2-3 advisory, no action:** guarding the whole lookcheck test also drops
+  its non-FFmpeg checks, as permitted by the no-logic-change ruling.
+
+CHARC ruling `616c87d6c5d8b47a` grants the two new in-envelope MINOR folds.
+No product code, assertions, test operations, parameter sets or selection
+markers change; no tests are added/removed, reverts or reopened findings.
+The photo row now covers 24 cases at 12 sites; package totals are 155 guarded
+cases at 94 sites.
+
+Turn 4 validation, logs/exit codes under `work/wp6.3e/turn4-*`:
+
+- Ruff check/format: exit 0, `All checks passed!` / `337 files already formatted`.
+- Mypy and darwin mypy: exit 0 each, `Success: no issues found in 166 source files`.
+- Photo whole parallel selection, present (`work/c63e-4p`): exit 0,
+  `122 passed, 1 deselected, 6 warnings in 20.87s` (`turn4-photo-present.log`).
+- Photo whole parallel selection, absent (`work/c63e-4a`): exit 0,
+  `98 passed, 24 skipped, 1 deselected in 11.51s` (`turn4-photo-absent.log`).
+- Original 152-node list, present (`work/c63e-4tp`): exit 0,
+  `152 passed, 6 warnings in 81.59s (0:01:21)` (`turn4-target-present.log`).
+- Original 152-node list, absent (`work/c63e-4ta`): exit 0,
+  `152 skipped in 1.47s` (`turn4-target-absent.log`): 150 standard fixture
+  reasons and two existing lookcheck reasons. All four runs have zero failures/errors.
+
+XML confirms these reviewed nodes in `tests/test_photo_verify.py`:
+
+| Node | FFmpeg present | FFmpeg absent |
+|---|---|---|
+| `test_orientation_matches_generated_upright[both]` | PASSED | SKIPPED, `SKIP_NO_FFMPEG` |
+| `test_orientation_matches_generated_upright[exif-only]` | PASSED | SKIPPED, `SKIP_NO_FFMPEG` |
+| `test_orientation_matches_generated_upright[irot-only]` | PASSED | SKIPPED, `SKIP_NO_FFMPEG` |
+| `test_orientation_matches_generated_upright[neither]` | PASSED | SKIPPED, `SKIP_NO_FFMPEG` |
+| `test_r9_decode_rejects_larger_size_difference[two-pixels]` | PASSED | SKIPPED, `SKIP_NO_FFMPEG` |
+| `test_r9_decode_rejects_larger_size_difference[tile]` | PASSED | SKIPPED, `SKIP_NO_FFMPEG` |
+
+The existing isolated runner retains the sandbox shim, disabled cache provider,
+GUI import blocks, disposable APPDATA/LOCALAPPDATA/XDG roots, bounded tests and
+startup-test exclusion. Runs are offline/no-sync with fresh basetemps; absent
+mode strips executable-holding PATH entries and asserts both tools are absent.
+`turn4-verification.log` (exit 0) confirms exactly the two authorized test edits,
+unchanged 122 selected photo IDs and staged 152-node list, only two owned files
+changed, and the empty spy section. `git diff --check` exits 0
+(`turn4-diff-check.log`). The final delta/outcome pass finds no additional issue.
+
+The seat's rehearsal on `8a30d6d4` is retained as the pre-fold record
+(record path: the seat fills). The rehearsal of record requires a NEW fresh
+clone on the final turn-4 head, or turn 5 if the spy finds more false passes.
+The whole-selection spy, its plugin/record paths and node dispositions belong
+below; the cell does not run it. Spy, final-head rehearsal, A r3 FINAL, B,
+laptop floor and release gates remain COMMISSIONED to the seat. No stopped
+cell item or scope deviation; no network fetch, build, GUI launch, footage
+access, owner-profile/evidence-folder write, project Git write, tag, push or
+mailbox action.
+
+## Spy run (runner PATH, the seat fills)

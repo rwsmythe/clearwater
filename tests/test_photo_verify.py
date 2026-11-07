@@ -118,11 +118,8 @@ def test_ffmpeg_default_decode_records_irot_only_rule(sample, configured, case, 
 
 
 @pytest.mark.parametrize("case", AD24_CASES)
-def test_orientation_matches_generated_upright(
-    request: pytest.FixtureRequest, sample, configured, case
-):
-    if case != "exif-only":
-        request.getfixturevalue("ffmpeg_tools")
+@pytest.mark.usefixtures("ffmpeg_tools")
+def test_orientation_matches_generated_upright(sample, configured, case):
     _, guard = configured
     source = sample(f"heic-ad24-{case}")
     image, _ = PhotoReader().read(source)
@@ -1740,6 +1737,7 @@ def test_r9_both_crop_edges_before_all_poses(configured, monkeypatch, axis, orie
 
 
 @pytest.mark.parametrize("damage", ["two-pixels", "tile"])
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_r9_decode_rejects_larger_size_difference(configured, monkeypatch, damage):
     _, guard = configured
     source, _ = _r9_odd_grid(guard)
