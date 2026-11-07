@@ -180,6 +180,7 @@ def test_device_frames_are_off_by_default() -> None:
 
 
 @pytest.mark.parametrize("kind", BACKENDS)
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_software_decode_yields_host_frames(sample: Any, kind: str) -> None:
     source = FFmpegVideoSource(device_backend=_backend(kind))
     info = source.probe(sample("vid-hevc8-bt709-full"))
@@ -191,6 +192,7 @@ def test_a_software_decode_yields_host_frames(sample: Any, kind: str) -> None:
     assert frame.device == "cpu" and isinstance(frame.pixels, np.ndarray)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_cpu_backend_source_takes_the_base_host_path(sample: Any) -> None:
     path = sample("vid-hevc8-bt709-full")
     base, cpu = FFmpegVideoSource(), FFmpegVideoSource(device_backend=NumpyBackend())
@@ -294,6 +296,7 @@ def test_the_sink_refuses_a_float64_device_frame(sample: Any, tmp_path: Path) ->
 
 
 @pytest.mark.parametrize("kind", BACKENDS)
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_the_sink_still_refuses_a_device_label_on_host_pixels(
     sample: Any, tmp_path: Path, kind: str
 ) -> None:
@@ -324,6 +327,7 @@ def test_a_sink_without_device_extensions_refuses_a_device_frame(
 # --- DR-63: an abort inside close's window ----------------------------------------------------
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_an_abort_during_close_survives_it(
     sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -353,6 +357,7 @@ def test_an_abort_during_close_survives_it(
     assert cleanups == [1, 1]
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_an_abort_after_a_clean_close_does_nothing(sample: Any, tmp_path: Path) -> None:
     out = tmp_path / "out.mp4"
     sink, frames = _opened(sample("vid-vfr"), out)

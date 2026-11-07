@@ -147,6 +147,7 @@ def test_the_new_parameters_are_keyword_only_with_defaults() -> None:
         assert getattr(app, name) is getattr(composition, name)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_without_a_cache_folder_a_video_fails_readably_and_writes_nothing(
     sample, tmp_path: Path
 ) -> None:

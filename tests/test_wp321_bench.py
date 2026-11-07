@@ -60,6 +60,7 @@ def test_a_device_frame_run_gives_the_sink_device_frames(
     assert devices and "cpu" not in devices
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_device_frame_run_on_the_cpu_backend_takes_the_host_path(
     sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -90,6 +91,7 @@ def test_an_absolute_subdir_is_refused(tmp_path: Path) -> None:
         bench_folder(tmp_path, tmp_path / "abs")
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_run_records_the_overlap_stamps_and_restores_the_engine(
     sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

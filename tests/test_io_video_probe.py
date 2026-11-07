@@ -84,6 +84,7 @@ def _fraction(text: str) -> Fraction:
 
 
 @pytest.mark.parametrize("sample_id", VIDEO_IDS)
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_every_video_sample_probes_to_its_manifest_facts(
     sample_id: str, sample: Sample, sample_entry: Entry
 ) -> None:
@@ -134,6 +135,7 @@ def test_every_video_sample_probes_to_its_manifest_facts(
         assert (color.transfer, color.assumed) == ("unknown", False)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_every_time_is_an_exact_fraction(sample: Sample) -> None:
     result = probe(sample("vid-vfr"))
     for value in (result.duration_s, result.start_offset_s, result.video.frame_rate):
@@ -143,6 +145,7 @@ def test_every_time_is_an_exact_fraction(sample: Sample) -> None:
     assert all(type(a.start_s) is Fraction for a in result.audio)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_the_edit_list_of_a_sample_is_reported_as_written(sample: Sample) -> None:
     result = probe(sample("vid-hevc8-bt709-full"))
     assert len(result.edit_list) == 1
@@ -152,17 +155,20 @@ def test_the_edit_list_of_a_sample_is_reported_as_written(sample: Sample) -> Non
 
 
 @pytest.mark.parametrize("sample_id", INTACT_IDS)
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_no_intact_sample_is_reported_truncated(sample_id: str, sample: Sample) -> None:
     kinds = {f.kind for f in probe(sample(sample_id)).faults}
     assert not kinds & {"truncated", "unreadable_tail"}
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_the_truncated_sample_is_truncated_and_nothing_else(sample: Sample) -> None:
     result = probe(sample("vid-truncated"))
     assert [f.kind for f in result.faults] == ["truncated"]
     assert "24 of 45" in result.faults[0].message
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_truncation_is_found_without_a_frame_count(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -200,6 +206,7 @@ def _corrupt_last_packet(source: Path, target: Path) -> Path:
     return target
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_damaged_last_packet_is_an_unreadable_tail(sample: Sample, tmp_path: Path) -> None:
     source = sample("vid-hevc8-bt709-full")
     assert not probe(source).faults  # the same file undamaged is clean: the check distinguishes
@@ -247,6 +254,7 @@ def test_the_tail_decode_starts_at_the_last_keyframe(
     assert start == "1.333334%+86400"
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_no_command_decodes_everything_or_reads_the_data_streams(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -282,6 +290,7 @@ def _drop(*keys: str) -> Callable[[dict[str, Any]], None]:
     return edit
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_untagged_yuvj_is_full_range_and_raises_no_missing_tags(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -291,6 +300,7 @@ def test_untagged_yuvj_is_full_range_and_raises_no_missing_tags(
     assert not result.faults
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_untagged_range_without_a_j_format_defaults_to_limited_and_warns_once(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -309,6 +319,7 @@ def test_untagged_range_without_a_j_format_defaults_to_limited_and_warns_once(
         assert name in fault.message
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_each_field_defaults_on_its_own(sample: Sample, monkeypatch: pytest.MonkeyPatch) -> None:
     result = _colour_of(sample, monkeypatch, "vid-hevc8-bt709-full", _drop("color_primaries"))
     assert result.video.color.assumed
@@ -327,6 +338,7 @@ def test_each_field_defaults_on_its_own(sample: Sample, monkeypatch: pytest.Monk
         ("color_space", "bt2020nc", "matrix", "bt709"),
     ],
 )
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_an_unexpected_tag_takes_the_d54_value_and_is_named(
     key: str,
     value: str,
@@ -356,6 +368,7 @@ def test_an_unexpected_tag_takes_the_d54_value_and_is_named(
         ("color_range", "tv", "range", "limited"),
     ],
 )
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_recognised_tags_map_without_a_warning(
     key: str,
     value: str,
@@ -373,6 +386,7 @@ def test_recognised_tags_map_without_a_warning(
 
 
 @pytest.mark.parametrize("sample_id", ["vid-hlg", "vid-pq"])
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_hdr_is_refused_with_the_other_tags_kept_where_the_vocabulary_has_them(
     sample_id: str, sample: Sample
 ) -> None:
@@ -404,6 +418,7 @@ def _matrix(a: int, b: int, c: int, d: int) -> str:
 @pytest.mark.parametrize(
     ("angle", "expected"), [(0, 0), (90, 90), (180, 180), (270, 270), (-90, 270), (-180, 180)]
 )
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_rotation_is_normalised_counter_clockwise_positive(
     angle: int, expected: int, sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -411,11 +426,13 @@ def test_rotation_is_normalised_counter_clockwise_positive(
     assert result.video.rotation == expected
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_the_real_rotated_sample_reads_ninety(sample: Sample) -> None:
     assert probe(sample("vid-rotated")).video.rotation == 90
 
 
 @pytest.mark.parametrize("angle", [45, -30, 89.5])
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_rotation_that_is_not_a_multiple_of_90_is_refused(
     angle: float, sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -427,6 +444,7 @@ def test_a_rotation_that_is_not_a_multiple_of_90_is_refused(
     assert str(angle) in str(caught.value)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_mirrored_matrix_is_refused(sample: Sample, monkeypatch: pytest.MonkeyPatch) -> None:
     spy = _Spy(monkeypatch)
     spy.video(_with_rotation(0, _matrix(-65536, 0, 0, 65536)))
@@ -435,6 +453,7 @@ def test_a_mirrored_matrix_is_refused(sample: Sample, monkeypatch: pytest.Monkey
     assert caught.value.kind == "unsupported" and "mirrored" in str(caught.value)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_plain_rotation_matrix_is_not_mirrored(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -458,6 +477,7 @@ def test_a_plain_rotation_matrix_is_not_mirrored(
         (lambda s: s.update(pix_fmt="rgb24"), "rgb24"),
     ],
 )
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_other_codecs_and_depths_are_unsupported(
     edit: Callable[[dict[str, Any]], Any],
     needle: str,
@@ -471,6 +491,7 @@ def test_other_codecs_and_depths_are_unsupported(
     assert caught.value.kind == "unsupported" and needle in str(caught.value)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_another_container_is_unsupported(sample: Sample, monkeypatch: pytest.MonkeyPatch) -> None:
     spy = _Spy(monkeypatch)
 
@@ -483,6 +504,7 @@ def test_another_container_is_unsupported(sample: Sample, monkeypatch: pytest.Mo
     assert caught.value.kind == "unsupported"
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_file_with_no_video_stream_is_unsupported(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -493,6 +515,7 @@ def test_a_file_with_no_video_stream_is_unsupported(
     assert caught.value.kind == "unsupported"
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_unreadable_files_are_refused_with_a_clear_message(tmp_path: Path) -> None:
     garbage = tmp_path / "noise.mp4"
     garbage.write_bytes(b"this is not a video" * 50)
@@ -515,6 +538,7 @@ def test_a_missing_ffprobe_is_a_clear_error(
         find_tool("ffmpeg")
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_the_locator_finds_the_tools() -> None:
     assert find_tool("ffprobe").name.lower().startswith("ffprobe")
 
@@ -570,6 +594,7 @@ def _with_gpmf(monkeypatch: pytest.MonkeyPatch, payload: bytes | None) -> None:
     )
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_settings_populate_gopro_and_a_natural_clip_has_no_gp_log(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -589,6 +614,7 @@ def test_settings_populate_gopro_and_a_natural_clip_has_no_gp_log(
 
 
 @pytest.mark.parametrize("profile", [b"FLAT", b"VIBRANT", b"natural"])
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_the_known_colour_profiles_do_not_warn(
     profile: bytes, sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -596,6 +622,7 @@ def test_the_known_colour_profiles_do_not_warn(
     assert not probe(sample("vid-hevc8-bt709-full")).faults
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_another_colour_profile_is_treated_as_log(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -605,6 +632,7 @@ def test_another_colour_profile_is_treated_as_log(
     assert "FLAT_LOG" in fault.message and fault.message.isascii()
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_protune_without_a_transfer_tag_is_log_and_missing_tags(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -615,6 +643,7 @@ def test_protune_without_a_transfer_tag_is_log_and_missing_tags(
     assert [f.kind for f in result.faults] == ["missing_tags", "gp_log"]
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_no_transfer_tag_without_protune_is_only_missing_tags(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -624,6 +653,7 @@ def test_no_transfer_tag_without_protune_is_only_missing_tags(
     assert [f.kind for f in probe(sample("vid-hevc8-bt709-full")).faults] == ["missing_tags"]
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_malformed_settings_atom_gives_no_gopro_and_one_structural_warning(
     sample: Sample, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -638,6 +668,7 @@ def test_a_malformed_settings_atom_gives_no_gopro_and_one_structural_warning(
     assert secret.decode() not in record.getMessage()
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_file_without_the_settings_atom_has_no_gopro(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -645,6 +676,7 @@ def test_a_file_without_the_settings_atom_has_no_gopro(
     assert probe(sample("vid-hevc8-bt709-full")).gopro is None
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_unreadable_movie_boxes_do_not_fail_the_probe(
     sample: Sample, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -680,6 +712,7 @@ def test_vfr_is_decided_on_sorted_presentation_times(pts: list[int], vfr: bool) 
 # --- round 1 remediation ------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_the_container_duration_is_the_longest_stream_and_exact(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -698,6 +731,7 @@ def test_the_container_duration_is_the_longest_stream_and_exact(
     assert video_s <= longer.duration_s  # the video track is never longer than the container
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_the_duration_fallback_uses_the_packet_with_the_highest_pts(
     sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -722,6 +756,7 @@ def test_the_duration_fallback_uses_the_packet_with_the_highest_pts(
 
 
 @pytest.mark.parametrize("sample_id", ["vid-hlg", "vid-pq"])
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_refused_file_is_never_decoded_not_even_for_the_tail(
     sample_id: str, sample: Sample, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -766,6 +801,7 @@ def test_frames_before_the_last_keyframe_are_not_required(
     assert probe_module._tail_unreadable(Path("clip.mp4"), packets, Fraction(1, 30000)) is False
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_messages_are_ascii_even_for_non_ascii_names(
     sample: Sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

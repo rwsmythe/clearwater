@@ -92,6 +92,7 @@ def check_pair(stream: VideoStreamInfo, decode: str, encode: str, *, depth: int)
 
 
 @pytest.mark.parametrize("sample_id", list(SAMPLES))
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_arguments_per_sample(sample: Callable[[str], Path], sample_id: str) -> None:
     rgb, yuv, rng, _ = SAMPLES[sample_id]
     stream = stream_of(sample, sample_id)
@@ -108,6 +109,7 @@ def test_arguments_per_sample(sample: Callable[[str], Path], sample_id: str) -> 
     )
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_yuvj_becomes_non_j_with_full_range(sample: Callable[[str], Path]) -> None:
     stream = stream_of(sample, "vid-hevc8-bt709-full")
     assert stream.pix_fmt == "yuvj420p"
@@ -257,6 +259,7 @@ def test_unsupported_siting_range_and_output_depth_are_refused() -> None:
         rgb_pix_fmt(16)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_hdr_samples_never_reach_the_arguments(sample: Callable[[str], Path]) -> None:
     # The probe refuses HLG/PQ (a fault) and leaves the matrix unknown; the arguments refuse it too.
     for sample_id in ("vid-hlg", "vid-pq"):
@@ -331,6 +334,7 @@ def test_messages_are_ascii_even_for_non_ascii_values() -> None:
         assert str(error.value).isascii()
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_assumed_values_pass_through_the_name_table(sample: Callable[[str], Path]) -> None:
     stream = stream_of(sample, "vid-untagged")
     assert stream.color.assumed
@@ -345,6 +349,7 @@ def test_assumed_values_pass_through_the_name_table(sample: Callable[[str], Path
 # --- D54 consumed, DR-20 item (1) --------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_untagged_sample_decodes_as_assumed_bt709_limited(sample: Callable[[str], Path]) -> None:
     result = probe(sample("vid-untagged"))
     assert result.video.color.assumed

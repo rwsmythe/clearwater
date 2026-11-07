@@ -479,6 +479,7 @@ def test_a_suffix_forming_a_device_name_is_refused_verbatim(
     assert list(out.iterdir()) == []
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_video_runs_the_real_video_job_through_run(tmp_path: Path, out: Path) -> None:
     video = tmp_path / "GX010001.MP4"
     video.write_bytes(b"not decoded")

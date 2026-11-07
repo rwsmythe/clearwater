@@ -298,6 +298,7 @@ def test_tool_env_delegates_to_spawn_helper(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 @pytest.mark.parametrize("tool", ["ffmpeg", "ffprobe"])
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_ffreport_parent_does_not_make_a_child_report(
     tool: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

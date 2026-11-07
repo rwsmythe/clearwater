@@ -94,6 +94,7 @@ def _only_png(guard):
 
 
 @pytest.mark.parametrize("case", AD24_CASES)
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_ffmpeg_default_decode_records_irot_only_rule(sample, configured, case, record_property):
     _, guard = configured
     source = sample(f"heic-ad24-{case}")
@@ -117,7 +118,11 @@ def test_ffmpeg_default_decode_records_irot_only_rule(sample, configured, case, 
 
 
 @pytest.mark.parametrize("case", AD24_CASES)
-def test_orientation_matches_generated_upright(sample, configured, case):
+def test_orientation_matches_generated_upright(
+    request: pytest.FixtureRequest, sample, configured, case
+):
+    if case != "exif-only":
+        request.getfixturevalue("ffmpeg_tools")
     _, guard = configured
     source = sample(f"heic-ad24-{case}")
     image, _ = PhotoReader().read(source)
@@ -133,6 +138,7 @@ def test_orientation_matches_generated_upright(sample, configured, case):
     assert "thumbnail_witness" in record
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_orientation_rejects_exif_always(sample, configured, monkeypatch):
     _, guard = configured
     source = sample("heic-ad24-both")
@@ -148,6 +154,7 @@ def test_orientation_rejects_exif_always(sample, configured, monkeypatch):
     assert "orientation_upright" in record["failed_checks"], "heic-ad24-both"
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_orientation_rejects_exif_never(sample, configured):
     _, guard = configured
     source = sample("heic-ad24-exif-only")
@@ -161,6 +168,7 @@ def test_orientation_rejects_exif_never(sample, configured):
     assert pv.compare_poses(never, ffmpeg)["orientation_ok"]
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_thumbnail_disagreement_is_recorded_but_never_the_pass_criterion(
     sample, configured, monkeypatch
 ):
@@ -643,6 +651,7 @@ def test_owner_heic_orientation_four_irot_classes(tmp_path):
 
 
 # Reviewer A round 1 controls. Each names the verification defect it catches.
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_r1_size_is_checked_before_pose_reduction(sample, configured, monkeypatch):
     _, guard = configured
     read = pv.read_photo
@@ -970,6 +979,7 @@ def _r1_generated_heic(guard, orientation, *, grid=True, thumbnail=True):
 
 
 @pytest.mark.parametrize("orientation,irot", [(1, 0), (8, 90), (3, 180), (6, 270)])
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_r1_real_grid_rotations_and_thumbnail_class_counts(configured, orientation, irot):
     _, guard = configured
     source, upright = _r1_generated_heic(guard, orientation)
@@ -1561,7 +1571,11 @@ def test_r3_orientation_product_failure_labels(sample, configured, monkeypatch, 
         ("compare_poses", "orientation_comparison_failed"),
     ],
 )
-def test_r3_orientation_step_failure_labels(sample, configured, monkeypatch, step, code):
+def test_r3_orientation_step_failure_labels(
+    request: pytest.FixtureRequest, sample, configured, monkeypatch, step, code
+):
+    if step == "compare_poses":
+        request.getfixturevalue("ffmpeg_tools")
     _, guard = configured
 
     def broken(*args, **kwargs):
@@ -1674,6 +1688,7 @@ def _r9_odd_grid(guard, *, orientation=1, chroma="420", width=257, height=192):
 
 
 @pytest.mark.parametrize("orientation,axis", [(1, 1), (6, 0)])
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_r9_real_odd_420_grid_uses_last_edge(configured, orientation, axis, record_property):
     _, guard = configured
     source, known = _r9_odd_grid(guard, orientation=orientation)
@@ -1785,6 +1800,7 @@ def test_r9_near_misses_still_fail(configured, monkeypatch, damage):
     assert record.get("oracle_size_rounded") is not True
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_r9_unrounded_summary_and_projection(sample, configured):
     _, guard = configured
     record = pv.verify_orientation(sample("heic-ad24-both"), guard, photo_class="HEIC-270")
@@ -1798,6 +1814,7 @@ def test_r9_unrounded_summary_and_projection(sample, configured):
 
 # Reviewer B: reject shared decoder size loss and silence DEBUG EXIF values.
 @pytest.mark.parametrize("orientation,axis", [(1, 1), (6, 0)])
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_b1_product_crop_matching_oracle_still_fails_primary_size(
     configured, monkeypatch, orientation, axis
 ):

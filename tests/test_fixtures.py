@@ -630,6 +630,7 @@ def test_mp4_user_data_holds_nothing_beyond_the_empty_meta(sample: Callable[[str
         assert b"udta" in data, path.name  # the empty one is there, so the walk sees something
 
 
+@needs_ffmpeg
 def test_planted_udta_payload_is_caught_by_name(
     sample: Callable[[str], Path], tmp_path: Path
 ) -> None:

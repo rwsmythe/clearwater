@@ -170,6 +170,7 @@ def test_a_record_with_a_zero_red_mean_passes_its_own_cache_validation() -> None
     assert scan.record_problem(record.record(), "GXZERO") is None
 
 
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not on PATH")
 def test_a_near_black_frame_is_excluded_by_name_and_never_ranked() -> None:
     black = scan.scan_record("GXBLACK", 5.0, 150150, TIME_BASE, _flat((0.01, 0.02, 0.03)))
     bright = scan.scan_record("GXBRIGHT", 5.0, 150150, TIME_BASE, _flat((0.98, 0.99, 0.99)))
@@ -614,7 +615,7 @@ def _deep_roots(root: Path) -> OutputRoots:
 
 
 @pytest.fixture(scope="module")
-def deep_pack(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+def deep_pack(ffmpeg_tools: None, tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     """Build a deep pack from two frames of a synthetic clip on the CPU: one chapter still and
     one candidate that serves two cases."""
     root = tmp_path_factory.mktemp("deep")
@@ -705,6 +706,7 @@ def test_the_deep_page_head_sections_and_wording(deep_pack: dict[str, Any]) -> N
     assert 'href="clip/GXSYN_c3.mp4"' in page
 
 
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not on PATH")
 def test_a_candidate_that_is_also_a_still_is_corrected_once(tmp_path: Path) -> None:
     roots = _deep_roots(tmp_path)
     clip = roots.check(roots.allowed / "GXSYN.mp4")

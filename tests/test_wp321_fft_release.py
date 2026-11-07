@@ -224,6 +224,7 @@ def _both_boundaries() -> list[str]:
     return ["export-analysis", threading.current_thread().name]
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_video_job_releases_twice_at_the_analysis_end_and_at_the_job_end(
     sample: Any, tmp_path: Path
 ) -> None:
@@ -235,6 +236,7 @@ def test_a_video_job_releases_twice_at_the_analysis_end_and_at_the_job_end(
     assert backend.sink_calls == sink.calls and sink.calls[-1] == "close"  # after the last frame
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_failed_video_job_releases_at_both_boundaries(sample: Any, tmp_path: Path) -> None:
     backend, sink = _Releasing(), FakeSink()
     sink.fail_at = 10
@@ -243,6 +245,7 @@ def test_a_failed_video_job_releases_at_both_boundaries(sample: Any, tmp_path: P
     assert backend.threads == _both_boundaries()
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_cancelled_video_job_releases_at_both_boundaries(sample: Any, tmp_path: Path) -> None:
     backend, sink = _Releasing(), FakeSink()
     result = _video(tmp_path, sample(SAMPLE), backend, sink, progress=_CancelAt(10))
@@ -256,6 +259,7 @@ def test_a_job_that_fails_before_choosing_a_backend_releases_nothing(tmp_path: P
     assert not result.ok and backend.releases == 0
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_raising_release_keeps_the_jobs_outcome(sample: Any, tmp_path: Path) -> None:
     backend, sink = _Releasing(error=RuntimeError("planted release failure")), FakeSink()
     result = _video(tmp_path, sample(SAMPLE), backend, sink)

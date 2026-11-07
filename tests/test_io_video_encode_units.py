@@ -1233,6 +1233,7 @@ def test_the_listings_never_list_a_data_track_packet(
     assert all(data_index != c[c.index("-select_streams") + 1] for c in listings)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_every_product_tool_process_runs_without_ffreport(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1255,6 +1256,7 @@ def test_every_product_tool_process_runs_without_ffreport(
         assert env is not None and all(key.upper() != "FFREPORT" for key in env)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_failed_output_listing_is_an_error_a_source_listing_is_not(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

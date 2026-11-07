@@ -156,7 +156,7 @@ artifact is one folder, not an installer; it is unsigned. No PyPI release is pla
    parallel leg, then builds, checks and zips. This does
    not replace step 6's local gate. `release` runs only on a tag push, with
    `contents: write`, and attaches the zip, its `.sha256` and generated notices
-   to a **DRAFT** release; notes come from `docs/release-notes-1.1.0.md` if present.
+   to a **DRAFT** release; notes come from `docs/release-notes-<version>.md` if present.
    **STOP** for a failed/incomplete job, wrong commit/version, missing asset or
    non-draft release. Do not publish to work around a workflow failure.
    A workflow-only failure AFTER a tag is pushed requires a new patch version

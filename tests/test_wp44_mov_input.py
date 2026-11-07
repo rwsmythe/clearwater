@@ -95,7 +95,7 @@ def _ffmpeg(*args: str) -> None:
 
 
 @pytest.fixture
-def qt_mov(tmp_path: Path) -> Path:
+def qt_mov(ffmpeg_tools: None, tmp_path: Path) -> Path:
     """Build a rotated qt-brand HEVC/B-frame/PCM source under this test's temp root."""
     unrotated = tmp_path / "unrotated.mov"
     source = tmp_path / "clip.MOV"

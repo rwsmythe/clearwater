@@ -522,6 +522,7 @@ def test_order_parallel_marker_and_build_flags_match_local_contract(workflow):
         "run",
         "pytest",
         "-q",
+        "-rs",
         "-n",
         "4",
         "--timeout",

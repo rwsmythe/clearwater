@@ -115,7 +115,7 @@ jobs:
         run: |
           Remove-Item Env:PYTEST_ADDOPTS -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path work | Out-Null
-          uv run pytest -q -n 4 --timeout 600 -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/ci-parallel
+          uv run pytest -q -rs -n 4 --timeout 600 -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/ci-parallel
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build release folder and zip

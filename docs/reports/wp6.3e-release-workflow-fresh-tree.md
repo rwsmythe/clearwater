@@ -1,9 +1,9 @@
 # WP6.3e - Release workflow fresh-tree fix
 
-Status: turn 2 candidate, 2026-11-07, folding the seat rehearsal of turn 1
-(`e9cde49d`, based on `d14a09c1`). Reviewer A,
-actionlint, the seat rehearsal, Reviewer B, the package gate and the 1.1.1
-release remain pending. Product code, build tools and version are unchanged.
+Status: turn 3 candidate, 2026-11-07, folding Reviewer A r1 on turn 2
+(`c66af644`, after `e9cde49d`, based on `d14a09c1`). The final runner-PATH
+seat rehearsal, actionlint, Reviewer A r2, Reviewer B, the package gate and
+the 1.1.1 release remain pending. Product code, build tools and version are unchanged.
 
 ## Failure and fix
 
@@ -16,8 +16,9 @@ The gitignored `work/` parent is absent on a fresh checkout.
 
 `.github/workflows/release.yml:117` now creates `work` with
 `New-Item -ItemType Directory -Force -Path work | Out-Null` before pytest
-at :118. The pytest command itself is byte-unchanged. Asset staging at :143
-also gains `-Force`. No other workflow line changes; action SHAs, uv 0.10.9,
+at :118. Turn 3 adds only `-rs` to the pytest command for skip visibility.
+Asset staging at :143 also gains `-Force`. No other workflow line changes;
+action SHAs, uv 0.10.9,
 version/annotated-tag gates, draft-only publication and permissions are unchanged.
 Checklist step 9 at `docs/release-checklist.md:162` requires a new patch
 version on a fixed commit after a pushed tag's workflow-only failure, retaining
@@ -65,14 +66,15 @@ The prediction and its test-module line references describe the turn-1 snapshot.
 | `test_clear_clip_removes_clips_statistics_and_frames_only` | :918 | `_deep_roots()` :559-561; FAIL. |
 | `test_the_page_links_only_a_verified_clip_of_the_current_deepest_frame` | :931 | `_deep_roots()` :559-561; FAIL. |
 
-Two additional conditional failures outside the workflow's marker expression
-also lack `footage`: `tests/test_lookcheck_deep.py:988`
-`test_the_deep_clip_is_staged_smoothed_encoded_checked_and_pruned` calls
-`_deep_roots()` at :998, and `tests/test_noise_experiments.py:553`
-`test_the_runner_records_one_deep_frame_under_two_settings` loads config at
-:558. Both are `gpu` + `slow`, and skip first if GPU selection fails; if a GPU
-is available they fail without config. They are excluded from the rehearsal's
-parallel leg.
+Outside the workflow's marker expression,
+`tests/test_lookcheck_deep.py:1040` (turn-2 line; formerly :988)
+`test_the_deep_clip_is_staged_smoothed_encoded_checked_and_pruned` is `gpu` +
+`slow` and now inherits the stand-in through `_deep_roots()`.
+`tests/test_noise_experiments.py:553`
+`test_the_runner_records_one_deep_frame_under_two_settings` carries
+`@pytest.mark.footage` at :549, as well as `gpu` + `slow`, and skips when the
+local TOML is missing; it does not fail for a missing TOML. Both are excluded
+from the rehearsal's parallel leg. These corrections dispose of Reviewer A F-2.
 
 `tests/conftest.py:294-297` makes its guard inert without config; :343-361
 skips footage-marked tests when config/footage is missing. The GX011627
@@ -234,3 +236,176 @@ deviation; full-module real-footage proof, unrestricted Git, actionlint,
 final-head rehearsal and both reviews remain seat work.
 
 Seat re-run on the final head: (the seat fills)
+
+## Runner PATH (Reviewer A F-1)
+
+**[MAJOR] F-1 confirmed, guard fold applied.** The seat and CHARC report that
+the GitHub runner image `windows-2025-vs2026` has neither FFmpeg nor ffprobe
+in `actions/runner-images/images/windows/Windows2025-VS2026-Readme.md`.
+This cell is offline and did not fetch that list. The successful rehearsal on
+`c66af644` inherited the laptop's WinGet Links PATH: sync, parallel tests
+(`8367 passed, 210 skipped`), build (no window) and staging each exited 0.
+That record did not model the runner's absent tools.
+
+The seat then removed every PATH entry containing `ffmpeg.exe` or `ffprobe.exe`
+and set `CUDA_VISIBLE_DEVICES=-1`. Parallel results were
+`149 failed, 7522 passed, 903 skipped, 3 errors`. The 152 failed/error node IDs
+are staged read-only at `work/wp6.3e/seat/runner-path-node-ids.txt`.
+The seat's causal split on those IDs found (A) tools absent, GPU visible:
+the same 152 failures/errors; (B) tools present, GPU hidden: 152 passed.
+FFmpeg absence is the sole confirmed cause; no GPU marker changes are needed.
+Leaving System32's `nvidia-smi` visible is a stated runner-PATH simulation limit.
+
+CHARC rulings `3b0e47f3383dc0f1` and `875e398addfd6ded` grant test-only guards
+in the following 15 modules. Counts are affected node IDs; sites count new
+guards, not parametrized cases. All modules contain tests outside the granted
+FFmpeg-dependent cases, so none receives a module-wide guard. The fixture
+policy is `tests/fixture_plugin.py:274-277`: skip with `SKIP_NO_FFMPEG` when
+`video.tools_available()` is false. Existing module-local skip styles are retained.
+
+| Module under `tests/` | Nodes | Added sites / form | Why / evidence in the final source |
+|---|---:|---|---|
+| `test_app_composition.py` | 1 | 1 per-test `usefixtures("ffmpeg_tools")` | :127 tests the real unreadable-video refusal, which first probes. |
+| `test_color_swscale.py` | 10 | 5 per-test fixture marks | :96, :113, :263, :338, :353 probe committed videos before checking color arguments; other tests use constructed streams. |
+| `test_fixtures.py` | 1 | 1 existing `needs_ffmpeg` decorator | :634 calls `video.measure()` on planted MP4 user data; other manifest/still tests need no tools. |
+| `test_headless_export.py` | 1 | 1 per-test fixture mark | :483 runs the real video refusal through the headless runner. |
+| `test_io_video_encode_units.py` | 2 | 2 per-test fixture marks | :1237 and :1260 stub subprocess results but `verify.read_packet_table()` still resolves ffprobe. |
+| `test_io_video_probe.py` | 71 | 36 per-test fixture marks | :88 onward probe real samples or check the real locator (:542); parser/filter and missing-tool tests stay unguarded. |
+| `test_io_video_spawn.py` | 2 | 1 per-test fixture mark | :302 spawns each real tool to prove FFREPORT suppression. |
+| `test_lookcheck_deep.py` | 4 | 2 per-test existing-style `skipif`; 1 fixture dependency | :174 calls `scan.scan_document()` (tool versions); :618 `deep_pack` generates/extracts a clip before its two consumers; :710 generates/extracts a clip. |
+| `test_photo_verify.py` | 21 | 9 per-test fixture marks; 2 conditional fixture guards | :98 onward use the FFmpeg orientation oracle; :121 guards only non-`exif-only` cases, :1574 only `compare_poses`, preserving the other parameter cases. |
+| `test_reviewpack.py` | 24 | 17 per-test fixture marks; 2 conditional fixture guards | :539 onward probe/copy/extract/render real media, including failure tests that first probe; :1663 guards only video, :1908 only non-photo failures. |
+| `test_wp321_bench.py` | 2 | 2 per-test fixture marks | :64 and :95 run the CPU video bench's real probe/decode. |
+| `test_wp321_device_frames.py` | 7 | 5 per-test fixture marks | :184, :196, :300, :331, :361 decode or open/close a real video sink; other cases are mocked/device-selected. |
+| `test_wp321_fft_release.py` | 4 | 4 per-test fixture marks | :228, :240, :249, :263 run real video jobs through release boundaries. |
+| `test_wp42_composition.py` | 1 | 1 per-test fixture mark | :151 expects a cache-folder refusal after the real probe succeeds. |
+| `test_wp44_mov_input.py` | 1 | 1 fixture dependency | :98 `qt_mov` generates the synthetic QuickTime source; routing and command-assembly cases stay unguarded. |
+
+Total: 152 node IDs, 93 added guard sites. Conditional guards request the
+existing fixture through `request.getfixturevalue("ffmpeg_tools")`; they change
+no existing assertion or test operation. `deep_pack` and `qt_mov` request the
+fixture before generating any media. There are no changes to conftest,
+fixture_plugin, product/build code, or selection markers (`gpu`, `footage`,
+`gui`, `slow`, `fullclip`). No new dependency or network test is introduced.
+
+No purpose-of-tool-absence test occurs among the 152. These existing controls
+outside the list remain unguarded:
+
+- `test_io_video_probe.py::test_a_missing_ffprobe_is_a_clear_error`
+- `test_io_video_encode_units.py::test_missing_ffmpeg_is_a_reason_not_an_exception`
+- `test_fixtures.py::test_plugin_skips_a_generated_sample_when_ffmpeg_is_absent`
+- `test_fixtures.py::test_plugin_hands_out_committed_samples_without_ffmpeg`
+- `test_fixtures.py::test_cli_rejects_an_unknown_group_and_reports_missing_ffmpeg`
+
+The adjacent mocked capability controls
+`test_an_encoder_missing_from_the_build_is_named` and
+`test_a_failed_listing_makes_every_encoder_unavailable` also stay unguarded.
+The existing `ffmpeg_decode` failure parameter in photo verification remains
+unguarded; the EXIF-only orientation case and both photo aid cases retain their
+previous behavior. Assertions expecting unsupported/unreadable/parse results
+are preserved, never widened to accept missing-tool errors.
+
+**Visibility and advisories:** the workflow's pytest argv now reads
+`uv run pytest -q -rs -n 4 ...`; adding `-rs` is its only turn-3 change.
+`test_order_parallel_marker_and_build_flags_match_local_contract` pins the new
+argv. RED before the workflow edit: `1 failed in 0.17s`, on the argv assertion
+(`work/wp6.3e/turn3-red.log`, exit 1). F-2's two static-prediction sentences
+are corrected above (**[MINOR] F-2 confirmed, corrected**).
+**[MINOR] F-4 confirmed, fixed:** checklist step 9 now names
+`docs/release-notes-<version>.md`, matching the workflow's versioned lookup.
+F-3 has no change, per CHARC's conftest precedent ruling.
+
+### Turn 3 validation
+
+Cell logs, exit-code files, the isolated runner and skip XML are under
+`work/wp6.3e/turn3-*`. All uv invocations are offline/no-sync with the existing
+shared environment. All pytest runs load `sandbox_mkdir_shim`, disable the
+cache provider and plugin autoload, load the timeout plugin explicitly, exclude
+the seat-only startup test and use fresh basetemps. APPDATA, LOCALAPPDATA and
+all XDG roots point inside disposable `turn3-profiles`; GUI imports are blocked
+in-process and in inheriting children through scratch `sitecustomize`.
+
+- FFmpeg present, staged target list, `work/c63e-3p`: exit 0,
+  `152 passed in 79.03s (0:01:19)` (`turn3-present.log`).
+- FFmpeg absent, the same list, `work/c63e-3a`: exit 0,
+  `152 skipped in 1.11s` (`turn3-absent.log`). Before importing pytest, the
+  runner strips every PATH entry holding either executable and asserts both
+  `shutil.which()` results are `None`; the child environment inherits that PATH.
+  No failed tests or setup errors. Skip reasons are checked in `turn3-absent.xml`.
+- `ruff check .`: exit 0, `All checks passed!`; `ruff format --check .`:
+  exit 0, `337 files already formatted`.
+- `mypy` and `mypy --platform darwin`: both exit 0,
+  `Success: no issues found in 166 source files`.
+
+- All 15 touched modules, whole parallel selection, `work/c63e-3m`: exit 1,
+  `6 failed, 1359 passed, 37 deselected, 6 warnings in 202.33s (0:03:22)`
+  (`turn3-modules.log`, case results in `turn3-modules.xml`). The six failures
+  are outside the 152-node fold. An isolated rerun using the original HEAD
+  (`c66af644`) test definitions reproduced the same six identities:
+  `6 failed in 10.45s` (`turn3-baseline.log`, exit 1). The scratch runner
+  recompiles the original test modules into their existing module namespaces
+  and replaces the six collected test objects; the unchanged audit fixture
+  runs normally. No tracked file or product revision is swapped for that check.
+  `turn3-baseline-comparison.log` records the comparison. They are:
+
+  | Unchanged test | Observed limitation / disposition |
+  |---|---|
+  | `test_fixtures.py::test_generators_write_only_inside_their_output_folders` | Audit records a `nul` write. Baseline reproduces; no edit authorized. |
+  | `test_fixtures.py::test_generators_read_only_their_own_code_and_libraries` | Shared environment resolves editable Clearwater imports under the main tree's `src`, outside this worktree's allowed audit roots. Baseline reproduces; unrestricted/local-environment seat rerun required. |
+  | `test_fixtures.py::test_ffmpeg_is_told_to_write_only_into_the_output_folders` | Audit records 55 media-tool processes plus `cmd.exe /c ver`. Baseline reproduces; no edit authorized. |
+  | `test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder` | Restricted token cannot stat `\\localhost\C$\` (`WinError 5`). Baseline reproduces; seat rerun required. |
+  | `test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc]` | Same administrative-share denial; baseline reproduces; seat rerun required. |
+  | `test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings` | Same administrative-share denial; baseline reproduces; seat rerun required. |
+
+- Workflow module whole, `work/c63e-3w`: exit 1,
+  `5 failed, 54 passed in 1.76s` (`turn3-workflow.log`). All five failures
+  are the previously recorded real-Git cases of
+  `test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`:
+  `annotated`, `lightweight`, `wrong-commit`, `mismatched-name`, `deleted-origin`.
+  Their fixture's local push exits 128 with Git `sh.exe`'s `CreateFileMapping`
+  fatal error, before any gate assertion. Both fresh-tree pins and the updated
+  `-rs` argv pin pass. The seat must run the five Git cases unrestricted.
+- Absent-tools controls, `work/c63e-3-controls`: exit 0,
+  `11 passed in 1.06s` (`turn3-controls.log`). This proves that the five
+  tool-absence controls listed above, the two mocked capability controls and
+  the four deliberately unguarded parameter cases still execute without tools.
+- Collection before and after: the touched modules retain exactly the same
+  1,402 node IDs. Their disjoint legs are 1,365 parallel + 37 serial + 0 fullclip
+  = 1,402 all (`turn3-collection.log`, exit 0). The empty scoped fullclip
+  collection returns pytest's no-tests exit 5; all/parallel/serial return 0.
+  No node or selection marker moves. These are scoped counts, not the full-suite
+  gate count; the laptop parallel floor remains 8,367 passed / 210 skipped,
+  to be checked at the seat against the final package head.
+- Independent delta check, `turn3-verification.log`: exit 0. Removing only
+  the 93 new guards and their fixture arguments restores every granted module's
+  original AST exactly, including assertions, parameter sets and selection
+  markers. The workflow, pin and checklist have exactly their requested edits;
+  only owned files changed. The staged node-list SHA256 is unchanged:
+  `485cca894a2ff25b5081feac0494ad695108f51907c18ca4712f6ba62e7f8dce`.
+  XML confirms 150 `SKIP_NO_FFMPEG` skips and two `ffmpeg not on PATH` skips.
+- `git diff --check`: exit 0 (`turn3-diff-check.log`).
+
+Verification loop: the seat confirmed F-1 by the causal split; the guard fold
+then passed all 152 with tools and skipped exactly those 152 without them.
+Broader module verification exposed six failures outside the fold; independent
+baseline reproduction rejected them as turn-3 regressions. No change was made
+to those tests, their fixtures or the environment under test to suppress them.
+The final delta/skip/collection pass found no additional in-scope issue.
+F-2/F-4 are fixed and F-3 is left unchanged as ruled. Reviewer A r2 and
+Reviewer B remain the dispatcher's next review steps; there is no new review
+verdict claimed here. This turn bundles F-1, the `-rs` pin and the two advisory
+text folds as explicitly dispatched; no product-code fix, revert or reopened
+finding. The cumulative review ledger remains at the seat (outside this
+turn's owned-file envelope).
+
+STOPPED validation items: the six unchanged whole-module cases and the five
+real-Git cases above need the seat's unrestricted runs; their bodies are not
+in this fold's edit grant. Actionlint is unavailable in the offline cell and
+remains a seat check. The whole laptop parallel floor, full runner-PATH
+rehearsal on a new clone (sync/tests/build/staging), actual expected runner
+skip count, both reviews, package gate and release remain COMMISSIONED to the
+seat by this dispatch. No network fetch, build, GUI launch, footage read/write,
+owner-profile write, evidence-folder write, project Git write, tag, push or
+mailbox operation was performed. The failed `v1.1.0` tag is untouched.
+
+Seat runner-path rehearsal on the final head: (the seat fills)

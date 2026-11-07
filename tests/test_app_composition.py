@@ -123,6 +123,7 @@ def test_a_photo_is_exported_through_the_real_engine(sample, tmp_path: Path) -> 
     assert image.pixels.shape == (64, 96, 3)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_video_request_runs_the_real_video_job(tmp_path: Path) -> None:
     out = tmp_path / "out"
     out.mkdir()

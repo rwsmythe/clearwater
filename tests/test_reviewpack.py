@@ -535,6 +535,7 @@ def test_actual_excerpt_start_uses_source_packet_not_rebased_zero() -> None:
     assert build.actual_excerpt_start(source_packets, excerpt_packets) == pytest.approx(19.2)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_failed_stream_copy_never_falls_back_to_whole_source(
     roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -558,6 +559,7 @@ def test_failed_stream_copy_never_falls_back_to_whole_source(
     assert source.read_bytes() == original
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_rotation_adapter_extracts_oriented_fixture_dimensions(
     roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -578,6 +580,7 @@ def test_rotation_adapter_extracts_oriented_fixture_dimensions(
     )
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_rotated_pair_autorotates_both_halves_with_equal_dimensions(
     roots: OutputRoots,
     monkeypatch: pytest.MonkeyPatch,
@@ -620,6 +623,7 @@ def test_rotated_pair_autorotates_both_halves_with_equal_dimensions(
     assert "-noautorotate" not in hstack and "transpose" not in " ".join(hstack)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_pair_refuses_unequal_display_dimensions_before_hstack(
     roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1045,6 +1049,7 @@ def test_sheet_refuses_stale_row_after_item_becomes_unreviewable(roots: OutputRo
     assert destination.read_bytes() == before
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_viewing_pts_uses_ticks_instead_of_rounded_decimal() -> None:
     """Decimal ffprobe time strings can round across a frame-selection boundary."""
     source = FIXTURES / "video" / "vfr.mp4"
@@ -1073,6 +1078,7 @@ def test_viewing_pts_uses_ticks_instead_of_rounded_decimal() -> None:
     assert build._frame_time(source, float(expected) - 0.0001) == expected
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_stream_copy_success_records_a_matched_source_packet(roots: OutputRoots) -> None:
     """Check the real copy/probe join rather than only a planted packet mapping."""
     source = FIXTURES / "video" / "hevc8-bt709-full.mp4"
@@ -1084,6 +1090,7 @@ def test_stream_copy_success_records_a_matched_source_packet(roots: OutputRoots)
     assert prepared["path"].is_relative_to(roots.allowed / "excerpts")
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_rotated_frame_at_nonzero_pts(roots: OutputRoots) -> None:
     """Showinfo's exact ticks must confirm a nonzero oriented extraction."""
     frame = build.extract_view_frame(
@@ -1096,6 +1103,7 @@ def test_rotated_frame_at_nonzero_pts(roots: OutputRoots) -> None:
         assert image.size == (180, 320)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_refused_fixture_is_recorded_without_a_review_row(roots: OutputRoots) -> None:
     """A real HLG refusal must reach the page and stay outside the owner tally."""
     shutil.copyfile(FIXTURES / "video" / "hlg.mp4", roots.footage / "IMG_6704.MOV")
@@ -1264,6 +1272,7 @@ def _timecode_source(roots: OutputRoots) -> Path:
         (2.1, 1.5015, "01:00:01:15"),
     ],
 )
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_gopro_tmcd_excerpt_preserves_stream_roster_without_whole_fallback(
     roots: OutputRoots,
     start: float,
@@ -1298,6 +1307,7 @@ def test_gopro_tmcd_excerpt_preserves_stream_roster_without_whole_fallback(
     assert source.read_bytes() == original
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_excerpt_copy_failure_is_recorded_skipped_and_exits_nonzero(
     roots: OutputRoots,
     monkeypatch: pytest.MonkeyPatch,
@@ -1361,6 +1371,7 @@ def test_stream_copy_command_rebases_preroll_for_product(roots: OutputRoots) -> 
     assert args[args.index("-avoid_negative_ts") + 1] == "make_zero"
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_excerpt_recorded_start_is_first_displayed_frame(roots: OutputRoots) -> None:
     """Packet pre-roll alone must not certify a trimmed-away display head."""
     source = FIXTURES / "video" / "hevc8-bt709-full.mp4"
@@ -1391,6 +1402,7 @@ def test_excerpt_recorded_start_is_first_displayed_frame(roots: OutputRoots) -> 
     assert first_hash(source, prepared["actual_start_s"]) == first_hash(prepared["path"], 0)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_gpu_pair_has_explicit_quality_control(
     roots: OutputRoots,
     monkeypatch: pytest.MonkeyPatch,
@@ -1451,6 +1463,7 @@ def test_timecode_advancement_preserves_smpte_boundaries(label, rate, expected) 
 
 
 @pytest.mark.parametrize("kind", ["video", "audio", "data"])
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_excerpt_integrity_rejects_changed_non_tmcd_payload(
     roots: OutputRoots,
     monkeypatch: pytest.MonkeyPatch,
@@ -1486,6 +1499,7 @@ def test_excerpt_integrity_rejects_changed_non_tmcd_payload(
     assert not list((roots.allowed / "excerpts").glob("*.mp4"))
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_earlier_excerpt_survives_failed_rerun_cleanup(
     roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1549,6 +1563,7 @@ def test_page_shows_escaped_warnings_and_local_captions(roots: OutputRoots) -> N
     assert "<figcaption>Corrected</figcaption>" in html
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_unrotated_frame_cleans_owned_extraction_directory(roots: OutputRoots) -> None:
     build.extract_view_frame(
         FIXTURES / "video" / "hevc8-bt709-full.mp4",
@@ -1559,6 +1574,7 @@ def test_unrotated_frame_cleans_owned_extraction_directory(roots: OutputRoots) -
     assert list(roots.allowed.glob(".frames-*")) == []
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_browser_sdr_transfer_policy_is_consistent(roots: OutputRoots) -> None:
     values = []
     for primary in ("bt709", "smpte432"):
@@ -1570,6 +1586,7 @@ def test_browser_sdr_transfer_policy_is_consistent(roots: OutputRoots) -> None:
     assert values[0] == values[1] == (121, 121, 121)
 
 
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_pair_preserves_variable_presentation_intervals(roots: OutputRoots) -> None:
     source = FIXTURES / "video" / "vfr.mp4"
     pair = roots.allowed / "vfr-pair.mp4"
@@ -1644,9 +1661,11 @@ def _fake_product(argv, **kwargs):
 
 @pytest.mark.parametrize("kind", ["photo", "video"])
 def test_done_item_with_failed_aid_is_loud(
-    roots: OutputRoots, monkeypatch: pytest.MonkeyPatch, kind: str
+    request: pytest.FixtureRequest, roots: OutputRoots, monkeypatch: pytest.MonkeyPatch, kind: str
 ) -> None:
     """A failed aid must keep the product link and row while failing the attempted piece."""
+    if kind == "video":
+        request.getfixturevalue("ffmpeg_tools")
     first = _item() if kind == "photo" else _item("GX011604", "V-S", "video")
     later = _item("IMG_6771") if kind == "photo" else _item("IMG_6704", "V-R", "video", "refused")
     fixture = FIXTURES / (
@@ -1887,9 +1906,14 @@ def test_page_explains_blank_undecided_exact_case_and_aid_flag(roots: OutputRoot
 
 @pytest.mark.parametrize("failure", ["size", "encode", "browser", "photo"])
 def test_failed_aid_removes_only_its_own_artifacts(
-    roots: OutputRoots, monkeypatch: pytest.MonkeyPatch, failure: str
+    request: pytest.FixtureRequest,
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
 ) -> None:
     """Failed size, pair, browser and thumbnail work must not leak or prune older files."""
+    if failure != "photo":
+        request.getfixturevalue("ffmpeg_tools")
     pairs = roots.allowed / "pairs"
     thumbs = roots.allowed / "thumbs"
     pairs.mkdir()
