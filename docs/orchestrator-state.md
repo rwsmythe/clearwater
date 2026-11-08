@@ -51,7 +51,7 @@
 
 ### Live board (RESUME HERE)
 
-**`v1.1.1` IS TAGGED; NOTHING IS PUSHED.** Annotated tag object `85cd0017` peels to **`c5ed85172b32fee474ddb4fb3b54f30eadf9adf4`** (= main = `release-1.1.1`), message "Clearwater 1.1.1" (record `clearwater-review-evidence\release-1.1.1\tag\tag.txt`). `v1.1.0` is unchanged (`0127e1a2` -> `356f2e4d`) and is NEVER moved. TAG REPORT posted to CHARC (`f0e184e1`, 2026-11-07T23:30Z) with the owner's two push lines (`git push origin main`, `git push origin v1.1.1`); CHARC relays them.
+**`v1.1.1` IS PUSHED AND ITS DRAFT IS VERIFIED (steps 8-10 DONE); the clean-account check (step 11, the OWNER's hand) and CHARC's `docs/proofs/release-1.1.1.md` are next; Publish is the owner's.** CHARC pushed main `d0cd949f` + `v1.1.1` on the owner's one-time word ("You do the pushing", 2026-11-07 ~23:35Z). Run `42439969961` (windows-2025-vs2026 20261103.298.1) SUCCESS on headSha `c5ed8517`: runner parallel `7515 / 1062` (the two extra skips vs the rehearsal are runner-only: no 8.3 short names; no `C$` admin share; `workflow\run-42439969961\skipdiff-vs-rehearsal.txt`). DRAFT (isDraft true, not prerelease) with three assets; `step10.json`: zip `3a4da9d1...395d` = the runner's own sidecar; source commit = `c5ed8517` in the sidecar, the run and the draft body; one top-level folder; member SET = the local build (306), 3 members differ in bytes (`Clearwater.exe`, `base_library.zip`, numpy RECORD's two launcher-exe hashes: DR-156 class); notices byte-equal (attached = inner = local `69a6837e...`); the workflow artifact = the draft's three files. Reported to CHARC. PRUNE done at the seat (`docs/proofs/prune-2026-11-07.md`, 9 items, 68.5 GiB freed). Earlier:  Annotated tag object `85cd0017` peels to **`c5ed85172b32fee474ddb4fb3b54f30eadf9adf4`** (= main = `release-1.1.1`), message "Clearwater 1.1.1" (record `clearwater-review-evidence\release-1.1.1\tag\tag.txt`). `v1.1.0` is unchanged (`0127e1a2` -> `356f2e4d`) and is NEVER moved. TAG REPORT posted to CHARC (`f0e184e1`, 2026-11-07T23:30Z) with the owner's two push lines (`git push origin main`, `git push origin v1.1.1`); CHARC relays them.
 
 How it got here (gen 59, all evidence under `clearwater-review-evidence\release-1.1.1\`):
 - Three ruled fix commits on top of the bump `d6d1d259` (CHARC rulings `86b67a7b`, `4c58fa63`, `8d7e91d7`): F1 notices.py artifact history sentence version-neutral (+ pin); F3 / N2 six root-notice lines version-neutral; F2 / F5 notes wording; the GPU-pack start-up sentence ended in its SHORT form. F4 (`docs/release-checklist.md`) -> DR-159 after the tag (CHARC's).
@@ -72,7 +72,7 @@ How it got here (gen 59, all evidence under `clearwater-review-evidence\release-
 3. Then WP6.5 (Mac) and WP7.1 (Insta360), CHARC's commissions.
 
 **Other standing items:**
-- Prunes owed on the owner's word only: the "Old copies" list above.
+- Prunes owed on the owner's word only: `.worktrees/release-1.1.1` (+ its r111 basetemps), `.worktrees/release-1.1.1-rv`, `work/release-1.1.1`, `work/release-1.1.1-proof-cpu` once the release record is written. The 2026-11-07 batch is DONE.
 - Open rows DR-148..DR-153, DR-155, DR-157, DR-158 (passed in r111), DR-159 (CHARC's, after the tag).
 
 ### Gen-59 lessons
