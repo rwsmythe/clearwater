@@ -1,0 +1,215 @@
+name: macOS build
+
+# WP6.5 (CHARC ruling Q5): ONE macOS job, validated on a branch push and shipped by
+# release.yml through workflow_call. No release job and no tag gate live here: the tag gate
+# is release.yml's windows job, whose verified version arrives as `release-version`.
+
+on:
+  workflow_call:
+    inputs:
+      release-version:
+        description: Version verified by the calling release workflow's tag gate
+        required: true
+        type: string
+  workflow_dispatch:
+  push:
+    branches: ["macos-validation/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-26
+    timeout-minutes: 180
+    env:
+      UV_FROZEN: "1"
+      UV_NO_SYNC: "1"
+      UV_PYTHON_PREFERENCE: only-managed
+      # WP6.5 group 2a (the macOS FFmpeg lock row, the Mac notices census and the darwin
+      # smoke) sets this to "true". Until then the build makes the .app WITHOUT FFmpeg, the
+      # FFmpeg-dependent macOS test families are deselected, no release asset is staged,
+      # and release mode (a call from release.yml) is refused by the version step.
+      MACOS_FFMPEG_BUNDLED: "false"
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@6b9c6063abd6010835644d4c2e1bef4cf5cd0fca # v6.0.1
+        with:
+          version: "0.10.9"
+          python-version: "3.12.13"
+          enable-cache: false
+          checksum: a92f61e9ac9b0f29668c15f56152e4a60143fca148ff5bfadb86718472c3f376
+
+      - name: Sync build environment
+        run: |
+          started=$(date +%s)
+          uv sync --frozen --no-default-groups --group dev
+          echo "Environment sync seconds: $(( $(date +%s) - started ))"
+
+      - name: Check version and record the run
+        id: version
+        shell: uv run python {0}
+        env:
+          RELEASE_VERSION: ${{ inputs.release-version }}
+        run: |
+          import os
+          import platform
+          import subprocess
+          from pathlib import Path
+          import clearwater
+
+          requested = os.environ.get("RELEASE_VERSION", "")
+          version = clearwater.__version__
+          if requested:
+              if version != requested:
+                  raise SystemExit("macOS build version differs from the verified release version")
+              if os.environ.get("MACOS_FFMPEG_BUNDLED") != "true":
+                  raise SystemExit("macOS release assets await WP6.5 group 2a (the bundled FFmpeg)")
+          try:
+              system = subprocess.run(
+                  ["sw_vers"], capture_output=True, text=True, timeout=30, check=True,
+              ).stdout.strip().splitlines()
+          except (OSError, subprocess.SubprocessError) as error:
+              raise SystemExit(f"cannot read the macOS version: {error}") from None
+          record = [
+              f"mode: {'release' if requested else 'validation'}",
+              f"clearwater.__version__: {version}",
+              f"GITHUB_SHA: {os.environ['GITHUB_SHA']}",
+              f"GITHUB_REF: {os.environ.get('GITHUB_REF', '')}",
+              f"ImageOS: {os.environ.get('ImageOS', '')}",
+              f"ImageVersion: {os.environ.get('ImageVersion', '')}",
+              f"machine: {platform.machine()}",
+              f"MACOS_FFMPEG_BUNDLED: {os.environ.get('MACOS_FFMPEG_BUNDLED', '')}",
+              *system,
+          ]
+          evidence = Path("work/evidence")
+          evidence.mkdir(parents=True, exist_ok=True)
+          (evidence / "run-record.txt").write_text("\n".join(record) + "\n", encoding="utf-8")
+          print("\n".join(record))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={version}\n")
+
+      - name: Static checks
+        run: |
+          uv run mypy
+          uv run mypy --platform darwin
+
+      - name: Run parallel tests
+        run: |
+          unset PYTEST_ADDOPTS
+          mkdir -p work/evidence
+          uv run pytest -q -rs -n 3 --timeout 600 -m "not gpu and not footage and not gui and not slow and not fullclip and not macos" -k "not test_python_m_clearwater_starts_the_shell_and_exits_0" --basetemp=work/ci-parallel 2>&1 | tee work/evidence/parallel.log
+
+      - name: Run serial tests
+        run: |
+          unset PYTEST_ADDOPTS
+          mkdir -p work/evidence
+          uv run pytest -q -rs --timeout 1200 -m "(gpu or footage or gui or slow) and not fullclip and not macos" -k "not test_python_m_clearwater_starts_the_shell_and_exits_0" --basetemp=work/ci-serial 2>&1 | tee work/evidence/serial.log
+
+      - name: Build app bundle without FFmpeg
+        if: env.MACOS_FFMPEG_BUNDLED != 'true'
+        run: |
+          uv run python tools/package/build.py --form onedir --out work/release 2>&1 | tee work/evidence/build.log
+
+      - name: Build release bundle and zip
+        if: env.MACOS_FFMPEG_BUNDLED == 'true'
+        run: |
+          lock=tools/package/ffmpeg-macos.lock.json
+          url=$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['asset_url'])" "$lock")
+          sha=$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['seat_sha256'])" "$lock")
+          uv run python tools/package/build.py --form onedir --ffmpeg-from "$url" --ffmpeg-sha256 "$sha" --notices --smoke --zip --out work/release 2>&1 | tee work/evidence/build.log
+
+      - name: Run macOS tests on the built bundle
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          unset PYTEST_ADDOPTS
+          bundle="$PWD/work/release/dist-onedir/Clearwater-${RELEASE_VERSION}-macos-onedir/Clearwater.app"
+          test -d "$bundle/Contents/MacOS"
+          export CLEARWATER_MAC_BUNDLE="$bundle"
+          export PATH="$bundle/Contents/MacOS:$PATH"
+          selection="not test_python_m_clearwater_starts_the_shell_and_exits_0"
+          if [ "$MACOS_FFMPEG_BUNDLED" != "true" ]; then
+            selection="$selection and not default_pipe_fidelity and not ffmpeg_text_and_redaction and not videotoolbox and not tool_and_worker_spawn and not test_macos_bundle_smoke[P16] and not test_macos_bundle_smoke[P57]"
+          fi
+          uv run pytest -q -rs --timeout 1200 -m macos -k "$selection" --basetemp=work/ci-macos --junitxml=work/evidence/macos-junit.xml 2>&1 | tee work/evidence/macos.log
+
+      - name: Check macOS skip reasons
+        shell: uv run python {0}
+        run: |
+          import re
+          from pathlib import Path
+
+          ALLOWED = ("VideoToolbox unavailable on this Mac: ",)
+          log = Path("work/evidence/macos.log").read_text(encoding="utf-8", errors="replace")
+          if not re.search(r"^(?:=+ )?\d+ passed\b.* in [0-9.]+s\b", log, re.MULTILINE):
+              raise SystemExit("macOS leg: no passing summary line in macos.log")
+          skipped = re.findall(r"^SKIPPED \[(\d+)\] [^:]+:\d+: (.*)$", log, re.MULTILINE)
+          refused = [reason for _count, reason in skipped if not reason.startswith(ALLOWED)]
+          if refused:
+              raise SystemExit("macOS leg: skip reasons outside the allowlist: " + " | ".join(refused))
+          print(f"macOS leg: {sum(int(count) for count, _ in skipped)} skipped, all allowed")
+
+      - name: Capture runner and encoder facts
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          {
+            echo "GITHUB_SHA=$GITHUB_SHA"
+            echo "ImageOS=$ImageOS"
+            echo "ImageVersion=$ImageVersion"
+            sw_vers
+            uname -m
+          } > work/evidence/runner.txt
+          if [ "$MACOS_FFMPEG_BUNDLED" = "true" ]; then
+            tool="work/release/dist-onedir/Clearwater-${RELEASE_VERSION}-macos-onedir/Clearwater.app/Contents/MacOS/ffmpeg"
+            shasum -a 256 "$tool" >> work/evidence/runner.txt
+            "$tool" -hide_banner -encoders > work/evidence/ffmpeg-encoders.txt
+            "$tool" -hide_banner -h encoder=hevc_videotoolbox > work/evidence/ffmpeg-hevc_videotoolbox.txt
+          fi
+
+      - name: Stage release assets
+        if: env.MACOS_FFMPEG_BUNDLED == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          name="Clearwater-${RELEASE_VERSION}-macos"
+          app="work/release/dist-onedir/Clearwater-${RELEASE_VERSION}-macos-onedir/Clearwater.app"
+          notices="$app/Contents/Resources/THIRD_PARTY_NOTICES.md"
+          for file in "work/release/$name.zip" "work/release/$name.zip.sha256" "$notices"; do
+            if [ ! -f "$file" ]; then
+              echo "Missing release asset: $file"
+              exit 1
+            fi
+          done
+          printf '# source-commit: %s\n' "$GITHUB_SHA" >> "work/release/$name.zip.sha256"
+          mkdir -p work/release-assets
+          cp "work/release/$name.zip" "work/release/$name.zip.sha256" work/release-assets/
+          cp "$notices" work/release-assets/THIRD_PARTY_NOTICES-macos.md
+
+      - name: Upload release assets
+        if: env.MACOS_FFMPEG_BUNDLED == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: macos-release
+          path: work/release-assets/*
+          if-no-files-found: error
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: macos-evidence
+          path: work/evidence/
+          if-no-files-found: warn

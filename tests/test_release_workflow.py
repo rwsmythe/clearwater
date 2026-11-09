@@ -8,6 +8,7 @@ No test calls a product entry point, builds an artifact or contacts GitHub.
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib.util
 import json
 import os
@@ -23,6 +24,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/release.yml"
+MACOS_WORKFLOW = ROOT / ".github/workflows/macos-build.yml"
 PINS = {
     "actions/checkout": "11bd71901bbe5b1630ceea73d27597364c9af683",
     "astral-sh/setup-uv": "6b9c6063abd6010835644d4c2e1bef4cf5cd0fca",
@@ -56,9 +58,25 @@ def script(workflow, name):
     return textwrap.dedent(body.rstrip())
 
 
+def job(workflow, name):
+    """One job's text: from its two-space header to the next job header (or the end)."""
+    match = re.search(
+        rf"^  {re.escape(name)}:\n(.*?)(?=^  [a-z][\w-]*:\n|\Z)",
+        workflow,
+        re.MULTILINE | re.DOTALL,
+    )
+    assert match, f"missing workflow job {name}"
+    return match[1]
+
+
 def test_every_action_is_one_of_the_seat_verified_sha_pins(workflow):
     uses = re.findall(r"^\s+(?:- )?uses: (\S+)", workflow, re.MULTILINE)
-    assert len(uses) == 6  # checkout in each job, plus the other four actions
+    # WP6.5: the macos job calls the repository's own reusable workflow (no ref to pin).
+    assert [value for value in uses if value.startswith("./")] == [
+        "./.github/workflows/macos-build.yml"
+    ]
+    uses = [value for value in uses if not value.startswith("./")]
+    assert len(uses) == 7  # checkout in each job, a download per platform, the other three
     assert {value.split("@")[0] for value in uses} == set(PINS)
     for value in uses:
         action, sha = value.split("@")
@@ -378,7 +396,7 @@ def test_sidecar_and_draft_body_record_the_built_commit(workflow):
 
 
 def test_windows_job_uses_frozen_unsynced_managed_python(workflow):
-    windows = workflow.split("\n  windows:\n", 1)[1].split("\n  release:\n", 1)[0]
+    windows = job(workflow, "windows")
     assert re.search(
         r'    env:\n      UV_FROZEN: "1"\n      UV_NO_SYNC: "1"\n'
         r"      UV_PYTHON_PREFERENCE: only-managed\n",
@@ -390,7 +408,7 @@ def test_windows_job_uses_frozen_unsynced_managed_python(workflow):
 
 
 def test_windows_job_budget_is_two_hours(workflow):
-    windows = workflow.split("\n  windows:\n", 1)[1].split("\n  release:\n", 1)[0]
+    windows = job(workflow, "windows")
     assert "    timeout-minutes: 120\n" in windows
 
 
@@ -444,11 +462,11 @@ def test_triggers_permissions_concurrency_and_release_are_bounded(workflow):
     assert "        required: true" in workflow
     assert "permissions:\n  contents: read\n" in workflow
     assert "group: release-${{ github.ref }}" in workflow
-    release = workflow.split("\n  release:\n", 1)[1]
-    windows = workflow.split("\n  windows:\n", 1)[1].split("\n  release:\n", 1)[0]
+    release = job(workflow, "release")
+    windows = job(workflow, "windows")
     assert "runs-on: windows-latest" in windows
     assert "contents: write" not in windows
-    assert "    needs: windows" in release
+    assert "    needs: [windows, macos]\n" in release
     assert "github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')" in release
     assert "    permissions:\n      contents: write" in release
     assert re.findall(r"^\s+draft: (\S+)", workflow, re.MULTILINE) == ["true"]
@@ -605,7 +623,11 @@ def test_ffmpeg_and_assets_come_from_lock_and_build_outputs(workflow):
     release = step(workflow, "Create draft release")
     assert "work/release-assets/*.zip\n" in release
     assert "work/release-assets/*.zip.sha256\n" in release
-    assert "work/release-assets/THIRD_PARTY_NOTICES.md" in release
+    assert "work/release-assets/THIRD_PARTY_NOTICES.md\n" in release
+    assert "work/release-assets/THIRD_PARTY_NOTICES-macos.md" in release
+    macos_download = step(workflow, "Download macOS release assets")
+    assert "name: macos-release" in macos_download
+    assert "path: work/release-assets" in macos_download
 
 
 @pytest.mark.parametrize(
@@ -744,3 +766,342 @@ def test_root_notices_distinguish_pyinstaller_terms_and_artifact_redistribution(
     python = next(line for line in text.splitlines() if line.startswith("| Python |"))
     assert "1.1.0" in python and "REDISTRIBUTES" in python and "1.0.0" in python
     assert "notice of record for the artifact" in text
+
+
+# --- WP6.5: the macOS job (CHARC ruling Q5: ONE reusable macos-build.yml) -------------------
+
+# sha256 of release.yml at 8ca7aeaf (before WP6.5's macOS job), by job() slice / header.
+BASE_WINDOWS_JOB_SHA256 = "6e8a9ffdf2cc823164e6a3cb6f9883eb9503bb69d61c3a51446589b4cc6924e8"
+BASE_RELEASE_JOB_SHA256 = "92048c38c8b0db52d6e7827b594bfcb499372cb23232746f2877eed7c89cba8e"
+BASE_HEADER_SHA256 = "d10fcff8052da48b415463720c39b8b621a9d53533303b7d646e380a10c1a036"
+CELL_EXCLUSION = "not test_python_m_clearwater_starts_the_shell_and_exits_0"
+MACOS_UV_CHECKSUM = "a92f61e9ac9b0f29668c15f56152e4a60143fca148ff5bfadb86718472c3f376"
+MACOS_JOB_CALL = """\
+    needs: windows
+    uses: ./.github/workflows/macos-build.yml
+    with:
+      release-version: ${{ needs.windows.outputs.version }}
+
+"""
+MACOS_DOWNLOAD = """\
+      - name: Download macOS release assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: macos-release
+          path: work/release-assets
+
+"""
+
+
+def _sha(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+@pytest.fixture
+def macos():
+    return MACOS_WORKFLOW.read_text(encoding="utf-8") if MACOS_WORKFLOW.is_file() else ""
+
+
+def test_windows_job_tag_gate_and_triggers_are_byte_identical(workflow):
+    """Ruling 1: the windows job (the tag gate inside it) and the header are unchanged."""
+    assert _sha(job(workflow, "windows")) == BASE_WINDOWS_JOB_SHA256
+    assert _sha(workflow.split("\njobs:\n", 1)[0]) == BASE_HEADER_SHA256
+
+
+def test_release_job_changes_are_exactly_the_ruled_ones(workflow):
+    """needs both jobs, a second download, the macOS notices attached; nothing else."""
+    jobs = workflow.split("\njobs:\n", 1)[1]
+    assert re.findall(r"^  ([a-z][\w-]*):\n", jobs, re.MULTILINE) == [
+        "windows",
+        "macos",
+        "release",
+    ]
+    assert job(workflow, "macos") == MACOS_JOB_CALL
+    release = job(workflow, "release")
+    assert release.count(MACOS_DOWNLOAD) == 1
+    names = re.findall(r"^      - name: (.+)", release, re.MULTILINE)
+    assert names.index("Download release assets") + 1 == names.index(
+        "Download macOS release assets"
+    )
+    restored = (
+        release.replace("    needs: [windows, macos]\n", "    needs: windows\n", 1)
+        .replace(MACOS_DOWNLOAD, "", 1)
+        .replace("            work/release-assets/THIRD_PARTY_NOTICES-macos.md\n", "", 1)
+    )
+    assert _sha(restored) == BASE_RELEASE_JOB_SHA256
+
+
+def test_macos_workflow_triggers_and_has_no_release_or_tag_gate(macos):
+    assert macos, "the macOS workflow has not been implemented"
+    head = macos.split("\njobs:\n", 1)[0]
+    assert (
+        "on:\n  workflow_call:\n    inputs:\n      release-version:\n"
+        "        description: Version verified by the calling release workflow's tag gate\n"
+        "        required: true\n        type: string\n"
+        '  workflow_dispatch:\n  push:\n    branches: ["macos-validation/**"]\n'
+    ) in head
+    assert "permissions:\n  contents: read\n" in head
+    assert "tags:" not in head
+    assert re.findall(r"^  ([a-z][\w-]*):\n", macos.split("\njobs:\n", 1)[1], re.MULTILINE) == [
+        "macos"
+    ]
+    for forbidden in (
+        "contents: write",
+        "refs/tags",
+        'GITHUB_REF"]',
+        "cat-file",
+        "action-gh-release",
+        "gh release",
+        "download-artifact",
+        "secrets.",
+    ):
+        assert forbidden not in macos, forbidden
+    assert not re.search(r"\bgit\s+(?:push|tag|fetch)\b|\bgh\s+workflow\s+run\b", macos)
+
+
+def test_macos_workflow_pins_the_same_actions_and_the_darwin_uv(macos):
+    uses = re.findall(r"^\s+(?:- )?uses: (\S+)", macos, re.MULTILINE)
+    assert {value.split("@")[0] for value in uses} == {
+        "actions/checkout",
+        "astral-sh/setup-uv",
+        "actions/upload-artifact",
+    }
+    for value in uses:
+        action, sha = value.split("@")
+        assert re.fullmatch(r"[a-f0-9]{40}", sha) and sha == PINS[action]
+    assert macos.count("persist-credentials: false") == 1
+    assert "fetch-depth: 0" in step(macos, "Checkout source")
+    setup = step(macos, "Set up uv")
+    assert re.findall(r'^          version: "([^"]+)"$', setup, re.MULTILINE) == ["0.10.9"]
+    assert 'python-version: "3.12.13"' in setup and "enable-cache: false" in setup
+    assert f"checksum: {MACOS_UV_CHECKSUM}" in setup
+
+
+def test_macos_job_runner_budget_environment_and_cpu_only_sync(macos):
+    macos_job = job(macos, "macos")
+    assert "    runs-on: macos-26\n" in macos_job and "macos-latest" not in macos
+    assert "    timeout-minutes: 180\n" in macos_job
+    assert re.search(
+        r'    env:\n      UV_FROZEN: "1"\n      UV_NO_SYNC: "1"\n'
+        r"      UV_PYTHON_PREFERENCE: only-managed\n",
+        macos_job,
+    )
+    assert re.search(r'^      MACOS_FFMPEG_BUNDLED: "(true|false)"$', macos_job, re.MULTILINE)
+    assert "uv sync --frozen --no-default-groups --group dev\n" in script(
+        macos, "Sync build environment"
+    )
+    assert "--extra gpu" not in macos and "continue-on-error" not in macos
+
+
+def test_macos_job_steps_mirror_the_windows_order(macos):
+    assert re.findall(r"^      - name: (.+)", macos, re.MULTILINE) == [
+        "Checkout source",
+        "Set up uv",
+        "Sync build environment",
+        "Check version and record the run",
+        "Static checks",
+        "Run parallel tests",
+        "Run serial tests",
+        "Build app bundle without FFmpeg",
+        "Build release bundle and zip",
+        "Run macOS tests on the built bundle",
+        "Check macOS skip reasons",
+        "Capture runner and encoder facts",
+        "Stage release assets",
+        "Upload release assets",
+        "Upload evidence",
+    ]
+    assert script(macos, "Static checks").splitlines() == [
+        "uv run mypy",
+        "uv run mypy --platform darwin",
+    ]
+
+
+def _pytest(macos, name):
+    lines = script(macos, name).splitlines()
+    command = next(line for line in lines if line.startswith("uv run pytest"))
+    return lines, shlex.split(command.split(" 2>&1 | tee ", 1)[0])
+
+
+def test_macos_test_legs_follow_the_windows_gate_with_the_ruled_differences(macos):
+    canonical = re.search(r'-m "(not gpu[^"]+)"', (ROOT / "CLAUDE.md").read_text())
+    assert canonical
+    lines, parallel = _pytest(macos, "Run parallel tests")
+    assert lines[:2] == ["unset PYTEST_ADDOPTS", "mkdir -p work/evidence"]
+    assert parallel == [
+        *(["uv", "run", "pytest", "-q", "-rs", "-n", "3", "--timeout", "600", "-m"]),
+        canonical[1] + " and not macos",
+        "-k",
+        CELL_EXCLUSION,
+        "--basetemp=work/ci-parallel",
+    ]
+    lines, serial = _pytest(macos, "Run serial tests")
+    assert lines[0] == "unset PYTEST_ADDOPTS"
+    assert serial == [
+        *(["uv", "run", "pytest", "-q", "-rs", "--timeout", "1200", "-m"]),
+        "(gpu or footage or gui or slow) and not fullclip and not macos",
+        "-k",
+        CELL_EXCLUSION,
+        "--basetemp=work/ci-serial",
+    ]
+    lines, leg = _pytest(macos, "Run macOS tests on the built bundle")
+    assert lines[0] == "unset PYTEST_ADDOPTS"
+    assert leg[:10] == [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "-rs",
+        "--timeout",
+        "1200",
+        "-m",
+        "macos",
+        "-k",
+    ]
+    assert leg[10] == "$selection" and f'selection="{CELL_EXCLUSION}"' in lines
+    assert 'export CLEARWATER_MAC_BUNDLE="$bundle"' in lines
+    assert 'export PATH="$bundle/Contents/MacOS:$PATH"' in lines
+    assert any(line.endswith('-macos-onedir/Clearwater.app"') for line in lines)
+    for line in macos.splitlines():
+        if "uv run pytest" in line:
+            assert "| tee work/evidence/" in line
+
+
+def test_macos_build_steps_are_gated_by_the_named_ffmpeg_switch(macos):
+    """Before group 2a: the .app without FFmpeg; after: the release flags from the lock."""
+    off = step(macos, "Build app bundle without FFmpeg")
+    assert "if: env.MACOS_FFMPEG_BUNDLED != 'true'" in off
+    command = next(line for line in script(macos, "Build app bundle without FFmpeg").splitlines())
+    assert command.startswith("uv run python tools/package/build.py --form onedir --out ")
+    assert not re.search(r"--(ffmpeg|notices|smoke|zip)", command)
+    on = script(macos, "Build release bundle and zip")
+    assert "if: env.MACOS_FFMPEG_BUNDLED == 'true'" in step(macos, "Build release bundle and zip")
+    flags = set(re.findall(r"--[a-z][a-z0-9-]*", on.splitlines()[-1]))
+    assert flags == {
+        "--form",
+        "--ffmpeg-from",
+        "--ffmpeg-sha256",
+        "--notices",
+        "--smoke",
+        "--zip",
+        "--out",
+    }
+    for name in ("Stage release assets", "Upload release assets"):
+        assert "if: env.MACOS_FFMPEG_BUNDLED == 'true'" in step(macos, name)
+    assert "if: always()" in step(macos, "Upload evidence")
+    upload = step(macos, "Upload release assets")
+    assert "name: macos-release" in upload and "if-no-files-found: error" in upload
+    stage = script(macos, "Stage release assets")
+    assert 'name="Clearwater-${RELEASE_VERSION}-macos"' in stage
+    assert "/Contents/Resources/THIRD_PARTY_NOTICES.md" in stage
+    assert "work/release-assets/THIRD_PARTY_NOTICES-macos.md" in stage
+    assert "# source-commit: %s" in stage and "$GITHUB_SHA" in stage
+    deselected = next(
+        line
+        for line in script(macos, "Run macOS tests on the built bundle").splitlines()
+        if "and not videotoolbox" in line
+    )
+    for family in (
+        "default_pipe_fidelity",
+        "ffmpeg_text_and_redaction",
+        "videotoolbox",
+        "tool_and_worker_spawn",
+        "test_macos_bundle_smoke[P16]",
+        "test_macos_bundle_smoke[P57]",
+    ):
+        assert f"and not {family}" in deselected
+
+
+@pytest.mark.parametrize(
+    "requested, source, bundled, outcome",
+    [
+        ("", "1.2.0", "false", "validation"),
+        ("", "1.2.0", "true", "validation"),
+        ("1.2.0", "1.2.0", "true", "release"),
+        ("1.2.0", "1.1.9", "true", "macOS build version differs"),
+        ("1.2.0", "1.2.0", "false", "await WP6.5 group 2a"),
+    ],
+)
+def test_macos_version_step_records_or_checks_the_release_version(
+    macos, tmp_path, monkeypatch, requested, source, bundled, outcome
+):
+    gate = step(macos, "Check version and record the run")
+    assert "shell: uv run python {0}" in gate
+    assert "RELEASE_VERSION: ${{ inputs.release-version }}" in gate
+    output = tmp_path / "output"
+    monkeypatch.chdir(tmp_path)
+    for name, value in {
+        "RELEASE_VERSION": requested,
+        "MACOS_FFMPEG_BUNDLED": bundled,
+        "GITHUB_SHA": "a" * 40,
+        "GITHUB_REF": "refs/heads/macos-validation/wp6.5",
+        "GITHUB_OUTPUT": str(output),
+        "ImageOS": "macos26",
+        "ImageVersion": "20261026.0455.2",
+    }.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setitem(sys.modules, "clearwater", SimpleNamespace(__version__=source))
+    calls = []
+
+    def sw_vers(args, **kwargs):
+        calls.append(args)
+        assert kwargs == {"capture_output": True, "text": True, "timeout": 30, "check": True}
+        return subprocess.CompletedProcess(args, 0, "ProductName:\tmacOS\nBuildVersion:\t25G83\n")
+
+    monkeypatch.setattr(subprocess, "run", sw_vers)
+    code = compile(script(macos, "Check version and record the run"), "macos-version", "exec")
+    if outcome in ("validation", "release"):
+        exec(code, {})
+        assert output.read_text() == f"version={source}\n"
+        record = (tmp_path / "work/evidence/run-record.txt").read_text().splitlines()
+        assert record[:3] == [
+            f"mode: {outcome}",
+            f"clearwater.__version__: {source}",
+            "GITHUB_SHA: " + "a" * 40,
+        ]
+        assert "ImageVersion: 20261026.0455.2" in record and "BuildVersion:\t25G83" in record
+        assert calls == [["sw_vers"]]
+    else:
+        with pytest.raises(SystemExit, match=outcome):
+            exec(code, {})
+        assert not output.exists() and calls == []
+
+
+@pytest.mark.parametrize(
+    "log, allowed",
+    [
+        ("12 passed, 30 deselected in 81.20s\n", True),
+        (
+            "SKIPPED [2] tests/test_macos_portability.py:230: VideoToolbox unavailable on this "
+            "Mac: no hardware session\n10 passed, 2 skipped in 9.01s\n",
+            True,
+        ),
+        (
+            "SKIPPED [1] tests/test_macos_portability.py:282: hdiutil could not create a APFS "
+            "image: x\n10 passed, 1 skipped in 9.01s\n",
+            False,
+        ),
+        (
+            "SKIPPED [1] tests/test_macos_portability.py:1569: CLEARWATER_MAC_BUNDLE is not "
+            "set: WP6.5 builds the app bundle\n3 passed, 1 skipped in 1.00s\n",
+            False,
+        ),
+        ("1 failed, 3 passed in 1.00s\n", False),
+        ("", False),
+    ],
+    ids=["clean", "vt-absent", "hdiutil", "bundle-unset", "failed", "empty"],
+)
+def test_macos_skip_allowlist_refuses_every_other_reason(
+    macos, tmp_path, monkeypatch, log, allowed
+):
+    """Only "VideoToolbox unavailable on this Mac: ..." may skip in the macOS leg."""
+    assert "shell: uv run python {0}" in step(macos, "Check macOS skip reasons")
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "work/evidence").mkdir(parents=True)
+    (tmp_path / "work/evidence/macos.log").write_text(log, encoding="utf-8")
+    code = compile(script(macos, "Check macOS skip reasons"), "macos-skips", "exec")
+    if allowed:
+        exec(code, {})
+    else:
+        with pytest.raises(SystemExit, match="macOS leg: "):
+            exec(code, {})
