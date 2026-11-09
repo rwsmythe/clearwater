@@ -3799,11 +3799,16 @@ def build(
             print(f"FAILED: {error}")
             return 1
     version = app_version()
-    try:
-        sources = pack_sources()
-    except (ImportError, ValueError) as error:  # PackageNotFoundError is an ImportError
-        print(f"FAILED: the pack sources cannot be scanned: {error}")
-        return 1
+    if sys.platform == "darwin":
+        # AD-33: no GPU pack on macOS (a CPU-only sync installs none of its distributions),
+        # so there is no pack code whose standard-library needs the bundle must carry.
+        sources: list[tuple[str, Path]] = []
+    else:
+        try:
+            sources = pack_sources()
+        except (ImportError, ValueError) as error:  # PackageNotFoundError is an ImportError
+            print(f"FAILED: the pack sources cannot be scanned: {error}")
+            return 1
     scan = scan_stdlib_imports(sources)
     wanted = hidden_imports(scan)
     report = write_hidden_import_report(

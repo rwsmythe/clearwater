@@ -3013,10 +3013,12 @@ def darwin_app_build(monkeypatch, tmp_path, *, seal, origin):
     monkeypatch.setattr(build, "native_origin_violations", origin)
     monkeypatch.setattr(build, "seal_macos_bundle", seal)
     out = tmp_path / "out"
+    # Built (and PyInstaller imported) BEFORE sys.platform reads darwin: PyInstaller's
+    # compat module reads the macOS version at import time.
+    source = make_exe(out / "synthetic", [], modules=["clearwater", "graphlib"])
 
     def build_folder(args):
         folder = Path(args[args.index("--distpath") + 1])
-        source = make_exe(out / "synthetic", [], modules=["clearwater", "graphlib"])
         for name in ("Clearwater/Clearwater", "Clearwater.app/Contents/MacOS/Clearwater"):
             (folder / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, folder / name)
@@ -3052,6 +3054,37 @@ def test_darwin_build_seals_the_app_and_rechecks_origin(tmp_path, monkeypatch, c
         assert "FAILED: bundle seal: /usr/bin/codesign --verify exited 1: planted" in printed
     else:
         assert status == 1 and "FAILED: after seal: planted after seal" in printed
+
+
+def test_darwin_build_scans_no_gpu_pack(tmp_path, monkeypatch, capsys):
+    """AD-33: the CPU-only macOS environment has no pack distributions to scan."""
+
+    def no_pack():
+        raise importlib.metadata.PackageNotFoundError("cupy-cuda12x")
+
+    def origin(executable, **kwargs):
+        return []
+
+    monkeypatch.setattr(build, "pack_sources", no_pack)
+    monkeypatch.setattr(build, "seal_macos_bundle", lambda bundle: None, raising=False)
+    monkeypatch.setattr(build, "native_origin_violations", origin)
+    monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
+    out = tmp_path / "out"
+    source = make_exe(out / "synthetic", [], modules=["clearwater", "graphlib"])
+
+    def build_folder(args):
+        folder = Path(args[args.index("--distpath") + 1])
+        target = folder / "Clearwater.app/Contents/MacOS/Clearwater"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+
+    monkeypatch.setattr(build, "run_pyinstaller", build_folder)
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    assert build.build("onedir", out=out) == 0
+    assert " hidden imports from 0 pack files; " in capsys.readouterr().out
+    monkeypatch.setattr(build.sys, "platform", "win32")
+    assert build.build("onedir", out=out) == 1
+    assert "FAILED: the pack sources cannot be scanned" in capsys.readouterr().out
 
 
 def test_windows_build_never_seals(tmp_path, monkeypatch):
