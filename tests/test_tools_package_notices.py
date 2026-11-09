@@ -13,15 +13,17 @@ import re
 import shutil
 import subprocess
 import sys
+import sysconfig
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-pytestmark = pytest.mark.skipif(
-    sys.platform != "win32",
-    reason="Windows native/interpreter fixtures; WP6.5 supplies native fixtures",
+WINDOWS_RELEASE_SKIP = (
+    "Windows native/interpreter fixture: the synthetic release copies python312.dll "
+    "and writes Clearwater.exe (no macOS release fixture yet)"
 )
+VENV_SITE_PACKAGES = Path(sysconfig.get_path("purelib"))
 
 
 @pytest.mark.parametrize("variable", ["PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE"])
@@ -190,6 +192,8 @@ def make_executable(folder, modules):
 
 @pytest.fixture
 def release(tmp_path):
+    if sys.platform != "win32":
+        pytest.skip(WINDOWS_RELEASE_SKIP)
     native_surface = _make_native_surface(tmp_path / "release-native-licences")
     folder = tmp_path / "release"
     internal = folder / "_internal"
@@ -1046,7 +1050,7 @@ def test_each_upstream_reuse_refuses_tampered_material(tmp_path, number, damage)
 def test_real_wheel_licence_files_are_copied_byte_for_byte(name, relative):
     """Newline normalization or GPL-section elision must fail the byte comparison."""
     module = load_notices()
-    path = ROOT / ".venv/Lib/site-packages" / relative
+    path = VENV_SITE_PACKAGES / relative
     expected = path.read_bytes()
     output = module.render_notices(text_plan(module, [module.LicenceInput(path)], name=name))
     assert expected in output
