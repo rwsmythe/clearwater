@@ -364,32 +364,64 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 POSIX_HOME_FOLDER = "home"
 """The prefix of the per-test home folder :func:`_posix_home_redirect` makes (WP6.5 A4)."""
 
+POSIX_XDG_FOLDERS = {
+    "XDG_CONFIG_HOME": ".config",
+    "XDG_DATA_HOME": ".local/share",
+    "XDG_CACHE_HOME": ".cache",
+    "XDG_STATE_HOME": ".local/state",
+}
+"""The XDG base-directory names :func:`_posix_home_redirect` sets, each to this folder under
+the per-test home (the XDG defaults relative to ``HOME``; WP6.5 QA fix, CHARC ruling). The
+folders are not created: the home stays empty until something writes there."""
+
 
 @pytest.fixture(autouse=True)
-def _posix_home_redirect(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
-    """On POSIX, point ``HOME`` at a fresh folder under the session temp root (WP6.5 A4).
+def _posix_home_redirect(request: pytest.FixtureRequest) -> Iterator[None]:
+    """On POSIX, point ``HOME`` and the XDG names at a fresh per-test folder (WP6.5 A4).
 
     On macOS ``Path.home() / "Library"`` holds Clearwater's settings and cache
-    (``clearwater.config.paths.app_locations``), and on Linux ``Path.home()`` is the XDG
-    fallback; ``Path.home()`` and ``os.path.expanduser`` read ``HOME`` there. So a test that
-    reaches those locations without its own redirect would write the real account's
-    ``~/Library/Application Support/Clearwater``; this redirect makes the isolation
-    structural, one place, for every test function (child processes inherit it). The folder
-    is ``tmp_path_factory.mktemp("home")``, beside the test's own ``tmp_path`` rather than
-    inside it, so a test that lists its ``tmp_path`` sees nothing new. A test that sets
-    ``HOME`` itself still wins (its ``monkeypatch`` change comes later). Session- and
-    module-scoped fixtures run before it and are not covered.
+    (``clearwater.config.paths.app_locations``), and on Linux the XDG variables, falling back
+    to ``Path.home()``, do; ``Path.home()`` and ``os.path.expanduser`` read ``HOME`` there. So
+    a test that reaches those locations without its own redirect would write the real
+    account's ``~/Library/Application Support/Clearwater`` (or its XDG folders); this redirect
+    makes the isolation structural, one place, for every test function (child processes
+    inherit it). The folder is ``tmp_path_factory.mktemp("home")``, beside the test's own
+    ``tmp_path`` rather than inside it, so a test that lists its ``tmp_path`` sees nothing
+    new; ``XDG_CONFIG_HOME``, ``XDG_DATA_HOME``, ``XDG_CACHE_HOME`` and ``XDG_STATE_HOME``
+    point at the :data:`POSIX_XDG_FOLDERS` paths under it. A test that sets ``HOME`` (or an
+    XDG name) itself still wins: its ``monkeypatch`` change comes later and is undone first.
+    Every name is restored after the test. Session- and module-scoped fixtures run before it
+    and are not covered.
+
+    The fixture requests no fixture but ``request`` and uses its OWN ``pytest.MonkeyPatch``,
+    undone in a ``finally`` after the ``yield``. Requesting the test's ``monkeypatch`` would
+    set that fixture up before :func:`_release_fft_plans` and so undo the test's patches
+    AFTER that fixture's finalizer ran (teardown is last-in, first-out); a test that replaced
+    ``clearwater.core.backend._probe_gpu`` then broke the release (the WP6.5 QA regression).
 
     NOT on Windows (``sys.platform == "win32"``): there isolation runs through ``APPDATA`` /
-    ``LOCALAPPDATA``, and ``HOME`` feeds git and uv; the fixture does nothing.
+    ``LOCALAPPDATA``, and ``HOME`` feeds git and uv; the fixture yields without touching
+    anything.
 
     Args:
         request: The test's fixture request (for the session temp-path factory).
-        monkeypatch: The test's monkeypatch, which restores ``HOME`` at teardown.
+
+    Yields:
+        Nothing; the test runs with the redirect in place.
     """
-    if sys.platform != "win32":
-        factory: pytest.TempPathFactory = request.getfixturevalue("tmp_path_factory")
-        monkeypatch.setenv("HOME", str(factory.mktemp(POSIX_HOME_FOLDER)))
+    if sys.platform == "win32":
+        yield
+        return
+    factory: pytest.TempPathFactory = request.getfixturevalue("tmp_path_factory")
+    home = factory.mktemp(POSIX_HOME_FOLDER)
+    patch = pytest.MonkeyPatch()
+    try:
+        patch.setenv("HOME", str(home))
+        for name, relative in POSIX_XDG_FOLDERS.items():
+            patch.setenv(name, str(home / relative))
+        yield
+    finally:
+        patch.undo()
 
 
 @pytest.fixture(autouse=True)
@@ -404,7 +436,9 @@ def _release_fft_plans(request: pytest.FixtureRequest) -> None:
     object, so the release also clears plans made through another ``CupyBackend`` on this
     thread; before the process's first probe it does nothing. It imports nothing: it acts only
     when ``cupy`` and ``clearwater.core.backend`` are already loaded and the GPU has been
-    probed, and it never touches ``cupy`` itself.
+    probed, and it never touches ``cupy`` itself. When ``_probe_gpu`` has no ``cache_info``
+    (a test replaced the cached probe and its patch is still in place) it returns without
+    probing (WP6.5 QA fix).
 
     Args:
         request: The test's fixture request, which runs the release at teardown.
@@ -415,7 +449,10 @@ def _release_fft_plans(request: pytest.FixtureRequest) -> None:
         core_backend = sys.modules.get("clearwater.core.backend")
         if "cupy" not in sys.modules or core_backend is None:
             return
-        if core_backend._probe_gpu.cache_info().currsize == 0:
+        cache_info = getattr(core_backend._probe_gpu, "cache_info", None)
+        if cache_info is None:
+            return  # a test replaced the probe: not the cached one, nothing to release
+        if cache_info().currsize == 0:
             return  # never probed: no test reached the GPU backend
         gpu, _ = core_backend._probe_gpu()
         if gpu is not None:
