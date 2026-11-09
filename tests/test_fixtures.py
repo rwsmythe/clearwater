@@ -1360,15 +1360,93 @@ def regenerated_cheap(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return out
 
 
+@pytest.mark.parametrize("host_platform", [b"MSFT", b"APPL", b"SUNW", b"\0\0\0\0"])
+def test_srgb_profile_is_the_committed_one_whatever_platform_littlecms_stamps(
+    host_platform: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WP6.5 G3 (C1): LittleCMS stamps the HOST into the ICC primary-platform signature
+    (bytes 40-44; ``APPL`` on the macOS runner), so ``stills.srgb_profile`` pins the
+    committed ``MSFT``; with any stamp the profile is the committed fixtures' (manifest
+    ``icc_md5``), and nothing else in the header moves."""
+    committed = {
+        e["facts"]["icc_md5"]
+        for e in MANIFEST["samples"]
+        if e["group"] == "stills" and e["facts"].get("icc_kind") == "srgb"
+    }
+    assert len(committed) == 1
+    real_tobytes = ImageCms.ImageCmsProfile.tobytes
+
+    def stamped(profile: ImageCms.ImageCmsProfile) -> bytes:
+        data = bytearray(real_tobytes(profile))
+        data[40:44] = host_platform
+        return bytes(data)
+
+    monkeypatch.setattr(ImageCms.ImageCmsProfile, "tobytes", stamped)
+    profile = stills.srgb_profile()
+    assert profile[40:44] == b"MSFT"
+    assert {hashlib.md5(profile, usedforsecurity=False).hexdigest()} == committed
+
+
+def _decoded_pixels(path: Path) -> np.ndarray | None:
+    """The decoded pixels of a regenerated still (HEIC through pillow_heif, high bit depth
+    kept; the rest through Pillow), or None for a file that is not an image."""
+    try:
+        if path.read_bytes()[4:8] == b"ftyp":
+            return np.asarray(pillow_heif.open_heif(str(path), convert_hdr_to_8bit=False))
+        with Image.open(path) as image:
+            return np.asarray(image)
+    except Exception:  # a dummy file (DNG / GoPro stand-ins) is not decodable: no figure
+        return None
+
+
+def _pixel_figure(fresh: Path, committed: Path) -> str:
+    """Max and p99 of ``|decoded fresh - decoded committed|`` in the decoded dtype's units
+    (pillow_heif returns 10-bit HEIC scaled to 16 bits: one 10-bit step is 64), with the
+    worst pixel's (row, col, channel) (WP6.5 G3, C2: the figure CHARC rules the bound on)."""
+    new, old = _decoded_pixels(fresh), _decoded_pixels(committed)
+    if new is None or old is None:
+        return "not decodable as an image (no pixel figure)"
+    if new.shape != old.shape or new.dtype != old.dtype:
+        return f"decoded {new.dtype}{new.shape} vs committed {old.dtype}{old.shape}"
+    diff = np.abs(new.astype(np.int64) - old.astype(np.int64))
+    worst = tuple(int(i) for i in np.unravel_index(int(np.argmax(diff)), diff.shape))
+    return (
+        f"decoded {new.dtype}{new.shape}: max {int(diff.max())}, "
+        f"p99 {float(np.percentile(diff, 99)):g}, nonzero {int(np.count_nonzero(diff))}, "
+        f"worst at {worst}"
+    )
+
+
 def test_stills_files_and_mask_regenerate_byte_identically(regenerated_cheap: Path) -> None:
+    """Every regenerated still, dummy file and the mask equals its committed bytes.
+
+    WP6.5 G3 (C2, CHARC's ruling): the loop COLLECTS every mismatch instead of stopping at
+    the first, and prints, per mismatched entry, the decoded-pixel max / p99 of the fresh
+    against the committed file (plus ``pillow_heif.libheif_info()``), so one macOS run gives
+    the whole list and its figures. It still fails on any mismatch.
+    """
     compared = 0
+    mismatches: list[str] = []
     for entry in MANIFEST["samples"]:
         if entry["group"] in ("stills", "files") or entry["id"] == "ad14-mask":
             assert entry["byte_reproducible"] is True
             fresh = regenerated_cheap / entry["path"]
-            assert fresh.read_bytes() == (FIXTURES_DIR / entry["path"]).read_bytes(), entry["id"]
-            assert manifest.md5_of(fresh) == entry["md5"], entry["id"]
+            committed = FIXTURES_DIR / entry["path"]
+            if fresh.read_bytes() != committed.read_bytes():
+                mismatches.append(f"{entry['id']}: {_pixel_figure(fresh, committed)}")
+            elif manifest.md5_of(fresh) != entry["md5"]:
+                mismatches.append(f"{entry['id']}: equal to the committed file, not its md5")
             compared += 1
+    if mismatches:
+        report = "\n".join(
+            [
+                f"{len(mismatches)} of {compared} regenerated entries differ from the "
+                f"committed bytes (libheif {pillow_heif.libheif_info()}):",
+                *mismatches,
+            ]
+        )
+        print(report, flush=True)
+        pytest.fail(report)
     assert compared == 66 + 11 + 1
     assert {
         p.relative_to(regenerated_cheap).as_posix()

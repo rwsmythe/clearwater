@@ -85,19 +85,28 @@ OMITTED = (
 _ICC_DATE = (2026, 10, 20, 0, 0, 0)
 """The fixed creation date pinned into the sRGB profile header (LittleCMS stamps the clock)."""
 
+_ICC_PLATFORM = b"MSFT"
+"""The primary-platform signature pinned into the sRGB profile header (WP6.5 G3, C1)."""
+
 
 def srgb_profile() -> bytes:
-    """Return Pillow's sRGB profile with its creation date pinned.
+    """Return Pillow's sRGB profile with its creation date and platform signature pinned.
 
     ``ImageCms.createProfile`` stamps the current time into the header (bytes 24 to 36), which
-    would make every run differ; the date is replaced with a fixed one. The profile ID is zero,
-    so no checksum depends on the date.
+    would make every run differ; the date is replaced with a fixed one. LittleCMS also stamps
+    the HOST platform into the primary-platform signature (bytes 40 to 44: ``MSFT`` on
+    Windows, ``APPL`` on macOS), so the committed fixtures, generated on Windows, carry
+    ``MSFT`` and a macOS run would build ``APPL``; the signature is pinned to the committed
+    ``MSFT`` so every host builds the same bytes. The profile ID is zero, so no checksum
+    depends on either field; the profile's tags (primaries, curves, white point) are the
+    library's.
 
     Returns:
         The profile's bytes.
     """
     data = bytearray(ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes())
     data[24:36] = struct.pack(">6H", *_ICC_DATE)
+    data[40:44] = _ICC_PLATFORM
     return bytes(data)
 
 
