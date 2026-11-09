@@ -255,6 +255,8 @@ INSTANCE_SURFACE_RELPATHS: tuple[str, ...] = (
     # the 1.1.0 release notes (the release workflow's draft body, 2026-11-06).
     "docs/release-notes-1.1.0.md",
     "docs/release-notes-1.1.1.md",
+    # the project log (2026-11-09): CLAUDE.md's dated narrative moved here verbatim.
+    "docs/project-log.md",
 ) + INSTANCE_STUB_RELPATHS
 INSTANCE_SURFACE_PREFIXES: tuple[str, ...] = (
     "docs/briefs/",
