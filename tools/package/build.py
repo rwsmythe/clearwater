@@ -1512,12 +1512,26 @@ def _ffmpeg_component_texts(components: list[FFmpegComponent], folder: Path) -> 
         raise ValueError("FFmpeg lock: component text directory differs from lock")
 
 
+def _sh_quote(value: str) -> str:
+    r"""``value`` as FFmpeg's configure ``sh_quote`` prints it (at ``b204e94e``).
+
+    Each ``'`` becomes ``'\''``; the result is printed as is when every byte is in
+    ``[A-Za-z0-9_/.+-]`` (the empty string included) and inside ``'...'`` otherwise.
+    """
+    escaped = value.replace("'", "'\\''")
+    if re.fullmatch(r"[A-Za-z0-9_/.+-]*", escaped):
+        return escaped
+    return f"'{escaped}'"
+
+
 def _configure_arguments(body: str) -> list[tuple[str, str, str | None]] | None:
     """``(argument, name, unquoted value or None)`` per printed argument, or None.
 
     ``body`` is the printed configuration without its ``configuration: `` prefix; None
     when it is not exactly arguments of :data:`_CONFIGURE_ARGUMENT` joined by single
-    spaces (an empty argument, a tab, a quote outside a value, an unbalanced quote).
+    spaces (an empty argument, a tab, a quote outside a value, an unbalanced quote), or
+    when a value is not spelled as ``sh_quote`` spells it (:func:`_sh_quote`; A r5: a
+    value configure prints bare, given redundant quotes, ``--extra-version='20261110'``).
     """
     arguments: list[tuple[str, str, str | None]] = []
     position = 0
@@ -1526,8 +1540,11 @@ def _configure_arguments(body: str) -> list[tuple[str, str, str | None]] | None:
         if match is None or match.end() == position:
             return None
         value = match["value"]
-        if value is not None and value.startswith("'"):
-            value = value[1:-1].replace("'\\''", "'")
+        if value is not None:
+            if value.startswith("'"):
+                value = value[1:-1].replace("'\\''", "'")
+            if _sh_quote(value) != match["value"]:
+                return None
         arguments.append((match.group(), match["name"], value))
         position = match.end()
         if position == len(body):

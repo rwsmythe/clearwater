@@ -3299,13 +3299,14 @@ def test_macos_lock_refuses_every_non_literal_byte_in_an_encoder_list():
 
 
 @pytest.mark.parametrize(
-    "value", ["libx265", "aac,libx265", "libx265,aac", "aac,libx265,mp3", "''", "aac,,mp3", ",aac"]
+    "value", ["libx265", "aac,libx265", "libx265,aac", "aac,libx265,mp3", "", "aac,,mp3", ",aac"]
 )
 def test_macos_lock_refuses_a_literal_list_naming_libx265_or_an_empty_item(value):
     """A literal list reaches ``libx265_encoder`` only through the item ``libx265``; an
-    empty item is not a literal name (refused)."""
+    empty item is not a literal name (refused). The empty value is printed bare
+    (``sh_quote`` leaves an empty string unquoted)."""
     data = macos_lock()
-    _configure(data, "--disable-encoder=" + (value if value == "''" else _sh_quote(value)))
+    _configure(data, "--disable-encoder=" + _sh_quote(value))
     with pytest.raises(ValueError, match="disabled"):
         build.validate_ffmpeg_lock(data, platform="darwin")
 
@@ -3349,6 +3350,61 @@ def test_macos_lock_admits_the_printed_quoting_forms(change):
     data = macos_lock()
     _configure(data, change)
     assert build.validate_ffmpeg_lock(data, platform="darwin") is data
+
+
+A5_REDUNDANT_QUOTES = [
+    ("--extra-version=20261110", "--extra-version='20261110'"),  # the reviewer's
+    ("--extra-version=20261110", "extra-version='20261110'"),
+    ("--extra-version=20261110", "extra_version='20261110'"),
+    ("--extra-version=20261110", "--extra_version='20261110'"),
+    ("--pkg-config-flags=--static", "--pkg-config-flags='--static'"),
+    ("--prefix=/Users/", "--prefix='/Users/"),  # the whole prefix value quoted (below)
+    ("append", "--disable-encoder='aac'"),  # the reviewer's
+    ("append", "--disable-encoder='aac_at'"),
+    ("append", "--extra-cflags=''"),  # sh_quote prints an empty value bare
+    ("append", "--extra-cflags='-O2'"),
+]
+
+
+@pytest.mark.parametrize(("spelling", "quoted"), A5_REDUNDANT_QUOTES)
+def test_macos_lock_refuses_quoting_configure_would_not_print(spelling, quoted):
+    """A r5 minor: configure quotes a value only when ``sh_quote`` must (a byte outside
+    ``[A-Za-z0-9_/.+-]``), so a quoted value that would print bare is not the printed form
+    and is refused; each admitted option in the fixture's line and the admitted appended
+    forms, given redundant quotes. (Every one was ACCEPTED at ``87df4840``.)"""
+    data = macos_lock()
+    line = data["configure_line"]
+    if spelling == "append":
+        data["configure_line"] = line + " " + quoted
+    elif spelling == "--prefix=/Users/":
+        start = line.index(spelling)
+        end = line.index(" ", start)
+        value = line[start + len("--prefix=") : end]
+        assert _sh_quote(value) == value  # the fixture prints it bare
+        data["configure_line"] = line[:start] + f"--prefix='{value}'" + line[end:]
+    else:
+        assert line.count(spelling) == 1
+        data["configure_line"] = line.replace(spelling, quoted)
+    with pytest.raises(ValueError, match="printed form"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+def test_macos_lock_admits_exactly_sh_quote_s_spelling_of_each_value():
+    """The positive side of the canonical-quoting rule: for values that need quoting
+    (a UTF-8 byte, a space, a quote, a comma) and values that do not, the ``sh_quote``
+    spelling is admitted and the other spelling refused."""
+    for value in ["-I/Users/José/include", "-L/opt/a b", "-DNAME='x'", "a,b", "-O2", ""]:
+        printed = _sh_quote(value)
+        other = value if printed != value else "'" + value.replace("'", "'\\''") + "'"
+        data = macos_lock()
+        _configure(data, f"--extra-cflags={printed}")
+        assert build.validate_ffmpeg_lock(data, platform="darwin") is data, printed
+        if value == "-L/opt/a b":
+            continue  # bare, it is two printed arguments (the stated limit), not one
+        data = macos_lock()
+        _configure(data, f"--extra-cflags={other}")
+        with pytest.raises(ValueError, match="printed form"):
+            build.validate_ffmpeg_lock(data, platform="darwin")
 
 
 @pytest.mark.parametrize(
