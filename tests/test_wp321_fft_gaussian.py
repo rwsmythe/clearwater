@@ -262,11 +262,84 @@ def test_the_batched_route_is_the_unbatched_one_bit_for_bit_gpu(
     _batched_is_unbatched(_gpu(), monkeypatch, shape, sigma)
 
 
+CONTROL_BATCH_LINES = 516
+"""The diagnostic's control batch: 172 RGB positions = 516 lines, a multiple of 4 (WP6.5 C16)."""
+
+
+def _batch_mismatch_report(
+    monkeypatch: pytest.MonkeyPatch,
+    a: Any,
+    sigma: float,
+    batched: np.ndarray,
+    unbatched: np.ndarray,
+) -> str:
+    """What CHARC rules C16 on (WP6.5 G3): the size and place of a batched / unbatched
+    difference, the library versions, the AD-11 tier-2 bound, and a control at 516 lines.
+
+    Only the constant is patched for the control (inside this test); the product is untouched.
+    """
+    import scipy
+
+    batch_lines = backend_module.FFT_BATCH_LINES
+    diff = np.abs(batched.astype(np.float64) - unbatched.astype(np.float64))
+    nonzero = np.argwhere(diff != 0)
+    first = [tuple(int(i) for i in position) for position in nonzero[:12]]
+    monkeypatch.setattr(backend_module, "FFT_BATCH_LINES", CONTROL_BATCH_LINES)
+    control = CPU.to_host(CPU.gaussian_blur(a, sigma))
+    control_diff = np.abs(control.astype(np.float64) - unbatched.astype(np.float64))
+    return "\n".join(
+        [
+            f"C16 diagnostic: batched (FFT_BATCH_LINES={batch_lines}) vs unbatched, "
+            f"shape {batched.shape}, sigma {sigma}",
+            f"  numpy {np.__version__}, scipy {scipy.__version__}",
+            f"  max abs {diff.max():.9g}, p99 {np.percentile(diff, 99):.9g}, "
+            f"nonzero {len(nonzero)} of {diff.size}",
+            f"  first positions (row, col[, channel]): {first}",
+            f"  inside the AD-11 tier-2 FFT bound {BOUND:g}: {bool(diff.max() <= BOUND)}",
+            f"  control FFT_BATCH_LINES={CONTROL_BATCH_LINES} vs unbatched: max abs "
+            f"{control_diff.max():.9g}, nonzero {int(np.count_nonzero(control_diff))}, "
+            f"bit-identical {bool(np.array_equal(control, unbatched))}",
+        ]
+    )
+
+
 @pytest.mark.parametrize(("shape", "sigma"), BATCHED[:2])
 def test_the_batched_route_is_the_unbatched_one_bit_for_bit_cpu(
     monkeypatch: pytest.MonkeyPatch, shape: tuple[int, ...], sigma: float
 ) -> None:
-    _batched_is_unbatched(CPU, monkeypatch, shape, sigma)
+    """Tier 1 (bit-identity) on the CPU route; on a mismatch the C16 diagnostic prints first.
+
+    WP6.5 G3 (CHARC's C16 ruling, measurement first): the darwin arm64 runner failed
+    ``[shape1-32.0]``. The bound is unchanged (the test still FAILS on any difference); the
+    report says how large the difference is and whether a 516-line batch removes it.
+    """
+    a = CPU.asarray(np.random.default_rng(9).random(shape, dtype=np.float32))
+    batched = CPU.to_host(CPU.gaussian_blur(a, sigma))
+    with monkeypatch.context() as patch:
+        patch.setattr(backend_module, "FFT_BATCH_LINES", 10**9)  # one batch per axis
+        unbatched = CPU.to_host(CPU.gaussian_blur(a, sigma))
+    if not np.array_equal(batched, unbatched):
+        report = _batch_mismatch_report(monkeypatch, a, sigma, batched, unbatched)
+        print(report, flush=True)
+        pytest.fail(report)
+
+
+def test_the_c16_diagnostic_reports_a_planted_difference(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The diagnostic itself, on every host: a planted one-ulp-scale difference is measured,
+    placed, judged against the tier-2 bound, and the control runs; the constant is restored."""
+    shape, sigma = BATCHED[1]
+    a = CPU.asarray(np.random.default_rng(9).random(shape, dtype=np.float32))
+    unbatched = CPU.to_host(CPU.gaussian_blur(a, sigma))
+    planted = unbatched.copy()
+    planted[7, 11, 2] = np.nextafter(planted[7, 11, 2], np.float32(2.0))
+    with monkeypatch.context() as patch:
+        report = _batch_mismatch_report(patch, a, sigma, planted, unbatched)
+    assert backend_module.FFT_BATCH_LINES != CONTROL_BATCH_LINES
+    assert "nonzero 1 of" in report
+    assert "first positions (row, col[, channel]): [(7, 11, 2)]" in report
+    assert f"inside the AD-11 tier-2 FFT bound {BOUND:g}: True" in report
+    assert "scipy " in report and "numpy " in report
+    assert f"control FFT_BATCH_LINES={CONTROL_BATCH_LINES} vs unbatched" in report
 
 
 # --- the memory bound (Q-C5a condition 2) ----------------------------------------------------
