@@ -5,83 +5,86 @@
 
 ### Generation
 
-- **Generation 59** (session `clearwater-orchestrator-20261107-1113`). LIVE 2026-11-07 ~21:13Z. Bash gauge 28 ms.
+- **Generation 59** (session `clearwater-orchestrator-20261107-1113`). LIVE 2026-11-07 ~21:13Z; ROLLED 2026-11-09 at the 400K cap at a clean boundary (wp65-cell1 returned; nothing running). Bash gauge 28 ms.
 - **CHARC is gen 20, `clearwater-charc-20261107-0949`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
-- **Seat folder `work/orch-g59/`:**
-  - `gate.sh` + `watch2.sh` (repointed to orch-g59); gate run `gate-r111/`.
-  - `build_uia.py` (= gen 56's, md5 `48ae19ef`); `gpu_proof.seat.py` (gen 56's with ONLY the `:989` label changed to 1.1.1, sha256 `9f5c7eda...`); `check_build.py` (zip / sidecar / member / notices census).
-  - `fix111.py`, `fix111b.py`, `fix111c.py` (the three ruled fix commits' edits); posts and drains.
-  - The CI-shaped rehearsal is still gen 58's `work/orch-g58/rehearsal.py` (md5 `b93db3bf`).
+- **Seat folder `work/orch-g59/`:** `gate.sh` + `watch2.sh` (repointed to orch-g59); `build_uia.py` (= gen 56's, md5 `48ae19ef`); `gpu_proof.seat.py` (label-only change); `check_build.py`, `check_draft.py`, `skipdiff.py`; `prune.py`, `prune2.py`; `wp65-fill.md`, `wp71-fill.md`; posts and drains. The CI-shaped rehearsal is still `work/orch-g58/rehearsal.py` (md5 `b93db3bf`).
 - **State worktree:** `.worktrees/orch-state-g59` (branch `orch-state-g59`; remove it and add your own).
-- **Release worktree:** `.worktrees/release-1.1.1` (branch `release-1.1.1` = main = `c5ed8517`, venv SYNCED, toml copied in).
-- **Review copy:** `.worktrees/release-1.1.1-rv` (detached at `bc14bc98`, the pre-rebase twin of `c5ed8517`).
-- **Old copies kept until the owner's prune:** `.worktrees/wp6.3e`, `.worktrees/wp6.3e-rA`, `.worktrees/release-1.1.0`, `work/ci-rehearsal/{e9cde49,c66af64,8a30d6d,f3de8b0,c5ed851}`, `work/release` (1.1.0 build), `work/release-1.1.1`, `work/release-1.1.1-proof-cpu`.
+- **WP6.5 worktree:** `.worktrees/wp6.5` (branch `wp6.5`; venv synced, toml copied in).
+- **Worktree list (8):** main, orch-state-g59, wp-dr125, wp6.1, wp6.3a, wp6.3b, wp6.4, wp6.5. Nothing owed to prune (the 2026-11-07 and 2026-11-09 batches are done: `docs/proofs/prune-2026-11-07.md`, `prune-2026-11-09.md`).
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
 
-- **DESKTOP INPUT RULE and ENTRY-POINT ISOLATION RULE (CLAUDE.md hardware section).** Paste BOTH VERBATIM into EVERY dispatch (current text: `clearwater-review-evidence\wp6.3b\cell\dispatch-11.md`, with the QUIT_SCRIPT exception).
+- **DESKTOP INPUT RULE and ENTRY-POINT ISOLATION RULE (CLAUDE.md hardware section).** Paste BOTH VERBATIM into EVERY dispatch (current text: `clearwater-review-evidence\wp6.5\cell\dispatch-1.md`, with the QUIT_SCRIPT exception and the Mac HOME reading).
   - A cell-written GUI or proof script is reviewed at the seat: grep for SendKeys / AppActivate / SendInput / keybd_event / mouse_event / pyautogui / SetForegroundWindow.
   - Such a script is RUN AT THE SEAT FROM md5-CHECKED COPIES.
-- **No seat or review run executes the DR-125 "before" shape:** a daemon blocked on `sys.stdin.buffer` at interpreter exit, or the OLD worker at `73453bdc`.
+- **No seat or review run executes the DR-125 "before" shape.**
 - **EVERY CLAUDE REVIEW PROMPT BANS `run_in_background`.** `codex_cell.py review` keeps only the reviewer's LAST message. Check that `review.txt` is a full report before acting.
 - **Launch a Codex turn or review ONLY with the Bash tool's `run_in_background`, never a shell `&`.**
-- **ROLLOVER TIMING (OWNER-RULED).** Below 400K a seat starts the next unit WHATEVER ITS SIZE; it rolls at the first clean boundary after 400K with nothing it started still running. At or past the cap, dispatch nothing new.
-- **NO ROLLOVER WHILE A JOB RUNS (OWNER, 2026-11-02).**
-- **NO PYTEST DURING A SERIAL OR FULLCLIP LEG** or a window; one heavy job at a time (gate, build, seat run). **Never edit a worktree a gate is running from.**
+- **ROLLOVER TIMING (OWNER-RULED).** Below 400K a seat starts the next unit WHATEVER ITS SIZE; it rolls at the first clean boundary after 400K with nothing it started still running (a live Agent-tool cell dies with the pane: wait for its return). At or past the cap, dispatch nothing new.
+- **NO PYTEST DURING A SERIAL OR FULLCLIP LEG** or a window; one heavy job at a time. **Never edit a worktree a gate is running from.**
 - **TWO CODEX SESSIONS ARE ALLOWED** (CHARC `a6934b58`), on disjoint files.
-- **Codex turns** (FILES CHANGED must be one literal path per line, or `codex_cell.py commit` refuses; commit by pathspec in the worktree then):
-  - Run a turn with `uv run python scripts/codex_cell.py turn --worktree <ABS> --prompt <p> --evidence <dir> --turn N [--session=<id>] > <dir>\turn-N.driver.stdout 2>&1`, with run_in_background.
-  - Commit with `codex_cell.py commit --worktree <ABS> --return-file <return-N.md>`.
-  - Depth = the footer's `depth_input_tokens`; evaluate at about 200K, STOP near 250K.
-  - FRESH prompt = `.claude/agents/implementer-codex-sol-high.md` + the brief at HEAD + `dispatch-N.md`, joined, with `tr -d '\r'`.
-  - A RESUMED session's prompt = `dispatch-N.md` alone, with `tr -d '\r'`.
-  - Never send the Write of a dispatch and the turn that reads it in ONE parallel batch.
-- **Claude cells (Agent tool):** read depth with `uv run --no-sync python scripts/cell_depth.py --live 3 <name>` at dispatch, every yield and before any ruling; about 250K = evaluate, about 400K = STOP. Their reviewer is CODEX. Reviewer A: `cat review-prompt.md review-diff.txt | tr -d '\r' | codex exec -p strong -s read-only --skip-git-repo-check -o review.txt - > review.out 2>&1` from the DETACHED copy (`( cd <copy> && ... )`). Assertions: banner `gpt-6.1-sol` / `high`, `grep -ac '^ERROR'` = 0, `grep -ac '^tokens used'` = 1, the verdict.
-- **Claude review of a Codex cell:** `codex_cell.py review --worktree <DETACHED copy> --base <sha> --prompt <p> --out <dir>`, in the background at the seat. Forms: `wp6.3a\B\r1\review-prompt-B.md` (full B), `wp6.3a\B\delta2\review-prompt-delta2.md` (a delta).
-- **Gates:** `bash work/<seat>/gate.sh <worktree> <run-id> <legs...>` (background), plus a Monitor on `watch2.sh <run-id> <summary line count>`. Re-arm the Monitor at its 30-minute expiry. gate.sh's static leg runs win32 mypy only: run `uv run mypy --platform darwin` beside it (W-STATIC since WP6.4's accept).
-- **Backslash-bearing Python is written with the Write tool**, never a heredoc or `sed -i`.
-- **A bare `cd` moves the session's cwd.** Use ONLY `( cd X && ... )`, `git -C` and absolute paths.
-- **QUIT_SCRIPT exception (owner's word, CLAUDE.md `1a38c935`):** `tests/test_app_startup.py::test_python_m_clearwater_starts_the_shell_and_exits_0` runs at the SEAT in gate legs and seat re-runs only. Every cell run keeps `-k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`.
-- **No `rm -rf` on a command-substituted path** (the safety check refuses it). Use fixed paths under `work/`, or leave the folder.
-- **Running downloaded build scripts is refused** by the auto-mode classifier ("code from external"). Read them as text.
-- **CI-SHAPED REHEARSAL BEFORE EVERY TAG (gen 57).** A fresh `git clone` with no `work/`, no toml, no footage; the runner's PATH (no ffmpeg / ffprobe) and no GPU; the workflow's own `run:` blocks extracted: `work/orch-g58/rehearsal.py <full sha> <ev> --runner-path`. The proof binds the head that gets tagged.
-- **A NEW WORKTREE'S `.venv` IS AN EMPTY SHELL (gen 58).** Run `uv sync --frozen` in it BEFORE any seat mypy, pytest or gate there.
-- **THE RELEASE SWEEP (gen 58).** A version bump greps the old version over README, `docs/user-guide.md`, the notes, `THIRD_PARTY_NOTICES.md`, `tests`, `src`, `tools` and `.github`, and settles EVERY hit before the Codex read; version-bearing PROSE that renders into the artifact counts, not only pins.
-- **RELEASE NOTES STATE BEHAVIOUR BY SHAPE (CHARC gen 20, 2026-11-07).** A clause list of what a check covers invites a false clause; three reads in a row found one. The clause-level truth lives in docstrings and tests.
+- **Codex turns:** `uv run python scripts/codex_cell.py turn --worktree <ABS> --prompt <p> --evidence <dir> --turn N [--session=<id>] > <dir>\turn-N.driver.stdout 2>&1` with run_in_background; commit with `codex_cell.py commit --worktree <ABS> --return-file <return-N.md>` (FILES CHANGED one literal path per line; else commit by pathspec in the worktree). Depth = the footer's `depth_input_tokens`; evaluate ~200K, STOP ~250K. FRESH prompt = `.claude/agents/implementer-codex-sol-high.md` + the brief at HEAD + `dispatch-N.md`, joined, `tr -d '\r'`; RESUMED = `dispatch-N.md` alone. Never Write a dispatch and launch the turn that reads it in ONE batch. The first (non-resumed) turn needs an ABSOLUTE `--worktree`.
+- **Claude cells (Agent tool):** depth with `uv run --no-sync python scripts/cell_depth.py --live 3 <name>` at dispatch, every yield, before any ruling; ~250K evaluate, ~400K STOP. Their reviewer is CODEX: `cat review-prompt.md review-diff.txt | tr -d '\r' | codex exec -p strong -s read-only --skip-git-repo-check -o review.txt - > review.out 2>&1` from the DETACHED copy (`( cd <copy> && ... )`); assert banner `gpt-6.1-sol` / `high`, `grep -ac '^ERROR'` = 0, `grep -ac '^tokens used'` = 1, the verdict.
+- **Claude review of a Codex cell:** `codex_cell.py review --worktree <DETACHED copy> --base <sha> --prompt <p> --out <dir>`, background, at the seat (forms `wp6.3a\B\r1\review-prompt-B.md`, `wp6.3a\B\delta2\review-prompt-delta2.md`).
+- **Gates:** `bash work/<seat>/gate.sh <worktree> <run-id> <legs...>` (background) + a Monitor on `watch2.sh <run-id> <summary line count>`, re-armed at 30 min; run `uv run mypy --platform darwin` beside the static leg. Copy the toml and `uv sync --frozen` in a new worktree first.
+- **Backslash-bearing Python goes through the Write tool**, never a heredoc (it struck again in gen 59: a heredoc with `r"C:\Users..."` died on `\U`).
+- **A bare `cd` moves the session's cwd.** ONLY `( cd X && ... )`, `git -C`, absolute paths.
+- **QUIT_SCRIPT exception:** `tests/test_app_startup.py::test_python_m_clearwater_starts_the_shell_and_exits_0` runs at the SEAT in gate legs only; every cell run keeps `-k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`.
+- **Running downloaded build scripts / binaries is refused** at this seat; read them as text.
+- **CI-SHAPED REHEARSAL BEFORE EVERY TAG** (`work/orch-g58/rehearsal.py --runner-path`); **THE RELEASE SWEEP** before any Codex read of a bump; **RELEASE NOTES STATE BEHAVIOUR BY SHAPE** (DR-159 carries them into checklist v3).
+- **A NEW WORKTREE'S `.venv` IS AN EMPTY SHELL** (`uv sync --frozen` first; the harness in an unsynced state worktree skips 40 -- run the harness on main).
+- **CLAUDE.md is CHARC's** (owner 2026-11-09: the Current-state block is rewritten at each accept; narrative goes to `docs/project-log.md`); the orchestrator never appends to it.
+- **Claude lane hold (CHARC, 2026-11-09):** if Claude weekly usage passes ~95 % before the 2026-11-09 09:59Z reset, hold the next Claude turn (WP6.5) and tell CHARC; Codex (WP7.1) proceeds regardless.
 
 ### Live board (RESUME HERE)
 
-**`v1.1.1` IS PUSHED AND ITS DRAFT IS VERIFIED (steps 8-10 DONE); the clean-account check (step 11, the OWNER's hand) and CHARC's `docs/proofs/release-1.1.1.md` are next; Publish is the owner's.** CHARC pushed main `d0cd949f` + `v1.1.1` on the owner's one-time word ("You do the pushing", 2026-11-07 ~23:35Z). Run `42439969961` (windows-2025-vs2026 20261103.298.1) SUCCESS on headSha `c5ed8517`: runner parallel `7515 / 1062` (the two extra skips vs the rehearsal are runner-only: no 8.3 short names; no `C$` admin share; `workflow\run-42439969961\skipdiff-vs-rehearsal.txt`). DRAFT (isDraft true, not prerelease) with three assets; `step10.json`: zip `3a4da9d1...395d` = the runner's own sidecar; source commit = `c5ed8517` in the sidecar, the run and the draft body; one top-level folder; member SET = the local build (306), 3 members differ in bytes (`Clearwater.exe`, `base_library.zip`, numpy RECORD's two launcher-exe hashes: DR-156 class); notices byte-equal (attached = inner = local `69a6837e...`); the workflow artifact = the draft's three files. Reported to CHARC. PRUNE done at the seat (`docs/proofs/prune-2026-11-07.md`, 9 items, 68.5 GiB freed). Earlier:  Annotated tag object `85cd0017` peels to **`c5ed85172b32fee474ddb4fb3b54f30eadf9adf4`** (= main = `release-1.1.1`), message "Clearwater 1.1.1" (record `clearwater-review-evidence\release-1.1.1\tag\tag.txt`). `v1.1.0` is unchanged (`0127e1a2` -> `356f2e4d`) and is NEVER moved. TAG REPORT posted to CHARC (`f0e184e1`, 2026-11-07T23:30Z) with the owner's two push lines (`git push origin main`, `git push origin v1.1.1`); CHARC relays them.
+**1.1.1 is RELEASED** (published 2026-11-09 05:30Z by CHARC on the owner's word after the owner's clean-account check passed; record `docs/proofs/release-1.1.1.md`). Nothing more for the release.
 
-How it got here (gen 59, all evidence under `clearwater-review-evidence\release-1.1.1\`):
-- Three ruled fix commits on top of the bump `d6d1d259` (CHARC rulings `86b67a7b`, `4c58fa63`, `8d7e91d7`): F1 notices.py artifact history sentence version-neutral (+ pin); F3 / N2 six root-notice lines version-neutral; F2 / F5 notes wording; the GPU-pack start-up sentence ended in its SHORT form. F4 (`docs/release-checklist.md`) -> DR-159 after the tag (CHARC's).
-- Codex reads: r1 (`d6d1d259`) 1 CRITICAL + 4 MINOR + 1 ADV; r2 (`c1625e55`, `fix\r2-delta`) 1 MAJOR + 1 MINOR; r3 (`6105f1f1`, `fix2\r3-delta`) 1 MAJOR; **r4 (`bc14bc98`, `fix3\r4-delta`) NO_NEW_CRITICAL_MAJOR**.
-- Rebased onto main `867a9f8d`: range-diff all four "=" (`ff\range-diff.txt`); main ff'd to `c5ed8517`; FREEZE posted (`74f99ae9`).
-- Build (`build\`): exit 0, no window, notices PASS 1540 / 478, smoke all PASS; zip sha256 `361a9301b53e396ebc744ed983b1443fac95534069c3baa79b7fb349a9d7ef53` = sidecar; 306 members = built, byte-identical; artifact notices sha256 `69a6837e...7c7d` (4,697,437 B); actionlint clean.
-- CPU proof (`proofs\cpu\`): all True, V4 0 / 0, 9 BEST-EFFORT. GPU proof not repeated (limit).
-- Rehearsal (`rehearsal\c5ed851-runnerpath\`): PASS, parallel 7517 / 1060, staged `Clearwater-1.1.1-windows-onedir.zip`.
-- FULL gate r111 (`gate\`): static clean + darwin; identity 9921; parallel 8370 / 207; serial 1318 / 19, 0 failed (DR-158's node passed); fullclip 7; harness 423; installer alone 113.
+**WP6.5 macOS validation** (brief `docs/briefs/wp6.5-brief.md` FINAL + my fill `49ca01bf`; Claude `implementer-opus-high`; both nets Codex; evidence `clearwater-review-evidence\wp6.5\`):
+- Round 0 dispatched 05:36Z: cell `wp65-cell1`, dispatch `wp6.5\cell\dispatch-1.md` (READ-ONLY; ledger `docs/proofs/wp6.5-ledger.md`); depth 68,866 at dispatch.
+- ROUND-0 RETURNED 2026-11-09 ~06:00Z: ledger commit **`a186c3ee`** on `wp6.5` (`docs/proofs/wp6.5-ledger.md`, 33,606 B, 0 CR; full evidence in its sections 0.0 and 3-8). Depth at the round-0 yield **254,025** (evaluation point): **group 1 goes to a FRESH `wp65-cell2` from the ledger**, not a resume. No STOP; ELEVEN findings for CHARC (the cell's return text is summarised here; the ledger is of record):
+  - **F0-6 CONFLICTS WITH CHARC's Q5 RULING -- RAISE FIRST:** `workflow_dispatch` fires only for a workflow file present on the DEFAULT branch, so a new `macos-validation.yml` that exists only on `wp6.5` cannot be dispatched. The cell recommends instead ONE reusable `.github/workflows/macos-build.yml` with triggers `workflow_call` (input release-version) + `workflow_dispatch` + `push: branches: ["macos-validation/**"]`, called by `release.yml`'s `macos` job (`needs: windows`); the owner's stage-1 act is a push of the branch to `refs/heads/macos-validation/wp6.5` (`git push origin wp6.5:refs/heads/macos-validation/wp6.5`); windows job byte-identical; needs a grant for `tests/test_release_workflow.py` pins (:59-69, :441-458, :603). Gen 60 VERIFIES F0-6 at the seat (GitHub docs: "workflow_dispatch ... the workflow must be on the default branch") and posts the conflict to CHARC with the cell's alternative.
+  - **F0-1 (ruling needed):** M-BUNDLE tests assume a `.app` (`tests/test_macos_portability.py:1566-1572`, `:1583-1606`); the onedir zip ships `Clearwater/Clearwater` + `_internal`; and `build.py` passes `--windowed`, so PyInstaller builds a `.app` on macOS anyway (makespec.py:472-474, :869-871). Q3 interacts.
+  - **F0-2 (sizing):** `notices.py` is Windows-shaped; the Mac's N13 needs its own host census + a macOS FFmpeg lock with component texts + a toolchain census; the largest item, may need its own group.
+  - **F0-3 / F0-4 correct CHARC note 4:** the runner (macos-latest = macos-26 = 26.6.2) is NEWER than the Mac (26.3.1); macOS 15+ has no Control-click Open (System Settings > Privacy & Security > Open Anyway, Apple support 102445).
+  - **F0-5:** the notices skip hides 35 functions / 158 ids (not ~22); one more function reads `.venv/Lib/site-packages`.
+  - **F0-7:** setup-uv's checksum is per platform: the seat must fetch the `uv-aarch64-apple-darwin` 0.10.9 sha256.
+  - **F0-8:** standard arm64 runner = 3 vCPU M1 / 7 GB / 14 GB disk: `-n 3` on the macOS job only.
+  - **F0-9:** framework symlinks in macOS builds; `build.py:2636-2637` (origin) and `_release_files` `:2769`/`:2777-2782` (zip) refuse every link.
+  - **F0-10:** README is core-scanned; FORBIDDEN_TERMS includes the test-runner and linter names; the macOS prerequisites section must not name them.
+  - **F0-11:** does the runner's serial leg run the QUIT_SCRIPT test (seat-only exception) or carry the cell `-k` exclusion? CHARC rules.
+  - **Q1:** recommended label `macos-26` (arm64, 26.6.2, image 20261026.0455.2); no FFmpeg on the image; `hevc_videotoolbox` on the runner UNVERIFIED (the first run's `-allow_sw 0` trial decides).
+  - **Q2 (no pick):** BtbN does NOT build macOS; martin-riedl.de 9.0.2 arm64 (sha256 sidecars, GPLv3 with libzvbi, build script Apache-2.0 with `-SKIP_ZVBI`, personal host); osxexperts FAILS (mutable URL, source points at 6.1); evermeet Intel-only + zvbi; jellyfin 8.1.3 not 9.x; **self-build in the owner's fork (Riedl script, `-SKIP_ZVBI`, macos-26, FFmpeg `b204e94e`) is the only candidate meeting every rule.**
+  - **Q3:** `--windowed` = `.app` on macOS; PyInstaller ad-hoc re-signs; adding FFmpeg after signing may break the seal ("damaged") -- unverified, a run-sheet observation.
+  - **CHARC notes designs:** note 1 = move the skip onto the `release` fixture (:191) and the native-reading test (:1049); note 2 = darwin PATH (interpreter bin, venv bin, /usr/bin, /bin, /usr/sbin, /sbin) + strip `DYLD_*`, set the DYLD fallbacks; the origin rule = a stdlib-struct Mach-O normalised identity (segments except `__LINKEDIT`, `__LINKEDIT` up to the signature, load commands without LC_CODE_SIGNATURE / LC_RPATH, dylib names by basename; one `@loader_path` rpath; relative in-folder framework links only), tested on Windows with synthetic thin and fat Mach-O fixtures; plus `smoke.py:578-597`'s darwin containment.
+  - **M census:** 224 / 9,921 collected (matches WP6.4); runner families vs stage-2 families in the ledger section 7.
+  - **Run sheet:** 15 steps; smallest full SCUBA clip GX011589 (48.8 MB, 6.4 s, start-up dominated; min 7 GiB) or GX011592 (396 MB, 42.3 s; min 8 GiB) -- CHARC picks.
+  - **Groups:** G1 Windows-proved (note 1, note 2 + Mach-O identity + links, DR-123, smoke containment); G2a the macOS FFmpeg per Q2 + macOS notices census (+ an owner fork act if self-build); G2b the workflow per Q5 + release job + pins + actionlint; G3 fold each runner run; stage 2 the run sheet.
+  - **Registration:** the new workflow file needs an `INSTANCE_SURFACE_RELPATHS` line beside `release.yml` (`tests/harness/genericity_lists.py:254`): a harness-file edit (seat edit or grant), then the harness gate.
+- **Gen 60's next for WP6.5:** verify at the seat (read-only): F0-6 (GitHub's workflow_dispatch default-branch rule), Q1's runner lines, Q2's candidate claims (BtbN README line, Riedl sha sidecars / licence / `-SKIP_ZVBI`), F0-1's test lines, F0-9's build.py lines; then ONE query to CHARC: F0-6 vs the Q5 ruling FIRST (with the cell's push-trigger alternative), then Q1-Q3, F0-1, F0-2 sizing, F0-3/4 note corrections, F0-7..F0-11, the run-sheet clip pick, the group split. On rulings: write `dispatch-2.md` (group 1) for a FRESH `wp65-cell2` (FRESH prompt = the brief + the ledger at `a186c3ee` + dispatch-2; the hardware rules verbatim).
+- **CHARC rulings already in hand (fold into dispatch-2):**
+  - **Q5 RULED (`c0be531c`) -- BUT round 0's F0-6 says its dispatch vehicle cannot fire from a non-default branch; re-put to CHARC before any build:** option (a) in REUSABLE form: `.github/workflows/macos-build.yml` (`on: workflow_call`; inputs ref / version label; the job: CPU-only sync, W + M legs with `-rs`, both mypy targets, onedir bundle with the bundled FFmpeg, smoke, notices inventory, zip + sidecar as a WORKFLOW ARTIFACT); callers: `.github/workflows/macos-validation.yml` (`workflow_dispatch` on ANY ref, no gate, no release job = stage 1's vehicle) and a `macos` job in `release.yml` = `uses: ./.github/workflows/macos-build.yml` after the untouched tag gate (windows job byte-identical; the release job's `needs` and assets gain the macOS zip + sidecar; notices one file per platform, named by platform). Both new files GRANTED into Files owned; `actionlint` on all three; `tests/test_release_workflow.py` pins extended (Windows job unchanged by text, gate unchanged, validation workflow has no release job and no tag gate); every third-party action 40-hex pinned. (b) DECLINED. AD-38 (18) at the accept. Both new `.github/workflows/*.yml` files need `genericity_lists` registration.
+  - **Stage-1 run:** when the first macos-build is ready and the two CHARC-note items are proved on Windows, post CHARC "ready for the owner's push of wp6.5 + dispatch of macos-validation on it" with the exact two lines; CHARC asks the owner each time.
+  - **Fill clarifications 2-10 CONCURRED**; lane margin hold concurred.
+- (superseded: see the round-0 entry's last bullet for gen 60's next steps.)
 
-**NEXT:**
-1. On CHARC's relay of the owner's push: checklist steps 8-10 (mine):
-   - watch the `release.yml` run (`gh run list --workflow release.yml`, `gh run watch`);
-   - the draft's assets: zip sha256 = the runner's OWN sidecar; member SET vs the local build `work\release-1.1.1` (DR-156: not byte-reproducible); notices byte-equal to `69a6837e...`; `# source-commit:` = `c5ed8517` = `github.sha`;
-   - the clean-account check (form: the 1.1.0 checklist v2 step 10);
-   - report to CHARC for `docs/proofs/release-1.1.1.md`; Publish is the owner's.
-2. On ANY run failure: STOP to CHARC; `v1.1.1` is never moved.
-3. Then WP6.5 (Mac) and WP7.1 (Insta360), CHARC's commissions.
+**WP7.1 Insta360 Studio exports** (brief `docs/briefs/wp7.1-brief.md` FINAL + my fill `c0569d03`; Codex `implementer-codex-sol-high`; both nets Claude; evidence `clearwater-review-evidence\wp7.1\`):
+- **NOT YET DISPATCHED** (gen 59 was at the cap). Gen 60: create `.worktrees/wp7.1` from main (`git worktree add -b wp7.1 .worktrees/wp7.1 main`), copy the toml, `uv sync --frozen`, `mkdir` the evidence folders, write `wp7.1\cell\dispatch-1.md` (round 0 READ-ONLY: Q2 export_oracle, the probe / decode / export / timing driver plan, the entry-point redirection, the seat-run split per fill clarification 1, the inventory file name `docs/reports/inventory-2026-11-09.md`), then a FRESH Codex turn 1.
+- **Q3 RULED (`9f2b04a1`): do NOT install the GPU pack;** the figures are source runs on the venv's CuPy. Fill clarifications 1-7 CONCURRED.
+- Every EXCLUSIVE timing run and multi-minute export is run AT THE SEAT from md5-checked copies of the cell's drivers, CHARC told before each, never during a WP6.5 heavy run.
 
-**Other standing items:**
-- Prunes owed on the owner's word only: `.worktrees/release-1.1.1` (+ its r111 basetemps), `.worktrees/release-1.1.1-rv`, `work/release-1.1.1`, `work/release-1.1.1-proof-cpu` once the release record is written. The 2026-11-07 batch is DONE.
-- Open rows DR-148..DR-153, DR-155, DR-157, DR-158 (passed in r111), DR-159 (CHARC's, after the tag).
+**Other standing items:** open rows DR-148..DR-153, DR-155, DR-157, DR-158 (watch), DR-159 (CHARC's checklist v3). C: about 2.6 TB free.
 
 ### Gen-59 lessons
 
-- **A ruling's wording can itself be false:** CHARC's A1 phrase ("the set of installed files") went into the fix commit, and the next read found it false. Verify a director's supplied wording against the code BEFORE committing it, the same as your own.
+- **A ruling's wording can itself be false:** CHARC's A1 phrase went into a fix commit and the next read found it false. Verify supplied wording against the code BEFORE committing it.
 - **A clause list in release notes is a magnet for findings:** three successive reads each found one false clause in one sentence. Propose the shape-only form as soon as a second round finds a clause.
-- **Main moves under a release branch** (CHARC's state commits): rebase onto main, record `git range-diff` (all "=") and the tree diff (state docs only), then ff. The reviewed sha and the tagged sha differ; the range-diff binds them.
-- **A harness run's tail can print "acked 1 message(s); moved inbox -> read."** It is fixture output from temp mailboxes; check the real inbox listing before worrying.
-- **The bare-`cd` slip recurred twice in gen 59** (`cd .worktrees/... &&` at the start of a command). Each was restored in the next call; nothing was written while moved.
+- **Main moves under a release branch** (CHARC's state commits): rebase onto main, record `git range-diff` (all "=") and the tree diff, then ff.
+- **Read the workflow's gate before planning a run on it:** WP6.5's stage-1 plan assumed a branch dispatch of `release.yml`; its version gate refuses any non-tag ref. Caught at the fill, ruled as Q5.
+- **The runner's skip set can differ from the CI-shaped rehearsal's** by host facts the rehearsal cannot mimic (8.3 short names, the `C$` admin share): diff SKIPPED reasons, never assume (7515 / 1062 vs 7517 / 1060).
+- **A harness run's tail can print "acked 1 message(s); moved inbox -> read."** It is fixture output; check the real inbox listing.
+- **The heredoc backslash collapse struck again** (prune2's KEEP block). The Write tool is the only safe route for any Python with a Windows path.
+- **The bare-`cd` slip recurred twice in gen 59** (`cd .worktrees/... &&` at the start of a command). Each was restored in the next call.
 
 ### Gen-58 lessons
 
