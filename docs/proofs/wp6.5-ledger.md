@@ -1669,4 +1669,142 @@ runner's checkout is owned by the runner user, so `safe.directory` is not needed
   propagation, zip-after-success, zip-mutation and missing-member contracts need darwin
   counterparts in part 3 before the switch goes on.
 
-Depth at G3-fix yield: DISPATCHER TO FILL
+Depth at G3-fix yield: 259,224 (wp65-cell10, read by the dispatcher with cell_depth.py at its G3-fix return)
+
+## Group 2a part 3 (`wp65-cell11`, dispatch-12; base `7149758f`)
+
+Turn G2a-PART-3. **STOPPED at item 2 (the census) on the dispatch's own rule** ("where a
+text is needed and is not in the zip's text members or already in the repository, STOP and
+name it"): seven licence texts the census needs are in neither place, and the Apple
+toolchain-runtime rows have no source pin or linkage evidence in the log. Item 1 (the lock)
+is DONE AS A DRAFT, validated and mutation-proved, but NOT committed: the pin test asserts
+the real lock is absent (`tests/test_release_workflow.py:1144`) and condition 4 flips that
+assertion only in the switch-ON commit, which cannot land before the notices rows (they need
+the texts). No product, test, workflow or fixture byte moved this turn; this ledger is the
+only commit. Nothing downloaded was extracted or run; no network read. Scratch
+`work\wp6.5\part3\` (scripts `scripts\zipread.py`, `tarlic.py`, `draft_lock.py`,
+`mutate.py`; outputs `tarlic.out`, `mutate.out`).
+
+### STOP: the census inputs not in the zip or the repository
+
+The zip's text members (30: `LICENSE.txt` = FFmpeg's GPLv3, 35,147 B, sha `8ceb4b9e...`;
+`build/FFmpeg-LICENSE.md`; versions, pins, toolchain, dylib lists, 15 component logs) carry
+NO component licence text. Each linked component's licence files were read IN MEMORY from
+the pinned source tarballs group 2a part 1 left under `work\wp6.5\g2a\dl\` (every tarball's
+sha256 equals its pin in the zip's `build/sha256-pins.txt`, the runner-verified list) and
+matched by sha256 against EVERY tracked file of the repository (`git ls-files`):
+
+| Component (pin) | Text needed (the Windows row's set, at this pin) | sha256 | Bytes | In repo |
+|---|---|---|---|---|
+| fribidi 1.0.16 | `fribidi-1.0.16/COPYING` (LGPL-2.1) | `32434afcc8666ba0...` | 26,440 | **NO** (Windows used `libiconv--COPYING.LIB`, other bytes) |
+| freetype 2.13.0 | `freetype-2.13.0/LICENSE.TXT` | `2e3bbb7d3c5c3963...` | 2,074 | **NO** (Windows `bd36c8b4...`) |
+| freetype 2.13.0 | `freetype-2.13.0/docs/FTL.TXT` | `08c135755dd58903...` | 6,743 | **NO** (Windows `5a5ee54c...`) |
+| SDL2 2.32.10 | `SDL2-2.32.10/LICENSE.txt` | `97f35b302b361680...` | 884 | **NO** (Windows `1c040b82...`) |
+| SDL2 2.32.10 | `SDL2-2.32.10/Xcode/SDL/pkg-support/resources/License.txt` | `37b975b5273734ea...` | 909 | **NO** |
+| libxml2 2.15.3 | `libxml2-2.15.3/dict.c` (whole file; the Windows row carries it) | `416253664eb3d95a...` | 25,239 | **NO** (its lines 1-17 = repo `libxml2--dict.c-L1-17.txt`) |
+| Apple clang-2100.1.1.101 runtime (compiler-rt builtins, libc++ header code; G2a-F5) | llvm-project `LICENSE.TXT` (Apache-2.0 WITH LLVM-exception) at Apple's source for this clang | - | - | **NO** (repo has `llvm-3.6.2-LICENSE.TXT` and Rust's compiler-builtins combined text, neither this source) |
+
+In the repository at the SAME bytes (reusable): zlib 1.3.2 (3 texts), openssl 3.6.1 (2),
+libxml2 (`Copyright`, `list.c`, both `NOTICE`, both excerpts), freetype (`docs/GPLv2.TXT`,
+`src/bdf/README`, `src/pcf/README`), fontconfig 2.17.1 (`COPYING`), harfbuzz 14.3.0
+(`COPYING`, `src/ms-use/COPYING`; the Windows `perf/texts/COPYING` is absent from 14.3.0),
+SDL2 (`hidapi` x4, `yuv2rgb`, `visualtest`, `Xcode-iOS` bitmapfont), libass 0.17.5, libogg
+1.3.6, x265 4.2 (3), x264 (the SAME commit `0480cb05` as the Windows row, so its text).
+
+**Toolchain-runtime gap (beyond the text):** the log names the compiler (`Apple clang version
+21.0.0 (clang-2100.1.1.101)`, lines 160 / 661) but no source repository or commit for it, and
+no link line showing `libclang_rt` (FFmpeg's make is not verbose; the zip's 15 component logs
+carry no `libclang_rt` / `compiler-rt` string). A `toolchain_runtime` row needs a pinned
+source (`repository/tree/<pin>`) and a linkage basis; neither is in the log. G2a-F5's rows
+are an inference the run does not prove.
+
+Reproduction: `python -I work\wp6.5\part3\scripts\tarlic.py work\wp6.5\g2a\dl -
+tools\package\native-licences\ffmpeg-components` (output `tarlic.out`); the repository-wide
+match is a 10-line `git ls-files` hash scan (0 matches for the six component texts).
+
+### Item 1: the lock (draft, validated; NOT committed)
+
+`work\wp6.5\part3\ffmpeg-macos.lock.draft.json` (sha256 `a6675a4e57aa8a9c...`, 0 CR; written
+by `draft_lock.py` from the sources, the fixture's shape kept field for field; the fixture
+untouched). It passes `validate_ffmpeg_lock(..., platform="darwin")` at the head (census
+`pending`, the only value the head admits).
+
+| Field | Value | Source |
+|---|---|---|
+| `release_tag` | `ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-9cb0fa8` | seat `fork-recipe-macos.md:57` (lightweight tag -> `9cb0fa81...` by `git ls-remote`) |
+| `build_repository_commit` | `9cb0fa81871f09ae3f750d6845874c26a871b985` | seat `:57`; `attempt3-run.json` `headSha`; zip `build/versions.txt` `recipe rwsmythe/FFmpeg-Builds@9cb0fa81...` |
+| `build_run_url` | `https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/42661533922` | zip `build/toolchain.txt` last line; dispatch |
+| `asset_name` / `archive_root` | `ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0(.zip)` | the seat file name; zip root folder (every member under it) |
+| `asset_url` | `.../releases/download/<tag>/<asset>` | the validator's exact form; dispatch |
+| `size_bytes` | 37,978,871 | the cell's own read of the seat zip |
+| `github_sha256` | `e3f251dc...76e4` | seat `:59` (GitHub asset digest) = `checksums.sha256` |
+| `seat_sha256` | `e3f251dc281a71e46e1464436c8cb281994af7fe4ed4978d95922ad82bb176e4` | **the cell's own `python -I` hash of the seat zip** (37,978,871 B) |
+| `version` | `n9.0.2-47-gb204e94e90-20261109` | log line 660 (`Check the binaries`) |
+| `configure_line` | `configuration: --prefix=/Users/runner/work/FFmpeg-Builds/FFmpeg-Builds/work/out --pkg-config-flags=--static --extra-version=20261109 --enable-gray --enable-libxml2 --enable-version3 --enable-gpl --enable-openssl --enable-libfreetype --enable-fontconfig --enable-libharfbuzz --enable-libass --enable-libx264 --enable-libx265` | log line 662, VERBATIM after the timestamp (read by script, not retyped) |
+| `runner_image_version` | `20261102.0473.1` | log line 18 (`Runner Image` group); line 155 `ImageVersion=` |
+| `source_record_url` | `https://github.com/rwsmythe/FFmpeg-Builds/tree/9cb0fa81...` | the fork tree at the build commit |
+| `retention_note` | "the asset is a release of the owner's fork (tag `<tag>`, not Latest); no retention policy applies; rebuild in the fork for an FFmpeg bump (checklist step)" | the Windows note's form plus the tag |
+| `build_script` | Riedl `f63b8aab...` | zip `build/versions.txt` last line |
+| `extract_members`, `ffmpeg_*`, `licence`, `macos_deployment_target`, `runner_label` | as the fixture | zip `build/versions.txt` line 1 (FFmpeg commit / ref); log 160-161, step env `DEPLOYMENT_TARGET: 14.0` |
+| `excluded[]` | the fixture's 21 rows | log lines 337-343: the build.sh call's `-SKIP_*=YES` = these 21 + `SKIP_TEST` / `SKIP_BUNDLE` (G2a2-F1) |
+| `components[]`, `toolchain`, `toolchain_runtime[]` | empty / null (census pending) | the STOP above |
+
+**Digest proof:** the cell's own hash of the seat zip: 37,978,871 B, sha256
+`e3f251dc281a71e46e1464436c8cb281994af7fe4ed4978d95922ad82bb176e4` (equal to the dispatch, the
+seat post and `checksums.sha256`).
+
+**Mutation family** (`mutate.py`: the draft validated, then `_download_ffmpeg` over the seat
+zip as a file URL with the module's test switch; `mutate.out`): unmutated GREEN; `size_bytes`
++1 RED "download size differs from lock", -1 RED "size exceeds lock"; `github_sha256` digit 0
+/ 63 +1 RED and `seat_sha256` digit 0 / 63 +1 RED ("sha256 readings differ"); both digests
+moved together (a self-consistent lock) digit 0 / 63 RED "download sha256 mismatch; archive was
+not opened"; the `--ffmpeg-sha256` argument digit 0 / 63 RED "argument differs from the lock".
+10 of 10 mutations RED. These are the head's existing rules (no new rule was needed); the
+family becomes a committed test with the lock.
+
+### The census from the run (rows and sources; `components[]` blocked by the STOP)
+
+| Item | Value | Source |
+|---|---|---|
+| Linkage, `ffmpeg` | 21 entries, all `/usr/lib/` (`libSystem.B`, `libbz2.1.0`, `libiconv.2`, `libc++.1`, `libobjc.A`) or `/System/Library/Frameworks/` (Foundation, AudioToolbox, CoreAudio, AVFoundation, CoreVideo, CoreMedia, CoreGraphics, OpenGL, ApplicationServices, CoreFoundation, Metal, VideoToolbox, CoreImage, AppKit, CoreServices, CoreText); no third-party dylib | log 618-638 (`Check the binaries`); zip `build/ffmpeg-dylibs.txt` |
+| Linkage, `ffprobe` | the same 21 (byte-identical list, sha `bd8b69c1...` both) | log 639-659; zip `build/ffprobe-dylibs.txt` |
+| FFmpeg's external libraries | appkit, avfoundation, bzlib, coreimage, iconv, libass, libfontconfig, libfreetype, libharfbuzz, libx264, libx265, libxml2, metal, openssl, sdl2, zlib; hwaccel audiotoolbox, videotoolbox | zip `build/logs/build-ffmpeg.log:144-153` |
+| Statically linked components | x264 `0480cb05`, x265 4.2 (8/10/12-bit), openssl 3.6.1, libxml2 2.15.3, zlib 1.3.2, freetype 2.13.0, fontconfig 2.17.1, harfbuzz 14.3.0, fribidi 1.0.16 (through libass; FFmpeg's line has no `--enable-libfribidi`), libass 0.17.5, SDL2 2.32.10 (autodetected) | zip `build/versions.txt`; pins `build/sha256-pins.txt`; the dylib census above (none of them dynamic) |
+| Built, not linked | libogg 1.3.6 | not in FFmpeg's external list |
+| Build tools (not in the binary) | nasm 3.02, pkg-config 0.29.2, cmake 4.0.3, ninja 1.13.2, meson 1.11.2 | `build/versions.txt`, `build/toolchain.txt` |
+| System, dynamic (not distributed) | bzlib, iconv, libc++, libobjc, libSystem, the frameworks | the dylib census |
+| Toolchain | Xcode 26.6 (17F113), SDK 26.5, `Apple clang version 21.0.0 (clang-2100.1.1.101)`, target `arm64-apple-darwin25.6.0`, `MACOSX_DEPLOYMENT_TARGET=14.0` (the step's minos check passed for both tools; the value itself is not printed) | log 157-163, 661, 551-556; zip `build/toolchain.txt` |
+| Two-way configure coverage | enabled = gpl, version3, gray, libxml2, openssl, libfreetype, fontconfig, libharfbuzz, libass, libx264, libx265; licence / feature switches (not libraries): gpl, version3, gray; the 8 others map to one component each; zlib and sdl2 are autodetected (`configure_flag` null) | log 662; `build-ffmpeg.log:144-150` |
+
+### Not done (blocked by the STOP), in the dispatch's order
+
+2. The complete-census rules (`components[]`, `toolchain`, `toolchain_runtime[]`, coverage)
+   and the `census` block naming the step and line range: need the texts and the runtime pin.
+3. The Apple toolchain marker byte-check (`Apple clang version 21.0.0 (clang-2100.1.1.101)`
+   from log 661, the `toolchain` object's field): not started; it reads the census object.
+4. The Mac notices and lifting the `--notices` / `--zip` refusal: need the texts.
+5. Switch ON + notices rows + pin-test flip (one commit) and the C13 un-skip: not done; the
+   lock lands in that commit. C13's five skips (`test_tools_package_build.py:386`, `:1304`,
+   `:1359`, `:1575`, `:1665`) are unchanged.
+
+### Verification loop (self)
+
+- Every draft field re-read against its source (table above): the configure line and version
+  are read by the script from the log lines, not retyped; size and digest from the bytes.
+- Suspected: the excluded rows drifted from the run. REJECTED: the log's build.sh call
+  (337-343) passes exactly the 21 + `SKIP_TEST` / `SKIP_BUNDLE`.
+- Suspected: a pinned tarball under `work\` differs from what the runner built. REJECTED: each of
+  the 15 distinct digests in the zip's `build/sha256-pins.txt` equals a tarball there
+  (`tarlic.out`); the three other files there (the cmake source, the nasm mirror archive, the
+  x265 generated archive) are not in the pin list and were not used.
+- Suspected: the Windows texts could stand in for this pin. CONFIRMED false for 6 texts (other
+  bytes); those are the STOP.
+- Readers of the lock fields at the head: `macos-build.yml:130` (`asset_url`, `seat_sha256`),
+  `build.py` (`_download_ffmpeg`, `_bundle_macos_ffmpeg`, `build()`), `smoke.py:854`; all read
+  fields the draft fills; no reader yet consumes the census (part 3's code, not written).
+- A second pass found nothing new.
+
+Counts: no product, tool, test, workflow or fixture byte changed, so no suite was re-run
+for this turn (the G3-fix counts stand); the only commit is this ledger (0 CR).
+
+Depth at part-3 yield: DISPATCHER TO FILL
