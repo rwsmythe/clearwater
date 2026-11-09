@@ -163,3 +163,4 @@ claim that they clear.
 | Round | Diff | Banner | Findings | Verdict | Disposition |
 |---|---|---|---|---|---|
 | r1 | `83d7c9ed..74a1dbf2` | gpt-6.1-sol, high | 1 NIT: `verify.py:685`, `:708` called a 1000000 movie timescale "coarser" than 30000 (it is finer; it cannot hold the exact end) | NO_NEW_CRITICAL_MAJOR | FIX (wording, docstring and comment; report title) |
+| r2 | `74a1dbf2..b772f63d` (delta) | gpt-6.1-sol, high | none | NO_NEW_CRITICAL_MAJOR | converged |
