@@ -1014,4 +1014,277 @@ absolute paths. One read-only Bash call (the upstream digest cross-check) passed
 120 s default and was moved to the background by the tool; it completed (exit 0) and its
 output file was read.
 
-Depth at the 4a yield: DISPATCHER TO FILL
+Depth at group-2a part-1 yield: 302,932 (wp65-cell4, read by the dispatcher with cell_depth.py at its 4a return)
+
+## Group 2a part 2 (`wp65-cell5`, dispatch-5; base `1ef10536`)
+
+Build turn 4b: the Clearwater side that consumes the fork's macOS asset, proved on Windows
+without the asset. No review round yet (Reviewer A reads this head). Every item test-first;
+the RED runs used the base `build.py` (`git archive 1ef10536`) loaded through the test
+modules' own hooks or a repo-rooted copy under `work\` (deleted after). Nothing downloaded was
+run; the only network reads were three FFmpeg source files at `b204e94e` as TEXT
+(`fftools/opt_common.c`, `libavutil/utils.c`, `ffbuild/version.sh`, under
+`work\wp6.5\g2a2\src\`) to confirm how the version and configuration are compiled in. Commits:
+`51b7e76a` (items 1-2), `34c16c24` (item 3), `d23c2856` (item 4), `dd9c734a` (item 5 loop
+fix), then this ledger; every committed blob 0 CR (byte count per file per commit).
+
+### The lock shape (item 1) and why
+
+A SECOND lock FILE `tools/package/ffmpeg-macos.lock.json` (the name G2b's switch reads),
+validated by the SAME `validate_ffmpeg_lock` with a `platform` keyword (`"win32"` default,
+`"darwin"`), the document's discriminator being `"platform": "macos-arm64"`. Against AD-38:
+(2) one lock per provider asset, each recording provider, tag, URL, size, GitHub digest = seat
+digest, the FFmpeg commit and the configure line verbatim with the MUST / MUST NOT rules; (11)
+`ffmpeg_ref` + 40-hex `ffmpeg_commit`, `version` fullmatched against `-g<prefix>`, the date
+bound to `--extra-version`; (12) the only bundling path `--ffmpeg-from <lock url>
+--ffmpeg-sha256 <lock sha>` with the provenance fields cross-bound; (13) the census rows bound
+to THIS asset. A row INSIDE the Windows lock was rejected: it would change the Windows
+document's bytes and its validator's field set (the brief and the dispatch require both
+unchanged) and would make every Windows reader carry a macOS asset; a second file keeps the
+Windows lock byte-identical and lets each platform's bundling read only its own pin.
+
+Fields (`build.py:919` `FFmpegMacLock`, 30): `schema_version` 2, `platform` `macos-arm64`,
+`census` (`pending`), `provider` (pinned `rwsmythe/FFmpeg-Builds`), `build_script`
+{`repository` pinned `https://git.martin-riedl.de/ffmpeg/build-script.git`, `commit` 40-hex},
+`release_tag` (fullmatch `ffmpeg-9.0-g<commit8>-macos-arm64-nozvbi-<build7>`),
+`build_repository_commit`, `build_run_url` (`https://github.com/<provider>/actions/runs/<n>`),
+`asset_name` (= `archive_root.zip`), `asset_url` (= the release download form, exact),
+`size_bytes`, `github_sha256` = `seat_sha256`, `ffmpeg_ref` `release/9.0`, `ffmpeg_commit`,
+`ffmpeg_repository` (the recipe's `https://github.com/FFmpeg/FFmpeg.git`), `version` (F3b),
+`configure_line`, `licence` `GPL-3.0-or-later`, `archive_root` (= `ffmpeg-<version minus
+date>-macos-arm64-gpl-9.0`, so a Windows-shaped root, name or URL can never pass),
+`extract_members` `[bin/ffmpeg, bin/ffprobe, LICENSE.txt]`, `source_record_url` (= the tree at
+the build commit, the Windows form), `retention_note`, `macos_deployment_target` `14.0`,
+`runner_label` `macos-26`, `runner_image_version` (`\d{8}\.\d+\.\d+`), `components` [],
+`excluded` (rows {stage `SKIP_<NAME>`, status `not-built(disabled)`, reason}; `SKIP_ZVBI` and
+`SKIP_DECKLINK` required), `toolchain` null, `toolchain_runtime` [].
+
+**Reading disclosed (not a STOP):** the dispatch lists "`source_record_url` (the run)". The
+Windows `source_record_url` is the recipe tree at the build commit (the per-component source
+recipes, AD-38 (12)); the macOS lock keeps that meaning AND adds `build_run_url` for the run,
+both bound to the provider. **Census form chosen:** `census: "pending"` requires `components`,
+`toolchain_runtime` EMPTY and `toolchain` null; `"complete"` is REFUSED this turn ("the macOS
+census rules are WP6.5 part 3's"), so no half-defined census rule ships; part 3 writes the
+complete-census rules with the real rows. `build()` on darwin refuses `--notices` / `--zip`
+while the census is pending (`build.py:4242`).
+
+### Items
+
+1. **The lock and its validator (`51b7e76a`).** `build.py:912` `FFmpegBuildScript`, `:919`
+   `FFmpegMacLock`, `:964` `FFMPEG_MACOS_LOCK_PATH` and the pinned constants, `:1435`
+   `_macos_configure_problem` (printed prefix; MUST `--enable-gpl`, `--enable-version3`,
+   `--enable-libx265`; MUST NOT `--enable-nonfree`, any `libfdk` token, `--enable-libzvbi`,
+   `--enable-decklink`; exactly one `--extra-version` = the version's date), `:1453`
+   `_validate_macos_ffmpeg_lock`, `:1572-1598` `validate_ffmpeg_lock` overloads + the
+   discriminator at `:1636` (darwin: `platform` must read `macos-arm64`; win32: a document
+   carrying `platform` is refused "is not the Windows lock"; any other platform refused; the
+   Windows body after it is unchanged), `:1824` `load_macos_ffmpeg_lock`. The synthetic fixture
+   `tests/ffmpeg_lock/ffmpeg-macos.fixture.json` (census pending; fork commit `deadbeef...`,
+   sha `0`x64, run id `40000000001`; `retention_note` says SYNTHETIC). The real lock is NOT
+   created. Tests `tests/test_tools_package_build.py:3111-3330`: the fixture passes and its
+   field set = `FFmpegMacLock`; its 21 excluded stages = the patch's `-SKIP_*=YES` switches
+   minus `SKIP_TEST` / `SKIP_BUNDLE`; each MUST / MUST NOT in turn (9) + prefix / no date; a
+   Windows-shaped asset 4 ways (URL only, root+name+URL, the Windows lock's URL, the Windows
+   tag); 25 provenance mutations (schema, provider, size, digests, commits, ref, repository,
+   major, licence, `.exe` members, source record, run URL x2, deployment target, runner label,
+   image version, retention note, census complete / unknown, non-empty census lists, toolchain,
+   build_script fields); the build script pin (2); excluded rows (7); exact field set (2); the
+   discriminator both ways + Linux; the loader reads its own file and refuses the Windows lock.
+   RED (base `build.py`): 51 `validate_ffmpeg_lock() got an unexpected keyword argument
+   'platform'` + 27 `no attribute 'FFMPEG_MACOS_LOCK_PATH'`; the excluded-rows data test
+   passes on both. GREEN.
+2. **`bundle_ffmpeg`'s darwin path (`51b7e76a`).** `build.py:2159` `bundle_ffmpeg(...,
+   platform="win32")`: `:2197` darwin -> `:2055` `_bundle_macos_ffmpeg`; any other platform
+   refused; the Windows body unchanged. The darwin order: the macOS lock; the destination must
+   be `Contents/MacOS` of a `.app` and none of the four targets may exist (BEFORE any
+   download); `_download_ffmpeg` (URL = lock, sha = lock, size bound, digest verified before
+   the archive is opened); `_ffmpeg_archive_members` (every member inspected: unsafe names,
+   links, duplicates; `bin/ffmpeg`, `bin/ffprobe`, `LICENSE.txt` required); staged under
+   `<out>/ffmpeg/<archive_root>.verified` with chmod 0755 on the two tools, 0644 on the texts
+   (G2a-F4); each tool `:2008` `_macos_tool_problem` (thin 64-bit Mach-O, CPU arm64,
+   MH_EXECUTE; FAT, x86_64, dylib, PE refused) and `:2018` `_macos_ffmpeg_version`; the
+   `ffmpeg-BUILD.txt` record (provider, build script @ commit, tag, asset, sha, version, commit,
+   ref, build commit, run, source recipes, the macOS lock path, deployment target, runner,
+   configure line); then `place_macos_tools` (tools to `Contents/MacOS` 0755, texts to
+   `Contents/Resources` 0644) and `verified_hashes` updated only after all of it. **Version
+   check, said as asked:** Windows RUNS `ffmpeg.exe -version` (bounded, PATH = its folder,
+   `_pinned_ffmpeg_version`) and byte-reads only the GCC / rustc toolchain markers; the darwin
+   path never runs the tool: it reads `FFMPEG_VERSION` and `FFMPEG_CONFIGURATION` from the
+   bytes (both are standalone C strings: `opt_common.c:204` prints `"%s version %s"` with
+   `FFMPEG_VERSION`, `:211` `"%sconfiguration: %s\n"` with `FFMPEG_CONFIGURATION`), requiring
+   exactly ONE version token (`n9.x.y-n-g<hex>-<8 digits>`, NUL-terminated, not glued to a
+   token character) equal to the lock's and the configure body as a NUL-terminated string not
+   preceded by a printable byte; 1 MiB blocks with an overlap, a match at a carried-over first
+   byte judged only in its earlier block. The smoke runs `-version` on the runner (item 3).
+   **The Apple toolchain marker check** (the Windows `_check_ffmpeg_toolchain_markers`)
+   needs the census: declared part 3 in `_bundle_macos_ffmpeg`'s docstring. `build()`
+   (`:4291`) passes `platform="darwin"` through `functools.partial` on darwin only (the
+   Windows call keeps its exact keywords: an existing stub test has no `platform`
+   parameter). Tests `test_tools_package_build.py:3334-3690` with a synthetic fork zip and fake
+   Mach-O heads (`subprocess.run` / `Popen` patched to FAIL, so nothing is ever run):
+   placement, bytes, texts, record fields, archive kept, modes (POSIX hosts); the chmod spy
+   (0755 on exactly ffmpeg / ffprobe, staged + placed, everything else 0644); verify before
+   open x3 (nothing staged or placed); unsafe members x4; zip symlink; Windows tool names; 10
+   per-tool refusals (x86_64, dylib, fat, PE, wrong / second / absent / glued version token,
+   configuration, prefixed configuration; nothing placed, no trusted hash); strings across
+   the 1 MiB boundary; destination outside an `.app` refused before download; the other
+   platform's lock refused by both bundling paths and Linux refused; an existing tool in the
+   `.app` refused before anything is placed; `build()` on darwin uses the macOS lock and the
+   darwin path and refuses `--notices` / `--zip` while the census is pending, and a sha other
+   than the lock's. RED: as item 1 (same run). GREEN 85 in the selection.
+3. **The darwin smoke run path (`34c16c24`, G1-F4).** `smoke.py:1095` `run_smoke`: win32
+   unchanged, darwin -> `:1003` `_run_macos_smoke`, any other host refused by name. The
+   darwin path: the executable `Clearwater.app/Contents/MacOS/Clearwater` (a release folder or
+   `Contents/MacOS` accepted, a onedir or a bundle without `Contents/Frameworks` refused);
+   smoke root disjoint from the bundle; `:967` `_macos_static_checks` (forbidden paths on the
+   bundle, forbidden entries, hidden imports with NO pack scan as `build()` on darwin, notices
+   read from `Contents/Resources/THIRD_PARTY_NOTICES.md` against `plan_notices` of the
+   executable folder); the 10 refusal + 2 worker rows, each through `_process` ->
+   `_contained_process` (G1's process-group containment and `killpg` census); the planted
+   exception: exactly one regular `Contents/Frameworks/scipy/_lib/_ccallback_c*.so`, never
+   reached through a link (checked on the shipping bundle and again in the copy), removed from
+   a COPY (`copytree(symlinks=True)`), the copy's `Contents/MacOS/Clearwater --export-worker`
+   expected to exit non-zero with the one stderr line naming `:961` `_macos_log_file` (= HOME
+   `/Library/Application Support/Clearwater/logs/clearwater.log`), the log holding one
+   traceback naming `_ccallback_c`; `:840` `_ffmpeg_checks`: darwin REQUIRES both tools in
+   `Contents/MacOS` (regular files; fail-closed, no SKIP), reads the macOS lock, runs
+   `ffmpeg` / `ffprobe -version` (version + configure line) and `ffmpeg -hide_banner -encoders`
+   expecting `:833` `_SMOKE_ENCODERS["darwin"]` = (`hevc_videotoolbox`, `libx265`); the Windows
+   message, PASS line, SKIP-when-absent rule and `load_ffmpeg_lock()` call are unchanged.
+   Tests `test_tools_package_smoke.py:999-1280` (a darwin `.app` fixture under a monkeypatched
+   `sys.platform`, `_contained_process` replaced by a bounded child running a Python stub):
+   the complete run (rows and their order, executables, the planted copy, the FFmpeg rows in
+   `Contents/MacOS`, PATH `/usr/bin` + `/bin`, every root under `out/smoke`, the log location,
+   shipping bytes unchanged, the PASS lines incl. `(hevc_videotoolbox; libx265)`); the log
+   path equals `config.paths.app_locations(platform="darwin", home=...)`; the encoder rows
+   equal `capability.encoder_roster(platform)` for win32 and darwin; 5 row failures by name
+   (version, configure, no VideoToolbox, the WINDOWS roster on darwin, no log); 11 fail-closed
+   inputs (no ffmpeg, no ffprobe, `.exe` tools, no `.so` (the shipping worker rows fail
+   first), two `.so`, `.pyd` only, no notices, notices in `Contents/MacOS`, stale notices, no
+   Frameworks, a onedir); the link refusal; Linux refused. RED: 19 "platform: smoke requires
+   the Windows onedir artifact" + 2 `_SMOKE_ENCODERS` absent + 1 Linux message. GREEN 22.
+4. **The switch's lock fields (`d23c2856`).** The step already reads `asset_url` and
+   `seat_sha256` from `tools/package/ffmpeg-macos.lock.json`, the fields of item 1's shape: no
+   rename. `.github/workflows/macos-build.yml:29-34` the env comment now names part 3;
+   `MACOS_FFMPEG_BUNDLED: "false"` kept (`:35`). Test `tests/test_release_workflow.py:1124`:
+   the step's lock path = `build.FFMPEG_MACOS_LOCK_PATH`; the two fields read, in order, are
+   `FFmpegMacLock` fields and fixture keys; the build line passes them as `--ffmpeg-from` /
+   `--ffmpeg-sha256`; the fixture's values are not in the workflow; the switch is exactly
+   `"false"` and no real lock exists (part 3 changes both together). RED: on the base
+   `build.py` (a copy of the module beside it under `work\wp6.5\g2a2\wfred\`): `no attribute
+   'FFMPEG_MACOS_LOCK_PATH'`. GREEN. `release.yml` untouched (the windows job's sha pins pass).
+5. **Verification loop:** below.
+
+### Proof the Windows lock / bundling verdicts are unchanged
+
+- `tools/package/ffmpeg.lock.json`: not touched (no diff from `1ef10536`).
+- `tests/test_tools_package_ffmpeg.py` (unmodified; the Windows lock validator and bundling):
+  run against the BASE `build.py` (the module copied beside a `git archive 1ef10536
+  tools/package`) and against the new one: 290 passed / 290 passed, the sorted node-id +
+  outcome lists identical (sha256 `2eb4eed8d476ccc8...` both).
+- `tests/test_tools_package_build.py`, the 275 pre-existing ids (no existing test edited; the
+  module only grew): new 275 passed; base (`WP61_BUILD_SCRIPT` = the base `build.py` copied
+  to `work\pkgbase\`, so its `REPO_ROOT` is the worktree) 275 passed; outcome maps identical
+  (`31abdd2acc190b86` both). (A first base copy under `work\wp6.5\g2a2\base\` failed 35
+  build()-calling ids environmentally, its `REPO_ROOT` being `work\`: discarded.)
+- `tests/test_tools_package_smoke.py`: no line removed from the module; the 44 + 1 pre-existing
+  ids pass / skip as before (66 passed, 1 skipped in all).
+- Darwin SIMULATION (a scratch plugin sets `sys.platform = "darwin"` after collection; not a
+  proof): the build module's 255 pre-existing non-space ids have IDENTICAL outcomes on base and
+  new (56 fail on both: simulation artifacts or G3 runner items, unchanged by this turn); the
+  2 new ids failing there are simulation artifacts (Windows file modes read as 0666; PyInstaller
+  reads `platform.mac_ver()` at import; the plugin's PYTHONPATH trips the build guard).
+
+### Counts at the group-2a part-2 head (`-p no:cacheprovider --timeout 600 --basetemp=work\wp6.5\g2a2\<module> -k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`)
+
+Static: `ruff check .` All checks passed; `ruff format --check .` 337 files already
+formatted; `mypy` Success 166; `mypy --platform darwin` Success 166.
+
+| Module | Result |
+|---|---|
+| `tests/test_tools_package_build.py` | 355 passed (group 2b: 275; +80) |
+| `tests/test_tools_package_ffmpeg.py` | 290 passed (unchanged module; identical to base) |
+| `tests/test_tools_package_smoke.py` | 66 passed, 1 skipped (group 2b: 44 + 1; +22; the skip is the non-Windows tripwire) |
+| `tests/test_release_workflow.py` | 79 passed (group 2b: 78; +1) |
+| `tests/test_tools_package_notices.py` | 415 passed (`-n 3`, as group 2b, to fit the tool call; module and `notices.py` untouched) |
+| `tests/test_portability.py` | 192 passed |
+| `tests/test_macos_portability.py` | 224 skipped (`macos` platform skip) |
+
+### Verification loop (self)
+
+- Suspected: `"--enable-nonfree"` read as a REMOVAL by the test helper (prefix `-`).
+  CONFIRMED (6 must-not ids did not raise); FIXED in the test (`---` marks removal).
+- Suspected: the prefixed-configuration probe also erased the version's NUL. CONFIRMED
+  ("version token(s) []"); FIXED in the test (the probe keeps the terminator).
+- Suspected: the `fftools` print concatenates the version / configuration into its format
+  literal, so a NUL-delimited read would miss them. REJECTED by reading the source at
+  `b204e94e` (`opt_common.c:204`, `:211`: both passed as `%s` arguments); the `"FFmpeg version
+  " FFMPEG_VERSION` arrays (space before the token) also satisfy the token rule.
+- Suspected: Python's lookbehind cannot see bytes before `pos`, so the block-start rule would
+  misjudge. REJECTED: `re.compile(rb'(?<![a-z])b').search(b'ab', 1)` is None.
+- Suspected: a pre-existing Windows `build()` stub (`fetched(destination, *, out, url,
+  sha256, verified_hashes)`) breaks if the call gains `platform=`. CONFIRMED by reading;
+  AVOIDED: darwin only passes it (`functools.partial`).
+- Suspected: the existing smoke fixture stubs `load_ffmpeg_lock` with a zero-argument lambda.
+  CONFIRMED; AVOIDED: the Windows path keeps `load_ffmpeg_lock()`; darwin calls
+  `load_macos_ffmpeg_lock()`.
+- Suspected: a partial placement leaves `ffmpeg` in the `.app` when `ffprobe` already exists.
+  CONFIRMED by design review (`place_macos_tools` is per file); FIXED: all four targets are
+  checked before the download (test asserts nothing placed, nothing fetched).
+- Suspected: the planted copy's unlink could follow a link into the shipping bundle.
+  CONFIRMED possible in principle; FIXED: the target must be a regular file inside the bundle
+  and its copy inside the copy (test with a link-reporting `.so`: refused, shipping file kept).
+- Suspected: a `.so`-less shipping bundle reaches the planted row. REJECTED: its worker rows
+  fail first (`worker-empty: exit 1`), which the test now records.
+- Found: the module docstring and `smoke_artifact`'s argument named only the Windows lock /
+  onedir. FIXED `dd9c734a`.
+- A final pass over items 1-4 found nothing new.
+
+### What only the fork run and the runner prove
+
+- **The fork run (seat):** the real asset's name, size, three-way digest, tag at the run's
+  head (F3), the run URL, the image version, the configure line VERBATIM and the build date;
+  that the real `ffmpeg` / `ffprobe` carry exactly one version token and the configure body
+  as C strings (the rule is from the source, never tested on a real Mach-O here); thin arm64
+  MH_EXECUTE; that `zip -X` gives no member the archive inspection refuses.
+- **The runner (switch ON, part 3):** `bundle_ffmpeg` on darwin over the real download; the
+  tools 0755 after a real extraction; the origin check admitting the two whole-file hashes in
+  `Contents/MacOS`; the seal (`codesign --sign -` without `--deep`, then `--verify --deep
+  --strict`) accepting the linker-signed tools as nested code, and the origin re-check after
+  it; the darwin smoke natively: the rows under `killpg` containment, the planted copy
+  starting from a bundle whose seal the removed `.so` breaks, the log under the redirected
+  HOME, `-version` / `-encoders` listing `hevc_videotoolbox` and `libx265`; `--zip` keeping the
+  execute bits.
+
+### What part 3 must fill
+
+1. `tools/package/ffmpeg-macos.lock.json` from the fork run (every field above; `census`
+   then flips with the census rows).
+2. The complete-census rules in `_validate_macos_ffmpeg_lock` (refused today): `components[]`
+   (the Riedl components, Windows row shape, texts under a macOS texts folder), the
+   `toolchain` object (Apple clang / SDK / deployment target bound to THIS asset) and
+   `toolchain_runtime[]` (compiler-rt builtins, libc++ header code, G2a-F5), plus the two-way
+   configure coverage.
+3. The Apple toolchain marker byte-check in `_bundle_macos_ffmpeg` (the Windows
+   `_check_ffmpeg_toolchain_markers` analogue), from the census.
+4. The Mac notices (`notices.py` reading the macOS lock; written to
+   `Contents/Resources/THIRD_PARTY_NOTICES.md`; confirm `plan_notices`' input is the
+   executable folder, as `_macos_static_checks` assumes), then lift the `--notices` / `--zip`
+   census refusal in `build()`.
+5. `MACOS_FFMPEG_BUNDLED: "true"` and the pin test's `"false"` + no-lock assertions
+   (`tests/test_release_workflow.py:1124`) flipped together.
+
+### Findings for the dispatcher
+
+- **G2a2-F1 (record):** the G2a-F2 skip set is mirrored in the fixture's `excluded` rows and
+  bound to the patch by a test; if CHARC's concurrence changes the skips, the patch and the
+  fixture change together (the test fails otherwise).
+- **G2a2-F2 (record, runner):** `--smoke Clearwater.app` (the bundle folder itself) is not
+  accepted: `find_executable` looks for `Clearwater.app/...` or `Clearwater` UNDER the folder
+  given; the release folder or `Contents/MacOS` work (the build passes `Contents/MacOS`).
+- Slip (disclosed): my second Bash call began with a bare `cd /dev/null 2>/dev/null;` (it
+  failed, `/dev/null` not being a directory; no cwd change, nothing written); every later call
+  used absolute paths or `--directory` / `git -C`. One heredoc collapsed `\\` (the known trap)
+  and failed its own assertion before writing; the edits were redone with the Edit tool.
+
+Depth at group-2a part-2 yield: DISPATCHER TO FILL
