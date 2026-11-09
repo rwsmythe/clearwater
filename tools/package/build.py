@@ -1832,10 +1832,11 @@ def _macos_census_components(data: dict[str, object], config: str) -> list[FFmpe
             raise ValueError("FFmpeg lock: invalid component chosen licence")
         _macos_texts(row.get("texts"), f"component {name}")
         status = row.get("status", "built")
-        if (status == "built-not-linked") != (name in FFMPEG_MACOS_UNLINKED) or status not in {
-            "built",
-            "built-not-linked",
-        }:
+        if (
+            not isinstance(status, str)
+            or status not in {"built", "built-not-linked"}
+            or (status == "built-not-linked") != (name in FFMPEG_MACOS_UNLINKED)
+        ):
             raise ValueError(f"FFmpeg lock: {name}: invalid component status {status!r}")
         flags = row["configure_flag"]
         if flags is not None:

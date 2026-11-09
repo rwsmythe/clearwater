@@ -3831,6 +3831,10 @@ def change_census(data: dict[str, Any], folder: Path, change: str) -> None:
         del libogg["status"]
     elif change == "linked-unlinked":
         zlib["status"] = "built-not-linked"
+    elif change == "status-list":
+        zlib["status"] = []  # A r6 minor 1: a non-string status was a TypeError
+    elif change == "status-dict":
+        zlib["status"] = {}
     elif change == "unlinked-flag":
         libogg["configure_flag"] = ["--enable-libogg"]
     elif change == "unmapped":
@@ -3927,6 +3931,8 @@ def change_census(data: dict[str, Any], folder: Path, change: str) -> None:
         ("chosen", "invalid component chosen licence"),
         ("unlinked-built", "libogg: invalid component status 'built'"),
         ("linked-unlinked", "zlib: invalid component status 'built-not-linked'"),
+        ("status-list", "zlib: invalid component status []"),
+        ("status-dict", "zlib: invalid component status {}"),
         ("unlinked-flag", "libogg: configure_flag must be null or nonempty"),
         ("unmapped", "unmapped=['--enable-libx265']"),
         ("absent", "absent=['--enable-zlib']"),
