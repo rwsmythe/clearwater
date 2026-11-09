@@ -780,4 +780,238 @@ M-RATE, M-V4, M-V4 corpus, M-SPACE, M-SPAWN, M-BUNDLE P16 / P57. Release mode is
 harness registration of `.github/workflows/macos-build.yml`). Re-runs: re-push, or "Re-run
 jobs" on the run page.
 
-Depth at group-2b yield: DISPATCHER TO FILL
+Depth at group-2b yield: 381,605 (wp65-cell3, read by the dispatcher with cell_depth.py at its group-2b return)
+
+## Group 2a (`wp65-cell4`, dispatch-4; base `b76066e1`)
+
+Turn 4a = part 1: the fork's macOS FFmpeg recipe as a patch, and the component pin table. No
+product, test or workflow edit in Clearwater; no `uv lock`; no downloaded script or binary was
+run (the build scripts and tarballs were read as text / listed as data; `bash -n` PARSE-ONLY
+syntax checks on the four edited scripts and the workflow's run blocks, no execution). Helper
+clones and data under `work\wp6.5\g2a\` (left in place for the seat): `FFmpeg-Builds\` (the fork,
+branch `wp6.5-macos`), `FFmpeg-Builds-applycheck\` (the apply proof), `build-script\` (Riedl),
+`x264\` (metadata clone), `dl\` (the 19 downloaded files, data only), `x265cmp\`, `ffmpeg-src\`
+(`configure`, `ffbuild/version.sh`, `RELEASE` at `b204e94e`), `runner\` (the image readme),
+`riedl-site\` (the provider's `versions.txt` / `codecs.txt`), `static\check_pins.py` + its output,
+`fork-commit-message.txt`.
+
+### 4a.0 The fork base
+
+`git ls-remote --symref https://github.com/rwsmythe/FFmpeg-Builds.git HEAD` (2026-11-09):
+`ref: refs/heads/wp6.3c-nozvbi-r2 HEAD` / `d77b8352f60bd180ebce585632846533aa60b183 HEAD`; branches
+`master` `c63bb308...`, `wp6.3c-nozvbi` `92d0b6a6...`, `wp6.3c-nozvbi-r2` `d77b8352...`. As expected.
+
+### 4a.1 The Riedl script pin
+
+`https://git.martin-riedl.de/ffmpeg/build-script.git`, default branch `main` (`ls-remote --symref`),
+head **`f63b8aab8f5ce1a067da86ba69e34a36a7e217e5`** (2026-08-17T17:33:44+02:00, "chore: ffmpeg
+update (version 9.0.1)"); read from a `git clone` (autocrlf off; 0 CR in the tree). Kept despite
+`develop` being newer (`ab619910`, 2026-10-31): the README names `main` the release-build branch;
+`develop` differs in scripts only by fribidi's switch to meson (needed for fribidi 1.0.17's help2man)
+and lame. Evidence that matters for the runner: the provider's own 9.0.2 macOS arm64 build
+(`riedl-site\versions.txt`) says "built with Apple clang version 14.0.0 (clang-1400.0.29.102)", so the
+script's macOS path is proven on an old toolchain, not on Xcode 26.6 / clang 21.
+
+Runner (image readme `images/macos/macos-26-arm64-Readme.md` at `actions/runner-images`
+`741e4eb8`, 2026-11-09): macOS 26.7.2 (25G332), image 20261102.0473.1 (round 0 read 26.6.2 /
+20261026: the image moved); default Xcode 26.6 (17F113), Clang/LLVM 21.0.0, Xcode CLT
+26.6.0.0.1781586589, Homebrew 7.0.11 with pkgconf 3.0.10, Ninja 1.13.2, CMake 4.4.5, Python3
+3.15.2, Cargo / Rust 1.99.1; **no autoconf, automake, libtool, cargo-c, meson or virtualenv** (0 hits).
+
+### 4a.2 Component pin table (arm64 macOS GPL build, the proposed skip set)
+
+Columns: component | how the script obtains it (at `f63b8aab`) | as the script stands | the recipe's
+pin | licence (basis) | GPL-3.0-compatible | linkage | file:line (upstream). "Windows row" = the
+seat-verified row of `tools/package/ffmpeg.lock.json` for the same project at a different pin;
+"tarball read" = the licence file read inside the pinned tarball by the cell; neither is a
+seat verification of THIS pin (part 3's census).
+
+| Component | Obtained | As the script stands | Recipe pin | Licence (basis) | GPL-3.0 | Linkage | file:line |
+|---|---|---|---|---|---|---|---|
+| FFmpeg 9.0.1 | `https://ffmpeg.org/releases/ffmpeg-$VERSION.tar.bz2` | FLOATING (tarball, no checksum) | **edit**: git `release/9.0` + `checkout --detach b204e94e90fca64045e9ca7dd44c65678c7eb29e` | GPL-3.0-or-later as configured (`--enable-gpl --enable-version3`) | yes | the program | `build-ffmpeg.sh:49`; `build.sh:662` |
+| zlib 1.3.2 | `https://www.zlib.net/fossils/zlib-1.3.2.tar.gz` | FLOATING | sha256 `bb329a0a...9d16` | Zlib (tarball read; Windows row) | yes | static (`--static`) | `build-zlib.sh:41`; `build.sh:265` |
+| openssl 3.6.1 | GitHub release `openssl-3.6.1.tar.gz` | FLOATING | sha256 `b1bfedcd...a82e` (= upstream `.sha256` = GitHub digest) | Apache-2.0 (tarball read; Windows row) | yes (GPL-3 only: the script sets `--enable-version3` for it, `build.sh:274-275`) | static (`no-shared`) | `build-openssl.sh:41`; `build.sh:271` |
+| libxml2 2.15.3 | `download.gnome.org/.../libxml2-2.15.3.tar.xz` | FLOATING | sha256 `78262a6e...7a07` (= gnome `.sha256sum`) | MIT AND ISC-Veillard (Windows row; tarball `Copyright` read) | yes | static (`--enable-shared=no`); `--enable-libxml2` always (`build-ffmpeg.sh:68`) | `build-libxml2.sh:42`; `build.sh:292` |
+| fribidi 1.0.16 | GitHub release tar.xz | FLOATING | sha256 `1b1cde5b...a05c` (asset has no GitHub digest) | LGPL-2.1-or-later (tarball read; Windows row) | yes | static | `build-fribidi.sh:41`; `build.sh:298` |
+| freetype 2.13.0 | savannah, mirror sourceforge | FLOATING | sha256 `a7aca0e5...1f80` (both URLs, same bytes) | FTL OR GPL-2.0-or-later (Windows row; cell-read UNVERIFIED for this tarball) | yes | static | `build-freetype.sh:46,49`; `build.sh:304` |
+| fontconfig 2.17.1 | freedesktop GitLab generic package | FLOATING | sha256 `9f5cae93...a541` | MIT (Windows row; tarball `COPYING` read) | yes | static | `build-fontconfig.sh:41`; `build.sh:311` |
+| harfbuzz 14.3.0 | GitHub release tar.xz (meson) | FLOATING | sha256 `16070d77...eae` (= GitHub digest) | MIT-Modern-Variant ("Old MIT", tarball read; Windows row) | yes | static | `build-harfbuzz.sh:41`; `build.sh:318` |
+| SDL2 2.32.10 | `libsdl.org/release` | FLOATING | sha256 `5f5993c5...5165` | Zlib (tarball read; Windows row) | yes | static; unskippable in `build.sh:324-328`, FFmpeg autodetects `sdl2` (configure `EXTERNAL_AUTODETECT_LIBRARY_LIST`): ffplay (not shipped) and libavdevice's sdl2 output device in ffmpeg | `build-sdl.sh:41` |
+| libass 0.17.5 | GitHub release | FLOATING | sha256 `caab4b99...094a` (= GitHub digest) | ISC (tarball read; Windows row) | yes | static | `build-libass.sh:41`; `build.sh:384` |
+| x264 | `code.videolan.org/.../archive/master/x264-master.tar.gz` | FLOATING (branch) | **edit**: git clone + `checkout --detach 0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee` (master head, 2025-09-10, r3223; also the Windows pin) | GPL-2.0-or-later (repo `COPYING` + Windows row) | yes | static | `build-x264.sh:36`; `build.sh:554` |
+| x265 4.2 | `bitbucket.org/multicoreware/x265_git/get/4.2.tar.gz` (generated) | FLOATING | **edit**: `downloads/x265_4.2.tar.gz` sha256 `40b1ea04...1210` | GPL-2.0-or-later AND MIT (Windows row) | yes | static, 8+10+12-bit (`SKIP_X265_MULTIBIT=NO`, Main10 needed) | `build-x265.sh:42`; `build.sh:568` |
+| libogg 1.3.6 | osuosl | FLOATING | sha256 `83e67047...4638` | BSD-3-Clause (tarball read; Windows row) | yes | built, NOT linked (unskippable `build.sh:402-406`; no FFmpeg flag uses it once vorbis / theora / opus are skipped) | `build-libogg.sh:41` |
+| nasm 3.02 (tool) | `http://www.nasm.us/...` + GitHub archive mirror | FLOATING | sha256 `f504227b...5998` / mirror `39e251d3...1586` | BSD-2-Clause (tarball read) | n/a | build tool, not linked (x86 asm only) | `build-nasm.sh:43,46`; `build.sh:238` |
+| pkg-config 0.29.2 (tool) | freedesktop | FLOATING | sha256 `6fc69c01...d591` | GPL-2.0-or-later, internal glib LGPL-2.1-or-later (tarball read) | n/a | build tool (`--with-pc-path=$TOOL_DIR/lib/pkgconfig`) | `build-pkg-config.sh:40,98`; `build.sh:259` |
+| cmake 4.0.3 (tool) | Kitware `cmake-4.0.3-macos-universal.tar.gz`, fallback source build | FLOATING (version hard-coded, no checksum) | sha256 `4e85de4d...ce9a` (= `SHA-256.txt` = GitHub digest); source `8d3537b7...3ffb` (= `SHA-256.txt`) | BSD-3-Clause | n/a | build tool (ninja, x265) | `build-cmake.sh:67,90`; `build.sh:280` |
+| ninja 1.13.2 (tool) | GitHub tag archive (built with cmake) | FLOATING | sha256 `974d6b2f...ae17` | Apache-2.0 (tarball read) | n/a | build tool (meson) | `build-ninja.sh:41`; `build.sh:286` |
+| meson (tool) | `pip install meson` (latest) in `python3 -m virtualenv` | FLOATING | **edit + workflow**: meson 1.11.2 wheel `--require-hashes` sha256 `7e4f6e83...a39` in a venv of `/usr/bin/python3` (1.12.x needs Python >= 3.10; the Xcode python3 is 3.9) | Apache-2.0 | n/a | build tool (harfbuzz) | `functions.sh:51-66` |
+| Apple clang (toolchain) | the runner's Xcode 26.6 (17F113), Clang 21.0.0, SDK 26.x | FLOATING with the image (recorded per run in `build/toolchain.txt`) | `MACOSX_DEPLOYMENT_TARGET=14.0` (= PySide6 6.12 / shiboken6 wheel floor `macosx_14_0`; <= the owner's 26.3.1) | Apple Xcode terms (not distributed); compiled-in compiler-rt builtins and libc++ header code: Apache-2.0 WITH LLVM-exception (part 3 toolchain census) | yes (LLVM-exception) | static builtins only | - |
+| macOS system libraries / frameworks | SDK (`/usr/lib`, `/System/Library`; VideoToolbox, CoreMedia, CoreVideo, CoreFoundation, AudioToolbox, AVFoundation, Security, libc++, libiconv, libbz2 ...) | system | the `otool -L` allowlist | system libraries, not distributed | n/a | dynamic | - |
+| Rust / cargo | for rav1e only | - | NOT USED (rav1e skipped) | - | - | - | `build-rav1e.sh:51` |
+| Riedl build script | vendored | - | `f63b8aab` + 5 edits in 4 files | Apache-2.0 (`LICENSE`) | n/a (not in the binary) | - | - |
+
+Skips (all are the script's own switches, `build.sh:47-165`; each component's script is NOT
+vendored, so a lost switch fails loudly):
+
+- `-SKIP_ZVBI=YES`: GPL-2.0-only (AD-38 (10)); owner-ruled.
+- `-SKIP_DECKLINK=YES`: nonfree (`build.sh:638`); already the default (`build.sh:43`), passed so a default change cannot enable it.
+- `-SKIP_LIBKLVANC=YES`, `-SKIP_ZIMG=YES`: their scripts run `./autogen.sh` (`build-libklvanc.sh:51`, `build-zimg.sh:51`), which needs autoconf / automake / libtool, absent from the image: a CERTAIN runner failure. libklvanc only serves DeckLink; zscale is unused.
+- `-SKIP_RAV1E=YES`: `cargo cinstall` needs cargo-c (absent from the image) and brings the Rust std + crate graph into the census (223 crate rows on Windows); AV1 encode unused.
+- `-SKIP_SRT=YES`: MPL-2.0 is not in AD-38 (16)'s component compatible constant as written (UNSETTLED there); a network protocol Clearwater does not use.
+- `-SKIP_LIBBLURAY`, `SNAPPY`, `LIBVMAF`, `AOM`, `DAV1D`, `OPEN_H264`, `OPEN_JPEG`, `SVT_AV1`, `LIBTHEORA`, `VPX`, `VVENC`, `LIBWEBP`, `LAME`, `OPUS`, `LIBVORBIS` `=YES`: unused by Clearwater (product: `libx265`, `hevc_videotoolbox`, native decoders, `-c:a copy`, `io/video/encode.py:515-531`, `decode.py:251`; tests: `libx264`, `libx265`, the native `aac` / `pcm_s16le` / `png` / `ffv1` encoders and `lavfi`, 0 uses of the others outside notices tests). Each kept one would be a pin, a texts row in part 3, and one more compile on an untested toolchain; dav1d / svt-av1 come from GitLab-generated archives whose bytes GitLab may regenerate (a sha256 mismatch = a second commit).
+- KEPT: x264 (`-SKIP_X264=NO`: the tests make H.264 fixtures with it), x265 with multibit (Main10).
+
+Summary: **18 components** (13 built: FFmpeg + 12 libraries, 11 of them linked, libogg built not
+linked; 5 build tools: nasm, pkg-config, cmake, ninja, meson) + the toolchain and system rows;
+**0 pinned as the script stands** (every tarball was fetched without a checksum, x264 from a branch,
+meson from latest); **18 pinned by the recipe's edits** (15 tarballs by sha256 incl. cmake's and
+x265's, FFmpeg and x264 by 40-hex commit, meson by wheel hash); **0 licence unsettled for a linked
+component** (SRT's MPL-2.0 is avoided by the skip); no GPL-2.0-only component (zvbi skipped and not
+vendored). Licence basis for THIS pin = the cell's read; the seat census is part 3.
+
+### 4a.3 The recipe (fork branch `wp6.5-macos`, ONE commit on `d77b8352`)
+
+Cell commit `a8d20eb4569fb8d3d5baf8b496a3d04c9eea8dd6` (tree `077bb2eaafaa5f4468d1a1b8bdfcdfe4cb731dc8`;
+37 files, all ADDED: `macos/build-script/` 34 files, `macos/sha256-pins.txt`,
+`macos/meson-requirements.txt`, `.github/workflows/build-macos.yml`; nothing else in the fork
+changes). The 30 unedited vendored files are blob- and mode-identical to `f63b8aab` (19 scripts
+100755); exactly four files differ. Edits (each in the commit message with its reason):
+
+1. `script/functions.sh` `download()`: sha256 looked up by exact URL in `macos/sha256-pins.txt`; a missing pin or a mismatch `exit 1` (no mirror fallback on a mismatch); a curl failure still returns non-zero so the script's own mirror path runs (and is pinned too).
+2. `script/functions.sh` `prepareMeson()`: requires the workflow's meson on PATH instead of `pip install meson` in a virtualenv.
+3. `script/build-ffmpeg.sh`: FFmpeg by `git clone --filter=blob:none --branch=release/9.0` + `git checkout --detach b204e94e...` (the WP6.3c form; `checkStatus` fails the build if absent); `-FFMPEG_SNAPSHOT` other than NO refused; `--extra-version` = `date -u +%Y%m%d` (Windows form) instead of the provider URL. `version/ffmpeg` not vendored.
+4. `script/build-x264.sh`: git clone + `checkout --detach 0480cb05...`.
+5. `script/build-x265.sh`: the uploaded release file `downloads/x265_4.2.tar.gz`: same tree as the generated `get/4.2.tar.gz` except `x265Version.txt`, which in the generated archive reads `releasetag: 4.0` / `repositorychangeset: 6318f22` (`x265cmp\`, `diff -rq`), and x265's `source/cmake/Version.cmake:51-122` reads that file when the tree is not a git checkout: the library would report 4.0.
+
+The workflow `.github/workflows/build-macos.yml`: `workflow_dispatch` only; `permissions: {}` at the
+top; both jobs `if: github.repository == 'rwsmythe/FFmpeg-Builds'`; actions pinned to 40-hex (checkout
+`11bd7190...` v4.2.2, upload-artifact `ea165f8d...` v4.6.2, download-artifact `d3f86a10...` v4.3.0,
+each verified to be the tag's commit via `gh api .../git/ref/tags/...`; the same pins Clearwater's
+workflows carry). **Not inherited:** `build.yml`'s floating `actions/checkout@v7`,
+`upload-artifact@v7`, `download-artifact@v8`, `cache@v6`, `docker/*@v4/v7` (AD-38 (15)) stay in
+`build.yml` only. Job `build` (`macos-26`, `contents: read`, `timeout-minutes: 150`): record the runner
+(sw_vers, image, Xcode, SDK, clang) and check every tool the build uses exists on the sanitized PATH,
+`build-zvbi.sh` absent, pins unique; meson 1.11.2 by hash into a venv of `/usr/bin/python3`; the build
+under `env -i` (PATH = meson venv + `/usr/bin:/bin:/usr/sbin:/sbin`, HOME, TMPDIR,
+`MACOSX_DEPLOYMENT_TARGET=14.0`, nothing else) with the 27 switches; on failure the last 80 lines of
+every component log; the logs as an artifact (`always()`); CHECKS that fail the run: the FFmpeg and
+x264 clones are at the pinned commits; `skip-*` markers (zvbi, decklink, libklvanc, rav1e, srt = YES;
+x264, x265, openssl = NO); per `ffmpeg` / `ffprobe`: executable, `lipo -archs` = `arm64`, `file` =
+`Mach-O 64-bit executable arm64`, `LC_BUILD_VERSION minos` = 14.0, `otool -L` entries ONLY under
+`/usr/lib/` or `/System/Library/` (the backstop); `-version` token fullmatch
+`^n9\.0\.2-47-gb204e94e[0-9a-f]*-[0-9]{8}$`, ffprobe's token equal; the configure line carries
+`--enable-gpl --enable-version3 --enable-libx265 --enable-libx264 --enable-openssl
+--extra-version=<the token's date>` and none of `--enable-nonfree`, `libfdk`, `--enable-libzvbi`,
+`--enable-decklink`; encoders `libx265`, `hevc_videotoolbox`, `libx264`, `aac`; decoders `hevc`,
+`h264`, `aac`. Package: ONE zip `ffmpeg-<describe>-macos-arm64-gpl-9.0.zip` (expected
+`ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0.zip`, root folder = name minus `.zip` as Windows)
+holding `bin/ffmpeg`, `bin/ffprobe`, `LICENSE.txt` (FFmpeg's `COPYING.GPLv3`, as BtbN's 35,147-byte
+LICENSE.txt), `build/` (`FFmpeg-LICENSE.md`, versions, `-version` both tools, encoders, decoders,
+dylib lists, `toolchain.txt`, the pins, `logs/`), `zip -X -r -9`; `checksums.sha256` (shasum form).
+Job `publish_release` (`ubuntu-24.04`, `contents: write`, needs build): re-verify the sha256, refuse
+an existing tag, `gh release create ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-<GITHUB_SHA:0:7>
+--target $GITHUB_SHA --latest=false` with the zip + `checksums.sha256`, then FAIL unless the tag ref
+= `GITHUB_SHA` (F3 form) and the GitHub asset digest = `sha256:<computed>` (retried 6 x 10 s).
+
+**Homebrew isolation:** `env -i` keeps `/opt/homebrew` and `/usr/local` off PATH (so no Homebrew
+`pkgconf`, `libpng-config` and the like, which freetype's configure would otherwise find), and drops
+`PKG_CONFIG_*`, `CPATH`, `LIBRARY_PATH`, `*FLAGS`, `HOMEBREW_*`; the script's own pkg-config searches
+only `$TOOL_DIR/lib/pkgconfig` (`build-pkg-config.sh:98`); Apple clang does not search
+`/opt/homebrew` by default. RESIDUAL: CMake 4.0.3's `Modules/Platform/Darwin.cmake:251-270` prepends
+`/opt/homebrew` to `CMAKE_SYSTEM_PREFIX_PATH` on arm64 even without `brew` on PATH, and no
+environment variable disables it (the 4.0.3 `Help/envvar` list); CMake builds only ninja and x265,
+whose macOS finds are NUMA (Linux-only), `rt` / `dl` and an unused VMAF lookup
+(`source/CMakeLists.txt:144-177`). The `otool -L` check is the backstop.
+
+**VideoToolbox:** FFmpeg's configure AUTODETECTS it on darwin (`configure:2180`
+`HWACCEL_AUTODETECT_LIBRARY_LIST`, `:7115` `check_apple_framework VideoToolbox`, encoder deps
+`:3812-3813`, `:3905`); the Riedl configure line passes no VideoToolbox flag (`build-ffmpeg.sh:67-68`);
+the provider's own build lists `hevc_videotoolbox` (`riedl-site\codecs.txt:101`). The encoder check
+makes a silent loss loud.
+
+**Patch:** `git format-patch -1 --stdout --base=d77b8352...` -> `tools/package/ffmpeg-fork-macos.patch`,
+**108,053 bytes, sha256 `9f334458d2eccc52ada5e0c429f1b303f8b89d18c620ea8d094039a25f353e30`**, 0 CR,
+`base-commit: d77b8352f60bd180ebce585632846533aa60b183` trailer. **Applies:** on a second fresh clone
+at `d77b8352` (`FFmpeg-Builds-applycheck\`), `git apply --check` OK and `git am --3way
+--committer-date-is-author-date` OK: tree `077bb2ea...` = the cell's tree, 19 files 100755. The
+commit sha depends on the committer identity and date (the cell's is `a8d20eb4`).
+
+### 4a.4 Static checks (here, no downloaded binary)
+
+- YAML parse (PyYAML `safe_load`): OK; jobs `build` (`contents: read`, `macos-26`, 150 min) and
+  `publish_release` (`contents: write`, `ubuntu-24.04`, 20 min); top `permissions: {}`; trigger
+  `workflow_dispatch` only; 4 `uses:`, all 40-hex.
+- `bash -n` (parse only) on the 7 run blocks and `bash --posix -n` on the four edited scripts: OK.
+- `static\check_pins.py` (reads the vendored tree as text): every `download` URL the vendored
+  scripts can request on darwin resolves (with `$VERSION` / cmake's `VERSION_*` / libxml2's
+  `VERSION_WITHOUT_PATCH`) to exactly one pin: 18 of 18, every pin requested, the 7 msys-only
+  pkg-config patch URLs excluded (`build-pkg-config.sh:52-89`, `uname -o` = Msys only); all 27
+  switches the workflow passes are parsed exactly once in `build.sh` (`:47-165`); every
+  `build.sh` call to a non-vendored script sits under a `SKIP_*` the workflow sets YES. NO PROBLEMS.
+- Release tag and asset name are deterministic from the run: `GITHUB_SHA:0:7` and the built
+  `-version` describe token (the date only in `--extra-version`, as Windows).
+- Found and fixed in the loop: two `pipefail` SIGPIPE hazards in the workflow (`awk ... exit` after
+  `otool -l`, `cmake --version | head -n 1`); both now read to the end.
+
+### 4a.5 What only the fork run proves; budget; the most likely failure
+
+Runner-only: every compile on Xcode 26.6 / clang 21 (the script's macOS path is proven only on Apple
+clang 14); the meson venv on the Xcode python3; the sanitized PATH being sufficient (checked first,
+in the record step); the deployment target taking in every component (minos check); the otool
+backstop; the encoder / decoder lists incl. `hevc_videotoolbox`; the zip, its digest three ways
+(computed, re-verified in the publish job, GitHub's asset digest) and the tag at the head.
+**Budget:** about 45-75 min on the 3-vCPU M1 arm64 runner (by component: openssl and the three x265
+depths are the largest C/C++ builds after FFmpeg's own ~10-15 min at `-j 3`; cmake is a binary
+download; no Rust); `timeout-minutes: 150` (2x the high end). **Most likely failure:** a compile error
+in an OLD component under clang 21, first suspect pkg-config 0.29.2's bundled 2017 glib (the script
+already carries the Dec 2024 `-Wno-int-conversion` fix, `build-pkg-config.sh:93-95`, `8509c03`
+"fix: pkg-config build on latest macOS"); the fix would be one more `CFLAGS` term in that script (or
+the build's pkg-config replaced) = a second fork commit = a new owner word. The log tail step prints
+the error in the job log, so diagnosis needs no second run.
+
+### 4a.6 Verification loop (self)
+
+- Suspected: the binaries would carry the runner's macOS (26.6+) as `minos` and refuse to start on
+  the owner's 26.3.1. CONFIRMED by reading (no deployment target anywhere in the script); FIXED by
+  `MACOSX_DEPLOYMENT_TARGET=14.0` (clang and CMake read it) plus the minos check.
+- Suspected: harfbuzz would find no meson (`prepareMeson` needs `virtualenv` or a meson on PATH; the
+  image has neither). CONFIRMED (readme); FIXED (edit 2 + the hashed meson).
+- Suspected: zimg / libklvanc need autotools. CONFIRMED (`./autogen.sh` in both; 0 autotools in the
+  image); avoided by the skips.
+- Suspected: the x265 generated archive reports the wrong version. CONFIRMED (`diff -rq`,
+  `Version.cmake`); FIXED (edit 5).
+- Suspected: freetype's configure finds Homebrew libpng via `libpng-config` on PATH. Plausible by
+  reading (not confirmed: depends on the image's packages); PREVENTED by `env -i`.
+- Suspected: SIGPIPE under `pipefail` in the check steps. CONFIRMED by reading; FIXED.
+- Suspected: the vendored files lost their exec bits on Windows. CHECKED: `update-index --chmod=+x`
+  from the upstream modes; the patch carries `new file mode 100755` and the apply clone has 19.
+- Rejected as false positive: a lost `-SKIP_ZVBI` silently building zvbi (its script is not vendored,
+  so `build.sh:424` would fail `checkStatus`).
+- A final pass found nothing new.
+
+### Findings for the dispatcher (4a)
+
+- **G2a-F1 (seat edit, not owned):** `.gitattributes` has `tools/package/ffmpeg-fork.patch -text`
+  but nothing for `ffmpeg-fork-macos.patch`; on a checkout with `core.autocrlf=true` (this
+  machine's system setting) the working copy turns CRLF. Add the same `-text` line.
+- **G2a-F2 (ruling):** the skip set goes beyond the owner's "-SKIP_ZVBI=YES" (the dispatch invited
+  proposals). To restore any component: drop its switch, vendor its script and version file, add
+  its pin; the cell regenerates the patch (before the fork commit, no owner word needed).
+- **G2a-F3 (owner acts, the WP6.3c form):** push `wp6.5-macos`; set it as the fork's default branch
+  (a `workflow_dispatch` workflow must exist on the default branch; `build.yml` and the Windows
+  recipe are on it unchanged); `gh workflow run build-macos.yml -R rwsmythe/FFmpeg-Builds --ref
+  wp6.5-macos` (no inputs: a successful run always publishes).
+- **G2a-F4 (part 2):** the zip stores 0755 for the tools, but Python's `zipfile` extraction drops
+  modes; `bundle_ffmpeg`'s darwin path must set the execute bits (the darwin exec-bit ruling).
+- **G2a-F5 (part 3):** census items new to macOS: compiler-rt builtins / libc++ header code
+  (Apache-2.0 WITH LLVM-exception), SDL2 inside ffmpeg (libavdevice sdl2 outdev), libogg built but not
+  linked, the deployment target 14.0 and the image version as lock / provenance fields.
+
+Slips this turn (disclosed): two Bash calls early in the turn carried a bare `cd` (`cd <worktree>
+2>/dev/null; true` and `cd /c && true`); no file was written by them; every later call used
+absolute paths. One read-only Bash call (the upstream digest cross-check) passed the tool's
+120 s default and was moved to the background by the tool; it completed (exit 0) and its
+output file was read.
+
+Depth at the 4a yield: DISPATCHER TO FILL
