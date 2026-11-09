@@ -53,6 +53,7 @@ from __future__ import annotations
 import argparse
 import ast
 import base64
+import fnmatch
 import functools
 import hashlib
 import importlib
@@ -982,6 +983,61 @@ FFMPEG_MACOS_RUNNER_LABEL = "macos-26"
 FFMPEG_MACOS_TOOLS = ("ffmpeg", "ffprobe")
 """The two Mach-O tools of the macOS asset, at ``bin/`` (no ``.exe``)."""
 
+FFMPEG_MACOS_EXCLUDED_STAGES = frozenset(
+    {
+        "SKIP_ZVBI",
+        "SKIP_DECKLINK",
+        "SKIP_LIBKLVANC",
+        "SKIP_RAV1E",
+        "SKIP_SRT",
+        "SKIP_ZIMG",
+        "SKIP_LIBBLURAY",
+        "SKIP_SNAPPY",
+        "SKIP_LIBVMAF",
+        "SKIP_AOM",
+        "SKIP_DAV1D",
+        "SKIP_OPEN_H264",
+        "SKIP_OPEN_JPEG",
+        "SKIP_SVT_AV1",
+        "SKIP_LIBTHEORA",
+        "SKIP_VPX",
+        "SKIP_VVENC",
+        "SKIP_LIBWEBP",
+        "SKIP_LAME",
+        "SKIP_OPUS",
+        "SKIP_LIBVORBIS",
+    }
+)
+"""The macOS lock's ``excluded`` stages, EXACTLY: the fork recipe's component skips.
+
+The ``-SKIP_<NAME>=YES`` switches ``tools/package/ffmpeg-fork-macos.patch`` passes to the
+build script, less ``SKIP_TEST`` and ``SKIP_BUNDLE`` (not components). Held here, not read
+from the patch, so the validator needs nothing but the lock; a test binds this set to the
+patch, so a recipe change that is not mirrored here fails the suite.
+"""
+
+FFMPEG_MACOS_REQUIRED_SWITCHES = ("gpl", "version3", "libx265")
+"""The configure switches the macOS line MUST enable (AD-38 (2) plus ``version3``)."""
+
+_LIBX265_ENCODER_OFF = frozenset(
+    {
+        "--disable-encoders",
+        "--disable-everything",
+        "--disable-all",
+        "--disable-avcodec",
+        "--enable-random",
+        "--disable-random",
+    }
+)
+"""Configure options that can switch the libx265 ENCODER off with ``--enable-libx265`` left on.
+
+FFmpeg's configure (at ``b204e94e``, its ``for opt do`` loop): ``--disable-encoders`` unsets
+the encoder list, ``--disable-everything`` every component list, ``--disable-all`` those and
+the libraries (libavcodec among them), ``--disable-avcodec`` the library itself, and
+``--enable-random`` / ``--disable-random`` (with or without ``=<lists>``) toggle components
+at random. ``--disable-encoder=<patterns>`` is judged per pattern.
+"""
+
 FFMPEG_COMPONENT_TEXTS_PATH = Path(__file__).with_name("native-licences") / "ffmpeg-components"
 """The byte-preserved component texts, covered exactly by the release lock."""
 
@@ -1433,12 +1489,36 @@ def _ffmpeg_component_texts(components: list[FFmpegComponent], folder: Path) -> 
 
 
 def _macos_configure_problem(config: str, version: str) -> str | None:
-    """The AD-38 (2) MUST / MUST NOT rules, plus no zvbi / DeckLink, for the macOS line."""
+    """The AD-38 (2) MUST / MUST NOT rules, plus no zvbi / DeckLink, for the macOS line.
+
+    A required switch must be ENABLED and never disabled. FFmpeg's configure applies its
+    options left to right and the last ``--enable-X`` / ``--disable-X`` wins, so a
+    disabling counterpart after the enable defeats it; this rule refuses the counterpart
+    ANYWHERE in the line (before or after), so the verdict never depends on option order
+    (the recipe's line carries none). The libx265 encoder must also stay selectable: an
+    option that can switch it off with the library left on (:data:`_LIBX265_ENCODER_OFF`,
+    or a ``--disable-encoder=`` pattern matching ``libx265``, matched as configure's shell
+    ``case`` patterns) is refused.
+    """
     if not config.startswith("configuration: "):
         return "configure_line must include its printed prefix"
     tokens = config.split()[1:]
-    if not {"--enable-gpl", "--enable-version3", "--enable-libx265"} <= set(tokens):
+    required = {f"--enable-{name}" for name in FFMPEG_MACOS_REQUIRED_SWITCHES}
+    if not required <= set(tokens):
         return "GPL, version3 and libx265 are required"
+    disabled = [f"--disable-{name}" for name in FFMPEG_MACOS_REQUIRED_SWITCHES]
+    for token in tokens:
+        option, _, value = token.partition("=")
+        if token in disabled:
+            return f"a required switch is disabled ({token})"
+        if option in _LIBX265_ENCODER_OFF or (
+            option == "--disable-encoder"
+            and any(
+                fnmatch.fnmatchcase("libx265_encoder", f"{item}_encoder")
+                for item in re.split(r"[,|]", value)  # configure joins items with "|"
+            )
+        ):
+            return f"the libx265 encoder can be disabled ({token})"
     if any(
         token in {"--enable-nonfree", "--enable-libzvbi", "--enable-decklink"} or "libfdk" in token
         for token in tokens
@@ -1555,6 +1635,12 @@ def _validate_macos_ffmpeg_lock(value: dict[str, object]) -> FFmpegMacLock:
         stages.add(stage)
     if not {"SKIP_ZVBI", "SKIP_DECKLINK"} <= stages:
         raise ValueError("FFmpeg lock: SKIP_ZVBI and SKIP_DECKLINK must be excluded")
+    if stages != FFMPEG_MACOS_EXCLUDED_STAGES:
+        raise ValueError(
+            "FFmpeg lock: excluded stages must be exactly the recipe's component skips; "
+            f"missing {sorted(FFMPEG_MACOS_EXCLUDED_STAGES - stages)}, "
+            f"unknown {sorted(stages - FFMPEG_MACOS_EXCLUDED_STAGES)}"
+        )
     if data["census"] == "complete":
         raise ValueError(
             "FFmpeg lock: the macOS census rules are WP6.5 part 3's; only census pending is valid"
@@ -1870,6 +1956,25 @@ def _ffmpeg_archive_members(
     return found
 
 
+def _macos_archive_members(
+    archive: zipfile.ZipFile, lock: FFmpegMacLock
+) -> dict[str, zipfile.ZipInfo]:
+    """The shared inventory, then the macOS layout rule: every member under the root.
+
+    :func:`_ffmpeg_archive_members` (shared with Windows, unchanged) inspects every member
+    and finds the three to extract; the macOS path additionally refuses any member,
+    extracted or not, that does not lie under ``<archive_root>/`` (the fork packages ONE
+    root folder; a stray top-level member means the asset is not the recipe's zip).
+    """
+    found = _ffmpeg_archive_members(archive, lock)
+    prefix = lock["archive_root"] + "/"
+    outside = [info.orig_filename for info in archive.infolist()]
+    outside = [name for name in outside if not name.startswith(prefix)]
+    if outside:
+        raise ValueError(f"FFmpeg archive: member(s) outside the archive root: {outside[:5]}")
+    return found
+
+
 def _check_ffmpeg_asset_url(url: str) -> None:
     parsed = urlsplit(url)
     if parsed.scheme == "file" and _TEST_ALLOW_FILE_URLS:
@@ -1997,58 +2102,197 @@ def _check_ffmpeg_toolchain_markers(path: Path, lock: FFmpegLock) -> None:
         raise ValueError(f"{path.name}: missing " + ", ".join(markers) + " toolchain marker")
 
 
-_FFMPEG_VERSION_TOKEN = re.compile(
-    rb"(?<![0-9A-Za-z._+-])(n9\.[0-9]+\.[0-9]+-[0-9]+-g[0-9a-f]{7,40}-[0-9]{8})\x00"
+_FFMPEG_VERSION_CANDIDATES = (
+    # FFMPEG_VERSION as a C string of its own, in every form ffbuild/version.sh (at
+    # b204e94e) can produce, any major, with or without "-<extra-version>": a release tag
+    # describe ("n9.0.2-47-g<hash>", "n8.0.1"), master's "N-<count>-g<hash>", a shallow
+    # clone's "git-YYYY-MM-DD-<hash>", and a numeric RELEASE / VERSION file ending in an
+    # extra-version date ("9.0.1-20261110"). A bare numeric "x.y.z" without that date cannot
+    # be told apart from another library's version string; the banner form below sees it.
+    re.compile(
+        rb"(?<![\x20-\x7e])((?:n[0-9]{1,5}\.[0-9]{1,5}|N-[0-9]{1,10}-g[0-9a-f]{1,40}"
+        rb"|git-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9a-f]{1,40})[!-~]{0,128}"
+        rb"|[0-9]{1,5}\.[0-9]{1,5}(?:\.[0-9]{1,5})?(?:-[!-~]{0,128})?-[0-9]{8}(?![!-~]))"
+    ),
+    # libav*'s ``av_*_ffversion[] = "FFmpeg version " FFMPEG_VERSION`` arrays (every
+    # library's version.c at b204e94e). They are ``const char[]`` data, so the byte before
+    # them can be anything: matched anywhere, with a token that starts as one of
+    # version.sh's forms does (a digit, n<digit>, N-<digit>, git-<digit>, or a bare
+    # describe hash). Prose such as libavutil's "Update your FFmpeg version to the newest
+    # one" (present in a real arm64 ffmpeg) is not a version.
+    re.compile(
+        rb"(?i:ffmpeg) version ((?:[0-9]|n[0-9]|N-[0-9]|git-[0-9]"
+        rb"|[0-9a-f]{7,40}(?![0-9A-Za-z]))[!-~]{0,128})"
+    ),
 )
-"""FFmpeg's ``FFMPEG_VERSION`` as the compiled-in C string (``-g<hash>-<extra date>``)."""
+"""Every plausible FFmpeg version string a tool can carry (A3-F2: detected, then judged)."""
+
+_FFMPEG_CANDIDATE_SPAN = 256
+"""At least the longest version candidate match, in bytes (183: prefix plus the token bound)."""
 
 _MH_EXECUTE = 2
+_PLATFORM_MACOS = 1
+_LC_VERSION_MIN_COMMANDS = frozenset({0x24, 0x25, 0x2F, 0x30})
+"""LC_VERSION_MIN_MACOSX / _IPHONEOS / _TVOS / _WATCHOS: the pre-LC_BUILD_VERSION forms."""
+
+_MACOS_TOOL_COMMANDS_LIMIT = 1024 * 1024
+"""The largest load-command table a tool may declare (FFmpeg's is a few KiB)."""
 
 
-def _macos_tool_problem(head: bytes) -> str | None:
-    """Why a tool's first bytes are not a thin arm64 Mach-O executable, or None."""
-    if len(head) < 32 or head[:4] != _MACHO_MAGIC_64:
+def _macos_version_word(text: str) -> int | None:
+    """``"14.0"`` as Mach-O's ``xxxx.yy.zz`` nibble word, or None when not a version."""
+    match = re.fullmatch(r"([0-9]{1,5})\.([0-9]{1,3})(?:\.([0-9]{1,3}))?", text)
+    if match is None:
+        return None
+    major, minor, patch = (int(part or 0) for part in match.groups())
+    if major > 0xFFFF or minor > 0xFF or patch > 0xFF:
+        return None
+    return major << 16 | minor << 8 | patch
+
+
+def _macos_version_text(word: int) -> str:
+    patch = word & 0xFF
+    return f"{word >> 16}.{word >> 8 & 0xFF}" + (f".{patch}" if patch else "")
+
+
+def _macos_tool_image(path: Path) -> bytes:
+    """A tool's Mach-O header plus its WHOLE declared load-command table, bounded.
+
+    The table is read only when ``sizeofcmds`` lies within the file and within
+    :data:`_MACOS_TOOL_COMMANDS_LIMIT`; otherwise the 32-byte header alone is returned,
+    which :func:`_macos_tool_problem` refuses as a malformed table.
+    """
+    size = path.stat().st_size
+    with path.open("rb") as stream:
+        image = stream.read(32)
+        if len(image) == 32 and image[:4] == _MACHO_MAGIC_64:
+            (sizeofcmds,) = struct.unpack_from("<I", image, 20)
+            if 32 + sizeofcmds <= size and sizeofcmds <= _MACOS_TOOL_COMMANDS_LIMIT:
+                image += stream.read(sizeofcmds)
+    return image
+
+
+def _macos_tool_problem(image: bytes, deployment_target: str) -> str | None:
+    """Why a tool is not a thin arm64 macOS executable built for the lock's target, or None.
+
+    ``image`` is the header and the whole load-command table (:func:`_macos_tool_image`).
+    The table is parsed and bounded by :func:`_macho_parse` (``sizeofcmds`` inside the
+    image, every ``cmdsize`` at least 8, a multiple of 8 and inside the table, the commands
+    exactly filling it). Then exactly ONE ``LC_BUILD_VERSION`` (well formed: ``cmdsize`` =
+    24 + 8 per tool entry) with platform macOS and ``minos`` EQUAL to
+    ``deployment_target`` (the recipe sets ``MACOSX_DEPLOYMENT_TARGET`` to exactly that
+    value, so an equal ``minos`` is the evidence that the binary is the recipe's build; a
+    lower one would also run, but would contradict the lock's record), and no
+    ``LC_VERSION_MIN_*`` command (the older form, refused: the recipe's toolchain emits
+    ``LC_BUILD_VERSION`` only, and two deployment records could disagree).
+    """
+    if len(image) < 32 or image[:4] != _MACHO_MAGIC_64:
         return "not a thin arm64 Mach-O executable (magic)"
-    cputype, _subtype, filetype = struct.unpack_from("<iiI", head, 4)
+    cputype, _subtype, filetype = struct.unpack_from("<iiI", image, 4)
     if cputype != _MACHO_CPU_ARM64 or filetype != _MH_EXECUTE:
         return f"not a thin arm64 Mach-O executable (cpu {cputype:#x}, filetype {filetype})"
+    parsed = _macho_parse(image)
+    if parsed is None:
+        return "malformed or truncated Mach-O load-command table"
+    if any(cmd in _LC_VERSION_MIN_COMMANDS for cmd, _ in parsed.commands):
+        return "an LC_VERSION_MIN_* command is present (LC_BUILD_VERSION only)"
+    builds = [body for cmd, body in parsed.commands if cmd == _LC_BUILD_VERSION]
+    if len(builds) != 1:
+        return f"expected exactly one LC_BUILD_VERSION, found {len(builds)}"
+    body = builds[0]
+    if len(body) < 24:
+        return "malformed LC_BUILD_VERSION"
+    platform, minos, _sdk, ntools = struct.unpack_from("<IIII", body, 8)
+    if len(body) != 24 + 8 * ntools:
+        return "malformed LC_BUILD_VERSION (cmdsize differs from its tool entries)"
+    if platform != _PLATFORM_MACOS:
+        return f"LC_BUILD_VERSION platform {platform} is not macOS"
+    expected = _macos_version_word(deployment_target)
+    if expected is None or minos != expected:
+        return (
+            f"LC_BUILD_VERSION minos {_macos_version_text(minos)} differs from the lock's "
+            f"deployment target {deployment_target}"
+        )
     return None
+
+
+def _scan_blocks(path: Path, overlap: int) -> Iterator[tuple[bytes, int, int]]:
+    """Yield ``(block, first, stop)``: judge in ``block`` the matches starting in [first, stop).
+
+    1 MiB blocks, each carrying the previous block's last ``overlap`` bytes. Every byte
+    position is judged in exactly one block, and only where at least ``overlap`` bytes
+    follow it (or the file ends), so a match no longer than ``overlap`` is always seen
+    WHOLE: a start in the carried tail is left to the next block, and the next block's
+    position 0 (judged already) is skipped, its byte serving only as look-behind context.
+    """
+    size = 1024 * 1024
+    if not 0 < overlap < size:
+        raise ValueError(f"scan overlap {overlap} out of range")
+    tail = b""
+    with path.open("rb") as stream:
+        chunk = stream.read(size)
+        while chunk:
+            following = stream.read(size)
+            block = tail + chunk
+            first = 1 if tail else 0
+            stop = len(block) - overlap + 1 if following else len(block)
+            yield block, first, max(first, stop)
+            tail = block[-overlap:]
+            chunk = following
 
 
 def _macos_ffmpeg_version(path: Path, lock: FFmpegMacLock) -> str:
     """Read the F3b version token and the configure line from a tool's bytes; never run it.
 
     FFmpeg compiles ``FFMPEG_VERSION`` and ``FFMPEG_CONFIGURATION`` in as plain C strings
-    (``fftools/opt_common.c`` prints them with ``%s``; ``av_version_info`` and
-    ``avutil_configuration`` return them), so each tool must carry exactly ONE version
-    token, equal to the lock's, and the lock's configure line verbatim as a C string not
-    preceded by a printable byte (so it is not the tail of a longer configuration). Read in
-    1 MiB blocks with an overlap, as :func:`_check_ffmpeg_toolchain_markers`.
+    (``fftools/opt_common.c`` prints them with ``%s``; ``av_version_info`` and the
+    ``*_configuration`` functions return them; each library's ``version.c`` carries
+    ``"FFmpeg version " FFMPEG_VERSION``). DETECTION is separate from validation (A3-F2):
+    every plausible version string is collected, in any form and any major
+    (:data:`_FFMPEG_VERSION_CANDIDATES`), and every plausible FFmpeg configuration (a C
+    string of its own that begins with ``--`` and carries one of FFmpeg's licence switches
+    ``--enable-gpl`` / ``--enable-version3`` / ``--enable-nonfree``, or the lock's own line
+    as a C string); then exactly ONE distinct version candidate must exist and equal the
+    lock's token, and exactly one distinct configuration candidate must exist and equal
+    the lock's configure line. Conflicting evidence is refused, never filtered away. Read
+    in 1 MiB blocks (:func:`_scan_blocks`), every candidate judged whole. LIMITS: a second
+    FFmpeg configuration carrying none of the licence switches and not starting with
+    ``--`` is not seen (its build's version arrays still are), nor is a bare ``x.y.z``
+    version with no extra-version outside the ``FFmpeg version`` arrays.
 
     Raises:
-        RuntimeError: The token or the configuration differs from the lock.
+        RuntimeError: The version candidates or the configuration differ from the lock.
         OSError: The file cannot be read.
     """
     body = lock["configure_line"].removeprefix("configuration: ").encode("utf-8")
-    configuration = re.compile(rb"(?<![\x20-\x7e])" + re.escape(body) + rb"\x00")
-    overlap = max(len(body) + 2, 128)
+    span = len(body) + 128
+    configuration = re.compile(rb"(?<![\x20-\x7e])(--[!-~][\x20-\x7e]{0,%d})" % span)
+    # FFmpeg's licence switches: no other configure the recipe links carries them, and a
+    # real arm64 ffmpeg also holds libvpx's own build configuration ("--prefix=...
+    # --disable-unit-tests"), which is not an FFmpeg configuration.
+    option = re.compile(rb"(?:^| )--enable-(?:gpl|version3|nonfree)(?: |$)")
+    # The lock's own line as a C string, whatever its first byte (configure joins the
+    # arguments as given): found, it is a candidate like any other.
+    exact = re.compile(rb"(?<![\x20-\x7e])(" + re.escape(body) + rb")\x00")
     tokens: set[bytes] = set()
-    configured = False
-    tail = b""
-    with path.open("rb") as stream:
-        while chunk := stream.read(1024 * 1024):
-            block = tail + chunk
-            # A match starting at a carried-over byte was already judged in the previous
-            # block, where its preceding byte was visible: start at 1 after the first block.
-            start = 1 if tail else 0
-            tokens.update(m.group(1) for m in _FFMPEG_VERSION_TOKEN.finditer(block, start))
-            configured = configured or configuration.search(block, start) is not None
-            tail = block[-overlap:]
+    configurations: set[bytes] = set()
+    for block, first, stop in _scan_blocks(path, max(span + 3, _FFMPEG_CANDIDATE_SPAN) + 1):
+        for pattern in _FFMPEG_VERSION_CANDIDATES:
+            tokens.update(m.group(1) for m in pattern.finditer(block, first) if m.start() < stop)
+        configurations.update(
+            m.group(1)
+            for m in configuration.finditer(block, first)
+            if m.start() < stop and option.search(m.group(1))
+        )
+        configurations.update(m.group(1) for m in exact.finditer(block, first) if m.start() < stop)
     if tokens != {lock["version"].encode("ascii")}:
         found = sorted(token.decode("ascii") for token in tokens)
         raise RuntimeError(f"{path.name}: version token(s) {found} differ from the lock")
-    if not configured:
-        raise RuntimeError(f"{path.name}: configuration differs from the lock")
+    if configurations != {body}:
+        raise RuntimeError(
+            f"{path.name}: configuration differs from the lock "
+            f"({len(configurations)} distinct configuration string(s))"
+        )
     return f"{path.name} version {lock['version']} (read from the binary)"
 
 
@@ -2063,12 +2307,15 @@ def _bundle_macos_ffmpeg(
     """``bundle_ffmpeg``'s darwin path: verify, stage, check, then place into the ``.app``.
 
     The order of the Windows path (the pin, then the download verified before the archive
-    is opened, then every member inspected) with three macOS differences: the tools are
+    is opened, then every member inspected) with these macOS differences: every member
+    must lie under ``<archive_root>/`` (:func:`_macos_archive_members`); the tools are
     the Mach-O ``bin/ffmpeg`` / ``bin/ffprobe``; they are STAGED under
     ``<out>/ffmpeg/<archive_root>.verified`` and given mode 0755 there (``zipfile`` drops
-    the archive's modes, G2a-F4), the texts 0644; and their version and configuration are
-    read from their bytes (:func:`_macos_ffmpeg_version`), never by running them (the
-    smoke runs them on the Mac runner). Only after both pass are they placed by
+    the archive's modes, G2a-F4), the texts 0644; each must be a thin arm64 executable
+    whose load commands record the lock's deployment target (:func:`_macos_tool_problem`);
+    and their version and configuration are read from their bytes
+    (:func:`_macos_ffmpeg_version`), never by running them (the smoke runs them on the
+    Mac runner). Only after both pass are they placed by
     :func:`place_macos_tools` (tools to ``Contents/MacOS``, texts to ``Contents/Resources``)
     before :func:`seal_macos_bundle`. The Apple toolchain marker check (the Windows
     :func:`_check_ffmpeg_toolchain_markers`) needs the census and is WP6.5 part 3's.
@@ -2098,7 +2345,7 @@ def _bundle_macos_ffmpeg(
     staging.mkdir()
     tool_hashes: set[str] = set()
     with zipfile.ZipFile(archive_path) as archive:
-        members = _ffmpeg_archive_members(archive, lock)
+        members = _macos_archive_members(archive, lock)
         targets = {
             **{f"bin/{tool}": staging / tool for tool in FFMPEG_MACOS_TOOLS},
             "LICENSE.txt": staging / "ffmpeg-LICENSE.txt",
@@ -2114,8 +2361,9 @@ def _bundle_macos_ffmpeg(
                 tool_hashes.add(digest.hexdigest())
     result = []
     for tool in FFMPEG_MACOS_TOOLS:
-        with (staging / tool).open("rb") as stream:
-            problem = _macos_tool_problem(stream.read(32))
+        problem = _macos_tool_problem(
+            _macos_tool_image(staging / tool), lock["macos_deployment_target"]
+        )
         if problem is not None:
             raise ValueError(f"{tool}: {problem}")
         result.append((destination / tool, _macos_ffmpeg_version(staging / tool, lock)))

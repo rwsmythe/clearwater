@@ -3124,12 +3124,40 @@ def test_macos_lock_fixture_validates_with_the_platform_discriminator():
     assert set(data) == set(build.FFmpegMacLock.__annotations__)
 
 
-def test_macos_lock_excluded_rows_are_exactly_the_recipe_skips():
-    """The fixture's excluded stages are the fork recipe's own component switches."""
+def recipe_skips() -> set[str]:
+    """The fork recipe's component switches: its ``-SKIP_<NAME>=YES`` less TEST / BUNDLE."""
     patch = MACOS_FORK_PATCH.read_text(encoding="utf-8")
-    switches = set(re.findall(r"-(SKIP_[A-Z0-9_]+)=YES", patch)) - {"SKIP_TEST", "SKIP_BUNDLE"}
+    return set(re.findall(r"-(SKIP_[A-Z0-9_]+)=YES", patch)) - {"SKIP_TEST", "SKIP_BUNDLE"}
+
+
+def test_macos_lock_excluded_rows_are_exactly_the_recipe_skips():
+    """The VALIDATOR's required set (and the fixture's rows) is the recipe's component skips."""
+    switches = recipe_skips()
+    assert switches == build.FFMPEG_MACOS_EXCLUDED_STAGES
     assert {row["stage"] for row in macos_lock()["excluded"]} == switches
     assert len(switches) == 21
+
+
+@pytest.mark.parametrize("stage", sorted(row["stage"] for row in macos_lock()["excluded"]))
+def test_macos_lock_refuses_each_missing_recipe_skip(stage):
+    """A3-F4: deleting any one of the 21 required exclusion rows is refused."""
+    data = macos_lock()
+    data["excluded"] = [row for row in data["excluded"] if row["stage"] != stage]
+    with pytest.raises(ValueError, match=r"must be excluded|exactly the recipe's component skips"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+@pytest.mark.parametrize("rows", ["invented", "two-only", "two-only-plus-invented"])
+def test_macos_lock_refuses_an_excluded_set_other_than_the_recipes(rows):
+    """A3-F4 (the reviewer's probe): an invented row, or only zvbi + DeckLink, is refused."""
+    data = macos_lock()
+    invented = {"stage": "SKIP_DOES_NOT_EXIST", "status": "not-built(disabled)", "reason": "x"}
+    if rows != "invented":
+        data["excluded"] = data["excluded"][:2]
+    if rows != "two-only":
+        data["excluded"].append(invented)
+    with pytest.raises(ValueError, match="exactly the recipe's component skips"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
 
 
 def _configure(data: dict[str, Any], change: str) -> None:
@@ -3159,6 +3187,50 @@ def test_macos_lock_configure_line_must_and_must_not(change, refusal):
     _configure(data, change)
     with pytest.raises(ValueError, match=re.escape(refusal)):
         build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "--disable-gpl",
+        "--disable-version3",
+        "--disable-libx265",
+        "before:--disable-libx265",
+        "before:--disable-gpl",
+        "--disable-encoder=libx265",
+        "--disable-encoder=aac,libx265",
+        "--disable-encoder=libx26*",
+        "--disable-encoder=aac|libx265",
+        "--disable-encoders",
+        "--disable-everything",
+        "--disable-all",
+        "--disable-avcodec",
+        "--enable-random",
+        "--disable-random",
+        "--disable-random=encoders",
+    ],
+)
+def test_macos_lock_refuses_a_required_switch_or_the_x265_encoder_disabled(change):
+    """A3-F3: configure applies options left to right, the last enable / disable winning,
+    so a disabling counterpart AFTER the enable defeats it; one anywhere is refused."""
+    data = macos_lock()
+    if change.startswith("before:"):
+        flag = change.removeprefix("before:")
+        data["configure_line"] = data["configure_line"].replace(
+            "--extra-version=", f"{flag} --extra-version="
+        )
+    else:
+        _configure(data, change)
+    with pytest.raises(ValueError, match=r"disabled"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+@pytest.mark.parametrize("change", ["--disable-encoder=aac", "--disable-libx264", "--disable-doc"])
+def test_macos_lock_admits_a_disable_that_leaves_the_required_set_on(change):
+    """The rule is about the required switches and the libx265 encoder, not every disable."""
+    data = macos_lock()
+    _configure(data, change)
+    assert build.validate_ffmpeg_lock(data, platform="darwin") is data
 
 
 def test_macos_lock_configure_line_keeps_its_printed_prefix_and_one_date():
@@ -3331,12 +3403,74 @@ def test_load_macos_lock_reads_its_own_file(tmp_path, monkeypatch):
         build.load_macos_ffmpeg_lock()
 
 
-def fake_macho(lock: dict[str, Any], *, cpu=0x0100000C, filetype=2, magic=0xFEEDFACF, extra=b""):
-    """A thin Mach-O head plus the two NUL-terminated strings FFmpeg compiles in."""
+LC_UUID, LC_BUILD_VERSION, LC_VERSION_MIN_MACOSX = 0x1B, 0x32, 0x24
+
+
+def macos_version(major: int, minor: int = 0, patch: int = 0) -> int:
+    """Mach-O's ``xxxx.yy.zz`` nibble form of a macOS version."""
+    return major << 16 | minor << 8 | patch
+
+
+def build_version(
+    minos: int = macos_version(14), *, platform: int = 1, ntools: int = 1, tools: int | None = None
+) -> bytes:
+    """An LC_BUILD_VERSION command (platform 1 = macOS) carrying ``tools`` ld entries."""
+    entries = b"".join(struct.pack("<II", 3, 0x04B00000) for _ in range(ntools))
+    size = 24 + len(entries)
+    count = ntools if tools is None else tools
+    fields = (LC_BUILD_VERSION, size, platform, minos, macos_version(26), count)
+    return struct.pack("<IIIIII", *fields) + entries
+
+
+def uuid_command() -> bytes:
+    return struct.pack("<II", LC_UUID, 24) + bytes(range(16))
+
+
+def macho_image(
+    commands: Sequence[bytes] | None = None,
+    *,
+    cpu: int = 0x0100000C,
+    filetype: int = 2,
+    magic: int = 0xFEEDFACF,
+    ncmds: int | None = None,
+    sizeofcmds: int | None = None,
+) -> bytes:
+    """A STRUCTURALLY VALID thin Mach-O header and load-command table (A3-F1's fixture)."""
+    commands = [uuid_command(), build_version()] if commands is None else list(commands)
+    table = b"".join(commands)
+    count = len(commands) if ncmds is None else ncmds
+    size = len(table) if sizeofcmds is None else sizeofcmds
+    return struct.pack("<IiiIIIII", magic, cpu, 0, filetype, count, size, 0x00200085, 0) + table
+
+
+def fake_macho(
+    lock: dict[str, Any],
+    *,
+    cpu=0x0100000C,
+    filetype=2,
+    magic=0xFEEDFACF,
+    extra=b"",
+    commands: Sequence[bytes] | None = None,
+    image: bytes | None = None,
+):
+    """A thin Mach-O head and load commands plus the two strings FFmpeg compiles in."""
     body = lock["configure_line"].removeprefix("configuration: ").encode()
-    head = struct.pack("<IiiIIIII", magic, cpu, 0, filetype, 0, 0, 0, 0)
+    if image is None:
+        image = macho_image(commands, cpu=cpu, filetype=filetype, magic=magic)
     strings = b"\0%s version %s\0\0" + lock["version"].encode() + b"\0" + body + b"\0"
-    return head + b"\0" * 64 + extra + strings + b"\0" * 32
+    return image + b"\0" * 64 + extra + strings + b"\0" * 32
+
+
+def test_macos_tool_check_parses_the_load_commands_and_binds_minos_to_the_lock():
+    """A3-F1: the reviewer's two images; only minos 14.0 (the lock's target) is admitted."""
+    for target, admitted in ((14, True), (26, False)):
+        image = struct.pack("<IiiIIIII", 0xFEEDFACF, 0x0100000C, 0, 2, 1, 24, 0, 0)
+        image += struct.pack("<IIIIII", 0x32, 24, 1, target << 16, 26 << 16, 0)
+        problem = build._macos_tool_problem(image, "14.0")
+        assert (problem is None) is admitted, problem
+    assert build._macos_tool_problem(macho_image(), "14.0") is None
+    problem = build._macos_tool_problem(macho_image()[:32], "14.0")
+    assert problem is not None and "load-command table" in problem
 
 
 @pytest.fixture
@@ -3529,6 +3663,14 @@ def test_macos_bundle_refuses_windows_tool_names(macos_bundle):
         ("ffmpeg", "configuration", RuntimeError, "configuration differs from the lock"),
         ("ffprobe", "configuration-prefix", RuntimeError, "configuration differs from the lock"),
         ("ffmpeg", "glued-version", RuntimeError, "version token"),
+        ("ffmpeg", "older-version", RuntimeError, "version token"),
+        ("ffprobe", "older-banner", RuntimeError, "version token"),
+        ("ffmpeg", "other-banner", RuntimeError, "version token"),
+        ("ffmpeg", "master-version", RuntimeError, "version token"),
+        ("ffmpeg", "shallow-version", RuntimeError, "version token"),
+        ("ffmpeg", "dated-numeric-version", RuntimeError, "version token"),
+        ("ffprobe", "suffixed-version", RuntimeError, "version token"),
+        ("ffmpeg", "second-configuration", RuntimeError, "configuration"),
     ],
 )
 def test_macos_bundle_checks_each_tool_without_running_it(
@@ -3559,8 +3701,24 @@ def test_macos_bundle_checks_each_tool_without_running_it(
         payload = payload.replace(b"--enable-libx265", b"--enable-libx266")
     elif damage == "configuration-prefix":
         payload = payload.replace(b"\0" + body, b"\0X" + body)
-    else:
+    elif damage == "glued-version":
         payload = payload.replace(b"\0" + version, b"\0x" + version)
+    elif damage == "older-version":  # A3-F2, the reviewer's probe: another major, then ours
+        payload += b"\0n8.0.1-47-gdeadbeef-20261110\0"
+    elif damage == "older-banner":  # libav*'s "FFmpeg version " FFMPEG_VERSION, a tarball build
+        payload += b"\0FFmpeg version 8.0.1\0"
+    elif damage == "other-banner":
+        payload += b"\0FFmpeg version n9.0.1-12-gdeadbeef01-20261110\0"
+    elif damage == "master-version":
+        payload += b"\0N-121234-gdeadbeef01-20261110\0"
+    elif damage == "shallow-version":
+        payload += b"\0git-2026-01-01-deadbee-20261110\0"
+    elif damage == "dated-numeric-version":
+        payload += b"\x009.0.1-20261110\0"
+    elif damage == "suffixed-version":
+        payload += b"\0" + version + b"-x\0"
+    else:  # a second FFMPEG_CONFIGURATION (the class sweep of A3-F2)
+        payload += b"\0--prefix=/tmp/out --enable-gpl --enable-libx265\0"
     case.members[name] = payload
     case.write()
     trusted: set[str] = set()
@@ -3580,13 +3738,157 @@ def test_macos_bundle_reads_strings_across_the_read_boundary(macos_bundle):
     for needle in (data["version"].encode(), b"--enable-libass"):
         offset = payload.index(needle)
         pad = 1024 * 1024 - offset - len(needle) // 2
-        case.members[name] = payload[:64] + b"\0" * pad + payload[64:]
+        head = len(macho_image())  # the padding goes after the load commands (A3-F1)
+        case.members[name] = payload[:head] + b"\0" * pad + payload[head:]
         case.write()
         result = bundle_macos(case)
         assert result[0][1].startswith("ffmpeg version ")
         shutil.rmtree(case.app / "Contents/Resources")
         for tool in ("ffmpeg", "ffprobe"):
             (case.app / "Contents/MacOS" / tool).unlink()
+
+
+def test_macos_bundle_admits_the_banner_form_of_the_locked_token(macos_bundle):
+    """libav*'s ``"FFmpeg version " FFMPEG_VERSION`` arrays carry the same token: admitted."""
+    case = macos_bundle
+    name = f"{case.data['archive_root']}/bin/ffmpeg"
+    case.members[name] += b"\0FFmpeg version " + case.data["version"].encode() + b"\0"
+    case.write()
+    assert bundle_macos(case)[0][1].startswith("ffmpeg version ")
+
+
+def test_macos_bundle_admits_strings_a_real_arm64_ffmpeg_carries(macos_bundle):
+    """Read in a real arm64 ffmpeg (Riedl 9.0.2, as data; ledger r1): libavutil's prose
+    "Update your FFmpeg version to ..." and libvpx's own build configuration are not FFmpeg
+    version / configuration candidates; a banner array after printable data bytes is."""
+    case = macos_bundle
+    name = f"{case.data['archive_root']}/bin/ffmpeg"
+    case.members[name] += (
+        b"\0 is not implemented. Update your FFmpeg version to the newest one from Git.\n\0"
+        b"\0--prefix=/Volumes/ffmpeg_arm64/tool --disable-unit-tests\0"
+        b"\xbfCJQFFmpeg version " + case.data["version"].encode() + b"\0"
+    )
+    case.write()
+    assert bundle_macos(case)[0][1].startswith("ffmpeg version ")
+
+
+def test_macos_bundle_reads_a_configuration_whatever_its_first_token(macos_bundle):
+    """configure also takes ``cc=clang`` (its ``*)`` branch strips an optional ``--``), so
+    the line may begin with a non-``--`` token: the lock's own line is still a candidate."""
+    case = macos_bundle
+    body = case.data["configure_line"].removeprefix("configuration: ")
+    case.data["configure_line"] = "configuration: cc=clang " + body
+    for tool in ("ffmpeg", "ffprobe"):
+        case.members[f"{case.data['archive_root']}/bin/{tool}"] = fake_macho(case.data)
+    case.write()
+    assert bundle_macos(case)[1][1].startswith("ffprobe version ")
+
+
+@pytest.mark.parametrize("needle", ["older-version", "older-banner"])
+def test_macos_bundle_sees_a_conflicting_version_across_the_read_boundary(macos_bundle, needle):
+    """A candidate straddling the 1 MiB block boundary is judged whole, in one block."""
+    case = macos_bundle
+    name = f"{case.data['archive_root']}/bin/ffmpeg"
+    candidate = {
+        "older-version": b"n8.0.1-47-gdeadbeef-20261110",
+        "older-banner": b"FFmpeg version 8.0.1",
+    }[needle]
+    payload = case.members[name]
+    for split in (1, len(candidate) // 2, len(candidate) - 1):
+        pad = 1024 * 1024 - len(payload) - 1 - split
+        case.members[name] = payload + b"\0" * pad + b"\0" + candidate + b"\0"
+        case.write()
+        with pytest.raises(RuntimeError, match="version token"):
+            bundle_macos(case)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "minos-26",
+        "minos-13",
+        "minos-14.0.1",
+        "platform-ios",
+        "missing",
+        "duplicate",
+        "version-min-too",
+        "version-min-only",
+        "truncated-table",
+        "short-table",
+        "table-past-limit",
+        "cmdsize-unaligned",
+        "cmdsize-zero",
+        "ntools-mismatch",
+        "huge-ncmds",
+    ],
+)
+def test_macos_bundle_refuses_a_tool_without_the_locked_deployment_target(macos_bundle, damage):
+    """A3-F1: the bounded load-command table must carry ONE LC_BUILD_VERSION, macOS, minos =
+    the lock's ``macos_deployment_target``; nothing is placed or trusted otherwise."""
+    case = macos_bundle
+    data = case.data
+    version_min = struct.pack("<IIII", LC_VERSION_MIN_MACOSX, 16, macos_version(14), 0)
+    commands: dict[str, Sequence[bytes]] = {
+        "minos-26": [uuid_command(), build_version(macos_version(26))],
+        "minos-13": [uuid_command(), build_version(macos_version(13))],
+        "minos-14.0.1": [uuid_command(), build_version(macos_version(14, 0, 1))],
+        "platform-ios": [uuid_command(), build_version(platform=2)],
+        "missing": [uuid_command()],
+        "duplicate": [uuid_command(), build_version(), build_version()],
+        "version-min-too": [uuid_command(), build_version(), version_min],
+        "version-min-only": [uuid_command(), version_min],
+        "ntools-mismatch": [uuid_command(), build_version(tools=3)],
+    }
+    unaligned = build_version()[:4] + struct.pack("<I", 28) + build_version()[8:] + bytes(4)
+    zero = build_version()[:4] + struct.pack("<I", 0) + build_version()[8:]
+    images = {
+        "truncated-table": macho_image(sizeofcmds=10_000_000),
+        "short-table": macho_image(sizeofcmds=24),
+        "table-past-limit": macho_image(sizeofcmds=2 * 1024 * 1024),
+        "cmdsize-unaligned": macho_image([uuid_command(), unaligned]),
+        "cmdsize-zero": macho_image([uuid_command(), zero]),
+        "huge-ncmds": macho_image(ncmds=0xFFFFFFFF),
+    }
+    image = images.get(damage) or macho_image(commands[damage])
+    padding = b"\0" * (3 * 1024 * 1024) if damage == "table-past-limit" else b""
+    for tool in ("ffmpeg", "ffprobe"):
+        case.members[f"{data['archive_root']}/bin/{tool}"] = fake_macho(data, image=image) + padding
+    case.write()
+    trusted: set[str] = set()
+    with pytest.raises(ValueError, match="ffmpeg: ") as refused:
+        bundle_macos(case, verified_hashes=trusted)
+    assert "LC_BUILD_VERSION" in str(refused.value) or "load-command" in str(refused.value)
+    assert trusted == set()
+    assert not (case.app / "Contents/MacOS/ffmpeg").exists()
+
+
+@pytest.mark.parametrize(
+    "outside", ["outside-root/unrelated", "unrelated.txt", "ROOT-CASE/extra.txt", "ROOT"]
+)
+def test_macos_bundle_refuses_a_member_outside_the_archive_root(macos_bundle, outside):
+    """A3-F5: on the macOS path every member lies under ``<archive_root>/``."""
+    case = macos_bundle
+    root = case.data["archive_root"]
+    name = {"ROOT-CASE/extra.txt": root.upper() + "/extra.txt", "ROOT": root}.get(outside, outside)
+    case.write(extra=[(name, b"x")])
+    with pytest.raises(ValueError, match="outside the archive root"):
+        bundle_macos(case)
+    assert not (case.app / "Contents/MacOS/ffmpeg").exists()
+    assert not (case.out / "ffmpeg" / (root + ".verified") / "ffmpeg").exists()
+
+
+def test_macos_archive_root_rule_leaves_the_windows_inventory_unchanged(macos_bundle, tmp_path):
+    """The Windows path's shared inventory still ignores an unextracted outside-root member."""
+    windows = json.loads((REPO_ROOT / "tools/package/ffmpeg.lock.json").read_text("utf-8"))
+    archive = tmp_path / "windows.zip"
+    with zipfile.ZipFile(archive, "w") as stream:
+        for member in windows["extract_members"]:
+            stream.writestr(f"{windows['archive_root']}/{member}", b"x")
+        stream.writestr("outside-root/unrelated", b"x")
+    with zipfile.ZipFile(archive) as stream:
+        assert set(build._ffmpeg_archive_members(stream, windows)) == set(
+            windows["extract_members"]
+        )
 
 
 def test_macos_bundle_refuses_a_destination_outside_an_app_before_download(macos_bundle, tmp_path):
