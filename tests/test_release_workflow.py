@@ -1161,7 +1161,12 @@ SWITCH_GATES = {
 SWITCH_ON_ONLY = re.compile(
     r'^( *)if \[ "\$MACOS_FFMPEG_BUNDLED" = "true" \]; then\n.*?^\1fi\n', re.MULTILINE | re.DOTALL
 )
-"""A shell branch taken only when the switch reads "true" (removed from the OFF reading)."""
+"""A shell branch taken only when the switch reads "true" (removed from the OFF reading when
+:func:`_off_reading` admits its shape)."""
+
+SHELL_BRANCH_WORD = re.compile(r"(?<![\w$-])(?:if|then|else|elif|fi|case|esac)(?![\w-])")
+"""A shell branching keyword as a word: inside a switch-true branch it marks an ``else`` /
+``elif`` arm or a nested branch, the shapes the OFF reading refuses (A r6 minor 2)."""
 
 ASSET_NEEDLES = (
     "--notices",
@@ -1181,6 +1186,29 @@ ASSET_NEEDLES = (
 asset, a download tool, or a run of the bundled tool."""
 
 
+def _off_reading(body: str) -> tuple[str, list[str]]:
+    """One step's text as the switch "false" runs it, and the switch branches it refuses.
+
+    A switch-true branch is removed only in its one supported shape: the ``if [
+    "$MACOS_FFMPEG_BUNDLED" = "true" ]; then`` line, plain commands, and the ``fi`` at the same
+    indent. A branching keyword inside it (an ``else`` / ``elif`` arm, a nested ``if`` or
+    ``case``) could hide commands that DO run with the switch OFF (A r6 minor 2: a download in
+    an ``else`` arm passed when the whole block was stripped), so such a branch is not read: it
+    is reported and left in the live text. A conservative refusal, not a shell evaluator.
+    """
+    refused: list[str] = []
+
+    def strip(match: re.Match[str]) -> str:
+        inner = "\n".join(match[0].splitlines()[1:-1])
+        words = SHELL_BRANCH_WORD.findall(inner)
+        if words:
+            refused.append(f"unsupported switch branch shape (inner {sorted(set(words))})")
+            return match[0]
+        return ""
+
+    return SWITCH_ON_ONLY.sub(strip, body), refused
+
+
 def _switch_off_violations(macos: str, lock: dict[str, Any]) -> tuple[list[str], list[str]]:
     """Read the macOS job as the switch's value runs it; return (violations, steps run)."""
     values = re.findall(r'^      MACOS_FFMPEG_BUNDLED: "(\w+)"$', macos, re.MULTILINE)
@@ -1196,7 +1224,8 @@ def _switch_off_violations(macos: str, lock: dict[str, Any]) -> tuple[list[str],
         if not SWITCH_GATES[condition]:
             continue
         ran.append(name)
-        live = SWITCH_ON_ONLY.sub("", body)
+        live, refused = _off_reading(body)
+        problems.extend(f"{name}: {reason}" for reason in refused)
         for needle in (*ASSET_NEEDLES, lock["asset_name"], lock["release_tag"]):
             if needle in live:
                 problems.append(f"{name}: {needle}")
@@ -1225,16 +1254,29 @@ def test_the_lock_with_the_switch_off_is_inert(macos):
     assert args.form == "onedir"
     assert args.ffmpeg_from is None and args.ffmpeg_sha256 is None
     assert not (args.notices or args.smoke or args.zip_release)
-    capture = SWITCH_ON_ONLY.sub("", step(macos, "Capture runner and encoder facts"))
+    capture, refused = _off_reading(step(macos, "Capture runner and encoder facts"))
+    assert refused == []
     assert "$tool" not in capture
 
 
 @pytest.mark.parametrize(
     "plant",
-    ["switch-on", "off-step-notices", "release-step-ungated", "capture-runs-the-tool"],
+    [
+        "switch-on",
+        "off-step-notices",
+        "release-step-ungated",
+        "capture-runs-the-tool",
+        "else-asset-download",
+        "elif-arm",
+        "nested-branch",
+    ],
 )
 def test_the_switch_off_guard_sees_each_planted_breach(macos, plant):
-    """The guard's controls: each planted breach of the OFF reading is reported."""
+    """The guard's controls: each planted breach of the OFF reading is reported.
+
+    ``else-asset-download`` is A r6 minor 2's executed probe (a download of the lock's asset
+    in an OFF ``else`` arm of the capture step's switch branch); ``elif-arm`` and
+    ``nested-branch`` are the other shapes the OFF reading refuses."""
     build = _build_tool()
     lock = build.load_macos_ffmpeg_lock()
     if plant == "switch-on":
@@ -1247,8 +1289,23 @@ def test_the_switch_off_guard_sees_each_planted_breach(macos, plant):
         gate = "\n        if: env.MACOS_FFMPEG_BUNDLED == 'true'\n"
         head, tail = macos.split("      - name: Build release bundle and zip", 1)
         planted = head + "      - name: Build release bundle and zip" + tail.replace(gate, "\n", 1)
-    else:
+    elif plant == "capture-runs-the-tool":
         planted = macos.replace('if [ "$MACOS_FFMPEG_BUNDLED" = "true" ]; then', "if true; then", 1)
+    else:
+        body = step(macos, "Capture runner and encoder facts")
+        arm = {
+            "else-asset-download": "          else\n",
+            "elif-arm": '          elif [ -n "$RUNNER_TEMP" ]; then\n',
+            "nested-branch": "            if true; then\n",
+        }[plant]
+        tail = "            fi\n" if plant == "nested-branch" else ""
+        download = "            curl " + lock["asset_url"] + " -o /tmp/asset.zip\n"
+        changed = body.replace("          fi\n", arm + download + tail + "          fi\n", 1)
+        assert changed != body
+        planted = macos.replace(body, changed, 1)
     assert planted != macos
     problems, _ran = _switch_off_violations(planted, lock)
     assert problems, plant
+    if plant in {"else-asset-download", "elif-arm", "nested-branch"}:
+        assert any("unsupported switch branch shape" in problem for problem in problems)
+        assert any(problem.endswith(": curl ") for problem in problems)
