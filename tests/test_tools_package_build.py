@@ -3554,7 +3554,7 @@ def test_macos_lock_refuses_a_windows_shaped_asset(how):
         ("runner_label", "macos-latest", "runner label must be macos-26"),
         ("runner_image_version", "latest", "invalid runner_image_version"),
         ("retention_note", "", "invalid retention_note"),
-        ("census", "complete", "census rules are WP6.5 part 3's"),
+        ("census", "complete", "census must be pending or a complete census object"),
         ("census", "partial", "census must be pending"),
         ("components", [{"stage": "build-x265.sh"}], "census pending: components"),
         ("toolchain_runtime", [{"name": "libc++"}], "census pending: components"),
@@ -3654,6 +3654,345 @@ def test_load_macos_lock_reads_its_own_file(tmp_path, monkeypatch):
     path.write_text((REPO_ROOT / "tools/package/ffmpeg.lock.json").read_text("utf-8"), "utf-8")
     with pytest.raises(ValueError, match="not a macOS lock"):
         build.load_macos_ffmpeg_lock()
+
+
+# --- WP6.5 part 3b: the macOS lock's complete census -------------------------------------
+
+MACOS_FLAGS = {
+    "fontconfig": ["--enable-fontconfig"],
+    "freetype": ["--enable-libfreetype"],
+    "harfbuzz": ["--enable-libharfbuzz"],
+    "libass": ["--enable-libass"],
+    "libxml2": ["--enable-libxml2"],
+    "openssl": ["--enable-openssl"],
+    "x264": ["--enable-libx264"],
+    "x265": ["--enable-libx265"],
+}
+"""The configure switch each component answers in the recipe's line (the rest: null)."""
+
+APPLE_CLANG = "Apple clang version 21.0.0 (clang-2100.1.1.101)"
+
+
+def macos_text(folder: Path, name: str, body: bytes | None = None) -> dict[str, str]:
+    """Write ``<name>--COPYING`` into ``folder``; its text record (member in a tarball)."""
+    body = f"{name} synthetic licence text\n".encode() if body is None else body
+    (folder / f"{name}--COPYING").write_bytes(body)
+    return {
+        "path": f"{name}--COPYING",
+        "sha256": hashlib.sha256(body).hexdigest(),
+        "member": f"{name}-1.0/COPYING",
+    }
+
+
+def complete_macos_lock(folder: Path) -> dict[str, Any]:
+    """The fixture with a SYNTHETIC complete census; its texts are written to ``folder``."""
+    data = macos_lock()
+    folder.mkdir(parents=True, exist_ok=True)
+    components = []
+    for name in sorted(build.FFMPEG_MACOS_COMPONENTS):
+        row: dict[str, Any] = {
+            "stage": f"build-{name}",
+            "name": name,
+            "repository": f"https://example.org/{name}-1.0.tar.gz",
+            "pin": hashlib.sha256(name.encode()).hexdigest(),
+            "pin_kind": "sha256",
+            "extra_repositories": [],
+            "configure_flag": MACOS_FLAGS.get(name),
+            "licence": "MIT",
+            "licence_basis": "pinned-source-text",
+            "gpl3_compatible": "yes",
+            "licence_note": "synthetic",
+            "texts": [macos_text(folder, name)],
+            "chosen": None,
+        }
+        if name in build.FFMPEG_MACOS_UNLINKED:
+            row["status"] = "built-not-linked"
+        components.append(row)
+    data["census"] = {
+        "state": "complete",
+        "job_url": data["build_run_url"] + "/job/1",
+        "log": "synthetic",
+        "linkage_step": "Check the binaries",
+        "linkage_lines": "618-659",
+        "version_lines": "660-662",
+        "toolchain_step": "Record and check the runner",
+        "toolchain_lines": "157-163",
+        "external_libraries": "build/logs/build-ffmpeg.log:144-153",
+    }
+    data["components"] = components
+    data["toolchain"] = {
+        "compiler": APPLE_CLANG,
+        "xcode": "26.6 (17F113)",
+        "sdk": "26.5",
+        "target": "arm64-apple-darwin25.6.0",
+        "deployment_target": "14.0",
+        "census_build_commit": data["build_repository_commit"],
+        "census_asset_sha256": data["github_sha256"],
+    }
+    data["toolchain_runtime"] = [
+        {
+            "name": "Apple clang 21.0.0 (clang-2100.1.1.101), Xcode 26.6, SDK 26.5, "
+            "deployment target 14.0",
+            "version": "clang-2100.1.1.101",
+            "kind": "apple-clang-runtime",
+            "reached_via": "toolchain",
+            "repository": "https://github.com/llvm/llvm-project",
+            "pin": APPLE_CLANG,
+            "pin_kind": "toolchain-marker",
+            "source_url": "https://github.com/llvm/llvm-project/tree/" + "3" * 40,
+            "licence": "Apache-2.0 WITH LLVM-exception",
+            "licence_basis": "upstream-text",
+            "gpl3_compatible": "yes",
+            "licence_note": "synthetic",
+            "texts": [macos_text(folder, "llvm-project")],
+            "evidence": "synthetic",
+            "basis": "toolchain-marker",
+            "basis_note": "synthetic",
+            "chosen": None,
+            "linkage": "inferred",
+        }
+    ]
+    return data
+
+
+def test_macos_complete_census_validates_against_its_text_folder(tmp_path):
+    folder = tmp_path / "texts"
+    data = complete_macos_lock(folder)
+    assert build.validate_ffmpeg_lock(data, platform="darwin", component_texts_path=folder) is data
+    assert set(data["census"]) == set(build.FFmpegMacCensus.__annotations__)
+    assert set(data["toolchain"]) == set(build.FFmpegMacToolchain.__annotations__)
+    assert set(data["toolchain_runtime"][0]) == set(build.FFmpegMacRuntime.__annotations__)
+    assert build.FFMPEG_MACOS_TEXTS_PATH.name == "ffmpeg-macos-components"
+    assert build.FFMPEG_MACOS_TEXTS_PATH.parent == build.FFMPEG_COMPONENT_TEXTS_PATH.parent
+
+
+def test_macos_complete_census_reads_the_macos_text_folder_by_default(tmp_path, monkeypatch):
+    """No folder argument: the macOS folder, read at call time (never the Windows one)."""
+    folder = tmp_path / "texts"
+    data = complete_macos_lock(folder)
+    monkeypatch.setattr(build, "FFMPEG_MACOS_TEXTS_PATH", folder)
+    assert build.validate_ffmpeg_lock(data, platform="darwin") is data
+    monkeypatch.setattr(build, "FFMPEG_MACOS_TEXTS_PATH", tmp_path / "absent")
+    with pytest.raises(ValueError, match="macOS text missing/unsafe"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+def component(data: dict[str, Any], name: str) -> dict[str, Any]:
+    return next(row for row in data["components"] if row["name"] == name)
+
+
+def change_census(data: dict[str, Any], folder: Path, change: str) -> None:
+    """Apply one named damage to a complete census (and its text folder)."""
+    zlib, libogg = component(data, "zlib"), component(data, "libogg")
+    runtime = data["toolchain_runtime"][0]
+    if change == "census-string":
+        data["census"] = "complete"
+    elif change == "census-state":
+        data["census"]["state"] = "partial"
+    elif change == "census-field":
+        data["census"]["otool"] = "618-659"
+    elif change == "census-job":
+        data["census"]["job_url"] = "https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/1/job/2"
+    elif change == "census-lines":
+        data["census"]["version_lines"] = "662-660"
+    elif change == "census-libraries":
+        data["census"]["external_libraries"] = "build/logs/build-x265.log:1-2"
+    elif change == "no-components":
+        data["components"] = []
+    elif change == "missing-component":
+        data["components"].remove(zlib)
+    elif change == "invented-component":
+        data["components"].append({**zlib, "name": "libvpx", "stage": "build-libvpx"})
+    elif change == "duplicate-component":
+        data["components"].append(dict(zlib))
+    elif change == "stage":
+        zlib["stage"] = "scripts.d/20-zlib.sh"
+    elif change == "via":
+        zlib["via"] = "shaderc git-sync-deps"
+    elif change == "http":
+        zlib["repository"] = "http://www.zlib.net/fossils/zlib-1.3.2.tar.gz"
+    elif change == "pin-kind":
+        zlib["pin_kind"] = "tag"
+    elif change == "tarball-pin":
+        zlib["pin"] = "1.3.2"
+    elif change == "commit-pin":
+        zlib["pin_kind"] = "commit"
+    elif change == "extra-repositories":
+        zlib["extra_repositories"] = [{"repository": "https://example.org/x.git"}]
+    elif change == "basis":
+        zlib["licence_basis"] = "seat-verified"
+    elif change == "incompatible":
+        zlib["gpl3_compatible"] = "no"
+    elif change == "licence":
+        zlib["licence"] = "GPL-2.0-only"
+    elif change == "chosen":
+        zlib["chosen"] = "Apache-2.0"
+    elif change == "unlinked-built":
+        del libogg["status"]
+    elif change == "linked-unlinked":
+        zlib["status"] = "built-not-linked"
+    elif change == "unlinked-flag":
+        libogg["configure_flag"] = ["--enable-libogg"]
+    elif change == "unmapped":
+        component(data, "x265")["configure_flag"] = None
+    elif change == "absent":
+        zlib["configure_flag"] = ["--enable-zlib"]
+    elif change == "twice":
+        component(data, "x264")["configure_flag"] = ["--enable-libx264", "--enable-libx265"]
+    elif change == "member-parent":
+        zlib["texts"][0]["member"] = "../COPYING"
+    elif change == "member-absolute":
+        zlib["texts"][0]["member"] = "/zlib-1.0/COPYING"
+    elif change == "member-backslash":
+        zlib["texts"][0]["member"] = "zlib-1.0\\COPYING"
+    elif change == "path":
+        zlib["texts"][0]["path"] = "zlib/COPYING"
+    elif change == "excerpt":
+        zlib["texts"][0]["member"] = "zlib-1.0/COPYING#L5-1"
+    elif change == "excerpt-name":
+        zlib["texts"][0]["member"] = "zlib-1.0/COPYING#L1-5"
+    elif change == "text-fields":
+        del zlib["texts"][0]["member"]
+    elif change == "no-texts":
+        zlib["texts"] = []
+    elif change == "no-toolchain":
+        data["toolchain"] = None
+    elif change == "compiler":
+        data["toolchain"]["compiler"] = "clang version 21.0.0"
+    elif change == "xcode":
+        data["toolchain"]["xcode"] = "26.6"
+    elif change == "target":
+        data["toolchain"]["target"] = "x86_64-apple-darwin25.6.0"
+    elif change == "deployment":
+        data["toolchain"]["deployment_target"] = "13.0"
+    elif change == "census-commit":
+        data["toolchain"]["census_build_commit"] = "f" * 40
+    elif change == "census-sha":
+        data["toolchain"]["census_asset_sha256"] = "f" * 64
+    elif change == "no-runtime":
+        data["toolchain_runtime"] = []
+    elif change == "two-runtimes":
+        data["toolchain_runtime"].append(dict(runtime))
+    elif change.startswith("runtime-"):
+        key, value = {
+            "runtime-pin": ("pin", "Apple clang version 21.0.1 (clang-2100.1.1.101)"),
+            "runtime-name": ("name", "compiler-rt"),
+            "runtime-version": ("version", "21.0.0"),
+            "runtime-licence": ("licence", "Apache-2.0"),
+            "runtime-linkage": ("linkage", "proven"),
+            "runtime-kind": ("kind", "gcc-runtime"),
+            "runtime-chosen": ("chosen", "Apache-2.0 WITH LLVM-exception"),
+            "runtime-source": ("source_url", "https://github.com/llvm/llvm-project"),
+            "runtime-repository": ("repository", "https://github.com/apple/llvm-project"),
+            "runtime-basis": ("basis", "binary"),
+        }[change]
+        runtime[key] = value
+    elif change == "bytes":
+        (folder / "zlib--COPYING").write_bytes(b"other\n")
+    elif change == "deleted":
+        (folder / "zlib--COPYING").unlink()
+    elif change == "stray":
+        (folder / "stray--COPYING").write_bytes(b"x\n")
+    elif change == "two-digests":
+        component(data, "x264")["texts"][0]["path"] = "zlib--COPYING"
+    elif change == "not-utf8":
+        zlib["texts"][0] = macos_text(folder, "zlib", b"caf\xe9\n")
+    else:
+        raise AssertionError(change)
+
+
+@pytest.mark.parametrize(
+    ("change", "refusal"),
+    [
+        ("census-string", "census must be pending or a complete census object"),
+        ("census-state", "census state must be complete"),
+        ("census-field", "invalid census fields"),
+        ("census-job", "census job_url must be a job of the build run"),
+        ("census-lines", "invalid census version_lines"),
+        ("census-libraries", "invalid census external_libraries"),
+        ("no-components", "components must be a nonempty list"),
+        ("missing-component", "components must be exactly the build's; missing ['zlib']"),
+        ("invented-component", "unknown ['libvpx']"),
+        ("duplicate-component", "duplicate component zlib"),
+        ("stage", "zlib: stage must be build-zlib"),
+        ("via", "via is Windows-only"),
+        ("http", "zlib: source repository must use HTTPS"),
+        ("pin-kind", "zlib: pin_kind must be sha256 or commit"),
+        ("tarball-pin", "zlib: invalid tarball sha256 pin"),
+        ("commit-pin", "zlib: invalid source commit"),
+        ("extra-repositories", "zlib: extra_repositories must be empty"),
+        ("basis", "licence_basis must be pinned-source-text"),
+        ("incompatible", "gpl3_compatible yes"),
+        ("licence", "incompatible/invalid component licence"),
+        ("chosen", "invalid component chosen licence"),
+        ("unlinked-built", "libogg: invalid component status 'built'"),
+        ("linked-unlinked", "zlib: invalid component status 'built-not-linked'"),
+        ("unlinked-flag", "libogg: configure_flag must be null or nonempty"),
+        ("unmapped", "unmapped=['--enable-libx265']"),
+        ("absent", "absent=['--enable-zlib']"),
+        ("twice", "configure flag --enable-libx265 mapped twice"),
+        ("member-parent", "unsafe component zlib text member"),
+        ("member-absolute", "unsafe component zlib text member"),
+        ("member-backslash", "unsafe component zlib text member"),
+        ("path", "unsafe component zlib text path"),
+        ("excerpt", "invalid component zlib text excerpt"),
+        ("excerpt-name", "invalid component zlib text excerpt"),
+        ("text-fields", "invalid component zlib text fields"),
+        ("no-texts", "component zlib texts must be nonempty"),
+        ("no-toolchain", "invalid toolchain fields"),
+        ("compiler", "invalid toolchain compiler"),
+        ("xcode", "invalid toolchain xcode"),
+        ("target", "invalid toolchain target"),
+        ("deployment", "toolchain deployment_target differs from macos_deployment_target"),
+        ("census-commit", "census_build_commit differs from build_repository_commit"),
+        ("census-sha", "census_asset_sha256 differs from github_sha256"),
+        ("no-runtime", "exactly one toolchain_runtime row"),
+        ("two-runtimes", "exactly one toolchain_runtime row"),
+        ("runtime-pin", "runtime pin must be"),
+        ("runtime-name", "runtime name must be"),
+        ("runtime-version", "runtime version must be"),
+        ("runtime-licence", "runtime licence must be"),
+        ("runtime-linkage", "runtime linkage must be 'inferred'"),
+        ("runtime-kind", "runtime kind must be 'apple-clang-runtime'"),
+        ("runtime-chosen", "runtime chosen must be None"),
+        ("runtime-source", "runtime source_url must be an llvm-project commit tree"),
+        ("runtime-repository", "runtime repository must be"),
+        ("runtime-basis", "runtime basis must be 'toolchain-marker'"),
+        ("bytes", "macOS text sha256 mismatch: zlib--COPYING"),
+        ("deleted", "macOS text missing/unsafe: zlib--COPYING"),
+        ("stray", "unlisted ['stray--COPYING']"),
+        ("two-digests", "text zlib--COPYING carries two digests"),
+        ("not-utf8", "macOS text is not strict UTF-8: zlib--COPYING"),
+    ],
+)
+def test_macos_complete_census_refuses(tmp_path, change, refusal):
+    folder = tmp_path / "texts"
+    data = complete_macos_lock(folder)
+    change_census(data, folder, change)
+    with pytest.raises(ValueError, match=re.escape(refusal)):
+        build.validate_ffmpeg_lock(data, platform="darwin", component_texts_path=folder)
+
+
+def test_macos_complete_census_admits_shared_texts_excerpts_and_a_commit_pin(tmp_path):
+    """One file may serve two rows (same digest); an excerpt names its line range."""
+    folder = tmp_path / "texts"
+    data = complete_macos_lock(folder)
+    x264 = component(data, "x264")
+    (folder / "x264--COPYING").unlink()
+    x264["texts"] = [dict(component(data, "zlib")["texts"][0], member="COPYING")]
+    x264.update(
+        repository="https://code.videolan.org/videolan/x264.git", pin="0" * 40, pin_kind="commit"
+    )
+    body = b"line 1\nline 2\n"
+    (folder / "libxml2--dict.c-L1-2.txt").write_bytes(body)
+    component(data, "libxml2")["texts"].append(
+        {
+            "path": "libxml2--dict.c-L1-2.txt",
+            "sha256": hashlib.sha256(body).hexdigest(),
+            "member": "libxml2-1.0/dict.c#L1-2",
+        }
+    )
+    assert build.validate_ffmpeg_lock(data, platform="darwin", component_texts_path=folder)
 
 
 LC_UUID, LC_BUILD_VERSION, LC_VERSION_MIN_MACOSX = 0x1B, 0x32, 0x24
@@ -4273,6 +4612,82 @@ def test_macos_scan_admits_the_tool_strings_across_the_read_boundary(tmp_path):
         for needle in (version, body):
             pad = boundary - good.index(needle) - len(needle) // 2
             assert scan_verdict(tmp_path, lock, b"\0" * pad + good + b"\0" * 64) == "ACCEPTED"
+
+
+MARKER = APPLE_CLANG.encode()
+
+
+def complete_bundle(case, folder: Path, monkeypatch, payload: bytes) -> None:
+    """Give ``macos_bundle``'s lock a complete census and its tools ``payload``."""
+    complete = complete_macos_lock(folder)
+    for key in ("census", "components", "toolchain", "toolchain_runtime"):
+        case.data[key] = complete[key]
+    monkeypatch.setattr(build, "FFMPEG_MACOS_TEXTS_PATH", folder)
+    root = case.data["archive_root"]
+    for tool in ("ffmpeg", "ffprobe"):
+        case.members[f"{root}/bin/{tool}"] = fake_macho(case.data, extra=payload)
+    case.write()
+    case.data["toolchain"]["census_asset_sha256"] = case.data["github_sha256"]
+    case.pin.write_text(json.dumps(case.data), encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("payload", "admitted"),
+    [
+        (b"\0" + MARKER + b"\0", True),
+        (b"\x01" + MARKER + b"\0", True),
+        (b"", False),
+        (b"\0X" + MARKER + b"\0", False),
+        (b"\0" + MARKER + b"X\0", False),
+        (b"\0" + MARKER.replace(b"21.0.0", b"21.0.1") + b"\0", False),
+        (b"\0" + MARKER.replace(b"2100.1.1.101", b"2100.1.1.10") + b"\0", False),
+    ],
+)
+def test_macos_bundle_requires_the_census_toolchain_marker(
+    macos_bundle, tmp_path, monkeypatch, payload, admitted
+):
+    """The tools must carry the toolchain object's compiler as a COMPLETE C string (CC_IDENT,
+    printed ``built with ...``); otherwise nothing is placed and nothing is trusted."""
+    case = macos_bundle
+    complete_bundle(case, tmp_path / "texts", monkeypatch, payload)
+    trusted: set[str] = set()
+    macos = case.app / "Contents" / "MacOS"
+    if admitted:
+        assert len(bundle_macos(case, verified_hashes=trusted)) == 2
+        assert sorted(p.name for p in macos.iterdir()) == ["Clearwater", "ffmpeg", "ffprobe"]
+        return
+    with pytest.raises(ValueError, match="ffmpeg: missing the Apple toolchain marker"):
+        bundle_macos(case, verified_hashes=trusted)
+    assert sorted(p.name for p in macos.iterdir()) == ["Clearwater"]
+    assert not (case.app / "Contents" / "Resources").exists() or not any(
+        (case.app / "Contents" / "Resources").iterdir()
+    )
+    assert trusted == set()
+
+
+def test_macos_marker_is_judged_across_the_read_boundary(tmp_path):
+    """Every split of the marker across a 1 MiB block is found; a printable byte glued
+    before it in the previous block is still seen (and refused)."""
+    folder = tmp_path / "texts"
+    lock = complete_macos_lock(folder)
+    path = tmp_path / "tool"
+    boundary = 1024 * 1024
+    for split in (0, 1, len(MARKER) // 2, len(MARKER), len(MARKER) + 1):
+        for prefix, found in ((b"\0", True), (b"Z", False)):
+            start = boundary - split
+            body = b"\0" * (start - 1) + prefix + MARKER + b"\0" + b"\0" * 64
+            assert body.index(MARKER) == start
+            path.write_bytes(body)
+            if found:
+                build._check_macos_toolchain_marker(path, lock)
+            else:
+                with pytest.raises(ValueError, match="missing the Apple toolchain marker"):
+                    build._check_macos_toolchain_marker(path, lock)
+    path.write_bytes(MARKER + b"\0")
+    build._check_macos_toolchain_marker(path, lock)
+    lock["toolchain"] = None
+    path.write_bytes(b"\0")
+    build._check_macos_toolchain_marker(path, lock)  # a pending census carries no marker
 
 
 @pytest.mark.parametrize(

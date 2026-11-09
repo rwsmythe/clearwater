@@ -916,19 +916,105 @@ class FFmpegBuildScript(TypedDict):
     commit: str
 
 
+class FFmpegMacText(TypedDict):
+    """A macOS component or runtime text: its file, byte hash and source member.
+
+    ``member`` is the path inside the pinned source (``<top>/<path>`` in a tarball, the
+    tree path at a commit); a line-range excerpt appends ``#L<first>-<last>``.
+    """
+
+    path: str
+    sha256: str
+    member: str
+
+
+class FFmpegMacComponent(TypedDict):
+    """A macOS FFmpeg component in the Windows row shape (texts carry their member).
+
+    ``pin_kind`` is ``sha256`` (``repository`` = the pinned download URL, ``pin`` = its
+    runner-verified digest) or ``commit``; ``status`` is ``built`` (the default) or
+    ``built-not-linked``; ``extra_repositories`` is always empty (one source per stage).
+    """
+
+    stage: str
+    name: str
+    repository: str
+    pin: str
+    pin_kind: str
+    extra_repositories: list[FFmpegSource]
+    configure_flag: list[str] | None
+    licence: str
+    licence_basis: str
+    gpl3_compatible: str
+    licence_note: str
+    texts: list[FFmpegMacText]
+    chosen: NotRequired[str | None]
+    status: NotRequired[str]
+
+
+class FFmpegMacToolchain(TypedDict):
+    """The Apple toolchain of THIS asset; ``compiler`` is the marker the tools carry."""
+
+    compiler: str
+    xcode: str
+    sdk: str
+    target: str
+    deployment_target: str
+    census_build_commit: str
+    census_asset_sha256: str
+
+
+class FFmpegMacRuntime(TypedDict):
+    """The Apple clang runtime row (compiler-rt builtins, libc++ portions; G2a-F5)."""
+
+    name: str
+    version: str
+    kind: str
+    reached_via: str
+    repository: str
+    pin: str
+    pin_kind: str
+    source_url: str
+    licence: str
+    licence_basis: str
+    gpl3_compatible: str
+    licence_note: str
+    texts: list[FFmpegMacText]
+    evidence: str
+    basis: str
+    basis_note: str
+    chosen: str | None
+    linkage: str
+
+
+class FFmpegMacCensus(TypedDict):
+    """Where the complete census was read: the run's job log (step and lines) and the zip."""
+
+    state: str
+    job_url: str
+    log: str
+    linkage_step: str
+    linkage_lines: str
+    version_lines: str
+    toolchain_step: str
+    toolchain_lines: str
+    external_libraries: str
+
+
 class FFmpegMacLock(TypedDict):
     """The macOS arm64 FFmpeg pin (WP6.5): the fork's release asset and its provenance.
 
     A SECOND lock document beside the Windows one, validated by the same
     :func:`validate_ffmpeg_lock` under ``platform="darwin"``; ``platform`` is its
     discriminator (the Windows document carries no such field). ``census`` is
-    ``"pending"`` until WP6.5 part 3 fills ``components``, ``toolchain`` and
-    ``toolchain_runtime`` from the fork run; a pending lock must keep all three empty.
+    ``"pending"`` (``components``, ``toolchain`` and ``toolchain_runtime`` then stay
+    empty) or a :class:`FFmpegMacCensus` naming the run-log step and lines the complete
+    census rows were read from (WP6.5 part 3).
     """
 
     schema_version: int
     platform: str
-    census: str
+    census: str | FFmpegMacCensus
     provider: str
     build_script: FFmpegBuildScript
     release_tag: str
@@ -952,10 +1038,10 @@ class FFmpegMacLock(TypedDict):
     macos_deployment_target: str
     runner_label: str
     runner_image_version: str
-    components: list[FFmpegComponent]
+    components: list[FFmpegMacComponent]
     excluded: list[FFmpegExcluded]
-    toolchain: dict[str, object] | None
-    toolchain_runtime: list[FFmpegRuntime]
+    toolchain: FFmpegMacToolchain | None
+    toolchain_runtime: list[FFmpegMacRuntime]
 
 
 FFMPEG_LOCK_PATH = Path(__file__).with_name("ffmpeg.lock.json")
@@ -1064,6 +1150,45 @@ the item ``libx265``, refused by name.
 
 FFMPEG_COMPONENT_TEXTS_PATH = Path(__file__).with_name("native-licences") / "ffmpeg-components"
 """The byte-preserved component texts, covered exactly by the release lock."""
+
+FFMPEG_MACOS_TEXTS_PATH = Path(__file__).with_name("native-licences") / "ffmpeg-macos-components"
+"""The macOS lock's texts (components and the toolchain runtime), covered exactly by it."""
+
+FFMPEG_MACOS_COMPONENTS = frozenset(
+    {
+        "fontconfig",
+        "freetype",
+        "fribidi",
+        "harfbuzz",
+        "libass",
+        "libogg",
+        "libxml2",
+        "openssl",
+        "sdl",
+        "x264",
+        "x265",
+        "zlib",
+    }
+)
+"""The components the fork's macOS build compiled, EXACTLY (a complete census names each).
+
+The zip's ``build/versions.txt`` less FFmpeg and the build tools (nasm, ninja, pkg-config,
+cmake, meson); one ``build/logs/build-<name>.log`` each. A missing or invented row fails.
+"""
+
+FFMPEG_MACOS_UNLINKED = frozenset({"libogg"})
+"""Components the build compiled but FFmpeg does not link (absent from its library list)."""
+
+FFMPEG_MACOS_NON_LIBRARY_SWITCHES = frozenset(
+    {"--enable-gpl", "--enable-version3", "--enable-gray"}
+)
+"""The macOS line's licence / feature switches, which name no source-pinned library."""
+
+FFMPEG_MACOS_COMPILER = re.compile(r"Apple clang version (\d+\.\d+\.\d+) \((clang-\d+(?:\.\d+)*)\)")
+"""The Apple toolchain marker: clang's version line, compiled into FFmpeg as ``CC_IDENT``."""
+
+FFMPEG_MACOS_LLVM_REPOSITORY = "https://github.com/llvm/llvm-project"
+"""Upstream of the Apple clang runtime row's licence text (Apple publishes no per-build tree)."""
 
 
 FFMPEG_COMPATIBLE_LICENCES = frozenset(
@@ -1609,8 +1734,233 @@ def _macos_configure_problem(config: str, version: str) -> str | None:
     return None
 
 
-def _validate_macos_ffmpeg_lock(value: dict[str, object]) -> FFmpegMacLock:
-    """Validate the macOS lock (:class:`FFmpegMacLock`); census rows are part 3's."""
+def _macos_texts(texts: object, context: str) -> list[FFmpegMacText]:
+    """Check one row's text records (:class:`FFmpegMacText`); the bytes are checked later."""
+    if not isinstance(texts, list) or not texts:
+        raise ValueError(f"FFmpeg lock: {context} texts must be nonempty")
+    for item in texts:
+        record = _ffmpeg_fields(item, set(FFmpegMacText.__annotations__), f"{context} text")
+        path = _ffmpeg_text(record["path"], f"{context} text path")
+        if (
+            any(c in path for c in ("/", "\\", ":", ".."))
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]*[A-Za-z0-9]", path) is None
+        ):
+            raise ValueError(f"FFmpeg lock: unsafe {context} text path")
+        if not re.fullmatch(r"[0-9a-f]{64}", _ffmpeg_text(record["sha256"], f"{context} sha256")):
+            raise ValueError(f"FFmpeg lock: invalid {context} text sha256")
+        member, _, lines = _ffmpeg_text(record["member"], f"{context} text member").partition("#")
+        if (
+            member.startswith("/")
+            or "\\" in member
+            or any(part in {"", ".", ".."} for part in member.split("/"))
+        ):
+            raise ValueError(f"FFmpeg lock: unsafe {context} text member")
+        excerpt = re.fullmatch(r"L([0-9]+)-([0-9]+)", lines) if lines else None
+        if lines and (
+            excerpt is None
+            or int(excerpt[1]) > int(excerpt[2])
+            or not path.endswith(f"-L{excerpt[1]}-{excerpt[2]}.txt")
+        ):
+            raise ValueError(f"FFmpeg lock: invalid {context} text excerpt")
+    return cast(list[FFmpegMacText], texts)
+
+
+def _macos_census_source(data: dict[str, object]) -> None:
+    """The complete census's source block: the run's job log, its step and line ranges."""
+    census = _ffmpeg_fields(data["census"], set(FFmpegMacCensus.__annotations__), "census")
+    for key in census:
+        _ffmpeg_text(census[key], f"census {key}")
+    if census["state"] != "complete":
+        raise ValueError("FFmpeg lock: census state must be complete")
+    run = re.escape(cast(str, data["build_run_url"]))
+    if not re.fullmatch(run + r"/job/[0-9]+", cast(str, census["job_url"])):
+        raise ValueError("FFmpeg lock: census job_url must be a job of the build run")
+    for key in ("linkage_lines", "version_lines", "toolchain_lines"):
+        span = re.fullmatch(r"([0-9]+)-([0-9]+)", cast(str, census[key]))
+        if span is None or int(span[1]) > int(span[2]):
+            raise ValueError(f"FFmpeg lock: invalid census {key}")
+    if not re.fullmatch(
+        r"build/logs/build-ffmpeg\.log:[0-9]+-[0-9]+", cast(str, census["external_libraries"])
+    ):
+        raise ValueError("FFmpeg lock: invalid census external_libraries")
+
+
+def _macos_census_components(data: dict[str, object], config: str) -> list[FFmpegMacComponent]:
+    """The component rows (Windows row shape) and the two-way configure coverage."""
+    components = data["components"]
+    if not isinstance(components, list) or not components:
+        raise ValueError("FFmpeg lock: census complete: components must be a nonempty list")
+    names: set[str] = set()
+    covered: set[str] = set()
+    for item in components:
+        row = _ffmpeg_component_fields(item)
+        if "via" in row:
+            raise ValueError("FFmpeg lock: invalid component fields (via is Windows-only)")
+        name = _ffmpeg_text(row["name"], "component name")
+        if name in names:
+            raise ValueError(f"FFmpeg lock: duplicate component {name}")
+        names.add(name)
+        if row["stage"] != f"build-{name}":
+            raise ValueError(f"FFmpeg lock: {name}: stage must be build-{name} (its zip log)")
+        repository = _ffmpeg_text(row["repository"], "component repository")
+        pin = _ffmpeg_text(row["pin"], "component pin")
+        if not repository.startswith("https://"):
+            raise ValueError(f"FFmpeg lock: {name}: source repository must use HTTPS")
+        if row["pin_kind"] == "sha256":
+            if not re.fullmatch(r"[0-9a-f]{64}", pin):
+                raise ValueError(f"FFmpeg lock: {name}: invalid tarball sha256 pin")
+        elif row["pin_kind"] == "commit":
+            if not re.fullmatch(r"[0-9a-f]{40}", pin):
+                raise ValueError(f"FFmpeg lock: {name}: invalid source commit")
+        else:
+            raise ValueError(f"FFmpeg lock: {name}: pin_kind must be sha256 or commit")
+        if row["extra_repositories"] != []:
+            raise ValueError(f"FFmpeg lock: {name}: extra_repositories must be empty")
+        if row["licence_basis"] != "pinned-source-text" or row["gpl3_compatible"] != "yes":
+            raise ValueError(
+                f"FFmpeg lock: {name}: licence_basis must be pinned-source-text and "
+                "gpl3_compatible yes"
+            )
+        _ffmpeg_text(row["licence_note"], "component licence note")
+        choices = _ffmpeg_licence_choices(
+            _ffmpeg_text(row["licence"], "licence"),
+            FFMPEG_COMPONENT_COMPATIBLE_LICENCES,
+            "component",
+        )
+        chosen = row.get("chosen")
+        if chosen is not None and (not isinstance(chosen, str) or chosen not in choices):
+            raise ValueError("FFmpeg lock: invalid component chosen licence")
+        _macos_texts(row.get("texts"), f"component {name}")
+        status = row.get("status", "built")
+        if (status == "built-not-linked") != (name in FFMPEG_MACOS_UNLINKED) or status not in {
+            "built",
+            "built-not-linked",
+        }:
+            raise ValueError(f"FFmpeg lock: {name}: invalid component status {status!r}")
+        flags = row["configure_flag"]
+        if flags is not None:
+            if not isinstance(flags, list) or not flags or status != "built":
+                raise ValueError(f"FFmpeg lock: {name}: configure_flag must be null or nonempty")
+            for flag in flags:
+                if not isinstance(flag, str) or not re.fullmatch(r"--enable-[a-z0-9-]+", flag):
+                    raise ValueError("FFmpeg lock: invalid component configure flag")
+                if flag in covered:
+                    raise ValueError(f"FFmpeg lock: configure flag {flag} mapped twice")
+                covered.add(flag)
+    if names != FFMPEG_MACOS_COMPONENTS:
+        raise ValueError(
+            "FFmpeg lock: components must be exactly the build's; "
+            f"missing {sorted(FFMPEG_MACOS_COMPONENTS - names)}, "
+            f"unknown {sorted(names - FFMPEG_MACOS_COMPONENTS)}"
+        )
+    arguments = _configure_arguments(config.removeprefix("configuration: ")) or []
+    enabled = {token for token, _name, _value in arguments if token.startswith("--enable-")}
+    external = enabled - FFMPEG_MACOS_NON_LIBRARY_SWITCHES
+    if external != covered:
+        raise ValueError(
+            f"FFmpeg lock: configure coverage differs; unmapped={sorted(external - covered)}, "
+            f"absent={sorted(covered - external)}"
+        )
+    return cast(list[FFmpegMacComponent], components)
+
+
+def _macos_census_toolchain(data: dict[str, object]) -> FFmpegMacToolchain:
+    """The Apple toolchain object, bound to THIS asset and the lock's deployment target."""
+    toolchain = _ffmpeg_fields(
+        data["toolchain"], set(FFmpegMacToolchain.__annotations__), "toolchain"
+    )
+    for key in toolchain:
+        _ffmpeg_text(toolchain[key], f"toolchain {key}")
+    for key, pattern in (
+        ("compiler", FFMPEG_MACOS_COMPILER.pattern),
+        ("xcode", r"[0-9]+(?:\.[0-9]+)* \([0-9A-Za-z]+\)"),
+        ("sdk", r"[0-9]+\.[0-9]+(?:\.[0-9]+)?"),
+        ("target", r"arm64-apple-darwin[0-9]+(?:\.[0-9]+)*"),
+    ):
+        if not re.fullmatch(pattern, cast(str, toolchain[key])):
+            raise ValueError(f"FFmpeg lock: invalid toolchain {key}")
+    for field, identity in (
+        ("deployment_target", "macos_deployment_target"),
+        ("census_build_commit", "build_repository_commit"),
+        ("census_asset_sha256", "github_sha256"),
+    ):
+        if toolchain[field] != data[identity]:
+            raise ValueError(f"FFmpeg lock: toolchain {field} differs from {identity}; re-census")
+    return cast(FFmpegMacToolchain, toolchain)
+
+
+def _macos_census_runtime(
+    data: dict[str, object], toolchain: FFmpegMacToolchain
+) -> list[FFmpegMacRuntime]:
+    """The ONE Apple clang runtime row (G2a-F5; CHARC R2), bound to the toolchain object."""
+    rows = data["toolchain_runtime"]
+    if not isinstance(rows, list) or len(rows) != 1:
+        raise ValueError("FFmpeg lock: census complete: exactly one toolchain_runtime row")
+    row = _ffmpeg_fields(rows[0], set(FFmpegMacRuntime.__annotations__), "toolchain runtime")
+    for key in set(FFmpegMacRuntime.__annotations__) - {"texts", "chosen"}:
+        _ffmpeg_text(row[key], f"runtime {key}")
+    marker = FFMPEG_MACOS_COMPILER.fullmatch(toolchain["compiler"])
+    assert marker is not None  # checked by _macos_census_toolchain
+    expected = {
+        "kind": "apple-clang-runtime",
+        "reached_via": "toolchain",
+        "pin_kind": "toolchain-marker",
+        "pin": toolchain["compiler"],
+        "version": marker[2],
+        "name": (
+            f"Apple clang {marker[1]} ({marker[2]}), Xcode {toolchain['xcode'].split()[0]}, "
+            f"SDK {toolchain['sdk']}, deployment target {toolchain['deployment_target']}"
+        ),
+        "repository": FFMPEG_MACOS_LLVM_REPOSITORY,
+        "licence": "Apache-2.0 WITH LLVM-exception",
+        "licence_basis": "upstream-text",
+        "gpl3_compatible": "yes",
+        "linkage": "inferred",
+        "basis": "toolchain-marker",
+        "chosen": None,
+    }
+    for key, value in expected.items():
+        if row[key] != value:
+            raise ValueError(f"FFmpeg lock: runtime {key} must be {value!r}")
+    if not re.fullmatch(
+        re.escape(FFMPEG_MACOS_LLVM_REPOSITORY) + r"/tree/[0-9a-f]{40}",
+        cast(str, row["source_url"]),
+    ):
+        raise ValueError("FFmpeg lock: runtime source_url must be an llvm-project commit tree")
+    _macos_texts(row["texts"], "runtime")
+    return cast(list[FFmpegMacRuntime], rows)
+
+
+def _macos_census_texts(
+    components: list[FFmpegMacComponent], runtime: list[FFmpegMacRuntime], folder: Path
+) -> None:
+    """Every text's bytes against the lock; the folder holds EXACTLY the lock's texts."""
+    expected: dict[str, str] = {}
+    for row in (*components, *runtime):
+        for text in row["texts"]:
+            if expected.setdefault(text["path"], text["sha256"]) != text["sha256"]:
+                raise ValueError(f"FFmpeg lock: text {text['path']} carries two digests")
+    for name, digest in expected.items():
+        path = folder / name
+        if not path.is_file() or path.is_symlink():
+            raise ValueError(f"FFmpeg lock: macOS text missing/unsafe: {name}")
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() != digest:
+            raise ValueError(f"FFmpeg lock: macOS text sha256 mismatch: {name}")
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise ValueError(f"FFmpeg lock: macOS text is not strict UTF-8: {name}") from error
+    actual = {path.name for path in folder.iterdir()} if folder.is_dir() else set()
+    if actual != set(expected):
+        raise ValueError(
+            "FFmpeg lock: macOS text directory differs from lock; "
+            f"unlisted {sorted(actual - set(expected))}, missing {sorted(set(expected) - actual)}"
+        )
+
+
+def _validate_macos_ffmpeg_lock(value: dict[str, object], texts: Path) -> FFmpegMacLock:
+    """Validate the macOS lock (:class:`FFmpegMacLock`), its census rows against ``texts``."""
     data = _ffmpeg_fields(value, set(FFmpegMacLock.__annotations__), "macOS document")
     if type(data["schema_version"]) is not int or data["schema_version"] != 2:
         raise ValueError("FFmpeg lock: unsupported schema_version")
@@ -1619,6 +1969,7 @@ def _validate_macos_ffmpeg_lock(value: dict[str, object]) -> FFmpegMacLock:
     for key in set(FFmpegMacLock.__annotations__) - {
         "schema_version",
         "size_bytes",
+        "census",
         "build_script",
         "extract_members",
         "components",
@@ -1720,16 +2071,24 @@ def _validate_macos_ffmpeg_lock(value: dict[str, object]) -> FFmpegMacLock:
             f"missing {sorted(FFMPEG_MACOS_EXCLUDED_STAGES - stages)}, "
             f"unknown {sorted(stages - FFMPEG_MACOS_EXCLUDED_STAGES)}"
         )
-    if data["census"] == "complete":
-        raise ValueError(
-            "FFmpeg lock: the macOS census rules are WP6.5 part 3's; only census pending is valid"
-        )
-    if data["census"] != "pending":
-        raise ValueError("FFmpeg lock: census must be pending (part 3 defines complete)")
-    if data["components"] != [] or data["toolchain_runtime"] != [] or data["toolchain"] is not None:
-        raise ValueError(
-            "FFmpeg lock: census pending: components, toolchain and toolchain_runtime stay empty"
-        )
+    if data["census"] == "pending":
+        if (
+            data["components"] != []
+            or data["toolchain_runtime"] != []
+            or data["toolchain"] is not None
+        ):
+            raise ValueError(
+                "FFmpeg lock: census pending: components, toolchain and toolchain_runtime stay "
+                "empty"
+            )
+        return cast(FFmpegMacLock, data)
+    if not isinstance(data["census"], dict):
+        raise ValueError("FFmpeg lock: census must be pending or a complete census object")
+    _macos_census_source(data)
+    components = _macos_census_components(data, text["configure_line"])
+    toolchain = _macos_census_toolchain(data)
+    runtime = _macos_census_runtime(data, toolchain)
+    _macos_census_texts(components, runtime, texts)
     return cast(FFmpegMacLock, data)
 
 
@@ -1737,7 +2096,7 @@ def _validate_macos_ffmpeg_lock(value: dict[str, object]) -> FFmpegMacLock:
 def validate_ffmpeg_lock(
     value: object,
     *,
-    component_texts_path: Path = ...,
+    component_texts_path: Path | None = ...,
     platform: Literal["win32"] = ...,
 ) -> FFmpegLock: ...
 
@@ -1746,7 +2105,7 @@ def validate_ffmpeg_lock(
 def validate_ffmpeg_lock(
     value: object,
     *,
-    component_texts_path: Path = ...,
+    component_texts_path: Path | None = ...,
     platform: Literal["darwin"],
 ) -> FFmpegMacLock: ...
 
@@ -1755,7 +2114,7 @@ def validate_ffmpeg_lock(
 def validate_ffmpeg_lock(
     value: object,
     *,
-    component_texts_path: Path = ...,
+    component_texts_path: Path | None = ...,
     platform: str,
 ) -> FFmpegLock | FFmpegMacLock: ...
 
@@ -1763,7 +2122,7 @@ def validate_ffmpeg_lock(
 def validate_ffmpeg_lock(
     value: object,
     *,
-    component_texts_path: Path = FFMPEG_COMPONENT_TEXTS_PATH,
+    component_texts_path: Path | None = None,
     platform: str = "win32",
 ) -> FFmpegLock | FFmpegMacLock:
     """Validate archive identity, source rows and two-way configure-flag coverage.
@@ -1788,7 +2147,9 @@ def validate_ffmpeg_lock(
 
     Args:
         value: The decoded lock document.
-        component_texts_path: Directory containing exactly the component texts.
+        component_texts_path: Directory containing exactly the component texts; None
+            reads the platform's folder (:data:`FFMPEG_COMPONENT_TEXTS_PATH`, or
+            :data:`FFMPEG_MACOS_TEXTS_PATH` for ``darwin``) at call time.
         platform: The ``sys.platform`` value the lock is for.
 
     Returns:
@@ -1801,7 +2162,10 @@ def validate_ffmpeg_lock(
     if platform == "darwin":
         if not isinstance(value, dict) or value.get("platform") != FFMPEG_MACOS_PLATFORM:
             raise ValueError(f"FFmpeg lock: not a macOS lock (platform {FFMPEG_MACOS_PLATFORM!r})")
-        return _validate_macos_ffmpeg_lock(cast(dict[str, object], value))
+        return _validate_macos_ffmpeg_lock(
+            cast(dict[str, object], value),
+            FFMPEG_MACOS_TEXTS_PATH if component_texts_path is None else component_texts_path,
+        )
     if platform != "win32":
         raise ValueError(f"FFmpeg lock: no FFmpeg lock for platform {platform!r}")
     if isinstance(value, dict) and "platform" in value:
@@ -1969,7 +2333,10 @@ def validate_ffmpeg_lock(
             f"absent={sorted(covered - external)}"
         )
     _ffmpeg_runtime(data, config)
-    _ffmpeg_component_texts(cast(list[FFmpegComponent], components), component_texts_path)
+    _ffmpeg_component_texts(
+        cast(list[FFmpegComponent], components),
+        FFMPEG_COMPONENT_TEXTS_PATH if component_texts_path is None else component_texts_path,
+    )
     return cast(FFmpegLock, data)
 
 
@@ -2464,6 +2831,33 @@ def _macos_ffmpeg_version(path: Path, lock: FFmpegMacLock) -> str:
     return f"{path.name} version {lock['version']} (read from the binary)"
 
 
+def _check_macos_toolchain_marker(path: Path, lock: FFmpegMacLock) -> None:
+    r"""The Apple analogue of :func:`_check_ffmpeg_toolchain_markers`: the census compiler.
+
+    FFmpeg's configure records ``$cc --version``'s first line as ``CC_IDENT`` and
+    ``fftools/opt_common.c`` prints it through ``"%sbuilt with %s\n"`` (the run's
+    ``built with Apple clang version ...`` line), so the toolchain object's ``compiler``
+    must occur as a COMPLETE C string: a non-printable byte (or the file start) before it
+    and a NUL after it. Read in 1 MiB blocks (:func:`_scan_blocks`); never run. A lock
+    whose census is pending carries no toolchain and is not checked (``build()`` refuses
+    ``--notices`` / ``--zip`` for it, so such a bundle is never released).
+
+    Raises:
+        ValueError: The marker is absent.
+        OSError: The file cannot be read.
+    """
+    toolchain = lock["toolchain"]
+    if toolchain is None:
+        return
+    marker = toolchain["compiler"].encode("ascii")
+    pattern = re.compile(rb"(?<![\x20-\x7e])" + re.escape(marker) + rb"\x00")
+    for block in _scan_blocks(path, len(marker) + 2):
+        for match in pattern.finditer(block.data, block.first):
+            if match.start() < block.stop:
+                return
+    raise ValueError(f"{path.name}: missing the Apple toolchain marker {toolchain['compiler']!r}")
+
+
 def _bundle_macos_ffmpeg(
     destination: Path,
     *,
@@ -2485,8 +2879,9 @@ def _bundle_macos_ffmpeg(
     (:func:`_macos_ffmpeg_version`), never by running them (the smoke runs them on the
     Mac runner). Only after both pass are they placed by
     :func:`place_macos_tools` (tools to ``Contents/MacOS``, texts to ``Contents/Resources``)
-    before :func:`seal_macos_bundle`. The Apple toolchain marker check (the Windows
-    :func:`_check_ffmpeg_toolchain_markers`) needs the census and is WP6.5 part 3's.
+    before :func:`seal_macos_bundle`. Each tool must also carry the census's Apple
+    toolchain marker (:func:`_check_macos_toolchain_marker`, the Windows
+    :func:`_check_ffmpeg_toolchain_markers` analogue) before anything is placed.
     """
     lock = load_macos_ffmpeg_lock()
     destination = destination.resolve()
@@ -2535,6 +2930,7 @@ def _bundle_macos_ffmpeg(
         if problem is not None:
             raise ValueError(f"{tool}: {problem}")
         result.append((destination / tool, _macos_ffmpeg_version(staging / tool, lock)))
+        _check_macos_toolchain_marker(staging / tool, lock)
     record = staging / "ffmpeg-BUILD.txt"
     record.write_text(
         "\n".join(

@@ -1134,12 +1134,16 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
             raise ValueError(
                 "notices: native manifest has duplicate file claim without co-licensing"
             )
-    # FFmpeg stage/runtime texts have their own lock and integrity checks in
-    # _ffmpeg_rows. Other unclaimed files/directories still fail closed here.
+    # FFmpeg stage/runtime texts (the Windows lock's two folders and the macOS lock's one)
+    # have their own lock and integrity checks. Other unclaimed files/directories still
+    # fail closed here.
     actual = {
         path.name
         for path in folder.iterdir()
-        if not (path.name in {"ffmpeg-toolchain", "ffmpeg-components"} and path.is_dir())
+        if not (
+            path.name in {"ffmpeg-toolchain", "ffmpeg-components", "ffmpeg-macos-components"}
+            and path.is_dir()
+        )
     }
     if actual != files:
         raise ValueError(

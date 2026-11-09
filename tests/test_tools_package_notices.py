@@ -1645,6 +1645,31 @@ def test_native_surface_refuses_integrity_and_coverage_errors(native_surface, da
 
 
 @pytest.mark.parametrize(
+    ("name", "admitted"),
+    [
+        ("ffmpeg-macos-components", True),
+        ("ffmpeg-components", True),
+        ("ffmpeg-toolchain", True),
+        ("ffmpeg-linux-components", False),
+    ],
+)
+def test_native_surface_leaves_the_ffmpeg_lock_text_folders_to_their_locks(
+    native_surface, name, admitted
+):
+    """WP6.5 part 3b: the macOS FFmpeg lock's text folder, like the Windows lock's two, is
+    checked by its own lock; any other unclaimed folder still fails closed."""
+    folder = native_surface / name
+    folder.mkdir(exist_ok=True)
+    (folder / "x--COPYING").write_bytes(b"synthetic text\n")
+    module = load_notices()
+    if admitted:
+        assert module.load_native_licences(native_surface)
+    else:
+        with pytest.raises(ValueError, match="without manifest rows: ffmpeg-linux-components"):
+            module.load_native_licences(native_surface)
+
+
+@pytest.mark.parametrize(
     "field, value",
     [
         ("component", ""),
