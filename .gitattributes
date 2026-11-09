@@ -1,3 +1,4 @@
 tests/fixtures/** -text
 tools/package/native-licences/** -text
 tools/package/ffmpeg-fork.patch -text
+tools/package/ffmpeg-fork-macos.patch -text
