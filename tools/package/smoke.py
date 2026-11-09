@@ -1,7 +1,8 @@
-"""Run bounded, headless Windows onedir checks without entering the GUI branch.
+"""Run bounded, headless onedir / ``.app`` checks without entering the GUI branch.
 
 Only the commissioned refusal/worker argument sets may launch Clearwater. Each
-row has fresh disposable profile roots and a System32-only PATH. A planted
+row has fresh disposable profile roots and a system-only PATH (System32 on
+Windows; ``/usr/bin:/bin`` on macOS, WP6.5). A planted
 import failure uses a separate copy; the shipping folder is only read. Process
 supervision is not window evidence: the seat supplies the independent UIA watch.
 """
@@ -829,15 +830,32 @@ def _static_checks(folder: Path, executable: Path) -> None:
     print(f"notices: PASS ({len(plan.entries)} entries; {len(plan.rows)} component rows)")
 
 
+_SMOKE_ENCODERS = {
+    "win32": ("hevc_nvenc", "libx265"),
+    "darwin": ("hevc_videotoolbox", "libx265"),
+}
+"""The -encoders row's expected names: ``io/video/capability.py``'s roster per platform."""
+
+
 def _ffmpeg_checks(folder: Path, run_root: Path, timeout: float) -> None:
-    if not any((folder / name).exists() for name in ("ffmpeg.exe", "ffprobe.exe")):
-        print("FFmpeg: SKIP (not bundled)")
-        return
-    lock = _build_tool().load_ffmpeg_lock()
+    suffix = ".exe" if sys.platform == "win32" else ""
+    if sys.platform == "win32":
+        if not any((folder / name).exists() for name in ("ffmpeg.exe", "ffprobe.exe")):
+            print("FFmpeg: SKIP (not bundled)")
+            return
+        lock = _build_tool().load_ffmpeg_lock()
+    else:
+        # macOS (WP6.5): the smoke runs only on a release bundle, so FFmpeg is required.
+        tools = [folder / name for name in ("ffmpeg", "ffprobe")]
+        if any(not path.is_file() or path.is_symlink() for path in tools):
+            raise SmokeError(
+                "FFmpeg: the macOS bundle must carry ffmpeg and ffprobe in Contents/MacOS"
+            )
+        lock = _build_tool().load_macos_ffmpeg_lock()
     for tool in ("ffmpeg", "ffprobe"):
         name = f"{tool}-version"
         done = _process(
-            folder / f"{tool}.exe",
+            folder / f"{tool}{suffix}",
             ["-version"],
             stdin="",
             root=run_root / name,
@@ -856,7 +874,7 @@ def _ffmpeg_checks(folder: Path, run_root: Path, timeout: float) -> None:
         print(f"{name}: PASS ({lines[0]})")
     name = "ffmpeg-encoders"
     done = _process(
-        folder / "ffmpeg.exe",
+        folder / f"ffmpeg{suffix}",
         ["-hide_banner", "-encoders"],
         stdin="",
         root=run_root / name,
@@ -864,9 +882,12 @@ def _ffmpeg_checks(folder: Path, run_root: Path, timeout: float) -> None:
         name=name,
     )
     encoders = {fields[1] for line in done.stdout.splitlines() if len(fields := line.split()) >= 2}
-    if done.returncode or done.stderr or not {"hevc_nvenc", "libx265"} <= encoders:
-        raise SmokeError(f"{name}: bundled binary must offer hevc_nvenc and libx265 without errors")
-    print(f"{name}: PASS (hevc_nvenc; libx265)")
+    hardware, software = _SMOKE_ENCODERS[sys.platform]
+    if done.returncode or done.stderr or not {hardware, software} <= encoders:
+        raise SmokeError(
+            f"{name}: bundled binary must offer {hardware} and {software} without errors"
+        )
+    print(f"{name}: PASS ({hardware}; {software})")
 
 
 def _run_windows_smoke(folder: Path, *, out: Path, timeout: float) -> None:
@@ -937,8 +958,142 @@ def _run_windows_smoke(folder: Path, *, out: Path, timeout: float) -> None:
     print("smoke: PASS (headless process checks; seat UIA watch supplies window evidence)")
 
 
+def _macos_log_file(root: Path) -> Path:
+    """The product's macOS log under a row's redirected HOME (``config.paths``, darwin)."""
+    library = root / "home" / "Library"
+    return library / "Application Support" / "Clearwater" / "logs" / "clearwater.log"
+
+
+def _macos_static_checks(bundle: Path, executable: Path) -> None:
+    """The Windows static rows on the ``.app``.
+
+    No GPU pack is scanned (AD-33: ``build()`` scans none on darwin) and the notices are
+    read from ``Contents/Resources`` (``Contents/MacOS`` holds only code under the seal;
+    WP6.5 part 3 generates them there).
+    """
+    build = _build_tool()
+    try:
+        bad = build.forbidden_paths(bundle) + build.forbidden_entries(executable)
+        if bad:
+            raise ValueError("; ".join(bad))
+    except (OSError, ValueError, zipfile.BadZipFile) as error:
+        raise SmokeError(f"bundle: {error}") from error
+    print("bundle: PASS (bundle and executable archives re-read)")
+    try:
+        wanted = build.hidden_imports(build.scan_stdlib_imports([]))
+        missing = build.missing_hidden_imports(executable, wanted)
+        if missing:
+            raise ValueError("; ".join(missing))
+    except (OSError, ImportError, ValueError) as error:
+        raise SmokeError(f"hidden-imports: {error}") from error
+    print(f"hidden-imports: PASS ({len(wanted)} modules re-read from built bundle)")
+    try:
+        tool = _notices_tool()
+        path = bundle / "Contents" / "Resources" / "THIRD_PARTY_NOTICES.md"
+        if not path.is_file() or path.is_symlink():
+            raise ValueError("THIRD_PARTY_NOTICES.md is missing from Contents/Resources")
+        plan = tool.plan_notices(executable.parent)
+        if path.read_bytes() != tool.render_notices(plan):
+            raise ValueError("document differs from generator plan/expected row count")
+    except (OSError, ValueError, KeyError, zipfile.BadZipFile) as error:
+        raise SmokeError(f"notices: {error}") from error
+    print(f"notices: PASS ({len(plan.entries)} entries; {len(plan.rows)} component rows)")
+
+
+def _run_macos_smoke(folder: Path, *, out: Path, timeout: float) -> None:
+    """Verify a macOS ``Clearwater.app`` headlessly, preserving its shipping bytes (WP6.5).
+
+    The Windows rows in the same order, each contained in its own process group
+    (:func:`_group_contained_process`); the planted exception removes the ``.so``
+    analogue of ``_ccallback_c*.pyd`` from a COPY of the bundle and expects the product
+    log under the row's redirected HOME; the FFmpeg rows are required and expect the
+    macOS encoder roster.
+
+    Args:
+        folder: The release folder holding ``Clearwater.app``, or its ``Contents/MacOS``.
+        out: Output root; fresh evidence/profile/copy roots go under ``smoke/``.
+        timeout: Per-process bound in seconds, positive and no greater than 60.
+
+    Raises:
+        SmokeError: A named static or process row fails; no GUI row is launched.
+        OSError: A required artifact/input cannot be read or evidence written.
+    """
+    if not 0 < timeout <= 60:
+        raise SmokeError("inputs: timeout must be in (0, 60] seconds")
+    build = _build_tool()
+    executable = cast(Path, build.find_executable(folder.resolve()))
+    folder = executable.parent
+    bundle = folder.parent.parent
+    if (
+        folder.name != "MacOS"
+        or folder.parent.name != "Contents"
+        or bundle.suffix != ".app"
+        or not (bundle / "Contents" / "Frameworks").is_dir()
+    ):
+        raise SmokeError(
+            "inputs: the macOS smoke requires the Clearwater.app bundle "
+            "(Contents/MacOS and Contents/Frameworks)"
+        )
+    smoke_root = out.resolve() / "smoke"
+    if smoke_root.is_relative_to(bundle) or bundle.is_relative_to(smoke_root):
+        raise SmokeError("inputs: smoke output and shipping bundle must be disjoint")
+    _macos_static_checks(bundle, executable)
+    smoke_root.mkdir(parents=True, exist_ok=True)
+    run_root = Path(tempfile.mkdtemp(prefix="run-", dir=smoke_root))
+    print(f"smoke evidence: {run_root}")
+    for row in (*REFUSAL_ROWS, *WORKER_ROWS):
+        run_row(executable, row, root=run_root / row.name, timeout=timeout)
+
+    # As on Windows: the native SciPy callback is required on the worker's composition
+    # import path; on macOS it is a regular .so in Contents/Frameworks.
+    name = "planted-exception"
+    targets = sorted((bundle / "Contents/Frameworks/scipy/_lib").glob("_ccallback_c*.so"))
+    if (
+        len(targets) != 1
+        or targets[0].is_symlink()
+        or not targets[0].resolve().is_relative_to(bundle.resolve())
+    ):
+        raise SmokeError(
+            f"{name}: expected one required scipy._lib._ccallback_c native import "
+            "(a regular .so in Contents/Frameworks)"
+        )
+    copy = run_root / "planted" / bundle.name
+    shutil.copytree(bundle, copy, symlinks=True)
+    planted = copy / targets[0].relative_to(bundle)
+    if planted.is_symlink() or not planted.resolve().is_relative_to(copy.resolve()):
+        raise SmokeError(f"{name}: the copied native import is not a file inside the copy")
+    planted.unlink()
+    root = run_root / name
+    log = _macos_log_file(root)
+    line = "Clearwater: unexpected error; see log: " + str(log).encode(
+        "ascii", "backslashreplace"
+    ).decode("ascii")
+    run_row(
+        copy / "Contents" / "MacOS" / executable.name,
+        SmokeRow(name, ("--export-worker",), "", None, line),
+        root=root,
+        timeout=timeout,
+    )
+    if not log.is_file():
+        raise SmokeError(f"{name}: product log was not written under redirected root")
+    text = log.read_text(encoding="utf-8")
+    if (
+        text.count("Unhandled exception") != 1
+        or "Traceback (most recent call last):" not in text
+        or "_ccallback_c" not in text
+    ):
+        raise SmokeError(f"{name}: expected one traceback for the unavailable worker import")
+    print(f"{name}-log: PASS ({log})")
+    _ffmpeg_checks(folder, run_root, timeout)
+    print(f"total: {build.tree_size(bundle)} bytes under {bundle}")
+    print("largest entries:")
+    for path, size in build.size_by_top_level(executable)[:10]:
+        print(f"  {size:12d} bytes  {path}")
+    print("smoke: PASS (headless process checks in contained process groups)")
+
+
 def run_smoke(folder: Path, *, out: Path, timeout: float = 60) -> None:
-    """Check a Windows onedir artifact with isolated, bounded headless rows.
+    """Check a Windows onedir artifact or a macOS ``.app`` with bounded headless rows.
 
     Args:
         folder: The release folder or its parent wrapper.
@@ -946,10 +1101,15 @@ def run_smoke(folder: Path, *, out: Path, timeout: float = 60) -> None:
         timeout: Per-process bound, positive and no greater than 60 seconds.
 
     Raises:
-        SmokeError: A check fails, or the host is not Windows.
+        SmokeError: A check fails, or the host is neither Windows nor macOS.
         OSError: Artifact/input reads or evidence writes fail.
     """
     if sys.platform == "win32":
         _run_windows_smoke(folder, out=out, timeout=timeout)
+    elif sys.platform == "darwin":
+        _run_macos_smoke(folder, out=out, timeout=timeout)
     else:
-        raise SmokeError("platform: smoke requires the Windows onedir artifact")
+        raise SmokeError(
+            "platform: the smoke runs on Windows and macOS only "
+            "(Linux is not a supported build host)"
+        )

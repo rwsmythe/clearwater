@@ -7,6 +7,8 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -987,3 +989,290 @@ def test_linux_containment_is_refused_by_name(monkeypatch, tmp_path):
     smoke = _smoke_for(monkeypatch, "linux")
     with pytest.raises(smoke.SmokeError, match=r"r: process containment .*Linux is not"):
         smoke._process(tmp_path, [], stdin="", root=tmp_path, timeout=1, name="r")
+
+
+# --- WP6.5 group 2a part 2 (G1-F4): the darwin smoke run path, by stubs --------------------
+
+MACOS_LOCK_FIXTURE = ROOT / "tests" / "ffmpeg_lock" / "ffmpeg-macos.fixture.json"
+CCALLBACK_SO = "_ccallback_c.cpython-312-darwin.so"
+
+DARWIN_STUB = r"""
+import json, os, sys
+from pathlib import Path
+config = json.loads(Path(os.environ['STUB_CONFIG']).read_text())
+args = sys.argv[1:]
+with Path(config['calls']).open('a') as stream:
+    stream.write(json.dumps({'exe': os.environ['STUB_EXE'], 'args': args, 'cwd': os.getcwd(),
+                             'env': dict(os.environ)}) + '\n')
+mode = config.get('mode', '')
+if args == ['-version']:
+    version = config['version'] if mode != 'version' else 'WRONG'
+    print(Path(os.environ['STUB_EXE']).name + ' version ' + version)
+    print(config['configure'] if mode != 'configure' else 'configuration: wrong')
+    sys.exit(0)
+if args == ['-hide_banner', '-encoders']:
+    rows = {'': ['hevc_videotoolbox', 'libx265'], 'encoders': ['libx265'],
+            'nvenc': ['hevc_nvenc', 'libx265']}[mode if mode in ('encoders', 'nvenc') else '']
+    print('\n'.join(' V..... ' + row + ' test' for row in rows))
+    sys.exit(0)
+if args == ['--export-worker']:
+    # any _ccallback_c native present imports (a .pyd-only bundle reaches the target check)
+    if not list((Path.cwd().parent / 'Frameworks/scipy/_lib').glob('_ccallback_c*')):
+        log = Path(os.environ['HOME']) / 'Library/Application Support/Clearwater'
+        log = log / 'logs/clearwater.log'
+        log.parent.mkdir(parents=True)
+        if mode != 'no-log':
+            log.write_text('Unhandled exception\nTraceback (most recent call last):\n'
+                           'ImportError: _ccallback_c missing\n')
+        print('Clearwater: unexpected error; see log: ' + str(log), file=sys.stderr)
+        sys.exit(1)
+    data = sys.stdin.read()
+    message = 'no request document on stdin' if not data else 'the request is not UTF-8 JSON'
+    print('export worker: ' + message, file=sys.stderr)
+    sys.exit(2)
+for expected, message in config['refusals']:
+    if args == expected:
+        print(message, file=sys.stderr)
+        sys.exit(2)
+raise RuntimeError('stub received an unexpected/GUI argument set')
+"""
+
+
+@pytest.fixture
+def darwin_app(tmp_path, monkeypatch):
+    """A synthetic Clearwater.app smoked under ``sys.platform == "darwin"`` by stubs.
+
+    The darwin process-group containment itself is proved above by FakeGroup and on the
+    runner natively; here ``_contained_process`` runs a Python stub in a bounded child so
+    the darwin rows, their arguments, roots and expectations are exercised on Windows.
+    """
+    smoke = load_smoke()
+    build = smoke._build_tool()
+    lock = json.loads(MACOS_LOCK_FIXTURE.read_text(encoding="utf-8"))
+    release = tmp_path / "release"
+    app = release / "Clearwater.app"
+    files = {
+        "Contents/MacOS/Clearwater": b"bootloader",
+        "Contents/MacOS/ffmpeg": b"mach-o ffmpeg",
+        "Contents/MacOS/ffprobe": b"mach-o ffprobe",
+        f"Contents/Frameworks/scipy/_lib/{CCALLBACK_SO}": b"synthetic required worker import",
+        "Contents/Resources/ffmpeg-LICENSE.txt": b"GPL text",
+        "Contents/Resources/THIRD_PARTY_NOTICES.md": b"NOTICES",
+    }
+    for name, data in files.items():
+        (app / name).parent.mkdir(parents=True, exist_ok=True)
+        (app / name).write_bytes(data)
+    plans = []
+    notices = SimpleNamespace(
+        plan_notices=lambda folder: plans.append(folder) or SimpleNamespace(entries=[1], rows=[1]),
+        render_notices=lambda plan: b"NOTICES",
+    )
+    monkeypatch.setattr(smoke, "_notices_tool", lambda: notices)
+    monkeypatch.setattr(build, "forbidden_paths", lambda root: [])
+    monkeypatch.setattr(build, "forbidden_entries", lambda executable: [])
+    monkeypatch.setattr(build, "pack_sources", lambda: pytest.fail("darwin scanned the pack"))
+    monkeypatch.setattr(build, "missing_hidden_imports", lambda executable, wanted: [])
+    monkeypatch.setattr(build, "load_ffmpeg_lock", lambda: pytest.fail("Windows lock read"))
+    monkeypatch.setattr(build, "load_macos_ffmpeg_lock", lambda: lock)
+    script = tmp_path / "darwin_stub.py"
+    script.write_text(DARWIN_STUB)
+    config_path = tmp_path / "stub.json"
+    config = {
+        "calls": str(tmp_path / "calls.jsonl"),
+        "version": lock["version"],
+        "configure": lock["configure_line"],
+        "refusals": REFUSALS,
+    }
+
+    def contained(executable, arguments, *, stdin, root, timeout, name):
+        env = smoke._environment(root)
+        env["STUB_CONFIG"] = str(config_path)
+        env["STUB_EXE"] = str(executable)
+        env["SYSTEMROOT"] = os.environ.get("SYSTEMROOT", "")  # the Windows host's interpreter
+        return subprocess.run(
+            [sys._base_executable, str(script), *arguments],
+            input=stdin,
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=str(executable.parent),
+            timeout=timeout,
+            check=False,
+        )
+
+    monkeypatch.setattr(smoke, "_contained_process", contained)
+    monkeypatch.setattr(smoke.sys, "platform", "darwin")
+
+    def prepare(mode=""):
+        config["mode"] = mode
+        config_path.write_text(json.dumps(config))
+
+    prepare()
+    return SimpleNamespace(
+        smoke=smoke, app=app, release=release, prepare=prepare, config=config, plans=plans
+    )
+
+
+def _calls(case):
+    path = Path(case.config["calls"])
+    return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+
+
+def test_darwin_smoke_runs_every_row_on_the_app_and_preserves_its_bytes(
+    darwin_app, tmp_path, capsys
+):
+    case = darwin_app
+    before = snapshot(case.app)
+    case.smoke.run_smoke(case.release, out=tmp_path / "out")
+    assert snapshot(case.app) == before
+    calls = _calls(case)
+    macos = case.app / "Contents" / "MacOS"
+    assert [call["args"] for call in calls[:10]] == [args for args, _ in REFUSALS]
+    assert [Path(call["exe"]) for call in calls[:12]] == [macos / "Clearwater"] * 12
+    planted = Path(calls[12]["exe"])
+    assert planted.parts[-4:] == ("Clearwater.app", "Contents", "MacOS", "Clearwater")
+    assert planted.is_relative_to(tmp_path / "out/smoke") and calls[12]["args"] == [
+        "--export-worker"
+    ]
+    copy = planted.parents[2]
+    assert not (copy / f"Contents/Frameworks/scipy/_lib/{CCALLBACK_SO}").exists()
+    assert (copy / "Contents/MacOS/ffmpeg").is_file()
+    assert [(Path(call["exe"]).name, call["args"]) for call in calls[13:]] == [
+        ("ffmpeg", ["-version"]),
+        ("ffprobe", ["-version"]),
+        ("ffmpeg", ["-hide_banner", "-encoders"]),
+    ]
+    assert all(Path(call["exe"]).parent == macos for call in calls[13:])
+    for call in calls:
+        env = call["env"]
+        assert env["PATH"] == os.pathsep.join(("/usr/bin", "/bin"))
+        assert env["TMPDIR"] == env["TEMP"]
+        for key in ("HOME", "TMPDIR", "XDG_CONFIG_HOME", "APPDATA"):
+            assert Path(env[key]).is_relative_to(tmp_path / "out/smoke")
+    logs = list((tmp_path / "out/smoke").rglob("clearwater.log"))
+    assert len(logs) == 1 and logs[0].parts[-6:-1] == (
+        "home",
+        "Library",
+        "Application Support",
+        "Clearwater",
+        "logs",
+    )
+    assert case.plans == [macos]
+    output = capsys.readouterr().out
+    for line in (
+        "bundle: PASS",
+        "hidden-imports: PASS",
+        "notices: PASS",
+        "planted-exception-log: PASS",
+        "ffmpeg-version: PASS",
+        "ffprobe-version: PASS",
+        "ffmpeg-encoders: PASS (hevc_videotoolbox; libx265)",
+        "smoke: PASS",
+    ):
+        assert line in output, line
+
+
+def test_darwin_planted_log_is_the_products_macos_log_path(tmp_path):
+    """The smoke's expected log is config.paths' darwin log file under the row's HOME."""
+    from clearwater.config.paths import app_locations
+
+    smoke = load_smoke()
+    root = tmp_path / "planted-exception"
+    expected = app_locations(platform="darwin", home=root / "home").log_file
+    assert smoke._macos_log_file(root) == expected
+
+
+@pytest.mark.parametrize("platform", ["win32", "darwin"])
+def test_smoke_encoder_rows_are_the_products_roster(platform):
+    """The -encoders row expects exactly the capability code's roster for the platform."""
+    from clearwater.io.video.capability import encoder_roster
+
+    assert load_smoke()._SMOKE_ENCODERS[platform] == encoder_roster(platform)
+
+
+@pytest.mark.parametrize(
+    "mode, row",
+    [
+        ("version", "ffmpeg-version"),
+        ("configure", "ffmpeg-version"),
+        ("encoders", "ffmpeg-encoders"),
+        ("nvenc", "ffmpeg-encoders"),
+        ("no-log", "planted-exception"),
+    ],
+)
+def test_darwin_smoke_rows_fail_by_name(darwin_app, tmp_path, mode, row):
+    darwin_app.prepare(mode)
+    with pytest.raises(darwin_app.smoke.SmokeError, match=row):
+        darwin_app.smoke.run_smoke(darwin_app.release, out=tmp_path / "out")
+
+
+@pytest.mark.parametrize(
+    "defect, message",
+    [
+        ("no-ffmpeg", "FFmpeg: the macOS bundle must carry ffmpeg and ffprobe"),
+        ("no-ffprobe", "FFmpeg: the macOS bundle must carry ffmpeg and ffprobe"),
+        ("exe-tools", "FFmpeg: the macOS bundle must carry ffmpeg and ffprobe"),
+        ("no-so", "worker-empty: exit 1; expected 2"),  # the shipping worker cannot import
+        ("two-so", "planted-exception: expected one required scipy._lib._ccallback_c"),
+        ("pyd-only", "planted-exception: expected one required scipy._lib._ccallback_c"),
+        ("no-notices", "notices: THIRD_PARTY_NOTICES.md is missing"),
+        ("notices-in-macos", "notices: THIRD_PARTY_NOTICES.md is missing"),
+        ("stale-notices", "notices: document differs"),
+        ("no-frameworks", "inputs: the macOS smoke requires the Clearwater.app bundle"),
+        ("onedir", "inputs: the macOS smoke requires the Clearwater.app bundle"),
+    ],
+)
+def test_darwin_smoke_fails_closed(darwin_app, tmp_path, defect, message):
+    case = darwin_app
+    contents = case.app / "Contents"
+    so = contents / f"Frameworks/scipy/_lib/{CCALLBACK_SO}"
+    notices = contents / "Resources/THIRD_PARTY_NOTICES.md"
+    target = case.release
+    if defect == "no-ffmpeg":
+        (contents / "MacOS/ffmpeg").unlink()
+    elif defect == "no-ffprobe":
+        (contents / "MacOS/ffprobe").unlink()
+    elif defect == "exe-tools":
+        for tool in ("ffmpeg", "ffprobe"):
+            (contents / "MacOS" / tool).rename(contents / "MacOS" / f"{tool}.exe")
+    elif defect == "no-so":
+        so.unlink()
+    elif defect == "two-so":
+        so.with_name("_ccallback_c.cpython-313-darwin.so").write_bytes(b"x")
+    elif defect == "pyd-only":
+        so.rename(so.with_name("_ccallback_c.cp312-win_amd64.pyd"))
+    elif defect == "no-notices":
+        notices.unlink()
+    elif defect == "notices-in-macos":
+        notices.rename(contents / "MacOS/THIRD_PARTY_NOTICES.md")
+    elif defect == "stale-notices":
+        notices.write_bytes(b"OLD NOTICES")
+    elif defect == "no-frameworks":
+        shutil.rmtree(contents / "Frameworks")
+    else:
+        shutil.rmtree(case.app)
+        target = tmp_path / "onedir"
+        (target / "Clearwater").mkdir(parents=True)
+        (target / "Clearwater/Clearwater").write_bytes(b"bootloader")
+        (target / "Clearwater/_internal").mkdir()
+    with pytest.raises(case.smoke.SmokeError, match=re.escape(message)):
+        case.smoke.run_smoke(target, out=tmp_path / "out")
+    if defect in {"no-notices", "notices-in-macos", "stale-notices", "no-frameworks", "onedir"}:
+        assert _calls(case) == []
+
+
+def test_darwin_planted_exception_never_deletes_through_a_link(darwin_app, tmp_path, monkeypatch):
+    """A .so reached through a link is refused before the copy is touched."""
+    case = darwin_app
+    so = case.app / f"Contents/Frameworks/scipy/_lib/{CCALLBACK_SO}"
+    real = Path.is_symlink
+    monkeypatch.setattr(Path, "is_symlink", lambda self: self.name == CCALLBACK_SO or real(self))
+    with pytest.raises(case.smoke.SmokeError, match="planted-exception: expected one required"):
+        case.smoke.run_smoke(case.release, out=tmp_path / "out")
+    assert so.is_file()
+
+
+def test_smoke_on_linux_is_refused_by_name(monkeypatch, tmp_path):
+    smoke = _smoke_for(monkeypatch, "linux")
+    with pytest.raises(smoke.SmokeError, match=r"platform: .*Linux is not a supported build host"):
+        smoke.run_smoke(tmp_path, out=tmp_path / "out")
