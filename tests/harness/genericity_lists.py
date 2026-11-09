@@ -184,6 +184,8 @@ SELF_EXCLUDE_RELPATHS: tuple[str, ...] = (
 # only. The manifest cross-check (test_manifest_accounting) accounts for BOTH sets
 # against the manifest's docs/*.md, so neither blurs the other.
 CORE_DOC_RELPATHS: frozenset[str] = frozenset({
+    # 2026-11-09: the scaffold README text (the root README is the application's page).
+    "docs/harness-readme.md",
     "docs/charc-charter.md",
     "docs/charc-bootstrap.md",
     "docs/model-prompting-standard.md",

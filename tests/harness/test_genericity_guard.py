@@ -316,7 +316,11 @@ class GuardRunsInDefaultInvocationTest(unittest.TestCase):
         self.assertNotIn("@unittest.skip", src,
                          "the whole-tree guard gate must not be skip-marked")
         # And the README documents the validation command that runs it.
-        readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        readme_rel = next(
+            (rel for rel in ("docs/harness-readme.md", "README.md") if (REPO_ROOT / rel).exists()),
+            "README.md",
+        )
+        readme = (REPO_ROOT / readme_rel).read_text(encoding="utf-8")
         self.assertIn("python -m unittest discover", readme)
 
 

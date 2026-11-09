@@ -19,6 +19,19 @@ def _read(rel: str) -> str:
     return (REPO_ROOT / rel).read_text(encoding="utf-8")
 
 
+HARNESS_README_RELPATHS = ("docs/harness-readme.md", "README.md")
+
+
+def harness_readme_relpath() -> str:
+    """The harness scaffold's README: the root README on a bare clone; an instantiated
+    project whose root README is the application's user page keeps the scaffold text at
+    docs/harness-readme.md (2026-11-09), which wins when present."""
+    for rel in HARNESS_README_RELPATHS:
+        if (REPO_ROOT / rel).exists():
+            return rel
+    return HARNESS_README_RELPATHS[-1]
+
+
 def _norm(text: str) -> str:
     """Collapse all runs of whitespace to single spaces so a contiguous phrase
     matches regardless of Markdown line-wrapping (the same collapse the live
@@ -137,7 +150,7 @@ class ReadmeAcceptanceTest(unittest.TestCase):
     """A.2 -- README names the four seams, the germination line, the kernel."""
 
     def setUp(self) -> None:
-        self.text = _read("README.md")
+        self.text = _read(harness_readme_relpath())
         self.lower = self.text.lower()
 
     def test_names_all_four_seams(self) -> None:
@@ -361,6 +374,7 @@ def _durable_operating_docs() -> list[str]:
             found.add(f"docs/{p.name}")
     found.add("docs/dispatch-recipe.md")
     found.add("README.md")
+    found.add(harness_readme_relpath())
     return sorted(found)
 
 
@@ -567,7 +581,7 @@ class CodexReviewerAcceptanceTest(unittest.TestCase):
         # The seam->plug-in linkage lives in the dispatch-recipe + README, NOT
         # the seam doc.
         self.assertIn("codex-reviewer.md", _read("docs/dispatch-recipe.md"))
-        self.assertIn("docs/codex-reviewer.md", _read("README.md"))
+        self.assertIn("docs/codex-reviewer.md", _read(harness_readme_relpath()))
 
 
 class CharterAcceptanceTest(unittest.TestCase):
