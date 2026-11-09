@@ -1,4 +1,4 @@
-From 9ef06057741f38ef775ec1655333be207d2b3d24 Mon Sep 17 00:00:00 2001
+From aebac45234124f4f3341ffbe750bdb8ddefc34fd Mon Sep 17 00:00:00 2001
 From: Reid Smythe <rwsmythe@gmail.com>
 Date: Mon, 9 Nov 2026 00:38:02 -1000
 Subject: [PATCH] feat(wp6.5): build macOS arm64 GPL FFmpeg release/9.0 at
@@ -86,9 +86,18 @@ ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-<commit7> created at this commit,
 and checks the tag and the GitHub asset digest (the tag must be absent
 beforehand: only an HTTP 404 from the lookup counts as absent).
 
+Before the build step the build job records what /usr/local/include and
+/usr/local/lib hold, moves each existing one aside with sudo and fails
+unless both paths are gone (ld64 lists /usr/local/lib among its standard
+library paths; a host header or static library there would enter the
+build unpinned, and otool -L sees only dylibs); it also records the
+compiler's and the linker's search paths under the build's sanitized
+environment. A step that always runs after the build puts both back.
+The records go into the archive's build/ folder.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- .github/workflows/build-macos.yml             | 310 ++++++++
+ .github/workflows/build-macos.yml             | 362 ++++++++++
  macos/build-script/LICENSE                    | 201 ++++++
  macos/build-script/build.sh                   | 683 ++++++++++++++++++
  macos/build-script/script/build-cmake.sh      |  92 +++
@@ -125,7 +134,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  macos/build-script/version/zlib               |   1 +
  macos/meson-requirements.txt                  |   3 +
  macos/sha256-pins.txt                         |  23 +
- 37 files changed, 2566 insertions(+)
+ 37 files changed, 2618 insertions(+)
  create mode 100644 .github/workflows/build-macos.yml
  create mode 100644 macos/build-script/LICENSE
  create mode 100755 macos/build-script/build.sh
@@ -166,10 +175,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 
 diff --git a/.github/workflows/build-macos.yml b/.github/workflows/build-macos.yml
 new file mode 100644
-index 0000000..84a15a7
+index 0000000..f8f0c78
 --- /dev/null
 +++ b/.github/workflows/build-macos.yml
-@@ -0,0 +1,310 @@
+@@ -0,0 +1,362 @@
 +name: Build FFmpeg macOS arm64
 +
 +# Clearwater WP6.5: one dispatch builds FFmpeg release/9.0 at the Windows pin for
@@ -246,6 +255,47 @@ index 0000000..84a15a7
 +          "$RUNNER_TEMP/meson-venv/bin/python3" -m pip install --disable-pip-version-check --no-deps --require-hashes -r macos/meson-requirements.txt
 +          test "$("$RUNNER_TEMP/meson-venv/bin/meson" --version)" = "$MESON_VERSION"
 +
++      - name: Move /usr/local/include and /usr/local/lib out of the build's reach
++        # ld64 lists /usr/local/lib among its standard library paths and clang its
++        # <sysroot>/usr/local/include; a host header or static library there would
++        # enter the build unpinned and pass every later check (otool -L sees only
++        # dylibs). Each directory is recorded, moved aside, and asserted gone; a
++        # failed move or assertion fails the job. Put back after the build step.
++        run: |
++          set -euo pipefail
++          for d in /usr/local/include /usr/local/lib; do
++            record="$RUNNER_TEMP/usr-local-$(basename "$d").txt"
++            if [ -e "$d" ] || [ -L "$d" ]; then
++              test ! -e "$d.clearwater-aside"
++              test ! -L "$d.clearwater-aside"
++              # a record, not a check: a listing error is noted, the move is the boundary
++              { sudo find "$d" -maxdepth 2 -print 2>&1 || echo "(find exited $?)"; } > "$record"
++              sudo mv "$d" "$d.clearwater-aside"
++            else
++              echo "$d was absent before the build" > "$record"
++            fi
++            if [ -e "$d" ] || [ -L "$d" ]; then
++              echo "::error::$d still exists after the move"
++              exit 1
++            fi
++          done
++          # record (not a check): the compiler's and the linker's search paths as
++          # the build step sees them (the same sanitized environment)
++          printf 'int main(void) { return 0; }\n' > "$RUNNER_TEMP/search-probe.c"
++          {
++            echo "== clang -E -v (include search)"
++            env -i HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
++              PATH="$RUNNER_TEMP/meson-venv/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
++              MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" \
++              /usr/bin/clang -x c -E -v "$RUNNER_TEMP/search-probe.c" -o /dev/null 2>&1
++            echo "== clang -Wl,-v (library and framework search)"
++            env -i HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
++              PATH="$RUNNER_TEMP/meson-venv/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
++              MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" \
++              /usr/bin/clang -Wl,-v "$RUNNER_TEMP/search-probe.c" -o "$RUNNER_TEMP/search-probe" 2>&1
++          } > "$RUNNER_TEMP/toolchain-search.txt"
++          cat "$RUNNER_TEMP/usr-local-include.txt" "$RUNNER_TEMP/usr-local-lib.txt" "$RUNNER_TEMP/toolchain-search.txt"
++
 +      - name: Build (vendored Riedl script, sanitized environment)
 +        run: |
 +          set -euo pipefail
@@ -265,6 +315,19 @@ index 0000000..84a15a7
 +              -SKIP_OPEN_JPEG=YES -SKIP_SVT_AV1=YES -SKIP_LIBTHEORA=YES -SKIP_VPX=YES \
 +              -SKIP_VVENC=YES -SKIP_LIBWEBP=YES -SKIP_LAME=YES -SKIP_OPUS=YES \
 +              -SKIP_LIBVORBIS=YES -SKIP_X264=NO -SKIP_X265=NO -SKIP_X265_MULTIBIT=NO
++
++      - name: Put /usr/local/include and /usr/local/lib back
++        if: ${{ always() }}
++        run: |
++          set -euo pipefail
++          for d in /usr/local/include /usr/local/lib; do
++            if [ -e "$d.clearwater-aside" ] || [ -L "$d.clearwater-aside" ]; then
++              # nothing may have recreated it during the build (mv would nest into it)
++              test ! -e "$d"
++              test ! -L "$d"
++              sudo mv "$d.clearwater-aside" "$d"
++            fi
++          done
 +
 +      - name: Print the component logs (on failure)
 +        if: ${{ failure() }}
@@ -374,6 +437,10 @@ index 0000000..84a15a7
 +          cp work/ffmpeg-version.txt work/ffprobe-version.txt work/ffmpeg-encoders.txt work/ffmpeg-decoders.txt \
 +            work/ffmpeg-dylibs.txt work/ffprobe-dylibs.txt "pkg/$root/build/"
 +          cp macos/sha256-pins.txt macos/meson-requirements.txt "pkg/$root/build/"
++          # the records taken before the build: what /usr/local/{include,lib} held
++          # (moved aside for the build) and the toolchain's search paths
++          cp "$RUNNER_TEMP/usr-local-include.txt" "$RUNNER_TEMP/usr-local-lib.txt" \
++            "$RUNNER_TEMP/toolchain-search.txt" "pkg/$root/build/"
 +          cp work/log/*.log "pkg/$root/build/logs/"
 +          {
 +            echo "ffmpeg $(git -C work/source/ffmpeg/ffmpeg rev-parse HEAD) (release/9.0, git describe $base)"
@@ -390,12 +457,6 @@ index 0000000..84a15a7
 +            xcodebuild -version
 +            echo "SDK $(xcrun --show-sdk-version) $(xcrun --show-sdk-path)"
 +            /usr/bin/clang --version
-+            # record (not a check): the compiler's default header search, and what
-+            # /usr/local held (off the build's PATH, but a compiler default may reach it)
-+            echo "clang default include search:"
-+            /usr/bin/clang -x c -E -v /dev/null 2>&1 > /dev/null | sed -n '/search starts here/,/End of search list/p'
-+            echo "/usr/local/include and /usr/local/lib:"
-+            ls -A /usr/local/include /usr/local/lib 2>&1 || true
 +            echo "MACOSX_DEPLOYMENT_TARGET=$DEPLOYMENT_TARGET"
 +            work/tool/bin/cmake --version | sed -n 1p
 +            echo "ninja $(work/tool/bin/ninja --version)"
