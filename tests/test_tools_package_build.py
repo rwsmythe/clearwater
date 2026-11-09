@@ -2105,7 +2105,7 @@ def test_macho_rpath_and_names_must_fit_the_location(tmp_path, monkeypatch, case
 
 
 def test_macho_without_rpath_dependency_may_carry_no_rpath(tmp_path, monkeypatch):
-    """PyInstaller adds the rpath only when a dependency uses @rpath (osx.py:566-567)."""
+    """PyInstaller adds the rpath only when a dependency uses @rpath (utils/osx.py:574)."""
     original = original_native(names=(ORIGINAL_NAMES[1],), rpaths=("/opt/x",))
     for rpaths in ((), ("@loader_path/..",)):
         built = built_native(1, names=(BUILT_NAMES[1],), rpaths=rpaths)
