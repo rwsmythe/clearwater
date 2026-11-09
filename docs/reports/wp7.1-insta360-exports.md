@@ -6,7 +6,7 @@ held for the owner. The look verdict is also pending. This report does not turn 
 ruled admission of failed outputs into a V4 pass.
 
 Evidence paths below are relative to the WP7.1 worktree unless absolute. `R/` means
-`work/wp7.1/records/`; `P/` means `work/wp7.1/probe/`; `D/` means `work/wp7.1/decode/`.
+`work/wp7.1/records/`; `P/` means `work/wp7.1/probe/`; `DEC/` means `work/wp7.1/decode/`.
 `W1` and `W2` mean the seat logs at
 `C:/Users/rwsmy/clearwater-review-evidence/wp7.1/seat/window1/window1.log` and
 `C:/Users/rwsmy/clearwater-review-evidence/wp7.1/seat/window2/window2.log`.
@@ -58,9 +58,9 @@ the inventory's nominal-rate heuristic is not the timing authority.
 | File | Product result | Raw range -> product range | Chosen decode path | Evidence |
 |---|---|---|---|---|
 | `SCUBA vids 2.mov` | Refused, `unsupported` | tv -> unresolved | None | `P/0.json` |
-| `SCUBA vids2.mp4` | Accepted | pc -> full | Software FrameStream checked | `P/1.json`; `D/short-first.json` |
+| `SCUBA vids2.mp4` | Accepted | pc -> full | Software FrameStream checked | `P/1.json`; `DEC/short-first.json` |
 | `SCUBA vids 3.mov` | Refused, `unsupported` | tv -> unresolved | None | `P/2.json` |
-| `SCUBA vids 3.mp4` | Accepted | pc -> full | Software FrameStream checked | `P/3.json`; `D/medium-first.json` |
+| `SCUBA vids 3.mp4` | Accepted | pc -> full | Software FrameStream checked | `P/3.json`; `DEC/medium-first.json` |
 | `SCUBA vids(1).mov` | Refused, `unsupported` | tv -> unresolved | None | `P/4.json` |
 | `SCUBA vids(1).mp4` | Accepted | tv -> limited | CUDA RGB pipe checked, C3 | `P/5.json`; `R/decode-hevc2259-prefix.json` |
 | `SCUBA vids.mp4` | Accepted, probe-only | tv -> limited | Command recorded, not exercised | `P/6.json` |
@@ -77,14 +77,14 @@ Values below are normalized RGB, R / G / B. There is **no numerical pass band**.
 
 | Selection | MAE | p99 absolute | Maximum absolute | Evidence |
 |---|---|---|---|---|
-| Short, first frame | .004392 / .003604 / .005119 | .016083 / .012634 / .017975 | .057313 / .037964 / .076127 | `D/short-first.json`, `agreement` |
-| Short, nearest 30 s | .004538 / .003385 / .005211 | .016220 / .011765 / .018235 | .053590 / .047974 / .066270 | `D/short-30s.json`, `agreement` |
-| Medium, first frame | .004545 / .003706 / .004899 | .015442 / .012161 / .016480 | .040436 / .037461 / .092470 | `D/medium-first.json`, `agreement` |
+| Short, first frame | .004392 / .003604 / .005119 | .016083 / .012634 / .017975 | .057313 / .037964 / .076127 | `DEC/short-first.json`, `agreement` |
+| Short, nearest 30 s | .004538 / .003385 / .005211 | .016220 / .011765 / .018235 | .053590 / .047974 / .066270 | `DEC/short-30s.json`, `agreement` |
+| Medium, first frame | .004545 / .003706 / .004899 | .015442 / .012161 / .016480 | .040436 / .037461 / .092470 | `DEC/medium-first.json`, `agreement` |
 
 First-frame PTS is zero in both pairs. Near 30 s, HEVC is `899900/30000`, ProRes
 `899899/30000`; independent packet enumeration selects ordinal 899 in both
 1,852-frame sources. Roster offsets span zero to two ticks, retained without
-interpolation (`D/short-30s.json`, `alignment`; `D/alignment-check.json`).
+interpolation (`DEC/short-30s.json`, `alignment`; `DEC/alignment-check.json`).
 
 Independent same-HEVC controls agree exactly at all selections: channel MAE/p99/max
 zero, luma slope 1 / intercept 0, shape `(2160,3840,3)`, residual parity and adjacent
@@ -95,9 +95,9 @@ found no sampled range-double-expansion or missing-upsampling signature; normal
 codec/chroma differences are not classified as a defect from their magnitude alone.
 
 The brightest of the required samples is short-near-30 s, selected by RGB-luma p99,
-not a whole-clip scene search (`D/results.json`, `brightest_sample`). Raw Y spans
+not a whole-clip scene search (`DEC/results.json`, `brightest_sample`). Raw Y spans
 2-255; p1/p50/p90/p99/p99.9 = 21/97/196/217/245; occupancy at least 235 is
-.400427%, at least 250 is .018880% (`D/short-30s.json`, `sdr_histogram`). This is
+.400427%, at least 250 is .018880% (`DEC/short-30s.json`, `sdr_histogram`). This is
 consistent with tagged full-range SDR. A scene histogram cannot prove the absence
 of mislabelled HDR or reconstruct Studio's tone mapping. The limited-range long
 source has admission and prefix decode evidence, not this ProRes-reference check.
@@ -126,7 +126,7 @@ Window 2 is the performance record accepted by CHARC. The N6 target is 12.0 min/
 |---|---:|---:|---:|---:|---:|---|
 | D, short | 1,852 | 639.48 | 10.35 | 3.01 | 232,415,145 | `R/bench-hevc62q.json`, `bench`; W2:12 |
 | E, medium | 13,154 | 4,845.61 | 11.04 | 2.73 | 1,575,091,882 | `R/bench-hevc439.json`, `bench`; W2:18 |
-| N6 control GX011627 | 681 | 246.3 | 10.84 | Not quoted | Not quoted | **Seat log W2:6**; record path there is in the main working folder |
+| N6 control GX011627 | 681 | 246.3 | 10.84 | 3.11 fps (681 frames / 219.3 s, seat log W2:6) | Not quoted | **Seat log W2:6**; record path there is in the main working folder |
 
 Frames-phase fps is `frames / phases_s.frames`, not the end-to-end rate. The control
 record was not copied here; its figures above are explicitly seat-log evidence.
@@ -135,6 +135,9 @@ instrument failure after measurement. E's launcher exited 0 (W2:18).
 E's retained throughput output replaces dropped export B for V4 and the look pack.
 The spawned-worker short export A completed on GPU in 2,143.33 s, but was not
 exclusive and is not a timing figure of record (`R/export-hevc62.json`, `result`).
+That record has top-level `ok: false`, `error: "RuntimeError: required GPU correction path not established"`:
+the turn-3 driver's wrong device check (dispatch 4), not an export failure;
+`result.ok` is true with `result.device: "GPU"`.
 
 Native benchmark phases, in seconds, retain their instrument names:
 
@@ -151,8 +154,9 @@ additive decode/correct/encode cost split. No such split is claimed.
 | D | 3,691,827,200 | 3,465 / 4,065.4 | 288 | 1,471.3 / 2,173.8 | PASS | `R/bench-hevc62q.json`, `bench.telemetry`, `memory_check` |
 | E | 3,709,526,016 | 3,327 / 4,065.4 | 312 | 1,471.3 / 2,173.8 | PASS | `R/bench-hevc439.json`, same fields |
 
-Memory sampling is nominally .25 s; maximum observed gaps .332 s (D) / .511 s (E),
-no sampler errors (`bench.telemetry.gaps_s`, `errors` in those records). Sampled peaks
+RSS is sampled nominally at 0.25 s (maximum gaps 0.332 s for D, 0.511 s for E);
+device memory is sampled at 1 s (maximum gaps 1.053 s / 1.241 s for D / E), with
+no sampler errors (`bench.telemetry.periods_s`, `gaps_s`, `errors` in those records). Sampled peaks
 are not continuous bounds. Both RSS peaks are below N4's 16 GB ceiling (spec N4).
 
 | Decode-only leg | Range | Frames read | Pipe bytes | Wall s | fps | Evidence |
@@ -183,7 +187,7 @@ the gate query header (`window2/gate-raw-D-20261109T173659Z.txt:25`).
 
 Sparse zero decoder/encoder samples do not establish an unused hardware path;
 the tied NVENC evidence is separate. Window-1 high memory includes other work.
-The coarse series misses D's .25 s sampler peak, illustrating its sampling limit.
+The coarse series misses D's 1 s device-sampler peak, illustrating its sampling limit.
 W2:7,10,16 records light byte-probe/review overlap; W2:18 records background
 system activity and E GPU temperature 67.9 C before / 78.1 C after. These conditions
 are retained; the seat admitted window 2 as the comparison window.
@@ -320,8 +324,10 @@ These are candidate instrument rows for CHARC's accept, not product defect rows.
 
 | Candidate | Finding, disposition and evidence |
 |---|---|
-| WP7.1 seat process supervision | `isolate.py` pid reuse, `run_export.py` poll exception type, finally-wait, F1 stale-parent adoption, F2 stale sampling, and the unmeasured supervisor cost were not covered by a long-child/pid-reuse proof before seat use. The frozen drivers now carry proofs (frozen-t7 / t8). Turn 7a repaired identity-aware cleanup and psutil timeout handling; r2 repaired discovery/sampling and finally paths; r3 guarded reads/discovery and added a distinguishing depth-2 proof; r4 reduced discovery cost; r5 guarded the private API, added public fallback, known-root seeding and snapshot-time cutoff. Evidence: `work/wp7.1/proofs-t7a/`, its `r2/` through `r5/` proof records and ledgers; W2:13,29-33. |
+| WP7.1 seat process supervision | WP7.1 seat process supervision (isolate.py pid reuse, run_export.py poll exception type, finally-wait, F1 stale-parent adoption, F2 stale sampling, and the unmeasured supervisor cost) was never exercised against a child that outlives one poll or a pid that is reused; the frozen drivers now carry proofs (frozen-t7 / t8). |
 | V16 idle memory never subtracted | Window-1 game raised idle memory; device peak, not peak minus idle, is compared with estimate. `R/bench-hevc62.json`, `bench.memory_check`, correctly fails with idle 3,467 MiB and device peak 6,483 MiB. Preserve the host-confounded record; do not relax the product check. |
+
+The seat DID hit pid reuse in window 2 (seat log W2:13), which is how the defect was found.
 
 The initial supervision proof gap covered children outliving a poll and reused pids;
 it is not a claim that the later seat never encountered them. D's cleanup exception
@@ -373,6 +379,9 @@ future change separately. The note does not waive the V4 failure documented abov
 
 ## 8. Limits and open acceptance items
 
+- **ProRes / 4:2:2 input:** a separate owner question at the accept (a spec change
+  plus a product package, Phase 7 candidate), per the brief's scope correction
+  `626e30f0` (`docs/briefs/wp7.1-brief.md:3`): "ProRes / 4:2:2 input is put to the owner at the accept as a separate question (a spec change + a product package, Phase 7 candidate)."
 - **Owner look verdict pending:** the pack is prepared; preference, artifacts,
   playback and flicker remain owner-reserved.
 - **Owner movie-level reading pending:** the one-movie-tick proposal in section 4
