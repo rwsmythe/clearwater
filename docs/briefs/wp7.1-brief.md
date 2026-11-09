@@ -1,6 +1,6 @@
-# WP7.1 — Insta360 Studio exports: validation on the owner's real files (dispatch brief, DRAFT)
+# WP7.1 — Insta360 Studio exports: validation on the owner's real files (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-11-05 ~18:20Z by CHARC gen 17 (session `clearwater-charc-20261105-0602`) on the owner's words of 2026-11-05 ("We can also get the insta360 work scheduled as well now that the upgrade is complete"; "exports is the scope"; "copy done"). The orchestrator fills the dispatch section; CHARC marks it FINAL. Spec v0.6.2: no clause change expected; a text note naming Insta360 Studio exports as a supported source and ProRes 422 as an accepted input codec is PROPOSED to the owner at the accept if the package proves them (any spec edit is the owner's). Dispatch slot: after WP6.3c's dispatch and the 1.1.0 release gate, in parallel with WP6.5's wait on the owner's Mac; never during an EXCLUSIVE window of another package.
+**Status:** FINAL 2026-11-09 ~05:50Z by CHARC gen 20 (session `clearwater-charc-20261107-0949`) after the 1.1.1 release; the footage is in place (`C:\Users\rwsmy\clearwater-footage\Insta360\`, seven files, 209 GB, listed at CHARC's seat 2026-11-09). Dispatch-time facts: base = main at or after `50c87e96`; the `inventory-2026-11-05.md` file name becomes `inventory-<dispatch date>.md`; Q3: the orchestrator states the GPU pack state at dispatch and installs it on the seat if absent (the 6.3a installer); the EXCLUSIVE timing figures never overlap WP6.5's Windows gate legs. Lane: Codex as written (well-specified instrument runs), both nets Claude. DRAFT history: 2026-11-05 ~18:20Z by CHARC gen 17 (session `clearwater-charc-20261105-0602`) on the owner's words of 2026-11-05 ("We can also get the insta360 work scheduled as well now that the upgrade is complete"; "exports is the scope"; "copy done"). The orchestrator fills the dispatch section; CHARC marks it FINAL. Spec v0.6.2: no clause change expected; a text note naming Insta360 Studio exports as a supported source and ProRes 422 as an accepted input codec is PROPOSED to the owner at the accept if the package proves them (any spec edit is the owner's). Dispatch slot: after WP6.3c's dispatch and the 1.1.0 release gate, in parallel with WP6.5's wait on the owner's Mac; never during an EXCLUSIVE window of another package.
 
 | Field | Content |
 |---|---|
@@ -43,4 +43,4 @@ The owner shoots an Insta360 camera on SCUBA dives and edits the recordings in I
 
 ## Dispatch section (orchestrator fills)
 
-(pending; not before WP6.3c's dispatch and the 1.1.0 release gate)
+(pending the orchestrator's fill; dispatchable from 2026-11-09)
