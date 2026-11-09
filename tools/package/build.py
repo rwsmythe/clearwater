@@ -30,9 +30,10 @@ layout, :mod:`clearwater.gpu_pack`); the WP6.3 downloader will write the same fi
 loader's start-up checks) and lists each problem.
 
 ``--ffmpeg-from URL --ffmpeg-sha256 HEX`` fetches only the archive named in
-``ffmpeg.lock.json`` and verifies the bytes, extracted inventory and both tools'
-version/configuration before accepting it. Local spikes use the same pinned HTTPS
-fetch. See ``tools/package/README.md`` for the spike measurements.
+``ffmpeg.lock.json`` (on macOS ``ffmpeg-macos.lock.json``, WP6.5) and verifies the
+bytes, extracted inventory and both tools' version/configuration before accepting it
+(on macOS read from the tools' bytes, then placed into the ``.app``). Local spikes use
+the same pinned HTTPS fetch. See ``tools/package/README.md`` for the spike measurements.
 
 ``--notices`` generates the onedir artifact's inventory-backed
 ``THIRD_PARTY_NOTICES.md`` after the FFmpeg step. Missing material, uncovered
@@ -3944,7 +3945,8 @@ def smoke_artifact(folder: Path, *, out: Path) -> int:
     """Run headless smoke checks and report a named failure as a non-zero status.
 
     Args:
-        folder: The Windows onedir artifact or its parent wrapper.
+        folder: The Windows onedir artifact, the macOS ``.app``'s release folder or
+            ``Contents/MacOS``, or a parent wrapper.
         out: The evidence root, with disposable profiles under ``smoke/``.
 
     Returns:
