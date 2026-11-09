@@ -1105,3 +1105,40 @@ def test_macos_skip_allowlist_refuses_every_other_reason(
     else:
         with pytest.raises(SystemExit, match="macOS leg: "):
             exec(code, {})
+
+
+# --- WP6.5 group 2a part 2: the switch's lock fields follow the macOS lock's shape ---------
+
+MACOS_LOCK_FIXTURE = ROOT / "tests/ffmpeg_lock/ffmpeg-macos.fixture.json"
+
+
+def _build_tool():
+    path = ROOT / "tools/package/build.py"
+    spec = importlib.util.spec_from_file_location("wp65_workflow_lock_build", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_macos_release_build_reads_the_macos_lock_fields_and_the_switch_stays_off(macos):
+    """The step reads asset_url / seat_sha256 from ffmpeg-macos.lock.json, the fields the
+    validator's macOS shape names; the switch is OFF until part 3 writes the real lock."""
+    build = _build_tool()
+    lines = script(macos, "Build release bundle and zip").splitlines()
+    assert lines[0] == "lock=tools/package/ffmpeg-macos.lock.json"
+    assert build.FFMPEG_MACOS_LOCK_PATH.relative_to(ROOT).as_posix() == lines[0].split("=", 1)[1]
+    read = re.findall(
+        r"""json\.load\(open\(sys\.argv\[1\]\)\)\['(\w+)'\]\)" "\$lock"\)$""",
+        "\n".join(lines),
+        re.MULTILINE,
+    )
+    assert read == ["asset_url", "seat_sha256"]
+    fields = set(build.FFmpegMacLock.__annotations__)
+    assert set(read) <= fields
+    fixture = json.loads(MACOS_LOCK_FIXTURE.read_text(encoding="utf-8"))
+    assert set(fixture) == fields
+    assert '--ffmpeg-from "$url" --ffmpeg-sha256 "$sha"' in lines[-1]
+    assert fixture["asset_url"] not in macos and fixture["seat_sha256"] not in macos
+    assert re.findall(r'^      MACOS_FFMPEG_BUNDLED: "(\w+)"$', macos, re.MULTILINE) == ["false"]
+    assert not (ROOT / "tools/package/ffmpeg-macos.lock.json").exists()

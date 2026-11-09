@@ -26,10 +26,12 @@ jobs:
       UV_FROZEN: "1"
       UV_NO_SYNC: "1"
       UV_PYTHON_PREFERENCE: only-managed
-      # WP6.5 group 2a (the macOS FFmpeg lock row, the Mac notices census and the darwin
-      # smoke) sets this to "true". Until then the build makes the .app WITHOUT FFmpeg, the
-      # FFmpeg-dependent macOS test families are deselected, no release asset is staged,
-      # and release mode (a call from release.yml) is refused by the version step.
+      # WP6.5 group 2a part 3 (the real tools/package/ffmpeg-macos.lock.json from the fork
+      # run, its census and the Mac notices) sets this to "true"; part 2 built the lock's
+      # shape and validator, the darwin bundling and the darwin smoke. Until then the build
+      # makes the .app WITHOUT FFmpeg, the FFmpeg-dependent macOS test families are
+      # deselected, no release asset is staged, and release mode (a call from release.yml)
+      # is refused by the version step.
       MACOS_FFMPEG_BUNDLED: "false"
     outputs:
       version: ${{ steps.version.outputs.version }}
