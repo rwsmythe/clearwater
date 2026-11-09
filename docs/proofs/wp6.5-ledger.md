@@ -9,6 +9,7 @@ dispatcher fills the depth figures.
 | Round | Reviewer | Blocking (crit/major) | Minor/nit | In-envelope / out | NEW / REOPENED | Reverts | Fixes: product / tests-only | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|
 | 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | 254,025 (wp65-cell1, read by the dispatcher with cell_depth.py at its round-0 yield) |
+| A r1 | Codex (seat, detached copy) on the group-1 head | 1 major (A1) | 1 minor (A2), 1 advisory (A3) | 3 in / 0 out | 3 NEW / 0 REOPENED | 0 | product 3 (build.py) + tests; all three FIXED at `2704a852` (group 2b) | group-2b row below |
 
 ## Round 0
 
@@ -581,4 +582,202 @@ Static: `ruff check .` All checks passed; `ruff format --check .` 337 files alre
 6. M-TOOL T11 / T12 pass plain (xfail condition false).
 7. `test_smoke_environment_strips_all_python_overrides` and the other smoke tests natively.
 
-Depth at group-1 yield: DISPATCHER TO FILL
+Depth at group-1 yield: 369,005 (wp65-cell2, read by the dispatcher with cell_depth.py at its group-1 yield)
+
+## Group 2b (`wp65-cell3`, dispatch-3; base `8ca7aeaf`)
+
+Build turn plus the Reviewer A r1 fold, proved on Windows. Commits: `2704a852` (items 1-4),
+`01407c6e` (item 5), `b8fcecc8` (item 6), `a8b0132c` (the AD-33 pack-scan fix found in the
+cell's own loop), then this ledger. RED runs used the base `build.py` / `notices.py` copied
+to `work\wp6.5\base\` and loaded through `WP61_BUILD_SCRIPT` (as group 1), and for the
+workflow a copy of the test module beside the BASE `release.yml` under `work\wp6.5\redwf\`.
+Every commit's blobs have 0 CR (checked per file per commit).
+
+### A r1 adjudication
+
+| # | Severity | Finding | Verdict | Change | Tests (RED on base -> GREEN) |
+|---|---|---|---|---|---|
+| A1 | MAJOR | `os.walk` without `onerror` swallowed an unreadable subtree from the origin check and the ZIP | FIXED | `build.py:2972` `_walk_error` raises; `:2977` `_macos_entries` passes it (the ONE macOS walker: origin walk, ZIP, notices and the folder-link view all use it) | `test_tools_package_build.py:2802` `test_unreadable_folder_fails_the_macos_walks[root,nested]`: `os.scandir` patched to raise for the root / a nested folder; the origin check, the ZIP and the notices inventory each raise and no ZIP is written. RED: 2 failed (DID NOT RAISE) |
+| A2 | MINOR | `linkedit.rstrip(b"\0")` admitted a changed final string-table terminator | FIXED | `build.py:2714` `_macho_identity`: `__LINKEDIT` content runs to the signature; ONLY a gap of < 16 zero bytes between the LC_SYMTAB string table's declared end and the signature is excluded (`:2795`); `:2829` `_macho_digest` and `:2907` `_is_macos_bootloader` compare without any strip | `:2258` padding table (7: padding dropped / kept admitted; 16 zeros dropped refused, kept admitted; junk dropped refused, kept admitted; final terminator changed refused); `:2280` the same for an ordinary native (2); bootloader `changed-final-string-terminator`; native `dropped-final-string-terminator`. RED: 6 failed incl. the reviewer's probe |
+| A3 | ADVISORY | unexplained bytes after the segments left the identity unchanged | FIXED (folded) | `build.py:2824`: an image must END where its segments end; `:2789-2791` the signature must lie inside `__LINKEDIT`. Applies to every thin image, the bootloader included: its PKG lies INSIDE `__LINKEDIT` after `fix_exe_for_code_signing` (`PyInstaller/utils/osx.py:223-224` sets strsize / filesize to the file end before signing), so the archive stays its only allowance. No PyInstaller output for an ordinary native carries a trailer: `codesign` writes the signature at `__LINKEDIT`'s end (the runner build is the native proof, G3 item 2) | `appended-trailer` (native and bootloader), `signature-outside-linkedit`. RED: the two trailer cases failed (admitted) |
+
+### Items
+
+1. **A r1 fold:** above.
+2. **G1-F1 classes (B) and (C), ONE shared predicate (`2704a852`).** `build.py:3071`
+   `macos_link_problem(root, contents, path)` = THE rule; `:3009`
+   `_macos_link_class_problem` (relative POSIX target; resolved from the link's physical
+   folder inside `root`; exists; ONE HOP: the named target itself (lstat of the joined
+   path) is not a link; then framework (`framework_link_problem`, unchanged) or (B) or
+   (C)); `:3049` `macos_link_view` (a folder target's entries, never through a further
+   link); `:3126` `_macos_depth` (a `.app`'s Resources mirrors Frameworks). Callers: the
+   origin walk `:3232` (a folder link's FILES are origin-checked at the link's location,
+   depth included); the ZIP `_macos_release_files` (contents root from `:3119`
+   `_macos_contents`); `notices.py:1419` (G1-F2: on darwin the same walker and predicate,
+   an admitted link adds no entry; win32 unchanged, every link refused with today's text).
+   Reading of "one hop" (disclosed, not a STOP): the TARGET named by the link must not be a
+   link; a target path that passes THROUGH an admitted folder link is allowed, because the
+   framework class the ruling keeps already does that (`<fw>/QtCore -> Versions/Current/QtCore`
+   traverses `Versions/Current`), and every link on such a path is itself checked by the
+   walk. Tests: `test_tools_package_build.py:2539` `LINK_CASES` (14 cases: B onedir; B in a
+   `.app` through PyInstaller's dotted-folder link plus its Resources copy; C data file; C
+   binary folder with nested framework links; refused: B name mismatch, B not in the
+   contents root, B to a folder, B to outside the contents root, a PLANTED ESCAPING LINK, a
+   PLANTED LINK-TO-LINK (the bindepend name pointed at the framework's own top-level link),
+   C link-to-link, C outside the three folders, C into `_CodeSignature`, a cross-link shape
+   in a onedir) run through ALL callers: `:2696` origin walk (14), `:2709` ZIP (14), `:2737`
+   notices (9 onedir); `:2749` notices on win32 unchanged; `:2758` a bad link INSIDE a
+   folder target refuses the folder link too; `:2777` a transformed native seen through a
+   non-mirrored cross-link fails its rpath depth. Two group-1 rows re-reasoned
+   (`:2411`: the B-shaped dangling link now reads "dangling", the escaping
+   `Versions/B` reads "outside the release folder"). RED: 42 failed (admitted cases refused
+   as "outside a .framework"; refusals with the base's other text; A1 not raised).
+3. **G1-F3 (`2704a852`).** `build.py:3653` `write_release_zip`: darwin members whose mode
+   carries an execute bit are `S_IFREG | 0755`, others 0644 (`:3720-3724`, AD-36 form);
+   win32 0644 always, the mode never read. Tests `:2842` the Windows byte-identity over a
+   MIXED run (`.exe` / `.bat` / suffixless files chmod 0755 beside 0644 texts; every member
+   0644; the archive's sha256 pinned to the BASE's output
+   `0d3bfbfb13332df42f0180e90556ccf7d7d43602b8b2ea04c924df21788d6d10`, which the base
+   module reproduces: PASSED on base); `:2859` the darwin rule from the real file mode
+   (green on a Windows host via `.exe`'s execute bit, and on darwin for all four
+   executables). RED: the darwin test failed (every member 0644).
+4. **The `.app` zip shape and the tool hook (`2704a852`).** `build.py:92` `MACOS_APP`;
+   `:345` `release_zip_name` (Windows unchanged; darwin `Clearwater-<version>-macos`);
+   `:365` `release_zip_folder` (darwin = `Clearwater.app`, the ZIP's ONE top-level item);
+   `:702` `find_executable` prefers `Clearwater.app/Contents/MacOS/Clearwater` on darwin
+   (PyInstaller's `--windowed` leaves the onedir COLLECT beside the BUNDLE; not shipped);
+   `:3653` `write_release_zip(..., name=)`; `build()` zips `release_zip_folder(root)` under
+   `release_zip_name` (`:3933-3945`). The hook: `:3138` `place_macos_tools(bundle,
+   executables, texts)` copies the VERIFIED bytes unchanged, code to `Contents/MacOS` (0755;
+   AD-34 (2) puts the frozen executable's folder first on PATH, so the bundled FFmpeg is
+   found there; M-BUNDLE P16 / P57 find it anywhere under the bundle) and texts to
+   `Contents/Resources` (0644; `Contents/MacOS` holds only code under the seal); `:3183`
+   `seal_macos_bundle` = ad-hoc RE-SIGN AFTER (`/usr/bin/codesign --sign - --force
+   --timestamp=none <app>`, WITHOUT `--deep` so nested code keeps its bytes and the origin
+   hashes / identities still hold) then `codesign --verify --deep --strict --verbose=2`
+   (ruling 3's seal proof), bounded, named failures. `build()` `:3905-3924`: on darwin,
+   after FFmpeg and notices, seal then RE-RUN the origin check (the re-signed bootloader).
+   Tests `:2904`, `:2912`, `:2922`, `:2950` (4 refusals), `:2957`, `:2986` (4 failures),
+   `:3032` (sealed / seal fails / origin after seal fails), `:3090` (win32 never seals).
+   RED: 18 failed. **Found in the loop and fixed (`a8b0132c`):** `build()` scanned the GPU
+   pack on darwin, but a CPU-only sync installs none of its distributions, so EVERY darwin
+   build would have failed "the pack sources cannot be scanned" before PyInstaller; darwin
+   now scans no pack (AD-33) (`:3802-3811`); test `:3059` (darwin passes without a pack,
+   win32 still refuses). Its RED by reading (the base calls `pack_sources()` on every
+   platform; the base copy under `work\` cannot run `build()`: its `REPO_ROOT` is `work\`).
+5. **The workflow (`01407c6e`).** `.github/workflows/macos-build.yml` per rulings 1-2: one
+   `macos` job; `workflow_call` (`release-version` required), `workflow_dispatch`, `push`
+   `macos-validation/**`; `permissions: contents: read`; no release job, no tag gate;
+   `macos-26`; `timeout-minutes: 180`; the windows job's three pinned actions (checkout,
+   setup-uv with the darwin checksum `a92f61e9...f376`, upload-artifact); CPU-only sync;
+   steps: version + run record (validation: `clearwater.__version__`, `GITHUB_SHA`,
+   `ImageOS`, `ImageVersion`, `sw_vers`; release: equals `release-version`), static (both
+   mypy targets), parallel (`-n 3`, the canonical marker `and not macos`, the cell `-k`),
+   serial (`and not macos`, the `-k`), build, the M leg (`CLEARWATER_MAC_BUNDLE` = the
+   built `.app`, its `Contents/MacOS` first on PATH, `-k`, junit), the skip-reason
+   allowlist (only "VideoToolbox unavailable on this Mac: ..."; a missing passing summary
+   fails), the capture, the stage (`Clearwater-<v>-macos.zip`, sidecar + `# source-commit`,
+   `THIRD_PARTY_NOTICES-macos.md` from `Contents/Resources`), uploads `macos-release` and
+   `macos-evidence` (`if: always()`); every pytest line `| tee work/evidence/<leg>.log`
+   under bash's `-eo pipefail`. **The named switch** `MACOS_FFMPEG_BUNDLED: "false"` (job
+   env): off = the build makes the `.app` with NO `--ffmpeg-*` / `--notices` / `--smoke` /
+   `--zip`, the M leg deselects the FFmpeg families, no capture of encoders, no stage, no
+   `macos-release`, and RELEASE MODE IS REFUSED by the version step ("macOS release assets
+   await WP6.5 group 2a"); on = the release build from `tools/package/ffmpeg-macos.lock.json`
+   (`asset_url`, `seat_sha256`; the lock's name and shape are group 2a's to confirm, the
+   step's pin test with it). `release.yml` exactly as ruled: `macos: needs: windows, uses:
+   ./.github/workflows/macos-build.yml, with: release-version`; `release: needs: [windows,
+   macos]`; a second download (`macos-release`); `THIRD_PARTY_NOTICES-macos.md` in `files:`.
+   Tests `tests/test_release_workflow.py`: the windows job slice and the header (triggers,
+   permissions, concurrency) sha256-pinned to `8ca7aeaf` (`:805`); the release job equals
+   the base after undoing exactly the three ruled edits (`:811`); the existing pins
+   re-pointed (`job()` helper; 7 pinned actions + the one local call; `needs: [windows,
+   macos]`; the macOS download and notices); `macos-build.yml` `:834-1094` (triggers, no
+   release / tag gate / write permission / download / secrets / push; same pins; runner,
+   budget, env, CPU-only; step order; the three pytest lines token by token; the switch;
+   the version step EXECUTED in 5 modes; the allowlist EXECUTED on 6 logs). RED (base
+   workflow): 21 failed. actionlint and the harness registration are the SEAT's (ruling 1).
+6. **README (`b8fcecc8`).** The `## Platforms` macOS bullet replaced: no Mac download yet;
+   for a source run on a Mac, Xcode Command Line Tools (`xcode-select -p`, `xcode-select
+   --install`) and uv at the builds' 0.10.9 (`curl -LsSf https://astral.sh/uv/0.10.9/install.sh
+   | sh`, `uv --version`); uv fetches Python 3.12; FFmpeg on PATH as for any source run (the
+   existing next bullet). No forbidden term (F0-10); nothing claimed the code does not do.
+
+### Counts at the group-2b head (`-p no:cacheprovider --timeout 600 --basetemp=work\wp6.5\g2b\<module> -k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`)
+
+Static: `ruff check .` All checks passed; `ruff format --check .` 337 files already
+formatted; `mypy` Success 166; `mypy --platform darwin` Success 166.
+
+| Module | Result |
+|---|---|
+| `tests/test_tools_package_build.py` | 275 passed (group 1: 200) |
+| `tests/test_release_workflow.py` | 78 passed (group 1: 59) |
+| `tests/test_tools_package_notices.py` | 415 passed (run with `-n 3` to fit the 10-minute tool call; with the same `notices.py` the 415 also passed serially in a combined run before the commit) |
+| `tests/test_tools_package_smoke.py` | 44 passed, 1 skipped (the non-Windows tripwire) |
+| `tests/test_portability.py` | 192 passed |
+| `tests/test_macos_portability.py` | 224 skipped (`macos` platform skip) |
+
+### Verification loop (self)
+
+- Suspected: a one-hop rule read as "no link anywhere on the target path" would refuse the
+  framework links the ruling keeps. CONFIRMED by reading (`<fw>/QtCore ->
+  Versions/Current/QtCore`); resolved by the reading above (the TARGET itself), tested by
+  the planted link-to-link and the dotted-folder cases.
+- Suspected: a folder link's view could recurse forever through a cycle of folder links.
+  CONFIRMED possible in principle; FIXED by design: nested links are classified at the
+  virtual location but never entered (each is checked, and viewed, at its own physical
+  place).
+- Suspected: the darwin build fails before PyInstaller (the GPU pack scan). CONFIRMED by
+  reading `pack_sources` against a CPU-only sync; FIXED `a8b0132c`.
+- Suspected: re-signing the bundle `--deep` would rewrite the FFmpeg tools and break their
+  whole-file hashes. CONFIRMED by PyInstaller's own `--deep` signing (`building/osx.py`
+  `assemble`); the seal re-signs WITHOUT `--deep`.
+- Suspected: the darwin build tests import PyInstaller under a patched `sys.platform`.
+  CONFIRMED (`PyInstaller/compat.py:110` reads `platform.mac_ver()` at import: failed in a
+  narrow selection); FIXED in the tests (the archive is built before the patch).
+- Rejected as false positive: none. A final pass found nothing new.
+
+### Findings for the dispatcher
+
+- **G2b-F1 (record; runner decides) -- PyInstaller can make a link-to-link the ruled rule
+  refuses.** `building/osx.py:400-425` cross-links a binary-only folder whose parent is
+  MIXED (`Contents/Resources/<p>/.dylibs -> ../../Frameworks/<p>/.dylibs`) and `:440-462`
+  makes `Contents/Frameworks/<p>/.dylibs -> __dot__dylibs`: two hops, refused by ONE HOP.
+  Not expected in this build: in the 1.1.1 Windows onedir `PIL`, `numpy` and `scipy` hold
+  binaries only (so the WHOLE folder is cross-linked once and the dotted link sits behind
+  it). If the runner's origin walk names a "link to a link", it is this, and the ruling
+  needs a third shape (the dotted-folder pair).
+- **G2b-F2 (record) -- a tag push before group 2a makes NO draft.** With the switch off,
+  release mode refuses in the macOS job, so `release` (needs both) is skipped: once this
+  reaches main, no Windows-only release can be cut until group 2a lands (or the switch's
+  meaning is ruled otherwise).
+- **G2b-F3 (record) -- the source-run FFmpeg on a Mac.** The README's existing source-run
+  line requires FFmpeg on PATH; the Mac prerequisites name only the ruled two tools, so the
+  guide's Mac source section (stage 2) must say where a source run's FFmpeg comes from (no
+  Homebrew requirement is ruled).
+
+### What only the runner proves (stage 1, first run, switch OFF)
+
+WILL prove (the owner's push of this head): the darwin uv checksum and CPU-only sync; the
+version / run record (image version, `GITHUB_SHA`, `sw_vers`); both mypy targets natively;
+the parallel and serial legs on macOS (the WP6.3e FFmpeg skip policy; the 158 neutral
+notices ids; the smoke tripwire's real clean / survivor rows; G1-F5); a real PyInstaller
+`.app` under the darwin PATH / DYLD sanitising; the Mach-O identity on real natives and the
+bootloader (0 violations expected), the link classes on real BUNDLE output (G2b-F1), the
+A3 end-of-image rule on real files; the seal (`codesign` re-sign + `--verify --deep
+--strict`) and the origin re-check after it; the M leg without the FFmpeg families: M-STATIC,
+M-PATH, M-DEVICE, M-FS (`hdiutil`), M-GUARD, M-TOOL (T11 / T12 plain), M-GUI (if the
+runner has a session), M-BUNDLE P24 / X28 on the real `.app`; the allowlist.
+WILL NOT prove until group 2a (the switch ON): FFmpeg inside the bundle and the seal over
+it, the notices (`Contents/Resources/THIRD_PARTY_NOTICES.md`), the darwin smoke, `--zip`
+and the ZIP's links / execute bits after a real unzip, the stage and `macos-release`, the
+encoder capture (DR-134), and the M families deselected now: M-PIPE, M-TEXT, M-CODEC,
+M-RATE, M-V4, M-V4 corpus, M-SPACE, M-SPAWN, M-BUNDLE P16 / P57. Release mode is refused.
+
+### The owner's act for stage 1 (asked by CHARC)
+
+`git push origin wp6.5:refs/heads/macos-validation/wp6.5` (after the seat's actionlint and
+harness registration of `.github/workflows/macos-build.yml`). Re-runs: re-push, or "Re-run
+jobs" on the run page.
+
+Depth at group-2b yield: DISPATCHER TO FILL
