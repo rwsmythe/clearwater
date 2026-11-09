@@ -2202,3 +2202,234 @@ def test_macos_bootloader_identity(tmp_path, monkeypatch, case):
     assert build._is_clearwater_bootloader(executable) is admitted
     monkeypatch.setattr(build.sys, "platform", "linux")
     assert build._is_clearwater_bootloader(executable) is False
+
+
+# --- macOS framework links (WP6.5, F0-9) -------------------------------------------------
+# PyInstaller's collect_files_from_framework_bundles (utils/osx.py:671-692) makes, in every
+# collected .framework: Versions/Current -> <version>, <fw>/<name> -> Versions/Current/<name>,
+# <fw>/Resources (and Helpers, Headers, ...) -> Versions/Current/<dir>.
+
+FRAMEWORK = "_internal/PySide6/Qt/lib/QtCore.framework"
+APP_FRAMEWORK = "Clearwater.app/Contents/Frameworks/PySide6/Qt/lib/QtCore.framework"
+
+ADMITTED_LINKS = [
+    (f"{FRAMEWORK}/Versions/Current", "A"),
+    (f"{FRAMEWORK}/Versions/Current", "5"),
+    (f"{FRAMEWORK}/QtCore", "Versions/Current/QtCore"),
+    (f"{FRAMEWORK}/Resources", "Versions/Current/Resources"),
+    (f"{FRAMEWORK}/Helpers", "Versions/Current/Helpers"),
+    (f"{APP_FRAMEWORK}/Versions/Current", "A"),
+    (f"{APP_FRAMEWORK}/QtCore", "Versions/Current/QtCore"),
+    (
+        "_internal/Outer.framework/Versions/A/Frameworks/Inner.framework/Inner",
+        "Versions/Current/Inner",
+    ),
+]
+
+REFUSED_LINKS = [
+    (f"{FRAMEWORK}/QtCore", "/usr/lib/libz.dylib", "absolute or not POSIX"),
+    (f"{FRAMEWORK}/QtCore", "C:/Windows/x.dll", "absolute or not POSIX"),
+    (f"{FRAMEWORK}/QtCore", "..\\..\\x", "absolute or not POSIX"),
+    (f"{FRAMEWORK}/QtCore", "", "absolute or not POSIX"),
+    ("_internal/libQt6Core.dylib", "PySide6/Qt/lib/libQt6Core.dylib", "outside a .framework"),
+    ("_internal/PySide6/Qt/lib/QtCore.framework", "../../QtCore.framework", "outside a .framework"),
+    ("Clearwater.app/Contents/Resources/base_library.zip", "../Frameworks/x", "outside"),
+    (f"{FRAMEWORK}/Versions/Current", "A/../../..", "not a sibling version folder"),
+    (f"{FRAMEWORK}/Versions/Current", "Current", "not a sibling version folder"),
+    (f"{FRAMEWORK}/Versions/Current", "..", "not a sibling version folder"),
+    (f"{FRAMEWORK}/QtCore", "Versions/A/QtCore", "not a framework structure link"),
+    (f"{FRAMEWORK}/QtCore", "Versions/Current/QtGui", "not a framework structure link"),
+    (f"{FRAMEWORK}/QtCore", "../../../../../../etc/passwd", "not a framework structure link"),
+    (f"{FRAMEWORK}/Versions/A/Resources/x", "y", "not a framework structure link"),
+    (f"{FRAMEWORK}/Versions/A", "../../QtGui.framework/Versions/A", "not a framework"),
+]
+
+
+@pytest.mark.parametrize("link, target", ADMITTED_LINKS)
+def test_framework_link_rule_admits_pyinstaller_framework_links(link, target):
+    """Pure rule over path strings (runs everywhere): the shapes PyInstaller makes."""
+    assert build.framework_link_problem(PurePosixPath(link), target) is None
+
+
+@pytest.mark.parametrize("link, target, reason", REFUSED_LINKS)
+def test_framework_link_rule_refuses_every_other_link(link, target, reason):
+    """Absolute, escaping, outside a framework or another shape: refused with the reason."""
+    problem = build.framework_link_problem(PurePosixPath(link), target)
+    assert problem is not None and reason in problem
+
+
+def _symlink(path: Path, target: str, *, folder: bool) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.symlink(target, path, target_is_directory=folder)
+    except (OSError, NotImplementedError) as error:
+        pytest.skip(f"os.symlink unavailable here (needs the symlink privilege): {error}")
+
+
+def macos_framework_release(home: Path, framework: str = FRAMEWORK) -> list[Path]:
+    """A collected QtCore.framework with PyInstaller's three links under ``home``."""
+    root = home / framework
+    tree(root, ["Versions/A/QtCore"], built_native(6, dylib_id="@rpath/QtCore"))
+    tree(root, ["Versions/A/Resources/Info.plist"], b"<plist/>")
+    links = [root / "Versions/Current", root / "QtCore", root / "Resources"]
+    _symlink(links[0], "A", folder=True)
+    _symlink(links[1], "Versions/Current/QtCore", folder=False)
+    _symlink(links[2], "Versions/Current/Resources", folder=True)
+    return links
+
+
+def framework_origin_check(tmp_path, monkeypatch, platform, *, extra=None):
+    original = original_native(dylib_id="/opt/qt/lib/QtCore.framework/Versions/A/QtCore")
+    base = tree(tmp_path / "python", ["lib/QtCore"], original)
+    monkeypatch.setattr(build.sys, "base_prefix", str(base))
+    monkeypatch.setattr(build, "_locked_native_distributions", lambda: [])
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
+    monkeypatch.setattr(build, "read_package", lambda _: SimpleNamespace(toc={}))
+    home = tree(tmp_path / "dist" / "Clearwater", ["Clearwater"], b"bootloader stand-in")
+    links = macos_framework_release(home)
+    if extra is not None:
+        extra(home)
+    monkeypatch.setattr(build.sys, "platform", platform)
+    return links, build.native_origin_violations(home / "Clearwater", original_path="")
+
+
+def test_origin_walk_admits_framework_links_on_macos_only(tmp_path, monkeypatch):
+    """darwin: the three links pass and the binary behind them is admitted; win32 unchanged.
+
+    Under win32 (today's rule) every link is refused and the transformed binary is unknown.
+    """
+    _, found = framework_origin_check(tmp_path / "mac", monkeypatch, "darwin")
+    assert found == []
+    links, found = framework_origin_check(tmp_path / "win", monkeypatch, "win32")
+    assert sorted(found) == sorted(
+        [
+            *(f"native origin: linked file {link}" for link in links),
+            f"native origin unknown: {FRAMEWORK}/Versions/A/QtCore",
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    "link, target, folder, reason",
+    [
+        ("_internal/libQt6Core.dylib", "PySide6/Qt/lib/libQt6Core.dylib", False, "outside"),
+        (f"{FRAMEWORK}/Headers", "/usr/include", True, "absolute"),
+        (f"{FRAMEWORK}/Helpers", "Versions/Current/Helpers", True, "dangling link"),
+        (f"{FRAMEWORK}/Versions/B", "../../../../../../../..", True, "not a framework"),
+    ],
+)
+def test_origin_walk_refuses_other_links_on_macos(
+    tmp_path, monkeypatch, link, target, folder, reason
+):
+    """Each refused link is named with its reason; the admitted ones beside it stay quiet."""
+    _, found = framework_origin_check(
+        tmp_path,
+        monkeypatch,
+        "darwin",
+        extra=lambda home: _symlink(home / link, target, folder=folder),
+    )
+    assert len(found) == 1
+    assert found[0].startswith(f"native origin: linked file {home_of(tmp_path) / link}: ")
+    assert reason in found[0]
+
+
+def home_of(tmp_path: Path) -> Path:
+    return tmp_path / "dist" / "Clearwater"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows junction regression")
+def test_origin_walk_refuses_a_junction_on_the_macos_path(tmp_path, monkeypatch):
+    """A junction is never a framework link."""
+    import _winapi
+
+    outside = tree(tmp_path / "outside", ["secret.dylib"])
+
+    def junction(home: Path) -> None:
+        _winapi.CreateJunction(str(outside), str(home / FRAMEWORK / "Headers"))
+
+    _, found = framework_origin_check(tmp_path, monkeypatch, "darwin", extra=junction)
+    headers = home_of(tmp_path) / FRAMEWORK / "Headers"
+    assert found == [f"native origin: linked file {headers}: junction"]
+
+
+def test_release_zip_stores_framework_links_as_links_on_macos(tmp_path, monkeypatch):
+    """S_IFLNK members carry the link text; files keep 0644; two writes are byte-identical."""
+    root = tmp_path / "Clearwater-1.2.0-macos-onedir"
+    tree(root, ["Clearwater/Clearwater"], b"bootloader")
+    macos_framework_release(root / "Clearwater")
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    archives = []
+    for run in ("a", "b"):
+        archive = build.write_release_zip(root, out=tmp_path / run, source_epoch=1793908801)
+        archives.append(archive.read_bytes())
+    assert archives[0] == archives[1]
+    prefix = f"{root.name}/Clearwater/{FRAMEWORK}"
+    with zipfile.ZipFile(io.BytesIO(archives[0])) as packed:
+        infos = {info.filename: info for info in packed.infolist()}
+        expected_links = {
+            f"{prefix}/Versions/Current": b"A",
+            f"{prefix}/QtCore": b"Versions/Current/QtCore",
+            f"{prefix}/Resources": b"Versions/Current/Resources",
+        }
+        for name, text in expected_links.items():
+            info = infos[name]
+            assert stat.S_ISLNK(info.external_attr >> 16)
+            assert info.external_attr >> 16 == stat.S_IFLNK | 0o755
+            assert info.compress_type == zipfile.ZIP_STORED
+            assert packed.read(info) == text
+        files = sorted(set(infos) - set(expected_links))
+        assert files == sorted(
+            [
+                f"{root.name}/Clearwater/Clearwater",
+                f"{prefix}/Versions/A/QtCore",
+                f"{prefix}/Versions/A/Resources/Info.plist",
+            ]
+        )
+        for name in files:
+            assert infos[name].external_attr >> 16 == stat.S_IFREG | 0o644
+
+
+def test_release_zip_link_rule_is_unchanged_on_windows(tmp_path, monkeypatch):
+    """win32: the same framework links are refused with today's text."""
+    root = tmp_path / "Clearwater-1.2.0-windows-onedir"
+    tree(root, ["Clearwater/Clearwater.exe"], b"bootloader")
+    macos_framework_release(root / "Clearwater")
+    monkeypatch.setattr(build.sys, "platform", "win32")
+    with pytest.raises(ValueError, match="release ZIP refuses linked/junction/outside member: "):
+        build.write_release_zip(root, out=tmp_path / "out", source_epoch=1793908801)
+    assert not (tmp_path / "out").exists()
+
+
+@pytest.mark.parametrize(
+    "link, target, folder",
+    [
+        ("Clearwater/_internal/libQt6Core.dylib", "PySide6/libQt6Core.dylib", False),
+        (f"Clearwater/{FRAMEWORK}/Headers", "../../../../../../../outside", True),
+    ],
+)
+def test_release_zip_refuses_other_links_on_macos(tmp_path, monkeypatch, link, target, folder):
+    """Outside a framework or escaping: refused before any ZIP byte is written."""
+    root = tmp_path / "Clearwater-1.2.0-macos-onedir"
+    tree(root, ["Clearwater/Clearwater"], b"bootloader")
+    tree(tmp_path, ["outside/secret.txt"])
+    macos_framework_release(root / "Clearwater")
+    _symlink(root / link, target, folder=folder)
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    with pytest.raises(ValueError, match="release ZIP refuses linked/junction/outside member: "):
+        build.write_release_zip(root, out=tmp_path / "out", source_epoch=1793908801)
+    assert not (tmp_path / "out").exists()
+
+
+def test_release_snapshot_records_links_by_their_text(tmp_path, monkeypatch):
+    """A retargeted framework link after the snapshot is a change, as a changed file is."""
+    root = tmp_path / "release"
+    tree(root, ["Clearwater/Clearwater"], b"bootloader")
+    links = macos_framework_release(root / "Clearwater")
+    tree(links[0].parent, ["B/QtCore", "B/Resources/Info.plist"], b"other")
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    before = build._release_snapshot(root)
+    assert before[links[0].relative_to(root).as_posix()] == ("link:A", 0)
+    links[0].unlink()
+    _symlink(links[0], "B", folder=True)
+    with pytest.raises(ValueError, match=r"changed after pre-smoke snapshot: .*Versions/Current"):
+        build._check_release_snapshot(root, before)

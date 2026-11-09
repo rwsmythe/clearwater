@@ -2892,30 +2892,38 @@ def _macos_layout(executable: Path) -> tuple[Path, Path]:
     return executable.parent, executable.parent / "_internal"
 
 
-def _macos_entries(root: Path) -> list[tuple[Path, bool]]:
-    """Every entry under ``root`` (sorted), never descending into a linked folder."""
+def _macos_entries(root: Path) -> list[tuple[Path, str]]:
+    """Every non-folder entry under ``root``, sorted, never descending into a linked folder.
+
+    Returns:
+        ``(path, kind)`` pairs, kind ``link`` (a symlink or junction, file or folder),
+        ``file`` or ``special``.
+    """
     entries = []
     for parent, folders, files in os.walk(root, followlinks=False):
         for name in [*folders, *files]:
             path = Path(parent) / name
             if path.is_symlink() or path.is_junction():
-                entries.append((path, True))
+                entries.append((path, "link"))
+                if name in folders:
+                    folders.remove(name)  # never walk through a link (a junction included)
             elif path.is_file():
-                entries.append((path, False))
+                entries.append((path, "file"))
+            elif not path.is_dir():
+                entries.append((path, "special"))
     return sorted(entries, key=lambda item: item[0].relative_to(root).as_posix())
 
 
 def _macos_link_problem(root: Path, path: Path) -> str | None:
     if path.is_junction():
         return "junction"
-    problem = framework_link_problem(
-        PurePosixPath(path.relative_to(root).as_posix()), os.readlink(path)
-    )
-    if problem is None and not Path(os.path.realpath(path)).is_relative_to(
-        Path(os.path.realpath(root))
-    ):
+    target = os.readlink(path)
+    problem = framework_link_problem(PurePosixPath(path.relative_to(root).as_posix()), target)
+    # Resolve from the link's own (physical) folder: the walk never enters a linked folder.
+    resolved = Path(os.path.realpath(path.parent / target))
+    if problem is None and not resolved.is_relative_to(Path(os.path.realpath(root))):
         problem = "link resolves outside the release folder"
-    if problem is None and not os.path.exists(path):
+    if problem is None and not resolved.exists():
         problem = "dangling link"
     return problem
 
@@ -2961,13 +2969,13 @@ def _macos_native_origin_violations(
         errors.append(
             f"native origin: {executable.name} differs from locked PyInstaller bootloader"
         )
-    for path, linked in _macos_entries(root):
+    for path, kind in _macos_entries(root):
         label = path.relative_to(root).as_posix()
-        if linked:
+        if kind == "link":
             problem = _macos_link_problem(root, path)
             if problem is not None:
                 errors.append(f"native origin: linked file {path}: {problem}")
-        elif path != executable:
+        elif kind == "file" and path != executable:
             depth = (
                 len(path.relative_to(contents).parts) - 1 if path.is_relative_to(contents) else None
             )
@@ -3251,6 +3259,39 @@ def source_commit_epoch() -> int:
 
 
 def _release_files(folder: Path) -> list[Path]:
+    if sys.platform == "darwin":
+        return _macos_release_files(folder)
+    else:
+        return _release_files_without_links(folder)
+
+
+def _macos_release_files(folder: Path) -> list[Path]:
+    """The ZIP members of a macOS release: files plus admitted framework links (F0-9).
+
+    A link is a member AS a link (never followed); any other link, a junction or a
+    special file is refused, as on Windows.
+    """
+    if folder.is_symlink() or folder.is_junction() or not folder.is_dir():
+        raise ValueError("release ZIP requires a physical release folder without junctions")
+    resolved = folder.resolve()
+    members = []
+    for path, kind in _macos_entries(folder):
+        relative = path.relative_to(folder)
+        if kind == "link":
+            problem = _macos_link_problem(folder, path)
+            if problem is not None:
+                raise ValueError(
+                    f"release ZIP refuses linked/junction/outside member: {relative} ({problem})"
+                )
+        elif kind == "special":
+            raise ValueError(f"release ZIP refuses special file: {relative}")
+        elif not path.resolve().is_relative_to(resolved):
+            raise ValueError(f"release ZIP refuses linked/junction/outside member: {relative}")
+        members.append(path)
+    return members
+
+
+def _release_files_without_links(folder: Path) -> list[Path]:
     if folder.is_symlink() or folder.is_junction() or not folder.is_dir():
         raise ValueError("release ZIP requires a physical release folder without junctions")
     resolved = folder.resolve()
@@ -3279,6 +3320,9 @@ def _release_files(folder: Path) -> list[Path]:
 def _release_snapshot(folder: Path) -> dict[str, tuple[str, int]]:
     snapshot = {}
     for path in _release_files(folder):
+        if path.is_symlink():
+            snapshot[path.relative_to(folder).as_posix()] = ("link:" + os.readlink(path), 0)
+            continue
         with path.open("rb") as stream:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
         snapshot[path.relative_to(folder).as_posix()] = (digest, path.stat().st_size)
@@ -3305,6 +3349,8 @@ def write_release_zip(folder: Path, *, out: Path, source_epoch: int) -> Path:
     Only file members are emitted, under the wrapper's single top-level folder.
     Every member has a UTC DOS timestamp (two-second precision), Unix regular-file
     mode 0644 and no extra/comment metadata. File mtimes and modes are ignored.
+    On macOS an admitted framework link (:func:`framework_link_problem`) is stored
+    AS a link: Unix mode ``S_IFLNK | 0755``, uncompressed, its content the link text.
 
     Args:
         folder: The onedir release wrapper, containing ``Clearwater/``.
@@ -3350,12 +3396,20 @@ def write_release_zip(folder: Path, *, out: Path, source_epoch: int) -> Path:
                 info = zipfile.ZipInfo(member, date_time=date_time)
                 info.create_system = 3
                 info.create_version = info.extract_version = 20
-                info.external_attr = (stat.S_IFREG | 0o644) << 16
                 info.internal_attr = 0
                 info.extra = info.comment = b""
-                archive.writestr(
-                    info, path.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9
-                )
+                if path.is_symlink():
+                    info.external_attr = (stat.S_IFLNK | 0o755) << 16
+                    link = os.readlink(path).encode("utf-8")
+                    archive.writestr(info, link, compress_type=zipfile.ZIP_STORED)
+                else:
+                    info.external_attr = (stat.S_IFREG | 0o644) << 16
+                    archive.writestr(
+                        info,
+                        path.read_bytes(),
+                        compress_type=zipfile.ZIP_DEFLATED,
+                        compresslevel=9,
+                    )
         with partial.open("rb") as stream:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
         partial_sidecar.write_bytes(f"{digest}  {target.name}\n".encode("ascii"))
