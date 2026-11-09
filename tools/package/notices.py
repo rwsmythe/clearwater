@@ -1415,9 +1415,22 @@ def _inventory(folder: Path) -> tuple[list[_Entry], Path]:
     if not (home / "_internal").is_dir():
         raise ValueError("notices: expected an onedir folder with _internal")
     entries: list[_Entry] = []
-    for path in sorted(home.rglob("*")):
+    if sys.platform == "darwin":
+        # WP6.5 (G1-F2): the build's ONE macOS link rule; a link is never followed, and an
+        # admitted link carries no bytes of its own (its target is inventoried where it is).
+        root, contents = tool._macos_layout(executable)
+        paths = [path for path, _ in tool._macos_entries(home)]
+    else:
+        paths = sorted(home.rglob("*"))
+    for path in paths:
         if path.is_symlink():
-            raise ValueError(f"notices: unsafe linked entry {path.name}")
+            if sys.platform == "darwin":
+                problem = tool.macos_link_problem(root, contents, path)
+                if problem is None:
+                    continue
+                raise ValueError(f"notices: unsafe linked entry {path.name}: {problem}")
+            else:
+                raise ValueError(f"notices: unsafe linked entry {path.name}")
         if not path.is_file():
             continue
         name = path.relative_to(home).as_posix()

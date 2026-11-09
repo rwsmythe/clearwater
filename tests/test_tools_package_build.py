@@ -20,6 +20,7 @@ import io
 import json
 import marshal
 import os
+import re
 import shutil
 import stat
 import struct
@@ -2030,6 +2031,20 @@ REFUSED_IMAGES = {
     "foreign-file": macho(
         code=bytes.fromhex("000080d2") * 16, names=BUILT_NAMES, rpaths=("@loader_path",)
     ),
+    # A r1 #2: the string table's final terminator dropped under the same declared strsize.
+    "dropped-final-string-terminator": built_native(linkedit=b"symbols\0strings", strsize=16),
+    # A r1 #3: bytes after the declared segments (and the signature) are unexplained.
+    "appended-trailer": built_native() + b"unexplained trailer",
+    # The declared signature reaches past __LINKEDIT's (and the file's) end.
+    "signature-outside-linkedit": built_native(
+        signature=None,
+        extra=(
+            _load_command(
+                LC_CODE_SIGNATURE,
+                struct.pack("<II", TEXT_OFFSET + len(ARM64_CODE) + 8, 64),
+            ),
+        ),
+    ),
 }
 
 
@@ -2186,6 +2201,13 @@ BOOTLOADER_CASES = {
         False,
     ),
     "still-fat": (fat((CPU_ARM64, built_bootloader())), False),
+    # A r1 #2: every original string-table byte, its final terminator included, must stay.
+    "changed-final-string-terminator": (
+        built_bootloader(linkedit=BOOT_LINKEDIT[:-1] + b"X" + PKG),
+        False,
+    ),
+    # A r1 #3: nothing may follow the re-signed image's segments.
+    "appended-trailer": (built_bootloader() + b"after the signature", False),
 }
 
 
@@ -2202,6 +2224,73 @@ def test_macos_bootloader_identity(tmp_path, monkeypatch, case):
     assert build._is_clearwater_bootloader(executable) is admitted
     monkeypatch.setattr(build.sys, "platform", "linux")
     assert build._is_clearwater_bootloader(executable) is False
+
+
+PADDING = b"\0" * 8
+
+
+@pytest.mark.parametrize(
+    "gap, built_linkedit, admitted",
+    [
+        # Proven alignment padding (< 16 zero bytes after the string table) may be dropped
+        # with the signature or kept: both admitted.
+        (PADDING, BOOT_LINKEDIT + PKG, True),
+        (PADDING, BOOT_LINKEDIT + PADDING + PKG, True),
+        # 16 zero bytes are not alignment padding: they must stay.
+        (b"\0" * 16, BOOT_LINKEDIT + PKG, False),
+        (b"\0" * 16, BOOT_LINKEDIT + b"\0" * 16 + PKG, True),
+        # Non-zero bytes after the string table are never padding.
+        (b"junk\0\0\0\0", BOOT_LINKEDIT + PKG, False),
+        (b"junk\0\0\0\0", BOOT_LINKEDIT + b"junk\0\0\0\0" + PKG, True),
+        # The boundary itself: the final string-table terminator changed.
+        (PADDING, BOOT_LINKEDIT[:-1] + b"X" + PKG, False),
+    ],
+    ids=[
+        "padding-dropped",
+        "padding-kept",
+        "sixteen-zeros-dropped",
+        "sixteen-zeros-kept",
+        "junk-dropped",
+        "junk-kept",
+        "terminator-changed",
+    ],
+)
+def test_bootloader_linkedit_excludes_only_proven_alignment_padding(
+    tmp_path, monkeypatch, gap, built_linkedit, admitted
+):
+    """A r1 #2: only < 16 zero bytes between the string table's end and the signature."""
+    arm = macho(
+        filetype=MH_EXECUTE,
+        code=BOOT_CODE,
+        linkedit=BOOT_LINKEDIT + gap,
+        strsize=len(BOOT_LINKEDIT),
+        names=("/usr/lib/libSystem.B.dylib",),
+        signature=b"L" * 32,
+    )
+    source = tmp_path / "runw"
+    source.write_bytes(arm)
+    executable = tmp_path / "Clearwater"
+    executable.write_bytes(built_bootloader(linkedit=built_linkedit))
+    monkeypatch.setattr(build, "_locked_bootloader", lambda: source)
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    assert build._is_clearwater_bootloader(executable) is admitted
+
+
+@pytest.mark.parametrize("kept", [False, True])
+def test_native_linkedit_alignment_padding_may_go_with_the_signature(tmp_path, monkeypatch, kept):
+    """A r1 #2 for ordinary natives: proven padding only; the strings stay exact."""
+    original = original_native(linkedit=b"symbols\0strings\0" + PADDING, strsize=16)
+    built = built_native(linkedit=b"symbols\0strings\0" + (PADDING if kept else b""), strsize=16)
+    found = macos_origin_check(
+        tmp_path,
+        monkeypatch,
+        "darwin",
+        original,
+        built,
+        relative="_internal/libbar.dylib",
+        name="libbar.dylib",
+    )
+    assert found == []
 
 
 # --- macOS framework links (WP6.5, F0-9) -------------------------------------------------
@@ -2312,10 +2401,11 @@ def test_origin_walk_admits_framework_links_on_macos_only(tmp_path, monkeypatch)
 @pytest.mark.parametrize(
     "link, target, folder, reason",
     [
-        ("_internal/libQt6Core.dylib", "PySide6/Qt/lib/libQt6Core.dylib", False, "outside"),
+        # A (B)-shaped top-level link whose target does not exist.
+        ("_internal/libQt6Core.dylib", "PySide6/Qt/lib/libQt6Core.dylib", False, "dangling"),
         (f"{FRAMEWORK}/Headers", "/usr/include", True, "absolute"),
         (f"{FRAMEWORK}/Helpers", "Versions/Current/Helpers", True, "dangling link"),
-        (f"{FRAMEWORK}/Versions/B", "../../../../../../../..", True, "not a framework"),
+        (f"{FRAMEWORK}/Versions/B", "../../../../../../../..", True, "outside the release"),
     ],
 )
 def test_origin_walk_refuses_other_links_on_macos(
@@ -2433,3 +2523,551 @@ def test_release_snapshot_records_links_by_their_text(tmp_path, monkeypatch):
     _symlink(links[0], "B", folder=True)
     with pytest.raises(ValueError, match=r"changed after pre-smoke snapshot: .*Versions/Current"):
         build._check_release_snapshot(root, before)
+
+
+# --- WP6.5 G1-F1 as ruled: link classes (B) and (C), ONE shared predicate -----------------
+# (B) PyInstaller's bindepend top-level link (depend/bindepend.py:196-210): in the contents
+# root, named as its target's basename, resolving there to a regular file. (C) BUNDLE's
+# cross-links between Contents/Frameworks, Resources and MacOS (building/osx.py:400-425,
+# :456-461, :537-547). ONE HOP: a link naming a link is refused. The same case table runs
+# through every caller: the origin walk, the release ZIP and (onedir) the artifact notices.
+
+LINK_BLOB = b"\xcf\xfa\xed\xfe trusted here by its whole-file hash"
+QT_BINARY = "PySide6/Qt/lib/QtCore.framework/Versions/A/QtCore"
+NOT_ADMITTED = "not a top-level dependency link or a bundle cross-link"
+
+LINK_CASES: dict[str, tuple[str, list[str], list[tuple[str, str, bool]], str | None]] = {
+    # name: (layout, files, links (path, target, folder), refusal reason or None)
+    "B-top-level-dependency": (
+        "onedir",
+        [f"_internal/{QT_BINARY}"],
+        [("_internal/QtCore", QT_BINARY, False)],
+        None,
+    ),
+    "B-app-through-a-dotted-folder-link": (
+        "app",
+        ["Contents/Frameworks/scipy/__dot__dylibs/libgfortran.5.dylib"],
+        [
+            ("Contents/Frameworks/scipy/.dylibs", "__dot__dylibs", True),
+            ("Contents/Frameworks/libgfortran.5.dylib", "scipy/.dylibs/libgfortran.5.dylib", False),
+            ("Contents/Resources/scipy", "../Frameworks/scipy", True),
+            ("Contents/Resources/libgfortran.5.dylib", "scipy/.dylibs/libgfortran.5.dylib", False),
+        ],
+        None,
+    ),
+    "C-data-file-cross-link": (
+        "app",
+        ["Contents/Resources/data.txt"],
+        [("Contents/Frameworks/data.txt", "../Resources/data.txt", False)],
+        None,
+    ),
+    "C-binary-folder-cross-link": (
+        "app",
+        [f"Contents/Frameworks/{QT_BINARY}", "Contents/Frameworks/PySide6/Qt/lib/libx.dylib"],
+        [
+            ("Contents/Resources/PySide6/Qt/lib", "../../../Frameworks/PySide6/Qt/lib", True),
+            ("Contents/Frameworks/QtCore", QT_BINARY, False),
+            ("Contents/Resources/QtCore", QT_BINARY, False),
+        ],
+        None,
+    ),
+    "B-name-is-not-the-target-basename": (
+        "onedir",
+        [f"_internal/{QT_BINARY}"],
+        [("_internal/QtGui", QT_BINARY, False)],
+        NOT_ADMITTED,
+    ),
+    "B-not-directly-in-the-contents-root": (
+        "onedir",
+        ["_internal/pkg/libbar.dylib"],
+        [("_internal/sub/libbar.dylib", "../pkg/libbar.dylib", False)],
+        NOT_ADMITTED,
+    ),
+    "B-target-is-a-folder": (
+        "onedir",
+        ["_internal/pkg/sub/libbar.dylib"],
+        [("_internal/sub", "pkg/sub", True)],
+        NOT_ADMITTED,
+    ),
+    "B-target-outside-the-contents-root": (
+        "onedir",
+        [],
+        [("_internal/Clearwater", "../Clearwater", False)],
+        NOT_ADMITTED,
+    ),
+    "planted-escaping-link": (
+        "onedir",
+        [],
+        [("_internal/libx.dylib", "../../../outside/libx.dylib", False)],
+        "link resolves outside the release folder",
+    ),
+    "planted-link-to-a-link": (
+        "onedir",
+        [f"_internal/{QT_BINARY}"],
+        [
+            ("_internal/PySide6/Qt/lib/QtCore.framework/Versions/Current", "A", True),
+            (
+                "_internal/PySide6/Qt/lib/QtCore.framework/QtCore",
+                "Versions/Current/QtCore",
+                False,
+            ),
+            ("_internal/QtCore", "PySide6/Qt/lib/QtCore.framework/QtCore", False),
+        ],
+        "link to a link (one hop only)",
+    ),
+    "C-app-link-to-a-link": (
+        "app",
+        ["Contents/Resources/data.txt"],
+        [
+            ("Contents/Frameworks/data.txt", "../Resources/data.txt", False),
+            ("Contents/MacOS/data.txt", "../Frameworks/data.txt", False),
+        ],
+        "link to a link (one hop only)",
+    ),
+    "C-outside-the-three-folders": (
+        "app",
+        ["Contents/Resources/data.txt"],
+        [("Contents/Info2.plist", "Resources/data.txt", False)],
+        NOT_ADMITTED,
+    ),
+    "C-into-the-signature-folder": (
+        "app",
+        ["Contents/_CodeSignature/CodeResources"],
+        [("Contents/Resources/CodeResources", "../_CodeSignature/CodeResources", False)],
+        NOT_ADMITTED,
+    ),
+    "cross-link-shape-in-a-onedir": (
+        "onedir",
+        ["_internal/other/data.txt"],
+        [("_internal/pkg/data.txt", "../other/data.txt", False)],
+        NOT_ADMITTED,
+    ),
+}
+
+
+def link_release(tmp_path: Path, layout: str, files, links) -> tuple[Path, Path]:
+    """Build a release under ``tmp_path/wrapper``; return (the ZIP folder, the executable)."""
+    wrapper = tmp_path / "wrapper"
+    if layout == "app":
+        home = wrapper / "Clearwater.app"
+        executable = home / "Contents/MacOS/Clearwater"
+        zip_folder = home
+    else:
+        home = wrapper / "Clearwater"
+        executable = home / "Clearwater"
+        zip_folder = wrapper
+    tree(executable.parent, [executable.name], b"bootloader stand-in")
+    tree(home, files, LINK_BLOB)
+    tree(tmp_path, ["outside/libx.dylib"], LINK_BLOB)
+    for path, target, folder in links:
+        _symlink(home / path, target, folder=folder)
+    return zip_folder, executable
+
+
+def link_origin_check(tmp_path, monkeypatch, executable: Path) -> list[str]:
+    """The real darwin origin walk; every planted file is trusted by its whole-file hash."""
+    empty = tmp_path / "python"
+    empty.mkdir(exist_ok=True)
+    monkeypatch.setattr(build.sys, "base_prefix", str(empty))
+    monkeypatch.setattr(build, "_locked_native_distributions", lambda: [])
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
+    monkeypatch.setattr(build, "read_package", lambda _: SimpleNamespace(toc={}))
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    return build.native_origin_violations(
+        executable, original_path="", ffmpeg_hashes={hashlib.sha256(LINK_BLOB).hexdigest()}
+    )
+
+
+def link_notices_inventory(monkeypatch, wrapper: Path, platform: str = "darwin") -> None:
+    """The artifact notices' inventory over a onedir folder, the build tool's archive stubbed."""
+    spec = importlib.util.spec_from_file_location(
+        "wp65_notices_links", Path(build.__file__).with_name("notices.py")
+    )
+    assert spec is not None and spec.loader is not None
+    notices = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(notices)
+    monkeypatch.setattr(build, "read_package", lambda _: SimpleNamespace(toc={}))
+    monkeypatch.setattr(notices, "_build_tool", lambda: build)
+    monkeypatch.setattr(build.sys, "platform", platform)
+    notices._inventory(wrapper)
+
+
+@pytest.mark.parametrize("case", sorted(LINK_CASES))
+def test_shared_link_rule_in_the_origin_walk(tmp_path, monkeypatch, case):
+    """Admitted classes pass; each refused link is named once with its reason."""
+    layout, files, links, reason = LINK_CASES[case]
+    _, executable = link_release(tmp_path, layout, files, links)
+    found = link_origin_check(tmp_path, monkeypatch, executable)
+    if reason is None:
+        assert found == []
+    else:
+        assert len(found) == 1, found
+        assert found[0].startswith("native origin: linked file ") and reason in found[0]
+
+
+@pytest.mark.parametrize("case", sorted(LINK_CASES))
+def test_shared_link_rule_in_the_release_zip(tmp_path, monkeypatch, case):
+    """The ZIP stores admitted links as links and refuses the rest before writing."""
+    layout, files, links, reason = LINK_CASES[case]
+    folder, _ = link_release(tmp_path, layout, files, links)
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    out = tmp_path / "out"
+    if reason is None:
+        archive = build.write_release_zip(folder, out=out, source_epoch=1793908801)
+        with zipfile.ZipFile(archive) as packed:
+            stored = {
+                info.filename: packed.read(info)
+                for info in packed.infolist()
+                if stat.S_ISLNK(info.external_attr >> 16)
+            }
+        prefix = folder.name + "/" + ("" if layout == "app" else "Clearwater/")
+        assert stored == {prefix + path: target.encode() for path, target, _ in links}
+    else:
+        with pytest.raises(
+            ValueError, match="release ZIP refuses linked/junction/outside"
+        ) as error:
+            build.write_release_zip(folder, out=out, source_epoch=1793908801)
+        assert reason in str(error.value)
+        assert not out.exists()
+
+
+@pytest.mark.parametrize(
+    "case", sorted(name for name, row in LINK_CASES.items() if row[0] == "onedir")
+)
+def test_shared_link_rule_in_the_artifact_notices(tmp_path, monkeypatch, case):
+    """G1-F2: the notices inventory uses the same rule (an admitted link carries no entry)."""
+    _, files, links, reason = LINK_CASES[case]
+    wrapper, _ = link_release(tmp_path, "onedir", files, links)
+    if reason is None:
+        link_notices_inventory(monkeypatch, wrapper)
+    else:
+        with pytest.raises(ValueError, match="notices: unsafe linked entry") as error:
+            link_notices_inventory(monkeypatch, wrapper)
+        assert reason in str(error.value)
+
+
+def test_notices_still_refuse_every_link_on_windows(tmp_path, monkeypatch):
+    """win32: a link the macOS rule admits is still refused with today's text."""
+    _, files, links, _ = LINK_CASES["B-top-level-dependency"]
+    wrapper, _ = link_release(tmp_path, "onedir", files, links)
+    tree(wrapper / "Clearwater", ["Clearwater.exe"], b"bootloader stand-in")
+    with pytest.raises(ValueError, match=r"^notices: unsafe linked entry QtCore$"):
+        link_notices_inventory(monkeypatch, wrapper, "win32")
+
+
+def test_folder_link_checks_nested_links_as_if_at_its_location(tmp_path, monkeypatch):
+    """(C) a folder target is walked: a bad link inside it refuses the folder link too."""
+    folder, executable = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/pkg/data.txt"],
+        [
+            ("Contents/Resources/pkg", "../Frameworks/pkg", True),
+            ("Contents/Frameworks/pkg/evil", "../../../../outside", True),
+        ],
+    )
+    problem = build.macos_link_problem(
+        folder, folder / "Contents/Frameworks", folder / "Contents/Resources/pkg"
+    )
+    assert problem == "evil under the linked folder: link resolves outside the release folder"
+    found = link_origin_check(tmp_path, monkeypatch, executable)
+    assert len(found) == 2 and all("outside the release folder" in line for line in found)
+
+
+def test_folder_link_files_are_checked_at_the_links_location(tmp_path, monkeypatch):
+    """A transformed native seen through a cross-link must fit the mirrored location."""
+    base = tree(tmp_path / "python", ["lib/libbar.dylib"], original_native())
+    monkeypatch.setattr(build.sys, "base_prefix", str(base))
+    monkeypatch.setattr(build, "_locked_native_distributions", lambda: [])
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
+    monkeypatch.setattr(build, "read_package", lambda _: SimpleNamespace(toc={}))
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    app = tmp_path / "Clearwater.app"
+    tree(app, ["Contents/MacOS/Clearwater"], b"bootloader stand-in")
+    tree(app, ["Contents/Frameworks/pkg/libbar.dylib"], built_native(1))
+    # Mirrored (PyInstaller's shape): the same relative path, so the same depth.
+    _symlink(app / "Contents/Resources/pkg", "../Frameworks/pkg", folder=True)
+    executable = app / "Contents/MacOS/Clearwater"
+    assert build.native_origin_violations(executable, original_path="") == []
+    # Not mirrored: seen one folder deeper, the rpath no longer fits.
+    _symlink(app / "Contents/Resources/deeper/pkg", "../../Frameworks/pkg", folder=True)
+    found = build.native_origin_violations(executable, original_path="")
+    assert len(found) == 1
+    assert found[0].startswith(
+        "native origin: Contents/Resources/deeper/pkg/libbar.dylib: LC_RPATH"
+    )
+
+
+@pytest.mark.parametrize("denied", ["root", "nested"])
+def test_unreadable_folder_fails_the_macos_walks(tmp_path, monkeypatch, denied):
+    """A r1 #1: a folder that cannot be listed fails the origin check, the ZIP and notices."""
+    folder, executable = link_release(
+        tmp_path, "onedir", [f"_internal/{QT_BINARY}", "_internal/pkg/libbar.dylib"], []
+    )
+    home = executable.parent
+    target = home if denied == "root" else home / "_internal/pkg"
+    real_scandir = os.scandir
+
+    def scandir(path: Any = ".") -> Any:
+        if os.path.normcase(os.fspath(path)) == os.path.normcase(str(target)):
+            raise PermissionError(13, "planted: permission denied", os.fspath(path))
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", scandir)
+    with pytest.raises(PermissionError, match="planted"):
+        link_origin_check(tmp_path, monkeypatch, executable)
+    zip_root = folder if denied == "nested" else home
+    with pytest.raises(PermissionError, match="planted"):
+        build.write_release_zip(zip_root, out=tmp_path / "out", source_epoch=1793908801)
+    assert not (tmp_path / "out").exists()
+    with pytest.raises(PermissionError, match="planted"):
+        link_notices_inventory(monkeypatch, folder)
+
+
+# --- WP6.5 G1-F3 and the .app release shape ------------------------------------------------
+
+MIXED_WINDOWS_PAYLOADS = {
+    "Clearwater/Clearwater.exe": b"synthetic executable",
+    "Clearwater/ffmpeg.exe": b"synthetic tool",
+    "Clearwater/run.bat": b"@echo off\r\n",
+    "Clearwater/_internal/native.dll": b"synthetic native",
+    "Clearwater/_internal/Clearwater": b"no suffix",
+    "Clearwater/THIRD_PARTY_NOTICES.md": b"synthetic notices\n",
+}
+# sha256 of the archive the base (8ca7aeaf, before the darwin exec-bit rule) writes for the
+# payloads above on the laptop's pinned interpreter (deflate output is zlib's: pinned there).
+WINDOWS_MIXED_ZIP_SHA256 = "0d3bfbfb13332df42f0180e90556ccf7d7d43602b8b2ea04c924df21788d6d10"
+
+
+def test_windows_release_zip_bytes_unchanged_by_the_darwin_exec_rule(tmp_path, monkeypatch):
+    """G1-F3: every Windows member stays 0644 whatever its mode; the bytes are the base's."""
+    monkeypatch.setattr(build.sys, "platform", "win32")
+    root = tmp_path / "Clearwater-1.1.0-windows-onedir"
+    for name, payload in MIXED_WINDOWS_PAYLOADS.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+        path.chmod(0o755 if name.endswith((".exe", ".bat", "/Clearwater")) else 0o644)
+    assert any(p.stat().st_mode & 0o111 for p in root.rglob("*") if p.is_file())
+    archive = build.write_release_zip(root, out=tmp_path, source_epoch=1793908801)
+    with zipfile.ZipFile(archive) as packed:
+        assert {info.external_attr for info in packed.infolist()} == {(stat.S_IFREG | 0o644) << 16}
+    if sys.platform == "win32":
+        assert hashlib.sha256(archive.read_bytes()).hexdigest() == WINDOWS_MIXED_ZIP_SHA256
+
+
+def test_macos_release_zip_keeps_execute_bits_from_the_file_mode(tmp_path, monkeypatch):
+    """G1-F3: on darwin a member with an execute bit is 0755, every other file 0644."""
+    app = tmp_path / "Clearwater.app"
+    executables = [
+        "Contents/MacOS/Clearwater",
+        "Contents/MacOS/ffmpeg",
+        "Contents/MacOS/helper.exe",  # executable by its suffix on a Windows host too
+        "Contents/Frameworks/libx.dylib",
+    ]
+    tree(app, [*executables, "Contents/Resources/notes.txt"], b"payload")
+    for name in executables:
+        (app / name).chmod(0o755)
+    (app / "Contents/Resources/notes.txt").chmod(0o644)
+    expected = {
+        f"Clearwater.app/{path.relative_to(app).as_posix()}": (
+            0o755 if path.stat().st_mode & 0o111 else 0o644
+        )
+        for path in app.rglob("*")
+        if path.is_file()
+    }
+    assert expected["Clearwater.app/Contents/MacOS/helper.exe"] == 0o755
+    assert expected["Clearwater.app/Contents/Resources/notes.txt"] == 0o644
+    if sys.platform == "darwin":
+        assert sorted(k for k, v in expected.items() if v == 0o755) == sorted(
+            f"Clearwater.app/{name}" for name in executables
+        )
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    archive = build.write_release_zip(
+        app, out=tmp_path / "out", source_epoch=1793908801, name="Clearwater-1.2.0-macos"
+    )
+    assert archive.name == "Clearwater-1.2.0-macos.zip"
+    assert archive.with_suffix(".zip.sha256").read_text().endswith("  Clearwater-1.2.0-macos.zip\n")
+    with zipfile.ZipFile(archive) as packed:
+        modes = {info.filename: info.external_attr >> 16 for info in packed.infolist()}
+    assert {name.split("/", 1)[0] for name in modes} == {"Clearwater.app"}
+    assert modes == {name: stat.S_IFREG | mode for name, mode in expected.items()}
+
+
+@pytest.mark.parametrize(
+    "platform, stem, folder",
+    [
+        ("win32", "Clearwater-1.2.0-windows-onedir", "."),
+        ("darwin", "Clearwater-1.2.0-macos", "Clearwater.app"),
+    ],
+)
+def test_release_zip_name_and_folder_per_platform(tmp_path, monkeypatch, platform, stem, folder):
+    """Windows unchanged; macOS packs the .app as Clearwater-<version>-macos.zip."""
+    assert build.release_zip_name("onedir", "1.2.0", platform) == stem
+    monkeypatch.setattr(build.sys, "platform", platform)
+    assert build.release_zip_name("onedir", "1.2.0") == stem
+    assert build.release_zip_folder(tmp_path) == tmp_path / folder
+
+
+def test_find_executable_prefers_the_app_bundle_on_macos(tmp_path, monkeypatch):
+    """PyInstaller leaves the onedir COLLECT beside the BUNDLE; the release is the .app."""
+    tree(tmp_path, ["Clearwater/Clearwater", "Clearwater.app/Contents/MacOS/Clearwater"])
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    assert build.find_executable(tmp_path) == tmp_path / "Clearwater.app/Contents/MacOS/Clearwater"
+    monkeypatch.setattr(build.sys, "platform", "win32")
+    with pytest.raises(FileNotFoundError, match=r"no Clearwater.exe under"):
+        build.find_executable(tmp_path)
+
+
+def test_place_macos_tools_puts_code_in_macos_and_texts_in_resources(tmp_path):
+    """The hook: verified bytes copied unchanged, code beside the bootloader, texts apart."""
+    app = tree(tmp_path / "Clearwater.app", ["Contents/MacOS/Clearwater"])
+    sources = tree(tmp_path / "verified", ["ffmpeg", "ffprobe", "LICENSE.txt"], b"bytes")
+    written = build.place_macos_tools(
+        app,
+        {"ffmpeg": sources / "ffmpeg", "ffprobe": sources / "ffprobe"},
+        {"ffmpeg-LICENSE.txt": sources / "LICENSE.txt"},
+    )
+    assert written == [
+        app / "Contents/MacOS/ffmpeg",
+        app / "Contents/MacOS/ffprobe",
+        app / "Contents/Resources/ffmpeg-LICENSE.txt",
+    ]
+    assert all(path.read_bytes() == b"bytes" for path in written)
+    if sys.platform != "win32":
+        assert [path.stat().st_mode & 0o777 for path in written] == [0o755, 0o755, 0o644]
+
+
+@pytest.mark.parametrize(
+    "bundle, executables, message",
+    [
+        ("Clearwater", {"ffmpeg": "ffmpeg"}, "needs a built .app bundle"),
+        ("Clearwater.app", {"../ffmpeg": "ffmpeg"}, "is not a plain file name"),
+        ("Clearwater.app", {"a\\b": "ffmpeg"}, "is not a plain file name"),
+        ("Clearwater.app", {"Clearwater": "ffmpeg"}, "already exists"),
+    ],
+)
+def test_place_macos_tools_refuses_unsafe_placement(tmp_path, bundle, executables, message):
+    app = tree(tmp_path / bundle, ["Contents/MacOS/Clearwater"])
+    source = tree(tmp_path / "verified", ["ffmpeg"])
+    with pytest.raises(ValueError, match=re.escape(message)):
+        build.place_macos_tools(app, {k: source / v for k, v in executables.items()})
+
+
+def test_seal_macos_bundle_re_signs_without_deep_then_verifies(tmp_path):
+    """Ad-hoc re-sign (nested code keeps its bytes), then a strict deep verify."""
+    app = tree(tmp_path / "Clearwater.app", ["Contents/MacOS/Clearwater"])
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    build.seal_macos_bundle(app, run=run)
+    assert [command for command, _ in calls] == [
+        ["/usr/bin/codesign", "--sign", "-", "--force", "--timestamp=none", str(app)],
+        ["/usr/bin/codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app)],
+    ]
+    assert all(
+        kwargs
+        == {
+            "stdin": subprocess.DEVNULL,
+            "capture_output": True,
+            "text": True,
+            "timeout": 300,
+            "check": False,
+        }
+        for _, kwargs in calls
+    )
+    assert "--deep" not in calls[0][0]
+
+
+@pytest.mark.parametrize("failure", ["sign-status", "verify-status", "timeout", "os-error"])
+def test_seal_macos_bundle_failures_are_named(tmp_path, failure):
+    app = tree(tmp_path / "Clearwater.app", ["Contents/MacOS/Clearwater"])
+
+    def run(command, **kwargs):
+        step = "sign" if "--sign" in command else "verify"
+        if failure == "timeout":
+            raise subprocess.TimeoutExpired(command, 300)
+        if failure == "os-error":
+            raise OSError("planted: codesign missing")
+        if failure == f"{step}-status":
+            return subprocess.CompletedProcess(
+                command, 1, "", "first\na sealed resource is missing\n"
+            )
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    with pytest.raises(RuntimeError, match=r"^bundle seal: /usr/bin/codesign --(sign|verify)") as e:
+        build.seal_macos_bundle(app, run=run)
+    if failure.endswith("status"):
+        assert str(e.value).endswith("exited 1: a sealed resource is missing")
+    with pytest.raises(ValueError, match=r"needs a built .app bundle"):
+        build.seal_macos_bundle(tmp_path, run=run)
+
+
+def darwin_app_build(monkeypatch, tmp_path, *, seal, origin):
+    """``build()`` on darwin with PyInstaller, the seal and the origin check stubbed."""
+    monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setattr(build, "pack_sources", lambda: [])
+    monkeypatch.setattr(build, "native_origin_violations", origin)
+    monkeypatch.setattr(build, "seal_macos_bundle", seal)
+    out = tmp_path / "out"
+
+    def build_folder(args):
+        folder = Path(args[args.index("--distpath") + 1])
+        source = make_exe(out / "synthetic", [], modules=["clearwater", "graphlib"])
+        for name in ("Clearwater/Clearwater", "Clearwater.app/Contents/MacOS/Clearwater"):
+            (folder / name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, folder / name)
+
+    monkeypatch.setattr(build, "run_pyinstaller", build_folder)
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    return build.build("onedir", out=out), out
+
+
+@pytest.mark.parametrize("outcome", ["sealed", "seal-fails", "origin-after-seal-fails"])
+def test_darwin_build_seals_the_app_and_rechecks_origin(tmp_path, monkeypatch, capsys, outcome):
+    """The .app is sealed after every placement and its origin checked again after."""
+    events = []
+
+    def seal(bundle):
+        events.append(("seal", bundle.name))
+        if outcome == "seal-fails":
+            raise RuntimeError("bundle seal: /usr/bin/codesign --verify exited 1: planted")
+
+    def origin(executable, **kwargs):
+        events.append(("origin", executable.relative_to(executable.parents[2]).as_posix()))
+        sealed = any(event[0] == "seal" for event in events)
+        return ["planted after seal"] if sealed and outcome.startswith("origin") else []
+
+    status, _ = darwin_app_build(monkeypatch, tmp_path, seal=seal, origin=origin)
+    printed = capsys.readouterr().out
+    assert events[:2] == [("origin", "Contents/MacOS/Clearwater"), ("seal", "Clearwater.app")]
+    if outcome == "sealed":
+        assert status == 0 and events[2:] == [("origin", "Contents/MacOS/Clearwater")]
+        assert "bundle seal: PASS" in printed
+    elif outcome == "seal-fails":
+        assert status == 1 and len(events) == 2
+        assert "FAILED: bundle seal: /usr/bin/codesign --verify exited 1: planted" in printed
+    else:
+        assert status == 1 and "FAILED: after seal: planted after seal" in printed
+
+
+def test_windows_build_never_seals(tmp_path, monkeypatch):
+    """win32: no codesign step exists on the Windows path."""
+    monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setattr(build, "pack_sources", lambda: [])
+    monkeypatch.setattr(build, "native_origin_violations", lambda *a, **kw: [])
+    monkeypatch.setattr(build, "seal_macos_bundle", lambda *a: pytest.fail("sealed on win32"))
+    out = tmp_path / "out"
+
+    def build_folder(args):
+        folder = Path(args[args.index("--distpath") + 1])
+        folder.mkdir(parents=True, exist_ok=True)
+        source = make_exe(out / "synthetic", [], modules=["clearwater", "graphlib"])
+        shutil.copyfile(source, folder / "Clearwater.exe")
+
+    monkeypatch.setattr(build, "run_pyinstaller", build_folder)
+    monkeypatch.setattr(build.sys, "platform", "win32")
+    assert build.build("onedir", out=out) == 0

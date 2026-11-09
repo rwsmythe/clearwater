@@ -69,7 +69,7 @@ import time
 import urllib.error
 import urllib.request
 import zipfile
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from datetime import UTC, datetime
 from http.client import HTTPMessage
 from pathlib import Path, PurePosixPath
@@ -88,6 +88,12 @@ FORMS: tuple[Form, ...] = ("onedir", "onefile")
 """Every supported form, in build order."""
 
 APP_NAME = "Clearwater"
+
+MACOS_APP = f"{APP_NAME}.app"
+"""The macOS release item: PyInstaller's BUNDLE, the one top-level entry of the macOS zip."""
+
+MACOS_CODESIGN = "/usr/bin/codesign"
+"""Apple's signing tool, by absolute path (as PyInstaller's ``utils/osx.py`` runs it)."""
 """The executable's name (``Clearwater.exe`` on Windows)."""
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -334,6 +340,41 @@ def release_dir(out: Path, form: Form, version: str) -> Path:
         ``out/dist-<form>/<release name>``.
     """
     return out / f"dist-{form}" / release_name(form, version)
+
+
+def release_zip_name(form: Form, version: str, platform: str | None = None) -> str:
+    """Return the release ZIP's stem (without ``.zip``).
+
+    Args:
+        form: The PyInstaller form.
+        version: The application version.
+        platform: A ``sys.platform`` value; the running one when None.
+
+    Returns:
+        Windows: the release folder's name (``Clearwater-<version>-windows-onedir``,
+        unchanged). macOS: ``Clearwater-<version>-macos``, whose ONE top-level item is
+        ``Clearwater.app`` (WP6.5, owner "2. app").
+    """
+    kind = sys.platform if platform is None else platform
+    if kind == "darwin":
+        return f"{APP_NAME}-{version}-{platform_tag(kind)}"
+    else:
+        return release_name(form, version, kind)
+
+
+def release_zip_folder(root: Path) -> Path:
+    """Return the folder the release ZIP packs: the wrapper on Windows, the ``.app`` on macOS.
+
+    Args:
+        root: The release folder (:func:`release_dir`).
+
+    Returns:
+        ``root`` on Windows; ``root / "Clearwater.app"`` on macOS.
+    """
+    if sys.platform == "darwin":
+        return root / MACOS_APP
+    else:
+        return root
 
 
 def pyinstaller_args(
@@ -672,9 +713,17 @@ def find_executable(root: Path) -> Path:
     """
     if sys.platform == "win32":
         suffix = ".exe"
+        candidates: tuple[Path, ...] = ()
     else:
         suffix = ""
-    for candidate in (root / APP_NAME / f"{APP_NAME}{suffix}", root / f"{APP_NAME}{suffix}"):
+        # WP6.5 (owner "2. app"): the macOS release is the BUNDLE; the onedir folder
+        # PyInstaller also leaves beside it is not shipped.
+        candidates = (root / MACOS_APP / "Contents" / "MacOS" / APP_NAME,)
+    for candidate in (
+        *candidates,
+        root / APP_NAME / f"{APP_NAME}{suffix}",
+        root / f"{APP_NAME}{suffix}",
+    ):
         if candidate.is_file():
             return candidate
     raise FileNotFoundError(f"no {APP_NAME}{suffix} under {root}")
@@ -2670,7 +2719,11 @@ def _macho_identity(image: bytes, *, bootloader: bool = False) -> _MachOIdentity
     each dylib command's name reduced to its basename (system names kept whole), and
     ``__LINKEDIT``'s vmsize / filesize zeroed; every segment's file bytes (a segment that
     holds the header from its first section on, with the padding before it required zero);
-    ``__LINKEDIT`` up to the code signature (returned apart). For the bootloader, also
+    ``__LINKEDIT`` up to the code signature (returned apart), less only PROVEN alignment
+    padding: fewer than 16 zero bytes between the string table's declared end and the
+    signature (WP6.5 A r1 #2; every string-table byte, terminators included, stays). The
+    image must END where its segments end and the signature must lie inside
+    ``__LINKEDIT`` (A r1 #3: no unexplained trailing bytes). For the bootloader, also
     zeroed: LC_SYMTAB strsize, LC_UUID, the SDK of LC_BUILD_VERSION / LC_VERSION_MIN_MACOSX
     (PyInstaller's ``fix_exe_for_code_signing``, ``update_exe_identifier`` and
     ``set_macos_sdk_version``).
@@ -2685,16 +2738,21 @@ def _macho_identity(image: bytes, *, bootloader: bool = False) -> _MachOIdentity
     parsed = _macho_parse(image)
     if parsed is None or parsed.cputype != _MACHO_CPU_ARM64:
         return None
-    signature = None
+    signature: tuple[int, int] | None = None
+    strings: int | None = None
     for cmd, body in parsed.commands:
         if cmd == _LC_CODE_SIGNATURE and len(body) >= 16:
-            signature = struct.unpack_from("<I", body, 8)[0]
+            signature = cast(tuple[int, int], struct.unpack_from("<II", body, 8))
+        elif cmd == _LC_SYMTAB and len(body) >= 24:
+            stroff, strsize = struct.unpack_from("<II", body, 16)
+            strings = stroff + strsize
     canonical: list[object] = [
         ("header", parsed.cputype, parsed.cpusubtype, parsed.filetype, parsed.flags)
     ]
     rpaths: list[str] = []
     names: list[tuple[int, str]] = []
     linkedit = None
+    end = 0
     for cmd, body in parsed.commands:
         if cmd == _LC_CODE_SIGNATURE:
             continue
@@ -2721,12 +2779,21 @@ def _macho_identity(image: bytes, *, bootloader: bool = False) -> _MachOIdentity
             stop = fileoff + filesize
             if 72 + nsects * 80 != len(body) or stop > len(image):
                 return None
+            end = max(end, stop)
             if segname.rstrip(b"\0") == b"__LINKEDIT":
                 if linkedit is not None:
                     return None
-                if signature is not None and fileoff <= signature <= stop:
-                    stop = signature
-                linkedit = image[fileoff:stop]
+                content = stop
+                if signature is not None:
+                    dataoff, datasize = signature
+                    if not fileoff <= dataoff <= dataoff + datasize <= stop:
+                        return None  # a signature outside __LINKEDIT is not PyInstaller's
+                    content = dataoff
+                if strings is not None and fileoff <= strings <= content:
+                    gap = image[strings:content]
+                    if len(gap) < 16 and not gap.strip(b"\0"):
+                        content = strings  # alignment padding only: may go with the signature
+                linkedit = image[fileoff:content]
                 sizes_zeroed = body[:32] + bytes(8) + body[40:48] + bytes(8) + body[56:]
                 canonical.append(("segment", sizes_zeroed))
                 continue
@@ -2754,13 +2821,13 @@ def _macho_identity(image: bytes, *, bootloader: bool = False) -> _MachOIdentity
             elif bootloader and cmd == _LC_VERSION_MIN_MACOSX and len(body) >= 16:
                 body = body[:12] + bytes(4) + body[16:]
             canonical.append(("command", cmd, body))
-    if linkedit is None:
+    if linkedit is None or end != len(image):
         return None
     return _MachOIdentity(tuple(canonical), linkedit, tuple(rpaths), tuple(names))
 
 
 def _macho_digest(identity: _MachOIdentity) -> str:
-    linkedit = hashlib.sha256(identity.linkedit.rstrip(b"\0")).hexdigest()
+    linkedit = hashlib.sha256(identity.linkedit).hexdigest()
     return "macho:" + hashlib.sha256(repr((identity.canonical, linkedit)).encode()).hexdigest()
 
 
@@ -2847,7 +2914,7 @@ def _is_macos_bootloader(executable: Path, source: Path) -> bool:
             expected is not None
             and expected.canonical == actual.canonical
             and expected.rpaths == actual.rpaths
-            and actual.linkedit.startswith(expected.linkedit.rstrip(b"\0"))
+            and actual.linkedit.startswith(expected.linkedit)
         ):
             return True
     return False
@@ -2892,15 +2959,36 @@ def _macos_layout(executable: Path) -> tuple[Path, Path]:
     return executable.parent, executable.parent / "_internal"
 
 
+_APP_FOLDERS = ("Frameworks", "Resources", "MacOS")
+
+
+def _macos_bundle_folders(root: Path) -> tuple[Path, ...]:
+    """``Contents/Frameworks``, ``Contents/Resources`` and ``Contents/MacOS`` of a ``.app``."""
+    if root.suffix != ".app":
+        return ()
+    return tuple(root / "Contents" / name for name in _APP_FOLDERS)
+
+
+def _walk_error(error: OSError) -> None:
+    """``os.walk``'s ``onerror``: a folder that cannot be read fails the walk (A r1 #1)."""
+    raise error
+
+
 def _macos_entries(root: Path) -> list[tuple[Path, str]]:
     """Every non-folder entry under ``root``, sorted, never descending into a linked folder.
+
+    A folder that cannot be listed (the root included) raises instead of silently dropping
+    its subtree from the origin check, the ZIP and the notices (WP6.5 A r1 #1).
 
     Returns:
         ``(path, kind)`` pairs, kind ``link`` (a symlink or junction, file or folder),
         ``file`` or ``special``.
+
+    Raises:
+        OSError: A folder under ``root`` (or ``root`` itself) cannot be listed.
     """
     entries = []
-    for parent, folders, files in os.walk(root, followlinks=False):
+    for parent, folders, files in os.walk(root, onerror=_walk_error, followlinks=False):
         for name in [*folders, *files]:
             path = Path(parent) / name
             if path.is_symlink() or path.is_junction():
@@ -2914,18 +3002,231 @@ def _macos_entries(root: Path) -> list[tuple[Path, str]]:
     return sorted(entries, key=lambda item: item[0].relative_to(root).as_posix())
 
 
-def _macos_link_problem(root: Path, path: Path) -> str | None:
-    if path.is_junction():
+def _within(path: Path, folders: Iterable[Path]) -> bool:
+    return any(path != folder and path.is_relative_to(folder) for folder in folders)
+
+
+def _macos_link_class_problem(
+    root: Path, contents: Path, physical: Path, location: Path
+) -> str | None:
+    """Classify one link: ``physical`` is resolved, ``location`` is where it counts as sitting."""
+    if physical.is_junction():
         return "junction"
-    target = os.readlink(path)
-    problem = framework_link_problem(PurePosixPath(path.relative_to(root).as_posix()), target)
+    target = os.readlink(physical)
+    if not target or target.startswith("/") or "\\" in target or ":" in target:
+        return f"link target {target!r} is absolute or not POSIX"
     # Resolve from the link's own (physical) folder: the walk never enters a linked folder.
-    resolved = Path(os.path.realpath(path.parent / target))
-    if problem is None and not resolved.is_relative_to(Path(os.path.realpath(root))):
-        problem = "link resolves outside the release folder"
-    if problem is None and not resolved.exists():
-        problem = "dangling link"
-    return problem
+    named = physical.parent / target
+    resolved = Path(os.path.realpath(named))
+    if not resolved.is_relative_to(Path(os.path.realpath(root))):
+        return "link resolves outside the release folder"
+    if not resolved.exists():
+        return "dangling link"
+    if named.is_symlink() or named.is_junction():
+        return "link to a link (one hop only)"
+    framework = framework_link_problem(PurePosixPath(location.relative_to(root).as_posix()), target)
+    if framework is None:
+        return None
+    real_contents = Path(os.path.realpath(contents))
+    if (
+        location.parent == contents
+        and PurePosixPath(target).name == location.name
+        and resolved.is_file()
+        and resolved.is_relative_to(real_contents)
+    ):
+        return None  # (B) PyInstaller's bindepend top-level link to a collected dependency
+    folders = _macos_bundle_folders(root)
+    real_folders = [Path(os.path.realpath(folder)) for folder in folders]
+    if (
+        _within(location, folders)
+        and _within(resolved, real_folders)
+        and (resolved.is_file() or resolved.is_dir())
+    ):
+        return None  # (C) BUNDLE's cross-link (or its dotted-folder link)
+    return f"{framework}; not a top-level dependency link or a bundle cross-link"
+
+
+def macos_link_view(path: Path) -> list[tuple[PurePosixPath, Path, str]]:
+    """The entries a folder link shows: ``(path under the link, physical entry, kind)``.
+
+    Args:
+        path: An admitted link (:func:`macos_link_problem`).
+
+    Returns:
+        Every non-folder entry under the link's folder target (never through a further
+        link), or nothing when the target is a file.
+
+    Raises:
+        OSError: A folder under the target cannot be listed.
+    """
+    resolved = Path(os.path.realpath(path))
+    if not resolved.is_dir():
+        return []
+    return [
+        (PurePosixPath(entry.relative_to(resolved).as_posix()), entry, kind)
+        for entry, kind in _macos_entries(resolved)
+    ]
+
+
+def macos_link_problem(root: Path, contents: Path, path: Path) -> str | None:
+    """Say why a link in a macOS release is refused, or ``None`` when it is admitted.
+
+    THE one link rule (WP6.5, G1-F1 as ruled), shared by the origin check, the release ZIP
+    and the artifact notices. Every link must be relative POSIX text, resolve (from its own
+    physical folder) inside ``root`` to something that exists, and name a target that is
+    NOT itself a link (one hop). Then exactly three classes are admitted:
+
+    - the framework-structure links (:func:`framework_link_problem`);
+    - (B) PyInstaller's bindepend top-level link: directly in the contents root, named
+      exactly as its target's basename, resolving inside the contents root to a regular
+      file (which the walk origin-checks in its own right);
+    - (C) a ``.app`` BUNDLE cross-link: located under ``Contents/Frameworks``,
+      ``Contents/Resources`` or ``Contents/MacOS`` and resolving under one of them to a
+      regular file or a folder (PyInstaller's ``building/osx.py`` cross-links and its
+      dotted-folder links). A folder target is walked and every link in it is checked as
+      if it sat at this link's location (never entered further); a special file there is
+      refused. Its files are origin-checked by the caller (:func:`macos_link_view`).
+
+    Everything else (a junction, an absolute or escaping target, a link to a link, any
+    other shape) is refused.
+
+    Args:
+        root: The release root (the ``.app``, or the folder holding ``_internal``).
+        contents: The contents root (``Contents/Frameworks`` or ``_internal``).
+        path: The link, a physical path under ``root``.
+
+    Returns:
+        ``None`` when admitted, else the reason.
+
+    Raises:
+        OSError: A folder under a folder target cannot be listed.
+    """
+    problem = _macos_link_class_problem(root, contents, path, path)
+    if problem is not None:
+        return problem
+    for relative, entry, kind in macos_link_view(path):
+        if kind == "special":
+            return f"special file {relative} under the linked folder"
+        if kind == "link":
+            nested = _macos_link_class_problem(
+                root, contents, entry, path.joinpath(*relative.parts)
+            )
+            if nested is not None:
+                return f"{relative} under the linked folder: {nested}"
+    return None
+
+
+def _macos_contents(root: Path) -> Path:
+    """The contents root of a release folder: a ``.app``'s Frameworks, else onedir's."""
+    if root.suffix == ".app":
+        return root / "Contents" / "Frameworks"
+    return root / APP_NAME / "_internal"
+
+
+def _macos_depth(root: Path, contents: Path, location: Path) -> int | None:
+    """Folders between ``location`` and its contents root, or ``None`` outside it.
+
+    In a ``.app``, ``Contents/Resources`` mirrors ``Contents/Frameworks`` (BUNDLE's
+    cross-links keep the relative path), so a file seen there has the same depth.
+    """
+    for folder in (contents, *_macos_bundle_folders(root)[1:2]):
+        if location.is_relative_to(folder):
+            return len(location.relative_to(folder).parts) - 1
+    return None
+
+
+def place_macos_tools(
+    bundle: Path, executables: Mapping[str, Path], texts: Mapping[str, Path] | None = None
+) -> list[Path]:
+    """Copy verified tools INTO a ``.app`` before it is sealed (:func:`seal_macos_bundle`).
+
+    Executables go to ``Contents/MacOS`` (beside the bootloader: AD-34 (2) puts the frozen
+    executable's folder first on PATH, so the bundled FFmpeg is found first) with mode
+    0755; texts (licences, the build record) go to ``Contents/Resources`` with mode 0644,
+    because ``Contents/MacOS`` may hold only code under the bundle's seal. Bytes are copied
+    unchanged, so the origin check's whole-file hashes from the verified archive still
+    apply. The macOS FFmpeg itself is WP6.5 group 2a's.
+
+    Args:
+        bundle: The built ``Clearwater.app``.
+        executables: Bundle file name -> the verified tool on disk.
+        texts: Bundle file name -> a text file on disk.
+
+    Returns:
+        The written paths, executables first.
+
+    Raises:
+        ValueError: The bundle is not a ``.app``, a name is not a plain file name, or a
+            destination exists or is a link.
+        OSError: A copy fails.
+    """
+    if bundle.suffix != ".app" or not (bundle / "Contents" / "MacOS").is_dir():
+        raise ValueError(f"tool placement needs a built .app bundle: {bundle}")
+    written = []
+    for folder, files, mode in (
+        (bundle / "Contents" / "MacOS", executables, 0o755),
+        (bundle / "Contents" / "Resources", texts or {}, 0o644),
+    ):
+        for name, source in sorted(files.items()):
+            if not name or PurePosixPath(name).name != name or "\\" in name or name in {".", ".."}:
+                raise ValueError(f"tool placement: {name!r} is not a plain file name")
+            target = folder / name
+            if target.is_symlink() or target.exists():
+                raise ValueError(f"tool placement: {target} already exists")
+            folder.mkdir(exist_ok=True)
+            shutil.copyfile(source, target)
+            target.chmod(mode)
+            written.append(target)
+    return written
+
+
+def seal_macos_bundle(
+    bundle: Path,
+    *,
+    run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    timeout: float = 300,
+) -> None:
+    """Ad-hoc re-sign a ``.app`` after everything was placed in it, then verify the seal.
+
+    PyInstaller signs the bundle when it builds it (``building/osx.py`` ``assemble``), so
+    anything written afterwards (the FFmpeg tools, the notices) breaks the seal. The bundle
+    is re-signed WITHOUT ``--deep`` (nested code keeps its bytes, so the origin check's
+    hashes and identities still hold) and then ``codesign --verify --deep --strict``
+    must pass. Bounded, never a shell, ``/usr/bin/codesign`` by path.
+
+    Args:
+        bundle: The built ``Clearwater.app``.
+        run: The process runner (a stub in tests).
+        timeout: Seconds allowed for each ``codesign`` call.
+
+    Raises:
+        RuntimeError: ``codesign`` fails, cannot start or times out (named).
+        ValueError: ``bundle`` is not a ``.app`` folder.
+    """
+    if bundle.suffix != ".app" or not bundle.is_dir():
+        raise ValueError(f"bundle seal needs a built .app bundle: {bundle}")
+    commands = (
+        [MACOS_CODESIGN, "--sign", "-", "--force", "--timestamp=none", str(bundle)],
+        [MACOS_CODESIGN, "--verify", "--deep", "--strict", "--verbose=2", str(bundle)],
+    )
+    for command in commands:
+        try:
+            result = run(
+                command,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            raise RuntimeError(f"bundle seal: {' '.join(command[:2])}: {error}") from error
+        if result.returncode != 0:
+            lines = [line.strip() for line in (result.stderr or "").splitlines() if line.strip()]
+            detail = f": {lines[-1][-300:]}" if lines else ""
+            raise RuntimeError(
+                f"bundle seal: {' '.join(command[:2])} exited {result.returncode}{detail}"
+            )
 
 
 def _macos_native_origin_violations(
@@ -2972,13 +3273,18 @@ def _macos_native_origin_violations(
     for path, kind in _macos_entries(root):
         label = path.relative_to(root).as_posix()
         if kind == "link":
-            problem = _macos_link_problem(root, path)
+            problem = macos_link_problem(root, contents, path)
             if problem is not None:
                 errors.append(f"native origin: linked file {path}: {problem}")
+                continue
+            # A folder link's files are checked as if they sat at the link's location.
+            for relative, shown, shown_kind in macos_link_view(path):
+                if shown_kind == "file":
+                    seen = path.joinpath(*relative.parts)
+                    depth = _macos_depth(root, contents, seen)
+                    inspect(f"{label}/{relative}", shown.name, shown.read_bytes(), depth)
         elif kind == "file" and path != executable:
-            depth = (
-                len(path.relative_to(contents).parts) - 1 if path.is_relative_to(contents) else None
-            )
+            depth = _macos_depth(root, contents, path)
             inspect(label, path.name, path.read_bytes(), depth)
     package = read_package(executable)
     for name, entry in package.toc.items():
@@ -3274,11 +3580,12 @@ def _macos_release_files(folder: Path) -> list[Path]:
     if folder.is_symlink() or folder.is_junction() or not folder.is_dir():
         raise ValueError("release ZIP requires a physical release folder without junctions")
     resolved = folder.resolve()
+    contents = _macos_contents(folder)
     members = []
     for path, kind in _macos_entries(folder):
         relative = path.relative_to(folder)
         if kind == "link":
-            problem = _macos_link_problem(folder, path)
+            problem = macos_link_problem(folder, contents, path)
             if problem is not None:
                 raise ValueError(
                     f"release ZIP refuses linked/junction/outside member: {relative} ({problem})"
@@ -3343,19 +3650,26 @@ def _check_release_snapshot(folder: Path, expected: dict[str, tuple[str, int]]) 
         raise ValueError(f"release folder {change} after pre-smoke snapshot: {name}")
 
 
-def write_release_zip(folder: Path, *, out: Path, source_epoch: int) -> Path:
+def write_release_zip(
+    folder: Path, *, out: Path, source_epoch: int, name: str | None = None
+) -> Path:
     """Archive a release wrapper with sorted files and fixed source-commit metadata.
 
     Only file members are emitted, under the wrapper's single top-level folder.
     Every member has a UTC DOS timestamp (two-second precision), Unix regular-file
     mode 0644 and no extra/comment metadata. File mtimes and modes are ignored.
-    On macOS an admitted framework link (:func:`framework_link_problem`) is stored
-    AS a link: Unix mode ``S_IFLNK | 0755``, uncompressed, its content the link text.
+    On macOS (WP6.5) a link the shared rule admits (:func:`macos_link_problem`) is
+    stored AS a link: Unix mode ``S_IFLNK | 0755``, uncompressed, its content the link
+    text; and a file whose mode carries an execute bit (PyInstaller's ``chmod 0755`` of
+    every Mach-O it collects, the bundled tools) is stored 0755, so it is executable
+    after unzip. Windows members are unchanged (0644, the mode never read).
 
     Args:
-        folder: The onedir release wrapper, containing ``Clearwater/``.
-        out: Output root for ``<folder name>.zip`` and its sha256 sidecar.
+        folder: The release folder: the onedir wrapper containing ``Clearwater/``, or on
+            macOS the ``Clearwater.app`` itself (its one top-level item).
+        out: Output root for ``<name>.zip`` and its sha256 sidecar.
         source_epoch: Source/tag commit time in Unix seconds; explicit for testing.
+        name: The archive's stem; the folder's name when None.
 
     Returns:
         The ZIP path. Its ``.zip.sha256`` sidecar ends with LF.
@@ -3379,7 +3693,7 @@ def write_release_zip(folder: Path, *, out: Path, source_epoch: int) -> Path:
     files = _release_files(folder)
     if not files:
         raise ValueError("release ZIP requires a nonempty release folder")
-    target = out / (folder.name + ".zip")
+    target = out / ((folder.name if name is None else name) + ".zip")
     sidecar = target.with_suffix(".zip.sha256")
     partial = target.with_suffix(".zip.part")
     partial_sidecar = sidecar.with_suffix(".sha256.part")
@@ -3403,7 +3717,12 @@ def write_release_zip(folder: Path, *, out: Path, source_epoch: int) -> Path:
                     link = os.readlink(path).encode("utf-8")
                     archive.writestr(info, link, compress_type=zipfile.ZIP_STORED)
                 else:
-                    info.external_attr = (stat.S_IFREG | 0o644) << 16
+                    if sys.platform == "darwin":
+                        executable = path.stat().st_mode & 0o111
+                        mode = 0o755 if executable else 0o644
+                    else:
+                        mode = 0o644
+                    info.external_attr = (stat.S_IFREG | mode) << 16
                     archive.writestr(
                         info,
                         path.read_bytes(),
@@ -3450,7 +3769,7 @@ def build(
     """
     try:
         if zip_release:
-            target = out / (release_dir(out, form, app_version()).name + ".zip")
+            target = out / (release_zip_name(form, app_version()) + ".zip")
             for path in (target, target.with_suffix(".zip.sha256")):
                 if not path.resolve().is_relative_to(out.resolve()):
                     raise ValueError("release ZIP cleanup must stay inside --out")
@@ -3578,10 +3897,31 @@ def build(
             )
             print(f"FAILED: artifact notices: {message}")
             return 1
+    if sys.platform == "darwin":
+        # WP6.5: everything placed after PyInstaller signed the .app (FFmpeg, notices) is
+        # sealed now; the re-signed bootloader is origin-checked again after the seal.
+        try:
+            seal_macos_bundle(_macos_layout(executable)[0])
+            print("bundle seal: PASS (ad-hoc re-sign; codesign --verify --deep --strict)")
+            origin_errors = native_origin_violations(
+                executable, original_path=original_path, ffmpeg_hashes=ffmpeg_hashes
+            )
+        except (OSError, RuntimeError, ValueError, zipfile.BadZipFile) as error:
+            reason = " ".join(str(error).split())
+            print(f"FAILED: {reason}".encode("ascii", "backslashreplace").decode("ascii"))
+            return 1
+        if origin_errors:
+            for error_line in origin_errors:
+                line = f"FAILED: after seal: {error_line}"
+                print(line.encode("ascii", "backslashreplace").decode("ascii"))
+            return 1
+    else:
+        pass
+    zip_folder = release_zip_folder(root)
     snapshot = None
     if zip_release:
         try:
-            snapshot = _release_snapshot(root)
+            snapshot = _release_snapshot(zip_folder)
         except (OSError, ValueError) as error:
             print(f"FAILED: release zip: {error}")
             return 1
@@ -3592,8 +3932,14 @@ def build(
     if zip_release:
         try:
             assert snapshot is not None
-            _check_release_snapshot(root, snapshot)
-            print(f"wrote {write_release_zip(root, out=out, source_epoch=source_commit_epoch())}")
+            _check_release_snapshot(zip_folder, snapshot)
+            archive = write_release_zip(
+                zip_folder,
+                out=out,
+                source_epoch=source_commit_epoch(),
+                name=release_zip_name(form, version),
+            )
+            print(f"wrote {archive}")
         except (OSError, ValueError, zipfile.BadZipFile, zipfile.LargeZipFile) as error:
             message = (
                 " ".join(str(error).split()).encode("ascii", "backslashreplace").decode("ascii")
