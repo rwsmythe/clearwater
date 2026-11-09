@@ -8,7 +8,7 @@ dispatcher fills the depth figures.
 
 | Round | Reviewer | Blocking (crit/major) | Minor/nit | In-envelope / out | NEW / REOPENED | Reverts | Fixes: product / tests-only | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|
-| 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | DISPATCHER TO FILL |
+| 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | 254,025 (wp65-cell1, read by the dispatcher with cell_depth.py at its round-0 yield) |
 
 ## Round 0
 
@@ -366,4 +366,219 @@ New files and their surface (`tests/harness/genericity_lists.py`):
   makes the edit (or CHARC grants it) and runs the harness gate.
 - `README.md`: existing, core-scanned (F0-10); no registration, vocabulary limits apply.
 
-Depth at round-0 end: DISPATCHER TO FILL
+Depth at round-0 end: 254,025 (wp65-cell1, read by the dispatcher with cell_depth.py at its round-0 yield)
+
+## Group 1 (`wp65-cell2`, dispatch-2; base `520a4a7e`)
+
+Build turn, proved on Windows; no review round yet (Reviewer A r1 reads this head). Every
+item test-first: the RED runs used the pre-change module (for `build.py`, a `git show` copy
+under `work\wp6.5\base3|base4\` loaded through the test module's own `WP61_BUILD_SCRIPT`
+hook; nothing checked out in the worktree). Working copies of the touched files were CRLF
+(system `autocrlf=true`); each was normalised to LF before editing; every commit's blobs
+have 0 CR.
+
+### Items
+
+1. **CHARC note 1 (F0-5), `5aa65d35`.** `tests/test_tools_package_notices.py:21-26` (the
+   module `pytestmark` dropped; `WINDOWS_RELEASE_SKIP`; `VENV_SITE_PACKAGES` from
+   `sysconfig.get_path("purelib")`), `:195-196` (the skip raised inside `release`), `:1053`
+   (the real-wheel reader platform-neutral, so it keeps no skip). Identity proof below.
+2. **CHARC note 2, darwin PATH, `3191302a`.** `tools/package/build.py:2350`
+   (`DARWIN_ANALYSIS_SYSTEM_PATH`), `:2354-2428` (`run_pyinstaller`: win32 branch unchanged
+   by text; `elif darwin` PATH = interpreter `bin`, venv `bin`, `/usr/bin`, `/bin`,
+   `/usr/sbin`, `/sbin`, every `DYLD_*` removed, `DYLD_FALLBACK_LIBRARY_PATH=/usr/lib`,
+   `DYLD_FALLBACK_FRAMEWORK_PATH=/System/Library/Frameworks`; `else` raises
+   `BuildEnvironmentError` naming Linux; PATH and the `DYLD_*` set restored in the one
+   `finally`). Test `tests/test_tools_package_build.py:120`
+   `test_analysis_uses_only_sanitized_path_and_restores_it` x {win32, darwin, linux} x
+   {success, failure} (6 ids; captures `os.environ` inside the stubbed analysis; exact PATH;
+   DYLD set; full environment equal before / after; Linux refused before PyInstaller).
+   RED: 4 failed (darwin, linux: the foreign PATH entry resolved, `else: pass`); GREEN 6.
+3. **CHARC note 2, Mach-O origin rule, `96d162ce`.** `build.py:2597` `_macho_slices` (thin
+   64-bit, or each slice of a FAT / FAT_64 file), `:2665` `_macho_identity` (the ledger
+   section 6 design; for the bootloader also LC_SYMTAB strsize, LC_UUID, the SDK of
+   LC_BUILD_VERSION / LC_VERSION_MIN_MACOSX), `:2776` `_macos_origin_identities` (interpreter
+   and locked-RECORD files counted by suffix OR magic, so suffixless framework binaries
+   count; RECORD verified first), `:2806` `macho_built_problem` (identity, then
+   `@rpath/<basename>` names and id, then the LC_RPATH rule), `:2840` `_is_macos_bootloader`
+   (thin arm64 built image vs the locked `runw`'s arm64 slice; `__LINKEDIT` must START with
+   the original's, the PKG may follow), `:2931` `_macos_native_origin_violations` (the walk),
+   `:3047` the `elif darwin` of `_is_clearwater_bootloader`, `:3057` `native_origin_violations`
+   dispatches darwin / else; the Windows body moved UNCHANGED (diff: additions only) into
+   `:3097` `_pe_native_origin_violations`; `_native_origin_hashes` gains a darwin-only
+   `|= _macos_origin_identities()` after its unchanged loops. `_is_native` needed no change:
+   its magic test already covers suffixless Mach-O; the darwin origin set now passes it the
+   file head. RPATH RULE AS BUILT: exactly `@loader_path` + one `/..` per folder between the
+   binary and the contents root when any dependency needs `@rpath`; none or that one
+   otherwise, because PyInstaller adds the rpath only when required
+   (`PyInstaller/utils/osx.py:574`, `if rpath_required and target_rpath not in rpaths`);
+   the target depth is PyInstaller's (`building/utils.py:323-325`, dest name relative to the
+   contents directory, `api.py:1186`). Tests `test_tools_package_build.py:1998-2200`
+   (synthetic thin / fat images by `struct`, constants the test's own): 6 admitted
+   transformations, each also refused under win32 (the whole-file rule) in the same test
+   (re-signed, dylib names rewritten, rpath replaced, unsigned original, fat original's
+   arm64 slice, suffixless framework binary); 8 refused images (changed `__TEXT` byte, added
+   load command, different basename, system dependency redirected to `@rpath`, changed
+   `__LINKEDIT`, x86_64 slice transformed, x86_64 slice untouched, foreign file); 7
+   location faults (depth too shallow / deep, two rpaths, no rpath for an `@rpath`
+   dependency, foreign rpath, absolute dependency name, id not `@rpath`); no-rpath allowed
+   without an `@rpath` dependency; a transformed native outside the contents root refused;
+   7 bootloader cases (the PyInstaller transformations admitted on darwin AND refused by the
+   old prefix rule, which now serves only `else`; code byte, added dependency, changed
+   `__LINKEDIT` prefix, added rpath, x86_64, still-fat refused). RED (base3): 15 failed =
+   every admitted / location case (the base refuses every transformed Mach-O, fail-closed);
+   the 15 refusal cases pass on both (they guard against over-admission). GREEN 30.
+4. **F0-9 links, `c88da7f4` (the origin-walk half landed in `96d162ce`).** `build.py:2856`
+   `framework_link_problem` (pure: admits exactly `<fw>/Versions/Current` -> a sibling
+   version folder and `<fw>/<name>` -> `Versions/Current/<name>`, PyInstaller's
+   `utils/osx.py:671-692`; refuses absolute / non-POSIX / empty targets, links outside a
+   `.framework`, escapes and every other shape), `:2895` `_macos_entries` (`os.walk` without
+   following links; a linked folder, a junction included, is pruned, never entered), `:2917`
+   `_macos_link_problem` (adds: resolves outside the release folder, dangling, junction;
+   resolution from the link's physical folder), `:3261-3318` `_release_files` (darwin ->
+   `_macos_release_files`; else -> `_release_files_without_links`, the Windows body
+   unchanged), `:3320` the snapshot records a link as `link:<text>`, `:3346-3410`
+   `--zip` stores an admitted link as `S_IFLNK | 0755`, `ZIP_STORED`, content = the link
+   text; files unchanged (0644, deflate 9). Tests `test_tools_package_build.py:2249-2435`: the
+   pure rule (8 admitted incl. the `.app` path and a nested framework; 15 refused, each with
+   its reason), the darwin origin walk over REAL links (admitted; and under win32 every link
+   refused with today's text plus the transformed binary unknown), 4 refused real links, a
+   junction (Windows only), the ZIP (links as links, files 0644, two writes byte-identical),
+   the win32 ZIP refusal unchanged, 2 refused ZIP links, the snapshot detecting a retargeted
+   link. `os.symlink` worked at this seat (no skip fired); a host without the privilege skips
+   those tests by the named reason, the pure-rule tests run everywhere. RED (base3): 34 of 41
+   failed (`framework_link_problem` absent; links refused); the 3 pre-existing
+   `test_release_zip_refuses_smoke_mutations` ids also fail under a base COPY because the
+   copy's `REPO_ROOT` is `work\` (environmental, not RED-relevant; they pass in tree). GREEN 41.
+5. **DR-123, `8d1d53b9`.** `tools/spike_io/licences.py:86` `BUNDLED_LIBRARY_FOLDERS`
+   (`av.libs` delvewheel, `av/.dylibs` delocate), `:156` `bundled_libraries`, `:175`
+   `library_licence_wording` (prefixes match with or without `lib`), `:237` `_CODE_SUFFIXES`
+   + `.so`, `.dylib`; the record adds `bundled_library_folders`. Framework binaries without
+   suffix were NOT added: `wheel_text_files` is called for `av` only, whose macOS wheel
+   carries `.so` and delocate `.dylib`s, no framework. Windows record checked at this seat:
+   old vs new `pyav_ffmpeg()` every existing key equal (31 libraries, same order). Tests
+   `tests/test_portability.py:4004` one per suffix class (`.so`, `.dylib`, `.dll`, `.pyd`,
+   `.exe`: a Mach-O head full of licence words is never read as text) and `:4038` one per
+   repair folder (delvewheel `.dll`, delocate `.dylib`); `_tool_t11` (`:3976`, W-TOOL T11 /
+   T12) now asserts the Mach-O forms. RED: `.so` / `.dylib` read as text (4 GPL counted),
+   `bundled_libraries` absent, T11 / T12 suffix assert; `.dll` / `.pyd` / `.exe` pass on both
+   (controls). GREEN 22 (selection). **M-TOOL T11 / T12 NOT edited:** they are `macos`-marked
+   and skip on Windows by design, so they cannot pass here; their `xfail` is conditional on
+   `{".so", ".dylib"} <= _CODE_SUFFIXES` (`tests/test_macos_portability.py:1453-1456`), now
+   false, so on the runner they run plain and must pass (G3 then drops the dead xfail).
+6. **Smoke darwin containment, `838b0d59`.** `tools/package/smoke.py:172`
+   `_group_contained_process` (`start_new_session=True`, pgid = root pid; refuses pgid 0 / 1
+   / its own group before any signal; `communicate` bounded; the `killpg(pgid, 0)` census
+   until the deadline -> SURVIVORS; a `finally` that always sends `killpg(SIGKILL)` and waits
+   `_GROUP_CLEANUP_SECONDS` (5 s) for the group to empty, else a named failure), `:707`
+   `elif darwin` binds `os.killpg` / `signal.SIGKILL` / `os.getpgrp()`, `:732` `else`
+   refuses Linux by name. `_environment` (`:121`): the SystemRoot / System32 lines moved
+   UNCHANGED into a win32 branch; darwin sets `TMPDIR` and PATH `/usr/bin:/bin` (needed: at
+   the base `_environment` raises on any non-Windows host, so the darwin containment, and
+   the existing `test_smoke_environment_strips_all_python_overrides`, would fail on the
+   runner; the latter passes under the darwin simulation now). The Job Object path is
+   unchanged (diff: no removed line in it). Tests `tests/test_tools_package_smoke.py:899-990`
+   by stubs (clean row: new session, redirected HOME / TMPDIR, system PATH, stdin bytes, the
+   signal sequence census -> SIGKILL -> census; survivor; survivor holding the pipes; hang;
+   immortal group; pgid 77 / 1 / 0 never signalled; the darwin binding loaded under
+   `sys.platform = "darwin"`; the Linux refusal) and the tripwire `:771` rewritten: off
+   Windows, darwin runs a REAL clean row and a REAL survivor row (refused, then the
+   grandchild must be gone within 5 s); any other POSIX host is refused by name. RED: 8
+   errors + 2 failures (`_group_contained_process` absent; darwin refused "awaits WP6.5");
+   GREEN 10 + the tripwire skipped here by its reason.
+
+### Note-1 identity proof (Windows)
+
+Base module `git archive a186c3ee tests/test_tools_package_notices.py` ->
+`work\wp6.5\base-a186c3ee\` (sha256 `15392b8f...` = the worktree's file before the edit).
+Base run: 415 collected, 415 passed. After: 415 collected, 415 passed. Outcome sets by node id
+(`-v` lines, `PASSED|FAILED|SKIPPED`, sorted): 415 = 415, identical (sha256 of both sorted
+lists `64503c4c6188de96...`). Final head: 415 passed.
+
+Darwin expectation for the runner (from a SIMULATION at this seat: a scratch plugin sets
+`sys.platform = "darwin"` after start-up; not a proof): 161 ids run (the 158 neutral + the 3
+real-wheel reader ids, now platform-neutral), 254 ids (108 functions) skip with
+"Windows native/interpreter fixture: the synthetic release copies python312.dll and writes
+Clearwater.exe (no macOS release fixture yet)". In the simulation 160 passed and 1 failed:
+`test_root_annex_generator_checks_committed_bytes_and_detects_a_changed_row` imports
+`urllib.request`, which on `sys.platform == "darwin"` imports `_scproxy` (absent on Windows): a
+simulation artifact; the runner decides it. The 3 reader ids read
+`<venv purelib>/numpy-2.5.4.dist-info/licenses/LICENSE.txt`,
+`scipy-1.18.1.dist-info/LICENSE.txt`, `pyinstaller-6.22.3.dist-info/licenses/COPYING.txt`:
+that the macOS wheels install those exact names is UNVERIFIED (no wheel downloaded).
+
+### Counts at the group-1 head `838b0d59` (`-p no:cacheprovider --timeout 600 -k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`)
+
+Static: `ruff check .` All checks passed; `ruff format --check .` 337 files already formatted;
+`mypy` Success 166; `mypy --platform darwin` Success 166.
+
+| Module | Result |
+|---|---|
+| `tests/test_tools_package_notices.py` | 415 passed |
+| `tests/test_tools_package_build.py` | 200 passed (base 131: the PATH test 1 -> 6 ids, +30 Mach-O, +34 links / ZIP) |
+| `tests/test_tools_package_smoke.py` | 44 passed, 1 skipped (the non-Windows tripwire, by its reason) |
+| `tests/test_portability.py` | 192 passed |
+| `tests/test_macos_portability.py` | 224 skipped (`macos` platform skip) |
+| `tests/test_release_workflow.py` | 59 passed |
+
+### Verification loop (self, before Reviewer A)
+
+- Suspected: a one-slice FAT file passes the bootloader check. CONFIRMED by design review
+  of `_macho_slices`; FIXED before commit (the built bootloader must be a thin image;
+  `still-fat` case).
+- Suspected: relative links with `/` do not resolve on Windows through a linked folder.
+  CONFIRMED (real-link tests reported `dangling link`); FIXED: resolve from the link's own
+  physical folder (`path.parent / target`), the same result on macOS.
+- Suspected: `os.walk(followlinks=False)` still enters a Windows junction. CONFIRMED (the
+  junction test saw the junction's file); FIXED: linked folders are pruned from the walk.
+- Suspected: the licence record's library order changes on Windows. CONFIRMED (Path sort is
+  case-insensitive on Windows); FIXED: sorted by name; records compared equal.
+- Suspected: `_environment` raises on macOS. CONFIRMED by reading (`SystemRoot` check);
+  FIXED in item 6 (darwin branch); the existing env test passes under the simulation.
+- Rejected as false positive: none. A final pass found nothing new.
+
+### Findings for the dispatcher (evidence; not built here)
+
+- **G1-F1 (STOP for a ruling; affects the first runner build) -- PyInstaller makes links
+  OUTSIDE frameworks in a macOS onedir.** `PyInstaller/depend/bindepend.py:196-210`: on
+  non-Windows, every binary dependency collected into a subfolder gets a top-level link
+  `<contents>/<basename>` -> `<subfolder path>` unless a hook suppresses it (no PySide6 /
+  numpy / scipy / Pillow hook does; only the NVIDIA hooks set
+  `bindepend_symlink_suppression`). Qt framework dependencies resolve to
+  `PySide6/Qt/lib/QtCore.framework/Versions/A/QtCore`, so the onedir will very likely hold
+  `_internal/QtCore -> PySide6/Qt/lib/QtCore.framework/Versions/A/QtCore` and the delocate
+  dylibs' top-level links. Item 4 as dispatched refuses them ("outside a framework"), so
+  the origin check and `--zip` would fail the build. Recommended second admitted class
+  (not built): a link directly in the contents root, relative, whose name equals its
+  target's basename, resolving inside the contents root to a regular file (the exact
+  `bindepend` shape). A `.app` adds BUNDLE's cross-links between `Contents/Frameworks`,
+  `Contents/Resources` and `Contents/MacOS` (`building/osx.py:418-425`, `:488-490`,
+  `:545-547`): a third class only if Q3 rules the `.app`.
+- **G1-F2 (G2a) -- `tools/package/notices.py:1418-1419` refuses ANY linked entry** in the
+  built folder (`notices: unsafe linked entry`), so `--notices` fails on the first
+  framework link: the Mac notices census (F0-2) must learn the same link rule.
+- **G1-F3 (G2a / G2b) -- the ZIP gives every file mode 0644** (`build.py` `write_release_zip`):
+  the unzipped macOS `Clearwater` executable and the bundled `ffmpeg` / `ffprobe` will not
+  be executable. A darwin executable-bit rule (0755 for Mach-O executables) is needed before
+  stage 2; not built (outside items 1-6).
+- **G1-F4 (G2a) -- the smoke's run path is still Windows-only:** `run_smoke` refuses
+  non-Windows, `_ffmpeg_checks` looks for `ffmpeg.exe`, the planted exception targets
+  `_ccallback_c*.pyd`; item 6 built the containment only.
+- **G1-F5 (record) -- `test_root_annex_generator...` on darwin** imports `urllib.request`
+  (`_scproxy`); expected to pass natively, unverified.
+
+### What only the runner can prove (the G3 list)
+
+1. The 158 neutral notices ids + 3 reader ids pass natively; the 254 skip with the reason.
+2. A real PyInstaller build passes the Mach-O identity: 0 origin violations (every
+   transformed native admitted by identity + its rpath / names; the bootloader by its
+   normalised image), and a planted foreign dylib is refused.
+3. The darwin analysis environment: PyInstaller analysis succeeds under the sanitised PATH
+   and DYLD fallbacks (no Homebrew library reached).
+4. The framework links (and G1-F1's class once ruled) pass the walk and survive `--zip` as
+   links; an unzip on macOS restores them.
+5. The smoke tripwire natively: a clean row, a survivor refused and killed with its group.
+6. M-TOOL T11 / T12 pass plain (xfail condition false).
+7. `test_smoke_environment_strips_all_python_overrides` and the other smoke tests natively.
+
+Depth at group-1 yield: DISPATCHER TO FILL
