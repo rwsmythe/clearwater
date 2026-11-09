@@ -2346,21 +2346,33 @@ class BuildEnvironmentError(ValueError):
     """The analysis environment cannot be constructed safely."""
 
 
+DARWIN_ANALYSIS_SYSTEM_PATH = ("/usr/bin", "/bin", "/usr/sbin", "/sbin")
+"""The system part of the macOS analysis PATH (``codesign``, ``lipo``, ``install_name_tool``)."""
+
+
 def run_pyinstaller(args: Sequence[str]) -> None:
     """Run PyInstaller in this process: ``PyInstaller.__main__.run(args)``.
 
     Windows analysis sees only the interpreter root/DLLs, venv Scripts and
-    Windows System32/root. PATH is restored even if importing/running analysis
-    fails. POSIX loader paths/rpaths are unchanged; WP6.5 owns their native proof.
+    Windows System32/root. macOS analysis (WP6.5, the AD-36 form) sees only the
+    interpreter ``bin``, the venv ``bin``, ``/usr/bin``, ``/bin``, ``/usr/sbin`` and
+    ``/sbin``; every ``DYLD_*`` variable is removed and the two dyld fallbacks are
+    pinned to the system locations, because PyInstaller resolves Mach-O
+    dependencies through macholib's ``dyld_find``, which reads them (its default
+    library fallback includes ``/usr/local/lib``). PATH and the ``DYLD_*`` set are
+    restored even if importing/running analysis fails. Any other platform is
+    refused: Clearwater is built on Windows and macOS only.
 
     Args:
         args: The command line (:func:`pyinstaller_args`).
 
     Raises:
-        BuildEnvironmentError: Windows SYSTEMROOT is unset; no safe PATH can be formed.
+        BuildEnvironmentError: Windows SYSTEMROOT is unset (no safe PATH can be
+            formed), or the platform is neither Windows nor macOS.
         SystemExit: PyInstaller's own exit on a failed build (non-zero status).
     """
     original = os.environ.get("PATH")
+    dyld_saved: dict[str, str] | None = None
     try:
         if sys.platform == "win32":
             system_root = os.environ.get("SYSTEMROOT")
@@ -2380,10 +2392,24 @@ def run_pyinstaller(args: Sequence[str]) -> None:
                     windows,
                 )
             )
+        elif sys.platform == "darwin":
+            dyld_saved = {k: v for k, v in os.environ.items() if k.startswith("DYLD_")}
+            for name in dyld_saved:
+                del os.environ[name]
+            os.environ["DYLD_FALLBACK_LIBRARY_PATH"] = "/usr/lib"
+            os.environ["DYLD_FALLBACK_FRAMEWORK_PATH"] = "/System/Library/Frameworks"
+            os.environ["PATH"] = os.pathsep.join(
+                (
+                    str(Path(sys.base_prefix) / "bin"),
+                    str(Path(sys.prefix) / "bin"),
+                    *DARWIN_ANALYSIS_SYSTEM_PATH,
+                )
+            )
         else:
-            # POSIX dependency resolution uses loader paths/rpaths; this Windows
-            # release fix does not change those. Native macOS proof is WP6.5's.
-            pass
+            raise BuildEnvironmentError(
+                f"platform {sys.platform!r}: no sanitized analysis environment; "
+                "Clearwater builds on Windows and macOS only (Linux is not supported)"
+            )
         main = importlib.import_module("PyInstaller.__main__")
         main.run(list(args))
     finally:
@@ -2391,6 +2417,10 @@ def run_pyinstaller(args: Sequence[str]) -> None:
             os.environ.pop("PATH", None)
         else:
             os.environ["PATH"] = original
+        if dyld_saved is not None:
+            for name in [k for k in os.environ if k.startswith("DYLD_")]:
+                del os.environ[name]
+            os.environ.update(dyld_saved)
 
 
 def _is_native(name: str, data: bytes = b"") -> bool:

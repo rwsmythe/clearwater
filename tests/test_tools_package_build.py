@@ -111,32 +111,57 @@ def test_origin_trust_refuses_foreign_locked_distribution(tmp_path, monkeypatch,
         build._locked_native_distributions()
 
 
-def test_analysis_uses_only_sanitized_path_and_restores_it(tmp_path, monkeypatch):
-    """A foreign resolver candidate must disappear even when analysis fails."""
-    foreign = tree(tmp_path / "foreign", ["foreign.dll"])
-    base = tree(tmp_path / "python", ["DLLs/trusted.dll"])
+DARWIN_SYSTEM_PATH = ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+
+
+@pytest.mark.parametrize("platform", ["win32", "darwin", "linux"])
+@pytest.mark.parametrize("outcome", ["success", "failure"])
+def test_analysis_uses_only_sanitized_path_and_restores_it(
+    tmp_path, monkeypatch, platform, outcome
+):
+    """A foreign resolver candidate must disappear even when analysis fails.
+
+    win32: the interpreter root and DLLs, venv Scripts, System32 and the Windows root.
+    darwin (AD-36 form, CHARC note 2): the interpreter and venv ``bin``, then the four
+    system directories; every ``DYLD_*`` variable removed and the two fallbacks pinned
+    to the system locations for the analysis. Everything is restored after success and
+    after failure. Any other platform (Linux) is refused before PyInstaller is imported.
+    """
+    foreign = tree(tmp_path / "foreign", ["foreign.dll", "libforeign.dylib"])
+    base = tree(tmp_path / "python", ["DLLs/trusted.dll", "bin/python3.12"])
     venv = tmp_path / "venv"
     windows = tmp_path / "Windows"
     original = str(foreign)
     monkeypatch.setenv("PATH", original)
     monkeypatch.setenv("SystemRoot", str(windows))
+    inherited_dyld = {
+        "DYLD_LIBRARY_PATH": str(foreign),
+        "DYLD_FRAMEWORK_PATH": str(foreign),
+        "DYLD_INSERT_LIBRARIES": str(foreign / "libforeign.dylib"),
+        "DYLD_FALLBACK_LIBRARY_PATH": str(foreign),
+    }
+    for name, value in inherited_dyld.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("DYLD_FALLBACK_FRAMEWORK_PATH", raising=False)
     monkeypatch.setattr(build.sys, "base_prefix", str(base))
     monkeypatch.setattr(build.sys, "prefix", str(venv))
-    monkeypatch.setattr(build.sys, "platform", "win32")
+    monkeypatch.setattr(build.sys, "platform", platform)
     seen = []
 
     def analysis(args):
-        seen.append(os.environ["PATH"].split(os.pathsep))
+        seen.append(dict(os.environ))
         resolved = next(
             (
-                Path(part) / "foreign.dll"
+                Path(part) / leaf
                 for part in os.environ["PATH"].split(os.pathsep)
-                if (Path(part) / "foreign.dll").is_file()
+                for leaf in ("foreign.dll", "libforeign.dylib")
+                if (Path(part) / leaf).is_file()
             ),
             None,
         )
         assert resolved is None
-        raise RuntimeError("analysis failed")
+        if outcome == "failure":
+            raise RuntimeError("analysis failed")
 
     real_import = build.importlib.import_module
     monkeypatch.setattr(
@@ -146,18 +171,37 @@ def test_analysis_uses_only_sanitized_path_and_restores_it(tmp_path, monkeypatch
             SimpleNamespace(run=analysis) if name == "PyInstaller.__main__" else real_import(name)
         ),
     )
-    with pytest.raises(RuntimeError, match="analysis failed"):
+    before = dict(os.environ)
+    if platform == "linux":
+        with pytest.raises(build.BuildEnvironmentError, match=r"linux.*Linux.*not supported"):
+            build.run_pyinstaller([])
+        assert seen == []
+    elif outcome == "failure":
+        with pytest.raises(RuntimeError, match="analysis failed"):
+            build.run_pyinstaller([])
+    else:
         build.run_pyinstaller([])
-    assert seen == [
-        [
+    assert dict(os.environ) == before
+    assert os.environ["PATH"] == original
+    if platform == "linux":
+        return
+    (environment,) = seen
+    path = environment["PATH"].split(os.pathsep)
+    if platform == "win32":
+        assert path == [
             str(base),
             str(base / "DLLs"),
             str(venv / "Scripts"),
             str(windows / "System32"),
             str(windows),
         ]
-    ]
-    assert os.environ["PATH"] == original
+        assert {k: v for k, v in environment.items() if k.startswith("DYLD_")} == inherited_dyld
+    else:
+        assert path == [str(base / "bin"), str(venv / "bin"), *DARWIN_SYSTEM_PATH]
+        assert {k: v for k, v in environment.items() if k.startswith("DYLD_")} == {
+            "DYLD_FALLBACK_LIBRARY_PATH": "/usr/lib",
+            "DYLD_FALLBACK_FRAMEWORK_PATH": "/System/Library/Frameworks",
+        }
 
 
 def test_missing_systemroot_is_a_named_build_failure(tmp_path, monkeypatch, capsys):
