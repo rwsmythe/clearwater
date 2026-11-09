@@ -12,6 +12,7 @@ dispatcher fills the depth figures.
 | A r1 | Codex (seat, detached copy) on the group-1 head | 1 major (A1) | 1 minor (A2), 1 advisory (A3) | 3 in / 0 out | 3 NEW / 0 REOPENED | 0 | product 3 (build.py) + tests; all three FIXED at `2704a852` (group 2b) | group-2b row below |
 | A r3 | Codex (seat, detached copy) on the group-2a part-2 head `de3d68a0` | 3 major (A3-F1, F2, F3) | 2 minor (A3-F4, F5) | 5 in / 0 out | 5 NEW / 0 REOPENED | 0 | product 5 (build.py) + tests; all five FIXED at `d81549fc` (turn 4b-r1, `wp65-cell7`); 1 more found by the cell's loop and fixed (configuration candidates) | part-2 r1 section below |
 | A r4 | Codex (seat, detached copy) on the part-2 r1 head `ae96a4e2` | 3 major (A4-F1, F2, F3) | 0 | 3 in / 0 out | 3 NEW / 0 REOPENED | 0 | product 3 (build.py) + tests; all three FIXED at `d6296b92` (turn 4b-r2, `wp65-cell8`); 2 more found by the cell's loop and fixed (printed configure form, extra-version spellings) | part-2 r2 section below |
+| A r5 | Codex (seat, detached copy) on the part-2 r2 head `87df4840` | 0 | 1 minor (redundant quoting admitted by the printed-form parser) | 1 in / 0 out | 1 NEW / 0 REOPENED | 0 | product 1 (build.py `_sh_quote` canonical check) + tests; FIXED at `fcfe5073` (turn G3-fix, `wp65-cell10`); the same turn folded the G3 runner classification (test-only, plus `notices.py` C15 and `stills.py` C1) | G3-fix section below |
 
 ## Round 0
 
@@ -1555,4 +1556,117 @@ check was redone with a script (`crcheck.py`, raw `git cat-file` blobs: 0 CR). O
 heredoc collapsed backslashes (the known trap) and failed its own assertion before writing;
 the ledger edits were redone with the Edit tool.
 
-Depth at group-2a part-2 r2 yield: DISPATCHER TO FILL
+Depth at group-2a part-2 r2 yield: 216,416 (wp65-cell8, read by the dispatcher with cell_depth.py at its 4b-r2 return)
+
+## G3 fix (`wp65-cell10`, dispatch-11; base `87df4840`)
+
+Turn G3-fix: fold the stage-1 runner classification and Reviewer A r5's minor. The runner
+run `42661729379` (on `ae96a4e2`) failed 63 tests in its parallel leg; the read-only
+classification turn (`wp65-cell9`, dispatch-10; depth 244,789 at its return) is the record:
+`clearwater-review-evidence\wp6.5\cell\g3-classification.md` (class (a) 60, (b) 1, (c) 2,
+(d) 0). CHARC's G3 rulings (2026-11-09 18:06Z) applied as given: C16 measurement first (no
+product change), C15 the tool fix, C1 / C2 granted, A4 a POSIX-only conftest HOME redirect,
+classes (a) / (b) fixed in the TEST. **No `src/` change; no committed fixture or committed
+notices-annex byte moved.** Scratch `work\wp6.5\g3fix\`.
+
+### A r5 adjudication
+
+| Finding | Verdict | Change | RED (`87df4840` code) | GREEN |
+|---|---|---|---|---|
+| A r5 MINOR, `build.py:1040` / `:1528-1531`: the printed-form parser admits redundant quoting configure never prints (`--extra-version='20261110'`, `--disable-encoder='aac'`) | FIXED (in-envelope, NEW) | `tools/package/build.py:1515` `_sh_quote` (configure's `sh_quote` at `b204e94e`: `'` -> `'\''`, bare when every byte is in `[A-Za-z0-9_/.+-]`, the empty string included); `:1546` `_configure_arguments` re-quotes each decoded value and refuses the line when the spelling differs. The positive guards hold: the UTF-8 path, the space, the embedded quote and the provider's real line (`--extra-version='https://www.martin-riedl.de'`, 34 arguments) parse. Windows branch untouched. The binary scan compares against the lock's line, which is validated on load, so the lock rule closes the reviewer's "noncanonical binary" case too. | `test_tools_package_build.py:3417` 10 redundant-quote forms (the reviewer's two; the four `extra-version` spellings; `--pkg-config-flags`; the whole `--prefix` value; `--disable-encoder='aac_at'`; `--extra-cflags=''` / `'-O2'`): **10 `DID NOT RAISE`**; `:3439` the canonical-spelling sweep: 1 `DID NOT RAISE` (`g3fix\a5-red.log`: 11 failed, 7 passed) | 566 passed; the r2 list test's empty value is now given in its printed (bare) form, `--disable-encoder=` (refused "disabled" as before) |
+
+Windows verdicts unchanged (`windows_compare.py`, base `git show 1ef10536`): validators 33,
+mismatches []; archive members 5, mismatches []; Windows-path definitions AST-identical to
+`de3d68a0` 10 of 10.
+
+### Per cause
+
+| Cause | Rows | Class | Change (head file:line) | Proof on Windows | Owed to the runner |
+|---|---|---|---|---|---|
+| A4 | (note 2) | ruling | `tests/conftest.py:369` `_posix_home_redirect`: autouse, `sys.platform != "win32"` only, `HOME` = `tmp_path_factory.mktemp("home")` (beside the test's `tmp_path`, so a test listing its `tmp_path` sees nothing new); composes with the footage temp-root guard (a basetemp child) and `_release_fft_plans`; a test that sets `HOME` itself wins | `tests/test_wp65_conftest_home.py`: the two POSIX tests SKIPPED by marker, the Windows test PASSES (HOME as collection found it) | the POSIX tests: `Path.home()`, `os.path.expanduser("~")`, `~/Library` and `app_locations()` under the folder |
+| C1 | 16-33 (18) | a | `tools/fixtures/stills.py:88` `_ICC_PLATFORM = b"MSFT"`, `:109` pinned in `srgb_profile()` (docstring says why) | `test_fixtures.py:1364`: LittleCMS stamp MSFT / APPL / SUNW / zero -> the manifest's `icc_md5`; RED on the old `stills.py` 3 failed (APPL, SUNW, zero), 1 passed; the regeneration test byte-identical (committed fixtures unchanged) | the 18 `-srgb` ids |
+| C2 | 1 | c | `tests/test_fixtures.py:1420` collects every mismatch, `:1402` `_pixel_figure` prints per entry decoded max / p99 / nonzero / worst (row, col, channel) plus `libheif_info()`; still FAILS | probe `g3fix\c2_probe.py`: a re-encoded HEIC `max 5, p99 3`, a one-pixel PNG change `max 7 ... worst at (3, 5, 1)`; Windows regeneration passes | the full mismatch list and its figures; CHARC rules the bound |
+| C3 | 10-15 | a | `test_core_deps.py:56`; `test_core_select.py:21` / `test_core_wp34.py:41` `NOT_INSTALLED` (darwin: `MACOS_CPU_REASON`), row 15's regex `re.escape`d; `got in (*REASONS, MACOS_CPU_REASON)` | passes; **simulated darwin** (`sys.platform = "darwin"` set by a scratch plugin in `pytest_configure`, `g3fix\sim\simdarwin.py`; `_probe_gpu` reads it and calls no Windows API after): the 12 select / wp34 ids PASS | `test_core_deps.py` (a child interpreter: the host's platform) |
+| C4 | 34-37 | a | `test_io_video_encode_units.py:223` `WINDOWS_ROSTER = encoder_roster("win32")`, passed to `_detect` / `resolve_encoder` in the four tests | 137 passed; simulated darwin (same plugin): the four PASS | the four ids |
+| C5 | 2 | a | `test_frozen_entry.py:620` `HOME` under `tmp_path` on POSIX | passes (unchanged path on win32) | the id |
+| C6 | 3 | b | `test_frozen_entry.py:1200` `skipif(darwin, "the gpu extra is not installable on macOS (AD-35)")`; the guard checks `find_spec("cuda")` first | passes on Windows (the canary RUNS; not skipped) | SKIPPED with the reason |
+| C7 | 4 | a | `test_gpu_pack.py:930` the expectation follows the file system (`cupy/__init__.py` still found after the rename -> `unlisted entry in site-packages: CuPy`, the runner's string) | passes (normcase branch) | the id |
+| C8 | 5-8 | a | `test_gpu_pack_install.py:1242` `skipif(!= win32, "Windows mapped-image sharing semantics")` (the siblings' reason) | passes, not skipped | SKIPPED |
+| C9 | 9 | a | `test_headless_export.py:1038` makes `footage/x` | passes | the read-only refusal |
+| C10 | 38 | a | `test_portability.py:3214` the Windows spelling part on win32 only | passes | the id |
+| C11 | 39-40 | a | `test_tools_package_build.py:140` sets `SYSTEMROOT` (the name `build.py` reads) | passes | the two win32-param ids |
+| C12 | 41, 42, 45 | a | `:339`, `:360`, `:427` `skipif(!= win32, "PE bootloader checks; pefile is win32-only (uv.lock)")` | pass, not skipped | SKIPPED |
+| C13 | 43-44, 49-52, 55-61 (13) | a | `:386`, `:1304`, `:1359`, `:1575`, `:1665` `skipif(!= win32, "Windows FFmpeg bundle contract ...; the macOS contract awaits ffmpeg-macos.lock.json, WP6.5 part 3")` | pass, not skipped | SKIPPED; **their darwin counterparts are part-3 work** (skipping is not darwin coverage) |
+| C14 | 46-48, 53-54 | a | rows 46-47 / 53-54: `:1094`, `:1411` `skipif(!= win32, ...)` -- the FALLBACK, not the platform-path stand-in: on darwin the build then seals a `.app` with `codesign` and re-checks origin, and rows 46-47's `json` comes from the pack scan that darwin skips (AD-33), so a platform-path stand-in does not make them pass cheaply; row 48: `:1125` `skipif(darwin, "no GPU pack is scanned on macOS (AD-33)")` | pass, not skipped | SKIPPED; darwin missing-member / smoke-after-notices counterparts are part-3 work |
+| C15 | 62 | a (tool, A2 (ii)) | `tools/package/notices.py:113` `_licence_order` = `as_posix().lower().split("/")` then the input (on Windows the very list `WindowsPath` compares); `:2577` | `notices.py --root-annex --check`: **root annex matches** (committed bytes unchanged); `test_tools_package_notices.py:872`: POSIX-style and Windows-style paths give the Windows order (zlib's three texts; every row of the root annex's FFmpeg rows); native POSIX order differs on **21 of 337** rows (cell9's figure) | the root-annex check on darwin |
+| C16 | 63 | c (STOP) | `tests/test_wp321_fft_gaussian.py:307` the CPU test prints, on mismatch, `_batch_mismatch_report` (`:269`): max abs, p99, nonzero count, the first 12 (row, col[, channel]), numpy / scipy versions, inside 1e-5 or not, and a control with `FFT_BATCH_LINES = 516` (patched inside the test only); still FAILS; `:327` proves the report on a planted one-ulp difference | the CPU test and the planted test pass; `backend.py` untouched | **the figure** (CHARC rules on it) |
+
+Counts: A r5 1 minor, in-envelope, NEW, 0 reverts; product-code fixes 1 (`build.py`) plus
+the release tool `notices.py` (C15, tool) and the fixture generator `stills.py` (C1, test
+infrastructure); test-only 13 causes plus A4 plus 1 loop finding. No `src/` change.
+
+### Proof Windows is unchanged (each module before at `87df4840` vs after at the head; `-m "not gpu"`, `-n 3`)
+
+| Module | Before | After |
+|---|---|---|
+| `test_tools_package_build.py` | 555 passed | 566 passed (+11 new) |
+| `test_tools_package_notices.py` | 415 passed | 416 passed (+1) |
+| `test_fixtures.py` | 354 passed | 358 passed (+4) |
+| `test_wp321_fft_gaussian.py` | 18 passed | 19 passed (+1) |
+| `test_portability.py` | 192 passed | 192 passed |
+| `test_macos_portability.py` | 224 skipped | 224 skipped |
+| `test_core_deps.py` / `test_core_select.py` / `test_core_wp34.py` | 4 / 17 / 29 passed | 4 / 17 / 29 passed |
+| `test_io_video_encode_units.py` / `test_io_video_encode.py` | 137 / 116 passed | 137 / 116 passed |
+| `test_frozen_entry.py` / `test_gpu_pack.py` / `test_gpu_pack_install.py` / `test_headless_export.py` | 193 / 112 / 113 / 74 passed | 193 / 112 / 113 / 74 passed |
+| `test_wp65_conftest_home.py` | (new) | 1 passed, 2 skipped (POSIX-only, by marker) |
+| `test_tools_package_ffmpeg.py` / `test_conftest_guard.py` | 290 / 60 passed | 290 / 60 passed |
+
+Skips on Windows: 0 before and 0 after in every module but the macOS module and the new
+POSIX tests. The before run used the base versions of the 19 changed files written in place
+by `g3fix\swap.py` and restored after (`git status` clean); the base test files' entry-point
+tests were checked first (the GUI stubbed, app-data redirected, as at every earlier gate).
+
+### Verification loop (self)
+
+- Pass 1, each cause against the runner's deciding `E` line (the table's row, the log
+  `runner\run-42661729379\macos-evidence\parallel.log`): C3 row 15's regex message, C4 row 35's
+  `'No NVIDIA graphics card' in ...videotoolbox...`, C6 `No module named 'cuda'` raised by
+  `find_spec` (marker + guard), C7 the runner's exact reason string, C11 `SYSTEMROOT is unset`,
+  C13 the five tests behind the 13 rows, C14 the five rows plus row 48. Each fix addresses its
+  deciding line, not a neighbour. Confirmed.
+- Pass 1, same assumption hidden by the runner's skips: **FOUND and FIXED**
+  `test_io_video_encode.py:1850` `test_real_capabilities_and_the_auto_rule` (C4's cause,
+  FFmpeg-gated: `set(caps) == {"hevc_nvenc", "libx265"}` would fail on darwin with FFmpeg);
+  it now expects `encoder_roster()`. Listed, not fixed (GUI- or GPU-marked; this cell runs
+  neither): `test_gui_settings_dialog.py:776` (`resolve_encoder("auto", capabilities)` without
+  a roster, NVENC rows; the darwin default roster would resolve otherwise -- C4's cause, serial
+  leg), `test_io_video_encode_bench.py:591` (`{...}["hevc_nvenc"]` KeyError on darwin,
+  `gpu`-marked). Checked and clean: `test_frozen_entry.py:730` (normcase, as the product),
+  `test_io_video_encode.py:1864` (guarded by `_nvenc_ready()`), the `CuPy not installed`
+  literals in `test_gui_gpu_pack_dialog.py` / `test_gui_status.py` (inputs, not expectations),
+  no other `SystemRoot`, `import pefile`, nested `find_spec`, or `x/..` spelling.
+- Pass 1, A4 composition: the guard is a `pytest_configure` hook on the basetemp (HOME plays
+  no part); `mktemp` lives under the basetemp; session- and module-scoped fixtures run before
+  the redirect (stated in the docstring; none of the tests reaching `app_locations()` found by
+  the grep uses one). On Linux `XDG_CONFIG_HOME` / `XDG_CACHE_HOME`, when set, outrank HOME
+  (not redirected by this ruling; the macOS legs do not read them).
+- Pass 2 over every cause and the loop items: nothing new. Loop ended.
+
+### Limits stated
+
+Every darwin-only fix is proven on Windows by its logic only, except C3 / C4 (simulated
+`sys.platform`, named above); the runner proves the rest at the re-push. `test_tools_package_build.py`
+cannot be imported under a simulated darwin on Windows (`urllib` reaches `_scproxy`), so
+C11-C14 have no simulation. C2 and C16 still fail on darwin by design (CHARC rules on the
+printed figures). With HOME redirected, git in a POSIX test reads no global config (the
+runner's checkout is owned by the runner user, so `safe.directory` is not needed).
+
+### Findings for the dispatcher
+
+- Same-cause tests listed above (`test_gui_settings_dialog.py:776`, `test_io_video_encode_bench.py:591`)
+  for the next table; both run only in legs this cell does not run.
+- C13 / C14 skips are not darwin coverage: the macOS bundle, notices-after-FFmpeg, smoke
+  propagation, zip-after-success, zip-mutation and missing-member contracts need darwin
+  counterparts in part 3 before the switch goes on.
+
+Depth at G3-fix yield: DISPATCHER TO FILL
