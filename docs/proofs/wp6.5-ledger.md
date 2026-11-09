@@ -11,6 +11,7 @@ dispatcher fills the depth figures.
 | 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | 254,025 (wp65-cell1, read by the dispatcher with cell_depth.py at its round-0 yield) |
 | A r1 | Codex (seat, detached copy) on the group-1 head | 1 major (A1) | 1 minor (A2), 1 advisory (A3) | 3 in / 0 out | 3 NEW / 0 REOPENED | 0 | product 3 (build.py) + tests; all three FIXED at `2704a852` (group 2b) | group-2b row below |
 | A r3 | Codex (seat, detached copy) on the group-2a part-2 head `de3d68a0` | 3 major (A3-F1, F2, F3) | 2 minor (A3-F4, F5) | 5 in / 0 out | 5 NEW / 0 REOPENED | 0 | product 5 (build.py) + tests; all five FIXED at `d81549fc` (turn 4b-r1, `wp65-cell7`); 1 more found by the cell's loop and fixed (configuration candidates) | part-2 r1 section below |
+| A r4 | Codex (seat, detached copy) on the part-2 r1 head `ae96a4e2` | 3 major (A4-F1, F2, F3) | 0 | 3 in / 0 out | 3 NEW / 0 REOPENED | 0 | product 3 (build.py) + tests; all three FIXED at `d6296b92` (turn 4b-r2, `wp65-cell8`); 2 more found by the cell's loop and fixed (printed configure form, extra-version spellings) | part-2 r2 section below |
 
 ## Round 0
 
@@ -1425,4 +1426,133 @@ Slips: one Bash heredoc collapsed backslashes (the known trap) and failed its ow
 before writing; the edits were redone with the Edit tool. One early Bash grep ran against
 an empty path variable and so searched the shared cwd (read-only; nothing written).
 
-Depth at group-2a part-2 r1 yield: DISPATCHER TO FILL
+Depth at group-2a part-2 r1 yield: 271,885 (wp65-cell7, read by the dispatcher with cell_depth.py at its 4b-r1 return)
+
+## Group 2a part 2 r2 (`wp65-cell8`, dispatch-9; base `ae96a4e2`)
+
+Turn 4b-r2: fold Reviewer A r4 (Codex, FINDINGS: 3 major, all executed;
+`clearwater-review-evidence\wp6.5\A\r4\review.txt`), with the dispatcher's steer: CONSERVATIVE
+REFUSAL over emulation. Only `tools/package/build.py`, `tests/test_tools_package_build.py` and
+this ledger changed; macOS branch only. Test-first: the new and changed tests ran against the
+`ae96a4e2` `build.py` (`git show` into `work\wp6.5\g2a2r2\red-ae96\`, loaded through the test
+module's `WP61_BUILD_SCRIPT` hook; `redfull.log`): **89 failed for the right reasons**
+(`DID NOT RAISE`, `ACCEPTED` where a refusal was asserted, the byte-family lists non-empty,
+the UTF-8 configuration refused as "2 distinct"), one of them on its message only (the tab
+case `--enable-libass\t--disable-libx265`: the old `split()` refused it as "disabled", the new
+rule as "printed form"); 3 more failures were the copy's location (`notices.py` not beside it),
+not new tests. Then GREEN. Nothing downloaded or run: FFmpeg's `configure` at `b204e94e`
+(r1's extract, `work\wp6.5\g2a2r1\src\`) read as text; the provider's arm64 `ffmpeg` (r1's zip,
+sha256 `c8ed4c4e...d924`) read as bytes. Commit `d6296b92`.
+
+### A r4 adjudication
+
+| Finding | Verdict | Change (head `d6296b92`) | RED (`ae96a4e2` code) | GREEN; the class each test binds |
+|---|---|---|---|---|
+| A4-F1 MAJOR, `--disable-encoder=` patterns matched unlike configure | FIXED (conservative refusal, not emulation) | `build.py:1053` `_LITERAL_ENCODER_LIST`: configure (`configure:4733-4741` at `b204e94e`) turns the value into ONE `case` pattern (`,` -> `_encoder\|`, `_encoder` appended once) and `eval`s it; that is NOT reproduced. `:1571` admits only a literal comma list of `[A-Za-z0-9_]` names not naming `libx265` (for such a list the pattern reaches `libx265_encoder` only through the item `libx265`); every other value is refused, **including the reviewer's reverse case `libx265\|aac`, which matches nothing in configure: refused as intended**. Neighbour found by the loop: the rules judged `config.split()` tokens, but configure prints each argument through `sh_quote` (a list is printed `'aac,mp3'`, and `'--disable-libx265 '`, which configure's `eval` still applies, split into `'--disable-libx265` and `'`): `:1040` `_CONFIGURE_ARGUMENT` + `:1515` `_configure_arguments` parse configure's PRINTED form (single spaces; `l` as given, the value bare in `[A-Za-z0-9_/.+-]` or `'...'` with `'\''`), the line refused when it is not that form. Second neighbour: `extra-version` is taken by configure's `*)` branch in any spelling (`--` optional, `-`/`_` alike); `:1588` counts every spelling (exactly one). The recipe's real line (the patch's `build-ffmpeg.sh` configure call plus `FFMPEG_LIB_FLAGS`; no quote, no disable) and the provider's printed line both parse. | the reviewer's three + `[[:digit:]]`, `libx26?`, `*265*`, `\l\i\b\x\2\6\5`, printed: 7 `DID NOT RAISE`, bare: 4 (`libx265\|aac`, `libx26?` and `*265*` were already refused); the byte family: 124 admitted values; literal lists naming libx265 / empty items: 5; printed form: 10; extra-version spellings: 3; the r1 test's three quoted forms: 3 | `test_tools_package_build.py:3266` (7 patterns x printed / bare); `:3281` EVERY printable byte other than a name byte or `,` (all pattern metacharacters, quotes, space, the rest), at 4 positions, printed; `:3304` (libx265 at each list position; empty items); `:3328` (10 non-printed forms: bare list, unquoted space, quoted names, unbalanced quotes, tabs, empty argument); `:3348` admitted quoting forms (the UTF-8 path, an embedded quote, a space in a value, an empty value); `:3363` (4 spellings); `:3372` the recipe's own line (each `--enable-*` traced to the patch); `:3239` admits literal lists incl. `libx265_encoder`, `LIBX265` |
+| A4-F3 MAJOR, candidates without complete C-string boundaries | FIXED | `build.py:2167` `_FFMPEG_BARE_VERSION` matches only where a version.sh form BEGINS (after a non-printable byte or the file start); `:2371` `_c_string` then takes the WHOLE C string around it (a NUL or the file start before, a NUL after, at most `_FFMPEG_STRING_LIMIT` = 8192 bytes, `:2214`), compared in full with the token: a trailing word, a control byte, a leading byte or a missing NUL make it another string. `:2185` `_FFMPEG_BANNER_VERSION`: the `"FFmpeg version " FFMPEG_VERSION` arrays are `const char[]` data whose START is not a NUL in a real binary (three of the provider's six arrays follow `\xff\xff\xff\xff`, `CJQ` and table bytes, the other three a NUL), so their start is not judged; the token runs from the prefix to the array's NUL (`:2356` `_c_string_end`), judged whole. `ffmpeg version %s` in `opt_common.c` is a printf format (`"%s version %s"` in the binary), never a candidate. Unterminated (file end first) and oversized (no NUL within the bound) candidates are kept as such and named in the refusal; a configuration candidate that is not valid UTF-8 is refused "not UTF-8". C strings are delimited by NUL only, so a UTF-8 path is part of ONE string (the reviewer's false "2 distinct" gone). `:2320` `_scan_blocks` now carries `context` = 8192 + 32 bytes of look-behind AND look-ahead around every judged position (`_ScanBlock`: `at_start` / `at_end`); matches are searched to the block's end (a lookahead sees the real next byte) and kept when they start before `stop`. | the reviewer's five cases: 5 `ACCEPTED`; the token / configuration byte families: lists non-empty; the UTF-8 lock: refused "2 distinct"; oversized: refused for another reason (a printable prefix counted as a second configuration), never as oversized; across the boundaries: 3 | `:3991` the reviewer's five; `:4006` EVERY byte 0x01-0xFF after the token, after it with words, before it, and after the token inside a banner, plus the token unterminated bare and in a banner; `:4035` every byte after / glued before the configuration, and it unterminated; `:4103` UTF-8 path accepted when the lock carries it, its Latin-1 form refused "not UTF-8" (alone and as a second string); `:4118` four oversized forms refused, a 7.9 KiB line and the token as the file's first string admitted; `:4147` three needles x 3 splits x 4 boundaries (the 1 MiB read boundary, the judged-region edges); `:4166` the real strings straddling the same boundaries admitted |
+| A4-F2 MAJOR, a conflicting `cc=` configuration ignored | FIXED | `build.py:2198` `_FFMPEG_CONFIGURE_SWITCH`: a configuration candidate is ANY complete C string carrying an FFmpeg-only configure switch as a whole space-separated token (`--enable-/--disable-` `gpl` / `version3` / `nonfree` / `libx264` / `libx265`, and `extra-version=` / `pkg-config-flags=` in every spelling), whatever its first argument; the lock's line always carries them (the validator requires `--enable-gpl` and one `--extra-version=`). **Library configurations are EXCLUDED by this stated rule, not refused:** they carry none of those switches (`grep` of FFmpeg's `.c` / `.h` / `.m` at `b204e94e` finds no such literal; in the provider's real binary, the only C strings with any `--enable-` / `--disable-` token are FFmpeg's own line, libvpx's `--prefix=/Volumes/ffmpeg_arm64/tool --disable-unit-tests` and two encoder help texts naming `--enable-rate-guide-deltaq` / `--delt...`). Refusing them instead would refuse a correct build for a component's string. LIMIT (unchanged in kind): an FFmpeg configuration with none of those switches is not seen; its build's `FFmpeg version` arrays are. | 44 of the 60 family cases `ACCEPTED` (the 16 already seen began with `--` and carried a licence switch) | `:4074` 6 first arguments (`cc=clang`, `--cc=clang`, `extra-version=x`, `--prefix=/other`, `--enable-gpl`, `x`) x 10 switches; `:4094` five library-like strings left alone (libvpx's real one, the help text, a `--enable-libs` configure, `--enable-gpl-compat-mode`, `(--enable-gpl)`) |
+
+Counts: 3 major, all in-envelope, all NEW (none reopened), 0 reverts; product fixes 3
+(`build.py`) plus 2 neighbours found by the loop (printed configure form, extra-version
+spellings), both in `_macos_configure_problem`; tests-only change: the r1 refusal test's three
+list / pattern values now in their printed (quoted) form (`:3200-3203`), its intent unchanged.
+
+### The reviewer's probe and the provider binary at the head
+
+`work\wp6.5\g2a2r2\ar4_probe.py` (`ar4_probe.log`), through the head's functions, bytes only:
+F1 bare `libx265_encoder|aac`, `libx26[[:digit:]]`, `libx265|aac` refused "not configure's
+printed form"; printed (quoted) refused "the libx265 encoder can be disabled ... only a literal
+list"; F2 second `cc=` record refused (2 distinct); F3 unterminated configuration refused
+`(unterminated)`, control byte refused, version with extra words refused (`'n9.0.2-...-20261110
+extra words'`), version at EOF refused `(unterminated)`; the UTF-8 path lock ACCEPTED and its
+binary ACCEPTED. **Provider binary** (66,332,880 bytes, its own token and printed line from
+`versions.txt`): **ACCEPTED** in 2.73 s; the line parses as configure's printed form; with the
+fork's token: REFUSED naming `'9.0.2-https://www.martin-riedl.de'`; with a wrong line: REFUSED
+naming the provider's.
+
+### Proof the Windows verdicts are unchanged
+
+`work\wp6.5\g2a2r2\windows_compare.py` (r1's script, base `git show 1ef10536`, head the
+worktree): **Windows validator comparisons: 33, mismatches: []** (the real lock ACCEPTED by
+both); **archive-member comparisons: 5, mismatches: []**; **Windows-path definitions
+AST-identical to `de3d68a0`: 10 of 10**. `tests/test_tools_package_ffmpeg.py` 290 passed.
+
+### Counts at the r2 head (`-p no:cacheprovider --timeout 600 --basetemp=work\wp6.5\g2a2r2\<module> -k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`)
+
+Static: `ruff check .` All checks passed; `ruff format --check .` 337 files already formatted;
+`mypy` Success 166; `mypy --platform darwin` Success 166.
+
+| Module | Result |
+|---|---|
+| `tests/test_tools_package_build.py` | 555 passed (r1: 432; +123) |
+| `tests/test_tools_package_ffmpeg.py` | 290 passed (unchanged) |
+| `tests/test_tools_package_smoke.py` | 66 passed, 1 skipped (unchanged; the non-Windows tripwire) |
+| `tests/test_release_workflow.py` | 79 passed (unchanged) |
+| `tests/test_tools_package_notices.py` | 415 passed (`-n 3`) |
+| `tests/test_portability.py` | 192 passed |
+| `tests/test_macos_portability.py` | 224 skipped (`macos` platform skip) |
+
+### Verification loop (self)
+
+- Suspected (F1 neighbour, "the rules read a different tokenisation than configure"): the
+  printed line quotes values and whole arguments, so `config.split()` both mis-split quoted
+  lists and missed a quoted option name. CONFIRMED by reading `sh_quote` (`configure:615`) and
+  the `for v in "$@"` assembly (`configure:4555-4559`): `'--disable-libx265 '` (configure's
+  `eval` drops the space and disables libx265) was ACCEPTED at `ae96a4e2`. FIXED: the printed
+  form is parsed, anything else refused; tests `:3328` / `:3348`.
+- Suspected (F1 neighbour, "another spelling of a judged option"): configure's `*)` branch
+  takes `[--]extra[-_]version=`; the date rule counted only `--extra-version=`. CONFIRMED
+  (`extra-version=20261110` appended was ACCEPTED). FIXED (`:1588`), test `:3363`. The
+  `--enable-X` / `--disable-X` and `--disable-encoder=` branches need the exact `--` spelling
+  (`configure:4733`, `:4743`; other spellings die in `die_unknown`): REJECTED as a hole.
+- Suspected (F1 neighbour): `libx265_encoder_select="atsc_a53 dovi_rpuenc"`; disabling a
+  selected item disables the encoder (`check_deps`, `configure:868`). Both are in
+  `CONFIG_EXTRA`, not `CMDLINE_SELECT` (`configure:2859`), so no command-line option reaches
+  them. REJECTED.
+- Suspected (F3, the block scanner): the bounded C string needs context on BOTH sides of a
+  judged position, and a match must not be cut at `stop` (a lookahead at `endpos` sees an end
+  of string). CONFIRMED in my first draft (searching with `endpos=stop`); FIXED before any
+  commit (search to the block end, keep starts before `stop`; context = bound + 32 for the
+  banner prefix). Proved by `work\wp6.5\g2a2r2\blocks_probe.py`: for 9 file sizes (0, 1,
+  context, 1 MiB +-1, 1 MiB + context, 2 MiB, 3 MiB + 7) every position judged exactly once,
+  with >= context bytes before (or the file start) and after (or the file end), `at_start` /
+  `at_end` exact: 0 problems.
+- Suspected (F3 class, "a one-byte change the families miss"): `mutation_probe.py`, 20,000
+  random one-byte replace / insert / delete mutations of a minimal tool against a C-string
+  oracle (accepted exactly when the token and the line are still complete strings and no new
+  version / configuration string appeared): 0 mismatches.
+- Suspected (F2, real-binary false candidates under the new rule): the provider's binary
+  (above) ACCEPTED; its C strings with configure-like tokens enumerated
+  (`real_strings.py`, `real_strings.log`): 4, only FFmpeg's own carries an FFmpeg-only switch.
+- A final pass over F1-F3 and the loop items found nothing new.
+
+### Limits stated
+
+The printed-form parser treats every unquoted space as an argument separator; configure
+leaves the part of an argument before its first `=` unquoted, so an argument with a space
+there prints like two arguments. Every such reading is judged (more tokens, never fewer), and
+configure rejects such option names (`die_unknown`) for every option this rule judges. The
+banner arrays' start is not judged (const data, evidence above). An FFmpeg configuration with
+none of the FFmpeg-only switches is not seen; a bare `x.y.z` version with no extra-version is
+seen only in the `FFmpeg version` arrays. The real fork binary's strings are the fork run's
+proof (run `42661533922`, not read by this cell).
+
+### Findings for the dispatcher
+
+- **G2a2r1-F1 (Windows; OPEN, routed to CHARC; UNCHANGED by this cell):** the Windows
+  validator ACCEPTS the real Windows lock with `--disable-libx265`, `--disable-gpl`,
+  `--disable-version3`, `--disable-encoder=libx265`, `--disable-encoders` or
+  `--disable-everything` appended (r1's `work\wp6.5\g2a2r1\windows_hole.py`, 6 of 6
+  ACCEPTED); the Windows branch checks `--enable-*` membership only. The A4-F1 rules (printed
+  form, literal encoder lists) would apply there as well. A Windows fold changes a Windows
+  verdict: CHARC's call (a DR row or a later package).
+
+Slips: one Bash call began `cd /c && ...` (the RED run) in breach of the no-`cd` rule; the
+directory lay outside the working directories, so the shell returned to its start folder
+(`pwd` checked straight after: `/c/Users/rwsmy/clearwater`); no later call used `cd`. One
+probe command built a `$'\r'` grep inside `$(...)` and failed to parse (nothing run); the CR
+check was redone with a script (`crcheck.py`, raw `git cat-file` blobs: 0 CR). One Bash
+heredoc collapsed backslashes (the known trap) and failed its own assertion before writing;
+the ledger edits were redone with the Edit tool.
+
+Depth at group-2a part-2 r2 yield: DISPATCHER TO FILL
