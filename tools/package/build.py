@@ -53,7 +53,6 @@ from __future__ import annotations
 import argparse
 import ast
 import base64
-import fnmatch
 import functools
 import hashlib
 import importlib
@@ -1035,7 +1034,32 @@ FFmpeg's configure (at ``b204e94e``, its ``for opt do`` loop): ``--disable-encod
 the encoder list, ``--disable-everything`` every component list, ``--disable-all`` those and
 the libraries (libavcodec among them), ``--disable-avcodec`` the library itself, and
 ``--enable-random`` / ``--disable-random`` (with or without ``=<lists>``) toggle components
-at random. ``--disable-encoder=<patterns>`` is judged per pattern.
+at random. ``--disable-encoder=<value>`` is judged by :data:`_LITERAL_ENCODER_LIST`.
+"""
+
+_CONFIGURE_ARGUMENT = re.compile(
+    r"(?P<name>(?:--)?[A-Za-z0-9][A-Za-z0-9_-]*)"
+    r"(?:=(?P<value>'(?:[^']|'\\'')*'|[A-Za-z0-9_/.+-]*))?"
+)
+"""One argument as FFmpeg's configure PRINTS it (its ``FFMPEG_CONFIGURATION``, at ``b204e94e``).
+
+configure joins its arguments with single spaces, each as ``l`` (up to and including the
+first ``=``, as given) plus ``sh_quote`` of the rest: as is when every byte is in
+``[A-Za-z0-9_/.+-]``, else inside ``'...'`` with each ``'`` written ``'\\''``. An argument
+without ``=`` is quoted whole, so a quoted option NAME (``'--disable-libx265 '``, which
+configure's ``eval`` still applies) does not match and the line is refused.
+"""
+
+_LITERAL_ENCODER_LIST = re.compile(r"[A-Za-z0-9_]+(?:,[A-Za-z0-9_]+)*")
+"""The only ``--disable-encoder=`` value admitted: a comma list of literal names (A4-F1).
+
+configure turns the value into ONE shell ``case`` pattern (each ``,`` becomes
+``_encoder|``, then ``_encoder`` is appended once) and evaluates it with ``eval``, so
+``*``, ``?``, ``[...]`` (with POSIX classes), ``|``, ``\\`` and quoting all carry shell
+semantics. Those are NOT reproduced: any other value is refused, whatever it would match
+(``libx265|aac`` matches nothing in configure and is still refused). For a literal list the
+pattern is ``<a>_encoder|<b>_encoder|...``, which reaches ``libx265_encoder`` only through
+the item ``libx265``, refused by name.
 """
 
 FFMPEG_COMPONENT_TEXTS_PATH = Path(__file__).with_name("native-licences") / "ffmpeg-components"
@@ -1488,45 +1512,83 @@ def _ffmpeg_component_texts(components: list[FFmpegComponent], folder: Path) -> 
         raise ValueError("FFmpeg lock: component text directory differs from lock")
 
 
+def _configure_arguments(body: str) -> list[tuple[str, str, str | None]] | None:
+    """``(argument, name, unquoted value or None)`` per printed argument, or None.
+
+    ``body`` is the printed configuration without its ``configuration: `` prefix; None
+    when it is not exactly arguments of :data:`_CONFIGURE_ARGUMENT` joined by single
+    spaces (an empty argument, a tab, a quote outside a value, an unbalanced quote).
+    """
+    arguments: list[tuple[str, str, str | None]] = []
+    position = 0
+    while True:
+        match = _CONFIGURE_ARGUMENT.match(body, position)
+        if match is None or match.end() == position:
+            return None
+        value = match["value"]
+        if value is not None and value.startswith("'"):
+            value = value[1:-1].replace("'\\''", "'")
+        arguments.append((match.group(), match["name"], value))
+        position = match.end()
+        if position == len(body):
+            return arguments
+        if body[position] != " ":
+            return None
+        position += 1
+
+
 def _macos_configure_problem(config: str, version: str) -> str | None:
     """The AD-38 (2) MUST / MUST NOT rules, plus no zvbi / DeckLink, for the macOS line.
 
-    A required switch must be ENABLED and never disabled. FFmpeg's configure applies its
+    The line must be configure's PRINTED form (:data:`_CONFIGURE_ARGUMENT`), so every
+    argument configure applied is one argument here and none hides inside a quote. A
+    required switch must be ENABLED and never disabled. FFmpeg's configure applies its
     options left to right and the last ``--enable-X`` / ``--disable-X`` wins, so a
     disabling counterpart after the enable defeats it; this rule refuses the counterpart
     ANYWHERE in the line (before or after), so the verdict never depends on option order
     (the recipe's line carries none). The libx265 encoder must also stay selectable: an
-    option that can switch it off with the library left on (:data:`_LIBX265_ENCODER_OFF`,
-    or a ``--disable-encoder=`` pattern matching ``libx265``, matched as configure's shell
-    ``case`` patterns) is refused.
+    option that can switch it off with the library left on (:data:`_LIBX265_ENCODER_OFF`)
+    is refused, and so is every ``--disable-encoder=`` value that is not a literal list or
+    that names ``libx265`` (:data:`_LITERAL_ENCODER_LIST`: conservative refusal, configure's
+    shell-pattern semantics are not emulated). ``extra-version`` is counted in every
+    spelling configure's ``*)`` branch takes (``--`` optional, ``-`` and ``_`` alike).
     """
     if not config.startswith("configuration: "):
         return "configure_line must include its printed prefix"
-    tokens = config.split()[1:]
+    arguments = _configure_arguments(config.removeprefix("configuration: "))
+    if arguments is None:
+        return "configure_line is not configure's printed form (single spaces, sh_quote)"
+    tokens = [argument for argument, _name, _value in arguments]
     required = {f"--enable-{name}" for name in FFMPEG_MACOS_REQUIRED_SWITCHES}
     if not required <= set(tokens):
         return "GPL, version3 and libx265 are required"
     disabled = [f"--disable-{name}" for name in FFMPEG_MACOS_REQUIRED_SWITCHES]
-    for token in tokens:
-        option, _, value = token.partition("=")
+    for token, option, value in arguments:
         if token in disabled:
             return f"a required switch is disabled ({token})"
-        if option in _LIBX265_ENCODER_OFF or (
-            option == "--disable-encoder"
-            and any(
-                fnmatch.fnmatchcase("libx265_encoder", f"{item}_encoder")
-                for item in re.split(r"[,|]", value)  # configure joins items with "|"
-            )
-        ):
+        if option in _LIBX265_ENCODER_OFF:
             return f"the libx265 encoder can be disabled ({token})"
+        if option == "--disable-encoder" and (
+            value is None
+            or not _LITERAL_ENCODER_LIST.fullmatch(value)
+            or "libx265" in value.split(",")
+        ):
+            return (
+                f"the libx265 encoder can be disabled ({token}): only a literal list of "
+                "encoder names not naming libx265 is admitted"
+            )
     if any(
         token in {"--enable-nonfree", "--enable-libzvbi", "--enable-decklink"} or "libfdk" in token
         for token in tokens
     ):
         return "nonfree, libfdk, zvbi or decklink is forbidden"
-    dates = [t.removeprefix("--extra-version=") for t in tokens if t.startswith("--extra-version=")]
+    dates = [
+        value or ""
+        for _token, name, value in arguments
+        if name.removeprefix("--").replace("_", "-") == "extra-version"
+    ]
     if dates != [version[-8:]]:
-        return "version date must match --extra-version"
+        return "version date must match --extra-version (exactly one, in any spelling)"
     return None
 
 
@@ -2102,33 +2164,60 @@ def _check_ffmpeg_toolchain_markers(path: Path, lock: FFmpegLock) -> None:
         raise ValueError(f"{path.name}: missing " + ", ".join(markers) + " toolchain marker")
 
 
-_FFMPEG_VERSION_CANDIDATES = (
-    # FFMPEG_VERSION as a C string of its own, in every form ffbuild/version.sh (at
-    # b204e94e) can produce, any major, with or without "-<extra-version>": a release tag
-    # describe ("n9.0.2-47-g<hash>", "n8.0.1"), master's "N-<count>-g<hash>", a shallow
-    # clone's "git-YYYY-MM-DD-<hash>", and a numeric RELEASE / VERSION file ending in an
-    # extra-version date ("9.0.1-20261110"). A bare numeric "x.y.z" without that date cannot
-    # be told apart from another library's version string; the banner form below sees it.
-    re.compile(
-        rb"(?<![\x20-\x7e])((?:n[0-9]{1,5}\.[0-9]{1,5}|N-[0-9]{1,10}-g[0-9a-f]{1,40}"
-        rb"|git-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9a-f]{1,40})[!-~]{0,128}"
-        rb"|[0-9]{1,5}\.[0-9]{1,5}(?:\.[0-9]{1,5})?(?:-[!-~]{0,128})?-[0-9]{8}(?![!-~]))"
-    ),
-    # libav*'s ``av_*_ffversion[] = "FFmpeg version " FFMPEG_VERSION`` arrays (every
-    # library's version.c at b204e94e). They are ``const char[]`` data, so the byte before
-    # them can be anything: matched anywhere, with a token that starts as one of
-    # version.sh's forms does (a digit, n<digit>, N-<digit>, git-<digit>, or a bare
-    # describe hash). Prose such as libavutil's "Update your FFmpeg version to the newest
-    # one" (present in a real arm64 ffmpeg) is not a version.
-    re.compile(
-        rb"(?i:ffmpeg) version ((?:[0-9]|n[0-9]|N-[0-9]|git-[0-9]"
-        rb"|[0-9a-f]{7,40}(?![0-9A-Za-z]))[!-~]{0,128})"
-    ),
+_FFMPEG_BARE_VERSION = re.compile(
+    rb"(?<![\x20-\x7e])(?:n[0-9]{1,5}\.[0-9]{1,5}|N-[0-9]{1,10}-g[0-9a-f]"
+    rb"|git-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9a-f]"
+    rb"|[0-9]{1,5}\.[0-9]{1,5}(?:\.[0-9]{1,5})?(?:-[!-~]{0,128})?-[0-9]{8}(?![0-9]))"
 )
-"""Every plausible FFmpeg version string a tool can carry (A3-F2: detected, then judged)."""
+"""Where ``FFMPEG_VERSION`` begins as a C string of its own (A3-F2: detected, then judged).
 
-_FFMPEG_CANDIDATE_SPAN = 256
-"""At least the longest version candidate match, in bytes (183: prefix plus the token bound)."""
+Every form ``ffbuild/version.sh`` (at ``b204e94e``) can produce, any major, with or without
+``-<extra-version>``: a release tag describe (``n9.0.2-47-g<hash>``, ``n8.0.1``), master's
+``N-<count>-g<hash>``, a shallow clone's ``git-YYYY-MM-DD-<hash>``, and a numeric RELEASE /
+VERSION file followed by an extra-version date (``9.0.1-20261110``). Only the START is
+matched, after a byte that is not printable ASCII (or at the file start); the candidate is
+then the WHOLE C string around it (:func:`_c_string`), so a trailing word, a control byte or
+a missing NUL makes it another string, never the token. A bare numeric ``x.y.z`` without
+that date cannot be told apart from another library's version string; the banner form
+(:data:`_FFMPEG_BANNER_VERSION`) sees it.
+"""
+
+_FFMPEG_BANNER_VERSION = re.compile(
+    rb"(?i:ffmpeg) version (?=[0-9]|n[0-9]|N-[0-9]|git-[0-9]|[0-9a-f]{7,40}(?![0-9A-Za-z]))"
+)
+"""libav*'s ``av_*_ffversion[] = "FFmpeg version " FFMPEG_VERSION`` arrays (``version.c``).
+
+They are ``const char[]`` data: the byte BEFORE them can be anything (a real arm64 ffmpeg
+has them after ``\\xff\\xff\\xff\\xff``, ``CJQ`` and table bytes), so their start is not
+judged; the token runs from the end of this prefix to the array's terminating NUL, judged
+whole (:func:`_c_string_end`). The token must start as one of version.sh's forms does (a
+digit, n<digit>, N-<digit>, git-<digit>, or a bare describe hash), so prose such as
+libavutil's "Update your FFmpeg version to the newest one" is not a version.
+"""
+
+_FFMPEG_CONFIGURE_SWITCH = re.compile(
+    rb"(?<![^\x00 ])(?:--(?:enable|disable)-(?:gpl|version3|nonfree|libx26[45])(?![^\x00 =])"
+    rb"|(?:--)?(?:extra[-_]version|pkg[-_]config[-_]flags)=)"
+)
+"""An FFmpeg-only configure switch as a whole space-separated token (A4-F2's detector).
+
+A C string carrying one is an FFmpeg configuration candidate, whatever its first argument
+(``cc=clang`` included): the licence switches, the libx264 / libx265 switches, and
+``extra-version`` / ``pkg-config-flags`` in every spelling configure's ``*)`` branch takes.
+Other components' build configurations carry none (a real arm64 ffmpeg holds libvpx's
+``--prefix=... --disable-unit-tests``, and an encoder's help text names its own
+``--enable-rate-guide-deltaq``) and are left alone by this stated rule. LIMIT: an FFmpeg
+configuration with none of these switches (an LGPL build without the recipe's flags) is not
+seen; that build's own ``FFmpeg version`` arrays still are.
+"""
+
+_FFMPEG_STRING_LIMIT = 8192
+"""The longest C string (bytes, without its NUL) a version or configuration candidate may be.
+
+A candidate whose C string has no NUL within this bound on either side is OVERSIZED and
+refused, never truncated into a plausible prefix. The recipe's configure line is under
+1 KiB.
+"""
 
 _MH_EXECUTE = 2
 _PLATFORM_MACOS = 1
@@ -2216,82 +2305,144 @@ def _macos_tool_problem(image: bytes, deployment_target: str) -> str | None:
     return None
 
 
-def _scan_blocks(path: Path, overlap: int) -> Iterator[tuple[bytes, int, int]]:
-    """Yield ``(block, first, stop)``: judge in ``block`` the matches starting in [first, stop).
+class _ScanBlock(NamedTuple):
+    """One block of :func:`_scan_blocks`: judge the positions in ``[first, stop)``."""
 
-    1 MiB blocks, each carrying the previous block's last ``overlap`` bytes. Every byte
-    position is judged in exactly one block, and only where at least ``overlap`` bytes
-    follow it (or the file ends), so a match no longer than ``overlap`` is always seen
-    WHOLE: a start in the carried tail is left to the next block, and the next block's
-    position 0 (judged already) is skipped, its byte serving only as look-behind context.
+    data: bytes
+    first: int
+    stop: int
+    at_start: bool
+    """``data[0]`` is the file's first byte."""
+    at_end: bool
+    """``data`` ends where the file ends."""
+
+
+def _scan_blocks(path: Path, context: int) -> Iterator[_ScanBlock]:
+    """Read ``path`` in 1 MiB blocks; every byte position is judged in exactly one block.
+
+    A judged position has at least ``context`` bytes of the block before it (or the file
+    start) and at least ``context`` after it (or the file end), so a bounded C string
+    around it is always seen WHOLE: each block carries the previous block's unjudged tail
+    plus ``context`` bytes of look-behind.
     """
     size = 1024 * 1024
-    if not 0 < overlap < size:
-        raise ValueError(f"scan overlap {overlap} out of range")
-    tail = b""
+    if not 0 < context < size // 2:
+        raise ValueError(f"scan context {context} out of range")
     with path.open("rb") as stream:
-        chunk = stream.read(size)
-        while chunk:
+        data, first, at_start = stream.read(size), 0, True
+        while True:
             following = stream.read(size)
-            block = tail + chunk
-            first = 1 if tail else 0
-            stop = len(block) - overlap + 1 if following else len(block)
-            yield block, first, max(first, stop)
-            tail = block[-overlap:]
-            chunk = following
+            stop = len(data) if not following else len(data) - context
+            yield _ScanBlock(data, first, max(first, stop), at_start, not following)
+            if not following:
+                return
+            keep = max(0, stop - context)
+            data, first, at_start = data[keep:] + following, stop - keep, at_start and keep == 0
+
+
+def _c_string_start(block: _ScanBlock, position: int) -> int | None:
+    """Where the C string holding ``position`` begins, or None when oversized.
+
+    The byte after the previous NUL, or the file start; None when neither lies within
+    :data:`_FFMPEG_STRING_LIMIT` bytes before ``position``.
+    """
+    low = max(0, position - _FFMPEG_STRING_LIMIT - 1)
+    nul = block.data.rfind(b"\0", low, position)
+    if nul >= 0:
+        return nul + 1
+    return 0 if block.at_start and low == 0 else None
+
+
+def _c_string_end(block: _ScanBlock, start: int) -> tuple[bytes, str]:
+    """``(content, problem)`` of the C string from ``start``: problem ``""`` when complete.
+
+    Complete = a NUL within :data:`_FFMPEG_STRING_LIMIT` bytes; ``"unterminated"`` when the
+    file ends first; ``"oversized"`` otherwise (content then truncated at the bound).
+    """
+    high = start + _FFMPEG_STRING_LIMIT + 1
+    nul = block.data.find(b"\0", start, high)
+    if nul >= 0:
+        return block.data[start:nul], ""
+    if block.at_end and len(block.data) < high:
+        return block.data[start:], "unterminated"
+    return block.data[start : start + _FFMPEG_STRING_LIMIT], "oversized"
+
+
+def _c_string(block: _ScanBlock, position: int) -> tuple[bytes, str]:
+    """``(content, problem)`` of the WHOLE C string holding ``position`` (both ends judged)."""
+    start = _c_string_start(block, position)
+    if start is None:
+        low = max(0, position - _FFMPEG_STRING_LIMIT)
+        return block.data[low : low + _FFMPEG_STRING_LIMIT], "oversized"
+    return _c_string_end(block, start)
+
+
+def _candidate_text(content: bytes, problem: str) -> str:
+    """A candidate as printable ASCII for an error message (``problem`` appended)."""
+    if len(content) > 96:  # both ends: a difference is often at the end
+        content = content[:60] + b"..." + content[-32:]
+    return repr(content.decode("ascii", "backslashreplace")) + (f" ({problem})" if problem else "")
 
 
 def _macos_ffmpeg_version(path: Path, lock: FFmpegMacLock) -> str:
     """Read the F3b version token and the configure line from a tool's bytes; never run it.
 
     FFmpeg compiles ``FFMPEG_VERSION`` and ``FFMPEG_CONFIGURATION`` in as plain C strings
-    (``fftools/opt_common.c`` prints them with ``%s``; ``av_version_info`` and the
-    ``*_configuration`` functions return them; each library's ``version.c`` carries
-    ``"FFmpeg version " FFMPEG_VERSION``). DETECTION is separate from validation (A3-F2):
-    every plausible version string is collected, in any form and any major
-    (:data:`_FFMPEG_VERSION_CANDIDATES`), and every plausible FFmpeg configuration (a C
-    string of its own that begins with ``--`` and carries one of FFmpeg's licence switches
-    ``--enable-gpl`` / ``--enable-version3`` / ``--enable-nonfree``, or the lock's own line
-    as a C string); then exactly ONE distinct version candidate must exist and equal the
-    lock's token, and exactly one distinct configuration candidate must exist and equal
-    the lock's configure line. Conflicting evidence is refused, never filtered away. Read
-    in 1 MiB blocks (:func:`_scan_blocks`), every candidate judged whole. LIMITS: a second
-    FFmpeg configuration carrying none of the licence switches and not starting with
-    ``--`` is not seen (its build's version arrays still are), nor is a bare ``x.y.z``
-    version with no extra-version outside the ``FFmpeg version`` arrays.
+    (``fftools/opt_common.c`` prints them through the ``"%s version %s"`` format;
+    ``av_version_info`` and the ``*_configuration`` functions return them; each library's
+    ``version.c`` carries ``"FFmpeg version " FFMPEG_VERSION`` as a ``const char[]``).
+    DETECTION is separate from validation (A3-F2), and every candidate is a COMPLETE C
+    string compared in full (A4-F3): a NUL (or the file start) before it, a NUL after it,
+    at most :data:`_FFMPEG_STRING_LIMIT` bytes, never a printable prefix. Version
+    candidates: every C string that begins with a version.sh form
+    (:data:`_FFMPEG_BARE_VERSION`, judged whole), and the token part of every
+    ``FFmpeg version`` array (:data:`_FFMPEG_BANNER_VERSION`, from the prefix to its NUL).
+    Configuration candidates: every C string carrying an FFmpeg-only configure switch
+    (:data:`_FFMPEG_CONFIGURE_SWITCH`), whatever its first argument (A4-F2); it must also
+    be valid UTF-8 (configure prints the arguments as given, so a UTF-8 path is part of ONE
+    string; undecodable evidence is refused as such). Then exactly ONE distinct version
+    candidate must exist and be the lock's token, complete; and exactly one configuration
+    candidate, the lock's configure line, complete. An unterminated (at the file end) or
+    oversized candidate is never the token or the line. Conflicting evidence is refused,
+    never filtered away. Read in 1 MiB blocks (:func:`_scan_blocks`). LIMITS: an FFmpeg
+    configuration with none of the FFmpeg-only switches is not seen (its build's version
+    arrays still are), nor is a bare ``x.y.z`` version with no extra-version outside the
+    ``FFmpeg version`` arrays.
 
     Raises:
         RuntimeError: The version candidates or the configuration differ from the lock.
         OSError: The file cannot be read.
     """
     body = lock["configure_line"].removeprefix("configuration: ").encode("utf-8")
-    span = len(body) + 128
-    configuration = re.compile(rb"(?<![\x20-\x7e])(--[!-~][\x20-\x7e]{0,%d})" % span)
-    # FFmpeg's licence switches: no other configure the recipe links carries them, and a
-    # real arm64 ffmpeg also holds libvpx's own build configuration ("--prefix=...
-    # --disable-unit-tests"), which is not an FFmpeg configuration.
-    option = re.compile(rb"(?:^| )--enable-(?:gpl|version3|nonfree)(?: |$)")
-    # The lock's own line as a C string, whatever its first byte (configure joins the
-    # arguments as given): found, it is a candidate like any other.
-    exact = re.compile(rb"(?<![\x20-\x7e])(" + re.escape(body) + rb")\x00")
-    tokens: set[bytes] = set()
-    configurations: set[bytes] = set()
-    for block, first, stop in _scan_blocks(path, max(span + 3, _FFMPEG_CANDIDATE_SPAN) + 1):
-        for pattern in _FFMPEG_VERSION_CANDIDATES:
-            tokens.update(m.group(1) for m in pattern.finditer(block, first) if m.start() < stop)
-        configurations.update(
-            m.group(1)
-            for m in configuration.finditer(block, first)
-            if m.start() < stop and option.search(m.group(1))
-        )
-        configurations.update(m.group(1) for m in exact.finditer(block, first) if m.start() < stop)
-    if tokens != {lock["version"].encode("ascii")}:
-        found = sorted(token.decode("ascii") for token in tokens)
+    versions: set[tuple[bytes, str]] = set()
+    configurations: set[tuple[bytes, str]] = set()
+    for block in _scan_blocks(path, _FFMPEG_STRING_LIMIT + 32):
+        # Matches are searched from ``first`` to the block's end (a lookahead must see the
+        # real next byte) and kept when they START before ``stop``.
+        for match in _FFMPEG_BARE_VERSION.finditer(block.data, block.first):
+            if match.start() < block.stop:
+                versions.add(_c_string(block, match.start()))
+        for match in _FFMPEG_BANNER_VERSION.finditer(block.data, block.first):
+            if match.start() < block.stop:
+                versions.add(_c_string_end(block, match.end()))
+        for match in _FFMPEG_CONFIGURE_SWITCH.finditer(block.data, block.first):
+            if match.start() >= block.stop:
+                continue
+            content, problem = _c_string(block, match.start())
+            if not problem:
+                try:
+                    content.decode("utf-8")
+                except UnicodeDecodeError:
+                    problem = "not UTF-8"
+            configurations.add((content, problem))
+    if versions != {(lock["version"].encode("ascii"), "")}:
+        found = sorted(_candidate_text(*candidate) for candidate in versions)
         raise RuntimeError(f"{path.name}: version token(s) {found} differ from the lock")
-    if configurations != {body}:
+    if configurations != {(body, "")}:
+        found = sorted(_candidate_text(*candidate) for candidate in configurations)
         raise RuntimeError(
             f"{path.name}: configuration differs from the lock "
-            f"({len(configurations)} distinct configuration string(s))"
+            f"({len(configurations)} distinct configuration string(s): {found})"
         )
     return f"{path.name} version {lock['version']} (read from the binary)"
 

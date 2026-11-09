@@ -3198,9 +3198,9 @@ def test_macos_lock_configure_line_must_and_must_not(change, refusal):
         "before:--disable-libx265",
         "before:--disable-gpl",
         "--disable-encoder=libx265",
-        "--disable-encoder=aac,libx265",
-        "--disable-encoder=libx26*",
-        "--disable-encoder=aac|libx265",
+        "--disable-encoder='aac,libx265'",  # configure prints a list quoted (sh_quote)
+        "--disable-encoder='libx26*'",
+        "--disable-encoder='aac|libx265'",
         "--disable-encoders",
         "--disable-everything",
         "--disable-all",
@@ -3225,11 +3225,161 @@ def test_macos_lock_refuses_a_required_switch_or_the_x265_encoder_disabled(chang
         build.validate_ffmpeg_lock(data, platform="darwin")
 
 
-@pytest.mark.parametrize("change", ["--disable-encoder=aac", "--disable-libx264", "--disable-doc"])
+@pytest.mark.parametrize(
+    "change",
+    [
+        "--disable-encoder=aac",
+        "--disable-encoder='aac,mp3'",
+        "--disable-encoder=libx265_encoder",  # configure: libx265_encoder_encoder, no match
+        "--disable-encoder=LIBX265",  # case patterns are case-sensitive
+        "--disable-libx264",
+        "--disable-doc",
+    ],
+)
 def test_macos_lock_admits_a_disable_that_leaves_the_required_set_on(change):
-    """The rule is about the required switches and the libx265 encoder, not every disable."""
+    """The rule is about the required switches and the libx265 encoder, not every disable:
+    a literal encoder list not naming ``libx265`` is admitted."""
     data = macos_lock()
     _configure(data, change)
+    assert build.validate_ffmpeg_lock(data, platform="darwin") is data
+
+
+def _sh_quote(value: str) -> str:
+    """FFmpeg configure's ``sh_quote``: as is when every byte is in [A-Za-z0-9_/.+-]."""
+    escaped = value.replace("'", "'\\''")
+    return escaped if re.fullmatch(r"[A-Za-z0-9_/.+-]*", escaped) else f"'{escaped}'"
+
+
+A4_F1_PATTERNS = [
+    "libx265_encoder|aac",  # the reviewer's: configure builds libx265_encoder|aac_encoder
+    "libx26[[:digit:]]",  # the reviewer's: a POSIX class fnmatch does not know
+    "libx265|aac",  # the reviewer's reverse case (no match in configure): REFUSED as intended
+    "[[:digit:]]",
+    "libx26?",
+    "*265*",
+    "\\l\\i\\b\\x\\2\\6\\5",
+]
+
+
+@pytest.mark.parametrize("pattern", A4_F1_PATTERNS)
+@pytest.mark.parametrize("form", ["printed", "bare"])
+def test_macos_lock_refuses_an_encoder_pattern_whose_effect_is_not_literal(pattern, form):
+    """A4-F1: configure turns ``--disable-encoder=<value>`` into ONE shell ``case`` pattern
+    (``,`` -> ``_encoder|``, then ``_encoder`` appended once) and evals it; its effect is
+    not reproduced: any value that is not a literal list of names is REFUSED, including
+    patterns that would not match ``libx265_encoder`` (the conservative rule). In the
+    printed (sh-quoted) form the encoder rule refuses it; bare, it is not configure's
+    printed form at all."""
+    data = macos_lock()
+    value = _sh_quote(pattern) if form == "printed" else pattern
+    _configure(data, f"--disable-encoder={value}")
+    match = "disabled" if form == "printed" else "disabled|printed form"
+    with pytest.raises(ValueError, match=match):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+def test_macos_lock_refuses_every_non_literal_byte_in_an_encoder_list():
+    """A4-F1's class: every printable byte other than a name byte or ``,`` (each pattern
+    metacharacter, quote, space and the rest), in the printed form, at each position."""
+    names = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_,")
+    admitted = []
+    for byte in range(0x20, 0x7F):
+        char = chr(byte)
+        if char in names:
+            continue
+        for value in (f"aac{char}", f"{char}aac", f"aac{char}mp3", char):
+            data = macos_lock()
+            _configure(data, "--disable-encoder=" + _sh_quote(value))
+            try:
+                build.validate_ffmpeg_lock(data, platform="darwin")
+            except ValueError:
+                continue
+            admitted.append(value)
+    assert admitted == []
+
+
+@pytest.mark.parametrize(
+    "value", ["libx265", "aac,libx265", "libx265,aac", "aac,libx265,mp3", "''", "aac,,mp3", ",aac"]
+)
+def test_macos_lock_refuses_a_literal_list_naming_libx265_or_an_empty_item(value):
+    """A literal list reaches ``libx265_encoder`` only through the item ``libx265``; an
+    empty item is not a literal name (refused)."""
+    data = macos_lock()
+    _configure(data, "--disable-encoder=" + (value if value == "''" else _sh_quote(value)))
+    with pytest.raises(ValueError, match="disabled"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "--disable-encoder=aac,mp3",  # configure would print the list quoted
+        "--extra-cflags=-O2 -g",  # a space outside quotes splits it into two arguments
+        "'--disable-libx265 '",  # a quoted option name: configure's eval strips the space
+        "'--disable-encoders'",
+        "--extra-cflags='-O2",  # unbalanced quote
+        "--extra-cflags='a'b'",
+        "--extra-cflags=\t-O2",
+        "--enable-libass\t--disable-libx265",
+        "",  # a trailing space: an empty argument
+        "--en'able'-gpl",
+    ],
+)
+def test_macos_lock_refuses_a_line_that_is_not_configures_printed_form(change):
+    """A4-F1's neighbour: the rules judge configure's PRINTED arguments (``l`` as given,
+    the value after the first ``=`` through ``sh_quote``, joined by single spaces). A line
+    not in that form could hide an option from them (``'--disable-libx265 '`` disables
+    libx265: configure's ``eval`` drops the space), so it is refused."""
+    data = macos_lock()
+    _configure(data, change)
+    with pytest.raises(ValueError, match="printed form"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "--extra-cflags='-I/Users/José/include'",  # A4-F3's UTF-8 path, quoted as printed
+        "--extra-cflags='-DNAME='\\''x'\\'''",  # an embedded quote, sh_quote's escape
+        "--extra-ldflags='-L/opt/a b'",
+        "--extra-cflags=",
+    ],
+)
+def test_macos_lock_admits_the_printed_quoting_forms(change):
+    data = macos_lock()
+    _configure(data, change)
+    assert build.validate_ffmpeg_lock(data, platform="darwin") is data
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "extra-version=20261110",
+        "extra_version=20261111",
+        "--extra_version=20261111",
+        "--extra-version=20261110",
+    ],
+)
+def test_macos_lock_counts_every_spelling_of_extra_version(change):
+    """configure's ``*)`` branch takes ``[--]name=value`` with ``-`` and ``_`` alike, so each
+    spelling sets ``extra_version`` (the last one wins): exactly one is admitted."""
+    data = macos_lock()
+    _configure(data, change)
+    with pytest.raises(ValueError, match="--extra-version"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+def test_macos_lock_admits_the_recipes_own_configure_line():
+    """The patch's configure call (``build-ffmpeg.sh``) with the recipe's enables, printed
+    as configure prints it: the fixture's line, rebuilt from the patch, is admitted."""
+    patch = MACOS_FORK_PATCH.read_text(encoding="utf-8")
+    assert '+./configure --prefix="$OUT_DIR" --pkg-config-flags="--static" ' in patch
+    data = macos_lock()
+    body = data["configure_line"].removeprefix("configuration: ")
+    assert body.startswith("--prefix=") and "'" not in body
+    for switch in body.split():
+        if switch.startswith("--enable-"):
+            assert f" {switch}" in patch or f'"{switch} ' in patch, switch
     assert build.validate_ffmpeg_lock(data, platform="darwin") is data
 
 
@@ -3800,6 +3950,226 @@ def test_macos_bundle_sees_a_conflicting_version_across_the_read_boundary(macos_
         case.write()
         with pytest.raises(RuntimeError, match="version token"):
             bundle_macos(case)
+
+
+def scan_tool(tmp_path: Path, lock: dict[str, Any], payload: bytes) -> str:
+    """``_macos_ffmpeg_version`` on ``payload`` as a file (bytes only; nothing runs)."""
+    target = tmp_path / "ffmpeg"
+    target.write_bytes(payload)
+    return build._macos_ffmpeg_version(target, lock)
+
+
+def scan_verdict(tmp_path: Path, lock: dict[str, Any], payload: bytes) -> str:
+    try:
+        scan_tool(tmp_path, lock, payload)
+    except RuntimeError as error:
+        return f"REFUSED {error}"
+    return "ACCEPTED"
+
+
+def tool_strings(lock: dict[str, Any]) -> tuple[bytes, bytes, bytes]:
+    """``(version token, configuration body, a minimal well-formed tool's bytes)``."""
+    version = lock["version"].encode()
+    body = lock["configure_line"].removeprefix("configuration: ").encode("utf-8")
+    return version, body, b"\0%s version %s\0" + version + b"\0" + body + b"\0"
+
+
+def test_macos_scan_admits_the_minimal_tool(tmp_path):
+    assert scan_tool(tmp_path, macos_lock(), tool_strings(macos_lock())[2]).startswith("ffmpeg")
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "second-cc-configuration",
+        "unterminated-configuration",
+        "control-byte-in-configuration",
+        "version-extra-words",
+        "version-at-eof",
+    ],
+)
+def test_macos_scan_refuses_the_reviewers_a4_cases(tmp_path, case):
+    """A4-F2 / A4-F3, the reviewer's probe: each was ACCEPTED at ``ae96a4e2``."""
+    lock = macos_lock()
+    version, body, good = tool_strings(lock)
+    payload = {
+        "second-cc-configuration": good
+        + b"\0cc=clang --prefix=/other --enable-gpl --enable-libx265\0",
+        "unterminated-configuration": b"\0" + version + b"\0" + body,
+        "control-byte-in-configuration": b"\0" + version + b"\0" + body + b"\x01junk\0",
+        "version-extra-words": b"\0" + version + b" extra words\0" + body + b"\0",
+        "version-at-eof": b"\0" + body + b"\0" + version,
+    }[case]
+    assert scan_verdict(tmp_path, lock, payload).startswith("REFUSED")
+
+
+def test_macos_scan_judges_the_whole_c_string_around_the_token(tmp_path):
+    """A4-F3's class: EVERY byte after the token, before its NUL (and every non-NUL byte
+    before it, after the previous NUL), makes the C string something other than the token;
+    the token at EOF (no NUL) is unterminated. Bare, and inside the banner array (whose
+    START is const data, not judged, but whose END is)."""
+    lock = macos_lock()
+    version, body, _good = tool_strings(lock)
+    tail = b"\0" + body + b"\0"
+    admitted = []
+    for byte in range(1, 256):
+        mark = bytes([byte])
+        for label, payload in (
+            ("after", b"\0" + version + mark + b"\0" + tail),
+            ("after-words", b"\0" + version + mark + b"words\0" + tail),
+            ("before", b"\0" + mark + version + b"\0" + tail),
+            ("banner-after", b"\0FFmpeg version " + version + mark + b"\0" + tail),
+        ):
+            if label == "banner-after":  # the bare token is needed for an accept at all
+                payload = b"\0" + version + payload
+            if scan_verdict(tmp_path, lock, payload) == "ACCEPTED":
+                admitted.append((label, byte))
+    assert admitted == []
+    for payload in (
+        tail + b"\0" + version,
+        tail + b"\0" + version + b"\0FFmpeg version " + version,
+    ):
+        assert "unterminated" in scan_verdict(tmp_path, lock, payload)
+
+
+def test_macos_scan_judges_the_whole_c_string_around_the_configuration(tmp_path):
+    """A4-F3's class for the configuration: every byte glued after or before the body, and
+    the body at EOF, are refused (one C string, compared whole)."""
+    lock = macos_lock()
+    version, body, _good = tool_strings(lock)
+    head = b"\0" + version + b"\0"
+    admitted = []
+    for byte in range(1, 256):
+        mark = bytes([byte])
+        for label, payload in (
+            ("after", head + body + mark + b"\0"),
+            ("after-words", head + body + mark + b"junk\0"),
+            ("before", head + b"\0" + mark + body + b"\0"),
+        ):
+            if scan_verdict(tmp_path, lock, payload) == "ACCEPTED":
+                admitted.append((label, byte))
+    assert admitted == []
+    assert "unterminated" in scan_verdict(tmp_path, lock, head + body)
+
+
+@pytest.mark.parametrize(
+    "first",
+    ["cc=clang", "--cc=clang", "extra-version=x", "--prefix=/other", "--enable-gpl", "x"],
+)
+@pytest.mark.parametrize(
+    "marker",
+    [
+        "--enable-gpl",
+        "--enable-version3",
+        "--enable-nonfree",
+        "--disable-gpl",
+        "--enable-libx265",
+        "--disable-libx265",
+        "--enable-libx264",
+        "--extra-version=20261110",
+        "extra_version=20261110",
+        "--pkg-config-flags=--static",
+    ],
+)
+def test_macos_scan_sees_a_second_configuration_by_any_ffmpeg_switch(tmp_path, first, marker):
+    """A4-F2's class: a C string carrying ANY of FFmpeg's own configure switches (licence,
+    libx264 / libx265, extra-version, pkg-config-flags), whatever its first argument, is a
+    configuration candidate; a second, different one is refused."""
+    lock = macos_lock()
+    good = tool_strings(lock)[2]
+    other = f"{first} --prefix=/other {marker}".encode()
+    assert "configuration" in scan_verdict(tmp_path, lock, good + b"\0" + other + b"\0")
+
+
+@pytest.mark.parametrize(
+    "library",
+    [
+        b"--prefix=/Volumes/ffmpeg_arm64/tool --disable-unit-tests",  # libvpx's, real
+        b"Rate distribution information input.It requires --enable-rate-guide-deltaq=1.",
+        b"--prefix=/usr/local --enable-shared --disable-static --enable-libs",
+        b"see --enable-gpl-compat-mode",  # not FFmpeg's switch (whole token)
+        b"(--enable-gpl)",  # not a token of its own
+    ],
+)
+def test_macos_scan_leaves_other_libraries_configurations_alone(tmp_path, library):
+    """The exclusion rule, stated: a configuration-like C string with NONE of FFmpeg's own
+    switches (as whole space-separated tokens) is another component's (libvpx's in a real
+    arm64 ffmpeg, SVT-AV1's help text), not an FFmpeg configuration."""
+    lock = macos_lock()
+    payload = tool_strings(lock)[2] + b"\0" + library + b"\0"
+    assert scan_verdict(tmp_path, lock, payload) == "ACCEPTED"
+
+
+def test_macos_scan_reads_a_utf8_configuration_as_one_string(tmp_path):
+    """A4-F3: a configure line with a UTF-8 include path is ONE C string (accepted when the
+    lock carries it); the same line in another encoding is malformed evidence, refused."""
+    lock = macos_lock()
+    lock["configure_line"] += " --extra-cflags='-I/Users/José/include'"
+    assert build.validate_ffmpeg_lock(lock, platform="darwin") is lock
+    version, body, good = tool_strings(lock)
+    assert scan_tool(tmp_path, lock, good).startswith("ffmpeg")
+    latin = body.replace("é".encode(), b"\xe9")
+    verdict = scan_verdict(tmp_path, lock, b"\0" + version + b"\0" + latin + b"\0")
+    assert "not UTF-8" in verdict
+    verdict = scan_verdict(tmp_path, lock, good + b"\0" + latin + b"\0")
+    assert "not UTF-8" in verdict
+
+
+def test_macos_scan_refuses_oversized_evidence(tmp_path):
+    """A candidate whose C string runs past the bound (no NUL within it) is refused as
+    oversized, never truncated into an acceptable prefix."""
+    lock = macos_lock()
+    version, body, good = tool_strings(lock)
+    filler = b"x" * 8192  # the bound (``_FFMPEG_STRING_LIMIT``)
+    for payload in (
+        good + b"\0" + body + b" " + filler + b"\0",
+        good + b"\0" + filler + b" --enable-gpl\0",
+        good + b"\0" + version + filler + b"\0",
+        good + b"\0FFmpeg version " + version + filler + b"\0",
+    ):
+        assert "oversized" in scan_verdict(tmp_path, lock, payload)
+    # Controls: within the bound, and the token as the file's first string (file start is
+    # a boundary), are admitted.
+    long = macos_lock()
+    long["configure_line"] += " --extra-cflags=-D" + "X" * (8000 - len(body))
+    assert build.validate_ffmpeg_lock(long, platform="darwin") is long
+    assert 7900 < len(tool_strings(long)[1]) <= 8192
+    assert scan_verdict(tmp_path, long, tool_strings(long)[2]) == "ACCEPTED"
+    first = version + b"\0" + body + b"\0"
+    assert scan_verdict(tmp_path, lock, first) == "ACCEPTED"
+
+
+READ_BOUNDARIES = (1024 * 1024, 1024 * 1024 - 8193, 1024 * 1024 - 8192, 2 * 1024 * 1024 - 8193)
+"""The block boundary and the judged-region edges (the bound 8192 plus the NUL)."""
+
+
+@pytest.mark.parametrize("needle", ["second-configuration", "glued-configuration", "token-tail"])
+def test_macos_scan_judges_c_strings_across_the_read_boundary(tmp_path, needle):
+    """The bounded C-string rule holds where a string straddles a read or judging boundary
+    (1, half its length and len - 1 bytes of it before the boundary)."""
+    lock = macos_lock()
+    version, body, good = tool_strings(lock)
+    candidate = {
+        "second-configuration": b"cc=clang --prefix=/other --enable-gpl",
+        "glued-configuration": body + b"\x01",
+        "token-tail": version + b" extra",
+    }[needle]
+    for boundary in READ_BOUNDARIES:
+        for split in (1, len(candidate) // 2, len(candidate) - 1):
+            pad = boundary - split - len(good) - 1
+            payload = good + b"\0" * pad + b"\0" + candidate + b"\0" + b"\0" * 64
+            assert payload.index(candidate, len(good)) == boundary - split
+            verdict = scan_verdict(tmp_path, lock, payload)
+            assert verdict.startswith("REFUSED"), (boundary, split)
+
+
+def test_macos_scan_admits_the_tool_strings_across_the_read_boundary(tmp_path):
+    lock = macos_lock()
+    version, body, good = tool_strings(lock)
+    for boundary in READ_BOUNDARIES:
+        for needle in (version, body):
+            pad = boundary - good.index(needle) - len(needle) // 2
+            assert scan_verdict(tmp_path, lock, b"\0" * pad + good + b"\0" * 64) == "ACCEPTED"
 
 
 @pytest.mark.parametrize(
