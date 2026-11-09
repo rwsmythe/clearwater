@@ -2081,4 +2081,223 @@ resolved at call time; its verdicts are the 33 above).
   folder); `notices.py` reads only the Windows lock. Each reads the draft's fields correctly.
 - Pass 2 over items 2-3, the R3 draft and the STOP evidence: nothing new. Loop ended.
 
-Depth at part-3b yield: DISPATCHER TO FILL
+Depth at part-3b yield: 376,153 (wp65-cell12, read by the dispatcher with cell_depth.py at its part-3b STOP return)
+
+## Group 2a part 3c (`wp65-cell13`, dispatch-14; base `ea68e99e`)
+
+Turn G2a-PART-3c: the AMENDED R3 commit under CHARC's rulings on the part-3b STOP (mail
+`20261109T2055Z`): Q1 option (i), the switch STAYS OFF; Q2, ONE texts folder of 36. No STOP.
+No `src/` change; `MACOS_FFMPEG_BUNDLED`, `notices.py`'s `_inventory` and the C14 rows are
+untouched; the committed Windows notices annex bytes did not move. Nothing downloaded was
+extracted or run; no network read. Scratch `work\wp6.5\part3c\` (scripts
+`scripts\verify_texts.py`, `scripts\verify_fields.py`, both this cell's; `mutate_seat.py` and
+`windows_compare.py`, copies of the part-3b scripts, read before they ran).
+
+### The commit
+
+| Commit | What | Blobs |
+|---|---|---|
+| `02d07744` | the lock, the 36 texts, the tests (artifact pin, re-hash, transport family, C13 darwin counterparts, pin flip, CHARC's guard) and the notices-fixture fix | 40; 0 CR except the two upstream CRLF texts (below); every text and the lock byte-equal to their source |
+| (this ledger) | this section; cell12's part-3b depth filled | 0 CR |
+
+### The lock (`tools/package/ffmpeg-macos.lock.json`, sha256 `caf3bdef...`, 25,699 B, 0 CR)
+
+Cell12's draft `work\wp6.5\part3b\r3\ffmpeg-macos.lock.json`, committed byte for byte (blob
+sha256 `caf3bdefbe24c4beaa7d2937799c530d1e107fcf4bdd252332e0b7e0177eac6f`). Verified before the
+commit (`verify_fields.py`, output `verify_fields.out`, VERDICT PASS):
+
+- re-validated under the head (`validate_ffmpeg_lock(platform="darwin")` against the draft
+  folder; then `load_macos_ffmpeg_lock()` against the committed folder in the tests);
+- the seat zip hashed by this cell: 37,978,871 B, sha256 `e3f251dc...76e4` = `size_bytes`,
+  `github_sha256`, `seat_sha256`, `toolchain.census_asset_sha256`; `checksums.sha256` agrees;
+- against the seat log `fork-run\attempt3-build.log` (874 lines): `version` (660),
+  `configure_line` (662, string-equal after the timestamp), the compiler (160 and 661 `built
+  with ...`), `xcode` (157-158), `sdk` (159), `target` (161), `runner_image_version` (18 and
+  155), `macos_deployment_target` (150 `DEPLOYMENT_TARGET: 14.0`), `excluded[]` = the build.sh
+  call's `-SKIP_*=YES` less `SKIP_TEST` / `SKIP_BUNDLE` (330-349), linkage 618-659 system-only;
+- `census.job_url` under `build_run_url`; `attempt3-run.json`: `headSha` `9cb0fa81...`, job
+  129375108552 at that URL; zip `build/versions.txt`: every component version, x264
+  `0480cb05`, recipe `9cb0fa81`, Riedl `f63b8aab`;
+- every `sha256` pin is in the zip's `build/sha256-pins.txt` with the row's `repository` as its
+  URL.
+
+**Seat-zip family on the committed lock** (`mutate_seat.py`, output `mutate_seat.out`):
+unmutated GREEN; size +1 / -1, `github_sha256` / `seat_sha256` digit 0 / 63, both digests
+together digit 0 / 63 (census binding), `--ffmpeg-sha256` digit 0 / 63: 10 of 10 RED.
+
+### The 36 texts (`tools/package/native-licences/ffmpeg-macos-components/`)
+
+Each re-verified by `verify_texts.py` (output `verify_texts.out`): the tarball whose sha256
+equals the row's pin (and is in `build/sha256-pins.txt`) opened IN MEMORY with `python -I`,
+the member read and compared with the lock's digest and the draft file's bytes; excerpts as
+the member's lines; LLVM from the seat file; x264 from the Windows x264 row (the same commit
+`0480cb05`, its `libdvdnav--COPYING`, re-hashed against that row). 36 of 36 OK, 0 extra.
+Every committed blob is byte-equal to its draft (so to its source). Tarballs under
+`work\wp6.5\g2a\dl\`: fontconfig `9f5cae93`, freetype `a7aca0e5`, fribidi `1b1cde5b`,
+harfbuzz `16070d77`, libass `caab4b99`, libogg `83e67047`, libxml2 `78262a6e`, openssl
+`b1bfedcd`, sdl `5f5993c5`, x265 (`x265-downloads.bin`) `40b1ea04`, zlib `bb329a0a`.
+
+| File | Source | sha256 |
+|---|---|---|
+| `fontconfig--COPYING` | `fontconfig.bin` `fontconfig-2.17.1/COPYING` | `51a51aa9823704fd90bccc616cdd17ebabb5b2b3e9cbde886ca02c7002288067` |
+| `freetype--LICENSE.TXT` | `freetype.bin` `freetype-2.13.0/LICENSE.TXT` | `2e3bbb7d7c5c396368dd0853a790ec29ce5b8647163dde42a0493fb0d6556b2b` |
+| `freetype--docs--FTL.TXT` | `freetype.bin` `freetype-2.13.0/docs/FTL.TXT` | `08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1` |
+| `freetype--docs--GPLv2.TXT` | `freetype.bin` `freetype-2.13.0/docs/GPLv2.TXT` | `c4120c6752c910c299e3bd9cb3a46ff262c268303ca2069b61f92f10a5656c18` |
+| `freetype--src--bdf--README` | `freetype.bin` `freetype-2.13.0/src/bdf/README` | `7984455e7e5a9faba3797c8bf095fbe10cc846316b7320aff8c58402e22b82fe` |
+| `freetype--src--pcf--README` | `freetype.bin` `freetype-2.13.0/src/pcf/README` | `18d9782898d9eac04476e2f744678137b2a889689ed3e923e052fc396a86f86b` |
+| `fribidi--COPYING` | `fribidi.bin` `fribidi-1.0.16/COPYING` | `32434afcc8666ba060e111d715bfdb6c2d5dd8a35fa4d3ab8ad67d8f850d2f2b` |
+| `harfbuzz--COPYING` | `harfbuzz.bin` `harfbuzz-14.3.0/COPYING` | `ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64` |
+| `harfbuzz--src--ms-use--COPYING` | `harfbuzz.bin` `harfbuzz-14.3.0/src/ms-use/COPYING` | `c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383` |
+| `libass--COPYING` | `libass.bin` `libass-0.17.5/COPYING` | `f7e30699d02798351e7f839e3d3bfeb29ce65e44efa7735c225464c4fd7dfe9c` |
+| `libogg--COPYING` | `libogg.bin` `libogg-1.3.6/COPYING` | `d2ab5758336489da61c12cc5bb757da5339c4ae9001f9bb0562b4370249af814` |
+| `libxml2--Copyright` | `libxml2.bin` `libxml2-2.15.3/Copyright` | `5d4873884a890122a4b9b20ad56ac6f7da1d796a5bfcf04a427970ac96217626` |
+| `libxml2--dict.c` | `libxml2.bin` `libxml2-2.15.3/dict.c` | `416253664eb3d95a393be6c61c649a1b5600729bbd1e3ce9123df08b12d8f388` |
+| `libxml2--dict.c-L1-17.txt` | `libxml2.bin` `libxml2-2.15.3/dict.c` lines 1-17 | `ea9e97f88bf4ef8ad1142e12d0e6da003968420aa38094f74b9b51206675438a` |
+| `libxml2--list.c` | `libxml2.bin` `libxml2-2.15.3/list.c` | `8a04740bfd8a37f3006bfc0404aa31429e56ef991cddcd47707ce2a9b1d98506` |
+| `libxml2--list.c-L1-16.txt` | `libxml2.bin` `libxml2-2.15.3/list.c` lines 1-16 | `2fdb83809864852d236c64fffa74054699e61887b736e18724d4a8ac0e9684f8` |
+| `libxml2--result--html-tokenizer--NOTICE` | `libxml2.bin` `libxml2-2.15.3/result/html-tokenizer/NOTICE` | `d6a2cb265a0a249a234b89eeffa7f316ebe5bff546672a0a2b1a861dd2238460` |
+| `openssl--LICENSE.txt` | `openssl.bin` `openssl-3.6.1/LICENSE.txt` | `7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a` |
+| `openssl--external--perl--Text-Template-1.56--LICENSE` | `openssl.bin` `openssl-3.6.1/external/perl/Text-Template-1.56/LICENSE` | `9837f05336ef3cbacb6a96e1672a0426d81ad01191f214b8d48e22ca62338181` |
+| `sdl--LICENSE.txt` | `sdl.bin` `SDL2-2.32.10/LICENSE.txt` | `97f35b302b361680ec1e891e95d2d52097bb95abff361434916d99dc1305f127` |
+| `sdl--Xcode-iOS--Demos--data--bitmapfont--license.txt` | `sdl.bin` `SDL2-2.32.10/Xcode-iOS/Demos/data/bitmapfont/license.txt` | `5059bc9c2f37b7e7a557685ae9330ecfd798537bdfde94de63a9c721c92a8856` |
+| `sdl--Xcode--SDL--pkg-support--resources--License.txt` | `sdl.bin` `SDL2-2.32.10/Xcode/SDL/pkg-support/resources/License.txt` | `37b975b5273734ea157fb1e363d06191036f289eca7767f736967816bedd156f` |
+| `sdl--src--hidapi--LICENSE-bsd.txt` | `sdl.bin` `SDL2-2.32.10/src/hidapi/LICENSE-bsd.txt` | `30eb1bef29b46f8ba7ab8b416035dbd93cb034a45481dd97815b944284582cd2` |
+| `sdl--src--hidapi--LICENSE-gpl3.txt` | `sdl.bin` `SDL2-2.32.10/src/hidapi/LICENSE-gpl3.txt` | `8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903` |
+| `sdl--src--hidapi--LICENSE-orig.txt` | `sdl.bin` `SDL2-2.32.10/src/hidapi/LICENSE-orig.txt` | `fb5436aa63d1b71a8dfbf74ecaf1a5b4e1ec4df7f80074d11fec99284f69ca5f` |
+| `sdl--src--hidapi--LICENSE.txt` | `sdl.bin` `SDL2-2.32.10/src/hidapi/LICENSE.txt` | `7d3b087c34f35d4d538e3bcddd1ff8f66e92f9ef336881999482800ddf840913` |
+| `sdl--src--video--yuv2rgb--LICENSE` | `sdl.bin` `SDL2-2.32.10/src/video/yuv2rgb/LICENSE` | `f7d74004cc75778cae46c5f0139f244d67c07ef64cf51937e8272352197dcb18` |
+| `sdl--visualtest--COPYING.txt` | `sdl.bin` `SDL2-2.32.10/visualtest/COPYING.txt` (upstream CRLF, 18 CR) | `dae65ccf728227eff8e10194437078a5628047b9f55d796039688e7ca8e3aa4e` |
+| `x264--COPYING` | Windows x264 row (`0480cb05`) text `ffmpeg-components/libdvdnav--COPYING` | `32b1062f7da84967e7019d01ab805935caa7ab7321a7ced0e30ebe75e5df1670` |
+| `x265--COPYING` | `x265-downloads.bin` `x265_4.2/COPYING` | `d8afb1bcc7a2cfc603683b168d6987ef0a48e59e0da3693bf55c5d33b67e2b49` |
+| `x265--source--dynamicHDR10--LICENSE.txt` | `x265-downloads.bin` `x265_4.2/source/dynamicHDR10/LICENSE.txt` | `47f15d63e82eb8a4de6e46471d5f96cf6d052fd5355944a002c3157880248b69` |
+| `x265--source--dynamicHDR10--json11--LICENSE.txt` | `x265-downloads.bin` `x265_4.2/source/dynamicHDR10/json11/LICENSE.txt` | `950e288a2548cb33f6a90d23958806b0803f510ab17c600d661619a73ae3a6c8` |
+| `zlib--LICENSE` | `zlib.bin` `zlib-1.3.2/LICENSE` | `e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2` |
+| `zlib--contrib--dotzlib--LICENSE_1_0.txt` | `zlib.bin` `zlib-1.3.2/contrib/dotzlib/LICENSE_1_0.txt` (upstream CRLF, 22 CR) | `36266a8fd073568394cb81cdb2b124f7fdae2c64c1a7ed09db34b4d22efa2951` |
+| `zlib--contrib--minizip--LICENSE.Info-Zip` | `zlib.bin` `zlib-1.3.2/contrib/minizip/LICENSE.Info-Zip` | `fc686023047ce5ce3a18a9b8a777156f0e475929d3de06bac279f3c025d2b2ca` |
+| `llvm-project--LICENSE.TXT` | seat `llvm-licence\LICENSE.TXT.llvmorg-21.1.0` (R2) | `8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee` |
+
+**The two CR-bearing blobs** carry the upstream's own CRLF bytes (the tarball members hold 18
+and 22 CR); the Windows folder's committed blobs of the same two texts hold the same counts,
+and `.gitattributes` has `tools/package/native-licences/** -text`. Byte equality to the source
+is the binding form (the validator re-hashes them), so "0 CR" holds for every other blob.
+
+### C13: skip -> check
+
+The five Windows tests keep a platform skip on darwin (they build `Clearwater.exe` against
+`ffmpeg.lock.json`), the "awaits ffmpeg-macos.lock.json" reason DELETED and replaced by a
+pointer to the counterpart. Each counterpart runs `build()` on its darwin path against the
+COMMITTED macOS lock on every host (on Windows `sys.platform` reads `darwin` for the build
+call only, the stand-in executable written first, as `darwin_app_build` does; the runner runs
+it natively).
+
+| Site (head) | Windows test (ids) | Before on darwin | After: darwin counterpart (ids), what is real |
+|---|---|---|---|
+| `:383` | `test_build_enforces_origin_after_all_native_copies` (2) | SKIPPED "awaits lock" | `..._on_darwin` (2): the REAL darwin bundling (real lock's version, configure line, census, toolchain marker; synthetic zip with the transport moved) and the REAL darwin origin walk; the tampered Mach-O is refused with the PATH source named |
+| `:1301` | `test_release_bundle_is_checked_in_the_built_executable_folder` (2) | SKIPPED "awaits lock" | `..._on_darwin` (2): build() takes the workflow's pair (`asset_url`, `seat_sha256`) from the committed lock, bundles into `Contents/MacOS`, fails on a bundle failure; a digest off the lock refused before PyInstaller |
+| `:1356` | `test_notices_writing_follows_ffmpeg_and_fails_the_build_on_error` (2) | SKIPPED "awaits lock" | `..._on_darwin` (2): the complete census admits `--notices`; the stand-in writer sees the real bundling's tools and `ffmpeg-BUILD.txt`; a notice failure refuses before the seal (the writer is a stand-in: the `.app` notices are F0-2's) |
+| `:1572` | `test_zip_is_published_only_after_successful_notices_and_smoke` (4) | SKIPPED "awaits lock" | `..._on_darwin` (4): notices -> seal -> smoke -> zip on the committed lock; stale zip removed first; the `.app` zip carries the notices |
+| `:1662` | `test_release_zip_refuses_smoke_mutations` (3) | SKIPPED "awaits lock" | `..._on_darwin` (3): added / removed / changed after the snapshot refuse the zip |
+
+On Windows the 13 Windows ids still pass (unchanged bodies); the 13 darwin ids pass. On the
+runner: 13 Windows ids SKIPPED with the pointer reason (the parallel leg; the `-m macos`
+allowlist is not involved), 13 darwin ids RUN. RED on the parent (lock and folder held out):
+all 13 darwin ids fail.
+
+### Other committed tests
+
+- `test_the_real_macos_lock_pins_the_artifact_and_validates`: tag, fork commit, asset, URL,
+  size, both digests and the census digest = `e3f251dc...`, census complete, run URL.
+- `test_the_macos_component_texts_are_exactly_the_locks_and_rehash_to_it`: the folder holds
+  EXACTLY the 36 names and each re-hashes to the lock; `..._refuses_a_damaged_texts_folder` (3:
+  one byte, one missing, one extra -> refused by the validator).
+- `test_the_real_macos_lock_refuses_each_transport_mutation` (13): the real lock with its
+  transport moved to a synthetic zip (the seat zip is not in the repository): unmutated GREEN;
+  size +1 / -1; `github_sha256` / `seat_sha256` digit 0 / 63; `all` (both digests and the census
+  digest moved, a self-consistent lock) digit 0 / 63 -> "download sha256 mismatch; archive was
+  not opened"; the `--ffmpeg-sha256` argument digit 0 / 63; plus `both` (the two digests only)
+  digit 0 / 63 -> the census binding. 12 RED, 1 GREEN.
+- The pin test (`test_release_workflow.py`
+  `test_macos_release_build_reads_the_macos_lock_fields_and_the_switch_stays_off`): its "false"
+  half KEPT; its "no lock" half FLIPPED to: the lock loads (validated), sits at
+  `FFMPEG_MACOS_LOCK_PATH`, and its `asset_url` / `seat_sha256` are not hard-coded in the
+  workflow.
+- **CHARC's guard** `test_the_lock_with_the_switch_off_is_inert`: reads `macos-build.yml`
+  statically (the existing `step` / `script` helpers): the switch reads exactly `"false"`;
+  every step's `if:` is one of four known conditions (an unknown one is a violation); for each
+  step that runs with the switch OFF, its text less the shell branches taken only on `"true"`
+  names none of `--notices`, `--zip`, `--ffmpeg-from`, `--ffmpeg-sha256`, the lock path,
+  `asset_url`, `seat_sha256`, `releases/download`, `curl`, `wget`, `gh release`,
+  `hide_banner`, the asset name or the tag; the three release steps do not run; the OFF build
+  command parses (`build.parse_args`) to `--form onedir` with no FFmpeg pair, no notices, no
+  smoke, no zip; the capture step runs no bundled tool. Controls
+  `test_the_switch_off_guard_sees_each_planted_breach` (4): switch flipped on, `--notices`
+  planted in the OFF build, the release step's gate removed, the capture branch forced: each
+  reported.
+- `test_tools_package_notices.py` `_make_native_surface` / `omit_production_embedded_census`:
+  the copied native surface leaves `ffmpeg-macos-components` to its lock as it does the
+  Windows two. **Found by this turn's module run:** with the folder committed and the fixtures
+  unchanged, `test_tools_package_notices.py` gave 76 passed, 344 errors and
+  `test_tools_package_smoke.py` 51 passed, 15 errors (`PermissionError` unlinking the folder as a
+  file); after: 420 passed and 66 passed, 1 skipped. Test-only.
+
+### What the runner proves at the re-push (switch OFF)
+
+- the parallel leg on darwin: the lock validates against the committed folder
+  (`load_macos_ffmpeg_lock`, the 36 texts re-hashed on the runner's checkout), the transport
+  family, the 13 C13 darwin ids natively (the real darwin bundling and origin walk included),
+  the guard and the pin test;
+- the build step runs `Build app bundle without FFmpeg` (no FFmpeg, no notices, no zip):
+  nothing bundles, nothing downloads; the M leg on the `.app` runs as before with the FFmpeg
+  families deselected;
+- the G3 diagnostics still owed (C2 / C16 figures, the C3 / C4 / C5 / C7 / C9-C11 ids, A4).
+
+### F0-2 carry-over (CHARC's re-stated condition 4; not this turn)
+
+ONE commit, in the F0-2 group: the `.app`-aware Mac census (`notices._inventory` over
+`Contents/MacOS`, `Frameworks`, `Resources`; a native manifest for the Mac host), the Mac
+notices rows (the `_ffmpeg_rows` darwin branch, the write location `Contents/Resources`), the
+C14 darwin counterparts (missing-member, smoke-after-notices), and `MACOS_FFMPEG_BUNDLED:
+"true"` with the pin test's `"false"` half flipped.
+
+### Counts at `02d07744` (`-p no:cacheprovider -n 3 --timeout 600 -m "not gpu" --basetemp=work\wp6.5\part3c\<module> -k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`)
+
+Static: `ruff check .` All checks passed; `ruff format --check .` 338 files already formatted;
+`mypy` Success 166; `mypy --platform darwin` Success 166.
+
+| Module | Result |
+|---|---|
+| `tests/test_tools_package_build.py` | 667 passed (part 3b: 636; +31) |
+| `tests/test_tools_package_notices.py` | 420 passed |
+| `tests/test_tools_package_ffmpeg.py` | 290 passed |
+| `tests/test_release_workflow.py` | 84 passed (79; +5) |
+| `tests/test_tools_package_smoke.py` | 66 passed, 1 skipped (the POSIX process-group proof) |
+| `tests/test_portability.py` | 192 passed |
+| `tests/test_macos_portability.py` | 224 skipped (`macos` platform skip) |
+
+RED on the parent (`tools/package/ffmpeg-macos.lock.json` and the folder held out, the rest of
+the tree as committed): the 37 new or changed ids, 24 failed and 13 errors (the transport
+fixture). `notices.py --root-annex --check`: root annex matches. **Windows unchanged**
+(`windows_compare.py` against `git show 1ef10536:tools/package/build.py`): validators 33,
+mismatches []; archive members 5, mismatches []; Windows-path definitions AST-identical to
+`de3d68a0` 9 of 10 (`validate_ffmpeg_lock`, as at part 3b; `build.py` did not change this turn).
+
+### Verification loop (self)
+
+- Pass 1: every lock field against its source (above); every text against its source (above);
+  the committed blobs against the draft (40 blobs, 0 unequal). Confirmed.
+- Suspected: the committed folder breaks a consumer that copies `native-licences`. CONFIRMED
+  (the notices fixtures; FIXED, test-only, counts above). Every other reader checked: `build.py`
+  (the two path constants), `notices.py:1144` (the folder excluded), the workflow tests, the
+  ffmpeg tests: green.
+- Suspected: a darwin-host test changes behaviour now that the lock exists. REJECTED: the darwin
+  build tests point `FFMPEG_MACOS_LOCK_PATH` at their own fixture; `smoke.py:854` reads the lock
+  only when the tools are in the bundle; no `macos`-marked test reads the lock.
+- Observation (not this turn's scope; for the dispatcher): the darwin origin walk judges a file
+  native by suffix or magic (`build.py:3725` `_is_native`), so a NON-Mach-O file replacing
+  `Contents/MacOS/ffmpeg` after placement is not an origin violation
+  (`_is_native("ffmpeg", b"#!/bin/sh ...")` is False; a changed Mach-O IS refused, as the
+  counterpart proves). Windows has the `.exe` suffix. The bundling check and the smoke's
+  version read are the other guards.
+- Pass 2 over the tests, the guard's controls and the blob check: nothing new. Loop ended.
+
+Depth at part-3c yield: DISPATCHER TO FILL
