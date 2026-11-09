@@ -55,14 +55,14 @@ primaries/transfer/matrix, with AAC audio and no data track (`P/0.json` through
 `P/6.json`). Product-accepted MP4s have no faults and are marked VFR by the product;
 the inventory's nominal-rate heuristic is not the timing authority.
 
-| File | Product result | Raw range -> product range | Chosen decode path | Evidence |
+| File | Product result | Raw range -> product range | Decode path exercised | Evidence |
 |---|---|---|---|---|
 | `SCUBA vids 2.mov` | Refused, `unsupported` | tv -> unresolved | None | `P/0.json` |
 | `SCUBA vids2.mp4` | Accepted | pc -> full | Software FrameStream checked | `P/1.json`; `DEC/short-first.json` |
 | `SCUBA vids 3.mov` | Refused, `unsupported` | tv -> unresolved | None | `P/2.json` |
 | `SCUBA vids 3.mp4` | Accepted | pc -> full | Software FrameStream checked | `P/3.json`; `DEC/medium-first.json` |
 | `SCUBA vids(1).mov` | Refused, `unsupported` | tv -> unresolved | None | `P/4.json` |
-| `SCUBA vids(1).mp4` | Accepted | tv -> limited | CUDA RGB pipe checked, C3 | `P/5.json`; `R/decode-hevc2259-prefix.json` |
+| `SCUBA vids(1).mp4` | Accepted | tv -> limited | Software FrameStream (probe record); CUDA pipe exercised by C3 | `P/5.json` (`cuda_executed: false`); `R/decode-hevc2259-prefix.json` |
 | `SCUBA vids.mp4` | Accepted, probe-only | tv -> limited | Command recorded, not exercised | `P/6.json` |
 
 The refusal messages are verbatim:
@@ -135,6 +135,14 @@ instrument failure after measurement. E's launcher exited 0 (W2:18).
 E's retained throughput output replaces dropped export B for V4 and the look pack.
 The spawned-worker short export A completed on GPU in 2,143.33 s, but was not
 exclusive and is not a timing figure of record (`R/export-hevc62.json`, `result`).
+A ran at about 34.7 min/min, 3.35x D on the same source (`result.elapsed_s` /
+`P/1.json` `product.duration_s`; A elapsed / `R/bench-hevc62q.json` `bench.wall_s`).
+No host-condition record exists for A, and it predates window 1, so its cause is
+not established. The spawned-worker (GUI) path therefore has no clean timing of record.
+CHARC's performance DR row (`cbb881c6`, item 4), held at `e6a411f4`, is answered
+for the bench path by window 2 only. The latter ruling's item 3 explicitly says:
+"D near N6 = no product DR, run A / window 1 recorded as host-confounded."
+That disposition supplies no individual host-condition evidence for A.
 That record has top-level `ok: false`, `error: "RuntimeError: required GPU correction path not established"`:
 the turn-3 driver's wrong device check (dispatch 4), not an export failure;
 `result.ok` is true with `result.device: "GPU"`.
@@ -169,7 +177,10 @@ normalization, correction or encoding. Bytes crossed a pipe, not a saved frame f
 C3 stopped at its cap without forced kill or trailing bytes; decoder exit 1 was the
 expected cap termination. Full and limited range decode alike at the sampled rates.
 Both legs are from confounded window 1, so this comparison is descriptive, not a
-clean absolute throughput baseline. No C2 medium decode-only result is claimed.
+clean absolute throughput baseline. C2 was not run, by CHARC's ruling `cbb881c6`
+(C1 and C3 agree; the decode question is closed). The packet's literal >2x trigger
+was met: C1 7.487 fps / D 3.01 fps in window 2 is about 2.49x
+(`R/decode-hevc62.json`, `fps`; `R/bench-hevc62q.json`, `bench.frames` / `bench.phases_s.frames`).
 
 The seat's five-second `gpu-series.csv` files are device-wide, not job-attributed.
 CSV timestamps are local UTC-10; the table selects each leg's UTC interval from W1/W2.
@@ -356,13 +367,18 @@ The primary r5 path meets CHARC's 5% bar; the fallback has no bar and records it
 and psutil version. No supervisor cost is subtracted from D/E/control walls.
 
 Turn 7b-fold's seat delta read was CLEAN; frozen-t8 follow-ups completed (W2:50,66).
-This report turn ran `uv run --no-sync ruff check work/wp7.1`: **exit 1, 511 findings**,
+Turn 13 wrote the report and ran `uv run --no-sync ruff check work/wp7.1`: **exit 1, 511 findings**,
 including historical generators, copied proof sources and generated stubs
 (`work/wp7.1/report-audit/ruff.log`). No driver was edited to hide that result.
 This broad scratch-tree check is not the earlier targeted-driver Ruff pass.
-No pytest, media, GPU, GUI or independent report review ran in this turn.
-Evidence-preservation audit is `work/wp7.1/report-audit/final.json`; report review
-and the report-only static/harness accept gate remain at the seat.
+No pytest, media, GPU, GUI or independent report review ran in turn 13.
+Reviewer A reviewed `2ef04e09`; turn 14 folded it at `5d917534`; turn 15 folds
+Reviewer B's single remediation (verdict `NO_NEW_CRITICAL_MAJOR`).
+`work/wp7.1/report-audit/final.json` audits the 392-line pre-fold report;
+turn 14's audit appears only in its transcript (`cell/turn-14.txt:3783,3939`).
+Turn 15's evidence-preservation audit of this folded report is
+`work/wp7.1/report-audit/final-t15.json`; the report-only static/harness accept
+gate remains at the seat. No checks or media runs were repeated in turns 14 or 15.
 
 ## 7. Spec note proposed to the owner
 
@@ -379,6 +395,7 @@ future change separately. The note does not waive the V4 failure documented abov
 
 ## 8. Limits and open acceptance items
 
+- **Spawned-worker timing:** A's unexplained 34.7 min/min (3.35x D; section 3) leaves no clean GUI-path timing of record; window 2 answers the held performance DR for the bench path only.
 - **ProRes / 4:2:2 input:** a separate owner question at the accept (a spec change
   plus a product package, Phase 7 candidate), per the brief's scope correction
   `626e30f0` (`docs/briefs/wp7.1-brief.md:3`): "ProRes / 4:2:2 input is put to the owner at the accept as a separate question (a spec change + a product package, Phase 7 candidate)."
