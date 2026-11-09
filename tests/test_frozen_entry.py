@@ -616,6 +616,8 @@ def test_a_source_run_starts_the_gui_as_1_0_0_did(
         "XDG_STATE_HOME",
     ):
         monkeypatch.setenv(variable, str(tmp_path / variable.lower()))
+    if sys.platform != "win32":  # macOS: Path.home() / Library; POSIX reads HOME (C5)
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
     log_dir = config_paths.app_locations().log_dir
     assert log_dir.is_relative_to(tmp_path)
     seen: list[tuple[str, Any]] = []
@@ -1193,6 +1195,10 @@ print("status", status, "qt", ",".join(loaded) or "-")
 """Run the real ``cuda.pathfinder`` canary module through the frozen ``-m`` branch."""
 
 
+@pytest.mark.skipif(
+    sys.platform == "darwin",
+    reason="the gpu extra is not installable on macOS (AD-35); no cuda.pathfinder",
+)
 def test_the_real_pathfinder_canary_module_runs_through_the_frozen_dash_m(
     tmp_path: Path,
 ) -> None:
@@ -1206,7 +1212,12 @@ def test_the_real_pathfinder_canary_module_runs_through_the_frozen_dash_m(
     """
     import clearwater
 
-    spec = importlib.util.find_spec("cuda.pathfinder")
+    # find_spec("cuda.pathfinder") imports the parent and raises when no ``cuda`` exists.
+    spec = (
+        None
+        if importlib.util.find_spec("cuda") is None
+        else importlib.util.find_spec("cuda.pathfinder")
+    )
     if spec is None or not spec.submodule_search_locations:
         pytest.skip("cuda.pathfinder is not installed (the gpu extra)")
     site = Path(next(iter(spec.submodule_search_locations))).parents[1]

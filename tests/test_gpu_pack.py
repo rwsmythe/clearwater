@@ -918,12 +918,21 @@ def test_ownership_is_the_first_component_of_any_record_row(
 def test_ownership_ignores_case_where_the_platform_does(
     tmp_path: Path, isolated: list[str]
 ) -> None:
-    """(b) On Windows ``CUPY`` and ``cupy`` are one folder; elsewhere they are two."""
+    """(b) On Windows ``CUPY`` and ``cupy`` are one folder; elsewhere they are two.
+
+    On a case-insensitive POSIX file system (macOS APFS by default; WP6.5 G3, C7) the
+    renamed folder still answers to ``cupy/__init__.py`` while ``normcase`` keeps the
+    case, so the ownership check names the unlisted ``CuPy`` instead. Refused either way
+    off Windows (and no pack is offered on macOS, AD-33).
+    """
     folder = make_pack(tmp_path)
     (_site(folder) / "cupy").rename(_site(folder) / "CuPy")
+    file_system_folds_case = (_site(folder) / "cupy" / "__init__.py").exists()
     reason = gpu_pack.check_pack(folder)
     if os.path.normcase("A") == "a":
         assert reason is None
+    elif file_system_folds_case:
+        assert reason == "unlisted entry in site-packages: CuPy"
     else:
         assert reason == "cupy-cuda12x file cupy/__init__.py missing"
 

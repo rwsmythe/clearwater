@@ -1033,6 +1033,9 @@ def test_b1_every_class_of_write_target_is_refused_before_anything_runs(
     monkeypatch.setattr(he, "configured_footage_folder", lambda config=None: footage)
     source = sample(STILL)
     if case == "text-spelling":  # forward slashes and a ".." step (R1 F1's class of spellings)
+        # POSIX resolves x/.. through a real x (Windows collapses it lexically): make one,
+        # so the spelling names footage/sub on every platform (WP6.5 G3, C9).
+        (footage / "x").mkdir()
         args = [source, "--out", footage.as_posix() + "/x/../sub"]
     elif case == "extended":  # R2 G1
         if not WINDOWS:

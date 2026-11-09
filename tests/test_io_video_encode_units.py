@@ -220,6 +220,10 @@ def _fake_run(outcomes: dict[tuple[str, int], tuple[int, str]], listing: str = L
     return run
 
 
+WINDOWS_ROSTER = capability.encoder_roster("win32")
+"""The NVENC roster these unit tests feed (AD-35: macOS offers hevc_videotoolbox; WP6.5 C4)."""
+
+
 def test_capabilities_from_the_listing_and_the_test_encodes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -230,7 +234,7 @@ def test_capabilities_from_the_listing_and_the_test_encodes(
         ("libx265", 10): (1, "10-bit not built"),
     }
     monkeypatch.setattr(capability, "_run", _fake_run(outcomes))
-    nvenc, x265 = capability._detect(Path("ffmpeg"))
+    nvenc, x265 = capability._detect(Path("ffmpeg"), WINDOWS_ROSTER)
     assert nvenc == EncoderCapability("hevc_nvenc", True, None, (8, 10), True)
     assert x265 == EncoderCapability("libx265", True, None, (8,), False)
 
@@ -244,7 +248,7 @@ def test_no_nvidia_device_gives_a_readable_reason(monkeypatch: pytest.MonkeyPatc
         ("libx265", 10): (0, ""),
     }
     monkeypatch.setattr(capability, "_run", _fake_run(outcomes))
-    nvenc, x265 = capability._detect(Path("ffmpeg"))
+    nvenc, x265 = capability._detect(Path("ffmpeg"), WINDOWS_ROSTER)
     assert not nvenc.available and nvenc.bit_depths == ()
     assert nvenc.reason is not None and "No NVIDIA graphics card" in nvenc.reason
     assert x265.available and x265.bit_depths == (8, 10)
@@ -254,7 +258,7 @@ def test_an_encoder_missing_from_the_build_is_named(monkeypatch: pytest.MonkeyPa
     listing = LISTING.replace(" V....D hevc_nvenc", " A....D not_video")
     outcomes = {("libx265", 8): (0, ""), ("libx265", 10): (0, "")}
     monkeypatch.setattr(capability, "_run", _fake_run(outcomes, listing))
-    nvenc, _ = capability._detect(Path("ffmpeg"))
+    nvenc, _ = capability._detect(Path("ffmpeg"), WINDOWS_ROSTER)
     assert nvenc.reason == "This FFmpeg build does not include the hevc_nvenc encoder."
 
 
@@ -293,20 +297,24 @@ def test_detection_is_cached_per_process(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_resolve_encoder_is_the_one_auto_rule() -> None:
+    """The Windows roster's auto rule (AD-35: darwin's roster is tested in
+    ``test_portability.py``); the roster is passed, so the test reads the same on
+    every host."""
     both = (
         EncoderCapability("hevc_nvenc", True, None, (8, 10), True),
         EncoderCapability("libx265", True, None, (8, 10), False),
     )
     no_gpu = (replace(both[0], available=False, reason="no card", bit_depths=()), both[1])
-    assert resolve_encoder("auto", both) == "hevc_nvenc"
-    assert resolve_encoder("auto", no_gpu) == "libx265"
-    assert resolve_encoder("hevc_nvenc", no_gpu) == "hevc_nvenc"  # open refuses it, by name
+    assert resolve_encoder("auto", both, roster=WINDOWS_ROSTER) == "hevc_nvenc"
+    assert resolve_encoder("auto", no_gpu, roster=WINDOWS_ROSTER) == "libx265"
+    # open refuses it, by name
+    assert resolve_encoder("hevc_nvenc", no_gpu, roster=WINDOWS_ROSTER) == "hevc_nvenc"
     nothing = (no_gpu[0], replace(both[1], available=False, reason="broken", bit_depths=()))
     with pytest.raises(VideoEncodeError) as caught:
-        resolve_encoder("auto", nothing)
+        resolve_encoder("auto", nothing, roster=WINDOWS_ROSTER)
     assert caught.value.kind == "unavailable" and "no card" in str(caught.value)
     with pytest.raises(VideoEncodeError) as caught:
-        resolve_encoder("h264_nvenc", both)
+        resolve_encoder("h264_nvenc", both, roster=WINDOWS_ROSTER)
     assert caught.value.kind == "refused"
 
 

@@ -50,7 +50,11 @@ def test_core_works_with_cupy_unimportable() -> None:
         "backend, reason = select_backend(Settings(), 2160, 3840, 'c3')\n"
         "print(backend.name + '|' + reason)\n"
     )
-    assert run_python(code) == "numpy|CPU: CuPy not installed"
+    # The child runs on this host, so its AD-9 reason is this platform's (darwin: AD-35).
+    from clearwater.core.backend import MACOS_CPU_REASON
+
+    expected = MACOS_CPU_REASON if sys.platform == "darwin" else "CPU: CuPy not installed"
+    assert run_python(code) == "numpy|" + expected
 
 
 IMPORT_CALLS = {"import_module", "__import__"}

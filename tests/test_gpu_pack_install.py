@@ -1239,6 +1239,7 @@ def test_headless_lock_refusal_exits_one(empty_plan, headless_entry, operation, 
     assert capsys.readouterr().err.strip() == "another GPU pack operation is in progress"
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows mapped-image sharing semantics")
 @pytest.mark.parametrize("operation", ["remove", "pending", "install-marker", "replace"])
 def test_write_open_probe_defers_before_any_rename(fake_index, monkeypatch, operation):
     installer = _installer()

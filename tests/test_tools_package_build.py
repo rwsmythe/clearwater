@@ -135,7 +135,9 @@ def test_analysis_uses_only_sanitized_path_and_restores_it(
     windows = tmp_path / "Windows"
     original = str(foreign)
     monkeypatch.setenv("PATH", original)
-    monkeypatch.setenv("SystemRoot", str(windows))
+    # The name build.py reads; Windows folds the case of environment names, POSIX does not
+    # (the darwin runner's win32-simulated ids failed on SystemRoot; WP6.5 G3, C11).
+    monkeypatch.setenv("SYSTEMROOT", str(windows))
     inherited_dyld = {
         "DYLD_LIBRARY_PATH": str(foreign),
         "DYLD_FRAMEWORK_PATH": str(foreign),
@@ -333,6 +335,9 @@ def test_record_native_hash_refuses_correct_digest_with_wrong_record_size(tmp_pa
         build._record_native_hash(dist, dist.files[0])
 
 
+@pytest.mark.skipif(
+    sys.platform != "win32", reason="PE bootloader checks; pefile is win32-only (uv.lock)"
+)
 def test_bootloader_refuses_executable_resource_section(tmp_path):
     """M5: replaceable resources must never introduce executable code."""
     import pefile
@@ -351,6 +356,9 @@ def test_bootloader_refuses_executable_resource_section(tmp_path):
     assert not build._is_clearwater_bootloader(target)
 
 
+@pytest.mark.skipif(
+    sys.platform != "win32", reason="PE bootloader checks; pefile is win32-only (uv.lock)"
+)
 def test_bootloader_identity_allows_resources_and_archive_but_refuses_code_changes(tmp_path):
     """Verify immutable PE sections from the locked windowed bootloader, never a name."""
     import pefile
@@ -372,6 +380,11 @@ def test_bootloader_identity_allows_resources_and_archive_but_refuses_code_chang
 
 
 @pytest.mark.parametrize("tampered", [False, True])
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); the macOS "
+    "contract awaits ffmpeg-macos.lock.json, WP6.5 part 3",
+)
 def test_build_enforces_origin_after_all_native_copies(
     tmp_path, monkeypatch, capsys, tampered, verified_ffmpeg_archive
 ):
@@ -410,6 +423,9 @@ def test_build_enforces_origin_after_all_native_copies(
         assert str(foreign / "ffmpeg.exe") in output
 
 
+@pytest.mark.skipif(
+    sys.platform != "win32", reason="PE bootloader checks; pefile is win32-only (uv.lock)"
+)
 def test_bootloader_rejects_a_changed_loader_import_directory(tmp_path):
     """Identical code bytes do not excuse an executable with redirected imports."""
     import pefile
@@ -1072,6 +1088,11 @@ def _fake_pyinstaller(
 
 
 @pytest.mark.parametrize(("bundle_has", "status"), [(["graphlib", "json"], 0), (["json"], 1)])
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="the PyInstaller stand-in writes the Windows Clearwater.exe; the macOS build "
+    "seals a .app (codesign) and scans no GPU pack (AD-33), WP6.5 part 3",
+)
 def test_a_missing_member_fails_the_build_and_the_set_is_written_to_the_report(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1101,6 +1122,7 @@ def test_a_missing_member_fails_the_build_and_the_set_is_written_to_the_report(
     assert ("hidden-import check: PASS" in printed) == (status == 0)
 
 
+@pytest.mark.skipif(sys.platform == "darwin", reason="no GPU pack is scanned on macOS (AD-33)")
 def test_an_unparsable_pack_file_fails_the_build_before_pyinstaller(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -1276,6 +1298,11 @@ def test_release_ffmpeg_options_reach_the_build(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize("fail", [False, True])
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); the macOS "
+    "contract awaits ffmpeg-macos.lock.json, WP6.5 part 3",
+)
 def test_release_bundle_is_checked_in_the_built_executable_folder(
     monkeypatch, tmp_path, capsys, fail
 ):
@@ -1326,6 +1353,11 @@ def test_notices_option_reaches_build_and_refuses_non_onedir(monkeypatch, tmp_pa
 
 
 @pytest.mark.parametrize("fails", [False, True])
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); the macOS "
+    "contract awaits ffmpeg-macos.lock.json, WP6.5 part 3",
+)
 def test_notices_writing_follows_ffmpeg_and_fails_the_build_on_error(
     monkeypatch, tmp_path, capsys, fails, verified_ffmpeg_archive
 ):
@@ -1373,6 +1405,11 @@ def test_notices_writing_follows_ffmpeg_and_fails_the_build_on_error(
 
 
 @pytest.mark.parametrize("status", [0, 1])
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="the PyInstaller stand-in writes the Windows Clearwater.exe; the macOS build "
+    "seals a .app (codesign) and scans no GPU pack (AD-33), WP6.5 part 3",
+)
 def test_smoke_follows_notices_and_propagates_failure(monkeypatch, tmp_path, status):
     """Dropping --smoke or ignoring its result must not produce a successful build."""
     monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
@@ -1532,6 +1569,11 @@ def test_source_commit_epoch_uses_a_bounded_read_only_git_query(monkeypatch):
 
 
 @pytest.mark.parametrize("failure", ["none", "notices", "smoke", "timestamp"])
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); the macOS "
+    "contract awaits ffmpeg-macos.lock.json, WP6.5 part 3",
+)
 def test_zip_is_published_only_after_successful_notices_and_smoke(
     tmp_path, monkeypatch, capsys, failure
 ):
@@ -1617,6 +1659,11 @@ def test_release_zip_refuses_junctions(tmp_path):
 
 
 @pytest.mark.parametrize("mutation", ["added", "removed", "changed"])
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); the macOS "
+    "contract awaits ffmpeg-macos.lock.json, WP6.5 part 3",
+)
 def test_release_zip_refuses_smoke_mutations(tmp_path, monkeypatch, capsys, mutation):
     """The published file set and identities must equal the pre-smoke inventory."""
     out = tmp_path / "out"

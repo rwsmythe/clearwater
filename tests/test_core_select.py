@@ -6,6 +6,7 @@ The device is mocked by a fake ``cupy`` module served through the backend module
 
 from __future__ import annotations
 
+import sys
 import types
 from collections.abc import Iterator
 from typing import Any
@@ -16,6 +17,11 @@ import pytest
 import clearwater.core.backend as backend_module
 from clearwater.core import CupyBackend, NumpyBackend, memory_estimate_bytes, select_backend
 from clearwater.interfaces.settings import Settings
+
+NOT_INSTALLED = (
+    backend_module.MACOS_CPU_REASON if sys.platform == "darwin" else "CPU: CuPy not installed"
+)
+"""The AD-9 reason for an absent CuPy on this platform (darwin's since WP6.4, AD-35)."""
 
 MIB = 2**20
 FOUR_K = (2160, 3840)
@@ -126,13 +132,13 @@ def test_forced(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_cupy_not_installed(monkeypatch: pytest.MonkeyPatch) -> None:
     install(monkeypatch, None, ModuleNotFoundError("No module named 'cupy'", name="cupy"))
     backend, reason = choose()
-    assert reason == "CPU: CuPy not installed" and isinstance(backend, NumpyBackend)
+    assert reason == NOT_INSTALLED and isinstance(backend, NumpyBackend)
 
 
 def test_cupy_absent_from_sys_modules(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(__import__("sys").modules, "cupy", None)  # import raises ImportError
     backend, reason = choose()
-    assert reason == "CPU: CuPy not installed" and isinstance(backend, NumpyBackend)
+    assert reason == NOT_INSTALLED and isinstance(backend, NumpyBackend)
 
 
 def test_cupy_failed_to_load(monkeypatch: pytest.MonkeyPatch) -> None:

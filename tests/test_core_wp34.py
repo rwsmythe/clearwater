@@ -7,6 +7,7 @@ defect the register names, so each test distinguishes the fix from the code it r
 from __future__ import annotations
 
 import math
+import re
 import sys
 import types
 from collections.abc import Iterator
@@ -36,6 +37,11 @@ REASONS = (
     "CPU: CUDA device unusable",
 )
 """The WP3.1 report's reason list (the estimate reason aside); DR-37 (a) adds none."""
+
+NOT_INSTALLED = (
+    backend_module.MACOS_CPU_REASON if sys.platform == "darwin" else "CPU: CuPy not installed"
+)
+"""The AD-9 reason for an absent CuPy on this platform (darwin's since WP6.4, AD-35)."""
 
 
 @pytest.fixture(autouse=True)
@@ -89,8 +95,10 @@ def test_dr37a_only_a_missing_cupy_is_not_installed(
     import_raising(monkeypatch, error)
     got = reason()
     want = "CPU: CuPy failed to load" if expected == "failed" else expected
+    if want == "CPU: CuPy not installed":
+        want = NOT_INSTALLED
     assert got == want
-    assert got in REASONS
+    assert got in (*REASONS, backend_module.MACOS_CPU_REASON)
 
 
 def test_dr37a_planted_pre_fix_rule_misnames_an_import_error() -> None:
@@ -106,7 +114,7 @@ def test_dr37a_cupy_blocked_in_sys_modules_is_not_installed(
     with pytest.raises(ModuleNotFoundError) as caught:
         __import__("cupy")
     assert caught.value.name == "cupy"
-    assert reason() == "CPU: CuPy not installed"
+    assert reason() == NOT_INSTALLED
 
 
 # -- DR-38 (c): check_rgb refuses an empty spatial size --------------------------------------------
@@ -188,7 +196,8 @@ def test_backend_for_refuses_other_devices(device: str) -> None:
 
 def test_backend_for_without_gpu_names_the_reason(monkeypatch: pytest.MonkeyPatch) -> None:
     import_raising(monkeypatch, ModuleNotFoundError("No module named 'cupy'", name="cupy"))
-    with pytest.raises(ValueError, match=r"'cuda:0'; available: cpu \(CPU: CuPy not installed\)"):
+    expected = re.escape(f"'cuda:0'; available: cpu ({NOT_INSTALLED})")
+    with pytest.raises(ValueError, match=expected):
         backend_for("cuda:0")
 
 

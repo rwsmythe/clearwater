@@ -3211,8 +3211,9 @@ def _text_t25(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     ):
         assert "/Users/diver" not in redact(leak), leak
     assert redact("GX01.MP4 done") == "GX01.MP4 done"
-    windows = he.Redactor([Path("C:\\Users\\diver\\footage")])
-    assert "diver" not in windows("C:\\Users\\diver\\footage\\GX01.MP4: refused")
+    if sys.platform == "win32":  # on POSIX such a spelling is one relative name (C10)
+        windows = he.Redactor([Path("C:\\Users\\diver\\footage")])
+        assert "diver" not in windows("C:\\Users\\diver\\footage\\GX01.MP4: refused")
 
 
 def _text_x25(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
