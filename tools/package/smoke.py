@@ -8,6 +8,7 @@ supervision is not window evidence: the seat supplies the independent UIA watch.
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import importlib.util
 import os
@@ -18,11 +19,11 @@ import tempfile
 import threading
 import time
 import zipfile
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import cache
 from pathlib import Path
 from types import ModuleType
-from typing import BinaryIO, NamedTuple, cast
+from typing import BinaryIO, NamedTuple, Protocol, cast
 
 import psutil
 
@@ -144,12 +145,140 @@ def _environment(root: Path) -> dict[str, str]:
         path = root / leaf
         path.mkdir(parents=True, exist_ok=True)
         env[key] = str(path)
-    system_root = env.get("SYSTEMROOT", "")
-    if not system_root or not Path(system_root).is_absolute():
-        raise SmokeError("environment: SystemRoot must name an absolute Windows directory")
-    env["PATH"] = str(Path(system_root) / "System32")
+    if sys.platform == "win32":
+        system_root = env.get("SYSTEMROOT", "")
+        if not system_root or not Path(system_root).is_absolute():
+            raise SmokeError("environment: SystemRoot must name an absolute Windows directory")
+        env["PATH"] = str(Path(system_root) / "System32")
+    else:
+        # macOS (WP6.5): the temporary root is TMPDIR; PATH holds the system tools only.
+        env["TMPDIR"] = env["TEMP"]
+        env["PATH"] = os.pathsep.join(_POSIX_PATH)
     env["QT_QPA_PLATFORM"] = "offscreen"  # defense in depth; approved rows never reach Qt
     return env
+
+
+_POSIX_PATH = ("/usr/bin", "/bin")
+"""The macOS smoke rows' PATH: system tools only, no Homebrew."""
+
+_GROUP_CLEANUP_SECONDS = 5.0
+"""How long the macOS cleanup waits for a killed process group to empty."""
+
+
+class _KillGroup(Protocol):
+    def __call__(self, pgid: int, signal: int, /) -> None: ...
+
+
+def _group_contained_process(
+    executable: Path,
+    arguments: Sequence[str],
+    *,
+    stdin: str,
+    root: Path,
+    timeout: float,
+    name: str,
+    killpg: _KillGroup,
+    kill_signal: int,
+    own_group: int,
+    popen: Callable[..., subprocess.Popen[bytes]] = subprocess.Popen,
+) -> subprocess.CompletedProcess[str]:
+    """Run one row in its own session and process group; census and kill the group.
+
+    The macOS containment (AD-37; WP6.5): ``start_new_session=True`` makes the root a
+    session and group leader (pgid = its pid) before it executes, so every descendant that
+    does not start its own session stays in that group. After the root exits and its pipes
+    reach EOF, ``killpg(pgid, 0)`` is the census: a group that still answers within the
+    deadline has SURVIVORS and the row fails. Cleanup always sends ``killpg(pgid, SIGKILL)``
+    and waits a bounded time for the group to empty. The group is never this process's own
+    (checked before any signal).
+
+    Args:
+        executable: The program to run.
+        arguments: Its arguments.
+        stdin: Text written to its standard input, then closed.
+        root: The row's disposable profile and temporary root.
+        timeout: The bound for the root and its pipes, in seconds.
+        name: The row name for messages.
+        killpg: ``os.killpg`` (a stub in tests).
+        kill_signal: ``signal.SIGKILL``.
+        own_group: This process's group (``os.getpgrp()``), never signalled.
+        popen: ``subprocess.Popen`` (a stub in tests).
+
+    Returns:
+        The finished row (exit status and decoded output).
+
+    Raises:
+        SmokeError: Timeout, survivors, a group that will not die, or an unsafe group.
+    """
+    env = _environment(root)
+    argv = _command(executable, arguments, env)
+    process: subprocess.Popen[bytes] | None = None
+    pgid = 0
+
+    def group_alive() -> bool:
+        try:
+            killpg(pgid, 0)
+        except ProcessLookupError:
+            return False
+        return True
+
+    try:
+        process = popen(
+            argv,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+            cwd=str(executable.parent),
+            start_new_session=True,
+        )
+        pgid = process.pid
+        if pgid <= 1 or pgid == own_group:
+            raise SmokeError(f"{name}: unsafe process group {pgid} (own group {own_group})")
+        deadline = time.monotonic() + timeout
+        try:
+            stdout, stderr = process.communicate(stdin.encode("utf-8"), timeout=timeout)
+        except subprocess.TimeoutExpired:
+            if process.poll() is None:
+                raise SmokeError(
+                    f"{name}: timeout after {timeout:g} s (root still alive)"
+                ) from None
+            if group_alive():
+                raise SmokeError(
+                    f"{name}: SURVIVORS (process group {pgid} holds the pipes after root exit)"
+                ) from None
+            raise SmokeError(f"{name}: timeout waiting for pipe EOF after root exit") from None
+        while group_alive():
+            if time.monotonic() >= deadline:
+                raise SmokeError(f"{name}: SURVIVORS (process left in group {pgid})")
+            time.sleep(0.01)
+        print(f"{name}: group census PASS (0 processes; new session; group {pgid})")
+        return subprocess.CompletedProcess(
+            argv,
+            process.returncode,
+            stdout.decode("utf-8", "replace"),
+            stderr.decode("utf-8", "replace"),
+        )
+    except (SmokeError, OSError) as error:
+        message = str(error).encode("ascii", "backslashreplace").decode("ascii")
+        print(f"{name}: FAIL ({message})", flush=True)
+        raise
+    finally:
+        if process is not None and pgid > 1 and pgid != own_group:
+            cleanup_deadline = time.monotonic() + _GROUP_CLEANUP_SECONDS
+            with contextlib.suppress(ProcessLookupError):
+                killpg(pgid, kill_signal)
+            try:
+                process.wait(max(0.0, cleanup_deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                raise SmokeError(f"{name}: root did not terminate after killpg") from None
+            while group_alive():
+                if time.monotonic() >= cleanup_deadline:
+                    raise SmokeError(f"{name}: process group {pgid} did not terminate after killpg")
+                time.sleep(0.01)
+            for stream in (process.stdin, process.stdout, process.stderr):
+                if stream is not None:
+                    stream.close()
 
 
 def _command(executable: Path, arguments: Sequence[str], env: dict[str, str]) -> list[str]:
@@ -575,6 +704,31 @@ if sys.platform == "win32":
                     if attributes_ready:
                         api.DeleteProcThreadAttributeList(attribute_memory)
 
+elif sys.platform == "darwin":
+    import signal
+
+    def _contained_process(
+        executable: Path,
+        arguments: Sequence[str],
+        *,
+        stdin: str,
+        root: Path,
+        timeout: float,
+        name: str,
+    ) -> subprocess.CompletedProcess[str]:
+        """Contain a row in its own process group (:func:`_group_contained_process`)."""
+        return _group_contained_process(
+            executable,
+            arguments,
+            stdin=stdin,
+            root=root,
+            timeout=timeout,
+            name=name,
+            killpg=os.killpg,
+            kill_signal=signal.SIGKILL,
+            own_group=os.getpgrp(),
+        )
+
 else:
 
     def _contained_process(
@@ -586,14 +740,10 @@ else:
         timeout: float,
         name: str,
     ) -> subprocess.CompletedProcess[str]:
-        """Refuse unproved POSIX containment; WP6.5 must supply its native proof.
-
-        The ruled method is start_new_session=True with a process-group census
-        via killpg(pgid, 0) and bounded killpg cleanup. It has not been proved
-        natively here, so this Windows release tool never launches uncontained.
-        """
+        """Refuse containment off Windows and macOS: Linux is not a supported build host."""
         raise SmokeError(
-            f"{name}: POSIX start_new_session/killpg containment awaits WP6.5 native proof"
+            f"{name}: process containment is proved on Windows and macOS only "
+            "(Linux is not a supported build host)"
         )
 
 

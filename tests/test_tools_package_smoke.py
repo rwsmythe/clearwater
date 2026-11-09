@@ -751,10 +751,239 @@ def test_job_creation_or_atomic_assignment_failure_is_named_and_never_runs_root(
     assert not Path(config["started"]).exists()
 
 
+NATIVE_GROUP_ROW = r"""
+import subprocess, sys
+if sys.argv[1] == "survivor":
+    child = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(120)"],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    open(sys.argv[2], "w").write(str(child.pid))
+print("export worker: no request document on stdin", file=sys.stderr)
+sys.exit(2)
+"""
+
+
 @pytest.mark.skipif(
-    sys.platform == "win32", reason="POSIX process-group native proof belongs to WP6.5"
+    sys.platform == "win32",
+    reason="native POSIX process-group proof (macOS runner); Windows proves it by stubs",
 )
-def test_non_windows_containment_never_silently_skips(tmp_path):
+def test_non_windows_containment_never_silently_skips(tmp_path, monkeypatch):
+    """darwin contains natively (a clean row; a survivor refused, then killed with its
+    group); any other POSIX platform is refused by name, never run uncontained."""
     smoke = load_smoke()
-    with pytest.raises(smoke.SmokeError, match=r"WP6\.5"):
-        smoke._process(tmp_path / "unused", [], stdin="", root=tmp_path, timeout=1, name="posix")
+    executable = tmp_path / "Clearwater" / "Clearwater"
+    if sys.platform != "darwin":
+        with pytest.raises(smoke.SmokeError, match=r"Linux is not a supported build host"):
+            smoke._process(executable, [], stdin="", root=tmp_path, timeout=1, name="posix")
+        return
+    executable.parent.mkdir(parents=True)
+    monkeypatch.setattr(
+        smoke,
+        "_command",
+        lambda target, arguments, env: [sys.executable, "-c", NATIVE_GROUP_ROW, *arguments],
+    )
+    done = smoke._process(
+        executable, ["clean"], stdin="", root=tmp_path / "a", timeout=10, name="a"
+    )
+    assert done.returncode == 2
+    assert done.stderr == "export worker: no request document on stdin\n"
+    marker = tmp_path / "grandchild.pid"
+    with pytest.raises(smoke.SmokeError, match=r"b: SURVIVORS"):
+        smoke._process(
+            executable,
+            ["survivor", str(marker)],
+            stdin="",
+            root=tmp_path / "b",
+            timeout=3,
+            name="b",
+        )
+    pid = int(marker.read_text())
+    deadline = time.monotonic() + 5
+
+    def gone() -> bool:
+        try:
+            return psutil.Process(pid).status() == psutil.STATUS_ZOMBIE
+        except psutil.NoSuchProcess:
+            return True
+
+    while not gone():
+        assert time.monotonic() < deadline, "the survivor outlived the group killpg"
+        time.sleep(0.05)
+
+
+# --- macOS process-group containment by stubs (WP6.5; AD-37) ----------------------------
+
+STUB_KILL = 9
+
+
+class FakeGroup:
+    """A scripted process group: ``popen`` and ``killpg`` answer from its state."""
+
+    def __init__(self, *, pid=4242, hangs=False, survivor=False, holds_pipes=False, immortal=False):
+        self.pid = pid
+        self.root_alive = True
+        self.members = survivor or holds_pipes
+        self.hangs = hangs
+        self.holds_pipes = holds_pipes
+        self.immortal = immortal
+        self.signals: list[tuple[int, int]] = []
+        self.popen_calls: list[tuple[list[str], dict]] = []
+        self.input = None
+
+    def popen(self, argv, **kwargs):
+        self.popen_calls.append((argv, kwargs))
+        return FakeProcess(self)
+
+    def killpg(self, pgid, signal):
+        assert pgid == self.pid
+        self.signals.append((pgid, signal))
+        if signal == STUB_KILL and not self.immortal:
+            self.root_alive = self.members = False
+        if signal == 0 and not (self.root_alive or self.members):
+            raise ProcessLookupError(3, "No such process")
+
+
+class FakeProcess:
+    stdin = stdout = stderr = None
+
+    def __init__(self, group):
+        self.group = group
+        self.pid = group.pid
+        self.returncode = None
+
+    def communicate(self, data, timeout):
+        self.group.input = data
+        if self.group.hangs:
+            raise subprocess.TimeoutExpired("stub", timeout)
+        self.group.root_alive = False
+        self.returncode = 2
+        if self.group.holds_pipes:
+            raise subprocess.TimeoutExpired("stub", timeout)
+        return b"", b"export worker: no request document on stdin\n"
+
+    def poll(self):
+        return None if self.group.root_alive else self.returncode
+
+    def wait(self, timeout):
+        if self.group.root_alive:
+            raise subprocess.TimeoutExpired("stub", timeout)
+        return self.returncode
+
+
+def run_group(smoke, group, tmp_path, *, timeout=0.05, own_group=77):
+    executable = tmp_path / "Clearwater" / "Clearwater"
+    executable.parent.mkdir(parents=True, exist_ok=True)
+    return smoke._group_contained_process(
+        executable,
+        ["--export-worker"],
+        stdin="request",
+        root=tmp_path / "row",
+        timeout=timeout,
+        name="worker",
+        killpg=group.killpg,
+        kill_signal=STUB_KILL,
+        own_group=own_group,
+        popen=group.popen,
+    )
+
+
+@pytest.fixture
+def darwin_smoke(monkeypatch):
+    smoke = load_smoke()
+    monkeypatch.setattr(smoke.sys, "platform", "darwin")
+    monkeypatch.setattr(smoke, "_GROUP_CLEANUP_SECONDS", 0.05)
+    return smoke
+
+
+def test_group_containment_clean_row_starts_a_new_session_and_censuses(
+    darwin_smoke, tmp_path, capsys
+):
+    """start_new_session, redirected roots, system PATH, census then the bounded killpg."""
+    group = FakeGroup()
+    done = run_group(darwin_smoke, group, tmp_path)
+    assert (done.returncode, done.stdout) == (2, "")
+    assert done.stderr == "export worker: no request document on stdin\n"
+    ((argv, kwargs),) = group.popen_calls
+    assert argv[1:] == ["--export-worker"]
+    assert kwargs["start_new_session"] is True
+    assert kwargs["cwd"] == str(tmp_path / "Clearwater")
+    env = kwargs["env"]
+    assert env["HOME"] == str(tmp_path / "row" / "home")
+    assert env["TMPDIR"] == env["TEMP"] == str(tmp_path / "row" / "temp")
+    assert env["PATH"] == os.pathsep.join(("/usr/bin", "/bin"))
+    assert group.input == b"request"
+    assert group.signals == [(4242, 0), (4242, STUB_KILL), (4242, 0)]
+    assert "worker: group census PASS (0 processes; new session; group 4242)" in (
+        capsys.readouterr().out
+    )
+
+
+@pytest.mark.parametrize(
+    "scenario, message",
+    [
+        ({"survivor": True}, r"worker: SURVIVORS \(process left in group 4242\)"),
+        ({"holds_pipes": True}, r"SURVIVORS \(process group 4242 holds the pipes after root exit"),
+        ({"hangs": True}, r"worker: timeout after 0\.05 s \(root still alive\)"),
+    ],
+    ids=["survivor", "survivor-holding-pipes", "root-hangs"],
+)
+def test_group_containment_fails_by_name_and_kills_the_group(
+    darwin_smoke, tmp_path, scenario, message
+):
+    """Every failure is named, and the whole group gets SIGKILL before the row returns."""
+    group = FakeGroup(**scenario)
+    with pytest.raises(darwin_smoke.SmokeError, match=message):
+        run_group(darwin_smoke, group, tmp_path)
+    assert (4242, STUB_KILL) in group.signals
+    assert group.signals[-1] == (4242, 0)
+    assert not (group.root_alive or group.members)
+
+
+def test_group_that_survives_killpg_is_a_named_failure(darwin_smoke, tmp_path):
+    """The cleanup is bounded: a group that will not die fails the row by name."""
+    group = FakeGroup(survivor=True, immortal=True)
+    with pytest.raises(darwin_smoke.SmokeError, match="group 4242 did not terminate after killpg"):
+        run_group(darwin_smoke, group, tmp_path)
+
+
+@pytest.mark.parametrize("pid", [77, 1, 0])
+def test_group_containment_never_signals_its_own_or_a_system_group(darwin_smoke, tmp_path, pid):
+    """A pid equal to this process's group (or 0 / 1) is refused before any signal."""
+    group = FakeGroup(pid=pid)
+    with pytest.raises(darwin_smoke.SmokeError, match=f"unsafe process group {pid}"):
+        run_group(darwin_smoke, group, tmp_path, own_group=77)
+    assert group.signals == []
+
+
+def _smoke_for(monkeypatch, platform):
+    monkeypatch.setattr(sys, "platform", platform)
+    return load_smoke()
+
+
+def test_darwin_binds_the_group_containment_to_killpg(monkeypatch, tmp_path):
+    """On darwin _contained_process passes os.killpg, SIGKILL and its own group."""
+    import signal
+
+    def killpg(pgid, sig):
+        raise AssertionError("not reached: the containment is captured")
+
+    monkeypatch.setattr(os, "killpg", killpg, raising=False)
+    monkeypatch.setattr(os, "getpgrp", lambda: 31337, raising=False)
+    monkeypatch.setattr(signal, "SIGKILL", STUB_KILL, raising=False)
+    smoke = _smoke_for(monkeypatch, "darwin")
+    seen = {}
+    monkeypatch.setattr(smoke, "_group_contained_process", lambda *a, **kw: seen.update(kw))
+    smoke._process(
+        tmp_path / "Clearwater", ["-c", "pass"], stdin="", root=tmp_path, timeout=1, name="r"
+    )
+    assert seen["killpg"] is killpg
+    assert (seen["kill_signal"], seen["own_group"]) == (STUB_KILL, 31337)
+    assert not hasattr(smoke, "_kernel32")
+
+
+def test_linux_containment_is_refused_by_name(monkeypatch, tmp_path):
+    """Linux is not a build host: the smoke refuses rather than run uncontained."""
+    smoke = _smoke_for(monkeypatch, "linux")
+    with pytest.raises(smoke.SmokeError, match=r"r: process containment .*Linux is not"):
+        smoke._process(tmp_path, [], stdin="", root=tmp_path, timeout=1, name="r")
