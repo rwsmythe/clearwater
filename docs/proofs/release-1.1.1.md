@@ -1,8 +1,8 @@
 # Clearwater 1.1.1 release record (CHARC generation 20, 2026-11-08)
 
 The release record required by `docs/release-checklist.md` v2 step 12. Written by
-CHARC after the owner's words, the orchestrator's tag report and the verified draft
-release. 1.1.1 is the first Clearwater version delivered as a download. It carries the
+CHARC after the owner's words, the orchestrator's tag report, the verified draft
+release, the owner's clean-account check and the publication. 1.1.1 is the first Clearwater version delivered as a download. It carries the
 same product code as the tag `v1.1.0`, whose release run failed before building anything;
 that attempt is recorded here too.
 
@@ -134,14 +134,15 @@ heavy running, 2.5 TB free throughout; archive `clearwater-review-evidence\relea
 | Source commit | EQUAL in four places: sidecar = run headSha = draft body = the gated commit |
 | Zip vs the local build (DR-156) | member SET 306 = 306, names identical, one top-level folder; three members differ in bytes (`Clearwater.exe`, `_internal/base_library.zip`, numpy's `RECORD` for its two console-script launchers written per install); the zip is not byte-reproducible across machines, as recorded |
 
-## Still open at this record
+## Steps 11 and 13: the owner's check and the publication
 
-- **Step 11, the clean-account check, is the OWNER's hand:** a clean Windows account on
-  this laptop (no Python, FFmpeg or PATH additions); unzip the DOWNLOADED zip (the draft
-  page, or `release-1.1.1\workflow\run-42439969961\assets\`, sha256 `3a4da9d1...`); run
-  `Clearwater.exe`; open a photo and export; Tools > Install GPU support..., review the
-  terms and size, install, restart, export on the GPU; confirm the device and the output.
-  The harness does not do this (desktop input rule).
-- **Step 13:** the owner reviews the draft and clicks Publish.
-- DR-159 (checklist v3) opened with this record; the owed prune of the 1.1.1 worktrees
-  and build folders waits on the owner's word.
+| Item | Value |
+|---|---|
+| Step 11, clean-account check | PASS by the OWNER's hand on the downloaded artifact (owner 2026-11-08, verbatim in chat to CHARC: "step 1 complete.  Publish", where "step 1" is the clean-account check as listed by CHARC); the harness drove nothing on the desktop |
+| Step 13, publish | Done by CHARC on the owner's word "Publish" (`gh release edit v1.1.1 --draft=false`); `isDraft` false, `isPrerelease` false, `publishedAt` 2026-11-09T05:30:45Z (GitHub's clock), target `main`, the same three assets (221,565,914 B zip; 161 B sidecar; 4,697,437 B notices); https://github.com/rwsmythe/clearwater/releases/tag/v1.1.1 |
+| Standing rule | The two acts the owner usually performs by hand (the push, the publish) were done by CHARC on the owner's explicit words in this session ("You do the pushing", "Publish"); each is a one-time instruction recorded here, not a change to the rule that the harness never pushes or publishes Clearwater's repository without the owner's word |
+
+**Clearwater 1.1.1 is RELEASED** (2026-11-09 05:30Z; 2026-11-08 19:30 -1000). Open after the
+record: DR-159 (checklist v3); the owed prune of `.worktrees/release-1.1.1` (+ r111
+basetemps), `.worktrees/release-1.1.1-rv`, `work/release-1.1.1` and
+`work/release-1.1.1-proof-cpu` on the owner's word.
