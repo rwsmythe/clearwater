@@ -1,118 +1,99 @@
-# Clearwater, the application
+# Clearwater
 
-Clearwater corrects colour cast, contrast loss and haze in underwater photos and
-video. Version 1.1.1 ships as a Windows one-folder download (a zip, unsigned, not an
-installer) on the GitHub release page, and installs from this repository with uv on any
-platform. The macOS code paths are in 1.1.1 but not yet validated on a Mac; there is no
-macOS download. Start with the [installation and user guide](docs/user-guide.md).
-See [third-party notices](THIRD_PARTY_NOTICES.md) and [LICENSE](LICENSE) for the
-GPL-2.0-or-later licence and component terms.
+Clearwater corrects the colour cast, lost contrast and haze in underwater photos and
+video shot with ordinary cameras: an iPhone at snorkel depth, a GoPro on a dive. It aims
+for a pleasing, natural-looking image rather than physically exact colour. Everything runs
+on your own computer; your photos and videos never leave it.
 
-# CHARC Harness
+Version 1.1.1 is a Windows download. Unzip it and run `Clearwater.exe`. No Python, no
+installer, no account.
 
-A germinable multi-agent development scaffold: one standing director (CHARC),
-rotating orchestrator generations, and ephemeral implementer cells, coordinated
-through durable file-based comms and a small set of bootstrap seams. Clone the
-repo, `launch charc`, and follow its bootstrap to fill the seams in for your own
-project.
+- [Download the latest release](https://github.com/rwsmythe/clearwater/releases)
+- [User guide](docs/user-guide.md): installation, a first-run walkthrough, video and photo
+  details, troubleshooting
+- [Release notes](docs/release-notes-1.1.1.md)
 
-> The application this instantiation runs is defined in `APPLICATION.md`.
+## What it does
 
-## Germinate a new project
+- **Photos:** opens iPhone HEIC and JPG (PNG and TIFF also work), corrects the image and
+  writes a 16-bit PNG (8-bit optional) with the colour profile embedded and the camera's
+  EXIF carried over, orientation applied once and correctly.
+- **Video:** opens GoPro and iPhone MP4 or MOV clips in HEVC or H.264, 8-bit or 10-bit.
+  A first pass analyses the whole clip and smooths the correction over time so it does not
+  flicker; the export writes an HEVC MP4 at full size, carrying timing, orientation and the
+  audio and data tracks it can keep.
+- **Compare before you export:** a split view slides between the original and the
+  corrected image. Fit the whole frame or look at 1:1 pixels. For a clip, scrub the
+  timeline and inspect any frame.
+- **Two correction methods:** 3C (the default) and Ancuti 2018. Adjust compensation
+  strength, white balance strength, sharpening and how much of the original to blend back;
+  finer controls live under Advanced.
+- **Presets:** save a look, load it later, import and export preset files to share them.
+- **Batch:** queue several photos and clips and process them in one run.
+- **Safe output:** results are written beside the source or to a folder you choose, named
+  `<original>_corrected`. Nothing is ever overwritten; a second export of the same file
+  gets `_2`, `_3` and so on. Your originals are never modified.
+- **Graphics-card processing, optional:** with an NVIDIA card, install GPU support from
+  the Tools menu (a separate download of about 1.7 GB, 2.5 GB installed). Without it,
+  everything still works on the processor, many times more slowly for video.
 
-1. Clone this repo (a bare clone is enough -- see "The staged guarantee" below).
-2. Launch CHARC: `.\scripts\launch_role.ps1 -Role charc` (sets
-   `HARNESS_ROLE=charc` and points the fresh session at its bootstrap doc).
-3. CHARC reads `docs/charc-state.md` then `docs/charc-charter.md`, verifies
-   comms, and runs the application-definition interview with the operator --
-   see `docs/charc-bootstrap.md` for the literal first-run flow.
+## Requirements
 
-## The staged guarantee
+- Windows 11 (Windows 10 is untested). The unpacked program is about 0.7 GB.
+- For GPU processing: an NVIDIA card with a driver that supports CUDA 12 (the 12.9
+  runtime; driver 576.57 or newer).
+- Disk space for the outputs and for the video analysis cache, whose size limit you set
+  in Settings.
 
-CHARC operation -- comms plus the charter -- works on a **bare clone** with no
-further setup: you can verify a role's inbox round-trip and reach the
-application-definition interview immediately. Orchestrator and implementer
-operation come online once the bootstrap's step 5 brings an orchestrator
-generation up. `docs/charc-bootstrap.md` documents exactly which steps require
-that live generation and which do not.
+## Performance
 
-## The four bootstrap seams
+With GPU processing on the laptop used for development, a full analysis and export of 4K
+GoPro footage takes about 11 to 12 minutes per minute of video. Other hardware and footage
+will differ. The processor-only route is many times slower and is reported on the export
+when it is used.
 
-The interview + the bootstrap checklist fill four seams, each a named artifact:
+## What it does not do
 
-1. **Seam 1 -- the application.** `APPLICATION.md` (repo root): what the
-   project does, its domain, success criteria, constraints. This is the ONE
-   file that carries instance/domain vocabulary by design; everything else in
-   this list stays application-agnostic.
-2. **Seam 2 -- the domain implementer cells.** `.claude/agents/`, authored from
-   `.claude/agents/implementer-template.md` -- one cell per model/effort tier
-   the project needs, filling the `<application>` placeholder and the
-   model/effort frontmatter.
-3. **Seam 3 -- the review/gate mechanism.** `docs/review-gate-seam.md`: the
-   mechanism-agnostic review-to-convergence + gate contract, with named
-   extension points and a minimal generic default that is operable from
-   minute one. A project's concrete fill (naming its real reviewer/gate) lives
-   in its own `docs/review-gate-<app>.md` instance doc, so this contract stays
-   pristine. `docs/codex-reviewer.md` is an optional, replaceable `REVIEWER`
-   plug-in reference for one substrate; it is not the reviewer, and a
-   non-software project ignores it and plugs its own.
-4. **Seam 4 -- per-role model/effort/permission-mode defaults.** Tuned inside
-   `scripts/launch_role.ps1` -- tunable starters, not canonical values (one
-   fixed exception: the director role stays at the harness's top-capability
-   tier regardless of project). Optional; a working starter ships.
+- **ProRes and other codecs:** only HEVC and H.264 video is accepted. Insta360 Studio
+  exports work when exported as H.265; ProRes exports are refused with a message.
+- **HDR video:** clips tagged HLG or PQ (including Dolby Vision with those transfers) are
+  refused. Record in your camera's standard (SDR) mode.
+- **RAW photos:** DNG and ProRAW are not supported.
+- **Native Insta360 recordings (`.insv`)** are not supported; export from Insta360 Studio
+  first.
+- **GoPro chapters** are not joined; open each chapter file on its own.
+- **Halos** can appear at some high-contrast edges against open water. Inspect edges in
+  the preview before exporting; a fix is planned.
+- **Not signed.** Windows SmartScreen may show an unknown publisher the first time; choose
+  More info, then Run anyway, after confirming you downloaded it from this repository's
+  release page. Each release ships a `.sha256` file to check the download against.
 
-## Repository layout
+## Platforms
 
-- `APPLICATION.md` -- the seam-1 application definition (instance content).
-- `docs/` -- the project record: the kernel docs below, the review/gate seam,
-  design specs and plans, per-arc dispatch briefs, proofs.
-- `docs/charc-bootstrap.md` -- the literal first-run flow + the 5-step
-  bootstrap checklist.
-- `docs/charc-charter.md` -- CHARC's standing authority, disciplines, and
-  comms routing (the director kernel).
-- `docs/orchestrator-context.md` -- the generic orchestrator operating model
-  (dispatch briefs, QA-the-implementer-product, own-the-accept).
-- `docs/dispatch-recipe.md` -- the generic implementer protocol every
-  dispatched cell reads first (isolated workspace, produce -> validate ->
-  converge, the review-to-convergence loop, the acceptance-transfer return
-  report).
-- `.claude/agents/` -- the shipped generic cell template plus the project's
-  own domain implementer cells authored from it.
-- `scripts/` -- the file-comms CLI (`role_mail.py`), the role launcher
-  (`launch_role.ps1`), and an optional mail UI (`comms_ui.py`).
-- `tests/` -- the harness / infrastructure test suite (this is what the
-  validation command below runs); a project's own application suite, if any,
-  lives under its own directory and is documented in `APPLICATION.md`.
+- **Windows:** the download above.
+- **macOS:** the code for Apple Silicon is in the tree and is being validated on a real
+  Mac now; there is no Mac download yet.
+- **From source, any platform:** clone the repository and run it with
+  [uv](https://docs.astral.sh/uv/); see the user guide's "Developer/source install"
+  section. Python 3.12 and FFmpeg on your PATH are needed for a source run.
 
-## Validating the harness
+## Privacy
 
-The harness / infrastructure suite runs under the stdlib `unittest` module:
+Clearwater does not collect anything and makes no network connection, with one exception:
+installing GPU support downloads the NVIDIA and CuPy packages from their public package
+index, after showing you their sizes and licence terms. Settings, presets and logs live
+under `%APPDATA%\Clearwater`; the cache and GPU support under `%LOCALAPPDATA%\Clearwater`.
 
-```
-python -m unittest discover -s tests
-```
+## Licence
 
-This is the review/gate seam's build gate: the doc-acceptance checks above, the
-genericity guard (no application vocabulary leaking into the reusable core),
-and the rest of the harness machinery tests. A project's own application suite
-(if it ships one) is documented separately in `APPLICATION.md`.
+Clearwater is free software under the GNU General Public License, version 2 or any later
+version; see [LICENSE](LICENSE). The bundled FFmpeg and the other third-party components
+are listed with their licences and sources in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+(the release zip carries its own copy for exactly the components it contains).
 
-## Comms and roles
+## Developers
 
-Roles (CHARC, an orchestrator generation, a peer director, the operator)
-coordinate through durable, file-based, per-role inboxes under `comms/` via
-`scripts/role_mail.py` -- never in-process message passing, so state survives a
-context reset. `docs/orchestrator-context.md` and `docs/charc-charter.md`
-document the routing; an implementer cell's return report goes to whoever
-dispatched it, never to a role mailbox.
-
-## Review, gate, and acceptance
-
-Every product (code, a plan, a doc) passes through the review-to-convergence
-loop defined by `docs/review-gate-seam.md` before a superior accepts it: an
-adversarial `REVIEWER` produces severity-classified findings, each is
-adjudicated (never blind-fixed), and the loop iterates to its
-`CONVERGENCE_CRITERION`. Review is a filter, never the gate -- the accepting
-superior verifies the claimed behavior against reality before merging.
-`docs/codex-reviewer.md` documents one optional, substrate-coupled `REVIEWER`
-plug-in; the seam itself names no concrete mechanism.
+The repository is developed by a multi-agent harness; that machinery is documented in
+[docs/harness-readme.md](docs/harness-readme.md), and the application's requirements in
+[the specification](docs/underwater-correction-spec.md) and
+[the implementation plan](docs/clearwater-implementation-plan.md).

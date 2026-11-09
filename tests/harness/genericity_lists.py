@@ -184,6 +184,8 @@ SELF_EXCLUDE_RELPATHS: tuple[str, ...] = (
 # only. The manifest cross-check (test_manifest_accounting) accounts for BOTH sets
 # against the manifest's docs/*.md, so neither blurs the other.
 CORE_DOC_RELPATHS: frozenset[str] = frozenset({
+    # 2026-11-09: the scaffold README text (the root README is the application's page).
+    "docs/harness-readme.md",
     "docs/charc-charter.md",
     "docs/charc-bootstrap.md",
     "docs/model-prompting-standard.md",
@@ -255,6 +257,8 @@ INSTANCE_SURFACE_RELPATHS: tuple[str, ...] = (
     # the 1.1.0 release notes (the release workflow's draft body, 2026-11-06).
     "docs/release-notes-1.1.0.md",
     "docs/release-notes-1.1.1.md",
+    # the project log (2026-11-09): CLAUDE.md's dated narrative moved here verbatim.
+    "docs/project-log.md",
 ) + INSTANCE_STUB_RELPATHS
 INSTANCE_SURFACE_PREFIXES: tuple[str, ...] = (
     "docs/briefs/",

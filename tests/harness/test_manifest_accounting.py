@@ -24,6 +24,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 # orchestrator bring-up stays folded in charc-bootstrap.md) -- ZERO extra files.
 SHIPPED_MANIFEST = {
     "README.md",
+    # 2026-11-09: the scaffold README text, moved out of the root README when an
+    # instantiated project makes the root README its application's user page.
+    "docs/harness-readme.md",
     "APPLICATION.md",
     "comms/.gitkeep",
     "scripts/role_mail.py",
@@ -86,18 +89,19 @@ def _unaccounted(tracked: set[str]) -> list[str]:
 
 
 class ManifestAccountingTest(unittest.TestCase):
-    def test_manifest_count_is_twenty_two(self) -> None:
+    def test_manifest_count_is_twenty_three(self) -> None:
         # The shipped-manifest count: 17 post-ARC-8, PLUS the 2026-08 harness-wide
         # model-prompting standard (docs/model-prompting-standard.md) = 18, PLUS
         # the 2026-09 dispatcher depth instrument (scripts/cell_depth.py,
         # generic/stdlib-only/no-app-vocabulary) = 19, PLUS the 2026-10-27
         # dual-model implementer lane (two usage readouts + the Codex cell
-        # driver, same posture) = 22.
+        # driver, same posture) = 22, PLUS the 2026-11-09 scaffold README file
+        # (docs/harness-readme.md) = 23.
         self.assertEqual(
-            len(SHIPPED_MANIFEST), 22,
-            "the shipped manifest is 22 files (17 post-ARC-8 plus the "
-            "model-prompting standard, the cell-depth instrument and the three "
-            "dual-model lane scripts)")
+            len(SHIPPED_MANIFEST), 23,
+            "the shipped manifest is 23 files (17 post-ARC-8 plus the "
+            "model-prompting standard, the cell-depth instrument, the three "
+            "dual-model lane scripts and the scaffold README file)")
 
     def test_charc_state_pointer_is_shipped(self) -> None:
         # The state-pointer file must be a tracked shipped-manifest file.
