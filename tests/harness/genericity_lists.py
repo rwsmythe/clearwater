@@ -254,6 +254,9 @@ INSTANCE_SURFACE_RELPATHS: tuple[str, ...] = (
     # the application's release workflow (WP6.3b, 2026-11-05): it builds and
     # checks the packaged application, so it names the application toolchain.
     ".github/workflows/release.yml",
+    # the macOS build workflow (WP6.5, 2026-11-09): called by release.yml and
+    # pushed to macos-validation/** for stage 1; it names the application toolchain.
+    ".github/workflows/macos-build.yml",
     # the 1.1.0 release notes (the release workflow's draft body, 2026-11-06).
     "docs/release-notes-1.1.0.md",
     "docs/release-notes-1.1.1.md",
