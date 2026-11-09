@@ -361,6 +361,37 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             item.add_marker(skip)
 
 
+POSIX_HOME_FOLDER = "home"
+"""The prefix of the per-test home folder :func:`_posix_home_redirect` makes (WP6.5 A4)."""
+
+
+@pytest.fixture(autouse=True)
+def _posix_home_redirect(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """On POSIX, point ``HOME`` at a fresh folder under the session temp root (WP6.5 A4).
+
+    On macOS ``Path.home() / "Library"`` holds Clearwater's settings and cache
+    (``clearwater.config.paths.app_locations``), and on Linux ``Path.home()`` is the XDG
+    fallback; ``Path.home()`` and ``os.path.expanduser`` read ``HOME`` there. So a test that
+    reaches those locations without its own redirect would write the real account's
+    ``~/Library/Application Support/Clearwater``; this redirect makes the isolation
+    structural, one place, for every test function (child processes inherit it). The folder
+    is ``tmp_path_factory.mktemp("home")``, beside the test's own ``tmp_path`` rather than
+    inside it, so a test that lists its ``tmp_path`` sees nothing new. A test that sets
+    ``HOME`` itself still wins (its ``monkeypatch`` change comes later). Session- and
+    module-scoped fixtures run before it and are not covered.
+
+    NOT on Windows (``sys.platform == "win32"``): there isolation runs through ``APPDATA`` /
+    ``LOCALAPPDATA``, and ``HOME`` feeds git and uv; the fixture does nothing.
+
+    Args:
+        request: The test's fixture request (for the session temp-path factory).
+        monkeypatch: The test's monkeypatch, which restores ``HOME`` at teardown.
+    """
+    if sys.platform != "win32":
+        factory: pytest.TempPathFactory = request.getfixturevalue("tmp_path_factory")
+        monkeypatch.setenv("HOME", str(factory.mktemp(POSIX_HOME_FOLDER)))
+
+
 @pytest.fixture(autouse=True)
 def _release_fft_plans(request: pytest.FixtureRequest) -> None:
     """Release the GPU backend's cuFFT plans after each test (WP3.21, CHARC ruling (A)).
