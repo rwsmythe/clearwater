@@ -1484,7 +1484,9 @@ def _make_native_surface(destination):
     shutil.copytree(
         ROOT / "tools/package/native-licences",
         destination,
-        ignore=shutil.ignore_patterns("ffmpeg-toolchain", "ffmpeg-components"),
+        ignore=shutil.ignore_patterns(
+            "ffmpeg-toolchain", "ffmpeg-components", "ffmpeg-macos-components"
+        ),
     )
     # Existing OpenSSL tests carry synthetic bytes, so bind their copied input
     # surface to those bytes rather than the seat-measured production DLLs.
@@ -1518,8 +1520,9 @@ def omit_production_embedded_census(surface):
     document.pop("limits", None)
     keep = {"manifest.json", *(name for name, _sha, _size in native_surface_inputs(document))}
     for item in surface.iterdir():
-        # This subdirectory is checked separately against the FFmpeg lock.
-        if item.name in {"ffmpeg-toolchain", "ffmpeg-components"} and item.is_dir():
+        # These subdirectories are checked separately against their FFmpeg locks.
+        folders = {"ffmpeg-toolchain", "ffmpeg-components", "ffmpeg-macos-components"}
+        if item.name in folders and item.is_dir():
             continue
         if item.name not in keep:
             item.unlink()

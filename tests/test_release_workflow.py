@@ -19,6 +19,7 @@ import sys
 import textwrap
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -1123,7 +1124,8 @@ def _build_tool():
 
 def test_macos_release_build_reads_the_macos_lock_fields_and_the_switch_stays_off(macos):
     """The step reads asset_url / seat_sha256 from ffmpeg-macos.lock.json, the fields the
-    validator's macOS shape names; the switch is OFF until part 3 writes the real lock."""
+    validator's macOS shape names. Part 3c committed the real lock; the switch stays OFF
+    until the F0-2 group (the .app census, the Mac notices, the C14 darwin rows; CHARC)."""
     build = _build_tool()
     lines = script(macos, "Build release bundle and zip").splitlines()
     assert lines[0] == "lock=tools/package/ffmpeg-macos.lock.json"
@@ -1141,4 +1143,112 @@ def test_macos_release_build_reads_the_macos_lock_fields_and_the_switch_stays_of
     assert '--ffmpeg-from "$url" --ffmpeg-sha256 "$sha"' in lines[-1]
     assert fixture["asset_url"] not in macos and fixture["seat_sha256"] not in macos
     assert re.findall(r'^      MACOS_FFMPEG_BUNDLED: "(\w+)"$', macos, re.MULTILINE) == ["false"]
-    assert not (ROOT / "tools/package/ffmpeg-macos.lock.json").exists()
+    real = build.load_macos_ffmpeg_lock()
+    assert build.FFMPEG_MACOS_LOCK_PATH.is_file()
+    assert real["asset_url"] not in macos and real["seat_sha256"] not in macos
+
+
+# --- WP6.5 part 3c, CHARC's guard: the lock present with the switch OFF is inert -----------
+
+SWITCH_GATES = {
+    "": True,
+    "always()": True,
+    "env.MACOS_FFMPEG_BUNDLED != 'true'": True,
+    "env.MACOS_FFMPEG_BUNDLED == 'true'": False,
+}
+"""Each step condition the macOS job uses -> whether the step runs with the switch "false"."""
+
+SWITCH_ON_ONLY = re.compile(
+    r'^( *)if \[ "\$MACOS_FFMPEG_BUNDLED" = "true" \]; then\n.*?^\1fi\n', re.MULTILINE | re.DOTALL
+)
+"""A shell branch taken only when the switch reads "true" (removed from the OFF reading)."""
+
+ASSET_NEEDLES = (
+    "--notices",
+    "--zip",
+    "--ffmpeg-from",
+    "--ffmpeg-sha256",
+    "ffmpeg-macos.lock.json",
+    "asset_url",
+    "seat_sha256",
+    "releases/download",
+    "curl ",
+    "wget ",
+    "gh release",
+    "hide_banner",
+)
+"""What a step that runs with the switch OFF must not name: the release flags, the lock, its
+asset, a download tool, or a run of the bundled tool."""
+
+
+def _switch_off_violations(macos: str, lock: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """Read the macOS job as the switch's value runs it; return (violations, steps run)."""
+    values = re.findall(r'^      MACOS_FFMPEG_BUNDLED: "(\w+)"$', macos, re.MULTILINE)
+    problems = [] if values == ["false"] else [f"the switch reads {values}"]
+    ran = []
+    for name in re.findall(r"^      - name: (.+)$", macos, re.MULTILINE):
+        body = step(macos, name)
+        gate = re.search(r"^        if: (.+)$", body, re.MULTILINE)
+        condition = gate[1].strip() if gate else ""
+        if condition not in SWITCH_GATES:
+            problems.append(f"{name}: unknown condition {condition!r}")
+            continue
+        if not SWITCH_GATES[condition]:
+            continue
+        ran.append(name)
+        live = SWITCH_ON_ONLY.sub("", body)
+        for needle in (*ASSET_NEEDLES, lock["asset_name"], lock["release_tag"]):
+            if needle in live:
+                problems.append(f"{name}: {needle}")
+    return problems, ran
+
+
+def test_the_lock_with_the_switch_off_is_inert(macos):
+    """CHARC's guard (part 3c): with the real lock committed and MACOS_FFMPEG_BUNDLED "false",
+    no step that runs calls --notices on a bundle, reads the lock's asset or downloads it, and
+    the one build it runs parses to no FFmpeg pair, no notices, no smoke and no zip. Read
+    statically from the workflow text; the workflow is never run."""
+    build = _build_tool()
+    lock = build.load_macos_ffmpeg_lock()
+    problems, ran = _switch_off_violations(macos, lock)
+    assert problems == []
+    assert "Build app bundle without FFmpeg" in ran
+    assert not {
+        "Build release bundle and zip",
+        "Stage release assets",
+        "Upload release assets",
+    } & set(ran)
+    command = script(macos, "Build app bundle without FFmpeg").splitlines()[0]
+    argv = shlex.split(command.split(" 2>&1", 1)[0])
+    assert argv[:4] == ["uv", "run", "python", "tools/package/build.py"]
+    args = build.parse_args(argv[4:])
+    assert args.form == "onedir"
+    assert args.ffmpeg_from is None and args.ffmpeg_sha256 is None
+    assert not (args.notices or args.smoke or args.zip_release)
+    capture = SWITCH_ON_ONLY.sub("", step(macos, "Capture runner and encoder facts"))
+    assert "$tool" not in capture
+
+
+@pytest.mark.parametrize(
+    "plant",
+    ["switch-on", "off-step-notices", "release-step-ungated", "capture-runs-the-tool"],
+)
+def test_the_switch_off_guard_sees_each_planted_breach(macos, plant):
+    """The guard's controls: each planted breach of the OFF reading is reported."""
+    build = _build_tool()
+    lock = build.load_macos_ffmpeg_lock()
+    if plant == "switch-on":
+        planted = macos.replace('MACOS_FFMPEG_BUNDLED: "false"', 'MACOS_FFMPEG_BUNDLED: "true"')
+    elif plant == "off-step-notices":
+        planted = macos.replace(
+            "--form onedir --out work/release", "--form onedir --notices --out work/release", 1
+        )
+    elif plant == "release-step-ungated":
+        gate = "\n        if: env.MACOS_FFMPEG_BUNDLED == 'true'\n"
+        head, tail = macos.split("      - name: Build release bundle and zip", 1)
+        planted = head + "      - name: Build release bundle and zip" + tail.replace(gate, "\n", 1)
+    else:
+        planted = macos.replace('if [ "$MACOS_FFMPEG_BUNDLED" = "true" ]; then', "if true; then", 1)
+    assert planted != macos
+    problems, _ran = _switch_off_violations(planted, lock)
+    assert problems, plant

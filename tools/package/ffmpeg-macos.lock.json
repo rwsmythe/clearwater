@@ -1,0 +1,575 @@
+{
+  "schema_version": 2,
+  "platform": "macos-arm64",
+  "census": {
+    "state": "complete",
+    "job_url": "https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/42661533922/job/129375108552",
+    "log": "the job's log, attempt 3, as the seat saved it (874 lines; gh run view --log form); line numbers are that file's",
+    "linkage_step": "Check the binaries",
+    "linkage_lines": "618-659",
+    "version_lines": "660-662",
+    "toolchain_step": "Record and check the runner",
+    "toolchain_lines": "157-163",
+    "external_libraries": "build/logs/build-ffmpeg.log:144-153"
+  },
+  "provider": "rwsmythe/FFmpeg-Builds",
+  "build_script": {
+    "repository": "https://git.martin-riedl.de/ffmpeg/build-script.git",
+    "commit": "f63b8aab8f5ce1a067da86ba69e34a36a7e217e5"
+  },
+  "release_tag": "ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-9cb0fa8",
+  "build_repository_commit": "9cb0fa81871f09ae3f750d6845874c26a871b985",
+  "build_run_url": "https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/42661533922",
+  "asset_name": "ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0.zip",
+  "asset_url": "https://github.com/rwsmythe/FFmpeg-Builds/releases/download/ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-9cb0fa8/ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0.zip",
+  "size_bytes": 37978871,
+  "github_sha256": "e3f251dc281a71e46e1464436c8cb281994af7fe4ed4978d95922ad82bb176e4",
+  "seat_sha256": "e3f251dc281a71e46e1464436c8cb281994af7fe4ed4978d95922ad82bb176e4",
+  "ffmpeg_ref": "release/9.0",
+  "ffmpeg_commit": "b204e94e90fca64045e9ca7dd44c65678c7eb29e",
+  "ffmpeg_repository": "https://github.com/FFmpeg/FFmpeg.git",
+  "version": "n9.0.2-47-gb204e94e90-20261109",
+  "configure_line": "configuration: --prefix=/Users/runner/work/FFmpeg-Builds/FFmpeg-Builds/work/out --pkg-config-flags=--static --extra-version=20261109 --enable-gray --enable-libxml2 --enable-version3 --enable-gpl --enable-openssl --enable-libfreetype --enable-fontconfig --enable-libharfbuzz --enable-libass --enable-libx264 --enable-libx265",
+  "licence": "GPL-3.0-or-later",
+  "archive_root": "ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0",
+  "extract_members": [
+    "bin/ffmpeg",
+    "bin/ffprobe",
+    "LICENSE.txt"
+  ],
+  "source_record_url": "https://github.com/rwsmythe/FFmpeg-Builds/tree/9cb0fa81871f09ae3f750d6845874c26a871b985",
+  "retention_note": "the asset is a release of the owner's fork (tag ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-9cb0fa8, not Latest); no retention policy applies; rebuild in the fork for an FFmpeg bump (checklist step)",
+  "macos_deployment_target": "14.0",
+  "runner_label": "macos-26",
+  "runner_image_version": "20261102.0473.1",
+  "components": [
+    {
+      "stage": "build-fontconfig",
+      "name": "fontconfig",
+      "repository": "https://gitlab.freedesktop.org/api/v4/projects/890/packages/generic/fontconfig/2.17.1/fontconfig-2.17.1.tar.xz",
+      "pin": "9f5cae93f4fffc1fbc05ae99cdfc708cd60dfd6612ffc0512827025c026fa541",
+      "pin_kind": "sha256",
+      "extra_repositories": [],
+      "configure_flag": [
+        "--enable-fontconfig"
+      ],
+      "licence": "MIT",
+      "licence_basis": "pinned-source-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "licence identity as the Windows seat-verified row; texts read at this pin from the runner-pinned source (zip build/sha256-pins.txt); every text byte-equal to a Windows text",
+      "texts": [
+        {
+          "path": "fontconfig--COPYING",
+          "sha256": "51a51aa9823704fd90bccc616cdd17ebabb5b2b3e9cbde886ca02c7002288067",
+          "member": "fontconfig-2.17.1/COPYING"
+        }
+      ],
+      "chosen": null
+    },
+    {
+      "stage": "build-freetype",
+      "name": "freetype",
+      "repository": "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.0.tar.gz",
+      "pin": "a7aca0e532a276ea8d85bd31149f0a74c33d19c8d287116ef8f5f8357b4f1f80",
+      "pin_kind": "sha256",
+      "extra_repositories": [],
+      "configure_flag": [
+        "--enable-libfreetype"
+      ],
+      "licence": "FTL OR GPL-2.0-or-later",
+      "licence_basis": "pinned-source-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "licence identity as the Windows seat-verified row; texts read at this pin from the runner-pinned source (zip build/sha256-pins.txt); new at this pin: freetype--LICENSE.TXT, freetype--docs--FTL.TXT",
+      "texts": [
+        {
+          "path": "freetype--LICENSE.TXT",
+          "sha256": "2e3bbb7d7c5c396368dd0853a790ec29ce5b8647163dde42a0493fb0d6556b2b",
+          "member": "freetype-2.13.0/LICENSE.TXT"
+        },
+        {
+          "path": "freetype--docs--FTL.TXT",
+          "sha256": "08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1",
+          "member": "freetype-2.13.0/docs/FTL.TXT"
+        },
+        {
+          "path": "freetype--docs--GPLv2.TXT",
+          "sha256": "c4120c6752c910c299e3bd9cb3a46ff262c268303ca2069b61f92f10a5656c18",
+          "member": "freetype-2.13.0/docs/GPLv2.TXT"
+        },
+        {
+          "path": "freetype--src--bdf--README",
+          "sha256": "7984455e7e5a9faba3797c8bf095fbe10cc846316b7320aff8c58402e22b82fe",
+          "member": "freetype-2.13.0/src/bdf/README"
+        },
+        {
+          "path": "freetype--src--pcf--README",
+          "sha256": "18d9782898d9eac04476e2f744678137b2a889689ed3e923e052fc396a86f86b",
+          "member": "freetype-2.13.0/src/pcf/README"
+        }
+      ],
+      "chosen": "GPL-2.0-or-later"
+    },
+    {
+      "stage": "build-fribidi",
+      "name": "fribidi",
+      "repository": "https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz",
+      "pin": "1b1cde5b235d40479e91be2f0e88a309e3214c8ab470ec8a2744d82a5a9ea05c",
+      "pin_kind": "sha256",
+      "extra_repositories": [],
+      "configure_flag": null,
+      "licence": "LGPL-2.1-or-later",
+      "licence_basis": "pinned-source-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "licence identity as the Windows seat-verified row; texts read at this pin from the runner-pinned source (zip build/sha256-pins.txt); new at this pin: fribidi--COPYING; linked through libass (FFmpeg's line has no --enable-libfribidi)",
+      "texts": [
+        {
+          "path": "fribidi--COPYING",
+          "sha256": "32434afcc8666ba060e111d715bfdb6c2d5dd8a35fa4d3ab8ad67d8f850d2f2b",
+          "member": "fribidi-1.0.16/COPYING"
+        }
+      ],
+      "chosen": null
+    },
+    {
+      "stage": "build-harfbuzz",
+      "name": "harfbuzz",
+      "repository": "https://github.com/harfbuzz/harfbuzz/releases/download/14.3.0/harfbuzz-14.3.0.tar.xz",
+      "pin": "16070d77cfc4ba1f1e7327e83bf9b3f55898081cabdb94e56a33e04fc8874eae",
+      "pin_kind": "sha256",
+      "extra_repositories": [],
+      "configure_flag": [
+        "--enable-libharfbuzz"
+      ],
+      "licence": "MIT-Modern-Variant",
+      "licence_basis": "pinned-source-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "licence identity as the Windows seat-verified row; texts read at this pin from the runner-pinned source (zip build/sha256-pins.txt); every text byte-equal to a Windows text; perf/texts/COPYING (a Windows-row text) is absent from 14.3.0",
+      "texts": [
+        {
+          "path": "harfbuzz--COPYING",
+          "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+          "member": "harfbuzz-14.3.0/COPYING"
+        },
+        {
+          "path": "harfbuzz--src--ms-use--COPYING",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+          "member": "harfbuzz-14.3.0/src/ms-use/COPYING"
+        }
+      ],
+      "chosen": null
+    },
+    {
+      "stage": "build-libass",
+      "name": "libass",
+      "repository": "https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.gz",
+      "pin": "caab4b993dd7be6187c55623b789ed75dddefea6e65938af134637c732fe094a",
+      "pin_kind": "sha256",
+      "extra_repositories": [],
+      "configure_flag": [
+        "--enable-libass"
+      ],
+      "licence": "ISC",
+      "licence_basis": "pinned-source-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "licence identity as the Windows seat-verified row; texts read at this pin from the runner-pinned source (zip build/sha256-pins.txt); every text byte-equal to a Windows text",
+      "texts": [
+        {
+          "path": "libass--COPYING",
+          "sha256": "f7e30699d02798351e7f839e3d3bfeb29ce65e44efa7735c225464c4fd7dfe9c",
+          "member": "libass-0.17.5/COPYING"
+        }
+      ],
+      "chosen": null
+    },
+    {
+      "stage": "build-libogg",
+      "name": "libogg",
+      "repository": "https://ftp.osuosl.org/pub/xiph/releases/ogg/libogg-1.3.6.tar.gz",
+      "pin": "83e6704730683d004d20e21b8f7f55dcb3383cdf84c0daedf30bde175f774638",
+      "pin_kind": "sha256",
+      "extra_repositories": [],
+      "configure_flag": null,
+      "licence": "BSD-3-Clause",
+      "licence_basis": "pinned-source-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "licence identity as the Windows seat-verified row; texts read at this pin from the runner-pinned source (zip build/sha256-pins.txt); every text byte-equal to a Windows text; built by the script, not linked: absent from FFmpeg's library list; carried by over-inclusion",
+      "texts": [
+        {
+          "path": "libogg--COPYING",
+          "sha256": "d2ab5758336489da61c12cc5bb757da5339c4ae9001f9bb0562b4370249af814",
+          "member": "libogg-1.3.6/COPYING"
+        }
+      ],
+      "chosen": null,
+      "status": "built-not-linked"
+    },
+    {
+      "stage": "build-libxml2",
+      "name": "libxml2",
+      "repository": "https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
+      "pin": "78262a6e7ac170d6528ebfe2efccdf220191a5af6a6cd61ea4a9a9a5042c7a07",
+      "pin_kind": "sha256",
+      "extra_repositories": [],
+      "configure_flag": [
+        "--enable-libxml2"
+      ],
+      "licence": "MIT AND ISC-Veillard",
+      "licence_basis": "pinned-source-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "licence identity as the Windows seat-verified row; texts read at this pin from the runner-pinned source (zip build/sha256-pins.txt); new at this pin: libxml2--dict.c; dict.c and list.c ISC-Veillard notices carried whole and as excerpts",
+      "texts": [
+        {
+          "path": "libxml2--Copyright",
+          "sha256": "5d4873884a890122a4b9b20ad56ac6f7da1d796a5bfcf04a427970ac96217626",
+          "member": "libxml2-2.15.3/Copyright"
+        },
+        {
+          "path": "libxml2--dict.c",
+          "sha256": "416253664eb3d95a393be6c61c649a1b5600729bbd1e3ce9123df08b12d8f388",
+          "member": "libxml2-2.15.3/dict.c"
+        },
+        {
+          "path": "libxml2--dict.c-L1-17.txt",
+          "sha256": "ea9e97f88bf4ef8ad1142e12d0e6da003968420aa38094f74b9b51206675438a",
+          "member": "libxml2-2.15.3/dict.c#L1-17"
+        },
+        {
+          "path": "libxml2--list.c",
+          "sha256": "8a04740bfd8a37f3006bfc0404aa31429e56ef991cddcd47707ce2a9b1d98506",
+          "member": "libxml2-2.15.3/list.c"
+        },
+        {
+          "path": "libxml2--list.c-L1-16.txt",
+          "sha256": "2fdb83809864852d236c64fffa74054699e61887b736e18724d4a8ac0e9684f8",
+          "member": "libxml2-2.15.3/list.c#L1-16"
+        },
+        {
+          "path": "libxml2--result--html-tokenizer--NOTICE",
+          "sha256": "d6a2cb265a0a249a234b89eeffa7f316ebe5bff546672a0a2b1a861dd2238460",
+          "member": "libxml2-2.15.3/result/html-tokenizer/NOTICE"
+        }
+      ],
+      "chosen": null
+    },
+    {
+      "stage": "build-openssl",
+      "name": "openssl",
+      "repository": "https://github.com/openssl/openssl/releases/download/openssl-3.6.1/openssl-3.6.1.tar.gz",
+      "pin": "b1bfedcd5b289ff22aee87c9d600f515767ebf45f77168cb6d64f231f518a82e",
+      "pin_kind": "sha256",
+      "extra_repositories": [],
+      "configure_flag": [
+        "--enable-openssl"
+      ],
+      "licence": "Apache-2.0",
+      "licence_basis": "pinned-source-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "licence identity as the Windows seat-verified row; texts read at this pin from the runner-pinned source (zip build/sha256-pins.txt); every text byte-equal to a Windows text",
+      "texts": [
+        {
+          "path": "openssl--LICENSE.txt",
+          "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a",
+          "member": "openssl-3.6.1/LICENSE.txt"
+        },
+        {
+          "path": "openssl--external--perl--Text-Template-1.56--LICENSE",
+          "sha256": "9837f05336ef3cbacb6a96e1672a0426d81ad01191f214b8d48e22ca62338181",
+          "member": "openssl-3.6.1/external/perl/Text-Template-1.56/LICENSE"
+        }
+      ],
+      "chosen": null
+    },
+    {
+      "stage": "build-sdl",
+      "name": "sdl",
+      "repository": "https://www.libsdl.org/release/SDL2-2.32.10.tar.gz",
+      "pin": "5f5993c530f084535c65a6879e9b26ad441169b3e25d789d83287040a9ca5165",
+      "pin_kind": "sha256",
+      "extra_repositories": [],
+      "configure_flag": null,
+      "licence": "Zlib",
+      "licence_basis": "pinned-source-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "licence identity as the Windows seat-verified row; texts read at this pin from the runner-pinned source (zip build/sha256-pins.txt); new at this pin: sdl--LICENSE.txt, sdl--Xcode--SDL--pkg-support--resources--License.txt; autodetected by FFmpeg's configure (sdl2 in its library list)",
+      "texts": [
+        {
+          "path": "sdl--LICENSE.txt",
+          "sha256": "97f35b302b361680ec1e891e95d2d52097bb95abff361434916d99dc1305f127",
+          "member": "SDL2-2.32.10/LICENSE.txt"
+        },
+        {
+          "path": "sdl--Xcode-iOS--Demos--data--bitmapfont--license.txt",
+          "sha256": "5059bc9c2f37b7e7a557685ae9330ecfd798537bdfde94de63a9c721c92a8856",
+          "member": "SDL2-2.32.10/Xcode-iOS/Demos/data/bitmapfont/license.txt"
+        },
+        {
+          "path": "sdl--Xcode--SDL--pkg-support--resources--License.txt",
+          "sha256": "37b975b5273734ea157fb1e363d06191036f289eca7767f736967816bedd156f",
+          "member": "SDL2-2.32.10/Xcode/SDL/pkg-support/resources/License.txt"
+        },
+        {
+          "path": "sdl--src--hidapi--LICENSE-bsd.txt",
+          "sha256": "30eb1bef29b46f8ba7ab8b416035dbd93cb034a45481dd97815b944284582cd2",
+          "member": "SDL2-2.32.10/src/hidapi/LICENSE-bsd.txt"
+        },
+        {
+          "path": "sdl--src--hidapi--LICENSE-gpl3.txt",
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+          "member": "SDL2-2.32.10/src/hidapi/LICENSE-gpl3.txt"
+        },
+        {
+          "path": "sdl--src--hidapi--LICENSE-orig.txt",
+          "sha256": "fb5436aa63d1b71a8dfbf74ecaf1a5b4e1ec4df7f80074d11fec99284f69ca5f",
+          "member": "SDL2-2.32.10/src/hidapi/LICENSE-orig.txt"
+        },
+        {
+          "path": "sdl--src--hidapi--LICENSE.txt",
+          "sha256": "7d3b087c34f35d4d538e3bcddd1ff8f66e92f9ef336881999482800ddf840913",
+          "member": "SDL2-2.32.10/src/hidapi/LICENSE.txt"
+        },
+        {
+          "path": "sdl--src--video--yuv2rgb--LICENSE",
+          "sha256": "f7d74004cc75778cae46c5f0139f244d67c07ef64cf51937e8272352197dcb18",
+          "member": "SDL2-2.32.10/src/video/yuv2rgb/LICENSE"
+        },
+        {
+          "path": "sdl--visualtest--COPYING.txt",
+          "sha256": "dae65ccf728227eff8e10194437078a5628047b9f55d796039688e7ca8e3aa4e",
+          "member": "SDL2-2.32.10/visualtest/COPYING.txt"
+        }
+      ],
+      "chosen": null
+    },
+    {
+      "stage": "build-x264",
+      "name": "x264",
+      "repository": "https://code.videolan.org/videolan/x264.git",
+      "pin": "0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee",
+      "pin_kind": "commit",
+      "extra_repositories": [],
+      "configure_flag": [
+        "--enable-libx264"
+      ],
+      "licence": "GPL-2.0-or-later",
+      "licence_basis": "pinned-source-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "licence identity as the Windows seat-verified row; texts read at this pin from the runner-pinned source (zip build/sha256-pins.txt); every text byte-equal to a Windows text; the Windows row's commit 0480cb05; its text is that row's bytes",
+      "texts": [
+        {
+          "path": "x264--COPYING",
+          "sha256": "32b1062f7da84967e7019d01ab805935caa7ab7321a7ced0e30ebe75e5df1670",
+          "member": "COPYING"
+        }
+      ],
+      "chosen": null
+    },
+    {
+      "stage": "build-x265",
+      "name": "x265",
+      "repository": "https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.2.tar.gz",
+      "pin": "40b1ea0453e0309f0eba934e0ddf533f8f6295966679e8894e8f1c1c8d5e1210",
+      "pin_kind": "sha256",
+      "extra_repositories": [],
+      "configure_flag": [
+        "--enable-libx265"
+      ],
+      "licence": "GPL-2.0-or-later AND MIT",
+      "licence_basis": "pinned-source-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "licence identity as the Windows seat-verified row; texts read at this pin from the runner-pinned source (zip build/sha256-pins.txt); every text byte-equal to a Windows text",
+      "texts": [
+        {
+          "path": "x265--COPYING",
+          "sha256": "d8afb1bcc7a2cfc603683b168d6987ef0a48e59e0da3693bf55c5d33b67e2b49",
+          "member": "x265_4.2/COPYING"
+        },
+        {
+          "path": "x265--source--dynamicHDR10--LICENSE.txt",
+          "sha256": "47f15d63e82eb8a4de6e46471d5f96cf6d052fd5355944a002c3157880248b69",
+          "member": "x265_4.2/source/dynamicHDR10/LICENSE.txt"
+        },
+        {
+          "path": "x265--source--dynamicHDR10--json11--LICENSE.txt",
+          "sha256": "950e288a2548cb33f6a90d23958806b0803f510ab17c600d661619a73ae3a6c8",
+          "member": "x265_4.2/source/dynamicHDR10/json11/LICENSE.txt"
+        }
+      ],
+      "chosen": null
+    },
+    {
+      "stage": "build-zlib",
+      "name": "zlib",
+      "repository": "https://www.zlib.net/fossils/zlib-1.3.2.tar.gz",
+      "pin": "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16",
+      "pin_kind": "sha256",
+      "extra_repositories": [],
+      "configure_flag": null,
+      "licence": "Zlib",
+      "licence_basis": "pinned-source-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "licence identity as the Windows seat-verified row; texts read at this pin from the runner-pinned source (zip build/sha256-pins.txt); every text byte-equal to a Windows text; autodetected by FFmpeg's configure (zlib in its library list)",
+      "texts": [
+        {
+          "path": "zlib--LICENSE",
+          "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+          "member": "zlib-1.3.2/LICENSE"
+        },
+        {
+          "path": "zlib--contrib--dotzlib--LICENSE_1_0.txt",
+          "sha256": "36266a8fd073568394cb81cdb2b124f7fdae2c64c1a7ed09db34b4d22efa2951",
+          "member": "zlib-1.3.2/contrib/dotzlib/LICENSE_1_0.txt"
+        },
+        {
+          "path": "zlib--contrib--minizip--LICENSE.Info-Zip",
+          "sha256": "fc686023047ce5ce3a18a9b8a777156f0e475929d3de06bac279f3c025d2b2ca",
+          "member": "zlib-1.3.2/contrib/minizip/LICENSE.Info-Zip"
+        }
+      ],
+      "chosen": null
+    }
+  ],
+  "excluded": [
+    {
+      "stage": "SKIP_ZVBI",
+      "status": "not-built(disabled)",
+      "reason": "GPL-2.0-only (AD-38 (10)): never linked into the GPL-3.0 binary; owner-ruled"
+    },
+    {
+      "stage": "SKIP_DECKLINK",
+      "status": "not-built(disabled)",
+      "reason": "nonfree (Riedl build.sh:638); passed so a changed default cannot enable it"
+    },
+    {
+      "stage": "SKIP_LIBKLVANC",
+      "status": "not-built(disabled)",
+      "reason": "its autogen.sh needs autotools, absent from the runner image; serves DeckLink only"
+    },
+    {
+      "stage": "SKIP_RAV1E",
+      "status": "not-built(disabled)",
+      "reason": "cargo-c is absent from the runner image; AV1 encode is unused"
+    },
+    {
+      "stage": "SKIP_SRT",
+      "status": "not-built(disabled)",
+      "reason": "MPL-2.0 is not in the component compatible constant as written; the protocol is unused"
+    },
+    {
+      "stage": "SKIP_ZIMG",
+      "status": "not-built(disabled)",
+      "reason": "its autogen.sh needs autotools, absent from the runner image; zscale is unused"
+    },
+    {
+      "stage": "SKIP_LIBBLURAY",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_SNAPPY",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_LIBVMAF",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_AOM",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_DAV1D",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_OPEN_H264",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_OPEN_JPEG",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_SVT_AV1",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_LIBTHEORA",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_VPX",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_VVENC",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_LIBWEBP",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_LAME",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_OPUS",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_LIBVORBIS",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    }
+  ],
+  "toolchain": {
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "xcode": "26.6 (17F113)",
+    "sdk": "26.5",
+    "target": "arm64-apple-darwin25.6.0",
+    "deployment_target": "14.0",
+    "census_build_commit": "9cb0fa81871f09ae3f750d6845874c26a871b985",
+    "census_asset_sha256": "e3f251dc281a71e46e1464436c8cb281994af7fe4ed4978d95922ad82bb176e4"
+  },
+  "toolchain_runtime": [
+    {
+      "name": "Apple clang 21.0.0 (clang-2100.1.1.101), Xcode 26.6, SDK 26.5, deployment target 14.0",
+      "version": "clang-2100.1.1.101",
+      "kind": "apple-clang-runtime",
+      "reached_via": "toolchain",
+      "repository": "https://github.com/llvm/llvm-project",
+      "pin": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+      "pin_kind": "toolchain-marker",
+      "source_url": "https://github.com/llvm/llvm-project/tree/3623fe661ae35c6c80ac221f14d85be76aa870f1",
+      "licence": "Apache-2.0 WITH LLVM-exception",
+      "licence_basis": "upstream-text",
+      "gpl3_compatible": "yes",
+      "licence_note": "compiler-rt builtins and libc++ portions can be present only as compiled portions embedded by the compiler, which the LLVM exception's redistribution clause covers; the text is carried for parity with the Windows libgcc / libstdc++ rows. Text source: llvm/llvm-project LICENSE.TXT at tag llvmorg-21.1.0 (tag object 827731c0) -> commit 3623fe66, sha256 8d85c105...afee, 15,141 B; equal at llvmorg-17.0.1 (e19b7dc3)",
+      "texts": [
+        {
+          "path": "llvm-project--LICENSE.TXT",
+          "sha256": "8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee",
+          "member": "LICENSE.TXT"
+        }
+      ],
+      "evidence": "toolchain marker: log 'Record and check the runner' 160 and 'Check the binaries' 661 ('built with Apple clang version 21.0.0 (clang-2100.1.1.101)'); otool -L (618-659) lists only /usr/lib and system frameworks, so libc++ is the system dylib, not bundled",
+      "basis": "toolchain-marker",
+      "basis_note": "Apple publishes no per-build source for its clang; the row is pinned to the marker and its licence text to upstream llvm-project",
+      "chosen": null,
+      "linkage": "inferred"
+    }
+  ]
+}

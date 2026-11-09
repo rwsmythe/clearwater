@@ -382,8 +382,8 @@ def test_bootloader_identity_allows_resources_and_archive_but_refuses_code_chang
 @pytest.mark.parametrize("tampered", [False, True])
 @pytest.mark.skipif(
     sys.platform != "win32",
-    reason="Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); the macOS "
-    "contract awaits ffmpeg-macos.lock.json, WP6.5 part 3",
+    reason="the Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); its "
+    "_on_darwin counterpart checks the committed ffmpeg-macos.lock.json on every host",
 )
 def test_build_enforces_origin_after_all_native_copies(
     tmp_path, monkeypatch, capsys, tampered, verified_ffmpeg_archive
@@ -1300,8 +1300,8 @@ def test_release_ffmpeg_options_reach_the_build(monkeypatch, tmp_path):
 @pytest.mark.parametrize("fail", [False, True])
 @pytest.mark.skipif(
     sys.platform != "win32",
-    reason="Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); the macOS "
-    "contract awaits ffmpeg-macos.lock.json, WP6.5 part 3",
+    reason="the Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); its "
+    "_on_darwin counterpart checks the committed ffmpeg-macos.lock.json on every host",
 )
 def test_release_bundle_is_checked_in_the_built_executable_folder(
     monkeypatch, tmp_path, capsys, fail
@@ -1355,8 +1355,8 @@ def test_notices_option_reaches_build_and_refuses_non_onedir(monkeypatch, tmp_pa
 @pytest.mark.parametrize("fails", [False, True])
 @pytest.mark.skipif(
     sys.platform != "win32",
-    reason="Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); the macOS "
-    "contract awaits ffmpeg-macos.lock.json, WP6.5 part 3",
+    reason="the Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); its "
+    "_on_darwin counterpart checks the committed ffmpeg-macos.lock.json on every host",
 )
 def test_notices_writing_follows_ffmpeg_and_fails_the_build_on_error(
     monkeypatch, tmp_path, capsys, fails, verified_ffmpeg_archive
@@ -1571,8 +1571,8 @@ def test_source_commit_epoch_uses_a_bounded_read_only_git_query(monkeypatch):
 @pytest.mark.parametrize("failure", ["none", "notices", "smoke", "timestamp"])
 @pytest.mark.skipif(
     sys.platform != "win32",
-    reason="Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); the macOS "
-    "contract awaits ffmpeg-macos.lock.json, WP6.5 part 3",
+    reason="the Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); its "
+    "_on_darwin counterpart checks the committed ffmpeg-macos.lock.json on every host",
 )
 def test_zip_is_published_only_after_successful_notices_and_smoke(
     tmp_path, monkeypatch, capsys, failure
@@ -1661,8 +1661,8 @@ def test_release_zip_refuses_junctions(tmp_path):
 @pytest.mark.parametrize("mutation", ["added", "removed", "changed"])
 @pytest.mark.skipif(
     sys.platform != "win32",
-    reason="Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); the macOS "
-    "contract awaits ffmpeg-macos.lock.json, WP6.5 part 3",
+    reason="the Windows FFmpeg bundle contract (ffmpeg.lock.json, Clearwater.exe); its "
+    "_on_darwin counterpart checks the committed ffmpeg-macos.lock.json on every host",
 )
 def test_release_zip_refuses_smoke_mutations(tmp_path, monkeypatch, capsys, mutation):
     """The published file set and identities must equal the pre-smoke inventory."""
@@ -4878,3 +4878,449 @@ def test_darwin_build_bundles_from_the_macos_lock_and_refuses_release_while_cens
         == 1
     )
     assert "FFmpeg URL/sha256 differ from the lock" in capsys.readouterr().out
+
+
+# --- WP6.5 part 3c: the committed macOS lock, its texts, its transport family and the C13
+# darwin contracts. The switch (MACOS_FFMPEG_BUNDLED) stays OFF: the .app notices are the
+# F0-2 group's (CHARC, 2026-11-09).
+
+REAL_MACOS_LOCK = REPO_ROOT / "tools" / "package" / "ffmpeg-macos.lock.json"
+"""The committed macOS lock: fork run 42661533922 attempt 3, its asset and its census."""
+
+REAL_MACOS_ASSET_SHA256 = "e3f251dc281a71e46e1464436c8cb281994af7fe4ed4978d95922ad82bb176e4"
+
+
+def real_macos_lock() -> dict[str, Any]:
+    return json.loads(REAL_MACOS_LOCK.read_text(encoding="utf-8"))
+
+
+def lock_texts(data: dict[str, Any]) -> dict[str, str]:
+    """Every text the lock names (components and toolchain runtime): path -> sha256."""
+    rows = [*data["components"], *data["toolchain_runtime"]]
+    return {text["path"]: text["sha256"] for row in rows for text in row["texts"]}
+
+
+def test_the_real_macos_lock_pins_the_artifact_and_validates():
+    """Condition 1: the lock pins the ARTIFACT (tag, fork commit, asset, size, both digests)."""
+    data = real_macos_lock()
+    assert build.load_macos_ffmpeg_lock() == data
+    tag = "ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-9cb0fa8"
+    asset = "ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0.zip"
+    assert data["release_tag"] == tag
+    assert data["build_repository_commit"] == "9cb0fa81871f09ae3f750d6845874c26a871b985"
+    assert data["asset_name"] == asset
+    assert data["asset_url"] == (
+        f"https://github.com/rwsmythe/FFmpeg-Builds/releases/download/{tag}/{asset}"
+    )
+    assert data["size_bytes"] == 37_978_871
+    assert data["github_sha256"] == data["seat_sha256"] == REAL_MACOS_ASSET_SHA256
+    assert data["toolchain"]["census_asset_sha256"] == REAL_MACOS_ASSET_SHA256
+    assert data["census"]["state"] == "complete"
+    assert data["build_run_url"] == (
+        "https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/42661533922"
+    )
+
+
+def test_the_macos_component_texts_are_exactly_the_locks_and_rehash_to_it():
+    """R1 / R2 / Q2: one folder, EXACTLY the lock's 36 texts, each byte-equal to its pin."""
+    wanted = lock_texts(real_macos_lock())
+    folder = build.FFMPEG_MACOS_TEXTS_PATH
+    assert folder == REPO_ROOT / "tools/package/native-licences/ffmpeg-macos-components"
+    assert len(wanted) == 36
+    assert sorted(path.name for path in folder.iterdir()) == sorted(wanted)
+    for name, digest in wanted.items():
+        assert hashlib.sha256((folder / name).read_bytes()).hexdigest() == digest, name
+
+
+@pytest.mark.parametrize("damage", ["byte", "missing", "extra"])
+def test_the_real_macos_lock_refuses_a_damaged_texts_folder(tmp_path, damage):
+    """The re-hash is also the validator's: a copy of the folder, damaged once, is refused."""
+    folder = tmp_path / "ffmpeg-macos-components"
+    shutil.copytree(build.FFMPEG_MACOS_TEXTS_PATH, folder)
+    data = real_macos_lock()
+    build.validate_ffmpeg_lock(data, component_texts_path=folder, platform="darwin")
+    if damage == "byte":
+        target = folder / "llvm-project--LICENSE.TXT"
+        body = bytearray(target.read_bytes())
+        body[100] ^= 1
+        target.write_bytes(bytes(body))
+    elif damage == "missing":
+        (folder / "fribidi--COPYING").unlink()
+    else:
+        (folder / "unlisted--COPYING").write_bytes(b"text\n")
+    with pytest.raises(ValueError):
+        build.validate_ffmpeg_lock(data, component_texts_path=folder, platform="darwin")
+
+
+def bump(hex_digest: str, index: int) -> str:
+    """``hex_digest`` with the digit at ``index`` moved by one (``f`` wraps to ``0``)."""
+    digit = (int(hex_digest[index], 16) + 1) % 16
+    return hex_digest[:index] + format(digit, "x") + hex_digest[index + 1 :]
+
+
+@pytest.fixture
+def real_lock_transport(tmp_path, monkeypatch):
+    """The real lock with its transport fields (size, digests, URL; the census digest follows)
+    moved to a synthetic zip: the seat's zip is not in the repository."""
+    data = real_macos_lock()
+    source = tmp_path / data["asset_name"]
+    with zipfile.ZipFile(source, "w") as archive:
+        archive.writestr(f"{data['archive_root']}/LICENSE.txt", b"synthetic\n")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    data["size_bytes"] = source.stat().st_size
+    data["github_sha256"] = data["seat_sha256"] = digest
+    data["toolchain"]["census_asset_sha256"] = digest
+    data["asset_url"] = source.as_uri()
+    monkeypatch.setattr(build, "_TEST_ALLOW_FILE_URLS", True)
+    return data
+
+
+def _transport_mutation(data: dict[str, Any], mutation: str) -> str:
+    """Apply ``mutation`` to ``data``; return the sha256 argument the caller passes."""
+    argument: str = data["github_sha256"]
+    kind, _, where = mutation.partition(" ")
+    if kind == "size":
+        data["size_bytes"] += int(where)
+    elif kind in {"github_sha256", "seat_sha256"}:
+        data[kind] = bump(data[kind], int(where))
+    elif kind == "both":  # the two digests together: a self-consistent pair
+        data["github_sha256"] = data["seat_sha256"] = bump(argument, int(where))
+    elif kind == "all":  # the two digests and the census digest: past every lock rule
+        moved = bump(argument, int(where))
+        data["github_sha256"] = data["seat_sha256"] = moved
+        data["toolchain"]["census_asset_sha256"] = moved
+        argument = moved
+    elif kind == "argument":
+        argument = bump(argument, int(where))
+    return argument
+
+
+@pytest.mark.parametrize(
+    ("mutation", "refusal"),
+    [
+        ("none", None),
+        ("size +1", "download size differs from lock"),
+        ("size -1", "download size exceeds lock"),
+        ("github_sha256 0", "sha256 readings differ"),
+        ("github_sha256 63", "sha256 readings differ"),
+        ("seat_sha256 0", "sha256 readings differ"),
+        ("seat_sha256 63", "sha256 readings differ"),
+        ("all 0", "download sha256 mismatch; archive was not opened"),
+        ("all 63", "download sha256 mismatch; archive was not opened"),
+        ("argument 0", "sha256 argument differs from the lock"),
+        ("argument 63", "sha256 argument differs from the lock"),
+        ("both 0", "census_asset_sha256 differs from github_sha256"),
+        ("both 63", "census_asset_sha256 differs from github_sha256"),
+    ],
+)
+def test_the_real_macos_lock_refuses_each_transport_mutation(
+    real_lock_transport, tmp_path, mutation, refusal
+):
+    """Condition 1's family: every size / digest field off by one (first and last digit) is
+    RED; the unmutated lock is GREEN. ``all`` moves both digests and the census digest (the
+    self-consistent lock reaches the download's own digest check); ``both`` moves the two
+    digests only (the census binds the asset)."""
+    data = json.loads(json.dumps(real_lock_transport))
+    argument = _transport_mutation(data, mutation)
+    out = tmp_path / "dl"
+
+    def attempt() -> None:
+        checked = build.validate_ffmpeg_lock(data, platform="darwin")
+        build._download_ffmpeg(data["asset_url"], argument, out, checked)
+
+    if refusal is None:
+        attempt()
+        return
+    with pytest.raises((ValueError, RuntimeError), match=re.escape(refusal)):
+        attempt()
+    assert not (out / data["archive_root"]).exists()
+
+
+# The C13 darwin contracts (G3 classification rows 43-44, 49-52, 55-61): build() on its darwin
+# path against the committed macOS lock. On Windows sys.platform reads "darwin" for the build
+# call only (the stand-in executable is written first, as in darwin_app_build); on the macOS
+# runner the platform is native.
+
+
+def darwin_release_build(monkeypatch, tmp_path, *, origin=None, seal=None) -> Path:
+    """Prepare ``build()``'s darwin path: PyInstaller writes the .app; returns ``out``."""
+    monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setattr(build, "pack_sources", lambda: [])
+    if origin is not None:
+        monkeypatch.setattr(build, "native_origin_violations", origin)
+    monkeypatch.setattr(build, "seal_macos_bundle", seal or (lambda bundle: None))
+    out = tmp_path / "out"
+    # Built (and PyInstaller imported) BEFORE sys.platform reads darwin (darwin_app_build).
+    source = make_exe(out / "synthetic", [], modules=["clearwater", "graphlib"])
+
+    def build_folder(args):
+        target = Path(args[args.index("--distpath") + 1]) / "Clearwater.app/Contents/MacOS"
+        target.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target / "Clearwater")
+
+    monkeypatch.setattr(build, "run_pyinstaller", build_folder)
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    return out
+
+
+def real_lock_bundle(case) -> SimpleNamespace:
+    """``macos_bundle`` on the REAL lock: every field but the transport (size, digests, URL; the
+    census digest follows) is the committed lock's, and the tools carry its version, its
+    configure line and its toolchain marker."""
+    real = real_macos_lock()
+    case.data.clear()
+    case.data.update(real)
+    marker = b"\0" + real["toolchain"]["compiler"].encode() + b"\0"
+    for tool in ("ffmpeg", "ffprobe"):
+        case.members[f"{real['archive_root']}/bin/{tool}"] = fake_macho(real, extra=marker)
+    case.write()
+    case.data["toolchain"]["census_asset_sha256"] = case.data["github_sha256"]
+    case.pin.write_text(json.dumps(case.data), encoding="utf-8")
+    return case
+
+
+@pytest.mark.parametrize("tampered", [False, True])
+def test_build_enforces_origin_after_all_native_copies_on_darwin(
+    tmp_path, monkeypatch, capsys, macos_bundle, tampered
+):
+    """C13 (``:383``'s darwin contract): the real bundling and the real darwin origin walk;
+    tool bytes verified from the archive pass, a post-extraction change fails the build."""
+    case = real_lock_bundle(macos_bundle)
+    monkeypatch.setattr(build.subprocess, "run", case.real_run)
+    monkeypatch.setattr(build, "_native_origin_hashes", lambda: set())
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
+    real_bundle = build.bundle_ffmpeg
+    changed = fake_macho(case.data, extra=b"changed after extraction")
+
+    def bundle(destination, **kwargs):
+        result = real_bundle(destination, **kwargs)
+        if tampered:
+            (destination / "ffmpeg").write_bytes(changed)
+        return result
+
+    monkeypatch.setattr(build, "bundle_ffmpeg", bundle)
+    out = darwin_release_build(monkeypatch, tmp_path)
+    foreign = tree(tmp_path / "foreign", ["ffmpeg"])
+    monkeypatch.setenv("PATH", str(foreign))
+    status = build.build(
+        "onedir",
+        out=out,
+        ffmpeg_from=case.data["asset_url"],
+        ffmpeg_sha256=case.data["seat_sha256"],
+    )
+    output = capsys.readouterr().out
+    assert status == int(tampered), output
+    assert ("native origin check: PASS" in output) == (not tampered)
+    macos = next(out.rglob("Clearwater.app")) / "Contents" / "MacOS"
+    root = case.data["archive_root"]
+    if not tampered:
+        for tool in ("ffmpeg", "ffprobe"):
+            assert (macos / tool).read_bytes() == case.members[f"{root}/bin/{tool}"]
+    else:
+        assert "Contents/MacOS/ffmpeg" in output and str(foreign / "ffmpeg") in output
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_release_bundle_is_checked_in_the_built_executable_folder_on_darwin(
+    monkeypatch, tmp_path, capsys, fail
+):
+    """C13 (``:1301``'s darwin contract): build() takes the workflow's pair (``asset_url``,
+    ``seat_sha256``) from the committed lock, bundles into Contents/MacOS, and fails on the
+    bundle's failure; a pair off the lock is refused before PyInstaller."""
+    pin = real_macos_lock()
+    calls = []
+
+    def fetched(destination, *, out, url, sha256, verified_hashes, platform):
+        assert platform == "darwin"
+        assert destination.as_posix().endswith("Clearwater.app/Contents/MacOS")
+        assert (destination / "Clearwater").is_file()
+        calls.append((url, sha256))
+        if fail:
+            raise RuntimeError("planted FFmpeg configuration mismatch")
+        return [(destination / "ffmpeg", f"ffmpeg version {pin['version']}")]
+
+    monkeypatch.setattr(build, "bundle_ffmpeg", fetched)
+    out = darwin_release_build(monkeypatch, tmp_path, origin=lambda *a, **kw: [])
+    status = build.build(
+        "onedir", out=out, ffmpeg_from=pin["asset_url"], ffmpeg_sha256=pin["seat_sha256"]
+    )
+    printed = capsys.readouterr().out
+    assert status == int(fail), printed
+    assert calls == [(pin["asset_url"], REAL_MACOS_ASSET_SHA256)]
+    if fail:
+        assert "FAILED: FFmpeg bundle: planted FFmpeg configuration mismatch" in printed
+        assert "bundle check: PASS" not in printed
+    else:
+        assert "bundle check: PASS" in printed
+    off = bump(REAL_MACOS_ASSET_SHA256, 63)
+    assert build.build("onedir", out=out, ffmpeg_from=pin["asset_url"], ffmpeg_sha256=off) == 1
+    assert "FFmpeg URL/sha256 differ from the lock" in capsys.readouterr().out
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_notices_writing_follows_ffmpeg_and_fails_the_build_on_error_on_darwin(
+    tmp_path, monkeypatch, capsys, macos_bundle, fails
+):
+    """C13 (``:1356``'s darwin contract): with the real (complete) census, --notices is
+    admitted; notices see the verified archive's material; a notice failure refuses the build
+    before the seal. The notices writer is a stand-in (the .app notices are the F0-2 group's)."""
+    case = real_lock_bundle(macos_bundle)
+    monkeypatch.setattr(build.subprocess, "run", case.real_run)
+    events = []
+    out = darwin_release_build(
+        monkeypatch,
+        tmp_path,
+        origin=lambda *a, **kw: [],
+        seal=lambda bundle: events.append("seal"),
+    )
+    root = case.data["archive_root"]
+
+    def notices(folder):
+        events.append("notices")
+        assert folder.as_posix().endswith("Clearwater.app/Contents/MacOS")
+        for tool in ("ffmpeg", "ffprobe"):
+            assert (folder / tool).read_bytes() == case.members[f"{root}/bin/{tool}"]
+        record = (folder.parent / "Resources" / "ffmpeg-BUILD.txt").read_text(encoding="utf-8")
+        assert case.data["github_sha256"] in record and case.data["release_tag"] in record
+        if fails:
+            raise ValueError("planted notice coverage failure")
+        path = folder.parent / "Resources" / "THIRD_PARTY_NOTICES.md"
+        path.write_text("generated notices", encoding="utf-8")
+        return path
+
+    monkeypatch.setattr(build, "write_artifact_notices", notices)
+    status = build.build(
+        "onedir",
+        out=out,
+        ffmpeg_from=case.data["asset_url"],
+        ffmpeg_sha256=case.data["seat_sha256"],
+        notices=True,
+    )
+    printed = capsys.readouterr().out
+    assert status == int(fails), printed
+    assert "census pending" not in printed
+    assert events == (["notices"] if fails else ["notices", "seal"])
+    if fails:
+        assert "FAILED: artifact notices: planted notice coverage failure" in printed
+    else:
+        assert "wrote" in printed and "THIRD_PARTY_NOTICES.md" in printed
+
+
+def _darwin_release_names(out: Path) -> tuple[Path, Path]:
+    """The darwin release folder and the release ZIP path (call after the platform is set)."""
+    version = build.app_version()
+    root = build.release_dir(out, "onedir", version)
+    return root, out / (build.release_zip_name("onedir", version) + ".zip")
+
+
+@pytest.mark.parametrize("failure", ["none", "notices", "smoke", "timestamp"])
+def test_zip_is_published_only_after_successful_notices_and_smoke_on_darwin(
+    tmp_path, monkeypatch, capsys, failure
+):
+    """C13 (``:1572``'s darwin contract): on the committed lock the zip is written only after
+    notices, the seal and the smoke all pass; a stale zip is removed first."""
+    pin = real_macos_lock()
+    order = []
+    out = darwin_release_build(
+        monkeypatch, tmp_path, origin=lambda *a, **kw: [], seal=lambda b: order.append("seal")
+    )
+    root, archive = _darwin_release_names(out)
+    out.mkdir(parents=True, exist_ok=True)
+    archive.write_bytes(b"previous release")
+    archive.with_suffix(".zip.sha256").write_bytes(b"previous checksum\n")
+
+    def checked_bundle(*args, **kwargs):
+        assert not archive.exists() and not archive.with_suffix(".zip.sha256").exists()
+        return []
+
+    def notices(folder):
+        order.append("notices")
+        if failure == "notices":
+            raise ValueError("planted notices failure")
+        path = folder.parent / "Resources" / "THIRD_PARTY_NOTICES.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("synthetic notices\n", encoding="utf-8")
+        return path
+
+    def smoke(folder, *, out):
+        assert (folder.parent / "Resources" / "THIRD_PARTY_NOTICES.md").is_file()
+        order.append("smoke")
+        return int(failure == "smoke")
+
+    def epoch():
+        assert order == ["notices", "seal", "smoke"]
+        if failure == "timestamp":
+            raise ValueError("planted source timestamp failure")
+        return 1793908801
+
+    monkeypatch.setattr(build, "bundle_ffmpeg", checked_bundle)
+    monkeypatch.setattr(build, "write_artifact_notices", notices)
+    monkeypatch.setattr(build, "smoke_artifact", smoke)
+    monkeypatch.setattr(build, "source_commit_epoch", epoch)
+    status = build.build(
+        "onedir",
+        out=out,
+        notices=True,
+        smoke=True,
+        zip_release=True,
+        ffmpeg_from=pin["asset_url"],
+        ffmpeg_sha256=pin["seat_sha256"],
+    )
+    printed = capsys.readouterr().out
+    assert status == int(failure != "none"), printed
+    assert order == (["notices"] if failure == "notices" else ["notices", "seal", "smoke"])
+    assert archive.exists() == archive.with_suffix(".zip.sha256").exists() == (failure == "none")
+    if failure == "none":
+        with zipfile.ZipFile(archive) as packed:
+            assert "Clearwater.app/Contents/Resources/THIRD_PARTY_NOTICES.md" in packed.namelist()
+    if failure == "timestamp":
+        assert "FAILED: release zip: planted source timestamp failure" in printed
+    assert root.is_dir()
+
+
+@pytest.mark.parametrize("mutation", ["added", "removed", "changed"])
+def test_release_zip_refuses_smoke_mutations_on_darwin(tmp_path, monkeypatch, capsys, mutation):
+    """C13 (``:1662``'s darwin contract): on the committed lock the published .app equals the
+    pre-smoke inventory; a file the smoke adds, removes or changes refuses the zip."""
+    pin = real_macos_lock()
+    out = darwin_release_build(monkeypatch, tmp_path, origin=lambda *a, **kw: [])
+    _root, archive = _darwin_release_names(out)
+
+    def notices(folder):
+        target = folder.parent / "Resources" / "THIRD_PARTY_NOTICES.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"covered bytes\n")
+        return target
+
+    def smoke(folder, *, out):
+        target = folder.parent / "Resources" / "THIRD_PARTY_NOTICES.md"
+        assert target.read_bytes() == b"covered bytes\n"
+        if mutation == "added":
+            (folder / "new-file.txt").write_bytes(b"uncovered bytes")
+        elif mutation == "removed":
+            target.unlink()
+        else:
+            # Same size, so a path/size-only snapshot would fail this control.
+            target.write_bytes(b"altered bytes\n")
+        return 0
+
+    monkeypatch.setattr(build, "bundle_ffmpeg", lambda *a, **kw: [])
+    monkeypatch.setattr(build, "write_artifact_notices", notices)
+    monkeypatch.setattr(build, "smoke_artifact", smoke)
+    monkeypatch.setattr(build, "source_commit_epoch", lambda: 1793908801)
+    status = build.build(
+        "onedir",
+        out=out,
+        notices=True,
+        smoke=True,
+        zip_release=True,
+        ffmpeg_from=pin["asset_url"],
+        ffmpeg_sha256=pin["seat_sha256"],
+    )
+    message = capsys.readouterr().out
+    assert status == 1, message
+    assert "release zip" in message and mutation in message
+    assert ("new-file.txt" if mutation == "added" else "THIRD_PARTY_NOTICES.md") in message
+    assert not archive.exists()
+    assert not archive.with_suffix(".zip.sha256").exists()
