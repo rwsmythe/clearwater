@@ -43,4 +43,26 @@ The owner shoots an Insta360 camera on SCUBA dives and edits the recordings in I
 
 ## Dispatch section (orchestrator fills)
 
-(pending the orchestrator's fill; dispatchable from 2026-11-09)
+Filled by orchestrator gen 59, 2026-11-09 ~05:50Z, at round 0 (CHARC commission `73d6ba1e`; the brief FINAL at `83b291e5`).
+
+- **Base commit:** main at this fill's commit (after `49ca01bf`, the WP6.5 fill). Worktree `.worktrees/wp7.1`, branch `wp7.1`, its `.venv` synced (`uv sync --frozen`) and `clearwater.local.toml` copied in before turn 1.
+- **Lane paces at the fill** (read 2026-11-09 05:34Z): Codex 15 % used, pace 0.218 (resets 2026-11-11 10:07Z); Claude 88 % used, pace 0.904 (resets 2026-11-09 09:59Z). **Lane CODEX** by the brief and by pace. Both nets Claude (`claude -p`, read-only, at the seat): Reviewer A on a detached copy `.worktrees/wp7.1-rA` to convergence, Reviewer B on the final head. Claude's thin margin until 10:00Z delays the Claude reviews, not the Codex turns.
+- **Cell:** `implementer-codex-sol-high`, `codex exec` turns through `scripts/codex_cell.py` (FRESH prompt = the cell definition + this brief at HEAD + `dispatch-N.md`). Depth from each turn's footer; evaluate at about 200K, STOP near 250K.
+- **Evidence:** `C:\Users\rwsmy\clearwater-review-evidence\wp7.1\` (`cell\`, `A\`, `B\`, `seat\`).
+- **File name:** the inventory report is `docs/reports/inventory-2026-11-09.md` (dispatch date; the brief's `inventory-2026-11-05.md` name is superseded per its status line).
+
+### Q3 (GPU pack state at dispatch) -- stated, with a recommendation for CHARC
+
+- **The GPU pack is ABSENT at the seat:** `%LOCALAPPDATA%\Clearwater\gpu-pack` does not exist (read 2026-11-09 05:47Z, listing only). `gpu_pack.pack_root()` resolves there.
+- **The GPU path does not need it for this package's runs:** the worktree venv carries CuPy (`cupy-cuda12x[ctk]` in the `dev` group, `pyproject.toml:47`; `find_spec('cupy')` True in a synced worktree venv). The design's runs are SOURCE runs (the headless export through the source worker, `bench.py`'s timing form, the probe module), and the N6 figure of record (10.89 min/min) was itself measured from source with the venv's CuPy. The pack (AD-33) serves only the FROZEN build.
+- **Recommendation: do NOT install the pack for WP7.1.** It would change the owner's installed 1.1.1 app (it would start loading CUDA from the pack) for no figure this brief asks. If CHARC wants the FROZEN build's ProRes throughput as well, that is a separate, named run with the 6.3a installer under REDIRECTED roots (WP6.3c's GPU proof form), not the real profile. CHARC rules; round 0 does not depend on it.
+
+### Seat clarifications (readings of the brief, offered for CHARC's round-0 rulings)
+
+1. **Who runs what.** The Codex cell writes the instrument drivers (probe table, decode agreement, the export and timing drivers, the look pack builder) under its worktree's gitignored `work\wp7.1\` and runs the light, non-timing steps itself where its sandbox allows (reading the footage folder read-only; the probe; the decode agreement). Every EXCLUSIVE timing figure (design item 5) and every multi-minute export (items 4, 5) is RUN AT THE SEAT from md5-checked copies of the cell's drivers, after the seat reads them in full (the hardware rules' "run at the seat from md5-checked copies"), with CHARC told before each and nothing else heavy running (no WP6.5 gate leg, no build). The cell folds the seat's outputs in its next turn.
+2. **Entry points.** Every driver that calls a product entry point (the headless export, the source worker, `app.main`) first redirects APPDATA, LOCALAPPDATA and the XDG roots to a disposable root under `work\wp7.1\roots`, blocks PySide6 / shiboken6, and bounds its time (ENTRY-POINT ISOLATION RULE, pasted verbatim in every dispatch). The probe and decode steps import the product modules directly under the same redirection.
+3. **The footage is read in place.** No copy into `work\` of any `.mov` / `.mp4` (Locks); the 62 s clip's outputs, the look stills and the decode frames are the only media written, under `work\wp7.1\`. The 37.7-minute export is NOT run in this package unless the owner says so (Hardware flags).
+4. **Disk:** C: has about 2.5 TB free; the 439 s exports and their outputs are well inside it. Checked again before each seat run.
+5. **Q2 (`tools/export_oracle.py`)** is answered by the cell at round 0 from the tool's text; if a two-output comparison needs a new function in `tools/`, the cell names it (signature, ten lines at most) and CHARC grants or declines the widened Files owned.
+6. **The package gate:** report-only as the brief expects (no committed code): static (ruff, format, both mypy targets) + harness at the accept; the full pytest legs are run only if `tools/` gains the Q2 function (then the affected test module and the full gate per GATE_CHECKS).
+7. **Beside WP6.5:** disjoint files; WP6.5's cell runs no heavy job in its round 0, and its later Windows gate legs are sequenced against WP7.1's EXCLUSIVE runs by the seat.
