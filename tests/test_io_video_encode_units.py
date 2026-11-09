@@ -629,7 +629,8 @@ def test_frame_end_is_the_next_source_pts_else_the_presentation_end() -> None:
     no_edits = _probe()
     assert verify.frame_end(no_edits, table, 3003) == 0 + 4004  # start_pts + duration_ts
     odd = _probe(edits=(_media(Fraction(4004, 30000) + Fraction(1, 90000)),))
-    assert verify.frame_end(odd, table, 3003) == 4005  # a fractional tick rounds up
+    unknown = replace(table, streams=tuple(replace(s, duration_ts=None) for s in table.streams))
+    assert verify.frame_end(odd, unknown, 3003) == 4005  # no track end known: a fraction rounds up
 
 
 def test_a_cut_files_frame_end_comes_from_its_sample_table() -> None:

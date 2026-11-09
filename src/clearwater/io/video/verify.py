@@ -681,6 +681,14 @@ def frame_end(probe: ProbeResult, table: PacketTable, last_pts: int) -> int:
     next pts comes from the sample table when it is known (``PacketTable.sample_pts``, which
     on a cut file names the samples past the cut too), else from the listed packets.
 
+    Without a next pts, the end is the presentation end (:func:`presentation_end`). An edit
+    list written in a movie timescale coarser than the track's (WP7.2: Insta360 Studio writes
+    whole microseconds, rounded up from 1/30000 ticks) ends a fraction of a tick away from the
+    track's own end (``start_pts + duration_ts``); when the two lie less than one tick apart
+    and the track ends after ``last_pts``, the track's end wins, exact. Otherwise -- no track
+    end known in these ticks, or an edit list that really trims the tail or runs past the
+    media -- a fractional end is rounded up.
+
     Args:
         probe: The source's probe result.
         table: The source's packet table.
@@ -695,10 +703,25 @@ def frame_end(probe: ProbeResult, table: PacketTable, last_pts: int) -> int:
     if later:
         return min(later)
     end = presentation_end(probe, table)
+    track = _track_end(probe, table)
+    if track is not None and track > last_pts and abs(end - track) < 1:
+        return track  # the edit list's end is the track's, rounded to a coarser movie tick
     whole = end.numerator // end.denominator
     if whole * end.denominator != end.numerator:
         whole += 1  # a fractional tick: the frame keeps at least its full source duration
     return whole
+
+
+def _track_end(probe: ProbeResult, table: PacketTable) -> int | None:
+    """Return the video track's own end in ticks (``start_pts + duration_ts``), or None.
+
+    None when the stream gives no duration or counts it in ticks other than the probe's video
+    time base (``presentation_end``'s unit). A missing start counts as 0, as there.
+    """
+    video = table.video
+    if video.duration_ts is None or video.time_base != probe.video.time_base:
+        return None
+    return (video.start_pts if video.start_pts is not None else 0) + video.duration_ts
 
 
 def readable_end(probe: ProbeResult, table: PacketTable, last_pts: int) -> int:
