@@ -3104,3 +3104,587 @@ def test_windows_build_never_seals(tmp_path, monkeypatch):
     monkeypatch.setattr(build, "run_pyinstaller", build_folder)
     monkeypatch.setattr(build.sys, "platform", "win32")
     assert build.build("onedir", out=out) == 0
+
+
+# --- WP6.5 group 2a part 2: the macOS FFmpeg lock and bundle_ffmpeg's darwin path ---------
+
+MACOS_LOCK_FIXTURE = REPO_ROOT / "tests" / "ffmpeg_lock" / "ffmpeg-macos.fixture.json"
+"""A SYNTHETIC macOS lock (census pending); the real lock is written from the fork run."""
+
+MACOS_FORK_PATCH = REPO_ROOT / "tools" / "package" / "ffmpeg-fork-macos.patch"
+
+
+def macos_lock() -> dict[str, Any]:
+    return json.loads(MACOS_LOCK_FIXTURE.read_text(encoding="utf-8"))
+
+
+def test_macos_lock_fixture_validates_with_the_platform_discriminator():
+    data = macos_lock()
+    assert build.validate_ffmpeg_lock(data, platform="darwin") is data
+    assert set(data) == set(build.FFmpegMacLock.__annotations__)
+
+
+def test_macos_lock_excluded_rows_are_exactly_the_recipe_skips():
+    """The fixture's excluded stages are the fork recipe's own component switches."""
+    patch = MACOS_FORK_PATCH.read_text(encoding="utf-8")
+    switches = set(re.findall(r"-(SKIP_[A-Z0-9_]+)=YES", patch)) - {"SKIP_TEST", "SKIP_BUNDLE"}
+    assert {row["stage"] for row in macos_lock()["excluded"]} == switches
+    assert len(switches) == 21
+
+
+def _configure(data: dict[str, Any], change: str) -> None:
+    line = data["configure_line"]
+    if change.startswith("---"):  # "---<flag>" removes <flag>; anything else is appended
+        data["configure_line"] = line.replace(" " + change[1:], "")
+    else:
+        data["configure_line"] = line + " " + change
+
+
+@pytest.mark.parametrize(
+    ("change", "refusal"),
+    [
+        ("---enable-gpl", "GPL, version3 and libx265 are required"),
+        ("---enable-version3", "GPL, version3 and libx265 are required"),
+        ("---enable-libx265", "GPL, version3 and libx265 are required"),
+        ("--enable-nonfree", "nonfree, libfdk, zvbi or decklink is forbidden"),
+        ("--enable-libfdk-aac", "nonfree, libfdk, zvbi or decklink is forbidden"),
+        ("--enable-libfdk_aac", "nonfree, libfdk, zvbi or decklink is forbidden"),
+        ("--enable-libzvbi", "nonfree, libfdk, zvbi or decklink is forbidden"),
+        ("--enable-decklink", "nonfree, libfdk, zvbi or decklink is forbidden"),
+        ("--extra-version=20261111", "version date must match --extra-version"),
+    ],
+)
+def test_macos_lock_configure_line_must_and_must_not(change, refusal):
+    data = macos_lock()
+    _configure(data, change)
+    with pytest.raises(ValueError, match=re.escape(refusal)):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+def test_macos_lock_configure_line_keeps_its_printed_prefix_and_one_date():
+    data = macos_lock()
+    data["configure_line"] = data["configure_line"].removeprefix("configuration: ")
+    with pytest.raises(ValueError, match="printed prefix"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+    data = macos_lock()
+    data["configure_line"] = data["configure_line"].replace(" --extra-version=20261110", "")
+    with pytest.raises(ValueError, match="--extra-version"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+WINDOWS_ROOT = "ffmpeg-n9.0.2-47-gb204e94e90-win64-gpl-9.0"
+
+
+def _windows_shaped(data: dict[str, Any], how: str) -> None:
+    tag = data["release_tag"]
+    if how == "url-only":
+        data["asset_url"] = data["asset_url"].replace("macos-arm64", "win64")
+    elif how == "asset":
+        data["archive_root"] = WINDOWS_ROOT
+        data["asset_name"] = WINDOWS_ROOT + ".zip"
+        data["asset_url"] = data["asset_url"].rsplit("/", 1)[0] + "/" + data["asset_name"]
+    elif how == "windows-lock-url":
+        windows = json.loads((REPO_ROOT / "tools/package/ffmpeg.lock.json").read_text("utf-8"))
+        data["asset_url"] = windows["asset_url"]
+    elif how == "tag":
+        data["release_tag"] = tag.replace("-macos-arm64", "")
+        data["asset_url"] = data["asset_url"].replace(tag, data["release_tag"])
+
+
+@pytest.mark.parametrize("how", ["url-only", "asset", "windows-lock-url", "tag"])
+def test_macos_lock_refuses_a_windows_shaped_asset(how):
+    data = macos_lock()
+    _windows_shaped(data, how)
+    with pytest.raises(ValueError, match=r"asset URL|archive_root|release tag"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "refusal"),
+    [
+        ("schema_version", 3, "unsupported schema_version"),
+        ("provider", "BtbN/FFmpeg-Builds", "provider must be the owner's fork"),
+        ("size_bytes", 0, "invalid size_bytes"),
+        ("seat_sha256", "1" * 64, "sha256 readings differ"),
+        ("github_sha256", "A" * 64, "sha256 readings differ"),
+        ("build_repository_commit", "deadbeef", "invalid build repository commit"),
+        ("ffmpeg_commit", "b204e94e" + "0" * 32, "version hash differs"),
+        ("ffmpeg_ref", "n9.0.2", "FFmpeg ref must be release/9.0"),
+        ("ffmpeg_repository", "https://git.ffmpeg.org/ffmpeg.git", "FFmpeg repository"),
+        ("version", "n8.0.1-47-gb204e94e90-20261110", "FFmpeg major must be 9"),
+        ("licence", "GPL-2.0-or-later", "GPL-3.0-or-later"),
+        (
+            "extract_members",
+            ["bin/ffmpeg.exe", "bin/ffprobe.exe", "LICENSE.txt"],
+            "extract_members",
+        ),
+        ("source_record_url", "https://github.com/rwsmythe/FFmpeg-Builds", "source record URL"),
+        ("build_run_url", "https://github.com/BtbN/FFmpeg-Builds/actions/runs/1", "build run URL"),
+        (
+            "build_run_url",
+            "https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/x",
+            "build run URL",
+        ),
+        ("macos_deployment_target", "26.0", "deployment target must be 14.0"),
+        ("runner_label", "macos-latest", "runner label must be macos-26"),
+        ("runner_image_version", "latest", "invalid runner_image_version"),
+        ("retention_note", "", "invalid retention_note"),
+        ("census", "complete", "census rules are WP6.5 part 3's"),
+        ("census", "partial", "census must be pending"),
+        ("components", [{"stage": "build-x265.sh"}], "census pending: components"),
+        ("toolchain_runtime", [{"name": "libc++"}], "census pending: components"),
+        ("toolchain", {"clang": "21.0.0"}, "census pending: components"),
+        ("build_script", {"repository": "https://example.invalid/x.git"}, "build_script fields"),
+    ],
+)
+def test_macos_lock_refuses_inconsistent_provenance(field, value, refusal):
+    data = macos_lock()
+    data[field] = value
+    with pytest.raises(ValueError, match=re.escape(refusal)):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+@pytest.mark.parametrize(
+    ("repository", "commit", "refusal"),
+    [
+        ("https://github.com/BtbN/FFmpeg-Builds.git", "f" * 40, "invalid build script repository"),
+        (
+            "https://git.martin-riedl.de/ffmpeg/build-script.git",
+            "main",
+            "invalid build script commit",
+        ),
+    ],
+)
+def test_macos_lock_pins_the_build_script(repository, commit, refusal):
+    data = macos_lock()
+    data["build_script"] = {"repository": repository, "commit": commit}
+    with pytest.raises(ValueError, match=re.escape(refusal)):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+@pytest.mark.parametrize(
+    ("change", "refusal"),
+    [
+        ("no-zvbi", "SKIP_ZVBI and SKIP_DECKLINK must be excluded"),
+        ("no-decklink", "SKIP_ZVBI and SKIP_DECKLINK must be excluded"),
+        ("zvbi-built", "status must be not-built(disabled)"),
+        ("bad-stage", "invalid excluded stage"),
+        ("duplicate", "duplicate excluded stage"),
+        ("extra-field", "invalid excluded stage fields"),
+        ("empty-reason", "invalid excluded reason"),
+    ],
+)
+def test_macos_lock_excluded_rows_fail_closed(change, refusal):
+    data = macos_lock()
+    rows = data["excluded"]
+    if change == "no-zvbi":
+        rows[:] = [row for row in rows if row["stage"] != "SKIP_ZVBI"]
+    elif change == "no-decklink":
+        rows[:] = [row for row in rows if row["stage"] != "SKIP_DECKLINK"]
+    elif change == "zvbi-built":
+        rows[0]["status"] = "built"
+    elif change == "bad-stage":
+        rows[0]["stage"] = "scripts.d/50-zvbi.sh"
+    elif change == "duplicate":
+        rows.append(dict(rows[0]))
+    elif change == "extra-field":
+        rows[0]["licence"] = "GPL-2.0-only"
+    else:
+        rows[0]["reason"] = ""
+    with pytest.raises(ValueError, match=re.escape(refusal)):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+@pytest.mark.parametrize("change", ["missing", "unknown"])
+def test_macos_lock_field_set_is_exact(change):
+    data = macos_lock()
+    if change == "missing":
+        del data["runner_image_version"]
+    else:
+        data["toolchain_census"] = "later"
+    with pytest.raises(ValueError, match="invalid macOS document fields"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+def test_lock_platform_discriminator_refuses_the_other_platform():
+    """A Windows lock is never a macOS lock and the reverse; Linux has no lock."""
+    windows = json.loads((REPO_ROOT / "tools/package/ffmpeg.lock.json").read_text("utf-8"))
+    with pytest.raises(ValueError, match="not a macOS lock"):
+        build.validate_ffmpeg_lock(windows, platform="darwin")
+    with pytest.raises(ValueError, match="is not the Windows lock"):
+        build.validate_ffmpeg_lock(macos_lock())
+    with pytest.raises(ValueError, match="is not the Windows lock"):
+        build.validate_ffmpeg_lock(macos_lock(), platform="win32")
+    with pytest.raises(ValueError, match="no FFmpeg lock for platform 'linux'"):
+        build.validate_ffmpeg_lock(windows, platform="linux")
+    assert build.validate_ffmpeg_lock(windows)["provider"] == "rwsmythe/FFmpeg-Builds"
+
+
+def test_load_macos_lock_reads_its_own_file(tmp_path, monkeypatch):
+    path = tmp_path / "ffmpeg-macos.lock.json"
+    path.write_text(MACOS_LOCK_FIXTURE.read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setattr(build, "FFMPEG_MACOS_LOCK_PATH", path)
+    assert build.load_macos_ffmpeg_lock()["platform"] == "macos-arm64"
+    assert build.FFMPEG_MACOS_LOCK_PATH.name == "ffmpeg-macos.lock.json"
+    path.write_text((REPO_ROOT / "tools/package/ffmpeg.lock.json").read_text("utf-8"), "utf-8")
+    with pytest.raises(ValueError, match="not a macOS lock"):
+        build.load_macos_ffmpeg_lock()
+
+
+def fake_macho(lock: dict[str, Any], *, cpu=0x0100000C, filetype=2, magic=0xFEEDFACF, extra=b""):
+    """A thin Mach-O head plus the two NUL-terminated strings FFmpeg compiles in."""
+    body = lock["configure_line"].removeprefix("configuration: ").encode()
+    head = struct.pack("<IiiIIIII", magic, cpu, 0, filetype, 0, 0, 0, 0)
+    strings = b"\0%s version %s\0\0" + lock["version"].encode() + b"\0" + body + b"\0"
+    return head + b"\0" * 64 + extra + strings + b"\0" * 32
+
+
+@pytest.fixture
+def macos_bundle(tmp_path, monkeypatch):
+    """A synthetic fork zip, a verified-transport lock and a built .app (never executed)."""
+    data = macos_lock()
+    root = data["archive_root"]
+    members = {
+        f"{root}/bin/ffmpeg": fake_macho(data),
+        f"{root}/bin/ffprobe": fake_macho(data),
+        f"{root}/LICENSE.txt": b"synthetic GPL-3.0 text\n",
+        f"{root}/build/toolchain.txt": b"Apple clang (synthetic)\n",
+        f"{root}/build/logs/build-ffmpeg.log": b"log\n",
+    }
+    source = tmp_path / data["asset_name"]
+    pin = tmp_path / "ffmpeg-macos.lock.json"
+    app = tree(tmp_path / "dist" / "Clearwater.app", ["Contents/MacOS/Clearwater"])
+    (app / "Contents" / "Frameworks").mkdir()
+    out = tmp_path / "out"
+
+    def write(extra=(), omit=(), infos=()):
+        with zipfile.ZipFile(source, "w") as archive:
+            for name, payload in members.items():
+                if name not in omit:
+                    info = zipfile.ZipInfo(name)
+                    info.external_attr = (0o100755 if "/bin/" in name else 0o100644) << 16
+                    archive.writestr(info, payload)
+            for name, payload in extra:
+                archive.writestr(name, payload)
+            for info, payload in infos:
+                archive.writestr(info, payload)
+        data["size_bytes"] = source.stat().st_size
+        data["github_sha256"] = data["seat_sha256"] = hashlib.sha256(
+            source.read_bytes()
+        ).hexdigest()
+        data["asset_url"] = source.as_uri()
+        pin.write_text(json.dumps(data), encoding="utf-8")
+
+    real_run = build.subprocess.run
+
+    def never_run(*args, **kwargs):
+        pytest.fail("bundle_ffmpeg's darwin path ran a binary")
+
+    monkeypatch.setattr(build, "FFMPEG_MACOS_LOCK_PATH", pin)
+    monkeypatch.setattr(build, "_TEST_ALLOW_FILE_URLS", True)
+    monkeypatch.setattr(build.subprocess, "run", never_run)
+    monkeypatch.setattr(build.subprocess, "Popen", never_run)
+    write()
+    return SimpleNamespace(
+        data=data,
+        members=members,
+        write=write,
+        app=app,
+        out=out,
+        pin=pin,
+        source=source,
+        real_run=real_run,
+    )
+
+
+def bundle_macos(case, **kwargs):
+    return build.bundle_ffmpeg(
+        case.app / "Contents" / "MacOS",
+        out=case.out,
+        url=kwargs.pop("url", case.data["asset_url"]),
+        sha256=kwargs.pop("sha256", case.data["github_sha256"]),
+        platform="darwin",
+        **kwargs,
+    )
+
+
+def test_macos_bundle_places_the_verified_tools_and_texts_and_runs_nothing(macos_bundle):
+    case = macos_bundle
+    trusted: set[str] = set()
+    result = bundle_macos(case, verified_hashes=trusted)
+    macos, resources = case.app / "Contents/MacOS", case.app / "Contents/Resources"
+    assert [(path, line) for path, line in result] == [
+        (macos / tool, f"{tool} version {case.data['version']} (read from the binary)")
+        for tool in ("ffmpeg", "ffprobe")
+    ]
+    root = case.data["archive_root"]
+    for tool in ("ffmpeg", "ffprobe"):
+        assert (macos / tool).read_bytes() == case.members[f"{root}/bin/{tool}"]
+    assert trusted == {hashlib.sha256(case.members[f"{root}/bin/ffmpeg"]).hexdigest()}
+    assert sorted(p.name for p in macos.iterdir()) == ["Clearwater", "ffmpeg", "ffprobe"]
+    assert sorted(p.name for p in resources.iterdir()) == ["ffmpeg-BUILD.txt", "ffmpeg-LICENSE.txt"]
+    assert (resources / "ffmpeg-LICENSE.txt").read_bytes() == b"synthetic GPL-3.0 text\n"
+    text = (resources / "ffmpeg-BUILD.txt").read_text(encoding="utf-8")
+    for field in (
+        "provider",
+        "release_tag",
+        "asset_name",
+        "github_sha256",
+        "version",
+        "ffmpeg_commit",
+        "ffmpeg_ref",
+        "build_repository_commit",
+        "build_run_url",
+        "source_record_url",
+        "configure_line",
+        "macos_deployment_target",
+        "runner_image_version",
+    ):
+        assert str(case.data[field]) in text, field
+    assert case.data["build_script"]["commit"] in text
+    assert "tools/package/ffmpeg-macos.lock.json" in text
+    assert not any(p.name.startswith("build") for p in case.app.rglob("*") if p.is_dir())
+    assert (case.out / "ffmpeg" / case.data["asset_name"]).is_file()
+    if sys.platform != "win32":
+        modes = {p.name: p.stat().st_mode & 0o777 for p in (*macos.iterdir(), *resources.iterdir())}
+        assert modes["ffmpeg"] == modes["ffprobe"] == 0o755
+        assert modes["ffmpeg-BUILD.txt"] == modes["ffmpeg-LICENSE.txt"] == 0o644
+
+
+def test_macos_bundle_sets_the_execute_bits_on_exactly_the_two_tools(macos_bundle, monkeypatch):
+    """G2a-F4: zipfile drops modes; 0755 goes on ffmpeg / ffprobe and on nothing else."""
+    case = macos_bundle
+    real_chmod = os.chmod
+    modes: list[tuple[str, int]] = []
+
+    def spy(path, mode, *args, **kwargs):
+        modes.append((Path(path).name, mode))
+        return real_chmod(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(os, "chmod", spy)
+    bundle_macos(case)
+    executable = sorted({name for name, mode in modes if mode & 0o111})
+    assert executable == ["ffmpeg", "ffprobe"]
+    assert {mode for name, mode in modes if name in executable} == {0o755}
+    assert {mode for name, mode in modes if name not in executable} == {0o644}
+    # staged (out/ffmpeg) then placed (the .app): two 0755 calls per tool
+    assert sorted(name for name, mode in modes if mode == 0o755) == ["ffmpeg"] * 2 + ["ffprobe"] * 2
+
+
+@pytest.mark.parametrize("kind", ["argument", "lock", "download"])
+def test_macos_bundle_verifies_before_opening_and_places_nothing(macos_bundle, kind):
+    case = macos_bundle
+    actual = case.data["github_sha256"]
+    if kind == "lock":
+        case.data["github_sha256"] = case.data["seat_sha256"] = "0" * 64
+        case.pin.write_text(json.dumps(case.data), encoding="utf-8")
+    if kind == "download":
+        payload = case.source.read_bytes()
+        case.source.write_bytes(payload[:-1] + bytes([payload[-1] ^ 1]))
+    with pytest.raises(ValueError, match="sha256"):
+        bundle_macos(case, sha256="0" * 64 if kind == "argument" else actual)
+    assert sorted(p.name for p in case.app.rglob("*")) == [
+        "Clearwater",
+        "Contents",
+        "Frameworks",
+        "MacOS",
+    ]
+    assert not (case.out / "ffmpeg" / (case.data["archive_root"] + ".verified")).exists()
+
+
+@pytest.mark.parametrize("name", ["../escape", "root/../escape", "C:/escape", "/absolute"])
+def test_macos_bundle_refuses_unsafe_members(macos_bundle, name):
+    macos_bundle.write(extra=[(name, b"unsafe")])
+    with pytest.raises(ValueError, match="unsafe"):
+        bundle_macos(macos_bundle)
+    assert not (macos_bundle.app / "Contents/MacOS/ffmpeg").exists()
+
+
+def test_macos_bundle_refuses_a_zip_symlink(macos_bundle):
+    info = zipfile.ZipInfo("link")
+    info.create_system = 3
+    info.external_attr = (stat.S_IFLNK | 0o777) << 16
+    macos_bundle.write(infos=[(info, b"bin/ffmpeg")])
+    with pytest.raises(ValueError, match="unsafe"):
+        bundle_macos(macos_bundle)
+
+
+def test_macos_bundle_refuses_windows_tool_names(macos_bundle):
+    root = macos_bundle.data["archive_root"]
+    macos_bundle.write(omit=[f"{root}/bin/ffmpeg"], extra=[(f"{root}/bin/ffmpeg.exe", b"MZ")])
+    with pytest.raises(ValueError, match="missing members"):
+        bundle_macos(macos_bundle)
+
+
+@pytest.mark.parametrize(
+    ("tool", "damage", "error", "refusal"),
+    [
+        ("ffmpeg", "x86_64", ValueError, "not a thin arm64 Mach-O executable"),
+        ("ffprobe", "dylib", ValueError, "not a thin arm64 Mach-O executable"),
+        ("ffmpeg", "fat", ValueError, "not a thin arm64 Mach-O executable"),
+        ("ffmpeg", "pe", ValueError, "not a thin arm64 Mach-O executable"),
+        ("ffmpeg", "version", RuntimeError, "version token"),
+        ("ffprobe", "second-version", RuntimeError, "version token"),
+        ("ffmpeg", "no-version", RuntimeError, "version token"),
+        ("ffmpeg", "configuration", RuntimeError, "configuration differs from the lock"),
+        ("ffprobe", "configuration-prefix", RuntimeError, "configuration differs from the lock"),
+        ("ffmpeg", "glued-version", RuntimeError, "version token"),
+    ],
+)
+def test_macos_bundle_checks_each_tool_without_running_it(
+    macos_bundle, tool, damage, error, refusal
+):
+    """The F3b token and the configure line are read from the bytes; nothing is placed."""
+    case = macos_bundle
+    data = case.data
+    name = f"{data['archive_root']}/bin/{tool}"
+    payload = case.members[name]
+    version = data["version"].encode()
+    body = data["configure_line"].removeprefix("configuration: ").encode()
+    if damage == "x86_64":
+        payload = fake_macho(data, cpu=0x01000007)
+    elif damage == "dylib":
+        payload = fake_macho(data, filetype=6)
+    elif damage == "fat":
+        payload = b"\xca\xfe\xba\xbe" + payload[4:]
+    elif damage == "pe":
+        payload = b"MZ" + payload[2:]
+    elif damage == "version":
+        payload = payload.replace(version, version[:-1] + b"9")
+    elif damage == "second-version":
+        payload += b"\0n9.0.2-46-gb204e94e90-20261110\0"
+    elif damage == "no-version":
+        payload = payload.replace(b"\0" + version + b"\0", b"\0" + b"x" * len(version) + b"\0")
+    elif damage == "configuration":
+        payload = payload.replace(b"--enable-libx265", b"--enable-libx266")
+    elif damage == "configuration-prefix":
+        payload = payload.replace(b"\0" + body, b"\0X" + body)
+    else:
+        payload = payload.replace(b"\0" + version, b"\0x" + version)
+    case.members[name] = payload
+    case.write()
+    trusted: set[str] = set()
+    with pytest.raises(error, match=re.escape(refusal)):
+        bundle_macos(case, verified_hashes=trusted)
+    assert trusted == set()
+    assert not (case.app / "Contents/MacOS/ffmpeg").exists()
+    assert not (case.app / "Contents/Resources").exists()
+
+
+def test_macos_bundle_reads_strings_across_the_read_boundary(macos_bundle):
+    """Both strings may straddle the 1 MiB read boundary and are still found."""
+    case = macos_bundle
+    data = case.data
+    name = f"{data['archive_root']}/bin/ffmpeg"
+    payload = case.members[name]
+    for needle in (data["version"].encode(), b"--enable-libass"):
+        offset = payload.index(needle)
+        pad = 1024 * 1024 - offset - len(needle) // 2
+        case.members[name] = payload[:64] + b"\0" * pad + payload[64:]
+        case.write()
+        result = bundle_macos(case)
+        assert result[0][1].startswith("ffmpeg version ")
+        shutil.rmtree(case.app / "Contents/Resources")
+        for tool in ("ffmpeg", "ffprobe"):
+            (case.app / "Contents/MacOS" / tool).unlink()
+
+
+def test_macos_bundle_refuses_a_destination_outside_an_app_before_download(macos_bundle, tmp_path):
+    folder = tree(tmp_path / "onedir", ["Clearwater/Clearwater"]) / "Clearwater"
+    with pytest.raises(ValueError, match=r"Contents/MacOS of a built \.app"):
+        build.bundle_ffmpeg(
+            folder,
+            out=macos_bundle.out,
+            url=macos_bundle.data["asset_url"],
+            sha256=macos_bundle.data["github_sha256"],
+            platform="darwin",
+        )
+    assert not (macos_bundle.out / "ffmpeg").exists()
+
+
+def test_bundling_refuses_the_other_platforms_lock(macos_bundle, tmp_path, monkeypatch):
+    """The macOS bundling path refuses a Windows lock; the Windows path a macOS lock."""
+    windows = REPO_ROOT / "tools" / "package" / "ffmpeg.lock.json"
+    monkeypatch.setattr(build, "FFMPEG_MACOS_LOCK_PATH", windows)
+    with pytest.raises(ValueError, match="not a macOS lock"):
+        bundle_macos(macos_bundle)
+    monkeypatch.setattr(build, "FFMPEG_LOCK_PATH", macos_bundle.pin)
+    destination = tree(tmp_path / "win", ["Clearwater.exe"])
+    with pytest.raises(ValueError, match="is not the Windows lock"):
+        build.bundle_ffmpeg(
+            destination,
+            out=macos_bundle.out,
+            url=macos_bundle.data["asset_url"],
+            sha256=macos_bundle.data["github_sha256"],
+        )
+    with pytest.raises(ValueError, match="no FFmpeg bundling for platform 'linux'"):
+        build.bundle_ffmpeg(
+            destination, out=macos_bundle.out, url="x", sha256="0" * 64, platform="linux"
+        )
+    assert not (macos_bundle.out / "ffmpeg").exists()
+
+
+def test_macos_bundle_existing_tool_in_the_app_is_refused(macos_bundle):
+    tree(macos_bundle.app, ["Contents/MacOS/ffprobe"])
+    with pytest.raises(ValueError, match="already exists"):
+        bundle_macos(macos_bundle)
+    assert not (macos_bundle.app / "Contents/MacOS/ffmpeg").exists()
+    assert not (macos_bundle.out / "ffmpeg").exists()
+
+
+def test_darwin_build_bundles_from_the_macos_lock_and_refuses_release_while_census_pending(
+    tmp_path, monkeypatch, capsys, macos_bundle
+):
+    """build() on darwin takes the macOS lock and the darwin bundling path."""
+    case = macos_bundle
+    calls = []
+
+    def fetched(destination, **kwargs):
+        calls.append((destination, kwargs))
+        return [(destination / "ffmpeg", "ffmpeg version x")]
+
+    seal_calls = []
+    monkeypatch.setattr(build, "bundle_ffmpeg", fetched)
+    monkeypatch.setattr(build.subprocess, "run", case.real_run)
+    monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setattr(build, "native_origin_violations", lambda executable, **kwargs: [])
+    monkeypatch.setattr(build, "seal_macos_bundle", seal_calls.append)
+    out = tmp_path / "build-out"
+    # Built (and PyInstaller imported) BEFORE sys.platform reads darwin (darwin_app_build).
+    source = make_exe(out / "synthetic", [], modules=["clearwater", "graphlib"])
+
+    def build_folder(args):
+        target = Path(args[args.index("--distpath") + 1]) / "Clearwater.app/Contents/MacOS"
+        target.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target / "Clearwater")
+
+    monkeypatch.setattr(build, "run_pyinstaller", build_folder)
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    status = build.build(
+        "onedir",
+        out=out,
+        ffmpeg_from=case.data["asset_url"],
+        ffmpeg_sha256=case.data["github_sha256"],
+    )
+    assert status == 0, capsys.readouterr().out
+    assert len(calls) == 1 and calls[0][1]["platform"] == "darwin"
+    assert calls[0][0].as_posix().endswith("Clearwater.app/Contents/MacOS")
+    assert calls[0][1]["url"] == case.data["asset_url"]
+    for flags in ({"notices": True}, {"notices": True, "smoke": True, "zip_release": True}):
+        assert (
+            build.build(
+                "onedir",
+                out=out,
+                ffmpeg_from=case.data["asset_url"],
+                ffmpeg_sha256=case.data["github_sha256"],
+                **flags,
+            )
+            == 1
+        )
+        assert "census pending" in capsys.readouterr().out
+    assert len(calls) == 1
+    assert (
+        build.build("onedir", out=out, ffmpeg_from=case.data["asset_url"], ffmpeg_sha256="1" * 64)
+        == 1
+    )
+    assert "FFmpeg URL/sha256 differ from the lock" in capsys.readouterr().out

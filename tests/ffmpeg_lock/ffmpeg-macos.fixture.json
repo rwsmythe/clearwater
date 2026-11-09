@@ -1,0 +1,145 @@
+{
+  "schema_version": 2,
+  "platform": "macos-arm64",
+  "census": "pending",
+  "provider": "rwsmythe/FFmpeg-Builds",
+  "build_script": {
+    "repository": "https://git.martin-riedl.de/ffmpeg/build-script.git",
+    "commit": "f63b8aab8f5ce1a067da86ba69e34a36a7e217e5"
+  },
+  "release_tag": "ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-deadbee",
+  "build_repository_commit": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+  "build_run_url": "https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/40000000001",
+  "asset_name": "ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0.zip",
+  "asset_url": "https://github.com/rwsmythe/FFmpeg-Builds/releases/download/ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-deadbee/ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0.zip",
+  "size_bytes": 1,
+  "github_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "seat_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "ffmpeg_ref": "release/9.0",
+  "ffmpeg_commit": "b204e94e90fca64045e9ca7dd44c65678c7eb29e",
+  "ffmpeg_repository": "https://github.com/FFmpeg/FFmpeg.git",
+  "version": "n9.0.2-47-gb204e94e90-20261110",
+  "configure_line": "configuration: --prefix=/Users/runner/work/FFmpeg-Builds/FFmpeg-Builds/work/out --pkg-config-flags=--static --extra-version=20261110 --enable-gray --enable-libxml2 --enable-version3 --enable-gpl --enable-openssl --enable-libfreetype --enable-fontconfig --enable-libharfbuzz --enable-libass --enable-libx264 --enable-libx265",
+  "licence": "GPL-3.0-or-later",
+  "archive_root": "ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0",
+  "extract_members": [
+    "bin/ffmpeg",
+    "bin/ffprobe",
+    "LICENSE.txt"
+  ],
+  "source_record_url": "https://github.com/rwsmythe/FFmpeg-Builds/tree/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+  "retention_note": "SYNTHETIC FIXTURE (WP6.5 group 2a part 2): not a release pin; the real tools/package/ffmpeg-macos.lock.json is written from the fork run in part 3",
+  "macos_deployment_target": "14.0",
+  "runner_label": "macos-26",
+  "runner_image_version": "20261102.0473.1",
+  "components": [],
+  "excluded": [
+    {
+      "stage": "SKIP_ZVBI",
+      "status": "not-built(disabled)",
+      "reason": "GPL-2.0-only (AD-38 (10)): never linked into the GPL-3.0 binary; owner-ruled"
+    },
+    {
+      "stage": "SKIP_DECKLINK",
+      "status": "not-built(disabled)",
+      "reason": "nonfree (Riedl build.sh:638); passed so a changed default cannot enable it"
+    },
+    {
+      "stage": "SKIP_LIBKLVANC",
+      "status": "not-built(disabled)",
+      "reason": "its autogen.sh needs autotools, absent from the runner image; serves DeckLink only"
+    },
+    {
+      "stage": "SKIP_RAV1E",
+      "status": "not-built(disabled)",
+      "reason": "cargo-c is absent from the runner image; AV1 encode is unused"
+    },
+    {
+      "stage": "SKIP_SRT",
+      "status": "not-built(disabled)",
+      "reason": "MPL-2.0 is not in the component compatible constant as written; the protocol is unused"
+    },
+    {
+      "stage": "SKIP_ZIMG",
+      "status": "not-built(disabled)",
+      "reason": "its autogen.sh needs autotools, absent from the runner image; zscale is unused"
+    },
+    {
+      "stage": "SKIP_LIBBLURAY",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_SNAPPY",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_LIBVMAF",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_AOM",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_DAV1D",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_OPEN_H264",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_OPEN_JPEG",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_SVT_AV1",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_LIBTHEORA",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_VPX",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_VVENC",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_LIBWEBP",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_LAME",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_OPUS",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    },
+    {
+      "stage": "SKIP_LIBVORBIS",
+      "status": "not-built(disabled)",
+      "reason": "unused by Clearwater (product: libx265, hevc_videotoolbox, native decoders; tests: libx264); the recipe skips it"
+    }
+  ],
+  "toolchain": null,
+  "toolchain_runtime": []
+}

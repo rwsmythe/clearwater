@@ -52,6 +52,7 @@ from __future__ import annotations
 import argparse
 import ast
 import base64
+import functools
 import hashlib
 import importlib
 import importlib.metadata
@@ -73,7 +74,7 @@ from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from datetime import UTC, datetime
 from http.client import HTTPMessage
 from pathlib import Path, PurePosixPath
-from typing import IO, Literal, NamedTuple, NotRequired, Protocol, TypedDict, cast
+from typing import IO, Literal, NamedTuple, NotRequired, Protocol, TypedDict, cast, overload
 from urllib.parse import urlsplit
 
 _TEST_ALLOW_FILE_URLS = False
@@ -907,8 +908,78 @@ class FFmpegLock(TypedDict):
     toolchain_runtime: list[FFmpegRuntime]
 
 
+class FFmpegBuildScript(TypedDict):
+    """The vendored build-script repository the macOS recipe runs, at its full commit."""
+
+    repository: str
+    commit: str
+
+
+class FFmpegMacLock(TypedDict):
+    """The macOS arm64 FFmpeg pin (WP6.5): the fork's release asset and its provenance.
+
+    A SECOND lock document beside the Windows one, validated by the same
+    :func:`validate_ffmpeg_lock` under ``platform="darwin"``; ``platform`` is its
+    discriminator (the Windows document carries no such field). ``census`` is
+    ``"pending"`` until WP6.5 part 3 fills ``components``, ``toolchain`` and
+    ``toolchain_runtime`` from the fork run; a pending lock must keep all three empty.
+    """
+
+    schema_version: int
+    platform: str
+    census: str
+    provider: str
+    build_script: FFmpegBuildScript
+    release_tag: str
+    build_repository_commit: str
+    build_run_url: str
+    asset_name: str
+    asset_url: str
+    size_bytes: int
+    github_sha256: str
+    seat_sha256: str
+    ffmpeg_ref: str
+    ffmpeg_commit: str
+    ffmpeg_repository: str
+    version: str
+    configure_line: str
+    licence: str
+    archive_root: str
+    extract_members: list[str]
+    source_record_url: str
+    retention_note: str
+    macos_deployment_target: str
+    runner_label: str
+    runner_image_version: str
+    components: list[FFmpegComponent]
+    excluded: list[FFmpegExcluded]
+    toolchain: dict[str, object] | None
+    toolchain_runtime: list[FFmpegRuntime]
+
+
 FFMPEG_LOCK_PATH = Path(__file__).with_name("ffmpeg.lock.json")
 """The release pin; local PATH copies never substitute for this record."""
+
+FFMPEG_MACOS_LOCK_PATH = Path(__file__).with_name("ffmpeg-macos.lock.json")
+"""The macOS arm64 release pin (WP6.5 part 3 writes it from the fork run)."""
+
+FFMPEG_MACOS_PLATFORM = "macos-arm64"
+"""The macOS lock's ``platform`` discriminator."""
+
+FFMPEG_MACOS_PROVIDER = "rwsmythe/FFmpeg-Builds"
+"""The owner's fork, the only macOS provider (AD-38 (9); WP6.5 group 2a)."""
+
+FFMPEG_MACOS_BUILD_SCRIPT = "https://git.martin-riedl.de/ffmpeg/build-script.git"
+"""The build script the fork's macOS recipe vendors (ledger ``## Group 2a`` 4a.1)."""
+
+FFMPEG_MACOS_DEPLOYMENT_TARGET = "14.0"
+"""``MACOSX_DEPLOYMENT_TARGET`` of the recipe: the PySide6 / shiboken6 wheel floor."""
+
+FFMPEG_MACOS_RUNNER_LABEL = "macos-26"
+"""The ruled GitHub arm64 runner label (round-0 ruling Q1)."""
+
+FFMPEG_MACOS_TOOLS = ("ffmpeg", "ffprobe")
+"""The two Mach-O tools of the macOS asset, at ``bin/`` (no ``.exe``)."""
 
 FFMPEG_COMPONENT_TEXTS_PATH = Path(__file__).with_name("native-licences") / "ffmpeg-components"
 """The byte-preserved component texts, covered exactly by the release lock."""
@@ -1360,11 +1431,175 @@ def _ffmpeg_component_texts(components: list[FFmpegComponent], folder: Path) -> 
         raise ValueError("FFmpeg lock: component text directory differs from lock")
 
 
+def _macos_configure_problem(config: str, version: str) -> str | None:
+    """The AD-38 (2) MUST / MUST NOT rules, plus no zvbi / DeckLink, for the macOS line."""
+    if not config.startswith("configuration: "):
+        return "configure_line must include its printed prefix"
+    tokens = config.split()[1:]
+    if not {"--enable-gpl", "--enable-version3", "--enable-libx265"} <= set(tokens):
+        return "GPL, version3 and libx265 are required"
+    if any(
+        token in {"--enable-nonfree", "--enable-libzvbi", "--enable-decklink"} or "libfdk" in token
+        for token in tokens
+    ):
+        return "nonfree, libfdk, zvbi or decklink is forbidden"
+    dates = [t.removeprefix("--extra-version=") for t in tokens if t.startswith("--extra-version=")]
+    if dates != [version[-8:]]:
+        return "version date must match --extra-version"
+    return None
+
+
+def _validate_macos_ffmpeg_lock(value: dict[str, object]) -> FFmpegMacLock:
+    """Validate the macOS lock (:class:`FFmpegMacLock`); census rows are part 3's."""
+    data = _ffmpeg_fields(value, set(FFmpegMacLock.__annotations__), "macOS document")
+    if type(data["schema_version"]) is not int or data["schema_version"] != 2:
+        raise ValueError("FFmpeg lock: unsupported schema_version")
+    if type(data["size_bytes"]) is not int or data["size_bytes"] <= 0:
+        raise ValueError("FFmpeg lock: invalid size_bytes")
+    for key in set(FFmpegMacLock.__annotations__) - {
+        "schema_version",
+        "size_bytes",
+        "build_script",
+        "extract_members",
+        "components",
+        "excluded",
+        "toolchain",
+        "toolchain_runtime",
+    }:
+        _ffmpeg_text(data[key], key)
+    text = cast(dict[str, str], data)
+    if text["provider"] != FFMPEG_MACOS_PROVIDER:
+        raise ValueError("FFmpeg lock: the macOS provider must be the owner's fork")
+    script = _ffmpeg_fields(
+        data["build_script"], set(FFmpegBuildScript.__annotations__), "build_script"
+    )
+    if script["repository"] != FFMPEG_MACOS_BUILD_SCRIPT:
+        raise ValueError("FFmpeg lock: invalid build script repository")
+    if not isinstance(script["commit"], str) or not re.fullmatch(r"[0-9a-f]{40}", script["commit"]):
+        raise ValueError("FFmpeg lock: invalid build script commit")
+    _check_ffmpeg_asset_url(text["asset_url"])
+    digest = text["github_sha256"]
+    if not re.fullmatch(r"[0-9a-f]{64}", digest) or digest != text["seat_sha256"]:
+        raise ValueError("FFmpeg lock: sha256 readings differ or are not 64 hex digits")
+    build_commit = text["build_repository_commit"]
+    if not re.fullmatch(r"[0-9a-f]{40}", build_commit):
+        raise ValueError("FFmpeg lock: invalid build repository commit")
+    commit, version = text["ffmpeg_commit"], text["version"]
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError("FFmpeg lock: invalid FFmpeg commit")
+    if not re.match(r"n9\.", version):
+        raise ValueError("FFmpeg lock: FFmpeg major must be 9")
+    version_commit = re.fullmatch(r"n9\.\d+\.\d+-\d+-g([0-9a-f]{7,40})-\d{8}", version)
+    if version_commit is None or not commit.startswith(version_commit.group(1)):
+        raise ValueError("FFmpeg lock: version hash differs from the FFmpeg commit")
+    if text["ffmpeg_ref"] != "release/9.0":
+        raise ValueError("FFmpeg lock: FFmpeg ref must be release/9.0")
+    if text["ffmpeg_repository"] != "https://github.com/FFmpeg/FFmpeg.git":
+        raise ValueError("FFmpeg lock: FFmpeg repository must be the recipe's GitHub mirror")
+    if text["licence"] != "GPL-3.0-or-later":
+        raise ValueError("FFmpeg lock: combined build must be GPL-3.0-or-later")
+    if data["extract_members"] != [*(f"bin/{tool}" for tool in FFMPEG_MACOS_TOOLS), "LICENSE.txt"]:
+        raise ValueError("FFmpeg lock: extract_members must name only the two tools and licence")
+    # The fork names the archive from the build's describe token (the version without
+    # its date): a Windows-shaped root, name or URL can never pass for the macOS asset.
+    root = text["archive_root"]
+    if root != f"ffmpeg-{version[:-9]}-macos-arm64-gpl-9.0":
+        raise ValueError("FFmpeg lock: archive_root must be the macOS arm64 asset of version")
+    if text["asset_name"] != root + ".zip":
+        raise ValueError("FFmpeg lock: asset name must match archive_root")
+    provider = text["provider"]
+    expected_url = (
+        f"https://github.com/{provider}/releases/download/{text['release_tag']}/{root}.zip"
+    )
+    if text["asset_url"] != expected_url and not (
+        _TEST_ALLOW_FILE_URLS and urlsplit(text["asset_url"]).scheme == "file"
+    ):
+        raise ValueError("FFmpeg lock: asset URL must match provider/release/asset")
+    if text["source_record_url"] != f"https://github.com/{provider}/tree/{build_commit}":
+        raise ValueError(
+            "FFmpeg lock: source record URL must match provider/build commit tree root"
+        )
+    if not re.fullmatch(
+        rf"https://github\.com/{re.escape(provider)}/actions/runs/[0-9]+", text["build_run_url"]
+    ):
+        raise ValueError("FFmpeg lock: build run URL must name a run of the provider")
+    if not re.fullmatch(
+        rf"ffmpeg-9\.0-g{commit[:8]}-macos-arm64-nozvbi-{build_commit[:7]}", text["release_tag"]
+    ):
+        raise ValueError("FFmpeg lock: release tag must name FFmpeg and build commits")
+    problem = _macos_configure_problem(text["configure_line"], version)
+    if problem is not None:
+        raise ValueError(f"FFmpeg lock: {problem}")
+    if text["macos_deployment_target"] != FFMPEG_MACOS_DEPLOYMENT_TARGET:
+        raise ValueError("FFmpeg lock: the macOS deployment target must be 14.0")
+    if text["runner_label"] != FFMPEG_MACOS_RUNNER_LABEL:
+        raise ValueError("FFmpeg lock: the runner label must be macos-26")
+    if not re.fullmatch(r"[0-9]{8}\.[0-9]+\.[0-9]+", text["runner_image_version"]):
+        raise ValueError("FFmpeg lock: invalid runner_image_version")
+    excluded = data["excluded"]
+    if not isinstance(excluded, list):
+        raise ValueError("FFmpeg lock: components/excluded must be lists")
+    stages: set[str] = set()
+    for item in excluded:
+        row = _ffmpeg_fields(item, set(FFmpegExcluded.__annotations__), "excluded stage")
+        for key in row:
+            _ffmpeg_text(row[key], f"excluded {key}")
+        stage = cast(str, row["stage"])
+        if not re.fullmatch(r"SKIP_[A-Z0-9_]+", stage):
+            raise ValueError("FFmpeg lock: invalid excluded stage (a recipe SKIP_ switch)")
+        if stage in stages:
+            raise ValueError("FFmpeg lock: duplicate excluded stage")
+        if row["status"] != "not-built(disabled)":
+            raise ValueError("FFmpeg lock: excluded status must be not-built(disabled)")
+        stages.add(stage)
+    if not {"SKIP_ZVBI", "SKIP_DECKLINK"} <= stages:
+        raise ValueError("FFmpeg lock: SKIP_ZVBI and SKIP_DECKLINK must be excluded")
+    if data["census"] == "complete":
+        raise ValueError(
+            "FFmpeg lock: the macOS census rules are WP6.5 part 3's; only census pending is valid"
+        )
+    if data["census"] != "pending":
+        raise ValueError("FFmpeg lock: census must be pending (part 3 defines complete)")
+    if data["components"] != [] or data["toolchain_runtime"] != [] or data["toolchain"] is not None:
+        raise ValueError(
+            "FFmpeg lock: census pending: components, toolchain and toolchain_runtime stay empty"
+        )
+    return cast(FFmpegMacLock, data)
+
+
+@overload
+def validate_ffmpeg_lock(
+    value: object,
+    *,
+    component_texts_path: Path = ...,
+    platform: Literal["win32"] = ...,
+) -> FFmpegLock: ...
+
+
+@overload
+def validate_ffmpeg_lock(
+    value: object,
+    *,
+    component_texts_path: Path = ...,
+    platform: Literal["darwin"],
+) -> FFmpegMacLock: ...
+
+
+@overload
+def validate_ffmpeg_lock(
+    value: object,
+    *,
+    component_texts_path: Path = ...,
+    platform: str,
+) -> FFmpegLock | FFmpegMacLock: ...
+
+
 def validate_ffmpeg_lock(
     value: object,
     *,
     component_texts_path: Path = FFMPEG_COMPONENT_TEXTS_PATH,
-) -> FFmpegLock:
+    platform: str = "win32",
+) -> FFmpegLock | FFmpegMacLock:
     """Validate archive identity, source rows and two-way configure-flag coverage.
 
     Stage licence identities must be seat-verified and their expressions must
@@ -1380,16 +1615,31 @@ def validate_ffmpeg_lock(
     ``configure_flag`` is null for dependencies or a list, since some stages
     contribute several switches (for example both opencore-amr codecs).
 
+    ``platform`` selects the lock (WP6.5): ``"win32"`` (the default) the Windows lock,
+    whose document carries no ``platform`` field and whose rules are unchanged;
+    ``"darwin"`` the macOS lock (:class:`FFmpegMacLock`), whose ``platform`` must read
+    ``macos-arm64``. A lock of the other platform is refused before any other rule.
+
     Args:
         value: The decoded lock document.
         component_texts_path: Directory containing exactly the component texts.
+        platform: The ``sys.platform`` value the lock is for.
 
     Returns:
         The same document, with its complete schema validated.
 
     Raises:
-        ValueError: The schema, pin, hashes or configure coverage is inconsistent.
+        ValueError: The schema, pin, hashes or configure coverage is inconsistent, or the
+            lock is not the named platform's.
     """
+    if platform == "darwin":
+        if not isinstance(value, dict) or value.get("platform") != FFMPEG_MACOS_PLATFORM:
+            raise ValueError(f"FFmpeg lock: not a macOS lock (platform {FFMPEG_MACOS_PLATFORM!r})")
+        return _validate_macos_ffmpeg_lock(cast(dict[str, object], value))
+    if platform != "win32":
+        raise ValueError(f"FFmpeg lock: no FFmpeg lock for platform {platform!r}")
+    if isinstance(value, dict) and "platform" in value:
+        raise ValueError(f"FFmpeg lock: a {value['platform']!r} lock is not the Windows lock")
     data = _ffmpeg_fields(value, set(FFmpegLock.__annotations__), "document")
     if type(data["schema_version"]) is not int or data["schema_version"] != 2:
         raise ValueError("FFmpeg lock: unsupported schema_version")
@@ -1570,8 +1820,23 @@ def load_ffmpeg_lock() -> FFmpegLock:
     return validate_ffmpeg_lock(json.loads(FFMPEG_LOCK_PATH.read_text(encoding="utf-8")))
 
 
+def load_macos_ffmpeg_lock() -> FFmpegMacLock:
+    """Read and validate the macOS release pin (``ffmpeg-macos.lock.json``).
+
+    Returns:
+        The verified-schema macOS lock document.
+
+    Raises:
+        ValueError: The document is invalid or not a macOS lock.
+        OSError: The document cannot be read.
+    """
+    return validate_ffmpeg_lock(
+        json.loads(FFMPEG_MACOS_LOCK_PATH.read_text(encoding="utf-8")), platform="darwin"
+    )
+
+
 def _ffmpeg_archive_members(
-    archive: zipfile.ZipFile, lock: FFmpegLock
+    archive: zipfile.ZipFile, lock: FFmpegLock | FFmpegMacLock
 ) -> dict[str, zipfile.ZipInfo]:
     seen: set[str] = set()
     found: dict[str, zipfile.ZipInfo] = {}
@@ -1636,7 +1901,7 @@ class _FFmpegRedirectHandler(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def _download_ffmpeg(url: str, sha256: str, out: Path, lock: FFmpegLock) -> Path:
+def _download_ffmpeg(url: str, sha256: str, out: Path, lock: FFmpegLock | FFmpegMacLock) -> Path:
     if url != lock["asset_url"]:
         raise ValueError("FFmpeg URL differs from the pinned asset URL")
     _check_ffmpeg_asset_url(url)
@@ -1731,6 +1996,165 @@ def _check_ffmpeg_toolchain_markers(path: Path, lock: FFmpegLock) -> None:
         raise ValueError(f"{path.name}: missing " + ", ".join(markers) + " toolchain marker")
 
 
+_FFMPEG_VERSION_TOKEN = re.compile(
+    rb"(?<![0-9A-Za-z._+-])(n9\.[0-9]+\.[0-9]+-[0-9]+-g[0-9a-f]{7,40}-[0-9]{8})\x00"
+)
+"""FFmpeg's ``FFMPEG_VERSION`` as the compiled-in C string (``-g<hash>-<extra date>``)."""
+
+_MH_EXECUTE = 2
+
+
+def _macos_tool_problem(head: bytes) -> str | None:
+    """Why a tool's first bytes are not a thin arm64 Mach-O executable, or None."""
+    if len(head) < 32 or head[:4] != _MACHO_MAGIC_64:
+        return "not a thin arm64 Mach-O executable (magic)"
+    cputype, _subtype, filetype = struct.unpack_from("<iiI", head, 4)
+    if cputype != _MACHO_CPU_ARM64 or filetype != _MH_EXECUTE:
+        return f"not a thin arm64 Mach-O executable (cpu {cputype:#x}, filetype {filetype})"
+    return None
+
+
+def _macos_ffmpeg_version(path: Path, lock: FFmpegMacLock) -> str:
+    """Read the F3b version token and the configure line from a tool's bytes; never run it.
+
+    FFmpeg compiles ``FFMPEG_VERSION`` and ``FFMPEG_CONFIGURATION`` in as plain C strings
+    (``fftools/opt_common.c`` prints them with ``%s``; ``av_version_info`` and
+    ``avutil_configuration`` return them), so each tool must carry exactly ONE version
+    token, equal to the lock's, and the lock's configure line verbatim as a C string not
+    preceded by a printable byte (so it is not the tail of a longer configuration). Read in
+    1 MiB blocks with an overlap, as :func:`_check_ffmpeg_toolchain_markers`.
+
+    Raises:
+        RuntimeError: The token or the configuration differs from the lock.
+        OSError: The file cannot be read.
+    """
+    body = lock["configure_line"].removeprefix("configuration: ").encode("utf-8")
+    configuration = re.compile(rb"(?<![\x20-\x7e])" + re.escape(body) + rb"\x00")
+    overlap = max(len(body) + 2, 128)
+    tokens: set[bytes] = set()
+    configured = False
+    tail = b""
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            block = tail + chunk
+            # A match starting at a carried-over byte was already judged in the previous
+            # block, where its preceding byte was visible: start at 1 after the first block.
+            start = 1 if tail else 0
+            tokens.update(m.group(1) for m in _FFMPEG_VERSION_TOKEN.finditer(block, start))
+            configured = configured or configuration.search(block, start) is not None
+            tail = block[-overlap:]
+    if tokens != {lock["version"].encode("ascii")}:
+        found = sorted(token.decode("ascii") for token in tokens)
+        raise RuntimeError(f"{path.name}: version token(s) {found} differ from the lock")
+    if not configured:
+        raise RuntimeError(f"{path.name}: configuration differs from the lock")
+    return f"{path.name} version {lock['version']} (read from the binary)"
+
+
+def _bundle_macos_ffmpeg(
+    destination: Path,
+    *,
+    out: Path,
+    url: str,
+    sha256: str,
+    verified_hashes: set[str] | None,
+) -> list[tuple[Path, str]]:
+    """``bundle_ffmpeg``'s darwin path: verify, stage, check, then place into the ``.app``.
+
+    The order of the Windows path (the pin, then the download verified before the archive
+    is opened, then every member inspected) with three macOS differences: the tools are
+    the Mach-O ``bin/ffmpeg`` / ``bin/ffprobe``; they are STAGED under
+    ``<out>/ffmpeg/<archive_root>.verified`` and given mode 0755 there (``zipfile`` drops
+    the archive's modes, G2a-F4), the texts 0644; and their version and configuration are
+    read from their bytes (:func:`_macos_ffmpeg_version`), never by running them (the
+    smoke runs them on the Mac runner). Only after both pass are they placed by
+    :func:`place_macos_tools` (tools to ``Contents/MacOS``, texts to ``Contents/Resources``)
+    before :func:`seal_macos_bundle`. The Apple toolchain marker check (the Windows
+    :func:`_check_ffmpeg_toolchain_markers`) needs the census and is WP6.5 part 3's.
+    """
+    lock = load_macos_ffmpeg_lock()
+    destination = destination.resolve()
+    bundle = destination.parent.parent
+    if (
+        destination.name != "MacOS"
+        or destination.parent.name != "Contents"
+        or bundle.suffix != ".app"
+    ):
+        raise ValueError(f"macOS FFmpeg goes into Contents/MacOS of a built .app: {destination}")
+    texts = ("ffmpeg-LICENSE.txt", "ffmpeg-BUILD.txt")
+    for target in (
+        *(destination / tool for tool in FFMPEG_MACOS_TOOLS),
+        *(bundle / "Contents" / "Resources" / name for name in texts),
+    ):
+        if target.is_symlink() or target.exists():
+            raise ValueError(f"tool placement: {target} already exists")
+    archive_path = _download_ffmpeg(url, sha256, out.resolve(), lock)
+    staging = archive_path.parent / (lock["archive_root"] + ".verified")
+    if staging.is_symlink():
+        raise ValueError("FFmpeg staging: unsafe output link")
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir()
+    tool_hashes: set[str] = set()
+    with zipfile.ZipFile(archive_path) as archive:
+        members = _ffmpeg_archive_members(archive, lock)
+        targets = {
+            **{f"bin/{tool}": staging / tool for tool in FFMPEG_MACOS_TOOLS},
+            "LICENSE.txt": staging / "ffmpeg-LICENSE.txt",
+        }
+        for name, path in targets.items():
+            digest = hashlib.sha256()
+            with archive.open(members[name]) as source, path.open("wb") as output:
+                while chunk := source.read(1024 * 1024):
+                    digest.update(chunk)
+                    output.write(chunk)
+            path.chmod(0o644 if name == "LICENSE.txt" else 0o755)
+            if name != "LICENSE.txt":
+                tool_hashes.add(digest.hexdigest())
+    result = []
+    for tool in FFMPEG_MACOS_TOOLS:
+        with (staging / tool).open("rb") as stream:
+            problem = _macos_tool_problem(stream.read(32))
+        if problem is not None:
+            raise ValueError(f"{tool}: {problem}")
+        result.append((destination / tool, _macos_ffmpeg_version(staging / tool, lock)))
+    record = staging / "ffmpeg-BUILD.txt"
+    record.write_text(
+        "\n".join(
+            [
+                f"Provider: {lock['provider']}",
+                f"Build script: {lock['build_script']['repository']} @ "
+                f"{lock['build_script']['commit']}",
+                f"Release tag: {lock['release_tag']}",
+                f"Asset: {lock['asset_name']}",
+                f"SHA256: {lock['github_sha256']}",
+                f"FFmpeg version: {lock['version']}",
+                f"FFmpeg commit: {lock['ffmpeg_commit']}",
+                f"FFmpeg ref: {lock['ffmpeg_ref']}",
+                f"Build repository commit: {lock['build_repository_commit']}",
+                f"Build run: {lock['build_run_url']}",
+                f"Per-component source recipes: {lock['source_record_url']}",
+                "Per-component pins and licence readings: "
+                "tools/package/ffmpeg-macos.lock.json in Clearwater source",
+                f"macOS deployment target: {lock['macos_deployment_target']}",
+                f"Runner: {lock['runner_label']} image {lock['runner_image_version']}",
+                lock["configure_line"],
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    record.chmod(0o644)
+    place_macos_tools(
+        bundle,
+        {tool: staging / tool for tool in FFMPEG_MACOS_TOOLS},
+        {name: staging / name for name in texts},
+    )
+    if verified_hashes is not None:
+        verified_hashes.update(tool_hashes)
+    return result
+
+
 def bundle_ffmpeg(
     destination: Path,
     *,
@@ -1738,31 +2162,43 @@ def bundle_ffmpeg(
     url: str,
     sha256: str,
     verified_hashes: set[str] | None = None,
+    platform: str = "win32",
 ) -> list[tuple[Path, str]]:
     """Fetch the pinned archive, verify before opening, then copy and check its tools.
 
     Every archive member is inspected for unsafe paths, links and duplicates,
     including members that will not be extracted. Only the two tools and the
     GPL text are copied. The output contains a build/source provenance record.
+    ``platform="darwin"`` takes the macOS lock and path (:func:`_bundle_macos_ffmpeg`);
+    the default is the Windows path, unchanged.
 
     Args:
-        destination: The built Clearwater executable's folder.
+        destination: The built Clearwater executable's folder (on darwin the ``.app``'s
+            ``Contents/MacOS``).
         out: The build output root; the archive is retained under ``ffmpeg/``.
         url: Must equal the committed lock's asset URL.
         sha256: Must equal both verified hash readings in the lock.
         verified_hashes: Optional in-memory output for extracted tool hashes, read
             from the verified archive streams. Updated only after both tools pass.
             Unextracted members and the non-native licence/build texts grant no trust.
+        platform: ``"win32"`` or ``"darwin"``: whose lock and tools.
 
     Returns:
         The two executable paths and their checked version lines.
 
     Raises:
-        ValueError: The pin, download, ZIP inventory or compiler markers differ.
+        ValueError: The pin, download, ZIP inventory or compiler markers differ, or the
+            platform has no bundling path.
         RuntimeError: Either tool fails its bounded version/configuration check.
         OSError: A download, extraction or provenance write fails.
         zipfile.BadZipFile: The verified bytes are not a valid ZIP.
     """
+    if platform == "darwin":
+        return _bundle_macos_ffmpeg(
+            destination, out=out, url=url, sha256=sha256, verified_hashes=verified_hashes
+        )
+    if platform != "win32":
+        raise ValueError(f"no FFmpeg bundling for platform {platform!r}")
     lock = load_ffmpeg_lock()
     destination = destination.resolve()
     archive_path = _download_ffmpeg(url, sha256, out.resolve(), lock)
@@ -3792,9 +4228,18 @@ def build(
         return 1
     if ffmpeg_from is not None:
         try:
-            lock = load_ffmpeg_lock()
+            # WP6.5: darwin bundles from the macOS lock; every other host keeps the
+            # Windows lock (Linux is refused before PyInstaller by run_pyinstaller).
+            lock: FFmpegLock | FFmpegMacLock = (
+                load_macos_ffmpeg_lock() if sys.platform == "darwin" else load_ffmpeg_lock()
+            )
             if ffmpeg_from != lock["asset_url"] or ffmpeg_sha256 != lock["github_sha256"]:
                 raise ValueError("FFmpeg URL/sha256 differ from the lock")
+            if lock.get("census") == "pending" and (notices or zip_release):
+                raise ValueError(
+                    "macOS FFmpeg lock census pending: --notices / --zip await the "
+                    "census rows (WP6.5 part 3)"
+                )
         except (OSError, ValueError) as error:
             print(f"FAILED: {error}")
             return 1
@@ -3838,8 +4283,12 @@ def build(
     executable = find_executable(root)
     ffmpeg_hashes: set[str] = set()
     if ffmpeg_from is not None and ffmpeg_sha256 is not None:
+        # The Windows call is unchanged; darwin names its platform (the .app's MacOS folder).
+        fetch: Callable[..., list[tuple[Path, str]]] = bundle_ffmpeg
+        if sys.platform == "darwin":
+            fetch = functools.partial(bundle_ffmpeg, platform="darwin")
         try:
-            for path, line in bundle_ffmpeg(
+            for path, line in fetch(
                 executable.parent,
                 out=out,
                 url=ffmpeg_from,
