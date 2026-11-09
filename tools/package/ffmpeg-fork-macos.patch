@@ -1,4 +1,4 @@
-From a8d20eb4569fb8d3d5baf8b496a3d04c9eea8dd6 Mon Sep 17 00:00:00 2001
+From 9ef06057741f38ef775ec1655333be207d2b3d24 Mon Sep 17 00:00:00 2001
 From: Reid Smythe <rwsmythe@gmail.com>
 Date: Mon, 9 Nov 2026 00:38:02 -1000
 Subject: [PATCH] feat(wp6.5): build macOS arm64 GPL FFmpeg release/9.0 at
@@ -34,9 +34,31 @@ with the same modes except these edits:
   downloads/x265_4.2.tar.gz instead of the generated get/4.2.tar.gz (the
   same tree, but the generated archive's x265Version.txt reads releasetag
   4.0, so the library would report 4.0).
+- script/build-x265.sh (also): every cmake call passes
+  -DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local" (CMake adds
+  Homebrew's prefix to its system search on macOS even when brew is off
+  PATH, Modules/Platform/Darwin.cmake; no find may reach a host package).
+- script/build-ninja.sh: -DBUILD_TESTING=OFF (ninja's CMakeLists includes
+  CTest, searches an installed GTest and otherwise FetchContent-downloads
+  GoogleTest outside download() and the pins) and the same
+  CMAKE_IGNORE_PREFIX_PATH.
+- script/build-cmake.sh: the fallback is the same release file
+  cmake-4.0.3-macos-universal.tar.gz from cmake.org (the same sha256)
+  instead of a source build (CMake's own configure runs with CTest on and
+  searches host packages); a failed second download fails the build.
+- script/build-nasm.sh: the fallback is the same release file
+  nasm-3.02.tar.gz as archived by the Wayback Machine (the same sha256,
+  with the generated configure) instead of GitHub's tag archive (no
+  configure; its autogen.sh needs autotools the runner lacks); the
+  autogen branch's checkStatus passes the status ($?) it lacked.
+- script/build-harfbuzz.sh: meson runs with -Dfreetype=enabled (this
+  build's freetype) and glib, gobject, cairo, chafa, icu, png, tests,
+  introspection, docs, utilities and gpu_demo disabled (auto features
+  only a host package could satisfy, and test / tool targets).
 
 macos/sha256-pins.txt: the sha256 of the 18 URLs the vendored scripts can
-request on macOS (mirrors included). macos/meson-requirements.txt: meson
+request on macOS (fallback URLs included; each fallback serves the same
+file as its primary). macos/meson-requirements.txt: meson
 1.11.2 by hash (the newest release that runs on the Xcode python3 3.9).
 
 .github/workflows/build-macos.yml: workflow_dispatch only; both jobs run
@@ -48,8 +70,9 @@ image, MACOSX_DEPLOYMENT_TARGET=14.0) with -SKIP_ZVBI=YES, -SKIP_DECKLINK=YES
 and the components Clearwater does not use skipped (libklvanc, rav1e, srt,
 zimg, libbluray, snappy, libvmaf, aom, dav1d, openh264, openjpeg, svt-av1,
 libtheora, vpx, vvenc, libwebp, lame, opus, libvorbis), then fails unless
-ffmpeg and ffprobe are arm64 Mach-O with minos 14.0, link only /usr/lib and
-/System/Library, report n9.0.2-47-gb204e94e...-<date> built from the pinned
+ffmpeg and ffprobe are arm64 Mach-O with minos 14.0, have an otool -L
+record that lists libSystem and nothing outside /usr/lib and
+/System/Library (a grep error fails too), report n9.0.2-47-gb204e94e...-<date> built from the pinned
 FFmpeg and x264 commits, carry --enable-gpl --enable-version3
 --enable-libx265 --enable-libx264 and not --enable-nonfree, libfdk,
 --enable-libzvbi or --enable-decklink, and list the libx265,
@@ -60,29 +83,30 @@ bin/ffprobe, LICENSE.txt = FFmpeg's COPYING.GPLv3, build/ with the version,
 encoder, dylib, toolchain and pin records and the component logs) plus
 checksums.sha256 under the tag
 ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-<commit7> created at this commit,
-and checks the tag and the GitHub asset digest.
+and checks the tag and the GitHub asset digest (the tag must be absent
+beforehand: only an HTTP 404 from the lookup counts as absent).
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- .github/workflows/build-macos.yml             | 271 +++++++
+ .github/workflows/build-macos.yml             | 310 ++++++++
  macos/build-script/LICENSE                    | 201 ++++++
  macos/build-script/build.sh                   | 683 ++++++++++++++++++
- macos/build-script/script/build-cmake.sh      | 110 +++
+ macos/build-script/script/build-cmake.sh      |  92 +++
  macos/build-script/script/build-ffmpeg.sh     |  73 ++
  macos/build-script/script/build-fontconfig.sh |  60 ++
  macos/build-script/script/build-freetype.sh   |  69 ++
  macos/build-script/script/build-fribidi.sh    |  60 ++
- macos/build-script/script/build-harfbuzz.sh   |  63 ++
+ macos/build-script/script/build-harfbuzz.sh   |  70 ++
  macos/build-script/script/build-libass.sh     |  60 ++
  macos/build-script/script/build-libogg.sh     |  60 ++
  macos/build-script/script/build-libxml2.sh    |  69 ++
- macos/build-script/script/build-nasm.sh       |  81 +++
- macos/build-script/script/build-ninja.sh      |  62 ++
+ macos/build-script/script/build-nasm.sh       |  85 +++
+ macos/build-script/script/build-ninja.sh      |  64 ++
  macos/build-script/script/build-openssl.sh    |  64 ++
  macos/build-script/script/build-pkg-config.sh | 107 +++
  macos/build-script/script/build-sdl.sh        |  60 ++
  macos/build-script/script/build-x264.sh       |  54 ++
- macos/build-script/script/build-x265.sh       | 133 ++++
+ macos/build-script/script/build-x265.sh       | 135 ++++
  macos/build-script/script/build-zlib.sh       |  74 ++
  macos/build-script/script/functions.sh        |  76 ++
  macos/build-script/version/fontconfig         |   1 +
@@ -100,8 +124,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  macos/build-script/version/x265               |   1 +
  macos/build-script/version/zlib               |   1 +
  macos/meson-requirements.txt                  |   3 +
- macos/sha256-pins.txt                         |  22 +
- 37 files changed, 2529 insertions(+)
+ macos/sha256-pins.txt                         |  23 +
+ 37 files changed, 2566 insertions(+)
  create mode 100644 .github/workflows/build-macos.yml
  create mode 100644 macos/build-script/LICENSE
  create mode 100755 macos/build-script/build.sh
@@ -142,10 +166,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 
 diff --git a/.github/workflows/build-macos.yml b/.github/workflows/build-macos.yml
 new file mode 100644
-index 0000000..e0958d2
+index 0000000..84a15a7
 --- /dev/null
 +++ b/.github/workflows/build-macos.yml
-@@ -0,0 +1,271 @@
+@@ -0,0 +1,310 @@
 +name: Build FFmpeg macOS arm64
 +
 +# Clearwater WP6.5: one dispatch builds FFmpeg release/9.0 at the Windows pin for
@@ -202,9 +226,18 @@ index 0000000..e0958d2
 +            env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin /bin/sh -c "command -v $tool" || { echo "::error::$tool not found on the sanitized PATH"; exit 1; }
 +          done
 +          # zvbi (GPL-2.0-only) cannot be built: its script is not vendored
++          # (checked in the directory that holds the vendored scripts)
++          test -f macos/build-script/script/build-ffmpeg.sh
 +          test ! -e macos/build-script/script/build-zvbi.sh
-+          # every pinned URL appears once
-+          test -z "$(awk '!/^#/ {print $2}' macos/sha256-pins.txt | sort | uniq -d)"
++          # the pin list is not empty and every pinned URL appears once
++          # (an assignment fails the step when awk fails)
++          pinned_urls=$(awk '!/^#/ && NF {print $2}' macos/sha256-pins.txt)
++          test -n "$pinned_urls"
++          duplicate_urls=$(printf '%s\n' "$pinned_urls" | sort | uniq -d)
++          if [ -n "$duplicate_urls" ]; then
++            echo "::error::pinned more than once: $duplicate_urls"
++            exit 1
++          fi
 +
 +      - name: Install meson (pinned by hash)
 +        run: |
@@ -274,10 +307,23 @@ index 0000000..e0958d2
 +              exit 1
 +            fi
 +            # the backstop: only macOS system libraries are linked dynamically
-+            otool -L "$B/$tool" | tail -n +2 | awk '{print $1}' > "work/$tool-dylibs.txt"
++            otool -L "$B/$tool" > "work/$tool-otool.txt"
++            tail -n +2 "work/$tool-otool.txt" | awk '{print $1}' > "work/$tool-dylibs.txt"
 +            cat "work/$tool-dylibs.txt"
-+            if grep -v -E '^(/usr/lib/|/System/Library/)' "work/$tool-dylibs.txt"; then
++            # a real dependency record, never an empty one (every executable links libSystem)
++            if ! grep -q -x -F /usr/lib/libSystem.B.dylib "work/$tool-dylibs.txt"; then
++              echo "::error::$tool: the otool -L record lacks /usr/lib/libSystem.B.dylib"
++              exit 1
++            fi
++            # grep -v: 0 = a line outside the allowlist, 1 = none, anything else = grep failed
++            outside_status=0
++            grep -v -E '^(/usr/lib/|/System/Library/)' "work/$tool-dylibs.txt" > "work/$tool-dylibs-outside.txt" || outside_status=$?
++            if [ "$outside_status" -eq 0 ]; then
++              cat "work/$tool-dylibs-outside.txt"
 +              echo "::error::$tool links a library outside /usr/lib and /System/Library"
++              exit 1
++            elif [ "$outside_status" -ne 1 ]; then
++              echo "::error::grep failed ($outside_status) on the $tool dylib list"
 +              exit 1
 +            fi
 +          done
@@ -291,9 +337,15 @@ index 0000000..e0958d2
 +          for flag in --enable-gpl --enable-version3 --enable-libx265 --enable-libx264 --enable-openssl "--extra-version=${token##*-}"; do
 +            echo " $configuration " | grep -q -- " $flag " || { echo "::error::configure line lacks $flag"; exit 1; }
 +          done
++          # grep -q: 0 = carried, 1 = absent, anything else = grep failed
 +          for flag in --enable-nonfree libfdk --enable-libzvbi --enable-decklink; do
-+            if echo "$configuration" | grep -q -- "$flag"; then
++            flag_status=0
++            printf '%s\n' "$configuration" | grep -q -F -e "$flag" || flag_status=$?
++            if [ "$flag_status" -eq 0 ]; then
 +              echo "::error::configure line carries $flag"
++              exit 1
++            elif [ "$flag_status" -ne 1 ]; then
++              echo "::error::grep failed ($flag_status) looking for $flag"
 +              exit 1
 +            fi
 +          done
@@ -338,6 +390,12 @@ index 0000000..e0958d2
 +            xcodebuild -version
 +            echo "SDK $(xcrun --show-sdk-version) $(xcrun --show-sdk-path)"
 +            /usr/bin/clang --version
++            # record (not a check): the compiler's default header search, and what
++            # /usr/local held (off the build's PATH, but a compiler default may reach it)
++            echo "clang default include search:"
++            /usr/bin/clang -x c -E -v /dev/null 2>&1 > /dev/null | sed -n '/search starts here/,/End of search list/p'
++            echo "/usr/local/include and /usr/local/lib:"
++            ls -A /usr/local/include /usr/local/lib 2>&1 || true
 +            echo "MACOSX_DEPLOYMENT_TARGET=$DEPLOYMENT_TARGET"
 +            work/tool/bin/cmake --version | sed -n 1p
 +            echo "ninja $(work/tool/bin/ninja --version)"
@@ -401,8 +459,13 @@ index 0000000..e0958d2
 +          tag="ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-${GITHUB_SHA:0:7}"
 +          echo "$SHA256  $ASSET" | sha256sum -c -
 +          sha256sum -c checksums.sha256
-+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" > /dev/null 2>&1; then
++          # the tag must not exist: a 404 is the only accepted answer (any other
++          # failure of the lookup fails the job instead of passing as "absent")
++          if tag_lookup=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" 2>&1); then
 +            echo "::error::tag $tag already exists"
++            exit 1
++          elif ! printf '%s\n' "$tag_lookup" | grep -q -F 'HTTP 404'; then
++            echo "::error::tag lookup failed: $tag_lookup"
 +            exit 1
 +          fi
 +          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
@@ -1315,10 +1378,10 @@ index 0000000..b98a7e6
 +fi
 diff --git a/macos/build-script/script/build-cmake.sh b/macos/build-script/script/build-cmake.sh
 new file mode 100755
-index 0000000..4c7fc37
+index 0000000..3642d52
 --- /dev/null
 +++ b/macos/build-script/script/build-cmake.sh
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,92 @@
 +#!/bin/sh
 +
 +# Copyright 2021 Martin Riedl
@@ -1387,48 +1450,30 @@ index 0000000..4c7fc37
 +fi
 +download https://github.com/Kitware/CMake/releases/download/v${VERSION_PATCH}/cmake-${VERSION_PATCH}-${CMAKE_OS}-${CMAKE_ARCH}.tar.gz "cmake-release.tar.gz"
 +if [ $? -ne 0 ]; then
-+    echo "download of cmake release failed; continue with local build"
-+else
-+    # unpack cmake-release
-+    tar -zxf "cmake-release.tar.gz"
-+    checkStatus $? "unpack of release failed"
-+    cd "cmake-${VERSION_PATCH}-${CMAKE_OS}-${CMAKE_ARCH}"
-+    checkStatus $? "change release directory failed"
-+    if [ "$CURRENT_OS" = "Darwin" ]; then
-+        cd "CMake.app/Contents"
-+        checkStatus $? "change app directory failed"
-+    fi
-+
-+    # copy required files
-+    cp bin/* "$TOOL_DIR/bin"
-+    checkStatus $? "copy cmake bin failed"
-+    cp -r share/* "$TOOL_DIR/share"
-+    checkStatus $? "copy cmake share failed"
-+    exit 0
++    # Clearwater WP6.5: the fallback is the same release file from cmake.org
++    # (the same sha256), not a source build (CMake's own configure runs with
++    # CTest on and searches host packages outside the pins).
++    echo "download of cmake release failed; start download from cmake.org"
++    download https://cmake.org/files/v${VERSION_MINOR}/cmake-${VERSION_PATCH}-${CMAKE_OS}-${CMAKE_ARCH}.tar.gz "cmake-release.tar.gz"
++    checkStatus $? "download of cmake release failed"
 +fi
 +
-+# download source
-+download https://cmake.org/files/v$VERSION_MINOR/cmake-$VERSION_PATCH.tar.gz "cmake.tar.gz"
-+checkStatus $? "download failed"
++# unpack cmake-release
++tar -zxf "cmake-release.tar.gz"
++checkStatus $? "unpack of release failed"
++cd "cmake-${VERSION_PATCH}-${CMAKE_OS}-${CMAKE_ARCH}"
++checkStatus $? "change release directory failed"
++if [ "$CURRENT_OS" = "Darwin" ]; then
++    cd "CMake.app/Contents"
++    checkStatus $? "change app directory failed"
++fi
 +
-+# unpack
-+tar -zxf "cmake.tar.gz"
-+checkStatus $? "unpack failed"
-+cd "cmake-$VERSION_PATCH/"
-+checkStatus $? "change directory failed"
-+
-+# prepare build
-+export OPENSSL_ROOT_DIR="$TOOL_DIR"
-+./configure --prefix="$TOOL_DIR" --parallel="$CPUS"
-+checkStatus $? "configuration failed"
-+
-+# build
-+make -j $CPUS
-+checkStatus $? "build failed"
-+
-+# install
-+make install
-+checkStatus $? "installation failed"
++# copy required files
++cp bin/* "$TOOL_DIR/bin"
++checkStatus $? "copy cmake bin failed"
++cp -r share/* "$TOOL_DIR/share"
++checkStatus $? "copy cmake share failed"
++exit 0
 diff --git a/macos/build-script/script/build-ffmpeg.sh b/macos/build-script/script/build-ffmpeg.sh
 new file mode 100755
 index 0000000..32aeb08
@@ -1717,10 +1762,10 @@ index 0000000..f5d14d2
 +checkStatus $? "installation failed"
 diff --git a/macos/build-script/script/build-harfbuzz.sh b/macos/build-script/script/build-harfbuzz.sh
 new file mode 100755
-index 0000000..377391c
+index 0000000..e17dede
 --- /dev/null
 +++ b/macos/build-script/script/build-harfbuzz.sh
-@@ -0,0 +1,63 @@
+@@ -0,0 +1,70 @@
 +#!/bin/sh
 +
 +# Copyright 2022 Martin Riedl
@@ -1774,7 +1819,14 @@ index 0000000..377391c
 +# prepare build
 +cd "harfbuzz-$VERSION/"
 +checkStatus $? "change directory failed"
-+meson build --prefix "$TOOL_DIR" --libdir=lib --default-library=static
++# (Clearwater WP6.5: the "auto" features that only a host package could
++# satisfy, the tests, the docs and the utilities are off; freetype is
++# required, from this build's own freetype)
++meson build --prefix "$TOOL_DIR" --libdir=lib --default-library=static \
++    -Dfreetype=enabled -Dglib=disabled -Dgobject=disabled -Dcairo=disabled \
++    -Dchafa=disabled -Dicu=disabled -Dpng=disabled -Dtests=disabled \
++    -Dintrospection=disabled -Ddocs=disabled -Dutilities=disabled \
++    -Dgpu_demo=disabled
 +checkStatus $? "configuration failed"
 +
 +# build
@@ -1993,10 +2045,10 @@ index 0000000..108edea
 +checkStatus $? "installation failed"
 diff --git a/macos/build-script/script/build-nasm.sh b/macos/build-script/script/build-nasm.sh
 new file mode 100755
-index 0000000..910bcdd
+index 0000000..ad98f71
 --- /dev/null
 +++ b/macos/build-script/script/build-nasm.sh
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,85 @@
 +#!/bin/sh
 +
 +# Copyright 2021 Martin Riedl
@@ -2041,8 +2093,12 @@ index 0000000..910bcdd
 +checkStatus $? "create directory failed"
 +download http://www.nasm.us/pub/nasm/releasebuilds/$VERSION/nasm-$VERSION.tar.gz nasm.tar.gz
 +if [ $? -ne 0 ]; then
-+    echo "download failed; start download from github server"
-+    download https://github.com/netwide-assembler/nasm/archive/refs/tags/nasm-$VERSION.tar.gz nasm.tar.gz
++    # Clearwater WP6.5: the fallback is the same release file (the same
++    # sha256, with the generated configure) as archived by the Wayback
++    # Machine, not GitHub's tag archive (no configure; autogen.sh needs
++    # autotools the runner lacks).
++    echo "download failed; start download from web.archive.org"
++    download https://web.archive.org/web/20260923205609id_/https://www.nasm.us/pub/nasm/releasebuilds/$VERSION/nasm-$VERSION.tar.gz nasm.tar.gz
 +    checkStatus $? "download failed"
 +fi
 +
@@ -2058,7 +2114,7 @@ index 0000000..910bcdd
 +else
 +    echo "run autogen first"
 +    ./autogen.sh
-+    checkStatus "autogen failed"
++    checkStatus $? "autogen failed"
 +fi
 +./configure --prefix="$TOOL_DIR"
 +checkStatus $? "configuration failed"
@@ -2080,10 +2136,10 @@ index 0000000..910bcdd
 +checkStatus $? "installation failed"
 diff --git a/macos/build-script/script/build-ninja.sh b/macos/build-script/script/build-ninja.sh
 new file mode 100755
-index 0000000..01df681
+index 0000000..f336a41
 --- /dev/null
 +++ b/macos/build-script/script/build-ninja.sh
-@@ -0,0 +1,62 @@
+@@ -0,0 +1,64 @@
 +#!/bin/sh
 +
 +# Copyright 2023 Martin Riedl
@@ -2136,7 +2192,9 @@ index 0000000..01df681
 +checkStatus $? "create build directory failed"
 +cd ninja_build
 +checkStatus $? "change build directory failed"
-+cmake -DCMAKE_INSTALL_PREFIX:PATH=$TOOL_DIR ../ninja-$VERSION/
++# (Clearwater WP6.5: no tests, so no GoogleTest find or FetchContent download;
++# no find in Homebrew's prefixes, which CMake adds on macOS even off PATH)
++cmake -DCMAKE_INSTALL_PREFIX:PATH=$TOOL_DIR -DBUILD_TESTING=OFF -DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local" ../ninja-$VERSION/
 +checkStatus $? "configuration failed"
 +
 +# build
@@ -2457,10 +2515,10 @@ index 0000000..e2d7b88
 +checkStatus $? "installation failed"
 diff --git a/macos/build-script/script/build-x265.sh b/macos/build-script/script/build-x265.sh
 new file mode 100755
-index 0000000..bb8d914
+index 0000000..4e2bb58
 --- /dev/null
 +++ b/macos/build-script/script/build-x265.sh
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,135 @@
 +#!/bin/sh
 +
 +# Copyright 2021 Martin Riedl
@@ -2515,6 +2573,8 @@ index 0000000..bb8d914
 +cd "x265/"
 +checkStatus $? "change directory failed"
 +
++# (Clearwater WP6.5: no find in Homebrew's prefixes, which CMake adds on
++# macOS even off PATH)
 +if [ $SKIP_X265_MULTIBIT = "NO" ]; then
 +    # prepare build 10 bit
 +    echo "start with 10bit build"
@@ -2522,7 +2582,7 @@ index 0000000..bb8d914
 +    checkStatus $? "create directory failed"
 +    cd 10bit/
 +    checkStatus $? "change directory failed"
-+    cmake -DCMAKE_INSTALL_PREFIX:PATH=$TOOL_DIR -DENABLE_SHARED=NO -DENABLE_CLI=OFF -DEXPORT_C_API=OFF -DHIGH_BIT_DEPTH=ON ../source
++    cmake -DCMAKE_INSTALL_PREFIX:PATH=$TOOL_DIR -DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local" -DENABLE_SHARED=NO -DENABLE_CLI=OFF -DEXPORT_C_API=OFF -DHIGH_BIT_DEPTH=ON ../source
 +    checkStatus $? "configuration 10 bit failed"
 +
 +    # build 10 bit
@@ -2537,7 +2597,7 @@ index 0000000..bb8d914
 +    checkStatus $? "create directory failed"
 +    cd 12bit/
 +    checkStatus $? "change directory failed"
-+    cmake -DCMAKE_INSTALL_PREFIX:PATH=$TOOL_DIR -DENABLE_SHARED=NO -DENABLE_CLI=OFF -DEXPORT_C_API=OFF -DHIGH_BIT_DEPTH=ON -DMAIN12=ON ../source
++    cmake -DCMAKE_INSTALL_PREFIX:PATH=$TOOL_DIR -DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local" -DENABLE_SHARED=NO -DENABLE_CLI=OFF -DEXPORT_C_API=OFF -DHIGH_BIT_DEPTH=ON -DMAIN12=ON ../source
 +    checkStatus $? "configuration 12 bit failed"
 +
 +    # build 12 bit
@@ -2552,7 +2612,7 @@ index 0000000..bb8d914
 +    checkStatus $? "symlink creation of 10 bit library failed"
 +    ln -s 12bit/libx265.a libx265_12bit.a
 +    checkStatus $? "symlink creation of 12 bit library failed"
-+    cmake -DCMAKE_INSTALL_PREFIX:PATH=$TOOL_DIR -DENABLE_SHARED=NO -DENABLE_CLI=OFF \
++    cmake -DCMAKE_INSTALL_PREFIX:PATH=$TOOL_DIR -DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local" -DENABLE_SHARED=NO -DENABLE_CLI=OFF \
 +        -DEXTRA_LINK_FLAGS=-L. -DEXTRA_LIB="x265_10bit.a;x265_12bit.a" -DLINKED_10BIT=ON -DLINKED_12BIT=ON source
 +    checkStatus $? "configuration 8 bit failed"
 +
@@ -2578,7 +2638,7 @@ index 0000000..bb8d914
 +    checkStatus $? "multi-bit library creation failed"
 +else
 +    # prepare build
-+    cmake -DCMAKE_INSTALL_PREFIX:PATH=$TOOL_DIR -DENABLE_SHARED=NO -DENABLE_CLI=OFF source
++    cmake -DCMAKE_INSTALL_PREFIX:PATH=$TOOL_DIR -DCMAKE_IGNORE_PREFIX_PATH="/opt/homebrew;/usr/local" -DENABLE_SHARED=NO -DENABLE_CLI=OFF source
 +    checkStatus $? "configuration failed"
 +
 +    # build
@@ -2879,21 +2939,22 @@ index 0000000..db2ba5f
 +meson==1.11.2 --hash=sha256:7e4f6e83fec83e3eaac928e058b073c7557b282c35b6a2024cea143a39926a39
 diff --git a/macos/sha256-pins.txt b/macos/sha256-pins.txt
 new file mode 100644
-index 0000000..e1d6719
+index 0000000..367761e
 --- /dev/null
 +++ b/macos/sha256-pins.txt
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,23 @@
 +# Clearwater WP6.5: sha256 of every file the vendored build script downloads,
 +# keyed by the exact URL (macos/build-script/script/functions.sh download()).
 +# Computed 2026-11-09 from the files as served; cross-checked where upstream
-+# publishes a digest (openssl, cmake, libxml2, harfbuzz, libass).
++# publishes a digest (openssl, cmake, libxml2, harfbuzz, libass). A fallback URL
++# serves the same file as its primary (nasm, cmake, freetype: the same sha256).
 +f504227b2f529e658d41629075f0503b38d67d790af345f34eba4af60c6a5998  http://www.nasm.us/pub/nasm/releasebuilds/3.02/nasm-3.02.tar.gz
-+39e251d3048c9f68678903c6b05b83942c66c71e467e8c5c3c1b26cff2ef1586  https://github.com/netwide-assembler/nasm/archive/refs/tags/nasm-3.02.tar.gz
++f504227b2f529e658d41629075f0503b38d67d790af345f34eba4af60c6a5998  https://web.archive.org/web/20260923205609id_/https://www.nasm.us/pub/nasm/releasebuilds/3.02/nasm-3.02.tar.gz
 +6fc69c01688c9458a57eb9a1664c9aba372ccda420a02bf4429fe610e7e7d591  https://pkg-config.freedesktop.org/releases/pkg-config-0.29.2.tar.gz
 +bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16  https://www.zlib.net/fossils/zlib-1.3.2.tar.gz
 +b1bfedcd5b289ff22aee87c9d600f515767ebf45f77168cb6d64f231f518a82e  https://github.com/openssl/openssl/releases/download/openssl-3.6.1/openssl-3.6.1.tar.gz
 +4e85de4daf1c3e82d7dc6b8ba5683972944b466343aeb9c327a742437bb3ce9a  https://github.com/Kitware/CMake/releases/download/v4.0.3/cmake-4.0.3-macos-universal.tar.gz
-+8d3537b7b7732660ea247398f166be892fe6131d63cc291944b45b91279f3ffb  https://cmake.org/files/v4.0/cmake-4.0.3.tar.gz
++4e85de4daf1c3e82d7dc6b8ba5683972944b466343aeb9c327a742437bb3ce9a  https://cmake.org/files/v4.0/cmake-4.0.3-macos-universal.tar.gz
 +974d6b2f4eeefa25625d34da3cb36bdcebe7fbce40f4c16ac0835fd1c0cbae17  https://github.com/ninja-build/ninja/archive/refs/tags/v1.13.2.tar.gz
 +78262a6e7ac170d6528ebfe2efccdf220191a5af6a6cd61ea4a9a9a5042c7a07  https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz
 +1b1cde5b235d40479e91be2f0e88a309e3214c8ab470ec8a2744d82a5a9ea05c  https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz
