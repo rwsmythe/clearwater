@@ -864,6 +864,56 @@ def test_root_annex_generator_checks_committed_bytes_and_detects_a_changed_row(t
     assert audit.read_bytes() == regenerated
 
 
+def _order(items, key=None) -> list[int]:
+    """The positions of ``items`` in their sorted order (``key`` None: the native order)."""
+    return sorted(range(len(items)), key=lambda i: items[i] if key is None else key(items[i]))
+
+
+def test_licence_texts_sort_in_windows_order_on_every_host():
+    """WP6.5 G3 (C15): ``pathlib`` orders paths case-insensitively on Windows only, so the
+    renderer's text order (and the ``licence-N`` numbering) depended on the host and the
+    macOS runner's ``--root-annex --check`` failed. The key gives the Windows order for
+    POSIX-style and Windows-style paths alike, here on the case-differing names of the zlib
+    row and on every row of the committed root annex's FFmpeg rows."""
+    from pathlib import PurePosixPath, PureWindowsPath
+
+    module = load_notices()
+    names = ["zlib--LICENSE", "zlib--contrib--dotzlib--LICENSE", "zlib--contrib--minizip--LICENSE"]
+    posix = [module.LicenceInput(PurePosixPath("/r/ffmpeg-components", n)) for n in names]
+    windows = [module.LicenceInput(PureWindowsPath("C:/r/ffmpeg-components", n)) for n in names]
+    assert _order(windows) == [1, 2, 0]  # Windows: case-insensitive, 'c' < 'l'
+    assert _order(posix) == [0, 1, 2]  # POSIX: case-sensitive, 'L' < 'c' (the runner's order)
+    assert _order(posix, module._licence_order) == _order(windows) == [1, 2, 0]
+    assert _order(windows, module._licence_order) == [1, 2, 0]
+
+    native = ROOT / "tools/package/native-licences"
+    lock = module._build_tool().validate_ffmpeg_lock(
+        json.loads((ROOT / "tools/package/ffmpeg.lock.json").read_text(encoding="utf-8")),
+        component_texts_path=native / "ffmpeg-components",
+    )
+    entries = (
+        "file:ffmpeg.exe",
+        "file:ffprobe.exe",
+        "file:ffmpeg-BUILD.txt",
+        "file:ffmpeg-LICENSE.txt",
+    )
+    rows = module._ffmpeg_component_rows(lock, entries, native) + module._ffmpeg_runtime_rows(
+        lock, entries, native
+    )
+    differing = 0
+    for row in rows:
+        items = list(row.licence_inputs)
+        as_posix = [i._replace(path=PurePosixPath(i.path.as_posix())) for i in items]
+        as_windows = [i._replace(path=PureWindowsPath(i.path.as_posix())) for i in items]
+        windows_order = _order(as_windows)
+        assert _order(as_posix, module._licence_order) == windows_order, row.name
+        assert _order(as_windows, module._licence_order) == windows_order, row.name
+        assert _order(items, module._licence_order) == windows_order, row.name
+        differing += _order(as_posix) != windows_order
+    print(f"rows whose native POSIX order differs: {differing} of {len(rows)}", flush=True)
+    assert differing > 0  # the check distinguishes: native POSIX order differs on some rows
+
+
 def test_runtime_notice_wording_distinguishes_supersets_and_shared_texts(release):
     """Unconditional linkage wording and misleading deduplication names regress."""
     module = load_notices()

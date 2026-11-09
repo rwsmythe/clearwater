@@ -110,6 +110,26 @@ class LicenceInput(NamedTuple):
     encoding: str = ""
 
 
+def _licence_order(item: LicenceInput) -> tuple[list[str], LicenceInput]:
+    r"""The sort key of a row's licence texts: Windows path order on every host (WP6.5 C15).
+
+    ``sorted`` on :class:`LicenceInput` compares the ``Path`` first, and ``pathlib`` compares
+    paths case-insensitively on Windows only (``WindowsPath`` lower-cases the whole string and
+    splits it at ``\``; ``PosixPath`` keeps the case), so the notices' text numbering
+    depended on the host. This key is that Windows comparison spelled host-independently:
+    the path's ``as_posix()`` lower-cased and split at ``/`` (on Windows the very list
+    ``WindowsPath`` compares, so the committed annex keeps its bytes), then the input itself
+    for the remaining fields (and, off Windows, the case of an otherwise equal path).
+
+    Args:
+        item: One licence input of a row.
+
+    Returns:
+        The key ``sorted`` orders the row's texts by.
+    """
+    return item.path.as_posix().lower().split("/"), item
+
+
 class NativeFile(NamedTuple):
     """A seat-measured binary identity, selected by basename or relative-path glob."""
 
@@ -2554,7 +2574,7 @@ def render_notices(plan: NoticePlan) -> bytes:
     for row in rows:
         if not row.licence_inputs:
             raise ValueError(f"notices: {row.name} missing licence material")
-        for item in sorted(row.licence_inputs):
+        for item in sorted(row.licence_inputs, key=_licence_order):
             if item in materials:
                 continue
             if item.path.name.casefold() == "licenseref-qt-commercial.txt":
