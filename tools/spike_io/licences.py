@@ -9,9 +9,11 @@ PATH, never from documentation:
 - PyAV's bundled FFmpeg: each library's ``configuration`` and ``license`` strings
   (``av._core.library_meta``), the build flags that decide its licence (``--enable-gpl``,
   ``--enable-version3``, ``--enable-nonfree``), the codecs and hardware devices it carries,
-  the DLLs in ``av.libs`` and the wheel's ``DELVEWHEEL`` provenance file, and every licence
-  string found inside the bundled x264, x265, libavcodec and libavutil DLLs (libavcodec's
-  and libavutil's own licence strings are the scan's positive control);
+  the native libraries the wheel-repair tool bundled (delvewheel's ``av.libs`` with its
+  ``DELVEWHEEL`` provenance file on Windows, delocate's ``av/.dylibs`` on macOS, which
+  writes no provenance file; DR-123), and every licence string found inside the bundled
+  x264, x265, libavcodec and libavutil libraries (libavcodec's and libavutil's own licence
+  strings are the scan's positive control);
 - whether PyAV can open and use the libx264, libx265 and NVENC encoders: a few synthetic frames
   are encoded to memory, and the encoder's self-identification in the bitstream is recorded;
 - the FFmpeg CLI build in use: ``ffmpeg -version``'s configuration line and ``ffmpeg -L``.
@@ -81,6 +83,17 @@ ENCODE_FRAMES = 5
 
 _ENCODER_ID = re.compile(rb"x26[45] [ -~]{0,160}")
 
+BUNDLED_LIBRARY_FOLDERS = ("av.libs", "av/.dylibs")
+"""Where a wheel-repair tool puts PyAV's bundled native libraries, relative to site-packages:
+delvewheel (Windows) writes ``av.libs``, delocate (macOS) writes ``av/.dylibs`` (DR-123)."""
+
+_LIBRARY_SUFFIXES = (".dll", ".dylib")
+"""The bundled-library suffixes: delvewheel's DLLs and delocate's dylibs."""
+
+_WORDING_PREFIXES = ("x264", "x265", "avcodec", "avutil")
+"""The libraries whose licence strings are read, matched with or without a ``lib`` prefix
+(delvewheel keeps ``avcodec-61-<hash>.dll``; delocate keeps ``libavcodec.61.dylib``)."""
+
 
 def distribution(name: str) -> dict[str, Any]:
     """Return a distribution's version, licence metadata and the names of its licence files.
@@ -140,21 +153,54 @@ def pillow_heif_bundled() -> dict[str, Any]:
     }
 
 
+def bundled_libraries(site_packages: Path) -> list[Path]:
+    """Return PyAV's bundled native libraries in every wheel-repair folder that exists.
+
+    Args:
+        site_packages: The folder ``av`` is installed in.
+
+    Returns:
+        The ``.dll`` / ``.dylib`` files of :data:`BUNDLED_LIBRARY_FOLDERS`, sorted by
+        folder then name.
+    """
+    found = []
+    for folder in BUNDLED_LIBRARY_FOLDERS:
+        libs = site_packages / folder
+        if libs.is_dir():
+            libraries = (p for p in libs.iterdir() if p.name.endswith(_LIBRARY_SUFFIXES))
+            found += sorted(libraries, key=lambda p: p.name)
+    return found
+
+
+def library_licence_wording(libraries: Sequence[Path]) -> dict[str, list[str]]:
+    """Read the licence strings inside the x264, x265, libavcodec and libavutil libraries.
+
+    Args:
+        libraries: Bundled libraries (:func:`bundled_libraries`).
+
+    Returns:
+        Per library file name (only those of :data:`_WORDING_PREFIXES`): up to ten distinct
+        NUL-terminated printable strings naming a GPL licence.
+    """
+    wording: dict[str, list[str]] = {}
+    for library in libraries:
+        if library.name.removeprefix("lib").startswith(_WORDING_PREFIXES):
+            found = {
+                m.group().decode("ascii").strip()
+                for m in _LICENCE_WORDING.finditer(library.read_bytes())
+            }
+            wording[library.name] = sorted(found)[:10]
+    return wording
+
+
 def pyav_ffmpeg() -> dict[str, Any]:
     """Read PyAV's bundled FFmpeg: version, per-library licence and configuration, codecs."""
     meta = av._core.library_meta
     configuration = str(meta["libavutil"]["configuration"])
     flags = configuration.split()
-    libs = Path(av.__file__).resolve().parent.parent / "av.libs"
-    dlls = sorted(p.name for p in libs.glob("*.dll")) if libs.is_dir() else []
-    wording: dict[str, list[str]] = {}
-    for prefix in ("libx264", "libx265", "avcodec", "avutil"):
-        for dll in libs.glob(f"{prefix}*.dll"):
-            found = {
-                m.group().decode("ascii").strip()
-                for m in _LICENCE_WORDING.finditer(dll.read_bytes())
-            }
-            wording[dll.name] = sorted(found)[:10]
+    site = Path(av.__file__).resolve().parent.parent
+    libraries = bundled_libraries(site)
+    wording = library_licence_wording(libraries)
     delvewheel = Path(str(importlib.metadata.distribution("av").locate_file(""))) / (
         f"av-{av.__version__}.dist-info/DELVEWHEEL"
     )
@@ -174,7 +220,10 @@ def pyav_ffmpeg() -> dict[str, Any]:
         "configuration": configuration,
         "codecs": {name: name in av.codecs_available for name in CODECS},
         "hwdevices": list(hwdevices_available()),
-        "bundled_dlls": dlls,
+        "bundled_dlls": [p.name for p in libraries],
+        "bundled_library_folders": sorted(
+            {p.parent.relative_to(site).as_posix() for p in libraries}
+        ),
         "dll_licence_wording": wording,
         "dist_info_licence_files": distribution("av")["licence_files"],
         "text_files": wheel_text_files("av"),
@@ -185,7 +234,22 @@ def pyav_ffmpeg() -> dict[str, Any]:
     }
 
 
-_CODE_SUFFIXES = (".py", ".pyi", ".pyx", ".pxd", ".pyd", ".pyc", ".dll", ".exe", ".c", ".h")
+_CODE_SUFFIXES = (
+    ".py",
+    ".pyi",
+    ".pyx",
+    ".pxd",
+    ".pyd",
+    ".pyc",
+    ".dll",
+    ".exe",
+    ".so",
+    ".dylib",
+    ".c",
+    ".h",
+)
+"""Files never read as text: sources and native code (the Mach-O ``.so`` / ``.dylib`` since
+DR-123)."""
 _TERMS = ("FFmpeg", "LGPL", "GPL", "General Public License", "x264", "x265")
 
 

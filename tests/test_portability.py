@@ -3974,12 +3974,84 @@ def _tool_t09(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
 
 def _tool_t11(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """T11 / T12: the licence scan keeps its Windows forms; the Mac forms are candidate DR 3
-    (deferred: tools/spike_io/licences.py is not this package's)."""
+    """T11 / T12: the licence scan keeps its Windows forms and has the Mach-O forms (DR-123,
+    WP6.5): ``.so`` / ``.dylib`` are code, and delocate's ``av/.dylibs`` is read."""
     licences = importlib.import_module("spike_io.licences")
-    assert {".pyd", ".dll", ".exe"} <= set(licences._CODE_SUFFIXES)
-    source = (TOOLS / "spike_io" / "licences.py").read_text(encoding="utf-8")
-    assert "av.libs" in source and ".dylib" in source  # pillow-heif's native scan already
+    assert {".pyd", ".dll", ".exe", ".so", ".dylib"} <= set(licences._CODE_SUFFIXES)
+    assert set(licences.BUNDLED_LIBRARY_FOLDERS) == {"av.libs", "av/.dylibs"}
+
+
+def _licence_wheel(tmp_path: Path, files: dict[str, bytes]) -> Any:
+    """A synthetic installed distribution ``fixture`` whose RECORD lists ``files``."""
+    site = tmp_path / "site"
+    for relative, data in files.items():
+        (site / relative).parent.mkdir(parents=True, exist_ok=True)
+        (site / relative).write_bytes(data)
+    info = site / "fixture-1.0.dist-info"
+    info.mkdir(parents=True, exist_ok=True)
+    (info / "METADATA").write_text("Name: fixture\nVersion: 1.0\n")
+    (info / "RECORD").write_text("".join(f"{relative},,\n" for relative in files))
+    return importlib.metadata.PathDistribution(info)
+
+
+MACHO_HEAD = bytes.fromhex("cffaedfe") + b"GPL x265 FFmpeg " * 4
+"""A Mach-O head whose bytes would count licence terms if the file were read as text."""
+
+
+@pytest.mark.parametrize(
+    "suffix", [".so", ".dylib", ".dll", ".pyd", ".exe"], ids=lambda s: s.lstrip(".")
+)
+def test_licence_scan_never_reads_a_native_library_as_text(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, suffix: str
+) -> None:
+    """DR-123: each native class (the Mach-O ``.so`` / ``.dylib`` included) is code, not text;
+    a licence text beside it is still read and counted."""
+    import importlib.metadata
+
+    licences = importlib.import_module("spike_io.licences")
+    native = f"fixture/_core.cpython-312-darwin{suffix}"
+    dist = _licence_wheel(
+        tmp_path, {native: MACHO_HEAD, "fixture-1.0.dist-info/LICENSE": b"GPL text\n"}
+    )
+    monkeypatch.setattr(licences.importlib.metadata, "files", lambda name: dist.files)
+    found = licences.wheel_text_files("fixture")
+    assert native not in found
+    assert found["fixture-1.0.dist-info/LICENSE"]["terms"]["GPL"] == 1
+
+
+@pytest.mark.parametrize(
+    "folder, names, kept",
+    [
+        (
+            "av.libs",
+            ["avcodec-61-0a1b2c3d.dll", "libx265-215-0a1b2c3d.dll", "notes.txt"],
+            ["avcodec-61-0a1b2c3d.dll", "libx265-215-0a1b2c3d.dll"],
+        ),
+        (
+            "av/.dylibs",
+            ["libavcodec.61.19.101.dylib", "libx265.215.dylib", "libavutil.59.dylib", "x.txt"],
+            ["libavcodec.61.19.101.dylib", "libavutil.59.dylib", "libx265.215.dylib"],
+        ),
+    ],
+    ids=["delvewheel-dll", "delocate-dylib"],
+)
+def test_licence_scan_reads_each_wheel_repair_folder(
+    tmp_path: Path, folder: str, names: list[str], kept: list[str]
+) -> None:
+    """DR-123: delvewheel's ``av.libs/*.dll`` (Windows) and delocate's ``av/.dylibs/*.dylib``
+    (macOS) are both read; the licence-wording prefixes match either naming."""
+    licences = importlib.import_module("spike_io.licences")
+    for name in names:
+        (tmp_path / folder).mkdir(parents=True, exist_ok=True)
+        (tmp_path / folder / name).write_bytes(b"\x00GNU General Public License x265\x00")
+    libraries = licences.bundled_libraries(tmp_path)
+    assert [path.name for path in libraries] == kept
+    assert {path.parent.relative_to(tmp_path).as_posix() for path in libraries} == {folder}
+    wording = licences.library_licence_wording(libraries)
+    assert sorted(wording) == sorted(
+        name for name in kept if "avcodec" in name or "avutil" in name or "x265" in name
+    )
+    assert all(found == ["GNU General Public License x265"] for found in wording.values())
 
 
 def _tool_t13(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
