@@ -85,4 +85,75 @@ cannot clear by a change inside `verify.py`: clearing them needs the instrument'
 (`tools/video_fidelity.py` / `compare.py`, not owned, "a finding there is a STOP") or the
 output's movie timescale and its rounding (`encode.py`, not owned), or a ruling on AD-22.
 
-No build in this turn (dispatch gate after round 0).
+No build in turn 1 (dispatch gate after round 0); the build followed CHARC's ruling below.
+
+## Ruling (CHARC, mail `708c3a6b`; dispatch 2)
+
+Q1 (a) granted: build the `frame_end` fix; `presentation_end` unchanged. Q1 (b), the movie-level
+reading, is held for the owner and out of this package. The brief's Done line is amended: the
+video stream duration SAME on the re-run; the three movie-level rows per the Q1 (b) ruling.
+
+## The fix
+
+`verify.py` `frame_end`, last-frame branch only (no next pts in the sample table or listing):
+the track's own end `_track_end` = `start_pts + duration_ts` (None without a duration, or when
+the stream's time base is not the probe's video time base) is returned when it ends after
+`last_pts` and lies LESS than one tick from `presentation_end`; otherwise the ceil of
+`presentation_end` as before. `presentation_end`, `readable_end` and every signature and
+caller are unchanged. Arithmetic is exact (`Fraction` against `int`).
+
+Where the result changes: only when the edit-list end lies strictly within one tick ABOVE the
+track end (`track < end < track + 1`): today `track + 1`, now `track`. An end within a tick
+below the track (rounded down) already gave `track` by the ceil; an end a whole tick or more
+away (a tail trim, or an edit past the media) and an end with no track end known keep the
+ceil. GoPro: a source whose edit-list end is a whole number of ticks (its movie timescale
+divides the track's) is unchanged by construction; the seat's serial leg (`footage` tests:
+`tests/test_video_fidelity.py`, `tests/test_v51_video_acceptance.py`) is the proof on footage.
+
+D86: `readable_end` calls `frame_end`; on a cut file the next pts still comes from the sample
+table (exact, unchanged); only its last sample takes the track end under the same rule.
+
+## Tests
+
+New `tests/test_io_video_verify_end.py` (synthetic; no file read). The existing
+`tests/test_io_video_encode_units.py:631-632` case (edit 4004 + 1/3 tick over a known track end
+4004, which pinned 4005) is re-pointed to a table without a stream duration (ruling (a)); the
+within-one-tick rule is pinned in the new file.
+
+RED on the base code (`83d7c9ed`'s `verify.py`; `work/t2-red.log`): 5 failed, 8 passed.
+
+| Test | Base | Fix |
+|---|---|---|
+| `test_an_edit_list_rounded_up_to_the_movie_tick_ends_at_the_track_end` (500000, mixed 1001/1002) | FAIL 12015 != 12014 | PASS |
+| `test_an_edit_list_rounded_down_to_the_movie_tick_ends_at_the_track_end` | pass | PASS |
+| `test_the_insta360_clips_end_at_their_track_end[insta360-62s]` | FAIL 1853855 != 1853854 | PASS |
+| `test_the_insta360_clips_end_at_their_track_end[insta360-439s]` | FAIL 13167168 != 13167167 | PASS |
+| `test_without_a_track_end_a_fractional_edit_end_still_rounds_up` (4005; 1853855) | pass | PASS |
+| `test_an_edit_end_within_one_tick_of_a_known_track_end_gives_the_track_end` | FAIL 4005 != 4004 | PASS |
+| `test_an_edit_end_a_tick_or_more_from_the_track_end_keeps_the_ceil` (5 cases) | pass | PASS |
+| `test_a_cut_files_readable_end_takes_the_track_end_for_its_last_sample` (D86) | FAIL 4005 != 4004 | PASS |
+| `test_io_video_encode_units.py::test_frame_end_is_the_next_source_pts_else_the_presentation_end` | pass | PASS |
+
+GREEN: `test_io_video_verify_end.py`, `test_io_video_encode_units.py` (whole module) and
+`test_container_spike_compare_equivalences.py`: 243 passed. D86 / cut-short selection of
+`test_io_video_encode.py` (`-k "truncated or cut or readable or tail"`, unmarked only): 12
+passed, among them `test_a_truncated_source_cuts_audio_at_the_readable_end` and
+`test_a_source_cut_at_a_packet_boundary_ends_at_its_last_readable_frame`. ruff, ruff format
+and mypy clean.
+
+## Movie-level rows
+
+The fix clears the video stream duration row only. The three movie-level rows compare
+movie-timescale values exactly and the source wrote them rounded to 1 us (Item 4 above);
+predicted on the 62 s re-run:
+
+| Row | source | output after the fix | difference |
+|---|---|---|---|
+| video stream duration | 926927/15000 | 926927/15000 | SAME |
+| mvhd (presentation form, exact) | 30897567/500000 | 926927/15000 | 1/1500000 s |
+| edit list, video, as written | 30897567/500000 | 926927/15000 | 1/1500000 s |
+| edit effect: vide | 30897567/500000 | 926927/15000 | 1/1500000 s |
+| edit effect: soun (today too) | 61781333/1000000 | 23168/375 | 1/3000000 s |
+
+These three rows are judged per CHARC's Q1 (b) ruling, held for the owner. This report makes no
+claim that they clear.
