@@ -10,6 +10,7 @@ dispatcher fills the depth figures.
 |---|---|---|---|---|---|---|---|---|
 | 0 | none (read-only work list) | - | - | - | - | 0 | none (no edit) | 254,025 (wp65-cell1, read by the dispatcher with cell_depth.py at its round-0 yield) |
 | A r1 | Codex (seat, detached copy) on the group-1 head | 1 major (A1) | 1 minor (A2), 1 advisory (A3) | 3 in / 0 out | 3 NEW / 0 REOPENED | 0 | product 3 (build.py) + tests; all three FIXED at `2704a852` (group 2b) | group-2b row below |
+| A r3 | Codex (seat, detached copy) on the group-2a part-2 head `de3d68a0` | 3 major (A3-F1, F2, F3) | 2 minor (A3-F4, F5) | 5 in / 0 out | 5 NEW / 0 REOPENED | 0 | product 5 (build.py) + tests; all five FIXED at `d81549fc` (turn 4b-r1, `wp65-cell7`); 1 more found by the cell's loop and fixed (configuration candidates) | part-2 r1 section below |
 
 ## Round 0
 
@@ -1287,4 +1288,141 @@ formatted; `mypy` Success 166; `mypy --platform darwin` Success 166.
   used absolute paths or `--directory` / `git -C`. One heredoc collapsed `\\` (the known trap)
   and failed its own assertion before writing; the edits were redone with the Edit tool.
 
-Depth at group-2a part-2 yield: DISPATCHER TO FILL
+Depth at group-2a part-2 yield: 368,353 (wp65-cell5, read by the dispatcher with cell_depth.py at its 4b return)
+
+## Group 2a part 2 r1 (`wp65-cell7`, dispatch-8; base `de3d68a0`)
+
+Turn 4b-r1: fold Reviewer A r3 (Codex, FINDINGS: 3 major, 2 minor, all executed;
+`clearwater-review-evidence\wp6.5\A\r3\review.txt`). Worktree head at the start `23e28fbe`
+(`wp65-cell6`'s patch commit), `2be3d775` during the turn; this cell touched neither the
+patch nor any file outside `tools/package/build.py`, `tests/test_tools_package_build.py`
+and this ledger. Test-first: every new refusal test ran RED on the part-2 `build.py`
+(unchanged in the worktree until the fold) before the fix: `work\wp6.5\g2a2r1\red.log`,
+67 failed for the right reasons (65 `DID NOT RAISE`, 1 `no attribute
+'FFMPEG_MACOS_EXCLUDED_STAGES'`, 1 `_macos_tool_problem() takes 1 positional argument`), then
+GREEN. Network reads, as DATA only, nothing run: FFmpeg's source at `b204e94e` (codeload
+tarball, `work\wp6.5\g2a2r1\src\`; `configure`, `ffbuild/version.sh`, every
+`FFMPEG_VERSION` / `FFMPEG_CONFIGURATION` use) and the provider's own macOS arm64 FFmpeg
+9.0.2 release zip (`ffmpeg.martin-riedl.de`, sha256 `c8ed4c4e...d924`, 28,395,699 bytes,
+`work\wp6.5\g2a2r1\dl\`), whose `ffmpeg` bytes were passed to the new parsers (below).
+
+### A r3 adjudication
+
+| Finding | Verdict | Change (head `d81549fc`) | RED (part-2 code) | GREEN |
+|---|---|---|---|---|
+| A3-F1 MAJOR, tool check reads 32 bytes, no deployment target | FIXED | `build.py:2158` `_macos_tool_image` reads the header + the WHOLE declared table when `sizeofcmds` lies within the file and <= 1 MiB (`_MACOS_TOOL_COMMANDS_LIMIT`); `:2175` `_macos_tool_problem(image, deployment_target)`: magic / arm64 / MH_EXECUTE, then `_macho_parse` (the origin check's bounded parser: table inside the image, each `cmdsize` >= 8, a multiple of 8, inside the table, the commands filling it exactly; `ncmds` bounded by the table), then no `LC_VERSION_MIN_*` (0x24 / 0x25 / 0x2F / 0x30: REFUSED, the older form; the recipe's toolchain emits `LC_BUILD_VERSION`, and two deployment records could disagree), exactly ONE `LC_BUILD_VERSION`, `cmdsize` = 24 + 8 x `ntools`, platform 1 (macOS), `minos` EQUAL to the lock's `macos_deployment_target`; `:2365` the bundling call. **Equal, not at-most:** the recipe sets `MACOSX_DEPLOYMENT_TARGET=14.0` exactly and the fork run checks minos 14.0, so equality is the evidence that the binary is the recipe's build; a lower minos would also run on 26.3.1 but would contradict the lock's record. | 15 bundle mutations (minos 26 / 13 / 14.0.1, iOS platform, missing, duplicate, VERSION_MIN beside / alone, table truncated past the file, table shorter than its commands, table past the limit, unaligned / zero `cmdsize`, `ntools` mismatch, `ncmds` 0xFFFFFFFF): `DID NOT RAISE`; the unit test (the reviewer's two images + a 32-byte head): TypeError | `test_tools_package_build.py:3825` (15) + `:3464` (reviewer's minos 14 admitted, 26 refused, a 32-byte head refused); positive fixture `macho_image` `:3429` (header + `LC_UUID` + `LC_BUILD_VERSION` minos 14.0 with one ld entry, structurally valid) now in every bundle test |
+| A3-F2 MAJOR, older versions invisible to the 9.x regex | FIXED | `build.py:2105` `_FFMPEG_VERSION_CANDIDATES`: DETECTION of every plausible FFMPEG_VERSION, any major, every `ffbuild/version.sh` form (read at `b204e94e`): bare C strings `n<maj>.<min>...`, `N-<n>-g<hash>...`, `git-YYYY-MM-DD-<hash>...`, a numeric RELEASE / VERSION ending in an 8-digit extra-version; and the `av_*_ffversion[] = "FFmpeg version " FFMPEG_VERSION` arrays (six `version.c`), matched anywhere with a version-shaped token; `:2219` `_scan_blocks` judges every start position in exactly one block with >= the longest match after it (no truncated candidate, no double count); `:2244` `_macos_ffmpeg_version` then refuses unless exactly ONE distinct candidate exists and it is the lock's token. | 6 tool mutations (the reviewer's `n8.0.1-...` + planted token, `FFmpeg version 8.0.1`, master `N-...`, shallow `git-...`, dated numeric, suffixed token) + 2 across the 1 MiB boundary: `DID NOT RAISE` (`other-banner` n9.0.1 was already refused by the 9.x regex) | `:3676` 8 new damages, `:3788` (2 needles x 3 split points), `:3751` banner of the locked token admitted |
+| A3-F3 MAJOR, `--disable-libx265` accepted | FIXED | `build.py:1491` `_macos_configure_problem` (macOS only): configure's `for opt do` loop applies options left to right and `$action $option` lets the LAST enable / disable win, so a disable after the enable is effective; the rule refuses `--disable-gpl` / `--disable-version3` / `--disable-libx265` ANYWHERE (order-independent; the recipe line carries none) and every option that can switch the libx265 ENCODER off with the library on (`:1022` `_LIBX265_ENCODER_OFF`: `--disable-encoders`, `--disable-everything`, `--disable-all`, `--disable-avcodec`, `--enable-random`, `--disable-random[=...]`; `--disable-encoder=<patterns>` matched as configure's shell `case` patterns, items split on `,` and `|`). | 15 of the 16 mutations: `DID NOT RAISE` (`aac|libx265` added after the RED run) | `:3213` (16) + `:3229` admits `--disable-encoder=aac`, `--disable-libx264`, `--disable-doc` |
+| A3-F4 MINOR, excluded set not bound | FIXED | `build.py:986` `FFMPEG_MACOS_EXCLUDED_STAGES` (21), `:1638` `stages` must EQUAL it (missing and unknown named). **A constant, not read from the patch at validation time:** the validator then needs nothing but the lock (no file I/O, the same verdict wherever the lock is checked) and the binding is a test that compares the VALIDATOR's set with the patch's `-SKIP_*=YES` less `SKIP_TEST` / `SKIP_BUNDLE`. | 19 single deletions (zvbi / DeckLink already refused) + invented row x3 forms: `DID NOT RAISE`; the binding test: `no attribute` | `:3133` (validator set = patch = fixture, 21), `:3142` (21 deletions), `:3151` (invented; zvbi + DeckLink only; both). Re-run after `2be3d775`: below |
+| A3-F5 MINOR, member outside `archive_root` accepted | FIXED | `build.py:1959` `_macos_archive_members`: the shared `_ffmpeg_archive_members` (UNCHANGED, AST-identical) first, then every member, extracted or not, must start with `<archive_root>/`; `:2348` the darwin path's only inventory call. The reviewer's probe called the shared helper directly; the macOS rule lives in the macOS wrapper so the Windows helper stays byte-identical. | 4 (`outside-root/unrelated`, a top-level file, the root upper-cased, a file named exactly the root): `DID NOT RAISE` | `:3868` (4) + `:3880` the Windows inventory still ignores an outside member |
+
+Counts: 3 major + 2 minor = 5, all in-envelope, all NEW, 0 reverts; product fixes 5 (`build.py`)
+plus one found by the loop (below); tests-only change: one existing test's padding moved past
+the load commands (`test_macos_bundle_reads_strings_across_the_read_boundary`, its 64-byte
+insertion point now inside the valid table).
+
+The reviewer's probe re-run at the head (`work\wp6.5\g2a2r1\ar3_probe.py`, F1 / F5 through the
+head's entry points): F1 minos 14 None, minos 26 "minos 26.0 differs from the lock's deployment
+target 14.0", 32 bytes only "malformed or truncated"; F2 REFUSED (`['n8.0.1-...',
+'n9.0.2-47-...']`); F3 REFUSED; F4 two-only / two + invented / 21 + invented all REFUSED; F5
+REFUSED.
+
+### Real arm64 Mach-O read (data only)
+
+The provider's own `ffmpeg` 9.0.2 macOS arm64 (66,332,880 bytes) through the head's parsers
+(`work\wp6.5\g2a2r1\real_macho_probe.py`): load-command table 5,168 bytes parsed, one
+`LC_BUILD_VERSION` (platform 1, minos 12.0, sdk 12.3, one tool); `_macos_tool_problem` None
+against 12.0, refused against 14.0 / 13.0 / 11.0. Its first read FOUND TWO FALSE CANDIDATES in
+my first cut: the version token `to` (libavutil's prose "Update your FFmpeg version to the
+newest one from Git") and a component's own build configuration `--prefix=/Volumes/ffmpeg_arm64/tool
+--disable-unit-tests` (libvpx's by its option, `vpx_codec_build_config`; libvpx is skipped in
+the fork recipe). Fixed before the commit: the banner token must start as a version.sh form
+does; a configuration candidate must carry an FFmpeg licence switch (`--enable-gpl` /
+`version3` / `nonfree`) or be the lock's own line. Then end to end with the provider's own
+token and configure line (`versions.txt`): ADMITTED (one version candidate `9.0.2-https://www.
+martin-riedl.de`, one configuration), 3.6 s for 66 MB; with the fork's token: REFUSED naming
+the provider's. Guard test `:3760` carries the three real strings (prose, libvpx's line, a
+banner after printable data bytes).
+
+### Proof the Windows verdicts are unchanged
+
+`work\wp6.5\g2a2r1\windows_compare.py` (base `git show 1ef10536:tools/package/build.py` vs the
+head, both loaded by path): **Windows validator comparisons: 33, mismatches: []** (the real
+lock ACCEPTED by both; appended `--disable-libx265` / `-gpl` / `-version3` /
+`--disable-encoder=libx265` / `--disable-everything` / `--enable-nonfree`; `--enable-gpl`
+removed; an invented excluded row; each of the 24 fields missing); **archive-member
+comparisons: 5, mismatches: []** (clean, outside-root, top-level, traversal, case-duplicate);
+**Windows-path definitions AST-identical to `de3d68a0`: 10 of 10** (`validate_ffmpeg_lock`,
+`load_ffmpeg_lock`, `_ffmpeg_archive_members`, `_download_ffmpeg`, `_pinned_ffmpeg_version`,
+`_check_ffmpeg_toolchain_markers`, `bundle_ffmpeg`, `_ffmpeg_runtime`,
+`_ffmpeg_component_texts`, `FFmpegLock`). `tests/test_tools_package_ffmpeg.py` 290 passed.
+
+### Counts at the r1 head (`-p no:cacheprovider --timeout 600 --basetemp=work\wp6.5\g2a2r1\<module> -k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`)
+
+Static: `ruff check .` All checks passed; `ruff format --check .` 337 files already formatted;
+`mypy` Success 166; `mypy --platform darwin` Success 166.
+
+| Module | Result |
+|---|---|
+| `tests/test_tools_package_build.py` | 432 passed (part 2: 355; +77) |
+| `tests/test_tools_package_ffmpeg.py` | 290 passed (unchanged) |
+| `tests/test_tools_package_smoke.py` | 66 passed, 1 skipped (unchanged; the skip is the non-Windows tripwire) |
+| `tests/test_release_workflow.py` | 79 passed (unchanged) |
+| `tests/test_tools_package_notices.py` | 415 passed (`-n 3`) |
+| `tests/test_portability.py` | 192 passed |
+| `tests/test_macos_portability.py` | 224 skipped (`macos` platform skip) |
+
+### Verification loop (self)
+
+- Suspected: a long or block-straddling candidate is seen truncated (a false conflict) or twice.
+  CONFIRMED possible with an unbounded token and the old one-byte skip; FIXED by bounded
+  candidate forms (longest 183 bytes, `_FFMPEG_CANDIDATE_SPAN` 256) and `_scan_blocks`' rule
+  (a start is judged only with >= the overlap after it); tests at 3 split points.
+- Suspected (class sweep, "filters before comparing"): the configuration check only looked
+  for the lock's body, so a second FFmpeg configuration passed. CONFIRMED (the
+  `second-configuration` mutation, RED on the part-2 code); FIXED: configuration candidates
+  collected, exactly one, equal.
+- Suspected: requiring the configuration to start with `--` refuses a legitimate line
+  beginning `cc=clang` (configure's `*)` branch strips an optional `--`). CONFIRMED (RED on a
+  copy without the exact-line candidate: "0 distinct configuration string(s)"); FIXED: the
+  lock's own line is a candidate whatever its first byte (`:3775`).
+- Suspected: real-binary false candidates. CONFIRMED twice on the provider's real arm64
+  binary (above); FIXED. Source greps of FFmpeg at `b204e94e` and of the ten kept-component
+  tarballs in `work\wp6.5\g2a\dl\` (fontconfig, freetype, fribidi, harfbuzz, libass, libxml2,
+  openssl, SDL2, x265, zlib; x264's clone there holds no sources and libogg was not grepped)
+  found no string literal of the bare forms and no `"--...enable-` / `disable-` literal; the
+  only `FFmpeg version` literals are the six `version.c` arrays, but a line-based grep cannot
+  see a phrase split across concatenated literals: libavutil's prose (`log.c:501-502`) was
+  found only by the real binary, so the binary read, not the grep, is the evidence.
+- Suspected (class sweep, "fixed small prefix"): `_macos_origin_identities`' 4-byte `head()`
+  only CLASSIFIES (the whole file is then read). REJECTED. Smoke's darwin `-encoders` row
+  accepts a superset by design (the roster is a lower bound); its `-version` rows compare the
+  first line's third field and require exactly one configuration line. REJECTED.
+- Suspected: `--disable-encoder=a|libx265` escapes a `,`-only split (configure builds a `case`
+  alternation with `|`). CONFIRMED by reading `configure`; FIXED (split on both) + test.
+- A final pass over F1-F5 and the loop items found nothing new.
+
+### Limits stated
+
+The configuration detector does not see a second FFmpeg configuration carrying none of the
+licence switches and not starting with `--` (that build's own `FFmpeg version` arrays are
+still candidates); a bare `x.y.z` FFmpeg version with no extra-version is seen only in the
+`FFmpeg version` arrays (alone it cannot be told from another library's version string). The
+real fork binary's strings are the fork run's proof (the first real read of OUR build).
+
+### Findings for the dispatcher
+
+- **G2a2r1-F1 (Windows, the same hole as A3-F3; NOT changed here):** the Windows validator
+  ACCEPTS the real Windows lock with `--disable-libx265`, `--disable-gpl`,
+  `--disable-version3`, `--disable-encoder=libx265`, `--disable-encoders` or
+  `--disable-everything` appended (`work\wp6.5\g2a2r1\windows_hole.py`, 6 of 6 ACCEPTED):
+  `build.py` Windows branch checks `--enable-*` membership only. A Windows fold changes a
+  Windows verdict, so it is the dispatcher's / CHARC's call (a DR row or a later package).
+- **G2a2r1-F2 (record):** the F4 constant and the patch move together; a recipe skip change
+  fails `test_macos_lock_excluded_rows_are_exactly_the_recipe_skips` until both agree.
+
+Slips: one Bash heredoc collapsed backslashes (the known trap) and failed its own assertion
+before writing; the edits were redone with the Edit tool. One early Bash grep ran against
+an empty path variable and so searched the shared cwd (read-only; nothing written).
+
+Depth at group-2a part-2 r1 yield: DISPATCHER TO FILL
