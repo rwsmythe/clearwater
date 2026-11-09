@@ -22,6 +22,7 @@ import marshal
 import os
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import zipfile
@@ -1784,3 +1785,420 @@ def test_verified_member_hashes_come_from_archive_streams_not_destination_files(
     assert (destination / "ffmpeg.exe").read_bytes() != archive_bytes
     assert hashlib.sha256(archive_bytes).hexdigest() in hashes
     assert hashlib.sha256((destination / "ffmpeg.exe").read_bytes()).hexdigest() not in hashes
+
+
+# --- macOS Mach-O origin identity (WP6.5, CHARC note 2) ---------------------------------
+# Synthetic thin and fat Mach-O images written with struct from the Mach-O layout
+# (<mach-o/loader.h>, <mach-o/fat.h>); the constants are this test's own, not build.py's.
+
+MH_MAGIC_64 = 0xFEEDFACF
+FAT_MAGIC = 0xCAFEBABE
+CPU_ARM64 = 0x0100000C
+CPU_X86_64 = 0x01000007
+MH_DYLIB = 6
+MH_EXECUTE = 2
+LC_SYMTAB = 0x2
+LC_LOAD_DYLIB = 0xC
+LC_ID_DYLIB = 0xD
+LC_SEGMENT_64 = 0x19
+LC_UUID = 0x1B
+LC_CODE_SIGNATURE = 0x1D
+LC_SOURCE_VERSION = 0x2A
+LC_BUILD_VERSION = 0x32
+LC_RPATH = 0x8000001C
+TEXT_OFFSET = 0x400
+ARM64_CODE = bytes.fromhex("1f2003d5") * 16
+X86_CODE = b"\x90" * 64
+
+
+def _load_command(cmd: int, payload: bytes) -> bytes:
+    padded = payload + bytes(-(8 + len(payload)) % 8)
+    return struct.pack("<II", cmd, 8 + len(padded)) + padded
+
+
+def _dylib(cmd: int, name: str) -> bytes:
+    return _load_command(cmd, struct.pack("<IIII", 24, 2, 0x10000, 0x10000) + name.encode() + b"\0")
+
+
+def _segment(name: bytes, fileoff: int, filesize: int, sections: Sequence[Any] = ()) -> bytes:
+    payload = struct.pack(
+        "<16sQQQQiiII",
+        name,
+        0x100000000 + fileoff,
+        filesize,
+        fileoff,
+        filesize,
+        7,
+        5,
+        len(sections),
+        0,
+    )
+    for sectname, offset, size in sections:
+        payload += struct.pack(
+            "<16s16sQQIIIIIIII",
+            sectname,
+            name,
+            0x100000000 + offset,
+            size,
+            offset,
+            2,
+            0,
+            0,
+            0x80000400,
+            0,
+            0,
+            0,
+        )
+    return _load_command(LC_SEGMENT_64, payload)
+
+
+def macho(
+    *,
+    cpu: int = CPU_ARM64,
+    filetype: int = MH_DYLIB,
+    code: bytes = ARM64_CODE,
+    linkedit: bytes = b"symbols\0strings\0",
+    names: Sequence[str] = (),
+    dylib_id: str | None = None,
+    rpaths: Sequence[str] = (),
+    signature: bytes | None = None,
+    uuid: bytes = b"\x11" * 16,
+    sdk: int = 0x000E0000,
+    strsize: int | None = None,
+    extra: Sequence[bytes] = (),
+) -> bytes:
+    """A thin 64-bit Mach-O image: __TEXT (header + one section), __LINKEDIT, commands."""
+    linkedit_offset = TEXT_OFFSET + len(code)
+    end = linkedit_offset + len(linkedit) + len(signature or b"")
+    symtab = (linkedit_offset, 1, linkedit_offset, len(linkedit) if strsize is None else strsize)
+    commands = [
+        _segment(b"__TEXT", 0, linkedit_offset, [(b"__text", TEXT_OFFSET, len(code))]),
+        _segment(b"__LINKEDIT", linkedit_offset, end - linkedit_offset),
+        _load_command(LC_SYMTAB, struct.pack("<IIII", *symtab)),
+        _load_command(LC_UUID, uuid),
+        _load_command(LC_BUILD_VERSION, struct.pack("<IIII", 1, 0x000B0000, sdk, 0)),
+    ]
+    if dylib_id is not None:
+        commands.append(_dylib(LC_ID_DYLIB, dylib_id))
+    commands += [_dylib(LC_LOAD_DYLIB, name) for name in names]
+    commands += list(extra)
+    commands += [
+        _load_command(LC_RPATH, struct.pack("<I", 12) + path.encode() + b"\0") for path in rpaths
+    ]
+    if signature is not None:
+        signed = struct.pack("<II", linkedit_offset + len(linkedit), len(signature))
+        commands.append(_load_command(LC_CODE_SIGNATURE, signed))
+    body = b"".join(commands)
+    header = struct.pack(
+        "<IiiIIIII", MH_MAGIC_64, cpu, 0, filetype, len(commands), len(body), 0x85, 0
+    )
+    image = header + body
+    assert len(image) <= TEXT_OFFSET
+    return image + bytes(TEXT_OFFSET - len(image)) + code + linkedit + (signature or b"")
+
+
+def fat(*slices: tuple[int, bytes]) -> bytes:
+    """A universal file: FAT_MAGIC header, then each slice at a 16 KiB boundary."""
+    table = b""
+    offset = 0x4000
+    placed = []
+    for cpu, image in slices:
+        table += struct.pack(">iiIII", cpu, 0, offset, len(image), 14)
+        placed.append((offset, image))
+        offset += -(-len(image) // 0x4000) * 0x4000
+    data = bytearray(offset)
+    data[: 8 + len(table)] = struct.pack(">II", FAT_MAGIC, len(slices)) + table
+    for start, image in placed:
+        data[start : start + len(image)] = image
+    return bytes(data)
+
+
+ORIGINAL_NAMES = ("/opt/homebrew/opt/foo/lib/libfoo.1.dylib", "/usr/lib/libSystem.B.dylib")
+BUILT_NAMES = ("@rpath/libfoo.1.dylib", "/usr/lib/libSystem.B.dylib")
+
+
+def original_native(**changes: Any) -> bytes:
+    """A wheel's dylib as installed: absolute names, its own rpaths, a linker signature."""
+    fields: dict[str, Any] = {
+        "names": ORIGINAL_NAMES,
+        "dylib_id": "/opt/build/lib/libbar.dylib",
+        "rpaths": ("/opt/homebrew/lib", "@loader_path/.dylibs"),
+        "signature": b"S" * 32,
+    }
+    return macho(**{**fields, **changes})
+
+
+def built_native(depth: int = 0, **changes: Any) -> bytes:
+    """What PyInstaller writes: @rpath names and id, one rpath of the depth, re-signed."""
+    fields: dict[str, Any] = {
+        "names": BUILT_NAMES,
+        "dylib_id": "@rpath/libbar.dylib",
+        "rpaths": ("@loader_path" + "/.." * depth,),
+        "signature": b"T" * 48,
+    }
+    return macho(**{**fields, **changes})
+
+
+def macos_origin_check(tmp_path, monkeypatch, platform, original, built, *, relative, name):
+    """Run the real origin check with ``original`` as the only interpreter native."""
+    base = tree(tmp_path / "python", [f"lib/{name}"], original)
+    monkeypatch.setattr(build.sys, "base_prefix", str(base))
+    monkeypatch.setattr(build, "_locked_native_distributions", lambda: [])
+    monkeypatch.setattr(build.sys, "platform", platform)
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
+    monkeypatch.setattr(build, "read_package", lambda _: SimpleNamespace(toc={}))
+    home = tree(tmp_path / "dist" / "Clearwater", ["Clearwater"], b"bootloader stand-in")
+    tree(home, [relative], built)
+    return build.native_origin_violations(home / "Clearwater", original_path="")
+
+
+def fat_original() -> bytes:
+    return fat(
+        (CPU_X86_64, original_native(cpu=CPU_X86_64, code=X86_CODE)),
+        (CPU_ARM64, original_native()),
+    )
+
+
+ADMITTED_TRANSFORMS = {
+    "re-signed": (original_native(), built_native(), "libbar.dylib", "_internal/libbar.dylib"),
+    "dylib-names-rewritten": (
+        original_native(rpaths=("@loader_path/..",)),
+        built_native(2),
+        "libbar.dylib",
+        "_internal/pkg/sub/libbar.dylib",
+    ),
+    "rpath-replaced": (
+        original_native(rpaths=("/opt/x", "/opt/y", "@loader_path/../lib")),
+        built_native(1),
+        "libbar.dylib",
+        "_internal/pkg/libbar.dylib",
+    ),
+    "unsigned-original": (
+        original_native(signature=None),
+        built_native(),
+        "libbar.dylib",
+        "_internal/libbar.dylib",
+    ),
+    "fat-original-arm64-slice": (
+        fat_original(),
+        built_native(),
+        "libbar.dylib",
+        "_internal/libbar.dylib",
+    ),
+    "framework-binary-without-suffix": (
+        original_native(dylib_id="/opt/qt/lib/QtCore.framework/Versions/A/QtCore"),
+        built_native(6, dylib_id="@rpath/QtCore"),
+        "QtCore",
+        "_internal/PySide6/Qt/lib/QtCore.framework/Versions/A/QtCore",
+    ),
+}
+
+
+@pytest.mark.parametrize("case", sorted(ADMITTED_TRANSFORMS))
+def test_macho_identity_admits_each_pyinstaller_transformation(tmp_path, monkeypatch, case):
+    """Each PyInstaller rewrite passes on darwin and fails under the whole-file rule (win32)."""
+    original, built, name, relative = ADMITTED_TRANSFORMS[case]
+    old = macos_origin_check(
+        tmp_path / "old", monkeypatch, "win32", original, built, relative=relative, name=name
+    )
+    assert old == [f"native origin unknown: {relative}"]
+    new = macos_origin_check(
+        tmp_path / "new", monkeypatch, "darwin", original, built, relative=relative, name=name
+    )
+    assert new == []
+
+
+REFUSED_IMAGES = {
+    "changed-text-byte": built_native(code=ARM64_CODE[:-1] + b"\x00"),
+    "added-load-command": built_native(
+        extra=(_load_command(LC_SOURCE_VERSION, struct.pack("<Q", 1)),)
+    ),
+    "different-basename": built_native(names=("@rpath/libother.1.dylib", BUILT_NAMES[1])),
+    "system-dependency-redirected": built_native(
+        names=(BUILT_NAMES[0], "@rpath/libSystem.B.dylib")
+    ),
+    "changed-linkedit": built_native(linkedit=b"symbols\0strings\1"),
+    "x86_64-slice-transformed": macho(
+        cpu=CPU_X86_64,
+        code=X86_CODE,
+        names=BUILT_NAMES,
+        dylib_id="@rpath/libbar.dylib",
+        rpaths=("@loader_path",),
+        signature=b"T" * 48,
+    ),
+    "x86_64-slice-untouched": original_native(cpu=CPU_X86_64, code=X86_CODE),
+    "foreign-file": macho(
+        code=bytes.fromhex("000080d2") * 16, names=BUILT_NAMES, rpaths=("@loader_path",)
+    ),
+}
+
+
+@pytest.mark.parametrize("case", sorted(REFUSED_IMAGES))
+def test_macho_identity_refuses_changed_or_foreign_images(tmp_path, monkeypatch, case):
+    """Code, commands, names, slices and foreign files outside the normalisation are refused."""
+    found = macos_origin_check(
+        tmp_path,
+        monkeypatch,
+        "darwin",
+        fat_original(),
+        REFUSED_IMAGES[case],
+        relative="_internal/libbar.dylib",
+        name="libbar.dylib",
+    )
+    assert found == ["native origin unknown: _internal/libbar.dylib"]
+
+
+LOCATION_FAULTS = {
+    "rpath-depth-too-shallow": (
+        "_internal/pkg/sub/libbar.dylib",
+        built_native(0),
+        "LC_RPATH ['@loader_path'] is not the one '@loader_path/../..' of its location",
+    ),
+    "rpath-depth-too-deep": (
+        "_internal/libbar.dylib",
+        built_native(1),
+        "LC_RPATH ['@loader_path/..'] is not the one '@loader_path' of its location",
+    ),
+    "two-rpaths": (
+        "_internal/libbar.dylib",
+        built_native(rpaths=("@loader_path", "@executable_path")),
+        "LC_RPATH ['@loader_path', '@executable_path'] is not the one '@loader_path'",
+    ),
+    "no-rpath-for-rpath-dependency": (
+        "_internal/libbar.dylib",
+        built_native(rpaths=()),
+        "LC_RPATH [] is not the one '@loader_path' of its location",
+    ),
+    "foreign-rpath": (
+        "_internal/libbar.dylib",
+        built_native(rpaths=("/usr/local/lib",)),
+        "LC_RPATH ['/usr/local/lib'] is not the one '@loader_path'",
+    ),
+    "absolute-dependency-name": (
+        "_internal/libbar.dylib",
+        built_native(names=("/usr/local/lib/libfoo.1.dylib", BUILT_NAMES[1])),
+        "dylib name '/usr/local/lib/libfoo.1.dylib' is not @rpath/<basename>",
+    ),
+    "id-not-rpath": (
+        "_internal/libbar.dylib",
+        built_native(dylib_id="/opt/build/lib/libbar.dylib"),
+        "dylib name '/opt/build/lib/libbar.dylib' is not @rpath/<basename>",
+    ),
+}
+
+
+@pytest.mark.parametrize("case", sorted(LOCATION_FAULTS))
+def test_macho_rpath_and_names_must_fit_the_location(tmp_path, monkeypatch, case):
+    """One LC_RPATH of @loader_path plus one /.. per folder below the contents root."""
+    relative, built, message = LOCATION_FAULTS[case]
+    found = macos_origin_check(
+        tmp_path,
+        monkeypatch,
+        "darwin",
+        original_native(),
+        built,
+        relative=relative,
+        name="libbar.dylib",
+    )
+    assert len(found) == 1 and found[0].startswith(f"native origin: {relative}: ")
+    assert message in found[0]
+
+
+def test_macho_without_rpath_dependency_may_carry_no_rpath(tmp_path, monkeypatch):
+    """PyInstaller adds the rpath only when a dependency uses @rpath (osx.py:566-567)."""
+    original = original_native(names=(ORIGINAL_NAMES[1],), rpaths=("/opt/x",))
+    for rpaths in ((), ("@loader_path/..",)):
+        built = built_native(1, names=(BUILT_NAMES[1],), rpaths=rpaths)
+        found = macos_origin_check(
+            tmp_path / str(len(rpaths)),
+            monkeypatch,
+            "darwin",
+            original,
+            built,
+            relative="_internal/pkg/libbar.dylib",
+            name="libbar.dylib",
+        )
+        assert found == []
+
+
+def test_macho_outside_the_contents_root_needs_the_whole_file(tmp_path, monkeypatch):
+    """Beside the executable only exact copies are admitted (no transformed identity)."""
+    found = macos_origin_check(
+        tmp_path,
+        monkeypatch,
+        "darwin",
+        original_native(),
+        built_native(),
+        relative="libbar.dylib",
+        name="libbar.dylib",
+    )
+    assert found == ["native origin unknown: libbar.dylib"]
+
+
+BOOT_CODE = bytes.fromhex("fd7bbfa9") * 32
+BOOT_LINKEDIT = b"bootloader symbols\0strings\0"
+PKG = b"MEI\x0c\x0b\x0a\x0b\x0e" + b"appended PKG archive" * 8
+
+
+def locked_runw() -> bytes:
+    """PyInstaller's universal2 ``runw`` as shipped: both slices linker-signed."""
+    x86 = macho(cpu=CPU_X86_64, filetype=MH_EXECUTE, code=X86_CODE, signature=b"x" * 16)
+    arm = macho(
+        filetype=MH_EXECUTE,
+        code=BOOT_CODE,
+        linkedit=BOOT_LINKEDIT,
+        names=("/usr/lib/libSystem.B.dylib",),
+        signature=b"L" * 32,
+    )
+    return fat((CPU_X86_64, x86), (CPU_ARM64, arm))
+
+
+def built_bootloader(**changes: Any) -> bytes:
+    """``runw`` thinned, unsigned, re-identified, SDK set, PKG appended, re-signed."""
+    linkedit = BOOT_LINKEDIT + PKG
+    fields: dict[str, Any] = {
+        "filetype": MH_EXECUTE,
+        "code": BOOT_CODE,
+        "linkedit": linkedit,
+        "names": ("/usr/lib/libSystem.B.dylib",),
+        "signature": b"A" * 64,
+        "uuid": b"\x22" * 16,
+        "sdk": 0x000F0200,
+        "strsize": len(linkedit),
+    }
+    return macho(**{**fields, **changes})
+
+
+BOOTLOADER_CASES = {
+    "pyinstaller-transformations": (built_bootloader(), True),
+    "changed-code-byte": (built_bootloader(code=BOOT_CODE[:-1] + b"\x00"), False),
+    "added-dependency": (
+        built_bootloader(names=("/usr/lib/libSystem.B.dylib", "@rpath/x.dylib")),
+        False,
+    ),
+    "changed-linkedit-prefix": (
+        built_bootloader(linkedit=b"Bootloader" + BOOT_LINKEDIT[10:] + PKG),
+        False,
+    ),
+    "added-rpath": (built_bootloader(rpaths=("@loader_path",)), False),
+    "x86_64-slice": (
+        macho(cpu=CPU_X86_64, filetype=MH_EXECUTE, code=X86_CODE, signature=b"A" * 64),
+        False,
+    ),
+    "still-fat": (fat((CPU_ARM64, built_bootloader())), False),
+}
+
+
+@pytest.mark.parametrize("case", sorted(BOOTLOADER_CASES))
+def test_macos_bootloader_identity(tmp_path, monkeypatch, case):
+    """The allowed bootloader differences pass on darwin; the old prefix rule refused even those."""
+    built, admitted = BOOTLOADER_CASES[case]
+    source = tmp_path / "runw"
+    source.write_bytes(locked_runw())
+    executable = tmp_path / "Clearwater"
+    executable.write_bytes(built)
+    monkeypatch.setattr(build, "_locked_bootloader", lambda: source)
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    assert build._is_clearwater_bootloader(executable) is admitted
+    monkeypatch.setattr(build.sys, "platform", "linux")
+    assert build._is_clearwater_bootloader(executable) is False

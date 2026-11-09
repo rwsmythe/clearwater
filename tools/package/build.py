@@ -61,6 +61,7 @@ import os
 import re
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import sysconfig
@@ -71,7 +72,7 @@ import zipfile
 from collections.abc import Iterable, Iterator, Sequence
 from datetime import UTC, datetime
 from http.client import HTTPMessage
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import IO, Literal, NamedTuple, NotRequired, Protocol, TypedDict, cast
 from urllib.parse import urlsplit
 
@@ -2524,6 +2525,8 @@ def _native_origin_hashes() -> set[str]:
         for entry in dist.files or ():
             if _is_native(str(entry)):
                 hashes.add(_record_native_hash(dist, entry))
+    if sys.platform == "darwin":
+        hashes |= _macos_origin_identities()
     return hashes
 
 
@@ -2544,6 +2547,436 @@ def _locked_bootloader() -> Path:
                 _record_native_hash(dist, entry)
                 return Path(str(dist.locate_file(entry)))
     raise ValueError("native origin: windowed bootloader missing from locked PyInstaller RECORD")
+
+
+# macOS origin identity (WP6.5, CHARC note 2; ledger section 6). PyInstaller rewrites
+# every collected Mach-O (``set_dylib_dependency_paths``: dylib names to
+# ``@rpath/<basename>``, every LC_RPATH replaced by one ``@loader_path(/..)*``), thins a
+# fat input to the target slice and ad-hoc re-signs it, so a whole-file hash refuses every
+# macOS build. The identity below is computed with ``struct`` only (macholib is
+# darwin-only in uv.lock, so the Windows tests could not use it).
+
+_MACHO_MAGIC_64 = b"\xcf\xfa\xed\xfe"
+_MACHO_FAT_LAYOUTS = {b"\xca\xfe\xba\xbe": (">iiIII", 20), b"\xca\xfe\xba\xbf": (">iiQQII", 32)}
+_MACHO_MAX_SLICES = 16
+_MACHO_CPU_ARM64 = 0x0100000C
+_LC_SYMTAB = 0x2
+_LC_LOAD_DYLIB = 0xC
+_LC_ID_DYLIB = 0xD
+_LC_SEGMENT_64 = 0x19
+_LC_UUID = 0x1B
+_LC_CODE_SIGNATURE = 0x1D
+_LC_VERSION_MIN_MACOSX = 0x24
+_LC_BUILD_VERSION = 0x32
+_LC_LOAD_WEAK_DYLIB = 0x80000018
+_LC_RPATH = 0x8000001C
+_LC_REEXPORT_DYLIB = 0x8000001F
+_LC_LOAD_UPWARD_DYLIB = 0x80000023
+_MACHO_LOAD_COMMANDS = frozenset(
+    {_LC_LOAD_DYLIB, _LC_LOAD_WEAK_DYLIB, _LC_REEXPORT_DYLIB, _LC_LOAD_UPWARD_DYLIB}
+)
+_MACHO_UNKNOWN = "unknown"
+
+
+class _MachO(NamedTuple):
+    cputype: int
+    cpusubtype: int
+    filetype: int
+    flags: int
+    header_end: int
+    commands: tuple[tuple[int, bytes], ...]
+
+
+class _MachOIdentity(NamedTuple):
+    canonical: tuple[object, ...]
+    linkedit: bytes
+    rpaths: tuple[str, ...]
+    names: tuple[tuple[int, str], ...]
+
+
+def _macho_slices(data: bytes) -> list[bytes]:
+    """Return a Mach-O file's thin images: itself if thin 64-bit, each slice if fat."""
+    if data[:4] == _MACHO_MAGIC_64:
+        return [data]
+    layout = _MACHO_FAT_LAYOUTS.get(data[:4])
+    if layout is None or len(data) < 8:
+        return []
+    form, size = layout
+    (count,) = struct.unpack_from(">I", data, 4)
+    table_end = 8 + count * size
+    if not 0 < count <= _MACHO_MAX_SLICES or table_end > len(data):
+        return []
+    slices = []
+    for index in range(count):
+        fields = struct.unpack_from(form, data, 8 + index * size)
+        offset, length = int(fields[2]), int(fields[3])
+        if offset < table_end or offset + length > len(data):
+            return []
+        slices.append(data[offset : offset + length])
+    return slices
+
+
+def _macho_parse(image: bytes) -> _MachO | None:
+    if len(image) < 32 or image[:4] != _MACHO_MAGIC_64:
+        return None
+    _, cputype, cpusubtype, filetype, count, size, flags, _ = struct.unpack_from(
+        "<IiiIIIII", image, 0
+    )
+    end = 32 + size
+    if end > len(image):
+        return None
+    offset = 32
+    commands = []
+    for _ in range(count):
+        if offset + 8 > end:
+            return None
+        cmd, cmdsize = struct.unpack_from("<II", image, offset)
+        if cmdsize < 8 or cmdsize % 8 or offset + cmdsize > end:
+            return None
+        commands.append((cmd, image[offset : offset + cmdsize]))
+        offset += cmdsize
+    if offset != end:
+        return None
+    return _MachO(cputype, cpusubtype, filetype, flags, end, tuple(commands))
+
+
+def _macho_string(body: bytes, minimum: int) -> str | None:
+    if len(body) < minimum:
+        return None
+    (offset,) = struct.unpack_from("<I", body, 8)
+    if not minimum <= offset < len(body):
+        return None
+    try:
+        return body[offset:].split(b"\0", 1)[0].decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def _macho_system_path(name: str) -> bool:
+    """Whether PyInstaller leaves this dependency name as written (its system exemption)."""
+    return (
+        name.startswith("/System/")
+        or (name.startswith("/usr/") and not name.startswith("/usr/local/"))
+        or "/Library/Frameworks/Tcl.framework/" in name
+        or "/Library/Frameworks/Tk.framework/" in name
+    )
+
+
+def _macho_identity(image: bytes, *, bootloader: bool = False) -> _MachOIdentity | None:
+    """Normalise a thin arm64 Mach-O image to what PyInstaller does not change.
+
+    Kept: the header's CPU type / subtype, file type and flags; every load command in
+    order, byte for byte, except: LC_CODE_SIGNATURE and LC_RPATH dropped (listed apart),
+    each dylib command's name reduced to its basename (system names kept whole), and
+    ``__LINKEDIT``'s vmsize / filesize zeroed; every segment's file bytes (a segment that
+    holds the header from its first section on, with the padding before it required zero);
+    ``__LINKEDIT`` up to the code signature (returned apart). For the bootloader, also
+    zeroed: LC_SYMTAB strsize, LC_UUID, the SDK of LC_BUILD_VERSION / LC_VERSION_MIN_MACOSX
+    (PyInstaller's ``fix_exe_for_code_signing``, ``update_exe_identifier`` and
+    ``set_macos_sdk_version``).
+
+    Args:
+        image: One thin image.
+        bootloader: Apply the bootloader's three extra normalisations.
+
+    Returns:
+        The identity, or ``None`` for anything not a well-formed thin arm64 image.
+    """
+    parsed = _macho_parse(image)
+    if parsed is None or parsed.cputype != _MACHO_CPU_ARM64:
+        return None
+    signature = None
+    for cmd, body in parsed.commands:
+        if cmd == _LC_CODE_SIGNATURE and len(body) >= 16:
+            signature = struct.unpack_from("<I", body, 8)[0]
+    canonical: list[object] = [
+        ("header", parsed.cputype, parsed.cpusubtype, parsed.filetype, parsed.flags)
+    ]
+    rpaths: list[str] = []
+    names: list[tuple[int, str]] = []
+    linkedit = None
+    for cmd, body in parsed.commands:
+        if cmd == _LC_CODE_SIGNATURE:
+            continue
+        if cmd == _LC_RPATH:
+            path = _macho_string(body, 12)
+            if path is None:
+                return None
+            rpaths.append(path)
+        elif cmd in _MACHO_LOAD_COMMANDS or cmd == _LC_ID_DYLIB:
+            name = _macho_string(body, 24)
+            if name is None:
+                return None
+            names.append((cmd, name))
+            kept = cmd != _LC_ID_DYLIB and _macho_system_path(name)
+            canonical.append(
+                ("dylib", cmd, name if kept else PurePosixPath(name).name, body[12:24])
+            )
+        elif cmd == _LC_SEGMENT_64:
+            if len(body) < 72:
+                return None
+            segname, _, _, fileoff, filesize, _, _, nsects, _ = struct.unpack_from(
+                "<16sQQQQiiII", body, 8
+            )
+            stop = fileoff + filesize
+            if 72 + nsects * 80 != len(body) or stop > len(image):
+                return None
+            if segname.rstrip(b"\0") == b"__LINKEDIT":
+                if linkedit is not None:
+                    return None
+                if signature is not None and fileoff <= signature <= stop:
+                    stop = signature
+                linkedit = image[fileoff:stop]
+                sizes_zeroed = body[:32] + bytes(8) + body[40:48] + bytes(8) + body[56:]
+                canonical.append(("segment", sizes_zeroed))
+                continue
+            start = fileoff
+            padding = True
+            if filesize and fileoff < parsed.header_end:
+                offsets = [
+                    struct.unpack_from("<I", body, 72 + index * 80 + 48)[0]
+                    for index in range(nsects)
+                ]
+                start = min((o for o in offsets if o >= parsed.header_end), default=stop)
+                if start > stop:
+                    return None
+                padding = not image[parsed.header_end : start].strip(b"\0")
+            canonical.append(
+                ("segment", body, start, padding, hashlib.sha256(image[start:stop]).hexdigest())
+            )
+        else:
+            if bootloader and cmd == _LC_SYMTAB and len(body) >= 24:
+                body = body[:20] + bytes(4)
+            elif bootloader and cmd == _LC_UUID and len(body) >= 24:
+                body = body[:8] + bytes(16)
+            elif bootloader and cmd == _LC_BUILD_VERSION and len(body) >= 24:
+                body = body[:16] + bytes(4) + body[20:]
+            elif bootloader and cmd == _LC_VERSION_MIN_MACOSX and len(body) >= 16:
+                body = body[:12] + bytes(4) + body[16:]
+            canonical.append(("command", cmd, body))
+    if linkedit is None:
+        return None
+    return _MachOIdentity(tuple(canonical), linkedit, tuple(rpaths), tuple(names))
+
+
+def _macho_digest(identity: _MachOIdentity) -> str:
+    linkedit = hashlib.sha256(identity.linkedit.rstrip(b"\0")).hexdigest()
+    return "macho:" + hashlib.sha256(repr((identity.canonical, linkedit)).encode()).hexdigest()
+
+
+def _macho_origin_identities(data: bytes) -> set[str]:
+    """Identities an ORIGINAL contributes: each thin arm64 image (a fat file's arm64 slice)."""
+    return {
+        _macho_digest(identity)
+        for image in _macho_slices(data)
+        if (identity := _macho_identity(image)) is not None
+    }
+
+
+def _macos_origin_identities() -> set[str]:
+    """Whole-file hashes and Mach-O identities of every interpreter / locked-wheel Mach-O.
+
+    Unlike the suffix-only scan in :func:`_native_origin_hashes`, a file counts by its first
+    bytes too (``.framework`` binaries carry no suffix). Locked-wheel files are verified
+    against their RECORD first.
+
+    Returns:
+        ``sha256`` hex digests and ``macho:`` identities.
+    """
+    identities: set[str] = set()
+
+    def head(path: Path) -> bytes:
+        with path.open("rb") as stream:
+            return stream.read(4)
+
+    for path in Path(sys.base_prefix).rglob("*"):
+        if path.is_file() and not path.is_symlink() and _is_native(path.name, head(path)):
+            data = path.read_bytes()
+            identities.add(hashlib.sha256(data).hexdigest())
+            identities |= _macho_origin_identities(data)
+    for dist in _locked_native_distributions():
+        for entry in dist.files or ():
+            path = Path(str(dist.locate_file(entry)))
+            if path.is_file() and _is_native(str(entry), head(path)):
+                identities.add(_record_native_hash(dist, entry))
+                identities |= _macho_origin_identities(path.read_bytes())
+    return identities
+
+
+def macho_built_problem(data: bytes, origins: set[str], depth: int) -> str | None:
+    """Say why a built Mach-O is not admitted on macOS, or ``None`` when it is.
+
+    Admitted: a thin arm64 image whose identity (:func:`_macho_identity`) is an original's,
+    whose non-system dependency names and own id are all ``@rpath/<basename>``, and whose
+    LC_RPATH set is exactly ``@loader_path`` plus one ``/..`` per folder between it and the
+    contents root (PyInstaller's ``target_rpath``; none at all is allowed only when no
+    dependency needs ``@rpath``).
+
+    Args:
+        data: The built file's bytes.
+        origins: Whole-file hashes and ``macho:`` identities of the trusted originals.
+        depth: Folders between the file and the contents root (0 = directly in it).
+
+    Returns:
+        ``None`` (admitted), ``"unknown"`` (no trusted original), or the named violation.
+    """
+    identity = _macho_identity(data)
+    if identity is None or _macho_digest(identity) not in origins:
+        return _MACHO_UNKNOWN
+    for cmd, name in identity.names:
+        if cmd == _LC_ID_DYLIB or not _macho_system_path(name):
+            rest = name.removeprefix("@rpath/")
+            if rest == name or not rest or "/" in rest:
+                return f"dylib name {name!r} is not @rpath/<basename>"
+    expected = "@loader_path" + "/.." * depth
+    needs_rpath = any(
+        cmd != _LC_ID_DYLIB and not _macho_system_path(name) for cmd, name in identity.names
+    )
+    if identity.rpaths != (expected,) and (needs_rpath or identity.rpaths):
+        return f"LC_RPATH {list(identity.rpaths)} is not the one {expected!r} of its location"
+    return None
+
+
+def _is_macos_bootloader(executable: Path, source: Path) -> bool:
+    actual = _macho_identity(executable.read_bytes(), bootloader=True)
+    if actual is None:
+        return False
+    for image in _macho_slices(source.read_bytes()):
+        expected = _macho_identity(image, bootloader=True)
+        if (
+            expected is not None
+            and expected.canonical == actual.canonical
+            and expected.rpaths == actual.rpaths
+            and actual.linkedit.startswith(expected.linkedit.rstrip(b"\0"))
+        ):
+            return True
+    return False
+
+
+def framework_link_problem(link: PurePosixPath, target: str) -> str | None:
+    """Say why a link in a macOS release is refused, or ``None`` for a framework link.
+
+    Pure (path strings only). Admitted are exactly the links PyInstaller's
+    ``collect_files_from_framework_bundles`` makes in a collected ``.framework``:
+    ``<fw>/Versions/Current`` naming a sibling version folder, and a top-level
+    ``<fw>/<name>`` naming ``Versions/Current/<name>``. Anything else (absolute,
+    escaping, outside a ``.framework``, another shape) is refused.
+
+    Args:
+        link: The link's path relative to the release root (POSIX).
+        target: The link's text as stored.
+
+    Returns:
+        ``None`` when admitted, else the reason.
+    """
+    if not target or target.startswith("/") or "\\" in target or ":" in target:
+        return f"link target {target!r} is absolute or not POSIX"
+    parts = link.parts
+    tops = [index for index, part in enumerate(parts[:-1]) if part.endswith(".framework")]
+    if not tops:
+        return "link outside a .framework"
+    inner = parts[tops[-1] + 1 :]
+    if inner == ("Versions", "Current"):
+        if "/" in target or target in {".", "..", "Current"}:
+            return f"Versions/Current target {target!r} is not a sibling version folder"
+        return None
+    if len(inner) == 1 and target == f"Versions/Current/{inner[0]}":
+        return None
+    return f"link {'/'.join(inner)!r} -> {target!r} is not a framework structure link"
+
+
+def _macos_layout(executable: Path) -> tuple[Path, Path]:
+    """The walk root and the contents root: the ``.app`` and its Frameworks, or onedir's."""
+    if executable.parent.name == "MacOS" and executable.parent.parent.name == "Contents":
+        return executable.parents[2], executable.parent.parent / "Frameworks"
+    return executable.parent, executable.parent / "_internal"
+
+
+def _macos_entries(root: Path) -> list[tuple[Path, bool]]:
+    """Every entry under ``root`` (sorted), never descending into a linked folder."""
+    entries = []
+    for parent, folders, files in os.walk(root, followlinks=False):
+        for name in [*folders, *files]:
+            path = Path(parent) / name
+            if path.is_symlink() or path.is_junction():
+                entries.append((path, True))
+            elif path.is_file():
+                entries.append((path, False))
+    return sorted(entries, key=lambda item: item[0].relative_to(root).as_posix())
+
+
+def _macos_link_problem(root: Path, path: Path) -> str | None:
+    if path.is_junction():
+        return "junction"
+    problem = framework_link_problem(
+        PurePosixPath(path.relative_to(root).as_posix()), os.readlink(path)
+    )
+    if problem is None and not Path(os.path.realpath(path)).is_relative_to(
+        Path(os.path.realpath(root))
+    ):
+        problem = "link resolves outside the release folder"
+    if problem is None and not os.path.exists(path):
+        problem = "dangling link"
+    return problem
+
+
+def _macos_native_origin_violations(
+    executable: Path, *, original_path: str, ffmpeg_hashes: Iterable[str]
+) -> list[str]:
+    hashes = _native_origin_hashes() | set(ffmpeg_hashes)
+    errors = []
+    root, contents = _macos_layout(executable)
+
+    def unknown(label: str, name: str) -> str:
+        likely = next(
+            (
+                Path(part) / Path(name).name
+                for part in original_path.split(os.pathsep)
+                if part and (Path(part) / Path(name).name).is_file()
+            ),
+            None,
+        )
+        suffix = f"; likely PATH source: {likely}" if likely else ""
+        return f"native origin unknown: {label}{suffix}"
+
+    def inspect(label: str, name: str, data: bytes, depth: int | None) -> None:
+        if _is_native(name, data) and hashlib.sha256(data).hexdigest() not in hashes:
+            problem = _MACHO_UNKNOWN if depth is None else macho_built_problem(data, hashes, depth)
+            if problem == _MACHO_UNKNOWN:
+                errors.append(unknown(label, name))
+            elif problem is not None:
+                errors.append(f"native origin: {label}: {problem}")
+        if name.lower().endswith(".zip") or data.startswith(b"PK\x03\x04"):
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                for member in archive.infolist():
+                    if not member.is_dir():
+                        inspect(
+                            label + "!" + member.filename,
+                            member.filename,
+                            archive.read(member),
+                            None,
+                        )
+
+    if not _is_clearwater_bootloader(executable):
+        errors.append(
+            f"native origin: {executable.name} differs from locked PyInstaller bootloader"
+        )
+    for path, linked in _macos_entries(root):
+        label = path.relative_to(root).as_posix()
+        if linked:
+            problem = _macos_link_problem(root, path)
+            if problem is not None:
+                errors.append(f"native origin: linked file {path}: {problem}")
+        elif path != executable:
+            depth = (
+                len(path.relative_to(contents).parts) - 1 if path.is_relative_to(contents) else None
+            )
+            inspect(label, path.name, path.read_bytes(), depth)
+    package = read_package(executable)
+    for name, entry in package.toc.items():
+        if entry[-1] not in {"o", "z"}:
+            inspect("pkg:" + name, name, package.extract(name), len(PurePosixPath(name).parts) - 1)
+    return errors
 
 
 def _is_clearwater_bootloader(executable: Path) -> bool:
@@ -2603,9 +3036,13 @@ def _is_clearwater_bootloader(executable: Path) -> bool:
             return expected is not None and identity(executable) == expected
         except (ValueError, pefile.PEFormatError):
             return False
+    elif sys.platform == "darwin":
+        # PyInstaller thins, unsigns, re-identifies (LC_UUID), appends the PKG inside
+        # __LINKEDIT and re-signs the bootloader: compare the normalised arm64 image.
+        return _is_macos_bootloader(executable, source)
     else:
-        # Refuse transformed Mach-O/ELF builds until WP6.5 proves their native
-        # identity rule. A byte-identical bootloader prefix is accepted here.
+        # Refuse transformed ELF builds (no Linux build is supported). A
+        # byte-identical bootloader prefix is accepted here.
         return executable.read_bytes().startswith(source.read_bytes())
 
 
@@ -2616,7 +3053,11 @@ def native_origin_violations(
 
     The main Windows executable is compared to the RECORD-verified runw.exe's
     immutable PE sections, allowing resources, debug timestamps and an appended
-    archive. Every other native must match a complete file hash. ZIPs (including
+    archive. Every other native must match a complete file hash. On macOS (WP6.5)
+    the bootloader and every Mach-O PyInstaller transformed are compared by their
+    normalised arm64 identity instead (:func:`_macho_identity`,
+    :func:`macho_built_problem`), and only framework links are admitted
+    (:func:`framework_link_problem`); the ``.app`` bundle is walked whole. ZIPs (including
     nested ZIPs and CArchive members) are inspected without executing contents.
     Extracted FFmpeg tools additionally match hashes supplied in memory by the
     verified archive reader. Names and on-disk build records grant no exemption.
@@ -2635,6 +3076,19 @@ def native_origin_violations(
         OSError: An input cannot be read.
         zipfile.BadZipFile: An archive is corrupt.
     """
+    if sys.platform == "darwin":
+        return _macos_native_origin_violations(
+            executable, original_path=original_path, ffmpeg_hashes=ffmpeg_hashes
+        )
+    else:
+        return _pe_native_origin_violations(
+            executable, original_path=original_path, ffmpeg_hashes=ffmpeg_hashes
+        )
+
+
+def _pe_native_origin_violations(
+    executable: Path, *, original_path: str, ffmpeg_hashes: Iterable[str]
+) -> list[str]:
     hashes = _native_origin_hashes() | set(ffmpeg_hashes)
     errors = []
 
