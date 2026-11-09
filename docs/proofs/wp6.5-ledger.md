@@ -1807,4 +1807,278 @@ family becomes a committed test with the lock.
 Counts: no product, tool, test, workflow or fixture byte changed, so no suite was re-run
 for this turn (the G3-fix counts stand); the only commit is this ledger (0 CR).
 
-Depth at part-3 yield: DISPATCHER TO FILL
+Depth at part-3 yield: 221,656 (wp65-cell11, read by the dispatcher with cell_depth.py at its part-3 STOP return)
+
+## Group 2a part 3b (`wp65-cell12`, dispatch-13; base `5ccf7c75`)
+
+Turn G2a-PART-3b: PART 3 items 2-5 after CHARC's STOP rulings R1-R3 (mail `20261109T2020Z`).
+**STOPPED at items 4-5 (the Mac notices, the switch ON) on a finding with a reproduction:**
+`notices.py` cannot inventory the `.app`, so `--notices` (which the switch turns on) fails on
+the runner before any zip, smoke or M leg on the bundle. Items 2 and 3 are DONE and committed
+green; the R3 commit (lock, texts, notices rows, pin flip, switch, mutation and re-hash tests)
+is NOT made: its lock and texts are drafted and validated under `work\wp6.5\part3b\r3\`.
+No `src/` change; no committed fixture or Windows notices-annex byte moved; nothing extracted
+or run from the asset or the tarballs; no network. Scratch `work\wp6.5\part3b\` (scripts
+`scripts\repro_app_inventory.py`, `make_texts.py`, `make_lock.py`, `mutate.py` (cell11's,
+plus a texts-folder argument); `windows_compare.py` (cell8's)).
+
+### STOP: the Mac notices cannot be generated for the `.app` (items 4-5)
+
+- `build()` passes `executable.parent` = `Clearwater.app/Contents/MacOS` to
+  `write_artifact_notices` (the `if notices:` block); the darwin smoke passes the same folder
+  to `plan_notices` (`smoke.py:995`). So the input IS the executable folder (dispatch-12
+  item 4's "confirm": confirmed).
+- `notices._inventory` (`notices.py:1431-1436`) then requires `Contents/MacOS/_internal`.
+  PyInstaller 6.22.3 builds a `.app` with NO `_internal`: code goes to `Contents/Frameworks`,
+  data to `Contents/Resources`, cross-linked (`PyInstaller/building/osx.py:183-311`).
+  **Reproduction** (`scripts\repro_app_inventory.py`: a minimal `.app` tree, `sys.platform`
+  set to `darwin` for the call only, no Windows API after):
+  `REFUSED: notices: expected an onedir folder with _internal`.
+- Past that line the darwin inventory walks only `Contents/MacOS` (`notices.py:1438-1442`), so
+  Frameworks / Resources (libpython, the Qt frameworks, the delocated `.dylibs`) would be
+  uncovered; the native manifest is keyed on Windows host paths and hashes
+  (`_internal/python312.dll`, `Qt6Core.dll`; round-0 F0-2); `_is_python_binary` reads
+  Windows DLL names; `write_notices` writes beside the executable (`notices.py:2750-2751`,
+  `Contents/MacOS`), while the darwin smoke and `macos-build.yml:191` read
+  `Contents/Resources/THIRD_PARTY_NOTICES.md`.
+- This is round-0 **F0-2** (the macOS host census), which CHARC concurred is "its own group
+  after the first runner run" (dispatch-2 item 5); the first run failed in the parallel leg
+  and never reached the build, so that group has not run. Dispatch-12 item 4 names only the
+  FFmpeg side.
+- **Consequence of switching ON now:** `macos-build.yml:133` runs `--notices --smoke --zip`;
+  the build exits 1 at `FAILED: artifact notices`, then `Run macOS tests on the built bundle`
+  finds no bundle (`test -d`), so the re-push loses the whole M leg the switch-OFF build
+  delivers today. Fail-closed (no unlisted binary ships), but no evidence.
+- **Asked of CHARC (recommended first):** (i) keep the switch OFF until the F0-2 host-census
+  group lands; amend R3 so the lock + texts + census + mutation / re-hash tests + the C13
+  un-skip commit now, the pin test's "no lock" half flipped and its `"false"` kept (switch ON
+  and the Mac notices then land together in the F0-2 group); (ii) switch ON now and accept a
+  red build step on the re-push (not recommended); (iii) run the F0-2 group first, then this
+  R3 commit unchanged.
+- **Also asked (R1 form):** the macOS validator checks ONE folder holding EXACTLY the macOS
+  lock's texts (the Windows rule's form), so the draft folder holds 36 files: the 7 R1 / R2
+  name plus 29 copied byte for byte from the same pinned tarballs (each equal to a Windows
+  text; x264's from the Windows row, same commit). The literal reading ("the six texts plus
+  the LLVM text", 7 files) needs a two-folder rule (macOS rows referencing
+  `ffmpeg-components/`, whose names collide: `freetype--LICENSE.TXT` differs per pin).
+  Recommendation: the one-folder form; CHARC rules.
+
+### Commits
+
+| Commit | What | Blobs |
+|---|---|---|
+| `5d7bd6d4` | items 2 + 3 + the notices folder exclusion, with tests | 0 CR (4 files) |
+| (this ledger) | this section; cell11's depth filled | 0 CR |
+
+### Item 2: the complete-census rules (`5d7bd6d4`)
+
+`census` is `"pending"` (unchanged rules) or a `FFmpegMacCensus` object; anything else is
+refused. A complete census (`_validate_macos_ffmpeg_lock` -> four helpers in `build.py`):
+
+- **Source block** (`_macos_census_source`): `state` complete; `job_url` a job of the lock's
+  `build_run_url`; `linkage_lines` / `version_lines` / `toolchain_lines` ordered spans;
+  `external_libraries` = `build/logs/build-ffmpeg.log:<a>-<b>`; every field nonempty text.
+- **Components** (`_macos_census_components`, the Windows row shape, `FFmpegMacComponent`):
+  names EXACTLY `FFMPEG_MACOS_COMPONENTS` (12: the zip's `build/versions.txt` less FFmpeg and
+  the build tools); `stage` = `build-<name>` (its zip log); `pin_kind` `sha256` (repository =
+  the pinned download URL, pin = the runner-verified digest) or `commit` (40 hex); HTTPS;
+  `extra_repositories` empty; `licence_basis` `pinned-source-text` (a new value: the identity
+  read from the texts at this pin, as the Windows seat-verified row for the component; the
+  Windows value `seat-verified` is refused here because no seat pass read these pins: CHARC
+  may want one) and `gpl3_compatible` `yes`; the licence expression and `chosen` by the
+  Windows component rules; `status` `built-not-linked` exactly for `FFMPEG_MACOS_UNLINKED`
+  (libogg) and then no flag; texts `{path, sha256, member}` (`FFmpegMacText`: safe file name,
+  64 hex, a relative member path, an excerpt as `#L<a>-<b>` with a `-L<a>-<b>.txt` name).
+- **Coverage, two-way:** the line's `--enable-*` less `FFMPEG_MACOS_NON_LIBRARY_SWITCHES`
+  (`gpl`, `version3`, `gray`) = the rows' flags, each mapped once.
+- **Toolchain** (`_macos_census_toolchain`, `FFmpegMacToolchain`): `compiler` the marker form
+  (`FFMPEG_MACOS_COMPILER`), `xcode`, `sdk`, `target` (arm64 darwin); `deployment_target` =
+  `macos_deployment_target`, `census_build_commit` = `build_repository_commit`,
+  `census_asset_sha256` = `github_sha256` (bound to THIS asset).
+- **Runtime** (`_macos_census_runtime`, `FFmpegMacRuntime`): EXACTLY one row, CHARC R2: kind
+  `apple-clang-runtime`, reached via `toolchain`, `pin_kind` `toolchain-marker`, `pin` = the
+  toolchain `compiler`, `version` = its clang build, `name` derived ("Apple clang 21.0.0
+  (clang-2100.1.1.101), Xcode 26.6, SDK 26.5, deployment target 14.0"), repository
+  `https://github.com/llvm/llvm-project`, `source_url` a commit tree there, licence
+  `Apache-2.0 WITH LLVM-exception`, `licence_basis` `upstream-text`, `linkage` `inferred`,
+  `basis` `toolchain-marker`, `chosen` null. **Windows-row fields that cannot apply, and how
+  filled:** `pin` (no Apple source commit) = the marker; `source_url` = the licence text's
+  upstream commit tree (R2: tag `llvmorg-21.1.0` -> `3623fe66`); `basis` (Windows:
+  `compile-log` / `lock-graph` / `binary`) = `toolchain-marker`; `linkage` (Windows: `proven`
+  / `superset`) = `inferred`, as R2 says.
+- **Texts** (`_macos_census_texts`): each referenced file exists (no link), sha256 equal,
+  strict UTF-8; one digest per path; the folder (`FFMPEG_MACOS_TEXTS_PATH` =
+  `native-licences/ffmpeg-macos-components`, read at call time) holds EXACTLY the lock's
+  texts. `validate_ffmpeg_lock(component_texts_path=None)` now resolves the platform's folder
+  (Windows: `FFMPEG_COMPONENT_TEXTS_PATH`; verdicts unchanged, below).
+
+Tests `test_tools_package_build.py` (`complete_macos_lock`: a SYNTHETIC complete census on
+the fixture; the fixture file is untouched): it validates (+ field sets); the default folder
+is read at call time; **59 refusals** (`test_macos_complete_census_refuses`, each matched to
+its rule's message: census, components, pins, basis, licence, status, coverage, members /
+paths / excerpts, toolchain, runtime, text bytes / folder); a shared text + an excerpt + a
+commit pin admitted; the pending-provenance row for `census: "complete"` now expects the new
+message. RED on the parent `build.py` (`WP61_BUILD_SCRIPT` = `git show
+5ccf7c75:tools/package/build.py` under `work\pkgbase\`): **71 failed** (70 `no attribute
+'FFMPEG_MACOS_COMPONENTS'`, 1 the old "census rules are WP6.5 part 3's" message). The parent
+refuses EVERY complete census, so no rule-by-rule RED exists there; each refusal's
+specificity is its matched message on the new code. GREEN.
+
+### Item 3: the Apple toolchain marker (`5d7bd6d4`)
+
+`build.py` `_check_macos_toolchain_marker`: the toolchain `compiler` must occur in each tool
+as a COMPLETE C string (non-printable byte or file start before, NUL after), read in 1 MiB
+blocks (`_scan_blocks`), never run; called in `_bundle_macos_ffmpeg` after the version read,
+before anything is placed. Source of the rule: FFmpeg's configure stores `$cc --version`'s
+first line as `CC_IDENT`, printed by `fftools/opt_common.c` as `built with %s` (the run's
+`built with Apple clang version 21.0.0 (clang-2100.1.1.101)`, log line 661). A pending lock
+has no toolchain and is not checked (`build()` refuses `--notices` / `--zip` for it). Tests:
+7 bundle cases (NUL / control byte before: admitted; absent, printable byte glued before,
+glued after, `21.0.1`, a shorter build: refused, nothing placed, nothing trusted); 5 split
+points x 2 prefixes across the 1 MiB boundary, the file-start case, the pending case.
+**Proof here:** logic and synthetic bytes only (the real tools are never read, by the
+dispatch's rule). **The runner proves** that the real `ffmpeg` / `ffprobe` carry the marker
+as such a string.
+
+### Item 4 (partial): the notices folder (`5d7bd6d4`)
+
+`notices.py` `load_native_licences` leaves `ffmpeg-macos-components/` to its lock as it does
+the Windows two (otherwise the Windows notices fail with "native licence files without
+manifest rows" the moment the folder lands). Test
+`test_native_surface_leaves_the_ffmpeg_lock_text_folders_to_their_locks` (4): RED on the
+parent `notices.py` 1 failed (`...without manifest rows: ffmpeg-macos-components`), 3 passed;
+GREEN 4. `notices.py --root-annex --check`: **root annex matches**. The `_ffmpeg_rows` darwin
+branch (tools without `.exe`, material in `Contents/Resources`, the macOS lock and folder)
+is NOT written: its entry labels depend on the `.app` inventory design (the STOP).
+
+### The R3 draft (NOT committed; `work\wp6.5\part3b\r3\`)
+
+- `ffmpeg-macos.lock.json` (sha256 `caf3bdef...`, 25,699 B, 0 CR): cell11's draft (sha
+  `a6675a4e`, verified) with the census filled by `make_lock.py`; it **validates** under
+  `5d7bd6d4` against `r3\ffmpeg-macos-components\` (36 files; 0 CR except two upstream CRLF
+  texts the Windows folder also carries, `zlib--contrib--dotzlib--LICENSE_1_0.txt` and
+  `sdl--visualtest--COPYING.txt`; `.gitattributes` has `native-licences/** -text`).
+- Texts: `make_texts.py` read the runner-verified pins from the zip's
+  `build/sha256-pins.txt` (in memory), opened each pinned tarball in memory, refused any whose
+  digest is not a pin, and wrote ONLY the named members. The seven new texts:
+
+| File | Member | sha256 | Bytes | Source |
+|---|---|---|---|---|
+| `fribidi--COPYING` | `fribidi-1.0.16/COPYING` | `32434afcc8666ba0...` | 26,440 | `.../fribidi-1.0.16.tar.xz`, pin `1b1cde5b...` |
+| `freetype--LICENSE.TXT` | `freetype-2.13.0/LICENSE.TXT` | `2e3bbb7d7c5c3963...` | 2,074 | `.../freetype-2.13.0.tar.gz`, pin `a7aca0e5...` |
+| `freetype--docs--FTL.TXT` | `freetype-2.13.0/docs/FTL.TXT` | `08c135755dd58903...` | 6,743 | same |
+| `sdl--LICENSE.txt` | `SDL2-2.32.10/LICENSE.txt` | `97f35b302b361680...` | 884 | `.../SDL2-2.32.10.tar.gz`, pin `5f5993c5...` |
+| `sdl--Xcode--SDL--pkg-support--resources--License.txt` | `SDL2-2.32.10/Xcode/SDL/pkg-support/resources/License.txt` | `37b975b5273734ea...` | 909 | same |
+| `libxml2--dict.c` (+ `libxml2--dict.c-L1-17.txt`, member `#L1-17`, = the Windows excerpt's bytes) | `libxml2-2.15.3/dict.c` | `416253664eb3d95a...` | 25,239 | `.../libxml2-2.15.3.tar.xz`, pin `78262a6e...` |
+| `llvm-project--LICENSE.TXT` | `LICENSE.TXT` | `8d85c1057d742e59...` | 15,141 | seat `LICENSE.TXT.llvmorg-21.1.0`, digest checked = R2 |
+
+  Licence identities read from the six (the LGPL-2.1 text; FreeType's dual FTL / GPLv2; the
+  zlib-style SDL texts; the ISC-style Veillard header) agree with the Windows rows.
+- **R2 seat record, verbatim:** see "The R2 record" below.
+- **Digest proof:** my own `python -I` hash of the seat zip: 37,978,871 B, sha256
+  `e3f251dc281a71e46e1464436c8cb281994af7fe4ed4978d95922ad82bb176e4` = `checksums.sha256`.
+- **Mutation family** on the COMPLETE draft (`mutate.out`): unmutated GREEN over the seat zip;
+  size +1 / -1 RED; `github_sha256` / `seat_sha256` digit 0 / 63 RED (readings differ); both
+  digests moved together, digit 0 / 63, now RED one rule EARLIER ("toolchain
+  census_asset_sha256 differs from github_sha256; re-census"); `--ffmpeg-sha256` digit 0 / 63
+  RED. 10 of 10. The committed form (R3) adds the three-field move (both digests and the
+  census digest) to reach "download sha256 mismatch", on a synthetic zip carrying the real
+  lock's other fields (the seat zip is not in the repository).
+
+### The R2 record (verbatim, `seat\llvm-licence\fetch-record.md`)
+
+Command (Git Bash, at the seat):
+
+    for T in llvmorg-21.1.0 llvmorg-17.0.1; do
+      gh api repos/llvm/llvm-project/git/ref/tags/$T --jq '"ref object: \(.object.type) \(.object.sha)"'
+      O=$(gh api repos/llvm/llvm-project/git/ref/tags/$T --jq '.object.sha'); gh api repos/llvm/llvm-project/git/tags/$O --jq '"peeled: \(.object.type) \(.object.sha)"'
+      gh api "repos/llvm/llvm-project/contents/LICENSE.TXT?ref=$T" -H "Accept: application/vnd.github.raw" > LICENSE.TXT.$T
+      wc -c < LICENSE.TXT.$T; sha256sum LICENSE.TXT.$T
+    done
+
+Output (verbatim):
+
+    == llvmorg-21.1.0
+    ref object: tag 827731c0bf12b0ce8d70e15ebf9f731e7961fe51
+    peeled: commit 3623fe661ae35c6c80ac221f14d85be76aa870f1
+    15141
+    8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee
+    == llvmorg-17.0.1
+    ref object: tag 3898e35f0ccd78c7dc82056d5c810ef44453bd75
+    peeled: commit e19b7dc36bc047b9eb72078d034596be766da350
+    15141
+    8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee
+
+Result: the two digests are EQUAL (no STOP). Path `LICENSE.TXT` (repository root), 15,141 B,
+0 CR.
+
+### The census (rows, sources)
+
+| Item | Value | Source |
+|---|---|---|
+| census `job_url` / log | `.../actions/runs/42661533922/job/129375108552`; the seat's saved job log (attempt 3, 874 lines) | seat `fork-run\attempt3-build.log`; dispatch-12 |
+| linkage | `ffmpeg` / `ffprobe`: 21 entries each, all `/usr/lib` or `/System/Library/Frameworks` | `Check the binaries`, lines 618-659 |
+| version, marker, configure | `ffmpeg version n9.0.2-47-gb204e94e90-20261109`; `built with Apple clang version 21.0.0 (clang-2100.1.1.101)`; the configure line | same step, 660-662 |
+| toolchain | Xcode 26.6 (17F113), SDK 26.5, the clang line, target `arm64-apple-darwin25.6.0` | `Record and check the runner`, 157-163; zip `build/toolchain.txt` |
+| FFmpeg's libraries | zlib, sdl2 autodetected; the eight flagged libraries | zip `build/logs/build-ffmpeg.log:144-153` |
+| components (12) | x264 `0480cb05` (commit); x265 4.2, openssl 3.6.1, libxml2 2.15.3, zlib 1.3.2, freetype 2.13.0, fontconfig 2.17.1, harfbuzz 14.3.0, fribidi 1.0.16, libass 0.17.5, SDL2 2.32.10 (tarball sha256 pins); libogg 1.3.6 built, NOT linked | zip `build/versions.txt`, `build/sha256-pins.txt` |
+| runtime (1) | the Apple clang runtime, `Apache-2.0 WITH LLVM-exception`, linkage inferred | CHARC R2; the R2 record |
+
+**For CHARC's accept note:** the Mac bundle's FFmpeg component set is NARROWER than the
+Windows one: 11 statically linked components (plus libogg, built but not linked) against the
+Windows lock's 100 component rows; the macOS line enables 8 external libraries and
+autodetects 2 (zlib, SDL2); 21 recipe stages are skipped (`excluded`). No `pending` gap
+remains in the census itself.
+
+### Not done (the STOP), in the dispatch's order
+
+4. The `_ffmpeg_rows` darwin branch and the `.app` notices (inventory, native rows, the write
+   location): the F0-2 host census.
+5. The R3 commit: `tools/package/ffmpeg-macos.lock.json` and
+   `native-licences/ffmpeg-macos-components/` (from `r3\`), the committed mutation family and
+   text re-hash test, the pin test (`tests/test_release_workflow.py:1144`, "false" and
+   no-lock), `macos-build.yml:35` "true", the C13 un-skip (the five `skipif` sites in
+   `test_tools_package_build.py`, whose darwin counterparts need the lock) and the C14 darwin
+   counterparts (missing-member, smoke-after-notices: both need the Mac notices).
+
+### Counts at `5d7bd6d4` (`-p no:cacheprovider -n 3 --timeout 600 -m "not gpu" --basetemp=work\wp6.5\part3b\<module> -k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`)
+
+Static: `ruff check .` All checks passed; `ruff format --check .` 338 files already formatted;
+`mypy` Success 166; `mypy --platform darwin` Success 166.
+
+| Module | Result |
+|---|---|
+| `tests/test_tools_package_build.py` | 636 passed (G3 fix: 566; +70) |
+| `tests/test_tools_package_notices.py` | 420 passed (416; +4) |
+| `tests/test_tools_package_ffmpeg.py` | 290 passed |
+| `tests/test_release_workflow.py` | 79 passed |
+| `tests/test_tools_package_smoke.py` | 66 passed, 1 skipped (the non-Windows tripwire) |
+| `tests/test_portability.py` | 192 passed |
+| `tests/test_macos_portability.py` | 224 skipped (`macos` platform skip) |
+
+`notices.py --root-annex --check`: root annex matches. **Windows unchanged**
+(`windows_compare.py` against `git show 1ef10536:tools/package/build.py`): validators 33,
+mismatches []; archive members 5, mismatches []; Windows-path definitions AST-identical to
+`de3d68a0` 9 of 10, the changed one `validate_ffmpeg_lock` (its texts-folder default is now
+resolved at call time; its verdicts are the 33 above).
+
+### Verification loop (self)
+
+- Pass 1, every rule against the real draft: the draft validates; each of the 59 synthetic
+  damages is refused by its own rule (matched message). Confirmed.
+- Suspected: a census object refused by the document's field-text loop. CONFIRMED in the
+  first edit (the loop checked `census` as text); FIXED before the commit (`census` has its
+  own rule).
+- Suspected: reusing `_ffmpeg_component_obligations` for the macOS rows would refuse
+  `built-not-linked`. CONFIRMED by reading; AVOIDED (the licence / chosen checks are inline).
+- Suspected: the marker's look-behind misjudged at a block start. REJECTED: `_scan_blocks`
+  gives `len(marker) + 2` bytes of context, and the test glues a printable byte in the
+  previous block at five split points (refused each time).
+- Readers of the lock fields: `macos-build.yml:131-132` (`asset_url`, `seat_sha256`);
+  `build()` (`lock.get("census") == "pending"`: a census object lifts the `--notices` /
+  `--zip` refusal with no code change); `_bundle_macos_ffmpeg` (now `toolchain`); `smoke.py`
+  (`load_macos_ffmpeg_lock()`: on the runner it re-validates the texts in the checkout's
+  folder); `notices.py` reads only the Windows lock. Each reads the draft's fields correctly.
+- Pass 2 over items 2-3, the R3 draft and the STOP evidence: nothing new. Loop ended.
+
+Depth at part-3b yield: DISPATCHER TO FILL
