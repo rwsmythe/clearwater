@@ -13,6 +13,7 @@ dispatcher fills the depth figures.
 | A r3 | Codex (seat, detached copy) on the group-2a part-2 head `de3d68a0` | 3 major (A3-F1, F2, F3) | 2 minor (A3-F4, F5) | 5 in / 0 out | 5 NEW / 0 REOPENED | 0 | product 5 (build.py) + tests; all five FIXED at `d81549fc` (turn 4b-r1, `wp65-cell7`); 1 more found by the cell's loop and fixed (configuration candidates) | part-2 r1 section below |
 | A r4 | Codex (seat, detached copy) on the part-2 r1 head `ae96a4e2` | 3 major (A4-F1, F2, F3) | 0 | 3 in / 0 out | 3 NEW / 0 REOPENED | 0 | product 3 (build.py) + tests; all three FIXED at `d6296b92` (turn 4b-r2, `wp65-cell8`); 2 more found by the cell's loop and fixed (printed configure form, extra-version spellings) | part-2 r2 section below |
 | A r5 | Codex (seat, detached copy) on the part-2 r2 head `87df4840` | 0 | 1 minor (redundant quoting admitted by the printed-form parser) | 1 in / 0 out | 1 NEW / 0 REOPENED | 0 | product 1 (build.py `_sh_quote` canonical check) + tests; FIXED at `fcfe5073` (turn G3-fix, `wp65-cell10`); the same turn folded the G3 runner classification (test-only, plus `notices.py` C15 and `stills.py` C1) | G3-fix section below |
+| A r6 | Codex (seat, detached copy) on the part-3c head `00e18e71` | 0 | 2 minor (status type, switch-OFF guard `else` arm), 1 advisory (x264 provenance; closed by the dispatcher) | 3 in / 0 out | 3 NEW / 0 REOPENED | 0 | product 1 (build.py) + test-only 1 (the guard), both FIXED at `cbe0a8b6` / `be5fe211` (turn QA-fix, `wp65-cell14`), with the seat-QA conftest regression (test-only, `b1f0d507`) | QA-fix section below |
 
 ## Round 0
 
@@ -2300,4 +2301,100 @@ mismatches []; archive members 5, mismatches []; Windows-path definitions AST-id
   version read are the other guards.
 - Pass 2 over the tests, the guard's controls and the blob check: nothing new. Loop ended.
 
-Depth at part-3c yield: DISPATCHER TO FILL
+Depth at part-3c yield: 273,035 (wp65-cell13, read by the dispatcher with cell_depth.py at its part-3c return)
+
+## QA fix (`wp65-cell14`, dispatch-15; base `00e18e71`)
+
+The seat's QA of `00e18e71` (parallel leg `work/orch-g63/gate-p00e1/`: 8981 passed, 209
+skipped, 1 error) and A r6's two minors, fixed under CHARC's ruling `77c70316`. Scratch
+`work\wp6.5\qafix\`. No `src/` change; no committed fixture, lock, text or notices-annex byte
+moved; the workflow unchanged.
+
+### The regression: cause as confirmed
+
+- Reproduced on `00e18e71` with the seat's command, `uv run --no-sync pytest -q -p
+  no:cacheprovider -p cupy "tests/test_portability.py::test_portability_cpu_selection[P23]"`:
+  **1 passed, 1 error**, `AttributeError: 'function' object has no attribute 'cache_info'` at
+  `tests\conftest.py:418` (teardown).
+- Confirmed with `--setup-show` on the same id: `SETUP F monkeypatch`, `SETUP F
+  _posix_home_redirect (fixtures used: monkeypatch)`, `SETUP F _release_fft_plans`, ...;
+  teardown `_release_fft_plans` BEFORE `monkeypatch`. A4's fixture requested `monkeypatch` and
+  so set it up ahead of `_release_fft_plans`; teardown is last-in, first-out, so `release()`
+  read P23's lambda `_probe_gpu` before the undo. It reaches the probe only when `cupy` is in
+  `sys.modules` (xdist order; `-p cupy` makes it deterministic). The seat's diagnosis holds.
+
+### The fix (commits)
+
+| Item | Commit | Change |
+|---|---|---|
+| (i) + (ii) + (iii) | `b1f0d507` | `tests/conftest.py`: `_posix_home_redirect(request)` requests nothing else; on POSIX its own `pytest.MonkeyPatch` sets `HOME` and `XDG_CONFIG_HOME` / `XDG_DATA_HOME` / `XDG_CACHE_HOME` / `XDG_STATE_HOME` (`POSIX_XDG_FOLDERS`: `.config`, `.local/share`, `.cache`, `.local/state` under the per-test home, not created, so the home stays empty), undone in a `finally` after the `yield`; on Windows it yields untouched. `release()` returns when `getattr(core_backend._probe_gpu, "cache_info", None)` is None. `tests/test_wp65_conftest_home.py`: the POSIX test asserts the four XDG paths and `app_locations()` under `.config` / `.cache` on Linux; new POSIX test: a test's own `monkeypatch` of `HOME` / `XDG_CONFIG_HOME` still wins; the Windows test also asserts the XDG names as collection found them. New `tests/test_wp65_conftest_order.py` (the ordering proof, below) |
+| A r6 minor 1 | `cbe0a8b6` | `tools/package/build.py:1834` `isinstance(status, str)` first, then the set, then the linked rule (messages unchanged); `test_macos_complete_census_refuses` `status-list` / `status-dict` expect `ValueError` `zlib: invalid component status []` / `{}` |
+| A r6 minor 2 | `be5fe211` | `tests/test_release_workflow.py`: `_off_reading` strips a switch-true `if ... fi` only when its inner lines hold no branching keyword (`if` / `then` / `else` / `elif` / `fi` / `case` / `esac` as a word); otherwise the step is reported `unsupported switch branch shape` and the block stays in the live text (conservative refusal, as ruled). The inert test asserts the real capture step has no refusal. Planted breaches added: `else-asset-download` (r6's executed probe: `else` + `curl <asset_url> -o /tmp/asset.zip` before the capture step's `fi`), `elif-arm`, `nested-branch`; each must report the refusal AND `curl ` |
+
+The ordering proof: each class holds one test and a class-scoped sentinel, set up before and
+torn down after every function-scoped fixture, which puts a stand-in `cupy` in `sys.modules`
+(only when the real one is absent; nothing imported, no device). Class 1: the sentinel installs
+a WITNESS probe, the test replaces it with a TRIPWIRE through `monkeypatch`; right order = the
+undo restores the witness and `release()` reads its `cache_info` exactly once (checked after
+the `yield`); wrong order = the tripwire raises. Class 2: a plain-function probe (P23's shape)
+must be neither called nor raise. `--setup-show` on the fix: `_release_fft_plans` set up
+before `monkeypatch`, torn down after it.
+
+### RED on the parent / GREEN
+
+| Proof | Parent | Fix |
+|---|---|---|
+| `-p cupy` `[P23]` (seat command) | `00e18e71`: 1 passed, 1 error (AttributeError, `conftest.py:418`) | 1 passed |
+| `test_wp65_conftest_order.py` (conftest swapped to its `00e18e71` blob, `qafix\swap.py`, restored) | 2 errors at teardown: class 1 `_release_fft_plans ran before the test's monkeypatch undo` + `read the restored probe 0 times`; class 2 `AttributeError` at `conftest.py:418` | 2 passed (also 2 passed with `-p cupy`) |
+| XDG redirect, simulated darwin (scratch probe copied into `tests/` for the run and deleted; `g3fix\sim\simdarwin.py` sets `sys.platform`) | 1 failed (`KeyError: 'XDG_CONFIG_HOME'`) | 1 passed (HOME under the basetemp, the four XDG paths under it) |
+| minor 1 (`build.py` swapped to its `00e18e71` blob, `qafix\swap_minors.py`, restored) | 2 failed, `TypeError: unhashable type: 'list'` / `'dict'` at `build.py:1835` | 2 passed |
+| minor 2 (the parent's strip-the-whole-block logic substituted in `_off_reading`, restored) | 3 failed (`else-asset-download`, `elif-arm`, `nested-branch`: `assert []`), 5 passed | 8 passed |
+
+The Windows half of `test_wp65_conftest_home.py` cannot go RED on Windows (the parent left
+`HOME` and the XDG names alone there too); the POSIX tests skip here by marker, so their
+XDG assertions are proven on Windows only by the simulated-darwin probe above.
+
+### Tests at the head (`-m "not gpu"`, every run with `-k 'not
+test_python_m_clearwater_starts_the_shell_and_exits_0'`)
+
+| Module | Result |
+|---|---|
+| `tests/test_portability.py` (`-n 3`) | 192 passed; with `-p cupy` 192 passed |
+| `tests/test_release_workflow.py` | 87 passed (84; +3) |
+| `tests/test_tools_package_build.py` | 669 passed (+2) |
+| `tests/test_tools_package_ffmpeg.py` | 290 passed |
+| `tests/test_tools_package_smoke.py` | 66 passed, 1 skipped (the POSIX process-group proof) |
+| `tests/test_tools_package_notices.py` (`-n 3`) | 420 passed |
+| `tests/test_macos_portability.py` | 224 skipped (`macos` platform skip); with `-p cupy` the same |
+| `tests/test_wp65_conftest_home.py` | 1 passed, 3 skipped (POSIX-only, by marker; +1 POSIX test) |
+| `tests/test_wp65_conftest_order.py` (new) | 2 passed; with `-p cupy` 2 passed |
+
+Every other module that patches `_probe_gpu`, with `-p cupy -n 3`: `test_core_backend` 38,
+`test_core_ops` 14, `test_core_prototype` 21, `test_core_select` 17, `test_core_speed` 20,
+`test_core_wp34` 29, `test_wp321_device_frames` 9, `test_wp321_device_proxy` 2,
+`test_methods_assembly` 73, `test_methods_assembly_prototype` 147, `test_methods_assembly_v8`
+5, `test_methods_compensation` 211, `test_methods_fusion` 126, `test_methods_fusion_prototype`
+94, `test_methods_white_balance` 97: all passed, none failed or errored.
+
+Static: `ruff check .` all passed; `ruff format --check .` 339 files formatted; `mypy` and
+`mypy --platform darwin` no issues in 166 source files. Blobs: 0 CR in each of the six
+committed files.
+
+### Verification loop (self)
+
+- Pass 1. Suspected: the own-MonkeyPatch fixture breaks "a test that sets HOME itself wins".
+  REJECTED: autouse setup precedes the test's `monkeypatch`, whose undo runs first and restores
+  the redirect value, then the fixture's `finally` restores the original (new POSIX test).
+  Suspected: the class sentinels' stand-in `cupy` leaks to other tests on the worker. REJECTED:
+  class teardown runs in the one item's teardown, before the next item; the stand-in is
+  installed only when no real `cupy` is loaded (`-p cupy` runs green). Suspected: the keyword
+  scan refuses the real capture step (`-hide_banner`, `hevc_videotoolbox`, paths). REJECTED:
+  the word match needs non-word, non-`-` boundaries; the inert test asserts no refusal.
+  Suspected: a switch `fi` followed by `|| cmd` or at another indent escapes. REJECTED: the
+  closer must be `fi` alone at the opener's indent, so such a block either does not match
+  (all of it stays live) or swallows an inner `fi` (refused).
+- Slip, fixed before any commit: a heredoc collapsed `\\n` in the release-test edit to a literal
+  newline (the known Git Bash trap); repaired with the Edit tool, the diff re-read.
+- Pass 2 over the three items and the tests: nothing new. Loop ended.
+
+Depth at QA-fix yield: DISPATCHER TO FILL
