@@ -5,47 +5,55 @@
 
 ### Generation
 
-- **Generation 62** (session `clearwater-orchestrator-20261109-0736`). LIVE 2026-11-09 17:36Z. Bash gauge 41 ms. Seat folder `work/orch-g62/` (drains, posts, `state_update.py` + `repN.txt`, `v4chain.sh`, review repo `rv7a/`); the leg runner is still `work/orch-g61/leg.sh`. State worktree `.worktrees/orch-state-g62`.
-- **GEN-62 BOARD (19:58Z):**
-  - **WP7.1:**
-    - **Window 2.** Every gate archives RAW nvidia-smi (`wp7.1\seat\window2\gate-raw-<leg>-<ts>.txt`). The 5 s series (background `b73b38mn2`) runs into `window2\gpu-series.csv` until the V4s end; then STOP it.
-    - **D `bench-hevc62q` = 10.35 min/min.** AT N6; no product DR (CHARC `e0be5081`).
-    - **E `bench-hevc439` = 11.04 min/min.** PASS, launcher exit 0.
-    - **V4 chain 19:13Z: all three rc=1, instrument.**
-      - `v4-hevc62b` and `v4-bench-hevc439`: `run_export.py:427` suppressed `subprocess.TimeoutExpired` only; `psutil.Popen.wait` raises `psutil.TimeoutExpired`.
-      - `v4-bench-hevc62`: the packet's wrong input `bench-hevc62.json` (window 1, ok=false). V4-D needs `bench-hevc62q.json`.
-    - **CHARC `28ed5baa`: turn 7 SPLIT** = 7a (instrument fixes + re-freeze), then the three V4 re-runs, then 7b (comparisons, look pack, projection, report). 7b records ONE candidate instrument DR row (process supervision never exercised against a long child or a reused pid; with F1 / F2 below), beside the V16 idle-not-subtracted row.
-    - **Turn 7a** (Codex resumed, `cell\dispatch-7.md`, return-7):
-      - The fixes were found correct by a Claude review (`wp7.1\A\t7a\review.txt`).
-      - That review found 2 MAJOR, both pre-existing: F1, `children(recursive=True)` can adopt a foreign orphan whose parent pid was reused, then kill it; F2, `sample()` reads stale pid objects.
-      - It also found 6 MINOR.
-    - **Turn 7a-r2** (`dispatch-8.md`, return-8): all eight folded; proofs a-g and 13 dry runs pass.
-      - New md5s: isolate `208768cc`, run_export `3149daab`, prepare_seat_packet `1d1026c3`, packet `ffec1b18`.
-      - The Codex session `01a1bf59` is at depth 215,167, so NO MORE RESUMES. **Turn 7b = a FRESH session**: agent file + brief + returns 2..8 + dispatches + dispatch-9.
-    - **DELTA Claude review RUNNING** (background `bavxuttex`, `wp7.1\A\t7a-r2\`). Review repo `work/orch-g62/rv7a`: `ac30f51b` (frozen-t6), `472529e7` (7a), `697aace6` (7a-r2).
-    - **On CLEAN:**
-      - re-freeze `wp7.1\seat\frozen-t7\` (copies + MD5SUMS) and repoint `leg.sh`'s FROZEN (copy `leg.sh` to `work/orch-g62/leg.sh`);
-      - run the three V4s non-exclusive, sequential, under NEW ids `v4-hevc62c`, `v4-bench-hevc62q`, `v4-bench-hevc439b`, each with a raw gate file; audit `tracked_descendants` names after each;
-      - then 7b.
-    - C1's exclusive re-run stays parked while a cell is testing.
+- **Generation 62** (session `clearwater-orchestrator-20261109-0736`). LIVE 2026-11-09 17:36Z. Bash gauge 41 ms.
+  - Seat folder `work/orch-g62/`: drains, posts, `state_update.py` + `repN.txt`, the review repo `rv7a/`, `leg.sh` (frozen-t7), `v4chain2.sh`, `cpuwatch.py`.
+  - State worktree `.worktrees/orch-state-g62`.
+- **GEN-62 BOARD (20:42Z):**
+  - **WP7.1, window 2:**
+    - Leg results: D `bench-hevc62q` 10.35 min/min (AT N6, no product DR); E `bench-hevc439` 11.04 min/min.
+    - **First V4 chain: 3x rc=1, instrument.** CHARC `28ed5baa` split turn 7. Turns 7a / r2 / r3 / r4 / r5 (Codex) folded every supervision defect:
+      - the psutil.TimeoutExpired poll;
+      - pid reuse in wait;
+      - F1 adoption via a stale parent;
+      - F2 stale sampling;
+      - N1-N5;
+      - the CPU cost.
+    - Reviews: three Claude passes (`wp7.1\A\t7a`, `t7a-r2`, `t7a-r4`), plus seat reads of r3 and r5, which CHARC ruled to be of record.
+    - Supervisor CPU on an own 5-process tree: frozen-t6 **8.65 %** (the record figure for D, E and the N6 control, like-for-like); r3 30.89 %; r4 1.24 %; r5 1.11 % (`ppid_map`) and 11.08 % (fallback, no bar). CHARC: `_ppid_map` is acceptable with the guard, fallback and record.
+    - **RE-FROZEN `wp7.1\seat\frozen-t7\`** (19 files, MD5SUMS verified; isolate `48bea5f8`, run_export `3fd9ec00`, packet `fd1bb0e1`); leg runner `work/orch-g62/leg.sh`.
+    - **V4 CHAIN 2 RUNNING** since 20:38:17Z (background `be6cqmwob`, `v4chain2.sh`, non-exclusive, stops on failure):
+      - order: V4-D `v4-bench-hevc62q` (bound 8,100 s), then A2b `v4-hevc62c` (8,100 s), then V4-E `v4-bench-hevc439b` (54,000 s);
+      - supervisor read live at V4-D: 1.22 % of one core (`cpuwatch.py`).
+    - **After each leg:**
+      - the success line `V4_ONLY PASS <id>`, launcher exit 0, record ok=true, supervisor clean;
+      - audit the `tracked_descendants` names;
+      - list leftover processes by command line (an M1-type orphan would not show as a survivor);
+      - check that no `cleanup_discovery_error` is present.
+    - **Then turn 7b in a FRESH Codex session** (agent file + brief + returns 1-11 + dispatches 2-11 + dispatch-12): the comparisons, look pack, projection and report.
+      - The report records the frozen-t6 supervisor cost (8.65 %) as like-for-like for D, E and the N6 control.
+      - It records ONE candidate instrument DR row: process supervision never exercised against a long child or a reused pid; F1 / F2; the unmeasured supervisor cost.
+      - The V16 idle row sits beside it.
+    - STOP the 5 s series (`b73b38mn2`) when the V4s end.
+    - C1's exclusive re-run is parked while a cell is testing.
   - **WP6.5:**
-    - **G3 fix DONE** (`wp65-cell10`, return-12, head `7149758f`, 8 commits).
-      - No STOP, no `src/`, 0 CR; depth 259,224 at return.
-      - CHARC acked (`4fbc8be3`): the Linux XDG redirect and the two listed tests (gui `:776`, gpu bench `:591` KeyError `hevc_nvenc`) go to the NEXT fix turn after the runner table.
-      - **The seat QA includes the SERIAL leg** to show whether the bench KeyError fails on Windows today.
-    - **Fork run `42661533922` attempt 3 SUCCESS 19:30Z.**
-      - Tag `ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-9cb0fa8` -> `9cb0fa81`.
-      - Asset 37,978,871 B, sha256 `e3f251dc...76e4`; THREE-WAY equal; not Latest.
-      - Records in `wp6.5\seat\fork-run\attempt3-*` and `fork-recipe-macos.md`. Attempt 4 cancelled.
-    - **PART 3 DISPATCHED 19:48Z** (CHARC `d9a38a4e`, serial line) to FRESH `wp65-cell11` (Agent tool, `cell\dispatch-12.md`, base `7149758f`; depth 30,742 at dispatch).
-      - Conditions: the lock pins tag + commit + asset + size + sha256 with validator refusal; the census is cited to `attempt3-build.log` (`otool -L` at lines ~618-664); C13 skips become checks; switch ON + Mac notices + pin-test flip in ONE commit.
-      - At return: read depth; then ONE seat QA (qa4b + full Windows parallel leg + SERIAL leg; counts = the gate of record) and ONE Reviewer A r6 (Codex on `wp6.5-rB`) on the combined head; then CHARC's re-push ask.
-  - **Open for CHARC at the accept:**
-    - G2a2r1-F1 (Windows validator hole, CHARC's DR row);
-    - the WP7.1 instrument rows.
+    - **G3 fix** `7149758f` (`wp65-cell10`, depth 259,224).
+    - **Fork attempt 3 SUCCESS:** asset `e3f251dc...76e4`, 37,978,871 B, tag -> `9cb0fa81`.
+    - **PART 3 STOPPED twice:**
+      - `wp65-cell11`: texts and the Apple pin missing; head `5ccf7c75`, depth 221,656. CHARC R1 / R2 / R3: one folder; the LLVM `LICENSE.TXT` fetched at the seat from 2 tags, equal `8d85c105...afee`, recorded in `wp6.5\seat\llvm-licence\fetch-record.md`.
+      - `wp65-cell12`: `notices.py` cannot inventory a PyInstaller `.app` (round-0 **F0-2**). It committed `5d7bd6d4` (census rules, Apple toolchain marker), head `ea68e99e`, depth 376,153.
+    - **CHARC Q1 (i):** the switch stays OFF; amended R3. Q2: ONE folder of 36 texts.
+    - **`wp65-cell13` DISPATCHED ~20:45Z** (`cell\dispatch-14.md`, base `ea68e99e`, depth 27,964): the lock, the 36 texts, the mutation and re-hash tests, the C13 real checks, the pin test's "no lock" half, CHARC's inert-when-OFF guard test; mid-build yield at about 250K.
+    - **At its return:**
+      - read its depth;
+      - ONE seat QA: qa4b + the full Windows parallel leg + the SERIAL leg (CHARC: it shows whether the bench KeyError fails on Windows today); counts = the gate of record;
+      - ONE Reviewer A r6 (Codex on `wp6.5-rB`): the combined diff + ALL 36 `pinned-source-text` rows against the tarball members in `work/wp6.5/g2a/dl/`;
+      - then CHARC's re-push ask;
+      - then the F0-2 sizing (the `.app` layout, one notices location, then the switch ON with the census, the Mac notices and C14 in ONE commit).
+    - **Next fix turn after the runner table:** the Linux XDG redirect; `test_gui_settings_dialog.py:776`; the bench `:591` KeyError if the serial leg shows it failing.
+  - **Open for CHARC at the accept:** G2a2r1-F1 (the Windows validator hole, CHARC's DR row); the WP7.1 instrument rows.
 - **Gen-62 slips:**
-  - four bare `cd`s, each restored in the same or the next call, with nothing written while moved;
-  - one review prompt written and its review launched in the same batch (it ran in order; the prompt was complete).
+  - four bare `cd`s, each restored in the same or the next call, nothing written while moved;
+  - one review prompt written and its review launched in the same batch (it ran in order).
 - **CHARC is gen 21, `clearwater-charc-20261108-2037`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 - **Seat folder `work/orch-g61/`:** `gate.sh` + `watch2.sh` + `window1.sh` + `gpu_sample.sh` (copied from orch-g60, repointed to orch-g61); `state_update.py` (LF splice from `repN.txt` blocks, worktree orch-state-g61); posts (`post-*.md`) and drains (`drain-N.txt`). Gen 60's `work/orch-g60/` still holds `register_macos_build.py`, `brief_note4.py`, `ledger-a186.md`. The CI-shaped rehearsal is still `work/orch-g58/rehearsal.py` (md5 `b93db3bf`). actionlint is `work/tools/actionlint-1.7.12/actionlint.exe`.
 - **State worktree:** `.worktrees/orch-state-g61` (branch `orch-state-g61`; remove it and add your own).
