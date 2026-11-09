@@ -1,4 +1,4 @@
-# WP7.2 -- last-sample end on coarse-edit-list sources (cell report)
+# WP7.2 -- last-sample end on sources whose edit list is rounded to the movie tick (cell report)
 
 Cell `wp72-cell1` (implementer-opus-high), worktree `.worktrees/wp7.2`, base `83d7c9ed`.
 Brief `docs/briefs/wp7.2-brief.md` (FINAL, `61c1aae3`).
@@ -157,3 +157,9 @@ predicted on the 62 s re-run:
 
 These three rows are judged per CHARC's Q1 (b) ruling, held for the owner. This report makes no
 claim that they clear.
+
+## Reviewer A (Codex, at the cell's seat; evidence `clearwater-review-evidence/wp7.2/A/`)
+
+| Round | Diff | Banner | Findings | Verdict | Disposition |
+|---|---|---|---|---|---|
+| r1 | `83d7c9ed..74a1dbf2` | gpt-6.1-sol, high | 1 NIT: `verify.py:685`, `:708` called a 1000000 movie timescale "coarser" than 30000 (it is finer; it cannot hold the exact end) | NO_NEW_CRITICAL_MAJOR | FIX (wording, docstring and comment; report title) |

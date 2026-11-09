@@ -682,7 +682,7 @@ def frame_end(probe: ProbeResult, table: PacketTable, last_pts: int) -> int:
     on a cut file names the samples past the cut too), else from the listed packets.
 
     Without a next pts, the end is the presentation end (:func:`presentation_end`). An edit
-    list written in a movie timescale coarser than the track's (WP7.2: Insta360 Studio writes
+    list whose movie timescale cannot hold the track's exact end (WP7.2: Insta360 Studio writes
     whole microseconds, rounded up from 1/30000 ticks) ends a fraction of a tick away from the
     track's own end (``start_pts + duration_ts``); when the two lie less than one tick apart
     and the track ends after ``last_pts``, the track's end wins, exact. Otherwise -- no track
@@ -705,7 +705,7 @@ def frame_end(probe: ProbeResult, table: PacketTable, last_pts: int) -> int:
     end = presentation_end(probe, table)
     track = _track_end(probe, table)
     if track is not None and track > last_pts and abs(end - track) < 1:
-        return track  # the edit list's end is the track's, rounded to a coarser movie tick
+        return track  # the edit list's end is the track's, rounded to whole movie ticks
     whole = end.numerator // end.denominator
     if whole * end.denominator != end.numerator:
         whole += 1  # a fractional tick: the frame keeps at least its full source duration
