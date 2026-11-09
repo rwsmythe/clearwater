@@ -38,6 +38,7 @@ from clearwater.io.video import (
     probe,
     resolve_encoder,
 )
+from clearwater.io.video import capability as capability_module
 from clearwater.io.video import encode as encode_module
 from clearwater.io.video import verify as verify_module
 from clearwater.io.video.boxes import read_movie_boxes
@@ -1847,14 +1848,18 @@ def test_planted_8_bit_output_for_a_10_bit_source_is_caught(sample: Sample, tmp_
 
 
 def test_real_capabilities_and_the_auto_rule() -> None:
+    """The running platform's roster (AD-35: hevc_videotoolbox on macOS, hevc_nvenc
+    elsewhere; WP6.5 G3, C4's cause in an FFmpeg-gated test) and its auto rule."""
+    hardware, software = capability_module.encoder_roster()
+    assert software == "libx265"
     caps = {c.name: c for c in detect_capabilities(refresh=True)}
-    assert set(caps) == {"hevc_nvenc", "libx265"}
+    assert set(caps) == {hardware, software}
     assert caps["libx265"].available and caps["libx265"].bit_depths == (8, 10)
-    assert not caps["libx265"].hw and caps["hevc_nvenc"].hw
+    assert not caps["libx265"].hw and caps[hardware].hw
     for cap in caps.values():
         assert cap.available == (cap.reason is None)
     resolved = resolve_encoder("auto", tuple(caps.values()))
-    assert resolved == ("hevc_nvenc" if caps["hevc_nvenc"].available else "libx265")
+    assert resolved == (hardware if caps[hardware].available else "libx265")
 
 
 @pytest.mark.gpu
