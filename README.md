@@ -71,8 +71,18 @@ when it is used.
 ## Platforms
 
 - **Windows:** the download above.
-- **macOS:** the code for Apple Silicon is in the tree and is being validated on a real
-  Mac now; there is no Mac download yet.
+- **macOS (Apple Silicon):** there is no Mac download yet; the Mac version is being
+  validated now. To run Clearwater from source on a Mac, install two command-line tools
+  first, in Terminal:
+  - **Xcode Command Line Tools.** Check with `xcode-select -p`: if it prints a folder,
+    they are already installed. If not, run `xcode-select --install` and follow the
+    dialog that opens.
+  - **uv**, which installs Clearwater's Python and packages. Install the version the
+    project's own builds use with `curl -LsSf https://astral.sh/uv/0.10.9/install.sh | sh`,
+    then open a new Terminal window and check with `uv --version`.
+
+  uv fetches Python 3.12 by itself. FFmpeg is still needed on your PATH for video, as for
+  any source run (next item).
 - **From source, any platform:** clone the repository and run it with
   [uv](https://docs.astral.sh/uv/); see the user guide's "Developer/source install"
   section. Python 3.12 and FFmpeg on your PATH are needed for a source run.
