@@ -1,4 +1,4 @@
-From aebac45234124f4f3341ffbe750bdb8ddefc34fd Mon Sep 17 00:00:00 2001
+From 92613dce4a2fa1e1189d0a913033364a140be350 Mon Sep 17 00:00:00 2001
 From: Reid Smythe <rwsmythe@gmail.com>
 Date: Mon, 9 Nov 2026 00:38:02 -1000
 Subject: [PATCH] feat(wp6.5): build macOS arm64 GPL FFmpeg release/9.0 at
@@ -92,12 +92,15 @@ unless both paths are gone (ld64 lists /usr/local/lib among its standard
 library paths; a host header or static library there would enter the
 build unpinned, and otool -L sees only dylibs); it also records the
 compiler's and the linker's search paths under the build's sanitized
-environment. A step that always runs after the build puts both back.
+environment, and fails unless the build step's tools (curl, git, make,
+clang, perl, tar, python3, meson, shasum) still run there. It sits after
+every setup step the build relies on and before the first configure; a
+step that always runs after the build puts both back.
 The records go into the archive's build/ folder.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- .github/workflows/build-macos.yml             | 362 ++++++++++
+ .github/workflows/build-macos.yml             | 382 ++++++++++
  macos/build-script/LICENSE                    | 201 ++++++
  macos/build-script/build.sh                   | 683 ++++++++++++++++++
  macos/build-script/script/build-cmake.sh      |  92 +++
@@ -134,7 +137,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  macos/build-script/version/zlib               |   1 +
  macos/meson-requirements.txt                  |   3 +
  macos/sha256-pins.txt                         |  23 +
- 37 files changed, 2618 insertions(+)
+ 37 files changed, 2638 insertions(+)
  create mode 100644 .github/workflows/build-macos.yml
  create mode 100644 macos/build-script/LICENSE
  create mode 100755 macos/build-script/build.sh
@@ -175,10 +178,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 
 diff --git a/.github/workflows/build-macos.yml b/.github/workflows/build-macos.yml
 new file mode 100644
-index 0000000..f8f0c78
+index 0000000..79e32e5
 --- /dev/null
 +++ b/.github/workflows/build-macos.yml
-@@ -0,0 +1,362 @@
+@@ -0,0 +1,382 @@
 +name: Build FFmpeg macOS arm64
 +
 +# Clearwater WP6.5: one dispatch builds FFmpeg release/9.0 at the Windows pin for
@@ -260,7 +263,9 @@ index 0000000..f8f0c78
 +        # <sysroot>/usr/local/include; a host header or static library there would
 +        # enter the build unpinned and pass every later check (otool -L sees only
 +        # dylibs). Each directory is recorded, moved aside, and asserted gone; a
-+        # failed move or assertion fails the job. Put back after the build step.
++        # failed move or assertion fails the job. Placed after every setup step the
++        # build relies on (checkout, the runner checks, the meson install) and before
++        # the first configure; put back after the build step.
 +        run: |
 +          set -euo pipefail
 +          for d in /usr/local/include /usr/local/lib; do
@@ -295,6 +300,24 @@ index 0000000..f8f0c78
 +              /usr/bin/clang -Wl,-v "$RUNNER_TEMP/search-probe.c" -o "$RUNNER_TEMP/search-probe" 2>&1
 +          } > "$RUNNER_TEMP/toolchain-search.txt"
 +          cat "$RUNNER_TEMP/usr-local-include.txt" "$RUNNER_TEMP/usr-local-lib.txt" "$RUNNER_TEMP/toolchain-search.txt"
++          # a check: the tools the build step uses still start with /usr/local gone,
++          # under the build's sanitized environment (fails here, not mid-build)
++          env -i HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
++            PATH="$RUNNER_TEMP/meson-venv/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
++            MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET" \
++            /bin/sh -c 'set -e
++              for tool in curl git make clang perl tar python3 meson; do
++                printf "%s: %s\n" "$tool" "$(command -v "$tool")"
++              done
++              curl --version
++              git --version
++              make --version
++              clang --version
++              perl -v
++              tar --version
++              python3 --version
++              meson --version
++              printf x | shasum -a 256'
 +
 +      - name: Build (vendored Riedl script, sanitized environment)
 +        run: |
