@@ -593,13 +593,39 @@ def _app_bundle_parts(parts: Sequence[str]) -> tuple[list[str], bool]:
     return rest, False
 
 
+def _app_content_rules(root: Path, app: Path, path: Path, *, is_file: bool) -> set[str]:
+    """Judge a physical or re-rooted app entry by the same location and module rules."""
+    inside_app = path.is_relative_to(app)
+    local = path.relative_to(app).parts if inside_app else path.relative_to(root).parts
+    parts, frozen = _app_bundle_parts(local) if inside_app else _bundle_parts(local)
+    metadata = inside_app and (
+        local in (("Contents", "Info.plist"), ("Contents", "PkgInfo"))
+        or (
+            local[:2] == ("Contents", "_CodeSignature")
+            and not path.name.lower().endswith(MODULE_SUFFIXES)
+        )
+    )
+    rules = set(name_violations(parts, module_root=frozen and is_file and not metadata))
+    if (
+        inside_app
+        and not frozen
+        and any(part.lower().split(".", 1)[0] == "tests" for part in parts)
+    ):
+        # Contents' non-frozen containers (PlugIns, _CodeSignature, etc.) cannot
+        # conceal test payloads below the container name (WP6.5 A r1 F3).
+        rules.add("tests")
+    if is_file and not frozen and not metadata and path.name.lower().endswith(MODULE_SUFFIXES):
+        rules.add("unexpected-module")
+    return rules
+
+
 def _app_forbidden_paths(root: Path, app: Path) -> list[str]:
     """Check the shared non-following release listing, admitting links before resolution.
 
-    Only physical files are opened for ZIP checks. A link is checked by its own name and
-    its target's kind, read by stat only AFTER admission; it is never opened. Identifier
-    folder aliases are also checked as package names. Physical folders are implicit in
-    the listing, so their names are checked as ancestors of its entries.
+    Only physical files are opened for ZIP checks. After admission, file links are judged
+    at their own location; a folder link's non-following view is re-rooted there and its
+    entries receive the physical tree's rules, without a name-shape gate. The shared
+    admission check has already admitted nested links before their kind is read.
     """
     entries = _macos_app_entries(root)
     found: list[str] = []
@@ -609,13 +635,6 @@ def _app_forbidden_paths(root: Path, app: Path) -> list[str]:
         inside_app = path.is_relative_to(app)
         local = path.relative_to(app).parts if inside_app else relative.parts
         parts, frozen = _app_bundle_parts(local) if inside_app else _bundle_parts(local)
-        metadata = inside_app and (
-            local in (("Contents", "Info.plist"), ("Contents", "PkgInfo"))
-            or (
-                local[:2] == ("Contents", "_CodeSignature")
-                and not path.name.lower().endswith(MODULE_SUFFIXES)
-            )
-        )
         file_kind = kind
         if kind == "link":
             problem = (
@@ -631,30 +650,21 @@ def _app_forbidden_paths(root: Path, app: Path) -> list[str]:
                 # allowed; path-text keys would misclassify files on case-insensitive or
                 # Unicode-normalising volumes (WP6.5 A r1 F2).
                 file_kind = "file" if stat.S_ISREG(os.stat(path).st_mode) else "folder"
-        rules = set(name_violations(parts, module_root=file_kind == "file" and not metadata))
-        if kind == "link" and file_kind == "folder" and path.name.isidentifier():
-            if frozen:
-                # At the frozen-path root this is [name, __init__.py]; nested framework
-                # structure and mirror links keep their already-mapped top-level package.
-                rules.update(name_violations([*parts, "__init__.py"], module_root=True))
-            else:
-                rules.add("unexpected-module")
-        if (
-            inside_app
-            and not frozen
-            and any(part.lower().split(".", 1)[0] == "tests" for part in parts)
-        ):
-            # Contents' non-frozen containers (PlugIns, _CodeSignature, etc.) cannot
-            # conceal test payloads below the container name (WP6.5 A r1 F3).
-            rules.add("tests")
-        if (
-            file_kind == "file"
-            and not frozen
-            and not metadata
-            and path.name.lower().endswith(MODULE_SUFFIXES)
-        ):
-            rules.add("unexpected-module")
+        rules = _app_content_rules(root, app, path, is_file=file_kind == "file")
         found += [f"{label} ({rule})" for rule in rules]
+        if kind == "link" and file_kind == "folder":
+            # macos_link_problem has admitted the outer link AND each nested link in
+            # this view. Only now may macos_link_view resolve/list its physical target.
+            for relative_entry, physical, entry_kind in macos_link_view(path, in_app=True):
+                shown = path.joinpath(*relative_entry.parts)
+                is_file = entry_kind == "file" or (
+                    entry_kind == "link" and stat.S_ISREG(os.stat(physical).st_mode)
+                )
+                shown_label = f"dist:{shown.relative_to(root).as_posix()}"
+                found += [
+                    f"{shown_label} ({rule})"
+                    for rule in _app_content_rules(root, app, shown, is_file=is_file)
+                ]
         if kind == "file" and (_is_zip_name(path.name) or _starts_with_zip_magic(path)):
             found += zip_violations(path, label, module_root=frozen and len(parts) == 1)
     return sorted(found)

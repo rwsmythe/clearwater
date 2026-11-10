@@ -811,9 +811,53 @@ def test_ar1_folder_alias_matches_the_physical_package_rule(tmp_path, where, tar
     _symlink(alias, target, folder=True)
     assert build.macos_link_problem(app, app / "Contents/Frameworks", alias) is None
     physical_root, physical_app = run4_content_release(tmp_path / "physical", [])
-    tree(physical_app, [f"{where}/__init__.py"])
-    assert hits(app_content_paths(physical_root, physical_app), f"{where}/__init__.py ({rule})")
-    assert hits(app_content_paths(root, app), f"{where} ({rule})")
+    module = "random/_generator.cpython-312-darwin.so"
+    tree(physical_app, [f"{where}/{module}"])
+    assert hits(app_content_paths(physical_root, physical_app), f"{where}/{module} ({rule})")
+    assert hits(app_content_paths(root, app), f"{where}/{module} ({rule})")
+
+
+AR2_FOLDER_ALIASES = (
+    ("Contents/Frameworks/foo-bar", "numpy"),
+    ("Contents/Frameworks/cupy-x", "numpy"),
+    ("Contents/Frameworks/2numpy", "numpy"),
+    ("Contents/MacOS/foo-bar", "../Frameworks/numpy"),
+    ("Contents/Frameworks/foo.bar", "numpy"),
+)
+
+
+@pytest.mark.parametrize("where, target", AR2_FOLDER_ALIASES)
+def test_ar2_folder_alias_checks_every_file_as_its_physical_equivalent(tmp_path, where, target):
+    """F1-b: re-root captured NumPy modules without imposing any alias-name shape gate."""
+    # Both extension names are taken from run 4; the data file must not become a module.
+    files = [
+        "random/_generator.cpython-312-darwin.so",
+        "linalg/_umath_linalg.cpython-312-darwin.so",
+    ]
+    root, app = run4_content_release(tmp_path / "alias", [f"numpy/{name}" for name in files])
+    tree(app, ["Contents/Frameworks/numpy/data.txt"])
+    alias = app / where
+    _symlink(alias, target, folder=True)
+    assert build.macos_link_problem(app, app / "Contents/Frameworks", alias) is None
+    physical_root, physical_app = run4_content_release(tmp_path / "physical", [])
+    tree(physical_app, [f"{where}/{name}" for name in [*files, "data.txt"]])
+    physical = app_content_paths(physical_root, physical_app)
+    assert len(physical) == len(files)
+    assert all(line.endswith(" (unexpected-module)") for line in physical)
+    recorder = _FsRecorder()
+    with pytest.MonkeyPatch.context() as patch:
+        recorder.install(patch)
+        found = app_content_paths(root, app)
+    assert found == physical
+    assert recorder.calls and recorder.admitted(app)
+    assert recorder.violations(root, tmp_path / "outside") == []
+
+
+def test_ar2_legitimate_nested_folder_alias_keeps_its_package_root(tmp_path):
+    """The admitted numpy/io -> random alias remains under the allowed NumPy package."""
+    root, app = run4_content_release(tmp_path, [RUN4_EXTENSIONS[0]])
+    _symlink(app / "Contents/Frameworks/numpy/io", "random", folder=True)
+    assert app_content_paths(root, app) == []
 
 
 def test_ar1_case_variant_file_link_uses_the_admitted_filesystem_kind(tmp_path, monkeypatch):
@@ -883,6 +927,9 @@ def test_ar1_info_plist_exempts_only_the_actual_metadata_name(tmp_path):
     assert app_content_paths(root, app) == []
     tree(app, ["Contents/Info.plist.so"])
     assert hits(app_content_paths(root, app), "Contents/Info.plist.so (unexpected-module)")
+    # The helper assertion is this test's RED on 2f69ad1d: its behavioural metadata
+    # checks already passed there. The behavioural mapping RED is covered separately
+    # by test_ar1_contents_containers_refuse_test_payloads (PlugIns/tests included).
     assert build._app_bundle_parts(("Contents", "Info.plist")) == (["Info.plist"], False)
 
 
@@ -3483,7 +3530,9 @@ class _FsRecorder:
     records only its first link, not each intermediate link admitted by the walk. On the
     pre-fold run-4 app Reviewer A observed 105 false alarms on 25 paths, all shared-rule
     post-admission calls (QtCore.framework/Versions/Current/QtCore, pillow_heif .dylibs).
-    Covered shape 5 remains the direct run-4 mirrors; no recorder logic is changed.
+    Covered shape 5 remains the direct run-4 mirrors; shape 6 adds the five A r2 direct
+    folder aliases in :func:`test_ar2_folder_alias_checks_every_file_as_its_physical_equivalent`
+    (no intermediate-link chains). No recorder logic is changed.
     """
 
     def __init__(self) -> None:
@@ -3806,7 +3855,9 @@ def test_no_following_call_before_the_walk_admits_the_links(tmp_path, monkeypatc
     shape's admitted links. Evidence for these shapes, not a proof of every following call.
     The notices inventory is onedir-only (it requires ``_internal``), so it never
     enumerates a ``.app``. The run-4 content-only shape (Frameworks extensions and Resources
-    mirror links) is :func:`test_run4_content_recorder_on_extensions_and_resource_mirrors`."""
+    mirror links) is :func:`test_run4_content_recorder_on_extensions_and_resource_mirrors`.
+    Shape 6's five direct folder aliases are recorded separately by
+    :func:`test_ar2_folder_alias_checks_every_file_as_its_physical_equivalent`."""
     folder, links, admitted = LINK_SHAPES[shape](tmp_path)
     zone = tmp_path / "wrapper" / "outside"
     executable = folder / "Contents/MacOS/Clearwater"
