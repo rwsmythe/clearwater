@@ -860,6 +860,130 @@ def test_ar2_legitimate_nested_folder_alias_keeps_its_package_root(tmp_path):
     assert app_content_paths(root, app) == []
 
 
+AR3_RANDOM_MODULES = tuple(
+    f"{name}.cpython-312-darwin.so"
+    for name in (
+        "bit_generator",
+        "_pcg64",
+        "_mt19937",
+        "_philox",
+        "_bounded_integers",
+        "mtrand",
+        "_common",
+        "_sfc64",
+        "_generator",
+    )
+)
+AR3_FOLDER_ALIASES = (
+    ("Contents/Frameworks/foo-bar", "holder", "inner", "unexpected-module"),
+    ("Contents/MacOS/foo-bar", "holder", "inner", "unexpected-module"),
+    ("Contents/Resources/foo-bar", "holder", "inner", "unexpected-module"),
+    ("Contents/Frameworks/foo", "holder", "inner", "unexpected-module"),
+    ("Contents/Frameworks/io", "holder", "inner", "shadow"),
+    ("Contents/Frameworks/foo-bar", "h3", "a/b", "unexpected-module"),
+)
+
+
+def ar3_nested_folder_release(tmp_path, holder="holder", inner="inner"):
+    """Use run-4 random modules behind an admitted nested folder link."""
+    root, app = run4_content_release(
+        tmp_path, [f"numpy/random/{name}" for name in AR3_RANDOM_MODULES]
+    )
+    target = "../" * len(PurePosixPath(inner).parts) + "random"
+    _symlink(app / f"Contents/Frameworks/numpy/{holder}/{inner}", target, folder=True)
+    return root, app
+
+
+@pytest.mark.parametrize("where, holder, inner, rule", AR3_FOLDER_ALIASES)
+def test_ar3_nested_folder_alias_matches_materialised_copy(
+    tmp_path, monkeypatch, where, holder, inner, rule
+):
+    """F1-c: modules reached through nested folder links retain every alias component."""
+    root, app = ar3_nested_folder_release(tmp_path / "alias", holder, inner)
+    prefix = "" if "/Frameworks/" in where else "../Frameworks/"
+    _symlink(app / where, f"{prefix}numpy/{holder}", folder=True)
+    physical_root, physical_app = run4_content_release(tmp_path / "physical", [])
+    tree(physical_app, [f"{where}/{inner}/{name}" for name in AR3_RANDOM_MODULES])
+    physical = app_content_paths(physical_root, physical_app)
+    assert len(physical) == 9 and all(line.endswith(f" ({rule})") for line in physical)
+    recorder = _FsRecorder()
+    real_problem, real_view = build.macos_link_problem, build.macos_link_view
+
+    def own_problem(app, frameworks, path):
+        recorder.note("own-admit", path, False)
+        return real_problem(app, frameworks, path)
+
+    def own_view(path, **kwargs):
+        recorder.note("own-view", path, False)
+        return real_view(path, **kwargs)
+
+    monkeypatch.setattr(build, "macos_link_problem", own_problem)
+    monkeypatch.setattr(build, "macos_link_view", own_view)
+    with pytest.MonkeyPatch.context() as patch:
+        recorder.install(patch)
+        found = app_content_paths(root, app)
+    assert found == physical
+    assert recorder.violations(root, tmp_path / "outside") == []
+    nested = app / f"Contents/Frameworks/numpy/{holder}/{inner}"
+    own = next(i for i, call in enumerate(recorder.calls) if call[:2] == ("own-admit", str(nested)))
+    accesses = [
+        i
+        for i, (name, path, follows) in enumerate(recorder.calls)
+        if path == str(nested) and (name == "own-view" or (name == "stat" and follows))
+    ]
+    assert accesses and own < min(accesses)
+
+
+def test_ar3_holder_alone_and_sibling_aliases_stay_allowed(tmp_path):
+    """The physical nested link and sibling aliases of its target are not folder loops."""
+    root, app = ar3_nested_folder_release(tmp_path)
+    assert app_content_paths(root, app) == []
+    _symlink(app / "Contents/Frameworks/numpy/holder/second", "../random", folder=True)
+    _symlink(app / "Contents/Frameworks/numpy/io", "random", folder=True)
+    assert app_content_paths(root, app) == []
+
+
+@pytest.mark.parametrize("through_alias", [False, True], ids=["physical", "alias"])
+def test_ar3_self_containing_folder_is_refused(tmp_path, through_alias):
+    """F1-c: an admitted folder link cannot recursively contain its own location."""
+    root, app = run4_content_release(tmp_path, [RUN4_EXTENSIONS[0]])
+    _symlink(app / "Contents/Frameworks/numpy/holder/up", "..", folder=True)
+    if through_alias:
+        _symlink(app / "Contents/Frameworks/foo-bar", "numpy/holder", folder=True)
+    found = app_content_paths(root, app)
+    assert hits(found, " (link: folder loop)")
+    if through_alias:
+        assert hits(found, "Contents/Frameworks/foo-bar/up (link: folder loop)")
+
+
+def test_ar3_refused_nested_link_is_reported_without_following_it(tmp_path, monkeypatch):
+    """A nested link's own refusal is reported at the alias without a following query."""
+    root, app = ar3_nested_folder_release(tmp_path)
+    alias = app / "Contents/Frameworks/foo-bar"
+    _symlink(alias, "numpy/holder", folder=True)
+    nested = app / "Contents/Frameworks/numpy/holder/inner"
+    real_problem, real_view, real_stat = build.macos_link_problem, build.macos_link_view, os.stat
+    assert real_problem(app, app / "Contents/Frameworks", alias) is None
+
+    def refuse(app, frameworks, path):
+        return "planted nested refusal" if path == nested else real_problem(app, frameworks, path)
+
+    def view(path, **kwargs):
+        assert path != nested, "refused link was listed"
+        return real_view(path, **kwargs)
+
+    def query(path, *args, **kwargs):
+        assert Path(path) != nested or not kwargs.get("follow_symlinks", True)
+        return real_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(build, "macos_link_problem", refuse)
+    monkeypatch.setattr(build, "macos_link_view", view)
+    monkeypatch.setattr(os, "stat", query)
+    found = app_content_paths(root, app)
+    assert hits(found, "Frameworks/foo-bar/inner (link: planted nested refusal)")
+    assert not hits(found, "Frameworks/foo-bar/inner/")
+
+
 def test_ar1_case_variant_file_link_uses_the_admitted_filesystem_kind(tmp_path, monkeypatch):
     """F2: model case-insensitive I/O with POSIX-style case-sensitive path keys on any OS."""
     root, app = run4_content_release(tmp_path, [RUN4_EXTENSIONS[0]])
@@ -3532,7 +3656,9 @@ class _FsRecorder:
     post-admission calls (QtCore.framework/Versions/Current/QtCore, pillow_heif .dylibs).
     Covered shape 5 remains the direct run-4 mirrors; shape 6 adds the five A r2 direct
     folder aliases in :func:`test_ar2_folder_alias_checks_every_file_as_its_physical_equivalent`
-    (no intermediate-link chains). No recorder logic is changed.
+    (no intermediate-link chains). Shape 7 adds the six A r3 nested folder aliases in
+    :func:`test_ar3_nested_folder_alias_matches_materialised_copy` (each link direct,
+    not an intermediate hop in another link's target). No recorder logic is changed.
     """
 
     def __init__(self) -> None:
@@ -3857,7 +3983,8 @@ def test_no_following_call_before_the_walk_admits_the_links(tmp_path, monkeypatc
     enumerates a ``.app``. The run-4 content-only shape (Frameworks extensions and Resources
     mirror links) is :func:`test_run4_content_recorder_on_extensions_and_resource_mirrors`.
     Shape 6's five direct folder aliases are recorded separately by
-    :func:`test_ar2_folder_alias_checks_every_file_as_its_physical_equivalent`."""
+    :func:`test_ar2_folder_alias_checks_every_file_as_its_physical_equivalent`; shape 7's
+    six nested aliases by :func:`test_ar3_nested_folder_alias_matches_materialised_copy`."""
     folder, links, admitted = LINK_SHAPES[shape](tmp_path)
     zone = tmp_path / "wrapper" / "outside"
     executable = folder / "Contents/MacOS/Clearwater"
