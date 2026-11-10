@@ -2588,6 +2588,7 @@ release run would fail. The fault is in the ruling's wording.
 - `:1079` `evaluate_if`: a small recursive-descent evaluator over `success()`, `cancelled()` (always false here), `always()`, `env.X`, `inputs.X`, string literals, `!`, `&&`, `||`, `==` / `!=` (string vs string, case-insensitive), and parentheses.
   - GitHub's implicit `success() &&` applies when no status function appears; no `if:` = `success()`.
   - Any other function, context, operator, literal, a non-string comparison or a broken wrapper raises `UnknownExpressionError`: conservative refusal.
+  - Qualified at the A r9 fold: the guarantee holds with GitHub's precedence (`!` over `==` / `!=` over `&&` over `||`), which `eeefd4cf` did not have. A comparison with a boolean or null operand (e.g. `!env.X == 'false'`) and a chained comparison are refused, not coerced.
 - `:1232` `_walk` evaluates the REAL `if:` of every step in order; a reached step fails only if it is the case's failing step.
 - `:1244` `_mode_violations` reports a reached list other than `MODE_REACHED`, or a reached step that reads `macos.log` before any reached step produced it (`tee work/evidence/macos.log`).
 - `:1275` the four cases:
@@ -2627,4 +2628,18 @@ release run would fail. The fault is in the ruling's wording.
 - Suspected: release mode with the switch OFF (refused by the version step) still runs the build without FFmpeg after that failure. True, and it is the ruling's unchanged condition: the job fails at the version step either way, and no release asset is staged.
 - Nothing new on a second pass.
 
-Depth at A-r8-fold yield: DISPATCHER TO FILL
+#### A r9 minor
+
+A r9 on `eeefd4cf` found no critical or major issue and passed CHECKs 1 and 3-6. Its one MINOR: `evaluate_if` gave comparisons precedence over `!`, so `!env.X == 'false'` with X = 'true' evaluated True, whereas GitHub reads `(!'true') == 'false'`.
+
+- **Fix** (`58596e3b`, `tests/test_release_workflow.py` only): the grammar is now or -> and -> comparison (`:1142`, its operands from `negation`) -> unary (`:1154`, `!` unary | primary) -> primary. Under the string-only comparison policy, a boolean operand raises `UnknownExpressionError` ("compares False with 'false'").
+- **New tests:**
+  - `:1338` the reviewer's expression, bare and wrapped, must raise.
+  - `:1347` `!(env.X == 'a')`, bare and wrapped, evaluates correctly: X = 'a' / 'A' -> False, 'b' -> True, and False after a failed step (implicit `success()`).
+- **Results:** the four mode cases, the A r8 control and every earlier evaluator case pass unchanged. `tests/test_release_workflow.py` 122 passed (117 + 5).
+- **RED at `eeefd4cf`:** `eeefd4cf`'s `evaluate_if` was swapped into the head file for one run, then restored (`cmp` equal). 2 failed (both must-raise cases, `DID NOT RAISE`), 27 passed: the parenthesized case, the four mode cases, the control and the earlier evaluator cases.
+- **Static:** `ruff check .` all passed; `ruff format --check .` 339 files already formatted; `mypy` and `mypy --platform darwin` no issues in 166 source files. Blobs 0 CR.
+
+Depth at A-r8-fold yield: 239,708 (wp65-cell15, read by the dispatcher with cell_depth.py at its A-r8-fold return)
+
+Depth at A-r9-fold yield: DISPATCHER TO FILL
