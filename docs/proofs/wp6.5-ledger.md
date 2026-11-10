@@ -2414,7 +2414,7 @@ byte-identical; `MACOS_FFMPEG_BUNDLED` stays "false". Scratch `work\wp6.5\run2fi
 
 | # | Test | Figure |
 |---|---|---|
-| 1 (C2) | `test_fixtures.py::test_stills_files_and_mask_regenerate_byte_identically` | 4 of 78 differ, all HEIC AD-24 (uint8 64x96x3): `-both` max 2 / p99 1 / nonzero 489; `-exif-only` 2 / 1 / 489; `-irot-only` 2 / 1 / 489; `-neither` 3 / 1 / 555; libheif 1.23.6, x265 4.3+1-e9b8812, libde265 1.1.3 |
+| 1 (C2) | `test_fixtures.py::test_stills_files_and_mask_regenerate_byte_identically` | 4 of 78 differ, all HEIC AD-24, decoded uint8 (shape per entry, `parallel.log:166-169`): `-both` (64, 96, 3) max 2 / p99 1 / nonzero 489; `-exif-only` (96, 64, 3) 2 / 1 / 489; `-irot-only` (64, 96, 3) 2 / 1 / 489; `-neither` (64, 96, 3) 3 / 1 / 555 (corrected at the A r8 fold: not all 64x96x3); libheif 1.23.6, x265 4.3+1-e9b8812, libde265 1.1.3 |
 | 2 (C16) | `test_wp321_fft_gaussian.py::...bit_for_bit_cpu[shape1-32.0]` | max abs 1.788e-07, p99 5.96e-08, nonzero 102,925 of 6,236,289; inside 1e-5; control `FFT_BATCH_LINES=516` max 1.49e-07, nonzero 9,996, not bit-identical; numpy 2.5.4, scipy 1.18.1 |
 | 3 | `test_jobs_export_process.py::test_an_exception_from_the_progress_kills_the_worker` | "the beat file stayed empty" (`:177`, read at `:1131`) after the worker kill |
 | 4 | `test_tools_package_smoke.py::test_non_windows_containment_never_silently_skips` | expected `b: SURVIVORS`; got `b: native containment failed: [Errno 1] Operation not permitted` (SURVIVORS raised at `smoke.py:254`, then the cleanup's `killpg(pgid, 0)` at `:221` raised EPERM) |
@@ -2557,4 +2557,74 @@ Pass 1:
 
 Pass 2 over the six items and the tests: nothing new. Loop ended.
 
-Depth at run-2-fix yield: DISPATCHER TO FILL
+Depth at run-2-fix yield: 207,998 (wp65-cell15, read by the dispatcher with cell_depth.py at its run-2-fix return)
+
+### Fold (A r8)
+
+Reviewer A r8 on `2e98ca1c`: 1 MAJOR, 1 MINOR; CHARC's corrected ruling `7910e7df`. Commit
+`bdf369ee` (`.github/workflows/macos-build.yml`, `tests/test_release_workflow.py`) and this
+ledger. Only `tests/test_release_workflow.py` was run.
+
+**MAJOR (A r8, `macos-build.yml:143` at `2e98ca1c`):** the continuation keyed on the bundling
+switch skipped "Run macOS tests on the built bundle" with the switch ON. That step is the only
+producer of `work/evidence/macos.log`, which "Check macOS skip reasons" reads, so a successful
+release run would fail. The fault is in the ruling's wording.
+
+**Fix.** The mode is `inputs.release-version`, set only by release.yml's `workflow_call`.
+
+- These four steps now carry `if: ${{ success() || (!cancelled() && !inputs.release-version) }}` (`!inputs.release-version`, not `== ''`):
+  - "Run serial tests" (`:125`);
+  - "Run macOS tests on the built bundle" (`:145`);
+  - "Check macOS skip reasons" (`:161`, which had no `if:` before);
+  - "Capture runner and encoder facts" (`:178`).
+- "Build app bundle without FFmpeg" keeps `${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}` (`:132`).
+- In release mode every step runs under `success()`, as at `69538abe`.
+- The job comment (`:38-46`) is rewritten.
+- No `continue-on-error` anywhere; release.yml untouched (its sha256 is still pinned).
+
+**Guard** (`tests/test_release_workflow.py`):
+
+- `:975` `MACOS_STEP_CONDITIONS`: the new exact map.
+- `:1079` `evaluate_if`: a small recursive-descent evaluator over `success()`, `cancelled()` (always false here), `always()`, `env.X`, `inputs.X`, string literals, `!`, `&&`, `||`, `==` / `!=` (string vs string, case-insensitive), and parentheses.
+  - GitHub's implicit `success() &&` applies when no status function appears; no `if:` = `success()`.
+  - Any other function, context, operator, literal, a non-string comparison or a broken wrapper raises `UnknownExpressionError`: conservative refusal.
+- `:1232` `_walk` evaluates the REAL `if:` of every step in order; a reached step fails only if it is the case's failing step.
+- `:1244` `_mode_violations` reports a reached list other than `MODE_REACHED`, or a reached step that reads `macos.log` before any reached step produced it (`tee work/evidence/macos.log`).
+- `:1275` the four cases:
+  1. release, all success: everything but the build without FFmpeg, with the bundle tests (the producer) before the skip-reason check (the reader), and staging and upload reached;
+  2. release, a failed parallel leg: only "Upload evidence" after it, as at `69538abe`;
+  3. validation, switch off, a failed leg: serial, the build without FFmpeg, the bundle tests, the skip reasons, the facts, the evidence upload;
+  4. validation, switch on, a failed leg: the same without the build, and NOT staging or upload.
+- `:1286` the control: `2e98ca1c`'s conditions rebuilt in the text fail case 1 with "Check macOS skip reasons reads work/evidence/macos.log before any reached step produced it".
+- `:1327` nine refused forms: `failure()`, `github.ref`, `steps.*`, `contains(...)`, `null`, `>`, a dangling `||`, an unclosed `(` and a broken `${{ }`.
+- `:1349` ten known-form evaluations.
+- `:1368` the planted-breach controls, re-aimed: "capture-keyed-on-the-switch" plants the A r8 form.
+- `:1576` `SWITCH_GATES` admits the new condition (it runs with the switch "false").
+
+**RED on `2e98ca1c`** (its `macos-build.yml` swapped in, restored, `cmp` equal):
+`test_both_modes_reach_the_ruled_steps_by_evaluation` 4 failed:
+
+- (1) release-all-success: missing the bundle tests and the facts, AND the skip-reason check reads `macos.log` before it is produced (the MAJOR).
+- (2) release-failed-leg: extra "Run serial tests". `2e98ca1c`'s bare `!cancelled()` ran the serial leg in release mode after a failure, unlike `69538abe`.
+- (3) validation-off-failed-leg: missing the skip-reason check.
+- (4) validation-on-failed-leg: missing the bundle tests, the skip-reason check and the facts.
+
+**GREEN at `bdf369ee`:** `tests/test_release_workflow.py` 117 passed (93 + 24: four cases, one control, nine refusals, ten known forms).
+
+**MINOR (A r8, ledger `:2417`):** the four HEIC entries are not all 64x96x3; `heic-ad24-exif-only` decoded as (96, 64, 3) (runner `parallel.log:167`). The runner-figures row now gives each entry's shape. The code was right: the bound requires the committed shape per entry, never 64x96x3.
+
+**Static:**
+
+- `ruff check .` all passed.
+- `ruff format --check .` 339 files already formatted.
+- `mypy` and `mypy --platform darwin` no issues in 166 source files.
+- Blobs 0 CR.
+- actionlint not run (the seat's).
+
+**Verification (self):**
+
+- Suspected: a push run's `inputs` context is empty and `workflow_dispatch` defines no `release-version`. Both read as null, so `!inputs.release-version` is true. That is validation mode, as intended.
+- Suspected: release mode with the switch OFF (refused by the version step) still runs the build without FFmpeg after that failure. True, and it is the ruling's unchanged condition: the job fails at the version step either way, and no release asset is staged.
+- Nothing new on a second pass.
+
+Depth at A-r8-fold yield: DISPATCHER TO FILL
