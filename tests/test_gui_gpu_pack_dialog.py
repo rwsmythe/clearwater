@@ -50,13 +50,27 @@ def _platform_words(platform: str) -> str:
     return f"{_PLATFORM_OS[match['os']]}/{match['arch']}"
 
 
-def lock_gap(tags: tuple[str, str] | None = None) -> str | None:
-    """Return why the GPU pack lock cannot be planned for ``tags``, or None when it can.
+def _fits_the_platform(tag: str, interpreter: str, platform: str) -> bool:
+    """Whether a wheel tag's PLATFORM part fits, its python and ABI parts set aside.
 
-    The reading is the lock's own, through the tag fit ``gpu_pack_install.plan()`` uses: a locked
-    distribution none of whose wheels has a tag that ``gpu_pack.tag_fits`` the interpreter and
-    platform tags leaves ``plan()`` with "0 compatible locked wheels". More than one fitting
-    wheel is a lock defect, not a platform gap, so it is not a reason to skip.
+    The platform part is read through ``gpu_pack.tag_fits`` itself (``any``, the exact tag, a
+    ``manylinux`` tag for the same machine), with the python and ABI parts replaced by
+    ``py3-none``, which every CPython 3 interpreter tag accepts.
+    """
+    return gpu_pack.tag_fits(f"py3-none-{tag.split('-')[-1]}", interpreter, platform)
+
+
+def lock_gap(tags: tuple[str, str] | None = None) -> str | None:
+    """Return why the GPU pack lock carries nothing for the PLATFORM in ``tags``, or None.
+
+    The reading is the lock's own, through the tag expansion ``gpu_pack_install.plan()`` uses
+    (``_wheel_tags``) and the platform part of ``gpu_pack.tag_fits``: a locked distribution
+    none of whose wheels has a tag for this platform is a platform gap, and the test skips.
+    An interpreter or ABI miss on a platform the lock has wheels for (``cp313`` on
+    ``win_amd64``) is NOT a gap (WP6.5 A r11 #3): the test runs and ``plan()`` fails it. So is
+    more than one fitting wheel, a lock defect. The reading is per distribution, as ``plan()``
+    fails per distribution; a pure-Python ``any`` wheel (``cuda-pathfinder``) fits every
+    platform, so a whole-lock reading would never skip.
 
     Args:
         tags: ``(interpreter, platform)`` as ``gpu_pack.platform_tags()`` returns them; the
@@ -71,7 +85,7 @@ def lock_gap(tags: tuple[str, str] | None = None) -> str | None:
             row[0]
             for row in distribution.wheels
             if any(
-                gpu_pack.tag_fits(tag, interpreter, platform)
+                _fits_the_platform(tag, interpreter, platform)
                 for tag in gpu_pack_install._wheel_tags(row[0])
             )
         ]
@@ -504,28 +518,35 @@ def test_without_loaded_status_gui_uses_normal_remove(
 
 
 @pytest.mark.parametrize(
-    ("tags", "words"),
+    ("tags", "words", "plans"),
     [
-        (("cp312", "win_amd64"), None),
-        (("cp312", "linux_x86_64"), None),
-        (("cp312", "macosx_14_0_arm64"), "darwin/arm64"),
-        (("cp312", "macosx_15_0_x86_64"), "darwin/x86_64"),
-        (("cp313", "win_amd64"), "win32/amd64"),
+        (("cp312", "win_amd64"), None, True),
+        (("cp312", "linux_x86_64"), None, True),
+        (("cp312", "macosx_14_0_arm64"), "darwin/arm64", False),
+        (("cp312", "macosx_15_0_x86_64"), "darwin/x86_64", False),
+        (("cp313", "win_amd64"), None, False),
     ],
     ids=["win-cp312", "linux-cp312", "mac-arm64", "mac-x86_64", "win-cp313"],
 )
-def test_the_lock_decides_the_skip_as_plan_does(monkeypatch, tags, words):
-    """WP6.5 run 3 S2: a tag pair the lock carries means no skip; one it does not means skip.
+def test_the_lock_decides_the_skip_as_plan_does(monkeypatch, tags, words, plans):
+    """WP6.5 run 3 S2, A r11 #3: only a platform the lock has no wheels for skips.
 
-    ``plan()`` is run on the same tags, so the skip reading and the planner agree.
+    ``plan()`` is run on the same tags. An interpreter the lock does not carry on a platform
+    it does (``win-cp313``) is no skip: the test runs and ``plan()`` fails it.
     """
     monkeypatch.setattr(gpu_pack, "platform_tags", lambda: tags)
     reason = lock_gap()
     assert reason == lock_gap(tags)
     if words is None:
         assert reason is None
-        assert gpu_pack_install.plan().wheels
+        require_locked_wheels()  # no skip
+        if plans:
+            assert gpu_pack_install.plan().wheels
+        else:
+            with pytest.raises(ValueError, match="cupy-cuda12x: 0 compatible locked wheels"):
+                gpu_pack_install.plan()
     else:
+        assert not plans
         assert reason == (
             f"GPU pack lock carries no wheels for {words} (cupy-cuda12x; tags {tags[0]}, {tags[1]})"
         )
