@@ -1329,8 +1329,14 @@ def darwin_app(tmp_path, monkeypatch):
         plan_notices=lambda folder: plans.append(folder) or SimpleNamespace(entries=[1], rows=[1]),
         render_notices=lambda plan: b"NOTICES",
     )
+    content_checks = []
+
+    def content_paths(root, *, app=None):
+        content_checks.append((root, app))
+        return []
+
     monkeypatch.setattr(smoke, "_notices_tool", lambda: notices)
-    monkeypatch.setattr(build, "forbidden_paths", lambda root: [])
+    monkeypatch.setattr(build, "forbidden_paths", content_paths)
     monkeypatch.setattr(build, "forbidden_entries", lambda executable: [])
     monkeypatch.setattr(build, "pack_sources", lambda: pytest.fail("darwin scanned the pack"))
     monkeypatch.setattr(build, "missing_hidden_imports", lambda executable, wanted: [])
@@ -1371,7 +1377,13 @@ def darwin_app(tmp_path, monkeypatch):
 
     prepare()
     return SimpleNamespace(
-        smoke=smoke, app=app, release=release, prepare=prepare, config=config, plans=plans
+        smoke=smoke,
+        app=app,
+        release=release,
+        prepare=prepare,
+        config=config,
+        plans=plans,
+        content_checks=content_checks,
     )
 
 
@@ -1387,6 +1399,7 @@ def test_darwin_smoke_runs_every_row_on_the_app_and_preserves_its_bytes(
     before = snapshot(case.app)
     case.smoke.run_smoke(case.release, out=tmp_path / "out")
     assert snapshot(case.app) == before
+    assert case.content_checks == [(case.app, case.app)]
     calls = _calls(case)
     macos = case.app / "Contents" / "MacOS"
     assert [call["args"] for call in calls[:10]] == [args for args, _ in REFUSALS]

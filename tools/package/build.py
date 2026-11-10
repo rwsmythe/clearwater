@@ -583,7 +583,66 @@ def _bundle_parts(parts: Sequence[str]) -> tuple[list[str], bool]:
     return rest, False
 
 
-def forbidden_paths(root: Path) -> list[str]:
+def _app_bundle_parts(parts: Sequence[str]) -> tuple[list[str], bool]:
+    """Map paths inside a .app to its frozen-path folders or executable folder."""
+    rest = list(parts)
+    if len(rest) > 2 and rest[0] == "Contents" and rest[1] in _APP_FOLDERS:
+        return rest[2:], rest[1] != "MacOS"
+    return rest, False
+
+
+def _app_forbidden_paths(root: Path, app: Path) -> list[str]:
+    """Check the shared non-following release listing, admitting links before resolution.
+
+    Only physical files are opened for ZIP checks. A link is checked by its own name and
+    its admitted target's kind in the same listing; it is never opened. Physical folders
+    are implicit in that listing, so their names are checked as ancestors of its entries.
+    """
+    entries = _macos_app_entries(root)
+    real_root = Path(os.path.realpath(root))
+    kinds = {real_root / path.relative_to(root): kind for path, kind in entries}
+    found: list[str] = []
+    for path, kind in entries:
+        relative = path.relative_to(root)
+        label = f"dist:{relative.as_posix()}"
+        inside_app = path.is_relative_to(app)
+        local = path.relative_to(app).parts if inside_app else relative.parts
+        parts, frozen = _app_bundle_parts(local) if inside_app else _bundle_parts(local)
+        metadata = inside_app and (
+            local in (("Contents", "Info.plist"), ("Contents", "PkgInfo"))
+            or local[:2] == ("Contents", "_CodeSignature")
+        )
+        file_kind = kind
+        if kind == "link":
+            problem = (
+                macos_link_problem(app, app / "Contents/Frameworks", path)
+                if inside_app and path != app
+                else "link at or outside the .app root"
+            )
+            if problem is not None:
+                found.append(f"{label} (link: {problem})")
+                file_kind = "link"
+            else:
+                # The component walk has admitted every link on this path. The canonical
+                # listing gives the target kind without an is_file/is_dir query; physical
+                # folders have no entry, and the rule already proved the target exists.
+                file_kind = kinds.get(Path(os.path.realpath(path)), "folder")
+        rules = name_violations(parts, module_root=file_kind == "file" and not metadata)
+        if (
+            file_kind == "file"
+            and not frozen
+            and not metadata
+            and path.name.lower().endswith(MODULE_SUFFIXES)
+            and "unexpected-module" not in rules
+        ):
+            rules.append("unexpected-module")
+        found += [f"{label} ({rule})" for rule in rules]
+        if kind == "file" and (_is_zip_name(path.name) or _starts_with_zip_magic(path)):
+            found += zip_violations(path, label, module_root=frozen and len(parts) == 1)
+    return sorted(found)
+
+
+def forbidden_paths(root: Path, *, app: Path | None = None) -> list[str]:
     """Return every bundled file or folder, or ZIP member, that breaks a bundle rule.
 
     Every path under ``root`` is checked by :func:`name_violations` on all its components;
@@ -591,10 +650,15 @@ def forbidden_paths(root: Path) -> list[str]:
 
     Args:
         root: The release folder.
+        app: The .app path, selected lexically from the executable by the caller. When
+            provided, use the shared non-following listing of ``root`` (which may also be
+            the .app itself). None keeps the onedir/Windows filesystem calls unchanged.
 
     Returns:
         Violations as ``dist:<path> (<rule>)``, sorted; empty when clean.
     """
+    if app is not None:
+        return _app_forbidden_paths(root, app)
     found: list[str] = []
     for path in sorted(root.rglob("*")):
         relative = path.relative_to(root)
@@ -4209,6 +4273,17 @@ def _macos_layout(executable: Path) -> tuple[Path, Path]:
     return executable.parent, executable.parent / "_internal"
 
 
+def _macos_content_app(executable: Path) -> Path | None:
+    """Select the content check's .app form from executable path text, without I/O."""
+    if (
+        executable.parent.name == "MacOS"
+        and executable.parent.parent.name == "Contents"
+        and executable.parents[2].suffix == ".app"
+    ):
+        return executable.parents[2]
+    return None
+
+
 _APP_FOLDERS = ("Frameworks", "Resources", "MacOS")
 
 
@@ -5394,7 +5469,10 @@ def build(
         "verified FFmpeg and bootloader)"
     )
     check_start = time.monotonic()
-    bad = forbidden_paths(root) + forbidden_entries(executable)
+    app = _macos_content_app(executable)
+    bad = (
+        forbidden_paths(root) if app is None else forbidden_paths(root, app=app)
+    ) + forbidden_entries(executable)
     missing = missing_hidden_imports(executable, wanted)
     check_wall = time.monotonic() - check_start
     print(f"build {form}: wall {wall:.1f} s; executable {executable}")
@@ -5408,7 +5486,9 @@ def build(
             print(f"  {line}")
     if bad:
         print(f"FORBIDDEN in the bundle ({len(bad)}):")
-        for name in bad[:50]:
+        # The runner tees stdout to build.log. Keep its full macOS evidence list; the
+        # onedir/Windows printer retains its existing cap and bytes.
+        for name in bad[:50] if app is None else bad:
             print(f"  {name}")
     if missing or bad:
         return 1

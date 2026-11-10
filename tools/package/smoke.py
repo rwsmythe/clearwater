@@ -1088,7 +1088,9 @@ def _macos_static_checks(bundle: Path, executable: Path) -> None:
     """
     build = _build_tool()
     try:
-        bad = build.forbidden_paths(bundle) + build.forbidden_entries(executable)
+        bad = build.forbidden_paths(
+            bundle, app=build._macos_content_app(executable)
+        ) + build.forbidden_entries(executable)
         if bad:
             raise ValueError("; ".join(bad))
     except (OSError, ValueError, zipfile.BadZipFile) as error:

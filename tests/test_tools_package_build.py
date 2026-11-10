@@ -17,6 +17,7 @@ import builtins
 import hashlib
 import importlib.metadata
 import importlib.util
+import inspect
 import io
 import json
 import marshal
@@ -672,6 +673,148 @@ def test_the_products_own_modules_and_the_stdlib_pass(tmp_path: Path) -> None:
         ],
     )
     assert build.forbidden_entries(executable) == []
+
+
+# WP6.5 run 4: literal names/links from work/wp6.5/run4-stage/app-listing.txt.
+# Keep these small fixtures here, independent of the uncommitted runner evidence.
+RUN4_EXTENSIONS = (
+    "numpy/random/_generator.cpython-312-darwin.so",
+    "scipy/linalg/_flapack.cpython-312-darwin.so",
+    "PIL/_imaging.cpython-312-darwin.so",
+    "PySide6/QtCore.abi3.so",
+    "_pillow_heif.cpython-312-darwin.so",
+)
+RUN4_MIRRORS = (
+    ("numpy", "../Frameworks/numpy", True),
+    ("scipy", "../Frameworks/scipy", True),
+    ("PIL", "../Frameworks/PIL", True),
+    ("PySide6/QtCore.abi3.so", "../../Frameworks/PySide6/QtCore.abi3.so", False),
+    (
+        "_pillow_heif.cpython-312-darwin.so",
+        "../Frameworks/_pillow_heif.cpython-312-darwin.so",
+        False,
+    ),
+)
+
+
+def app_content_paths(root: Path, app: Path) -> list[str]:
+    """Use the explicit app form, or the old API for the parent's RED record."""
+    if "app" in inspect.signature(build.forbidden_paths).parameters:
+        return build.forbidden_paths(root, app=app)
+    return build.forbidden_paths(root)
+
+
+def run4_content_release(tmp_path: Path, names=RUN4_EXTENSIONS) -> tuple[Path, Path]:
+    """Physical Frameworks extensions and their run-4 Resources mirror symlinks."""
+    root = tmp_path / "Clearwater-1.1.1-macos-onedir"
+    app = root / "Clearwater.app"
+    tree(app, ["Contents/MacOS/Clearwater", "Contents/Info.plist", "Contents/PkgInfo"])
+    tree(app, [f"Contents/Frameworks/{name}" for name in names], LINK_BLOB)
+    packages = {PurePosixPath(name).parts[0] for name in names}
+    for name, target, folder in RUN4_MIRRORS:
+        if PurePosixPath(name).parts[0] in packages:
+            _symlink(app / "Contents/Resources" / name, target, folder=folder)
+    return root, app
+
+
+@pytest.mark.parametrize("name", RUN4_EXTENSIONS)
+@pytest.mark.parametrize("root_is_app", [False, True], ids=["release", "app"])
+def test_run4_content_allows_framework_modules_and_resource_links(tmp_path, name, root_is_app):
+    """Frozen dependencies use their package name, for release and smoke roots."""
+    root, app = run4_content_release(tmp_path, [name])
+    assert app_content_paths(app if root_is_app else root, app) == []
+
+
+@pytest.mark.parametrize(
+    "where",
+    [
+        "Contents/Frameworks/cupy/runtime.so",
+        "Contents/Frameworks/numpy/cupy/runtime.so",
+        "Contents/Resources/PIL/cupy/runtime.so",
+        "Contents/MacOS/cupy/runtime.so",
+        "Contents/_CodeSignature/cupy/runtime.so",
+        "Contents/cupy/runtime.so",
+    ],
+)
+def test_run4_content_still_refuses_gpu_names_at_every_depth(tmp_path, where):
+    """Mapping and metadata exemptions never exempt the GPU-name rule."""
+    root, app = run4_content_release(tmp_path, [])
+    tree(app, [where])
+    assert hits(app_content_paths(root, app), f"{where} (gpu-module)")
+
+
+@pytest.mark.parametrize("where", ["Contents/MacOS/numpy.so", "Contents/numpy.so"])
+def test_run4_content_refuses_modules_outside_frozen_path_folders(tmp_path, where):
+    """Even an allowed package's extension cannot sit beside the executable."""
+    root, app = run4_content_release(tmp_path, [])
+    tree(app, [where])
+    assert hits(app_content_paths(root, app), f"{where} (unexpected-module)")
+
+
+@pytest.mark.parametrize("folder", [False, True], ids=["file", "folder"])
+def test_run4_content_checks_the_links_own_gpu_name(tmp_path, folder):
+    """An admitted alias cannot conceal a forbidden name behind an allowed target."""
+    root, app = run4_content_release(tmp_path, ["numpy/random/_generator.cpython-312-darwin.so"])
+    name = "cupy" if folder else "cupy.so"
+    target = "../Frameworks/numpy" + ("" if folder else "/random/_generator.cpython-312-darwin.so")
+    _symlink(app / "Contents/Resources" / name, target, folder=folder)
+    assert hits(app_content_paths(root, app), f"Resources/{name} (gpu-module)")
+
+
+def test_run4_content_metadata_exempts_only_the_module_root_rule(tmp_path):
+    """Info/PkgInfo and signature metadata are allowed; other name rules remain."""
+    root, app = run4_content_release(tmp_path, [])
+    tree(app, ["Contents/_CodeSignature/private.so"])
+    assert app_content_paths(root, app) == []
+    tree(app, ["Contents/_CodeSignature/libnvrtc.so"])
+    assert hits(app_content_paths(root, app), "_CodeSignature/libnvrtc.so (cuda-library)")
+
+
+def test_run4_content_checks_only_physical_archives(tmp_path, monkeypatch):
+    """ZIP suffix/magic checks open physical files; mirror links are never opened."""
+    root, app = run4_content_release(tmp_path, [])
+    archive = app / "Contents/Frameworks/base_library.zip"
+    archive.parent.mkdir(parents=True)
+    archive.write_bytes(zip_bytes({"cupy/__init__.pyc": b"x"}))
+    alias = app / "Contents/Resources/base_library.zip"
+    _symlink(alias, "../Frameworks/base_library.zip", folder=False)
+    recorder = _FsRecorder()
+    with pytest.MonkeyPatch.context() as patch:
+        recorder.install(patch)
+        found = app_content_paths(root, app)
+    assert hits(found, "Frameworks/base_library.zip!cupy/__init__.pyc (gpu-module)")
+    assert not hits(found, "Resources/base_library.zip!")
+    assert not [call for call in recorder.calls if call[0] in _OPENS and call[1] == str(alias)]
+    assert recorder.violations(root, tmp_path / "outside") == []
+
+
+def test_run4_content_recorder_on_extensions_and_resource_mirrors(tmp_path):
+    """Covered shape 5: content checks on run-4 Frameworks files and mirror links."""
+    root, app = run4_content_release(tmp_path)
+    recorder = _FsRecorder()
+    with pytest.MonkeyPatch.context() as patch:
+        recorder.install(patch)
+        found = app_content_paths(root, app)
+    assert found == []
+    assert recorder.calls
+    assert set(recorder.admitted(app)) == {
+        f"Contents/Resources/{name}" for name, _, _ in RUN4_MIRRORS
+    }
+    assert recorder.violations(root, tmp_path / "outside") == []
+
+
+def test_run4_content_refuses_a_linked_app_before_entering_it(tmp_path):
+    """A linked .app child of the release root is never used as the walk boundary."""
+    root = tmp_path / "release"
+    outside = tree(tmp_path / "outside", ["Contents/Frameworks/numpy/core.so"])
+    app = root / "Clearwater.app"
+    _symlink(app, "../outside", folder=True)
+    recorder = _FsRecorder()
+    with pytest.MonkeyPatch.context() as patch:
+        recorder.install(patch)
+        found = app_content_paths(root, app)
+    assert found
+    assert recorder.violations(root, outside) == []
 
 
 def test_the_scipy_adapter_exception_is_narrow(tmp_path: Path) -> None:
@@ -3498,7 +3641,8 @@ def _recorded_entry_points(
 ) -> tuple[_FsRecorder, list[str], list[str | None]]:
     """The public entry points on a ``.app`` under the recorder: the origin check (with
     ``original_path=path``), the release ZIP (which must refuse) and the shared rule on each
-    link. The bootloader comparison and ``read_package`` are stubs that record an ``open``."""
+    link, plus the content check. The bootloader comparison and ``read_package`` are stubs
+    that record an ``open``."""
     executable = folder / "Contents/MacOS/Clearwater"
     contents = folder / "Contents/Frameworks"
     empty = tmp_path / "python"
@@ -3526,21 +3670,23 @@ def _recorded_entry_points(
         with pytest.raises(ValueError, match="release ZIP refuses linked/junction/outside"):
             build.write_release_zip(folder, out=tmp_path / "out", source_epoch=1793908801)
         problems = [build.macos_link_problem(folder, contents, folder / link) for link in links]
+        assert app_content_paths(folder, folder)
     return recorder, found, problems
 
 
 @pytest.mark.parametrize("shape", sorted(LINK_SHAPES))
 def test_no_following_call_before_the_walk_admits_the_links(tmp_path, monkeypatch, shape):
     """A r13 / A r14 #2: the public entry points (the origin check, the release ZIP, the
-    shared rule) under the recorder (:class:`_FsRecorder`), on the COVERED SHAPES: r11's
-    out-and-back, r13's nested ``pkg/evil`` (the folder cross-link admitted) and r13's
+    shared rule, content check) under the recorder (:class:`_FsRecorder`), on the COVERED
+    SHAPES: r11's out-and-back, r13's nested ``pkg/evil`` (the folder cross-link admitted) and r13's
     linked ``Contents``; A r14's linked PATH directory is
     :func:`test_a_linked_path_candidate_is_never_followed`. Each refuses; no call FOLLOWS a
     path under the release root through a link before the walk's admission of that link
     (in the recorded order), and none touches the outside alias. The walk admits exactly the
     shape's admitted links. Evidence for these shapes, not a proof of every following call.
     The notices inventory is onedir-only (it requires ``_internal``), so it never
-    enumerates a ``.app``."""
+    enumerates a ``.app``. The run-4 content-only shape (Frameworks extensions and Resources
+    mirror links) is :func:`test_run4_content_recorder_on_extensions_and_resource_mirrors`."""
     folder, links, admitted = LINK_SHAPES[shape](tmp_path)
     zone = tmp_path / "wrapper" / "outside"
     executable = folder / "Contents/MacOS/Clearwater"
@@ -4283,6 +4429,21 @@ def test_darwin_build_scans_no_gpu_pack(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(build.sys, "platform", "win32")
     assert build.build("onedir", out=out) == 1
     assert "FAILED: the pack sources cannot be scanned" in capsys.readouterr().out
+
+
+def test_run4_content_printer_keeps_all_violations_in_runner_log(tmp_path, monkeypatch, capsys):
+    """The runner tees stdout to build.log; the macOS list must not stop at 50."""
+    bad = [f"dist:Clearwater.app/Contents/Frameworks/cupy/bad{i:03}.so" for i in range(115)]
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+    monkeypatch.setattr(build, "REPO_ROOT", REPO_ROOT)
+    monkeypatch.setattr(build, "forbidden_entries", lambda _: bad)
+    status, _ = darwin_app_build(
+        monkeypatch, tmp_path, seal=lambda _: None, origin=lambda *a, **kw: []
+    )
+    printed = capsys.readouterr().out
+    assert status == 1
+    assert "FORBIDDEN in the bundle (115):" in printed
+    assert all(f"  {name}\n" in printed for name in bad)
 
 
 def test_windows_build_never_seals(tmp_path, monkeypatch):
