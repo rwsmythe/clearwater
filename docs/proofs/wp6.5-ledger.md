@@ -3894,10 +3894,10 @@ CHARC's ruling (MINOR in the review). All five findings adjudicated; no dispute 
   entries by the physical tree's rules, with no name-shape gate (see A r2 below).
   The three r1 aliases (Frameworks/foo, Frameworks/io, MacOS/numpy) still receive their
   physical equivalents' rules, now labelled at each actual module beneath the alias.
-- **F2 MAJOR, confirmed / fixed:** `build.py:633` reads an admitted link's kind with
+- **F2 MAJOR, confirmed / fixed:** `build.py:634` reads an admitted link's kind with
   `stat.S_ISREG(os.stat(path).st_mode)` AFTER `macos_link_problem` returns None. The
   path-text kinds dictionary and its root-realpath construction are gone. ZIP checks
-  still open physical files only. `tests:819` builds the real case-variant file link
+  still open physical files only. `tests:987` builds the real case-variant file link
   `MacOS/evil.so -> ../Frameworks/NUMPY/random/_generator.cpython-312-darwin.so`. The
   test models a case-insensitive volume by mapping NUMPY to numpy in stat/lstat and
   stat-following the alias to the physical target. A realpath adapter preserves NUMPY
@@ -3907,17 +3907,17 @@ CHARC's ruling (MINOR in the review). All five findings adjudicated; no dispute 
   refuses `evil.so` as `unexpected-module`. This is a bounded filesystem model, not
   a claim of native macOS execution.
 - **F3 MAJOR, confirmed / fixed:** `build.py:586` strips Contents for every other
-  non-frozen container as well as the three existing folder mappings. `:642` also
+  non-frozen container as well as the three existing folder mappings. `:616` also
   refuses `tests` beneath non-frozen Contents containers: dropping Contents alone
-  would still miss PlugIns/tests and _CodeSignature/tests. `tests:873` covers all
-  three ruled payloads; `:880` confirms Info.plist/PkgInfo stay allowed, Info.plist
+  would still miss PlugIns/tests and _CodeSignature/tests. `tests:1041` covers all
+  three ruled payloads; `:1048` confirms Info.plist/PkgInfo stay allowed, Info.plist
   maps to `(["Info.plist"], False)`, and Info.plist.so is refused.
-- **A2 ADVISORY, confirmed / fixed:** `build.py:612` narrows the signature-metadata
+- **A2 ADVISORY, confirmed / fixed:** `build.py:604` narrows the signature-metadata
   exemption to names WITHOUT a module suffix. The revised `tests:788` first permits
   CodeResources, then refuses private.so as `unexpected-module`, and still refuses
   libnvrtc.so as `cuda-library`.
 - **A1 ADVISORY, recorded / no logic fold:** added to `_FsRecorder`'s uncovered list
-  (`tests:3482`). A chain admitted by the walk records admission for its FIRST link
+  (`tests:3654`). A chain admitted by the walk records admission for its FIRST link
   only, omitting intermediate links. Reviewer A's full pre-fold run-4 app produced
   **105 false alarms on 25 paths**, all shared-rule post-admission calls; examples
   QtCore.framework/Versions/Current/QtCore and the pillow_heif .dylibs chain. Covered
@@ -3992,21 +3992,18 @@ in full). CHARC `e162ad24` REPLACES `0317f4cb` F1; base `eee896b6`. No STOP or d
 | Codex lane A r2 | 1 MAJOR, 1 ADVISORY | F1-b in-envelope and fixed; A-r2-1 documented in its test | 2 / 0 | 0 | Product code + tests; advisory comment only | Claude at seat; CLI/transport version and dispatcher-read depth not supplied |
 
 - **F1-b MAJOR, confirmed / fixed:** `tools/package/build.py:596` factors the physical
-  entry's name rules into `_app_content_rules`, used for both physical and re-rooted
-  entries (`module_root` = frozen-and-file, with the metadata exemptions and non-frozen
-  module rule). `:655` replaces the identifier gate and synthetic `__init__.py` check
-  with `macos_link_view(path, in_app=True)` AFTER `macos_link_problem` admits the link.
-  Its relative entries are joined lexically to the alias path; every entry is judged
-  there, and nested link kinds are read from their physical paths only after admission.
-  F2's following stat after admission, F3's non-frozen Contents/tests checks and A2's
-  narrowed signature exemption remain. No shared admission or listing code changed.
-- **Contract / invariant check:** `macos_link_view` resolves the already-admitted outer
-  link and lists its physical folder target without following nested links; it returns
-  relative names, physical paths and kinds, never descends into a nested folder link.
-  Before the new caller reaches that view, `macos_link_problem` has checked every
-  nested link in the view at its re-rooted location. Consequently the added following
-  stat of a nested link occurs only after its admission. Re-rooted names themselves
-  receive only lexical operations; ZIP checks still open physical listing files only.
+  entry's name rules into `_app_content_rules`, used for physical and re-rooted entries
+  (`module_root` = frozen-and-file, metadata exemptions and non-frozen module rule).
+  `_app_link_content` at `:622` now owns the re-rooted view; its recursive nested-link
+  handling supersedes r2's one-level expansion under A r3's ruling `7a246dfd` below.
+  F2's post-admission stat (`:634`), F3's Contents/tests checks (`:616`) and A2's
+  narrowed signature exemption (`:604`) remain. Shared admission/listing code unchanged.
+- **Contract / invariant check (corrected at A r3):** `macos_link_view` lists one physical
+  target without descending through nested folder links. The r2 caller expanded only
+  that one level: this was the F1-c gap, closed by `_app_link_content`'s recursion at the
+  r3 fold head. Every nested link now receives its own `macos_link_problem` call before
+  any following query or view, and admitted folder entries are expanded recursively at
+  their re-rooted locations. ZIP checks still open physical listing files only.
 - **Regressions / recorder:** `tests/test_tools_package_build.py:830` uses two literal
   NumPy extension names from the run-4 listing plus non-module data, real files and
   real POSIX-text `os.symlink` links, independent of gitignored evidence. All FIVE
@@ -4017,7 +4014,7 @@ in full). CHARC `e162ad24` REPLACES `0317f4cb` F1; base `eee896b6`. No STOP or d
   no recorder logic changed. These direct aliases do not hit A1's chain limitation.
   `:856` keeps the legitimate nested numpy/io -> random alias clean; r1's three alias
   tests now compare actual re-rooted module paths rather than synthetic package labels.
-- **A-r2-1 ADVISORY, addressed:** `tests:924` explains explicitly why the Info.plist
+- **A-r2-1 ADVISORY, addressed:** `tests:1048` explains explicitly why the Info.plist
   helper assertion is its RED on `2f69ad1d`; its behavioural assertions already passed
   there. The existing PlugIns/tests test supplies the separate behavioural mapping RED.
 
@@ -4062,7 +4059,7 @@ in full). CHARC `e162ad24` REPLACES `0317f4cb` F1; base `eee896b6`. No STOP or d
 xdist scheduling can first import PyInstaller in
 `test_darwin_build_bundles_from_the_macos_lock_and_refuses_release_while_census_pending`
 while `macos_bundle` has patched Popen to `never_run`. PyInstaller's cold import calls
-`platform.win32_ver`, which executes `ver`; the fixture rejects it at `tests:5595`.
+`platform.win32_ver`, which executes `ver`; the fixture rejects it at `tests:5722`.
 The single test on PARENT `eee896b6` reproduces the identical failure (**1 failed,
 754 deselected**, `ar2-parent-cold-import.log`). This is not a product regression or a
 sandbox failure. No fixture change made. Keeping each module on one worker via
@@ -4083,3 +4080,96 @@ One logical fold plus tests and ledger; no commit, src/interface/workflow/depend
 shared admission/listing, notices, fixture-bytes/debt/C14 change; no frozen run, real
 bin/FFmpeg access, desktop input, network action, other-worktree read, or footage/profile
 write. All evidence written inside this worktree. Dispatcher-read depth not supplied.
+
+
+### A r3 fold
+
+Claude Reviewer A r3 read in full from
+`C:/Users/rwsmy/clearwater-review-evidence/wp6.5/A-codex/r3/review.txt`.
+Base `6dc8c000`; folded under CHARC `7a246dfd`. No STOP or dispute.
+
+| Round | Severity counts | Scope / disposition | NEW / REOPENED | Reverts | Fix kind | Reviewer / depth |
+| --- | --- | --- | --- | --- | --- | --- |
+| Codex lane A r3 | 1 MAJOR, 2 ADVISORY | F1-c in-envelope and fixed; A-r3-1 accepted; A-r3-2 ledger corrected | 3 / 0 | 0 | Product code + tests; advisories documentation only | Claude at seat; CLI/transport version and dispatcher-read depth not supplied |
+
+- **F1-c MAJOR, confirmed / fixed:** `tools/package/build.py:622` `_app_link_content`
+  judges the link at its shown location, calls its OWN `macos_link_problem` first,
+  then reads kind by following stat (`:634`). A refused link returns its re-rooted
+  `(link: <problem>)` label, with no stat, resolve, view or descent. An admitted folder
+  is resolved only after that admission, then its non-following view is recursively
+  re-rooted (`:645-648`). Nested links pass their PHYSICAL paths into the same helper
+  and their SHOWN paths into name checks; files receive the same `_app_content_rules`
+  as physical entries. `_app_forbidden_paths:658` routes every physically enumerated
+  link through this helper too, covering the physical walk and alias walk together.
+- **Guard / conservative refusal:** at `build.py:641`, `targets` holds resolved folder
+  targets of links on the CURRENT descent path, outer link included when descending
+  into its entries. For each newly admitted folder link, compare
+  `previous.is_relative_to(resolved)` for every stack entry. This refuses a target
+  equal to OR an ancestor containing an earlier target as `(link: folder loop)` at
+  the re-rooted label, with no descent. Siblings receive the same incoming immutable
+  stack, so visiting a shared sibling target is allowed. Physical holder/up -> .. is
+  refused when its recursive view closes the cycle; through foo-bar -> numpy/holder
+  the ancestor target is refused directly at foo-bar/up. Both use this same helper.
+- **Tests / order / recorder:** `tests/test_tools_package_build.py:898` covers all SIX
+  F1-c shapes with nine literal run-4 NumPy random extensions. Every result must equal
+  its materialised physical copy line-for-line: nine unexpected-module lines for five
+  shapes and nine shadow lines for Frameworks/io. Each runs the existing recorder
+  (covered shape 7) with zero invariant violations; explicit own-admission/view events
+  additionally prove the nested link's own call precedes its first following stat or
+  view. These direct nested links do not hit A1's intermediate-chain limitation; the
+  recorder logic is unchanged. Existing shapes and direct alias regressions also pass.
+  `:937` proves holder/inner alone, two sibling aliases and numpy/io -> random stay 0.
+  `:947` refuses the folder cycle both physically and through an alias. `:959` injects
+  a nested own-call refusal and proves its alias label is reported without stat/view
+  of that refused link or descent beneath it.
+- **A-r3-1 ADVISORY, accepted under `7a246dfd`:** non-frozen module files retain
+  unexpected-module and lose the extra shadow label under the ruled frozen-and-file
+  name check. Every such file remains refused; no path newly passes. No code change.
+- **A-r3-2 ADVISORY, corrected:** replaced r2's one-level safety description with the
+  F1-c gap and its recursive closure; updated r1/r2 F2/F3/A2/test/recorder references
+  to this fold's head. Historical RED/GREEN counts and recorded run evidence retained.
+
+**RED / GREEN**, logs and scratch probes under `work/wp6.5/f6/`:
+
+- `git show 6dc8c000:tools/package/build.py` copied to `build_r3.py`, loaded via
+  `WP61_BUILD_SCRIPT`. Final `-k ar3` parent run: **9 failed, 1 passed, 755 deselected
+  in 2.09s** (`red-final.log`). Six shapes fail at `tests:925` (`found == physical`,
+  parent returns [] versus nine physical lines); two loop cases fail at `:954` (no
+  folder-loop refusal); the refusal-order case fails at `:976` (parent stats the
+  nested link before its own admission/refusal). Holder-only/sibling preservation passes.
+- Final targeted r1/r2/r3/run-4/existing recorder selection: **52 passed, 713 deselected
+  in 3.23s**, `green-final.log`.
+- Build + notices, **-n 3 --dist loadfile: 1185 passed in 124.54s** (765 build,
+  420 notices), `build-notices.log`. The pre-existing order-dependent Popen-blocking
+  fixture is UNCHANGED, as ruled out of scope by CHARC `7ec41241`; no default-distribution
+  rerun or fixture edit in this fold.
+- Official smoke: **74 passed, 1 skipped in 83.64s**, `smoke.log` (native POSIX
+  process-group proof skipped). Portability: **226 skipped in 0.40s** on Windows,
+  `portability.log`. No native Mac or frozen-bundle result claimed.
+- Ruff check clean; format check **339 files already formatted**; mypy and mypy darwin
+  each clean in **166 source files** (`ruff-check.log`, `ruff-format.log`, `mypy.log`,
+  `mypy-darwin.log`). `git diff --check` exits 0; all three changed files have
+  zero CR bytes (`diff-check.log`, `line-endings.log`).
+- Onedir nine-case content census on `6dc8c000` versus head: **372 = 372**,
+  calls/order/following flags/results/messages identical (`onedir-census.json/.log`).
+  `source-identity.log` confirms byte-identical source for the old default content
+  loop, `_bundle_parts`, shared listing, link rule, chain/class helpers, link view and
+  onedir smoke static call site. No admission changed.
+- `listing_probe.py` rebuilds all **293 files, 114 folders and 86 real links** from
+  app-listing.txt, with captured link text and inert files/valid empty ZIPs:
+  **0 content violations from release and app roots**, `listing.log`.
+
+All pytest runs use the sandbox shim, startup-test exclusion, no cache provider and
+individual work-tree basetemps. Existing PYTHONPATH-bootstrap runner unchanged.
+
+**Verification loop:** pass 1 independently confirmed F1-c with physical copies and
+parent RED, then fixed recursion and loop refusal as ruled. The added own-admission
+and injected-refusal checks confirm call order independently of the recorder's broader
+walk-admission signal. Pass 2: targeted/recorder and full module suites, the whole
+captured graph, source identity and onedir census found no new product issue.
+No sandbox-limited failure or open design question remains; the next Claude review is
+at the seat, and convergence is not claimed. One logical fold plus tests and ledger;
+no commit, shared admission/listing, src/interface/workflow/dependency/notices/fixture-byte,
+debt/C14 change, frozen run, real bin/FFmpeg access, desktop input, network action,
+other-worktree read or footage/profile write. All evidence is inside this worktree.
+Dispatcher-read depth not supplied.
