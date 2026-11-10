@@ -2397,4 +2397,164 @@ committed files.
   newline (the known Git Bash trap); repaired with the Edit tool, the diff re-read.
 - Pass 2 over the three items and the tests: nothing new. Loop ended.
 
-Depth at QA-fix yield: DISPATCHER TO FILL
+Depth at QA-fix yield: 122,607 (wp65-cell14, read by the dispatcher with cell_depth.py at its QA-fix return)
+
+Re-gate on 69538abe (gen 63, work/orch-g63/gate-r6953/): parallel 8988 passed / 210 skipped; serial 1 failed / 1317 passed / 19 skipped = DR-96's THIRD recurrence (tests/test_gui_startup.py::test_shutdown_stops_every_worker_when_one_overruns_its_timeout, 3/3 alone); the gate STANDS (CHARC 77a42ff3).
+
+## Run-2 fix (`wp65-cell15`, dispatch-16; base `69538abe`)
+
+Runner run 2 (`42764505729`, on `69538abe`; macOS 26.7.2 arm64, ImageOS macos26, image
+20261102.0473.1; validation mode, `MACOS_FFMPEG_BUNDLED` false) failed its parallel leg:
+**4 failed / 7762 passed / 1227 skipped** in 187.6 s (run 1: 63 failed). The serial leg and
+every bundle step were skipped. CHARC's rulings (`351a1c1c`) applied as given. No `src/`
+change; no committed fixture, lock, text or notices-annex byte moved; `release.yml`
+byte-identical; `MACOS_FFMPEG_BUNDLED` stays "false". Scratch `work\wp6.5\run2fix\`.
+
+### The runner figures (the seat's table, `runner\run-42764505729\runner-table.md`)
+
+| # | Test | Figure |
+|---|---|---|
+| 1 (C2) | `test_fixtures.py::test_stills_files_and_mask_regenerate_byte_identically` | 4 of 78 differ, all HEIC AD-24 (uint8 64x96x3): `-both` max 2 / p99 1 / nonzero 489; `-exif-only` 2 / 1 / 489; `-irot-only` 2 / 1 / 489; `-neither` 3 / 1 / 555; libheif 1.23.6, x265 4.3+1-e9b8812, libde265 1.1.3 |
+| 2 (C16) | `test_wp321_fft_gaussian.py::...bit_for_bit_cpu[shape1-32.0]` | max abs 1.788e-07, p99 5.96e-08, nonzero 102,925 of 6,236,289; inside 1e-5; control `FFT_BATCH_LINES=516` max 1.49e-07, nonzero 9,996, not bit-identical; numpy 2.5.4, scipy 1.18.1 |
+| 3 | `test_jobs_export_process.py::test_an_exception_from_the_progress_kills_the_worker` | "the beat file stayed empty" (`:177`, read at `:1131`) after the worker kill |
+| 4 | `test_tools_package_smoke.py::test_non_windows_containment_never_silently_skips` | expected `b: SURVIVORS`; got `b: native containment failed: [Errno 1] Operation not permitted` (SURVIVORS raised at `smoke.py:254`, then the cleanup's `killpg(pgid, 0)` at `:221` raised EPERM) |
+
+### Commits
+
+| Item | Commit | Files |
+|---|---|---|
+| 1 C2 | `7f554bc5` | `tests/test_fixtures.py` |
+| 2 C16 | `641d1cb1` | `tests/test_wp321_fft_gaussian.py` |
+| 3 beat | `0eeee5b3` | `tests/test_jobs_export_process.py` |
+| 4 containment | `500dbea3` | `tools/package/smoke.py`, `tests/test_tools_package_smoke.py` |
+| 5 workflow | `40d9b5d7` | `.github/workflows/macos-build.yml`, `tests/test_release_workflow.py` |
+| 6 gui `:776` | `9b15e87a` | `tests/test_gui_settings_dialog.py` |
+
+### Item 1: C2, the HEIC AD-24 bound (`7f554bc5`)
+
+- `tests/test_fixtures.py:1402` `_pixel_figures` returns the printed figure plus the decoded dtype, max and p99; `_pixel_figure` (kept, same text) wraps it.
+- `:1450` `HEIC_AD24_IDS` (the four ids), `HEIC_AD24_MAX_ABS = 4`, `HEIC_AD24_P99 = 1.0`.
+- `:1465` `_regeneration_report(fresh_root, committed_root, host)`: on `win32` every entry byte-identical; on any other host the same except a HEIC AD-24 entry whose bytes differ passes when its decode is uint8 of the committed shape with max <= 4 and p99 <= 1. Returns `(compared, failures, bounded)`; a byte-identical entry still checks the manifest md5.
+- `:1516` the regeneration test calls it with `sys.platform`; it prints the bounded rows (figures, "-- inside the non-Windows HEIC AD-24 bound ...") and fails on any failure row (an over-bound HEIC row says "-- OUTSIDE ..."); `compared == 78` and the file-set check unchanged.
+- Proofs: `:1577` the committed tree passes on win32 / darwin / linux (78 compared, no rows); `:1585` a real re-encoded `heic-ad24-neither` (pixels inverted: max 255, p99 253) fails on darwin, linux AND win32; `:1612` `png8-gradient-none` with one pixel moved by 1 (`max 1, ... nonzero 3` = one pixel's three channels) fails on darwin and linux, no bound applied; `:1654` the edges on a stubbed decode, simulated darwin: max 4 with p99 1 (186 samples moved) passes as a bounded row, max 5 / p99 2 / a uint16 decode / a different shape fail; on win32 every plant fails.
+
+### Item 2: C16, the tier-2 bound off Windows (`641d1cb1`)
+
+- `tests/test_wp321_fft_gaussian.py:307` `NON_WINDOWS_REASON`: the 516-line control (a multiple of 4) is not bit-identical on the arm64 runner either (max 1.49e-07, nonzero 9,996), which settles that the difference comes from the library's FFT path (pocketfft SIMD on arm64), not the batch size.
+- `:317` `_cpu_batch_verdict(..., host)`: bit-identical passes; on `win32` any difference fails (report + "host win32: the assertion is bit-for-bit"); elsewhere passes iff max abs <= `BOUND` (1e-5), the report (max / p99 / nonzero / control, `_batch_mismatch_report`) plus the verdict and the reason always printed.
+- `:358` the CPU test uses it with `sys.platform`. `backend.py` untouched.
+- `:392` proof by host: win32 equal passes, one ulp fails; darwin equal / one ulp pass, 2e-5 fails; linux one ulp passes, 2e-5 fails (7 cases).
+
+### Item 3: atomic beats (`0eeee5b3`)
+
+- `tests/test_jobs_export_process.py:66` `BEAT_WRITER`: `write_beat(beat, text)` writes `beat.tmp` in the same folder and `os.replace`s it onto `beat` (retrying a Windows `PermissionError` while a reader holds the old file, 200 x 1 ms, then once more unguarded).
+- `:86` `GRANDCHILD` (Q11's grandchild) and the progress-raises child (`:1134`) both use it, including the first beat "0": the two writers share one shape.
+- `:190` `_read_beat` keeps its retry; an empty file is still NOT a beat (docstring says why).
+- **Hypothesis statement:** "the kill lands between `write_text`'s truncate and its write" is **NOT CONFIRMED**. The runner's log carries no kill timestamp or file mtime. The failure is made impossible by the atomic write, whatever the cause.
+  - Supporting reading, not proof: the child sends the progress line and starts its next `write_text` right after, and that line is what triggers the kill. So the kill races that write, rather than a random point in the 50 ms loop.
+  - Windows probe `work\wp6.5\run2fix\probe_race.py` (kill on reading the progress line; 300 runs per form): bare `write_text` left the file empty **0 of 300** (always "1", so no Windows repro). The atomic form left "0" in 14 of 300, which shows the kill does land inside the beat that follows the progress line, and never empty.
+- **10 runs on Windows** (a loop; `-n 3`, `-m "not gpu"`): 84 passed in each of the 10 (8.47-9.24 s), 0 failed.
+
+### Item 4: darwin containment (`500dbea3`)
+
+`tools/package/smoke.py`:
+
+- `:173` `GroupMember(pid, stat, comm)`.
+- `:191` `_group_census(pgid, run=subprocess.run)`: `/bin/ps -A -o pid=,pgid=,stat=,comm=` (absolute, timeout 10 s), keeps the rows of `pgid` with zombies included. A failed `ps` or an unreadable line is a named `SmokeError`.
+- `:237` `_live` = members whose stat does not start with `Z`; `_listing` = `pid <pid> <stat> <comm>` per member.
+- `:309` `group_alive()`:
+  - `ProcessLookupError` = empty.
+  - `PermissionError` = the census decides: a live member raises "`<row>: process group <pgid> has a member this process may not signal (EPERM; members: ...)`"; no live member prints "`... answers EPERM with no live member (members: ...): contained`" and counts as contained.
+  - The probe answering = the census counts the live members.
+  - Any other exception propagates (`_process` names it "native containment failed").
+  - Every SURVIVORS / "did not terminate" message carries `members: <listing>`.
+  - The PASS line reads "0 live processes".
+- `:845` darwin binds `census=_group_census`.
+
+`tests/test_tools_package_smoke.py`:
+
+- `FakeGroup` gains `census`, zombies, an EPERM / other-error probe and an unsignalable member.
+- New tests:
+  - `:1014` Lookup -> empty, no census.
+  - `:1025` zombie-only contained, whether the probe answers or raises EPERM (the EPERM line printed).
+  - `:1043` one live member beside a zombie -> SURVIVORS naming both.
+  - `:1056` EPERM with a live member -> the named message with the listing, caused by the `PermissionError`.
+  - `:1069` an `OSError(EIO)` propagates.
+  - `:1088` the `ps` parse.
+- The existing SURVIVORS / did-not-terminate regexes now carry the listing.
+- The native darwin test (`:808`) asserts the survivor's pid is in row b's message and prints it.
+
+**Hypothesis pending:** "EPERM from `killpg(pgid, 0)` on a group holding only zombies after the SIGKILL" stays a HYPOTHESIS until the next runner run. The runner's listing (row b's message, or the printed EPERM line) confirms it.
+
+- If that listing shows a LIVE member after SIGKILL, that is a different defect and a STOP.
+- Note: on the parent code, the stub zombie-only-EPERM case reproduces the runner's raw `PermissionError` exactly.
+
+### Item 5: the workflow (`40d9b5d7`)
+
+- `.github/workflows/macos-build.yml` conditions:
+  - `:123` "Run serial tests" `if: ${{ !cancelled() }}`.
+  - `:130` "Build app bundle without FFmpeg", `:143` "Run macOS tests on the built bundle" and `:175` "Capture runner and encoder facts" `if: ${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}`.
+- Unchanged: no `continue-on-error` anywhere, the skip-reason check and every release-only step.
+- **pipefail:** set by the job's `defaults: run: shell: bash` (`:44-46`; the comment at `:38-43` says so). For the named `bash` shell, Actions runs `bash --noprofile --norc -eo pipefail {0}`, so a failing pytest before `| tee` fails its step (run 2's job did fail on the parallel leg). The three test steps declare no `shell:` of their own.
+- The facts capture needs nothing from the skip-reason check, so neither moves: no STOP.
+- Reading noted: the serial condition is the ruling's verbatim `!cancelled()`. In release mode a failed earlier step therefore also runs the serial leg, but the job still fails and the release-only steps keep their default `success()` gate. With the switch "false" the version step refuses release mode anyway.
+- `tests/test_release_workflow.py`:
+  - `:975` `MACOS_STEP_CONDITIONS`, every step's exact `if:`.
+  - `:1016` `_validation_violations` reports a condition off the map, any `continue-on-error`, a test step with its own `shell:` or without `| tee`, the job's bash default missing, or release.yml's text sha256 other than `dd91eae3...` (69538abe).
+  - `:1043` asserts none.
+  - `:1065` five planted breaches, each reported.
+  - `:1273` `SWITCH_GATES` admits the two new conditions (both run with the switch "false"). The inert-lock guard still passes with "Build app bundle without FFmpeg" run and the release steps not run.
+  - The build-gate test reads the new condition.
+- actionlint NOT run (the seat runs it).
+
+### Item 6: `test_gui_settings_dialog.py:776` (`9b15e87a`)
+
+- `tests/test_gui_settings_dialog.py:57` `WINDOWS_ROSTER = capability.encoder_roster("win32")`.
+- `:779` `resolve_encoder("auto", capabilities, roster=WINDOWS_ROSTER) == default`, then `default != resolved` (as C4).
+
+### RED on the parent / GREEN
+
+| Proof | Parent `69538abe` | Head |
+|---|---|---|
+| 1 C2 new tests | collection-level: `_regeneration_report` absent (no host rule exists; the parent's test is byte-identity on every host, so run 2 itself is its darwin RED) | 12 passed; module 370 passed (358 + 12) |
+| 2 C16 new tests | `_cpu_batch_verdict` absent (the parent asserts bit-identity on every host; run 2 is its darwin RED) | 7 passed; module CPU 26 passed (19 + 7) |
+| 3 beats | no Windows RED: the bare form passes on Windows, and the probe gave 0 / 300 empty | 10 x 84 passed |
+| 4 stubs (`red_smoke.py`: parent `smoke.py` swapped in, `run_group` passing `census` only when accepted; restored, `git status` clean) | 10 failed, 11 passed: zombie-only (answers) -> SURVIVORS / did not terminate; zombie-only EPERM -> raw `PermissionError` (the runner's failure); survivor beside zombie -> wrong message; EPERM with a live member -> raw `PermissionError`; census parse / binding absent; the four reworded messages lack the listing. Guards passing on the parent too: Lookup -> empty, other `OSError` propagates, own-group refusals | 73 passed, 1 skipped (66 + 7; the skip = the native POSIX proof) |
+| 5 workflow (parent `macos-build.yml` swapped in, restored) | 3 failed: the new guard (4 condition rows), the build-gate test, the inert-lock guard (the old condition is no longer admitted) | 93 passed (87 + 6) |
+| 6 gui `:776`, simulated darwin (`run2fix\sim\simdarwin2.py`: imports `urllib.request` first, since on darwin it imports `_scproxy`, absent here, then sets `sys.platform`) | 1 failed (`injected-enables-ten-bit`: `'libx265' == 'hevc_nvenc'`), 1 passed | 2 passed; Windows parent 2 passed, head module 95 passed |
+
+### Static and tests at the head (`9b15e87a`; `-m "not gpu"`, every run with `-k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`)
+
+Static: `ruff check .` all passed; `ruff format --check .` 339 files formatted; `mypy` and
+`mypy --platform darwin` no issues in 166 source files. Blobs 0 CR (counted in Python).
+
+| Module | Result |
+|---|---|
+| `tests/test_fixtures.py` (`-n 3`) | 370 passed |
+| `tests/test_wp321_fft_gaussian.py` | 26 passed, 17 deselected (gpu) |
+| `tests/test_jobs_export_process.py` (`-n 3`) | 84 passed (and 10 x 84 in the loop) |
+| `tests/test_tools_package_smoke.py` | 73 passed, 1 skipped |
+| `tests/test_release_workflow.py` | 93 passed |
+| `tests/test_gui_settings_dialog.py` (`QT_QPA_PLATFORM=offscreen`) | 95 passed |
+| `tests/test_tools_package_build.py` (`-n 3`) | 669 passed |
+| `tests/test_tools_package_notices.py` (`-n 3`) | 420 passed |
+| `tests/test_macos_portability.py` | 224 skipped (platform) |
+| `tests/test_wp65_conftest_home.py` | 1 passed, 3 skipped |
+
+### Verification loop (self)
+
+Pass 1:
+
+- **Suspected:** the HEIC bound admits a 10-bit or reshaped decode. REJECTED: uint8 and the committed shape are required (the uint16 and shape plants fail).
+- **Suspected:** p99 at exactly 1 is an interpolation artefact. Checked: with 18,432 samples, p99 sits between sorted indices 18,246 and 18,247. 185 moved samples gave 0.69, so the edge plant moves 186 to land exactly on 1.
+- **Suspected:** `os.replace` fails on Windows while `_read_beat` holds the file. HANDLED: the writer retries `PermissionError`. The 10-run loop and the Q11 grandchild test stay green.
+- **Suspected:** the cleanup's census raising inside `finally` hides the first error. ACCEPTED as is: it raises only a named `SmokeError` (EPERM with a live member) or an un-named `OSError`, never a pass.
+- **Slips, fixed before commit:**
+  - A heredoc collapsed `\\n` / `\\0` (the known Git Bash trap). This left a NUL byte in `test_fixtures.py` and broke f-strings in the FFT test. Repaired, then NUL and CR counts checked.
+  - `test_jobs_export_process.py` was checked out CRLF (1,392 CR) and normalised to LF before commit (HEAD blob 0 CR).
+  - The workflow comment first said "continue-on-error", which the existing guard rightly refused; it was reworded.
+- **Found, NOT fixed (out of this turn's scope; the dispatcher's):** the whole `test_gui_settings_dialog.py` under simulated darwin gives 2 more failures: `test_cache_job_errors_are_not_presented_once_the_main_window_closes[window-closing / window-open]` (presented-message lists differ). This may be a simulation artefact (on Windows `Path.home()` ignores HOME) or a real serial-leg darwin row; the next runner run's serial leg will say. No write under `C:\Users\rwsmy\Library` (checked: absent).
+
+Pass 2 over the six items and the tests: nothing new. Loop ended.
+
+Depth at run-2-fix yield: DISPATCHER TO FILL
