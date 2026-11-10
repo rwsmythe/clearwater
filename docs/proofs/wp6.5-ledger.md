@@ -4871,7 +4871,7 @@ No false positives were rejected. The final static and module runs above found n
 Fresh Codex cell, dispatch F0-2 / 3, base/head `701475de` (uncommitted fold for the seat).
 All six A findings are CONFIRMED, NEW and in envelope; none rejected or deferred.
 Review evidence read only: `C:/Users/rwsmy/clearwater-review-evidence/wp6.5/f02/A/r1/review.txt`.
-CHARC ruling `e625a2113921103d` fixes the declaration and layout forms. Lane at dispatch:
+CHARC ruling `698a6460` fixes the declaration and layout forms. Lane at dispatch:
 2026-11-10 18:41Z, Codex 33% / pace 0.363, Claude 40% / pace 2.056; Codex lower,
 so Codex implements and Claude A/B run at the seat. Dispatcher-read depth unavailable here.
 
@@ -4882,22 +4882,25 @@ records remain byte-unchanged. F0-2b must write the declaration WITH its Mac row
 {"embedded_census": {"darwin": {"status": "complete", "evidence": "run <id>, head <sha>; macho-identities.txt"}}}
 ```
 
-Absent declaration means Windows complete only. An absent/malformed/incomplete darwin
-claim, a completed claim without evidence, or a completed claim with zero darwin hosts
-refuses with `EMBEDDED_CENSUS_PENDING`. An evidenced nonempty census then undergoes all
-existing identity, component, parent-version and missing-host checks.
+Absent declaration means Windows complete only. An absent or well-shaped incomplete
+darwin claim, or a completed claim with zero darwin hosts, refuses with
+`EMBEDDED_CENSUS_PENDING`. Following A r2, malformed claims (including missing evidence)
+instead receive the manifest schema refusal on every platform. An evidenced nonempty
+census then undergoes all existing identity, component, parent-version and missing-host checks.
 
 | Finding | Adjudication and change | Regression surface |
 |---|---|---|
 | F1 MAJOR | CONFIRMED/FIXED: `notices.py:851` `census_preflight` enforces the declaration independently of host count, before per-host checks. | Empty, 110 Windows + one unrelated darwin, several darwin hosts, complete without evidence, complete with zero hosts; both planner and writer. Completed consistent fixture passes; completed missing carried-parent host still refuses. |
 | F2 MAJOR | CONFIRMED/FIXED: planner (`notices.py:2295`) and writer (`:3281`) call the shared preflight; `_macos_static_checks` (`smoke.py:1109`) calls it before its notices existence query. Windows smoke code unchanged. | Real preflight with production pending manifest and missing notices yields the named pending reason. |
 | F3 MAJOR | CONFIRMED/FIXED: `_app_entry_owner` (`notices.py:1731`) verifies each native's installed origin against RECORD, then `_same_macho` against the bundled bytes. | Real synthetic Mach-O rewrites pass; changed code, non-Mach-O replacement and changed origin refuse for `_pillow_heif` and extensionless QtCore. |
-| F4 MAJOR | CONFIRMED/FIXED: one `in_app` context (`notices.py:2297`) per plan requires darwin plus inventory's bundle home and bootloader label; explicitly passed to FFmpeg selection (`:1862`) and vendored path conversion (`:1672`), reused for classification. | Windows `X.app` retains missing FFmpeg pair/text message, Contents-prefixed alien has original vendored behavior, notices bytes equal `200dffd8` for ordinary and `X.app` onedir. |
+| F4 MAJOR | CONFIRMED/FIXED: the plan passes `in_app` to FFmpeg selection and vendored path conversion, and reuses it for classification. A r2 A1 completes the ruling: the inventory's actual walk returns the context, replacing the suffix/bootloader recomputation. | Windows `X.app` retains missing FFmpeg pair/text message, Contents-prefixed alien has original vendored behavior, notices bytes equal `200dffd8` for ordinary and `X.app` onedir. |
 | F5 MINOR | CONFIRMED/FIXED inside notices only: `_find_notices_executable` (`notices.py:1610`) checks discovery components without following before `find_executable`; uses the shared rule for inner links and rejects a linked root. Outer bundle checked before nested candidates. | Filesystem recorder, linked Contents/root, starting from release and Contents/MacOS: no inventory-owned premature following calls. |
 | F6 MINOR | CONFIRMED/FIXED: workflow script (`macos-build.yml:193`) rejects root symlink/junction before is_dir/listing/read, writes one refusal line and exits 1. Notices likewise guards its call to the unchanged `_macos_app_entries`. | Executed workflow script, symlink and modeled junction; planted is_dir assertion ensures rejection precedes any following root query. |
 
-F3 applies to every RECORD-attributed `.so`/`.dylib` and every Mach-O identified in either
-the bundled file OR its installed origin, including extensionless framework executables.
+F3's r1 fold covered RECORD-attributed `.so`/`.dylib` files and thin arm64 origins;
+its thin-only classifier missed replaced extensionless executables with universal2 origins.
+A r2 F1 completes this coverage using the build's first-bytes classifier on the bundled
+file OR its installed origin, including universal2 framework executables.
 Libpython retains its interpreter-origin `_same_macho` check. Bootloader, generated
 metadata and link entries retain their separate rules; independently licensed natives
 still require their native manifest bindings. No `build.py` change.
@@ -4937,10 +4940,10 @@ SHA-256 `cedaab4fcc6a27ed89c985cfc16b93ded8e2e8b20a1e83e69a155aee137f1541`, byte
 **Verification loop:** all six reported suspicions reproduced and fixed. A subsequent
 trace suspected nested candidates when discovery starts at Contents/MacOS: the recorder
 confirmed **2 failed, 2 passed** before ordering the outer bundle first
-(`red-macos-start.log`); after that fix all four cases pass. Native origin inspection also
-covers extensionless framework replacements by checking the original image, even when the
-replacement is no longer parseable as Mach-O. No false positive rejected. Final product
-review against the six findings found no further issue.
+(`red-macos-start.log`); after that fix all four cases pass. Native origin inspection at r1
+covered extensionless replacements only with thin arm64 origins. A r2 F1 confirms and fixes
+the universal2-origin gap, including non-Mach-O replacements. No false positive rejected.
+The r1 self-review missed that gap; the r2 fold's verification is recorded below.
 
 **Locks checked:** `git diff --exit-code 701475de --` the unowned `build.py`, native licence
 surface, macOS lock, `src/`, and `release.yml` exits 0 (`locked-paths.log`). Switch remains
@@ -4983,3 +4986,114 @@ both final platform checks are green. No additional design choice is outstanding
 | Round | Critical | Major | Minor | In/out | NEW/REOPENED | Reverts | Fix kind | Reviewer/transport | Depth |
 |---|---:|---:|---:|---|---|---:|---|---|---|
 | F0-2 A r1, fold | 0 | 4 | 2 | 6/0 | 6/0 | 0 | Product code + regression controls | Codex A from seat; subsequent Claude A/B pending | Dispatcher-read, not supplied |
+
+### F0-2a A r2 fold
+
+Fresh Codex cell, dispatch F0-2 / 4, base/head `5729dd63`; no commit by the cell.
+Review read: `C:/Users/rwsmy/clearwater-review-evidence/wp6.5/f02/A-claude/r2/review.txt`.
+CHARC ruling **`7a363f94`**: fold F1 MAJOR, F2 MINOR, A1 and A2 advisories; A3 is
+NOT folded. Recorded dispatch paces at 2026-11-10 19:05Z: Codex 33% / 0.362,
+Claude 40% / 2.031. Codex implements, Claude A r3 and B run at the seat.
+Dispatcher-read depth not supplied. No STOP or disputed premise.
+
+| Item | Adjudication and change | RED / GREEN control |
+|---|---|---|
+| F1 MAJOR | CONFIRMED/FIXED, reopened F3 coverage: `_app_entry_owner` (`tools/package/notices.py:1792`) uses the build's `_is_native(relative, first_four_bytes)` on the bundle OR installed origin. A universal2 origin therefore requires both RECORD digest and `_same_macho`, even for an extensionless non-Mach-O replacement. | `test_app_record_native_requires_verified_macho_origin` (`tests/test_tools_package_notices.py:4669`): 36 cases, thin/fat origins x `.so`/`.dylib`/extensionless QtCore x six mutations. On `5729dd63`, the three universal2 QtCore replacements fail `verdict == None`; rewritten thin arm64 passes for every origin/path. All 36 pass at the fold. |
+| F2 MINOR | CONFIRMED/FIXED, new: `_native_document` (`notices.py:854`) validates an optional census on EVERY platform using the existing manifest schema refusal. Windows preflight retains its no-I/O path; the real Windows planner still reads and validates its manifest. | `test_embedded_census_schema_is_strict` (`:4752` in notices tests): 11 malformed shapes x darwin/win32; parent fails all 22 at the direct manifest reader's expected refusal. The Windows planner's malformed-key test (`:4767`) also fails on parent. Missing-evidence planner/writer cases now expect the schema refusal (both fail parent regex). All pass at the fold. |
+| A1 advisory | CONFIRMED/FIXED, reopened F4 context: `_InventoryEntries` (`notices.py:237`) carries the actual walk's `in_app` flag. `_inventory` (`:1594`) sets true ONLY in the darwin bundle branch, false in onedir, and retains the frozen `(entries, home)` signature with list-compatible rows. `plan_notices` (`:2318`) consumes this returned flag without reclassifying the home. | `test_darwin_onedir_app_suffix_carries_inventory_layout` (`notices tests:4808`) uses the real onedir walk of `X.app` with a planted `Contents/MacOS/Clearwater`. On parent it fails `assert in_app is False` at the first context consumer; fold passes. Existing real app-plan tests cover the true branch. |
+| A2 advisory | CONFIRMED/FIXED, new: the root-link fixture (`tests/test_tools_package_build.py:7805`) now includes `outside/Contents/MacOS/Clearwater`. Archive enumeration is stubbed only in this discovery test, so the stand-in cannot cause an unrelated archive-parser failure after an old unsafe walk. | On extracted `701475de`, `release-root` and `macos-root` both fail the intended `pytest.raises` at `:7815` with DID NOT RAISE ValueError. Both Contents cases fail the recorder's zero-follow assertion at `:7817`. On `5729dd63` and fold, all four pass. |
+| A3 advisory | CONFIRMED/BANKED to the seat's accept, per ruling: repeated RECORD parsing and origin reads. | No cache added, no timing claim made. Seat owns the watched DR row at accept; not a loop-driving finding. |
+
+`_same_macho` (`notices.py:1831`, unchanged) first admits identical whole-file bytes;
+otherwise its bundled thin-arm64 identity digest must belong to
+`build._macho_origin_identities(original)` (`tools/package/build.py:4229`). That helper
+normalises the original's arm64 slice(s) via `_macho_slices`, including universal2.
+The test's x86_64 slice has a real x86 CPU header and different code. Thin x86_64,
+changed-code fat, non-Mach-O, changed-code thin and RECORD-mismatched origin cases refuse.
+Named positive controls preserve non-Mach-O RECORD data, fat-origin `.so` and `.dylib`
+files, and PyInstaller's rewritten/thinned arm64 output. No `build.py` edit.
+
+The census's validated additive shape is:
+
+```json
+{"embedded_census": {"darwin": {"status": "complete", "evidence": "run <id>, head <sha>; macho-identities.txt"}}}
+```
+
+If present, the object has ONLY `darwin`, whose object has exactly `status` and `evidence`;
+both values are nonempty, unpadded single-line strings (the existing `_single_line_text`
+predicate). Status `pending` with evidence is well-shaped, but darwin preflight returns
+`EMBEDDED_CENSUS_PENDING`. Message classification for A r2 CHECK 1:
+
+- No declaration, with no hosts, 110 Windows hosts plus one unrelated darwin host, or
+  several darwin hosts: ONE `EMBEDDED_CENSUS_PENDING`, before per-host checks.
+- Evidenced `complete` with zero darwin hosts: the same named pending refusal.
+- `complete` without evidence, evidence `""` / `"   "` / `7` / a multiline string,
+  `darwin: "complete"`, census given as a list, a `win32` key only, extra keys inside
+  `darwin`, or `linux`/`win32` next to a complete declaration: manifest schema refusal
+  (`notices: native licence manifest schema is invalid`) on BOTH platforms.
+- Well-shaped `pending` with evidence: the named pending refusal on darwin.
+- Evidenced, complete, nonempty, consistent census: passes; a missing carried-parent
+  host still gets the existing per-host refusal. Production Windows manifest has no
+  declaration, remains byte-equal to `200dffd8`, and keeps its normal behavior.
+
+**Evidence:** `work/wp6.5/f02a-fold2/`. The copied `run_pytest.py` loads
+`sandbox_mkdir_shim` through sys.path and removes inherited PYTHONPATH before checks;
+all pytest commands disable cacheprovider, use unique disposable basetemps, `-m 'not gpu'`,
+and retain the dispatch's forbidden-startup `-k` exclusion. Entry-point scan found only
+the existing isolated smoke child (Qt imports blocked, disposable profile roots, 15 s
+timeout) and the portability docstring; no new product entry-point execution was added.
+
+**RED on extracted `5729dd63`:** `red-parent-final.log`, **29 failed / 48 passed**.
+The failures are F1's three universal2 extensionless replacements (`verdict == None`),
+F2's 22 schema cases plus one Windows planner case (DID NOT RAISE), the two updated
+missing-evidence message assertions, and A1's `in_app is False` assertion. The other
+48 are passing controls, including A2's already-fixed discovery paths. The separate
+`701475de` A2 run (`red-a2-final.log`) has **4 failed**, at the intended lines above;
+the earlier exploratory run reached archive parsing, which the final fixture excludes.
+Branch never moved; only explicit `WP65_NOTICES_SCRIPT` selects an extracted copy.
+
+**Validation at the fold:**
+
+| Check | Result | Log |
+|---|---|---|
+| ruff check / format check | All checks passed / 339 already formatted | `ruff-final.log`, `format-final.log` |
+| mypy / mypy --platform darwin | Success, 166 source files each | `mypy.log`, `mypy-darwin.log` |
+| Notices + build, `-n 3` plain | **1298 passed, 1 skipped** | `notices-build-plain.log` |
+| Notices + build, `-n 3 --dist loadfile` | **1298 passed, 1 skipped** | `notices-build-loadfile.log` |
+| Final focused regressions plus both Windows artifact byte cases | **79 passed** | `green-final.log` |
+| Smoke + portability + workflow | **223 passed, 227 skipped, 5 failed** (sandbox Git limitation below) | `smoke-port-workflow.log` |
+| Root annex CLI | `root annex matches` | `annex.log` |
+| Windows root annex bytes versus `200dffd8` | **854656 bytes**, SHA-256 `cedaab4fcc6a27ed89c985cfc16b93ded8e2e8b20a1e83e69a155aee137f1541`, byte-equal | `annex-bytes.log` |
+
+Both ordinary and `X.app` artifact-byte comparisons against `200dffd8` pass in the full
+runs (`test_windows_notices_bytes_equal_pre_f02`). The build skip is the unchanged
+POSIX-only CPython sysconfig case. The other skips are 226 macOS-native portability cases
+on Windows and the existing native POSIX process-group smoke proof. No new skip added.
+All five failures are `test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`
+(`annotated`, `lightweight`, `wrong-commit`, `mismatched-name`, `deleted-origin`): the
+local-only `git push origin HEAD:refs/heads/main --tags` exits 128 after `sh.exe` reports
+`fatal error - CreateFileMapping`. DISPOSITION: seat reruns all five outside the restricted
+token, as dispatch 4 authorizes. They are not counted green; no real remote was used.
+Final `5729dd63` RED assertion lines in notices tests: F1 `:4711` (returned RECORD path
+instead of None); F2 `:4760` / `:4773` (DID NOT RAISE) and `:4574` (wrong refusal text);
+A1 `:4826` (`True is False`). A2's `701475de` assertion lines are recorded above.
+
+**Verification loop:** all four commissioned suspicions reproduced (A2 at its earlier
+parent), confirmed and fixed. One test-only fixture correction separated Windows schema
+testing from the darwin-only app layout; no product change arose from it. Ruff's local
+exception-name check was fixed. No false-positive finding rejected. A subsequent source
+pass against F1/F2/A1/A2 found no further issue; A3 remains explicitly deferred.
+
+**Locks:** unowned paths byte-unchanged against `5729dd63`, including `build.py`, `src/`,
+all `.github/`, both FFmpeg locks, native licence texts AND manifest, `uv.lock` and root
+notices (`locked-paths.log`, exit 0). Switch remains `"false"`. No dependencies, cache,
+network fetch, commit, frozen run, GPU work, footage/profile write, mailbox or other
+worktree access. `_inventory` still returns two values, and no link rule changed.
+All four changed files have zero CR bytes (`lf-check.log`); `git diff --check` is clean
+(`diff-check.log`). This turn bundles the four named review remediations and their ledger.
+Claude A r3/B and the two-leg package gate remain the seat's next steps.
+
+| Round | Critical | Major | Minor | Advisories | In/out | NEW/REOPENED | Reverts | Fix kind | Reviewer/transport | Depth |
+|---|---:|---:|---:|---:|---|---|---:|---|---|---|
+| F0-2 A r1, cumulative | 0 | 4 | 2 | 0 | 6/0 | 6/0 | 0 | Product + tests | Codex A at seat | Not supplied |
+| F0-2 A r2, fold | 0 | 1 | 1 | 3 | 5/0 | 3/2 (F1, A1 reopen coverage); A3 banked | 0 | Product + tests; no cache | Claude A at seat; A r3/B pending | Not supplied |
