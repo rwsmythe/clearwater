@@ -4999,7 +4999,7 @@ Dispatcher-read depth not supplied. No STOP or disputed premise.
 | Item | Adjudication and change | RED / GREEN control |
 |---|---|---|
 | F1 MAJOR | CONFIRMED/FIXED, reopened F3 coverage: `_app_entry_owner` (`tools/package/notices.py:1792`) uses the build's `_is_native(relative, first_four_bytes)` on the bundle OR installed origin. A universal2 origin therefore requires both RECORD digest and `_same_macho`, even for an extensionless non-Mach-O replacement. | `test_app_record_native_requires_verified_macho_origin` (`tests/test_tools_package_notices.py:4669`): 36 cases, thin/fat origins x `.so`/`.dylib`/extensionless QtCore x six mutations. On `5729dd63`, the three universal2 QtCore replacements fail `verdict == None`; rewritten thin arm64 passes for every origin/path. All 36 pass at the fold. |
-| F2 MINOR | CONFIRMED/FIXED, new: `_native_document` (`notices.py:854`) validates an optional census on EVERY platform using the existing manifest schema refusal. Windows preflight retains its no-I/O path; the real Windows planner still reads and validates its manifest. | `test_embedded_census_schema_is_strict` (`:4752` in notices tests): 11 malformed shapes x darwin/win32; parent fails all 22 at the direct manifest reader's expected refusal. The Windows planner's malformed-key test (`:4767`) also fails on parent. Missing-evidence planner/writer cases now expect the schema refusal (both fail parent regex). All pass at the fold. |
+| F2 MINOR | CONFIRMED/FIXED, new: `_native_document` (`notices.py:856` at `5729dd63`) validates an optional census on EVERY platform using the existing manifest schema refusal. Windows preflight retains its no-I/O path; the real Windows planner still reads and validates its manifest. | `test_embedded_census_schema_is_strict` (`:4752` in notices tests): 11 malformed shapes x darwin/win32; parent fails all 22 at the direct manifest reader's expected refusal. The Windows planner's malformed-key test (`:4767`) also fails on parent. Missing-evidence planner/writer cases now expect the schema refusal (both fail parent regex). All pass at the fold. |
 | A1 advisory | CONFIRMED/FIXED, reopened F4 context: `_InventoryEntries` (`notices.py:237`) carries the actual walk's `in_app` flag. `_inventory` (`:1594`) sets true ONLY in the darwin bundle branch, false in onedir, and retains the frozen `(entries, home)` signature with list-compatible rows. `plan_notices` (`:2318`) consumes this returned flag without reclassifying the home. | `test_darwin_onedir_app_suffix_carries_inventory_layout` (`notices tests:4808`) uses the real onedir walk of `X.app` with a planted `Contents/MacOS/Clearwater`. On parent it fails `assert in_app is False` at the first context consumer; fold passes. Existing real app-plan tests cover the true branch. |
 | A2 advisory | CONFIRMED/FIXED, new: the root-link fixture (`tests/test_tools_package_build.py:7805`) now includes `outside/Contents/MacOS/Clearwater`. Archive enumeration is stubbed only in this discovery test, so the stand-in cannot cause an unrelated archive-parser failure after an old unsafe walk. | On extracted `701475de`, `release-root` and `macos-root` both fail the intended `pytest.raises` at `:7815` with DID NOT RAISE ValueError. Both Contents cases fail the recorder's zero-follow assertion at `:7817`. On `5729dd63` and fold, all four pass. |
 | A3 advisory | CONFIRMED/BANKED to the seat's accept, per ruling: repeated RECORD parsing and origin reads. | No cache added, no timing claim made. Seat owns the watched DR row at accept; not a loop-driving finding. |
@@ -5097,3 +5097,255 @@ Claude A r3/B and the two-leg package gate remain the seat's next steps.
 |---|---:|---:|---:|---:|---|---|---:|---|---|---|
 | F0-2 A r1, cumulative | 0 | 4 | 2 | 0 | 6/0 | 6/0 | 0 | Product + tests | Codex A at seat | Not supplied |
 | F0-2 A r2, fold | 0 | 1 | 1 | 3 | 5/0 | 3/2 (F1, A1 reopen coverage); A3 banked | 0 | Product + tests; no cache | Claude A at seat; A r3/B pending | Not supplied |
+
+## F0-2b
+
+Fresh Codex implementer, dispatch F0-2b / 1, base/head `8955f790`.
+Dispatcher-read depth not supplied. No commit by the cell. CHARC `3fdf1fd3`
+accepts the seat census as the pre-check of record; `da5a86b7` makes run 8 the
+first plan on real bundle bytes, with no public app artifact.
+
+### Entry preflight: STOP D1 (MINOR, dispatch premise mismatch)
+
+**ANSWERED by dispatch F0-2b / 2:** add eleven new licence texts, reuse two
+committed texts, keep the four Qt attribution JSON files as evidence only.
+The implementation below supersedes this entry-preflight remaining list.
+
+All 25 entries in `work/wp6.5/f02b-census/SHA256SUMS` were verified against
+the staged bytes (`work/wp6.5/f02b-cell/inspect.log`). Principal records:
+
+| Record | SHA-256 |
+|---|---|
+| `darwin-census.md` | `3c871568bb3a1b4271a6d49ee135c6804aba40e7488153fad69efa81aa961dbf` |
+| `darwin-rows.json` | `f66b87d707affefada38a4d92b913f067850e96067b6136a5a4dfa423da3148a` |
+| `darwin-components.json` | `5f46afba507dec83f84c668e4252e9dc5fc16e468b341b9dcaf9a0d84666f25f` |
+| `census-return.md` | `463d896350908204a32c9773c7e72c2c229a8ea9797a5a2fe3bb240dd23b9ec4` |
+| `darwin-texts/index.json` | `25a8ca470d57f0045b359f6914dbcfa3880585c86e5312a4f8c8c62e23be6a24` |
+| `run7/macho-identities.txt` | `7b633fb790116092bbe0bb5ad5a772e481cbd466275b0540807dc8ce458326e5` |
+| `run7/app-listing.txt` | `fb083d71fc673d0ca5955403135b2600e228f8afa322498b92b3c0b38ebcfa17` |
+
+Dispatch item 1 requires six `reused_from` inputs to reference existing local
+native-licence files instead of adding duplicates. A recursive SHA-256 scan of
+`tools/package/native-licences/` confirms only TWO have a local counterpart:
+`darwin-libffi-LICENSE` -> `libffi-cpython-source-deps-LICENSE.txt`, and
+`darwin-python-build-standalone-LICENSE.openssl-3.txt` ->
+`openssl-3.5.5-LICENSE.txt` (also present in the two FFmpeg text folders).
+
+The other FOUR `reused_from` inputs have no matching bytes anywhere under
+`native-licences/`. Their references name external seat evidence, not committed
+manifest inputs:
+
+| Staged input | SHA-256 |
+|---|---|
+| `work/wp6.5/f02b-census/darwin-texts/darwin-qtbase-src--3rdparty--forkfd--qt_attribution.json` | `525fd890017a3966f542da42a9ff0ca2a0d71bc45f80a4871de3e0bd0f612612` |
+| `work/wp6.5/f02b-census/darwin-texts/darwin-qtbase-src--corelib--kernel--qt_attribution.json` | `27bb1f28d336f1f8f6d44689f28cb650f0844cc82672e36ae168d0716783fad5` |
+| `work/wp6.5/f02b-census/darwin-texts/darwin-qtbase-src--dbus--qt_attribution.json` | `346532e1fb3bf653bc949408834c305646fc93f96650a2af9b2171d141c107ee` |
+| `work/wp6.5/f02b-census/darwin-texts/darwin-qtbase-src--plugins--platforms--cocoa--qt_attribution.json` | `27a435bfea96ca950f4a5ad6a82be7fe2a62bb4db0d8851e7a84fc5dce0c3ff3` |
+
+Cheap reproduction: `work/wp6.5/f02b-cell/reuse-reproduction.log` records all
+six staged filenames, their hashes, original `reused_from` strings, and recursive
+local matches. No external evidence path or other worktree was read. Independent
+inspection of `darwin-components.json` shows those four JSON files are not
+manifest file references; their upstream paths appear as explanatory evidence.
+The four component licence texts are separate staged inputs.
+
+**Ruling requested:** treat those four attribution JSON files as evidence-only,
+add the ELEVEN new runtime licence texts, and reuse the TWO existing runtime
+texts. This preserves the supplied 15 component rows and adds no redundant
+attribution blobs. Alternatively authorize adding the four evidence JSON files,
+which would mean 15 files added / two reused, rather than six reused. No choice
+was implemented because the dispatch requires STOP on a premise mismatch.
+
+Counts observed: 56 proposed darwin hosts, 15 new components (INCLUDING the two
+carried-notice components; not 15 plus two), 94 existing component additions,
+17 staged text/evidence files. Counts landed: ZERO. No manifest, text, source,
+test or workflow file changed. Windows rows/output and all frozen paths remain
+unchanged. Static checks, pytest RED/GREEN and root-annex checks were not run;
+this is a pre-implementation finding, not a product-code verification claim.
+
+**REMAINING at the D1 yield (superseded below):** all implementation items 1-8, including identity schema/matching,
+framework-seal rule, darwin limits and host counts, synthetic full-plan coverage,
+workflow changes, six carried findings and CUDA skip; then parent RED, full
+requested validation, Windows byte checks, verification loop and Claude A/B.
+Rows and census declaration must still land in ONE implementation commit.
+
+Run-8 reading checklist retained for the continuation: bind darwin rows by
+`macho:` identity by relpath, never whole-file sha256/size; equal identity with
+different sha256 is recorded as ad-hoc signing variability without failure;
+different identity is a STOP to CHARC (`da5a86b7` item 2). Record PBS BUILD;
+absent/different marker produces the existing parent-version refusal and is a
+FINDING with the observed marker, not a STOP (`3fdf1fd3` item 2). RECORD-ownership
+refusals in run 8 are findings unless they name a product file.
+
+| Round | Critical | Major | Minor | In/out | NEW/REOPENED | Reverts | Fix kind | Reviewer/transport | Depth |
+|---|---:|---:|---:|---|---|---:|---|---|---|
+| F0-2b entry preflight | 0 | 0 | 1 | 1/0 | 1/0 | 0 | Ledger only; ruling pending | Cell reproduction, no review round | Not supplied |
+
+### F0-2b / 2 implementation
+
+Resumed Codex cell, head still `8955f790`; D1 answered by the dispatcher's second
+dispatch. No further STOP or interface dispute. No cell commit. The rows and
+`embedded_census` declaration are in this ONE pending implementation change set.
+Claude A and B are seat-run follow-ups, not claimed here. Dispatcher-read depth
+not supplied. Evidence below is under `work/wp6.5/f02b-cell/`.
+
+| Dispatch item | Change / mechanic | RED on extracted `8955f790` and GREEN |
+|---|---|---|
+| 1, census data / F4 / F5 | `native-licences/manifest.json:4054` adds 15 components, INCLUDING the two carried-notice components and two static CPython libraries. `:11688` starts 56 darwin hosts; `:16082` declares `complete`, evidence `run 42897107215 @ 8955f790`. 94 existing component rows gain darwin `embedded_in` paths only. Python parent version is `3.12.13 (python-build-standalone 20260303)`. | `test_f02b_real_manifest_census_and_platform_limits` fails parent on missing `embedded_census`; fold loads all hosts, rows and texts. The full synthetic plan below checks every carried source pin. No general SPDX whitelist exists: existing string validation accepts the two ruled values, `blessing` and `AFL-2.1 OR GPL-2.0-or-later`; no whitelist extension needed. |
+| 2, identities | `notices.py:406` has distinct darwin/Windows row schemas. Darwin JSON carries ONLY `macho`, INSTEAD OF sha256/size_bytes. `_embedded_macho` (`:635`) uses unchanged `build._macho_identity` + `_macho_digest`; `_embedded_claims` (`:642`) checks that reading and detects moved identities. Windows scan, SHA-256/size checks and refusal wording retain their original branch. | `test_f02b_darwin_identity_is_signature_invariant`: parent rejects a rewritten/re-signed image by whole-file SHA-256; changed-code and non-Mach-O cases fail the expected `macho:` expected/actual-message assertion. All three pass at fold. Missing/malformed `macho` and additional sha256/size fields refuse; two identical declared images and an undeclared extra copy have explicit controls. |
+| 3, F2 framework seals | `_APP_FRAMEWORK_SEAL` beside `_APP_BUILD_METADATA` and `_app_framework_seal` (`notices.py:1848`) restrict the exact Frameworks / framework / Versions/A shape, physical files, `<?xml` prefix, and same-plan executable attribution. The comment names PyInstaller `building/osx.py`, `codesign --deep`. Invalid seal-shaped entries never fall back to RECORD ownership. | Six framework positive cases fail parent as unknown CodeResources; all pass. Negative controls cover non-framework, unattributed executable, non-plist, linked seal, onedir layout, and even RECORD-owned non-plist bytes. That last case is DID NOT RAISE on parent and now refuses by the ordinary unknown-entry message. |
+| 4, F6c limits | `_limit_declarations` (`notices.py:492`) adds platform/parent for darwin only, schema_version remains 1. Same-plan selection (`:2736`) requires an existing physical inventory file attributed to the declared parent: a verified embedded host, or an unambiguous RECORD owner in the same plan. | Parent refuses the new valid form at its old schema. Wrong-owner and absent-path cases fail the expected named limits refusal assertion there; fold accepts the valid form and rejects both invalid paths. Windows limits and their statements are unchanged; darwin statements copy Windows VERBATIM. |
+| 5, B ADV 3 / plan | `tests/test_tools_package_notices.py:403`, `_RUN7_APP_TREE`: all 293 files and 86 links from run 7's listing; synthetic native images and RECORDs; real manifest/text loading, native origin verification, ownership, and all 14 limits. Both six framework Info.plists and six generated CodeResources are asserted by owner. | Parent refuses the real manifest's new host schema. Fold passes. Only the census identity reading and the TWO wheel-carried notice inputs are substituted, since synthetic images/texts cannot reproduce their run-7 pins. The CArchive/PYZ are real stand-ins, never run. Other native parsing and RECORD-origin checks are real. `app_release` no longer skips off Windows; Python licence location follows the host's actual layout. Seat census section (b), accepted in `da5a86b7`, remains the pre-check; run 8 is the first actual bundle plan. |
+| 6, workflow | `macos-build.yml:30` switch ON; bundled build uses `!cancelled()`; upload additionally requires `inputs.release-version`. Validation evidence reads PBS BUILD (`:106`), emits `# bootloader\tContents/MacOS/Clearwater\t<macho>` (`:223`), and invokes `file -E -b` (`:210`). Step order and listing/otool branch unchanged. | Parent fails switch/condition assertions, evaluated failed-leg build paths, validation upload exclusion, BUILD present/absent/different cases, and file flags. Fold passes the same selection, including executed script checks. A release build DOES run after a failed test leg; stage AND upload retain implicit success() and therefore do NOT run after failure. Validation success stages an asset but never uploads `macos-release`. |
+| 7, carried items | B MINOR 1: `_find_notices_executable` (`notices.py:1709`) discovers from the enclosing release root when started at Contents/MacOS, and refuses nested app candidates through non-following enumeration. B MINOR 2: `_macos_ffmpeg_rows` (`:2086`) checks the pins pointer and the Runner label/image against the writer and lock. B ADV 3/4 are rows 5/6. A r3 ADV 1: `_inventory` (`:1673`) returns `tuple[_InventoryEntries, Path]`; plan uses `entries.in_app` directly (`:2437`). A r3 ADV 2: the earlier A r2 F2 ledger citation now names `:856` at `5729dd63`. | Nested-app parent probe fails DID NOT RAISE. Both tampered provenance lines fail DID NOT RAISE on parent; fold refuses each, with a fixture in the real writer's fifteen-line format. Existing no-premature-follow recorders and ordinary/X.app Windows byte cases remain green. Annotation/citation changes have no behavioral RED requirement. |
+| 8, CUDA | `tests/test_wp321_bench.py:60` skips before running a GPU benchmark when `_probe_gpu` returns unavailable, using `CUDA unavailable for device-frame benchmark: <reason>`. The workflow skip allowlist admits exactly that prefix alongside the existing VideoToolbox prefix. | Parent reaches a planted `GPU benchmark ran with no CUDA device` assertion instead of skipping; parent workflow rejects that skip reason. Fold passes both controls without probing a real GPU. |
+
+The `.github` diff is restricted to the six dispatched changes, their corrected
+comments, and item 8's explicitly requested skip-reason allowance. No selection
+expression change is required: the existing switch-dependent branch now leaves
+`default_pipe_fidelity`, `ffmpeg_text_and_redaction`, `tool_and_worker_spawn`,
+`test_macos_bundle_smoke[P16]` and `[P57]` selected. `videotoolbox` is also selected
+and retains its named availability skip on a runner lacking the encoder.
+
+#### Census, text reuse, limits and byte locks
+
+The census references and SHA-256 values in the entry preflight above remain the
+inputs of record, accepted by CHARC `3fdf1fd3`. D1's four staged attribution JSON
+paths/hashes are retained there as EVIDENCE ONLY, not committed or referenced by
+runtime component rows. `_attribution_spec` (`notices.py:373`) returns None when
+the optional field is absent; no schema requires it for these Qt git-tree rows.
+
+Counts landed: **56 darwin hosts** (SciPy 33, Pillow 10, PySide6 9, pillow-heif 2,
+Python 1, Shiboken6 1), **15 new components**, **94 existing component additions**,
+**11 byte-exact new licence files**, **2 existing texts reused** by existing local
+filename, **4 attribution JSON inputs retained only as staged evidence**, and
+**14 darwin limits**. The 15 components already INCLUDE the two carried-notice
+components; they are not 15 plus two. No component named by a proposed host was
+missing. JSON schema_version remains 1. No existing text was edited.
+
+| Darwin limit | Host count |
+|---|---:|
+| BASICLU / IPX / cuPDLP-C (U-S5) | 2 |
+| COLAMD (U-S4) | 1 |
+| Cython-generated code (U-S8) | 82 |
+| DCDFLIB | 2 |
+| FITPACK | 2 |
+| L-BFGS-B | 1 |
+| LSODA (ODEPACK) | 1 |
+| NNLS | 1 |
+| QUADPACK | 1 |
+| SLSQP | 1 |
+| Sobol direction numbers (U-S9) | 1 |
+| Tcl/Tk header (U-T1) | 1 |
+| VODE / ZVODE | 1 |
+| mdspan (Kokkos, U-S6) | 7 |
+
+The Cython row covers all 82 counterparts, including the 49 without embedded-host
+declarations. U-H3, U-N2 and x86inc do not apply on macOS and gain no darwin limit.
+`manifest-counts.json` records these counts. `locks-proof.log` confirms literal
+byte-unchanged JSON blocks for all 110 Windows hosts; existing component fields
+except additive embedded_in are unchanged, and darwin limits preserve every
+Windows statement verbatim. `windows-base-proof.log` confirms the manifests at
+`200dffd8` and `8955f790` are themselves byte-identical, SHA-256
+`1a3d3bba9fad9617dae0a966212de27322077c4c6922c35ec5ea46425d01bf9e`.
+
+Both ordinary and X.app `test_windows_notices_bytes_equal_pre_f02` cases pass in
+the full notices/build runs. Root `--root-annex --check`: **root annex matches**.
+Its rendered bytes remain **854656**, SHA-256
+`cedaab4fcc6a27ed89c985cfc16b93ded8e2e8b20a1e83e69a155aee137f1541`.
+The root golden file is unchanged from `200dffd8` (`root-golden-lock.log`).
+`locked-paths.log` confirms no diff to build.py, src/, release.yml, either FFmpeg
+lock, uv.lock or the root notices. No real bundle build/run, GPU activation,
+network fetch, external push/tag/dispatch, owner-profile edit or real role-mailbox
+write was performed. Harness tests exercise disposable mail and launcher fixtures.
+Final recheck: `locks-proof-final.log` reproduces the byte assertions;
+`final-files-proof.log` confirms eight tracked files are LF-only and the eleven
+new licence texts make nineteen total owned paths. `diff-check-final.log` is clean.
+
+#### RED, GREEN and verification loop
+
+All pytest runs used the copied `run_pytest.py`, sandbox_mkdir_shim,
+`-p no:cacheprovider`, disposable basetemps under this scratch directory,
+`-m 'not gpu'`, and the required startup exclusion. No Qt module ran under xdist.
+Entry-point scans found only the existing isolated smoke stand-in (GUI stubbed,
+disposable profiles, bounded child timeout), not a new product-entry execution.
+The old bench test's GPU leg was intercepted before its benchmark could run.
+
+Final parent proof: extracted notices, manifest, workflow and bench-test sources
+from `8955f790` through read-only Git, selected with explicit WP65_* overrides;
+branch never moved. `red-parent-final.log` / `.xml`: **35 failed, 22 passed**.
+Failures: **18 notices, 16 workflow, 1 CUDA**; the table above names the assertion
+or refusal reached per item. `red-summary-final.log` indexes every failing ID.
+The matching fold selection (`green-final.log`) is **57 passed**. Earlier exploratory
+RED runs are retained but superseded by this behavior-level final selection.
+
+| Check | Observed result | Log |
+|---|---|---|
+| ruff check / format check | All checks passed / 339 already formatted | `ruff-final.log`, `format-final.log` |
+| mypy / mypy --platform darwin | Success, 166 source files each | `mypy-final.log`, `mypy-darwin-final.log` |
+| Notices + build, final plain `-n 3` | **1326 passed, 1 skipped** | `notices-build-final.log` |
+| Notices + build, final `-n 3 --dist loadfile` | **1326 passed, 1 skipped** | `notices-build-loadfile-final.log` |
+| Smoke + macOS portability + workflow + bench, serial / not gpu | **245 passed, 227 skipped, 5 failed**, 1 deselected | `serial-final.log` |
+| Harness unittest discovery, sandbox mkdir shim / workspace TEMP | **423 run: 419 passed, 1 skipped, 3 failed** | `harness.log` |
+| Root annex / Windows byte locks | Matches / both artifact cases byte-equal | `annex.log`, `locks-proof.log`, full notices logs |
+
+The earlier loadfile run (`notices-build-loadfile.log`) was **1326 passed,
+1 skipped**; final repeat additionally includes the refined identity-test
+stand-ins that make the parent fail at matching behavior rather than construction.
+The build skip is unchanged, CPython sysconfig data POSIX-only. Serial skips are
+226 macOS-native cases on Windows plus the existing POSIX process-group case.
+
+All FIVE serial failures are the existing
+`test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`
+parameters **annotated, lightweight, wrong-commit, mismatched-name, deleted-origin**:
+the disposable local `git push origin HEAD:refs/heads/main --tags` fails with
+Git's `sh.exe: fatal error - CreateFileMapping`, exit 128. They are not counted
+green or silently skipped. **Seat reruns them outside the restricted token.**
+
+The three harness failures are MINOR / OUT-OF-ENVELOPE verification findings,
+OUTSIDE the owned files, and are not counted green:
+
+- `test_subprocess_no_site_packages_runs_core`: its `-S` child does not inherit
+  the imported mkdir shim; a child TemporaryDirectory yields WinError 5 while
+  making its disposable `charc/inbox` tree.
+- `test_bash_cc_preflight_refusal_positive_control`: the launcher dry-run exits 1,
+  but stdout lacks the expected missing-bash-path message after the CLI preflight
+  lines. Cause not established here; rerun at the seat with stderr retained.
+- `test_resolve_main_checkout_root_falls_back_when_git_unavailable_or_fails`:
+  workspace-only TEMP puts the test's alleged non-repo directory inside this Git
+  worktree, so real Git resolves the main checkout instead of failing. Seat reruns
+  with an ordinary non-repository temporary root.
+
+These are exposed verification limitations, not fixes to the unowned harness.
+No harness source changed. This non-verbose unittest log reports one skip without
+its reason; no new skip was introduced in harness source.
+
+Verification loop (not independent Claude review): D1 MINOR confirmed and answered;
+the duplicate-identity relocation map was confirmed by the existing missing-host
+control's unexpected moved-path refusal (`all-small.log`), fixed to retain every
+declared relpath, and covered by the shared-identity controls. A suspected
+RECORD-owned/non-plist framework seal fallback was independently reproduced
+(`seal-record-red.log`, DID NOT RAISE), fixed to refuse, then covered in full runs.
+Both are in-envelope MINOR findings, fixed. No false-positive finding rejected.
+Fixture-only corrections supplied real origin files (Distribution.files filters
+missing files), restored synthetic metadata/owner mappings, and made pending
+censuses explicit after the production declaration became complete. The subsequent
+source/manifest/workflow pass and focused tests found no new product issue.
+
+**Run 8 checklist:** the earlier `da5a86b7` / `3fdf1fd3` reading rule still binds:
+same macho identity plus changed whole-file sha256 means record signing variability,
+no failure; a changed identity is a STOP to CHARC. PBS BUILD absent/different is
+recorded and the existing parent-version refusal is a FINDING with the observed
+value, not a STOP. RECORD-ownership refusals are findings unless they name a
+product file. Confirm bundled FFmpeg/ffprobe, notices at Contents/Resources, seal
+and smoke PASS, stage success with no validation-mode macos-release upload, and
+the formerly excluded FFmpeg families. U1-U10 and the census's U3/U4/U10 accept
+notes remain in the accepted census; no new upstream evidence claim is made.
+
+**REMAINING at this handoff:** Claude A on this delta, Claude B on the whole group,
+the seat's two-leg package gate and reruns above, then CHARC's ready/push/run-8
+proof. No implementation item is intentionally deferred.
+
+| Phase | Critical | Major | Minor | In/out | NEW/REOPENED | Reverts | Fix kind | Review status | Depth |
+|---|---:|---:|---:|---|---|---:|---|---|---|
+| F0-2b build/self-verification | 0 | 0 | 3 | 3/0 | 3/0 (D1 plus identity/seal controls) | 0 | Product + data + tests; D1 ruled | Final self-pass zero new product issues; Claude A/B pending | Not supplied |
