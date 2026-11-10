@@ -507,6 +507,84 @@ def hits(found: list[str], needle: str) -> list[str]:
     return [line for line in found if needle in line]
 
 
+def model_sysconfig_build(monkeypatch, system="posix"):
+    """Model the runner interpreter without changing pathlib's host platform selection."""
+    implementation = SimpleNamespace(**{**vars(sys.implementation), "_multiarch": "darwin"})
+    monkeypatch.setattr(
+        build,
+        "sys",
+        SimpleNamespace(
+            **{
+                **vars(sys),
+                "platform": "darwin" if system == "posix" else "win32",
+                "abiflags": "",
+                "implementation": implementation,
+            }
+        ),
+    )
+    monkeypatch.setattr(build, "os", SimpleNamespace(**{**vars(os), "name": system}))
+
+
+@pytest.mark.parametrize(
+    ("module", "expected"),
+    [
+        ("_sysconfigdata__darwin_darwin", []),
+        ("_sysconfigdata_evil", ["unexpected-module"]),
+        ("_sysconfigdata__linux_x86_64-linux-gnu", ["unexpected-module"]),
+        ("pkg._sysconfigdata__darwin_darwin", ["unexpected-module"]),
+    ],
+)
+def test_run5_pyz_accepts_only_the_interpreters_exact_sysconfig_module(
+    monkeypatch, module, expected
+):
+    """Only the build interpreter's exact top-level name is a generated PYZ module."""
+    model_sysconfig_build(monkeypatch)
+    monkeypatch.setenv("_PYTHON_SYSCONFIGDATA_NAME", "_sysconfigdata_evil")
+    assert build.module_violations(module) == expected
+
+
+@pytest.mark.parametrize("module", ["_sysconfigdata__darwin_darwin", "_sysconfigdata_evil"])
+def test_run5_windows_has_no_sysconfig_module_exception(monkeypatch, module):
+    """The POSIX-only exception does not widen Windows' module allowlist."""
+    model_sysconfig_build(monkeypatch, "nt")
+    assert build.module_violations(module) == ["unexpected-module"]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="CPython sysconfig data is POSIX-only")
+def test_run5_sysconfig_name_agrees_with_cpython(monkeypatch):
+    """The native interpreter's own name is accepted with the environment override unset."""
+    import sysconfig
+
+    monkeypatch.delenv("_PYTHON_SYSCONFIGDATA_NAME", raising=False)
+    assert build.module_violations(sysconfig._get_sysconfigdata_name()) == []
+
+
+def test_run5_sysconfig_exception_is_only_for_pyz(tmp_path, monkeypatch):
+    """A generated name in CArchive, a loose file, ZIP or app content is still refused."""
+    module = "_sysconfigdata__darwin_darwin"
+    executable = make_exe(
+        tmp_path / "archive",
+        [(module, pyc(module), "m")],
+        modules=[module, "_sysconfigdata_evil", "pkg." + module],
+    )
+    model_sysconfig_build(monkeypatch)
+    assert build.forbidden_entries(executable) == [
+        f"pkg:{module} (unexpected-module)",
+        "pyz:_sysconfigdata_evil (unexpected-module)",
+        f"pyz:pkg.{module} (unexpected-module)",
+    ]
+    assert build.module_violations(module, allow_boot=True) == ["unexpected-module"]
+    loose = tree(tmp_path / "loose", [f"{INTERNAL}/{module}.pyc"])
+    assert build.forbidden_paths(loose) == [f"dist:{INTERNAL}/{module}.pyc (unexpected-module)"]
+    assert build.zip_violations(
+        zip_bytes({module + ".pyc": b"x"}), "test.zip", module_root=True
+    ) == [f"test.zip!{module}.pyc (unexpected-module)"]
+    root, app = run4_content_release(tmp_path / "app", [module + ".pyc"])
+    assert app_content_paths(root, app) == [
+        f"dist:Clearwater.app/Contents/Frameworks/{module}.pyc (unexpected-module)"
+    ]
+
+
 @pytest.mark.parametrize(
     ("platform", "filename"), [("win32", "Clearwater.exe"), ("darwin", "Clearwater")]
 )
@@ -999,6 +1077,7 @@ def test_ar4_content_under_aliased_release_root(tmp_path, monkeypatch, root_is_a
 
 def test_ar4_folder_diamond_is_refused_with_one_budget_line(tmp_path, monkeypatch):
     """A non-cyclic 13-level diamond is bounded per top-level link, across all levels."""
+    monkeypatch.setattr(build, "_MACOS_LINK_CONTENT_ENTRIES", 64, raising=False)
     root, app = run4_content_release(tmp_path, [])
     for level in range(13):
         for side in ("a", "b"):
@@ -1023,6 +1102,11 @@ def test_ar4_folder_diamond_is_refused_with_one_budget_line(tmp_path, monkeypatc
     assert found.count(label) == 1
     # No descent can emit a second refusal at the same top-level label.
     assert len(found) == len(set(found))
+
+
+def test_run5_content_budget_has_run4_headroom():
+    """The real limit leaves at least ten times the measured run-4 per-link maximum."""
+    assert build._MACOS_LINK_CONTENT_ENTRIES >= 10 * 99
 
 
 def test_ar4_budget_is_shared_across_levels_and_resets_per_link(tmp_path, monkeypatch):
@@ -4759,7 +4843,35 @@ def test_seal_macos_bundle_failures_are_named(tmp_path, failure):
         build.seal_macos_bundle(tmp_path, run=run)
 
 
-def darwin_app_build(monkeypatch, tmp_path, *, seal, origin):
+def run5_collect_sibling(root):
+    """Create six run-5 COLLECT links, spanning its three unshipped link classes.
+
+    Names come from run 5's build.log; targets mirror the captured app-listing.txt.
+    The sibling uses the same PyInstaller framework and dylib layout as the .app.
+    """
+    internal = root / "Clearwater/_internal"
+    framework = "PySide6/Qt/lib/QtCore.framework"
+    tree(
+        internal,
+        [
+            f"{framework}/Versions/A/QtCore",
+            f"{framework}/Versions/A/Resources/Info.plist",
+            "PIL/.dylibs/libXau.6.dylib",
+            "pillow_heif/.dylibs/libx265.217.dylib",
+        ],
+    )
+    for name, target, folder in (
+        (f"{framework}/QtCore", "Versions/Current/QtCore", False),
+        (f"{framework}/Resources", "Versions/Current/Resources", True),
+        (f"{framework}/Versions/Current", "A", True),
+        ("QtCore", f"{framework}/Versions/Current/QtCore", False),
+        ("libXau.6.dylib", "PIL/.dylibs/libXau.6.dylib", False),
+        ("libx265.217.dylib", "pillow_heif/.dylibs/libx265.217.dylib", False),
+    ):
+        _symlink(internal / name, target, folder=folder)
+
+
+def darwin_app_build(monkeypatch, tmp_path, *, seal, origin, collect_sibling=False, app_payload=()):
     """``build()`` on darwin with PyInstaller, the seal and the origin check stubbed."""
     monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
     monkeypatch.setattr(build, "pack_sources", lambda: [])
@@ -4775,10 +4887,55 @@ def darwin_app_build(monkeypatch, tmp_path, *, seal, origin):
         for name in ("Clearwater/Clearwater", "Clearwater.app/Contents/MacOS/Clearwater"):
             (folder / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, folder / name)
+        if collect_sibling:
+            run5_collect_sibling(folder)
+        tree(folder / "Clearwater.app", list(app_payload))
 
     monkeypatch.setattr(build, "run_pyinstaller", build_folder)
     monkeypatch.setattr(build.sys, "platform", "darwin")
     return build.build("onedir", out=out), out
+
+
+@pytest.mark.parametrize("plant", [False, True], ids=["clean", "forbidden-in-app"])
+def test_run5_build_checks_only_the_shipped_app(tmp_path, monkeypatch, capsys, plant):
+    """The COLLECT sibling's six links cannot fail the shipped .app's content check."""
+    monkeypatch.setattr(build, "REPO_ROOT", REPO_ROOT)
+    status, _ = darwin_app_build(
+        monkeypatch,
+        tmp_path,
+        seal=lambda _: None,
+        origin=lambda *a, **kw: [],
+        collect_sibling=True,
+        app_payload=["Contents/Frameworks/cupy.pyc"] if plant else [],
+    )
+    printed = capsys.readouterr().out
+    assert status == int(plant), printed
+    assert "dist:Clearwater/_internal/" not in printed
+    if plant:
+        assert "dist:Contents/Frameworks/cupy.pyc (gpu-module)" in printed
+        assert "dist:Clearwater.app/" not in printed
+    else:
+        assert "FORBIDDEN in the bundle" not in printed
+
+
+def test_run5_release_zip_excludes_the_collect_sibling(tmp_path, monkeypatch):
+    """The same selected app is packed; no COLLECT member reaches the release ZIP."""
+    root, app = run4_content_release(tmp_path, [])
+    run5_collect_sibling(root)
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    folder = build.release_zip_folder(root)
+    assert folder == app
+    assert build._macos_release_files(folder) == sorted(
+        app / name
+        for name in ("Contents/Info.plist", "Contents/MacOS/Clearwater", "Contents/PkgInfo")
+    )
+    archive = build.write_release_zip(folder, out=tmp_path / "zip", source_epoch=1700000000)
+    with zipfile.ZipFile(archive) as stream:
+        assert sorted(stream.namelist()) == [
+            "Clearwater.app/Contents/Info.plist",
+            "Clearwater.app/Contents/MacOS/Clearwater",
+            "Clearwater.app/Contents/PkgInfo",
+        ]
 
 
 @pytest.mark.parametrize("outcome", ["sealed", "seal-fails", "origin-after-seal-fails"])
@@ -5829,6 +5986,7 @@ def macos_bundle(tmp_path, monkeypatch):
         pin.write_text(json.dumps(data), encoding="utf-8")
 
     real_run = build.subprocess.run
+    real_popen = build.subprocess.Popen
 
     def never_run(*args, **kwargs):
         pytest.fail("bundle_ffmpeg's darwin path ran a binary")
@@ -5847,6 +6005,7 @@ def macos_bundle(tmp_path, monkeypatch):
         pin=pin,
         source=source,
         real_run=real_run,
+        real_popen=real_popen,
     )
 
 
@@ -6563,6 +6722,7 @@ def test_darwin_build_bundles_from_the_macos_lock_and_refuses_release_while_cens
     seal_calls = []
     monkeypatch.setattr(build, "bundle_ffmpeg", fetched)
     monkeypatch.setattr(build.subprocess, "run", case.real_run)
+    monkeypatch.setattr(build.subprocess, "Popen", case.real_popen)
     monkeypatch.setenv("PYINSTALLER_CONFIG_DIR", str(tmp_path / "cfg"))
     monkeypatch.setattr(build, "native_origin_violations", lambda executable, **kwargs: [])
     monkeypatch.setattr(build, "seal_macos_bundle", seal_calls.append)
@@ -6814,6 +6974,7 @@ def test_build_enforces_origin_after_all_native_copies_on_darwin(
     tool bytes verified from the archive pass, a post-extraction change fails the build."""
     case = real_lock_bundle(macos_bundle)
     monkeypatch.setattr(build.subprocess, "run", case.real_run)
+    monkeypatch.setattr(build.subprocess, "Popen", case.real_popen)
     monkeypatch.setattr(build, "_native_origin_hashes", lambda: set())
     monkeypatch.setattr(build, "_is_clearwater_bootloader", lambda _: True)
     real_bundle = build.bundle_ffmpeg
@@ -6894,6 +7055,7 @@ def test_notices_writing_follows_ffmpeg_and_fails_the_build_on_error_on_darwin(
     before the seal. The notices writer is a stand-in (the .app notices are the F0-2 group's)."""
     case = real_lock_bundle(macos_bundle)
     monkeypatch.setattr(build.subprocess, "run", case.real_run)
+    monkeypatch.setattr(build.subprocess, "Popen", case.real_popen)
     events = []
     out = darwin_release_build(
         monkeypatch,

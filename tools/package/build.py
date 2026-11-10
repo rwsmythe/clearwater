@@ -333,6 +333,9 @@ def release_name(form: Form, version: str, platform: str | None = None) -> str:
 def release_dir(out: Path, form: Form, version: str) -> Path:
     """Return the folder the build writes the release into.
 
+    On macOS PyInstaller leaves both ``Clearwater.app`` and its COLLECT sibling
+    ``Clearwater/`` here. Only the .app ships; the sibling is an unshipped by-product.
+
     Args:
         out: The output folder.
         form: The PyInstaller form.
@@ -492,6 +495,10 @@ def name_violations(parts: Sequence[str], *, module_root: bool) -> list[str]:
 def module_violations(module: str, *, allow_boot: bool = False) -> list[str]:
     """Return the rules a frozen module name (``a.b.c``) breaks: :func:`name_violations`.
 
+    A PYZ module may use the POSIX build interpreter's exact generated sysconfig
+    data name. Compute CPython's default name without its environment override;
+    this exception never applies to CArchive module entries (``allow_boot=True``).
+
     Args:
         module: A dotted module name from the PYZ or a CArchive module entry.
         allow_boot: Exempt PyInstaller's boot modules (:data:`BOOT_MODULE_PREFIXES`) from the
@@ -503,7 +510,16 @@ def module_violations(module: str, *, allow_boot: bool = False) -> list[str]:
     """
     parts = module.split(".")
     boot = allow_boot and module.startswith(BOOT_MODULE_PREFIXES)
-    return name_violations([*parts[:-1], parts[-1] + ".pyc"], module_root=not boot)
+    sysconfig_data = (
+        not allow_boot
+        and os.name == "posix"
+        and module
+        == f"_sysconfigdata_{getattr(sys, 'abiflags', '')}_{sys.platform}_"
+        f"{getattr(sys.implementation, '_multiarch', '')}"
+    )
+    return name_violations(
+        [*parts[:-1], parts[-1] + ".pyc"], module_root=not (boot or sysconfig_data)
+    )
 
 
 def _is_zip_name(name: str) -> bool:
@@ -5539,7 +5555,7 @@ def build(
     check_start = time.monotonic()
     app = _macos_content_app(executable)
     bad = (
-        forbidden_paths(root) if app is None else forbidden_paths(root, app=app)
+        forbidden_paths(root) if app is None else forbidden_paths(release_zip_folder(root), app=app)
     ) + forbidden_entries(executable)
     missing = missing_hidden_imports(executable, wanted)
     check_wall = time.monotonic() - check_start
