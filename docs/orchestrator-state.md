@@ -9,12 +9,12 @@
   - Seat folder `work/orch-g65/` (drains, posts). Gen 64's scripts stay in `work/orch-g64/` and are used from there: `gate.sh`, `watch2.sh`, `leg.sh`, `gpu_sample.sh`, `window3.sh`, `window3v4.sh`, `qa.sh`, `f02-sizing.md`.
   - State worktree `.worktrees/orch-state-g65`.
   - Bash gauge 26-35 ms.
-- **NO CELL IS LIVE.** No Codex turn, review, gate or leg is running.
+- **LIVE CELL: `wp65-cell16`** (implementer-opus-high, Agent tool), WP6.5 run-3 group, dispatch-17 (`clearwater-review-evidence\wp6.5\cell\dispatch-17.md`), worktree `.worktrees/wp6.5`, base `a93a0ab7`, depth 0 at dispatch 08:32Z. It dies with this pane: a successor re-dispatches from the ledger and `git log`.
 - **CHARC is gen 21, `clearwater-charc-20261108-2037`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **WP6.5: READY for the re-push, waiting on the OWNER's word through CHARC** (CHARC `d9f82775`: per-word until a standing word exists; CHARC performs the push and sends the remote head + run id).
+1. **WP6.5: run 3 READ** (`42781244075`, runner table `wp6.5\runner\run-42781244075\runner-table.md`; CHARC rulings `d6981092`); the run-3 group is with `wp65-cell16`. On its return: seat QA, Codex A to convergence, re-gate (plan 2), a "ready" post; CHARC pushes under the owner's STANDING push word (2026-11-10). HISTORY of the run-3 push: (CHARC `d9f82775`: per-word until a standing word exists; CHARC performs the push and sends the remote head + run id).
    - Command: `git push origin wp6.5:refs/heads/macos-validation/wp6.5` (`69538abe` -> `a93a0ab7`, 11 commits, nothing under `src/`).
    - Then watch the run: a background `until` loop on `gh run view <id> --json status,conclusion`. Download read-only into `clearwater-review-evidence\wp6.5\runner\run-<id>\` (`gh run download`, `gh run view --log`), and build the runner table (form: `runner\run-42764505729\runner-table.md`).
    - **Expect:** C2 / C16 pass under their non-Windows bounds; items 3 and 4 pass; item 4's census listing CONFIRMS or refutes the EPERM-on-zombie hypothesis (a LIVE member after SIGKILL = STOP to CHARC); with the mode-keyed continuation every later step runs even if a leg fails, so run 3 yields the `.app` listing and otool for **F0-2**.
