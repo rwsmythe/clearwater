@@ -3494,7 +3494,10 @@ call. It records, as `(call, path, following)` in ONE ordered sequence:
   (`build._macos_link_chain_problem`) returns admitted, after its own calls.
 
 Not covered: opens made in C below these names (`io.FileIO` built directly, an extension
-module's own `fopen`), child processes, calls on a file descriptor.
+module's own `fopen`), child processes, calls on a file descriptor; from the A r15 fold
+(below) also named: calls with `dir_fd`, and `DirEntry.is_symlink` / `is_junction`
+(cached from the listing, whose `scandir` is recorded). The reading of a recorded path
+was changed by the A r15 fold (below).
 
 `:3332` `violations(root, zone)` walks the calls IN ORDER: a call is a violation when it
 touches the outside zone at all, or FOLLOWS a path under the release root through a link
@@ -3516,7 +3519,8 @@ them.
    under the release root;
 4. A r14's linked PATH folder (`Contents/Resources/bin -> ../../../outside/bin`, an unknown
    `Contents/Aaa.dylib` met first), with `original_path` naming the linked folder as
-   written, through `..` past the link, and followed by a host folder holding the file.
+   written, through `..` past the link, and followed by a host folder holding the file;
+   from the residual fold also a host alias into the bundle and a host link elsewhere.
 
 ### Regressions
 
@@ -3671,3 +3675,72 @@ keep today's query" for the `.app` form only. Commit `976f8c26` (`tools/package/
   effect, agent cwd resets), and scratch went to the main repo's `work\wp6.5\ar14fold\`.
 
 Depth at residual-fold yield: DISPATCHER TO FILL
+
+### A r15 fold (recorder)
+
+Codex Reviewer A r15 on `bce8bddc..4a1ccd69`: `VERDICT: FINDINGS`, three MINOR, all in the
+TEST recorder, folded under CHARC `4ed56fcb` (dispatch-19c, `wp65-cell18`; base
+`4a1ccd69`). Its CHECK 1, 3, 4 and 5 passed. Commit `2222a794`
+(`tests/test_tools_package_build.py` only): NO product change; no admission, onedir or
+Windows change.
+
+- **The reading model** (`tests/test_tools_package_build.py:3343` `violations()`, `:3387`
+  `_followed()`): a recorded path is read as the system reads it, with the unpatched
+  `lstat` / `readlink` only. From its anchor, component by component: a link (symlink, or a
+  junction by `os.path.isjunction`) is replaced by its TEXT at its PHYSICAL position (an
+  absolute text restarts at its anchor; the `\\?\` and `\??\` prefixes are dropped), and
+  `..` steps from the physical position. A link under the release root must be admitted
+  earlier, unless it is met while following an admitted link's own text (that walk
+  validated it); a component reached through an OUTSIDE link's text that lies strictly
+  under the release root is a violation (the residual's host alias); an alias to the root
+  or above it is allowed. A component that cannot be read ends the reading; 40 hops end a
+  loop. `realpath` is no longer used in the reading.
+- **#1 relative paths** (`:3229` `note()`): a relative path is recorded joined to
+  `os.getcwd()` of the moment, never normalised (`..` kept); a hand-built relative call is
+  joined at check time; admission events the same.
+  `:3775` `test_the_recorder_reads_a_relative_path_from_the_working_folder` (A's probe:
+  cwd beside the `.app`, `open("Clearwater.app/Contents/Resources/pkg/data")` with no
+  admission: a violation; and a recorded relative `os.lstat` carries the joined path).
+- **#2 an allowed ancestor alias** (`_followed`): after an alias the reading continues at
+  its physical target, so later components are recognised under the release root.
+  `:3792` `test_the_recorder_reads_on_from_an_allowed_alias_physical_target` (A's probe:
+  `<real tmp>/alias -> <wrapper>`, an `open` through `Contents/Resources/bin`: a violation;
+  an `open` of the physical `Contents/MacOS/Clearwater` through the same alias: none).
+- **#3 non-following calls** (`violations()` no longer skips them; `:3250` `os.open` still
+  records `following` as "the final component followed"): every call's ANCESTORS are
+  checked; `following=False` spares only the final component.
+  `:3809` `test_the_recorder_checks_the_ancestors_of_a_non_following_call` (A's probe:
+  modeled `O_NOFOLLOW`, a stubbed open backend returning 7; `os.open` and `lstat` of
+  `Contents/Resources/pkg/data` are violations, `lstat` of the link itself is not).
+  **Found, as asked:** at `4a1ccd69` EVERY call recorded `following=False` was skipped
+  wholesale, ancestors included: `lstat`, `readlink`, `os.open` under `O_NOFOLLOW`,
+  `DirEntry.is_dir` / `is_file` / `stat` with `follow_symlinks=False`, and the `admit`
+  events. All but `admit` are now ancestor-checked. `Path.is_symlink` / `is_junction` and
+  `os.path.isjunction` reach the recorder as `os.lstat` (Windows; POSIX `isjunction` makes
+  no call); `DirEntry.is_symlink` / `is_junction` are not recorded (cached; listed above).
+- The modeled-junction test (`test_the_recorder_sees_a_junction_as_a_link[modeled]`)
+  models both spellings of `Contents/MacOS`, since the reading is now physical (macOS
+  `/var` -> `/private/var`).
+- **RED on `4a1ccd69`** (a throwaway detached worktree; scratch
+  `work\wp6.5\ar14fold\test_ar15_recorder_red.py`, the three new tests verbatim, run
+  against that revision's own recorder): **3 failed**, each at its violation assertion
+  (`[]` returned). **GREEN** at `2222a794`.
+- **Re-run of every recorder-dependent test** (the r11 / r13 shapes, the A r14 PATH cases
+  and host cases, the recorder unit tests, the boundary, walk and missing-return tests): 23
+  passed; NO product call is newly reported. Cross-check that the new reading still
+  catches the residual: the PATH cases against `d1ecd039`'s `build.py` still fail
+  `host-alias-into-bundle` at `recorder.violations` (and `host-link-elsewhere` at its
+  message).
+- **GREEN:** `test_tools_package_build.py` + `test_tools_package_notices.py` (`-n 3`):
+  **1136 passed** (1133 + 3); `test_tools_package_smoke.py`: 74 passed, 1 skipped;
+  `test_macos_portability.py`: 226 skipped; `ruff check .`, `ruff format --check .` (339
+  files), `mypy`, `mypy --platform darwin` (166 source files): clean; committed blob 0 CR,
+  0 NUL.
+- **Verification loop:** suspected the physical reading turns the shapes' legitimate
+  non-following calls (the walk's `lstat` / `readlink` on canonical paths, the listing's
+  `DirEntry` queries) into violations: REJECTED, all green (their ancestors are physical
+  by construction). Suspected the checker is now vacuous on some path (an exception or an
+  early `False`): REJECTED by the three RED -> GREEN cases, the late-admission and junction
+  tests, and the `d1ecd039` cross-check. Pass 2: nothing new.
+
+Depth at A-r15-fold yield: DISPATCHER TO FILL
