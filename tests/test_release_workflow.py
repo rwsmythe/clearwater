@@ -1665,7 +1665,7 @@ def test_the_app_listing_step_lists_the_bundle_and_every_mach_o_file(macos):
         "fi",
     ]
     text = "\n".join(lines)
-    assert '  find "$app" -ls\n' in text
+    assert '  find "$app" -ls || echo "find -ls failed for $app"\n' in text
     # By file type, never by name: every regular file is asked, Mach-O ones get otool -L.
     assert 'done < <(find "$app" -type f -print0)' in text
     assert '    kind=$(file -b "$entry" || true)' in text

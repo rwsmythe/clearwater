@@ -148,7 +148,7 @@ jobs:
           fi
           {
             echo "# find $app -ls"
-            find "$app" -ls
+            find "$app" -ls || echo "find -ls failed for $app"
             echo
             echo "# otool -L over every Mach-O file in the bundle (found by file type)"
             while IFS= read -r -d '' entry; do
