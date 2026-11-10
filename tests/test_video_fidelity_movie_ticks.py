@@ -725,3 +725,45 @@ def test_a_listless_sources_implicit_dwell_is_not_dropped(monkeypatch):
     rows, _ = _listless_rows(monkeypatch, source, output)
     for name in (vf.VIDEO_EDIT_AS_WRITTEN, vf.EDIT_EFFECT):
         assert rows[name].status == compare.DIFFERENT
+
+
+def _with_both_absent_video(facts, *, first=False):
+    track = replace(facts.movie.tracks[0], track_id=3, edits=None, earliest_composition=0)
+    stream = dict(facts.probe["streams"][0], index=2, id="0x3")
+    tracks, streams = facts.movie.tracks, facts.probe["streams"]
+    return replace(
+        facts,
+        movie=replace(facts.movie, tracks=(track, *tracks) if first else (*tracks, track)),
+        probe={**facts.probe, "streams": [stream, *streams] if first else [*streams, stream]},
+        keys={2: "vide#0", 0: "vide#1", 1: "soun#0"} if first else {**facts.keys, 2: "vide#1"},
+    )
+
+
+def test_insta360_rounding_keeps_a_both_absent_video_key_equal_as_written(monkeypatch):
+    """R1 stays SAME as at ad36c021; the second absent pair is not an identity conversion."""
+    source = _with_both_absent_video(_facts(source=True))
+    output = _with_both_absent_video(_facts(source=False))
+    rows, notes = _rows(monkeypatch, source, output)
+    for name in MOVIE_ROWS:
+        assert rows[name].status == compare.SAME
+    item = rows[vf.VIDEO_EDIT_AS_WRITTEN]
+    assert READING in item.note and item.note in notes
+    assert item.source["vide#1"] is None and item.output["vide#1"] is None
+    assert "vide#1" not in item.note
+
+
+@pytest.mark.parametrize("first", [True, False], ids=["case-125", "mirror-order"])
+def test_source_identity_rounding_keeps_another_both_absent_video_key_equal(monkeypatch, first):
+    """A both-absent key cannot refuse the ruled F2 SAME, in either video-key order."""
+    source, output = _listless_pair()
+    source = _with_both_absent_video(source, first=first)
+    output = _with_both_absent_video(output, first=first)
+    rows, notes = _listless_rows(monkeypatch, source, output)
+    for name in (vf.VIDEO_EDIT_AS_WRITTEN, vf.EDIT_EFFECT, vf.MOVIE_DURATION):
+        assert rows[name].status == compare.SAME
+    item = rows[vf.VIDEO_EDIT_AS_WRITTEN]
+    assert READING in item.note and item.note in notes
+    absent_key, identity_key = ("vide#0", "vide#1") if first else ("vide#1", "vide#0")
+    assert item.source[absent_key] is None and item.output[absent_key] is None
+    assert absent_key not in item.note
+    assert f"source {identity_key} (no edit list; identity): V=300001/30001" in item.note

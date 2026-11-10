@@ -810,7 +810,8 @@ def _movie_tick_reading(
     (D != V); the existing AD-22 reading takes precedence in ``fidelity_items``.
     An absent list is figured as an identity, not a written entry. On the video
     "as written" row only a source-side absence can use Q-C: its implicit effect
-    is compared with the output's single conventional media entry.
+    is compared with the output's single conventional media entry. A key with
+    no edit list on either side stays None == None, as written.
     """
     if item.status == compare.SAME:
         return item, None
@@ -869,7 +870,11 @@ def _movie_tick_reading(
                 else _written_entries(movie, track)
             )
             if entries is None:
-                if side == 0 and item.name == VIDEO_EDIT_AS_WRITTEN:
+                if (
+                    side == 0
+                    and item.name == VIDEO_EDIT_AS_WRITTEN
+                    and item.output.get(key) is not None
+                ):
                     entries = _effect_entries(movie, track)
                     identity_source_keys.add(key)
                 else:
