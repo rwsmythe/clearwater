@@ -134,6 +134,14 @@ jobs:
         run: |
           uv run python tools/package/build.py --form onedir --out work/release 2>&1 | tee work/evidence/build.log
 
+      - name: Build release bundle and zip
+        if: env.MACOS_FFMPEG_BUNDLED == 'true'
+        run: |
+          lock=tools/package/ffmpeg-macos.lock.json
+          url=$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['asset_url'])" "$lock")
+          sha=$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['seat_sha256'])" "$lock")
+          uv run python tools/package/build.py --form onedir --ffmpeg-from "$url" --ffmpeg-sha256 "$sha" --notices --smoke --zip --out work/release 2>&1 | tee work/evidence/build.log
+
       - name: List the app bundle
         if: ${{ !cancelled() && !inputs.release-version }}
         env:
@@ -161,14 +169,6 @@ jobs:
               esac
             done < <(find "$app" -type f -print0)
           } > "$listing" 2>&1
-
-      - name: Build release bundle and zip
-        if: env.MACOS_FFMPEG_BUNDLED == 'true'
-        run: |
-          lock=tools/package/ffmpeg-macos.lock.json
-          url=$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['asset_url'])" "$lock")
-          sha=$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['seat_sha256'])" "$lock")
-          uv run python tools/package/build.py --form onedir --ffmpeg-from "$url" --ffmpeg-sha256 "$sha" --notices --smoke --zip --out work/release 2>&1 | tee work/evidence/build.log
 
       - name: Run macOS tests on the built bundle
         if: ${{ success() || (!cancelled() && !inputs.release-version) }}

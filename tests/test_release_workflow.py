@@ -904,8 +904,8 @@ def test_macos_job_steps_mirror_the_windows_order(macos):
         "Run parallel tests",
         "Run serial tests",
         "Build app bundle without FFmpeg",
-        "List the app bundle",
         "Build release bundle and zip",
+        "List the app bundle",
         "Run macOS tests on the built bundle",
         "Check macOS skip reasons",
         "Capture runner and encoder facts",
@@ -1643,11 +1643,12 @@ LISTING = "work/evidence/app-listing.txt"
 
 
 def test_the_app_listing_step_lists_the_bundle_and_every_mach_o_file(macos):
-    """Run 3 item 7: after the build without FFmpeg, ``find -ls`` of the .app and ``otool -L``
+    """Run 3 item 7: after BOTH builds (A r11 #4), ``find -ls`` of the .app and ``otool -L``
     over every Mach-O file found by file type (an extensionless Mach-O counts), written into the
     evidence upload; a missing .app is said in the listing and the step exits 0."""
     names = re.findall(r"^      - name: (.+)$", macos, re.MULTILINE)
-    assert names.index("List the app bundle") == names.index("Build app bundle without FFmpeg") + 1
+    assert names.index("List the app bundle") == names.index("Build release bundle and zip") + 1
+    assert names.index("List the app bundle") > names.index("Build app bundle without FFmpeg")
     body = step(macos, "List the app bundle")
     assert f"        if: {VALIDATION_ONLY}\n" in body
     assert "continue-on-error" not in body and "shell:" not in body
@@ -1702,6 +1703,29 @@ def test_the_app_listing_condition_by_mode(macos, mode, inputs, failed, runs):
     for switch in ("false", "true"):
         env = {"MACOS_FFMPEG_BUNDLED": switch}
         assert evaluate_if(condition, failed=failed, env=env, inputs=inputs) is runs, mode
+
+
+@pytest.mark.parametrize(
+    ("switch", "built_by"),
+    [("false", "Build app bundle without FFmpeg"), ("true", "Build release bundle and zip")],
+    ids=["switch-off", "switch-on"],
+)
+@pytest.mark.parametrize("failing", [None, "Run parallel tests"], ids=["ok", "failed-leg"])
+def test_the_app_listing_follows_whichever_build_ran(macos, switch, built_by, failing):
+    """A r11 #4: validation mode, the real ``if:`` expressions EVALUATED step by step. With the
+    switch on and every step green, the FFmpeg-ON build makes the .app and the listing is
+    reached AFTER it (before this fold it ran first and found no bundle); with the switch off,
+    after the build without FFmpeg. A failed leg still lists (the release build, gated on
+    success, is then not reached). Release mode never lists."""
+    reached = _walk(macos, {}, switch, failing)
+    assert "List the app bundle" in reached
+    later = reached[reached.index("List the app bundle") :]
+    for name in ("Build app bundle without FFmpeg", "Build release bundle and zip"):
+        assert name not in later
+    if failing is None or built_by != "Build release bundle and zip":
+        assert built_by in reached
+        assert reached.index(built_by) < reached.index("List the app bundle")
+    assert "List the app bundle" not in _walk(macos, {"release-version": "1.2.0"}, switch, None)
 
 
 # --- WP6.5 group 2a part 2: the switch's lock fields follow the macOS lock's shape ---------
