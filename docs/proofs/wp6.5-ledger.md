@@ -4467,3 +4467,210 @@ push/tag/dispatch, src/interface/.github/dependency/notices/debt/C14/committed-f
 change, real bin/FFmpeg access, frozen run/build, product entry-point/GUI launch,
 desktop input, network action, other-worktree read or footage/profile write.
 All evidence stays inside this worktree; the seat handles review, commits and run 6.
+
+## F0-2 round 0
+
+`wp65-cell19` (Claude, implementer-opus-high, FRESH), dispatch F0-2 / 1, base `200dffd8`,
+2026-11-10. Brief `main:docs/briefs/wp6.5-f02-brief.md` (FINAL, `4d69b21b`). Inputs read only:
+run-6 evidence `run-42865170579/macos-evidence/` (`app-listing.txt`, `build.log`, `macos.log`),
+gen 64's sizing `work/orch-g64/f02-sizing.md`. Census scripts and outputs under
+`work/wp6.5/f02/` (`census.py` -> `census.txt`, `repro_embedded.py` -> `repro_embedded.log`).
+No product edit before this section. **Verdict: STOP (one dispute, D1, below), with a cheap
+reproduction; two premise corrections (P1, P2) that do not by themselves need a ruling.**
+
+### Item 1 -- the listing and the Mach-O census
+
+**Confirmed (the seat's fact 1): the `otool -L` output exists; the brief's premise is false; no
+workflow fix is needed.** `macos-build.yml:145-171` redirects the whole block into the listing
+(`} > "$listing" 2>&1`), so the job log shows only the echo lines.
+`app-listing.txt` has 1,430 LINES:
+
+- lines 1-495: `# find <app> -ls` with **493 entries = 293 files, 114 folders, 86 links**;
+- lines 496-1430: the otool section with **155 Mach-O sections**. By type: 129 `Mach-O 64-bit bundle arm64`,
+  25 `... dynamically linked shared library arm64`, 1 `... executable arm64`. There are **0** `otool -L
+  failed` lines. There are 122 `@rpath` load lines, and every one names a file that ships: QtCore 33, QtGui 22,
+  libshiboken6 8, QtNetwork 7, libpyside6 6, the PIL / pillow_heif dylibs 2-4 each, libpython 1.
+  The other 502 load lines are absolute paths, all under `/usr/lib/` (240) or `/System/Library/` (262).
+  **No** absolute load points anywhere else, so no system library ships and none is missing.
+
+**The brief's per-folder counts are corrected.** The brief has "Frameworks 397 / Resources 157".
+Counted from the listing:
+
+- `Contents/Frameworks` holds 289 entries: 166 files, 76 folders, 47 links.
+- `Contents/Resources` holds 195 entries: **124 regular files**, 32 folders, 39 links.
+  The files are 99 Qt translation / data files under `PySide6/Qt`,
+  23 under `numpy-2.5.4.dist-info`, `base_library.zip` and `icon-windowed.icns`.
+- `Contents/MacOS` holds 1 file.
+- `Contents/_CodeSignature/CodeResources` and `Contents/Info.plist` are 1 each.
+
+That gives 1 + 1 + 2 + 2 + 196 + 290 + 1 = 493.
+
+**Mach-O census by provenance (155):**
+
+| Provenance | Count | Files (listing lines) | Licence source | Record in `native-licences/` today |
+|---|---|---|---|---|
+| PyInstaller bootloader | 1 | `Contents/MacOS/Clearwater` (L497) | pyinstaller dist-info (GPL-2.0-or-later WITH Bootloader Exception), the `pyinstaller` row by name | n/a (row by name, as `Clearwater.exe`) |
+| CPython (python-build-standalone 20260303) | 1 | `Frameworks/libpython3.12.dylib` (L505), **17,763,616 bytes** (listing line 206) | PSF `LICENSE.txt` of the build interpreter, plus whatever third-party sources are compiled in | **none for a Mac host.** The Windows hosts `_internal/python312.dll`, `_bz2.pyd`, `_decimal.pyd`, `_elementtree.pyd`, `_lzma.pyd`, `pyexpat.pyd` and `unicodedata.pyd` each have records, and `libffi-8.dll` and `libcrypto/libssl` are separate rows. |
+| shiboken6 wheel | 2 | `shiboken6/libshiboken6.abi3.6.12.dylib` (L515), `shiboken6/Shiboken.abi3.so` (L520) | wheel licence (LGPL-3) + audit text-36 | none for a Mac host (the Windows host `shiboken6.abi3.dll` carries "Python 3.7.0") |
+| pyside6-essentials wheel | 33 | 5 `PySide6/*.abi3.so`, `libpyside6.abi3.6.12.dylib`, 6 `Qt/lib/*.framework/Versions/A/*` (QtCore, QtGui, QtWidgets, QtNetwork, QtSvg, QtDBus; L976-1060), 21 `Qt/plugins/**/lib*.dylib` (L686-966, incl. the Mac-only `libqcocoa`, `libqmacstyle`, `libqmacheif`, `libqmacjp2`, tls backends) | wheel licence (LGPL-3) + audit text-36 | none for a Mac host (9 Windows hosts: Qt6Core/Gui/Network/Svg.dll, qjpeg/qtiff/qwebp/qwindows/qdirect2d.dll) |
+| Pillow wheel | 19 | 6 `PIL/*.cpython-312-darwin.so` + 13 delocated `PIL/__dot__dylibs/*.dylib` (L578-630: lcms2, xcb, jpeg 62.4.0, sharpyuv, openjp2 2.5.4, avif 16.4.2, zlib-ng 1.3.1, webp 7, Xau, webpmux, webpdemux, lzma 5, tiff 6) | RECORD ownership by `pillow` + Pillow's aggregate dist-info texts (`notices.py:2387-2395`) | none for a Mac host (6 Windows hosts `PIL/_avif/_imaging/...pyd` carry aom, dav1d, libyuv, sharpyuv, pythoncapi_compat ...) |
+| pillow-heif wheel | 4 | top-level `Frameworks/_pillow_heif.cpython-312-darwin.so` (L1140), `pillow_heif/__dot__dylibs/libheif.1.23.6`, `libde265.0.2.3`, `libx265.217` (L1123-1135) | `LICENSES_bundled.txt` sub-rows by basename prefix (`notices.py:2397-2475`): libheif / libde265 LGPL-3.0-only, x265 GPL-2.0-or-later (the GPL-2.0-or-later product may carry it) | none for a Mac host (3 Windows hosts: libde265 / libx265 / libstdc++ DLLs) |
+| numpy wheel | 13 | `numpy/**/*.cpython-312-darwin.so` | RECORD ownership + aggregate texts; **no vendored dylib** on macOS (Accelerate from `/System`, no `.dylibs`) | none for a Mac host (the Windows host is `numpy.libs` OpenBLAS, Windows-only) |
+| scipy wheel | 82 | `scipy/**/*.cpython-312-darwin.so` | RECORD ownership + aggregate texts; **no vendored dylib** on macOS (no gfortran / OpenBLAS; Accelerate) | none for a Mac host (83 Windows hosts: xsf, HiGHS, SuperLU, ARPACK, PROPACK, Boost, pybind11 ...) |
+
+Total 1 + 1 + 2 + 33 + 19 + 4 + 13 + 82 = **155**. **Unlisted vendored library: none.** The only
+vendored dylibs are the 13 + 3 the brief foresaw; numpy and scipy vendor nothing on macOS.
+
+### Item 2 -- the lock's census
+
+**Confirmed: `complete`.** `ffmpeg-macos.lock.json` `census` is an object whose `state` is `"complete"`.
+It cites job `.../runs/42661533922/job/129375108552`, `linkage_lines` 618-659, `version_lines` 660-662, `toolchain_lines` 157-163,
+and `external_libraries` `build/logs/build-ffmpeg.log:144-153`. The lock has 12 components and 1
+`toolchain_runtime` row, and `seat_sha256 == github_sha256`. Two places read it:
+
+- `build.py`'s `--notices` / `--zip` gate (`build.py:5470`) tests only `lock.get("census") == "pending"`.
+  So a complete census lifts it.
+- `load_macos_ffmpeg_lock` validates the complete census (`build.py:1913-1931`, `:2220-2237`).
+
+Neither the lock nor the gate changes.
+
+### Item 3 -- the inventory shape (first-half design, held by the STOP)
+
+- **The walk.** On darwin, `_inventory(folder)` does the following:
+  - finds the bootloader with `find_executable(folder)`. That works for the release root, the `.app` and `Contents/MacOS`, which is the folder `build()` passes, `build.py:5584`;
+  - takes `root, contents = tool._macos_layout(executable)`, so `root` is the `.app`;
+  - enumerates ONCE through `tool._macos_app_entries(root)` (`build.py:4383`), which classifies each entry as `link` / `file` / `special` from the `DirEntry` without following and never descends into a link;
+  - returns `home = root` (the `.app`). Every label is `.app`-rooted (`file:Contents/Frameworks/...`).
+
+  `Info.plist` and `_CodeSignature/CodeResources` sit outside the three folders but ship in the ZIP. The proposal is to inventory them too, attributed to Clearwater as generated build metadata. **This is a design point for the ruling.**
+- **A link entry.** Each link is first admitted by `tool.macos_link_problem(root, contents, path)`, the
+  ONE rule. A refusal raises `unsafe linked entry`. Only then is ONE entry added:
+  `link:<bundle-rooted path> -> <os.readlink text>` (kind `link`), attributed to the PyInstaller
+  bootloader row. PyInstaller's BUNDLE / bindepend / framework re-creation makes every one of the
+  86 links (they carry no bytes; wheels cannot carry links). The inventory never stats or opens a
+  path through a link. An admitted link's target files are inventoried at their physical path by the same walk.
+  Windows keeps `rglob` and its `unsafe linked entry` refusal, unchanged.
+- **The bootloader archive.** `read_package(executable)` (`build.py:776`, `CArchiveReader`) reads
+  `Contents/MacOS/Clearwater`. Run 6 read the same archive in the hidden-import and bundle checks
+  (`build.log:120-121`, PASS).
+- **Darwin name tables** (Windows tables byte-identical):
+  - `Clearwater.exe` maps to `Contents/MacOS/Clearwater`, rows Clearwater + PyInstaller (`notices.py:1907/:1912`);
+  - `THIRD_PARTY_NOTICES.md` maps to `Contents/Resources/THIRD_PARTY_NOTICES.md`;
+  - `_internal/base_library.zip` maps to `Contents/Resources/base_library.zip`. The Frameworks entry of the same name is a link (listing line 260 `Frameworks/base_library.zip -> ../Resources/base_library.zip`);
+  - the RECORD key is the label minus `Contents/Frameworks/` or `Contents/Resources/`. PyInstaller's `__dot__<x>` folder is read as `.<x>` only where the admitted sibling link `.<x> -> __dot__<x>` exists (`PIL/.dylibs`, `pillow_heif/.dylibs`; RECORD names `PIL/.dylibs/...`);
+  - `Contents/Resources/icon-windowed.icns` (PyInstaller's default icon, RECORD `PyInstaller/bootloader/images/icon-windowed.icns`) goes to the PyInstaller row;
+  - FFmpeg labels: `file:Contents/MacOS/ffmpeg`, `file:Contents/MacOS/ffprobe`, `file:Contents/Resources/ffmpeg-BUILD.txt` and `file:Contents/Resources/ffmpeg-LICENSE.txt` (`build.py:3041-3044`). The lock on darwin is `ffmpeg-macos.lock.json` with texts under `ffmpeg-macos-components/`. `write_notices` / `plan_notices` default to the Windows lock today (`notices.py:1789`, `:2714`), and both `build()` and smoke call them without a lock path (`build.py:5584`, `smoke.py:1112`). So the DEFAULT becomes platform-selected inside `notices.py`, and no caller changes;
+  - system-runtime exclusion globs on darwin: **none** (item 1: no system library ships).
+- **P1 (premise correction): `_python_file_names` on darwin is `libpython3.12.dylib` ONLY, never
+  `*.cpython-312-darwin.so`.** No standard-library extension `.so` ships. python-build-standalone on
+  macOS builds them into libpython: the bundle has no `lib-dynload`, and libpython is 17.8 MB.
+  The ONLY top-level `*.cpython-312-darwin.so` is `_pillow_heif.cpython-312-darwin.so`,
+  which pillow-heif's RECORD owns; the brief's glob would hand it to the PSF row. And the
+  identity check (`_is_python_binary`, a whole-file SHA-256 against the interpreter's file,
+  `notices.py:1535-1539`) cannot match on macOS: PyInstaller rewrites and re-signs every
+  collected Mach-O, which is why the build's origin check uses the canonical `macho:` identity
+  (`build.py:4109` `_macho_identity`, `:4229` `_macho_origin_identities`, `:4238` `_macos_origin_identities`). The darwin check is therefore the build's
+  `macho:` identity of the bundled file against that of `sys.base_prefix/lib/libpython3.12.dylib`,
+  computed on the runner at notices time. This stays in `notices.py` and calls build.py read-only.
+- **`_is_native` name-only callers (`build.py:3965`, `:3970`):** on darwin
+  `_native_origin_hashes` already adds `_macos_origin_identities()` (`build.py:3972-3973`). That
+  function admits by head bytes (`:4255`, `:4262`), so an extensionless Mach-O is covered and
+  run 6's origin check PASSED (`build.log:115`). **No build.py change is needed there.**
+
+### Item 4 -- the one notices location and the seal
+
+- `Contents/Resources/THIRD_PARTY_NOTICES.md`. `write_notices` writes `executable.parent /
+  THIRD_PARTY_NOTICES.md` today (`notices.py:2755`, which is `Contents/MacOS` on darwin) with its temp file at
+  `path.parent.parent`. On darwin it becomes `<.app>/Contents/Resources/THIRD_PARTY_NOTICES.md`,
+  and the temp file goes beside it in `Contents/Resources` (same folder, so `os.replace` is atomic).
+  Smoke already reads that exact path (`smoke.py:1109-1113`), so **smoke.py needs no change**.
+- **Seal order at `200dffd8`: notices are written BEFORE the seal.** `build()` writes them at
+  `build.py:5582-5590` and calls `seal_macos_bundle` after (`:5591-5609`, ad-hoc re-sign, then
+  `codesign --verify --deep --strict`, then the origin check again). The seal therefore covers the
+  notices in `Contents/_CodeSignature/CodeResources`. A file added to `Contents/Resources` AFTER
+  signing would fail `--verify --strict` (an unsealed resource). That does not happen: the smoke (`:5620`)
+  only reads, and its planted-exception row works on a COPY. **No change to the seal step.**
+
+### Item 5 -- the switch
+
+With `MACOS_FFMPEG_BUNDLED: "true"` (`macos-build.yml:35`), validation mode runs:
+
+- "Build release bundle and zip" (`:137-143`, `--notices --smoke --zip`);
+- "Stage release assets" (`:239-256`);
+- "Upload release assets" (`:258-264`, artifact `macos-release`).
+
+I agree with CHARC's reading that an artifact is not a release. One caution: this repository is
+public, so the artifact (the zipped `.app` with FFmpeg) is downloadable by any signed-in GitHub user
+for the retention period. N13 still holds, because the notices are inside the ZIP and staged beside it.
+Recommendation (owned file, second half): keep staging in validation mode, and gate the
+upload on release mode or give it `retention-days: 1`. The ruling decides.
+
+A second note for the second half: the bundled build step has the default `success()` condition. A failing test
+leg in validation mode therefore skips the build, unlike the switch-off build (`!cancelled()`, `:133`).
+Recommendation: `${{ success() || (!cancelled() && !inputs.release-version) }}` there too.
+
+### Item 6 -- the deselected families
+
+`macos-build.yml:184-186` deselects these while the switch is off:
+
+- `default_pipe_fidelity`, `ffmpeg_text_and_redaction` and `tool_and_worker_spawn` (`tests/test_macos_portability.py:560`, `:689`, `:458`);
+- `videotoolbox` (`:734`, `:784`, `:916`, `:1000`, `:1037`);
+- `test_macos_bundle_smoke[P16]` and `[P57]` (`:1646-1655`).
+
+With the switch on, the selection keeps only the startup-test exclusion, so all of them run.
+`videotoolbox` stays the one allowed skip (`ALLOWED`, `:196`; `tests/test_macos_portability.py:231`, `:936`).
+Run 6: 136 passed, 10,612 deselected (`macos.log`).
+
+### Item 7 -- build order
+
+As dispatched: items 1-4 of the build order, then the mid-build yield. **Held by D1.**
+
+### Item 8 -- the out-of-bounds check
+
+Nothing here needs `src/`, `release.yml`, the lock or the link rule / content check. D1 needs a
+director ruling on scope and on the identity basis, not on any of those surfaces.
+
+### D1 (DISPUTE, STOP) -- the Mac native rows: a whole embedded-component census
+
+The brief sizes the Mac rows as "S if only the wheels' own vendored dylibs, M+ if an unlisted
+library appears". Item 1 finds no unlisted library. **The rows are still not S. `notices.py`
+refuses every darwin plan today on the DR-144 embedded-host census, which is Windows-only, and a Mac census
+needs binary identities the laptop cannot produce.**
+
+- **Mechanism.** `native-licences/manifest.json` declares **110 `embedded_hosts`**, all of them
+  `_internal/...` Windows paths, with exact SHA-256 and size. Their parents are scipy 83,
+  pyside6-essentials 9, python 7, pillow 6, pillow-heif 3, numpy 1 and shiboken6 1.
+  `_check_embedded_parents` (`notices.py:608-641`) raises `embedded <host> absent while parent <p> is carried;
+  re-census required` for each declared host that is absent while its parent is selected. **All
+  seven parents ship in the run-6 `.app`**, and no Windows host path can occur there.
+- **Reproduction** (`work/wp6.5/f02/repro_embedded.py`, pure data calls on `200dffd8`; no
+  entry point). It selects only `python` for `file:Contents/Frameworks/libpython3.12.dylib`.
+  Output: `embedded hosts: 110 darwin-shaped: 0` and
+  `REFUSED: notices: embedded _internal/_bz2.pyd absent while parent python is carried; re-census required`.
+- **What a Mac census needs.** The same embedded sources (Qt 3rdparty in QtCore / QtGui /
+  QtNetwork / QtSvg and the image plugins; xsf / HiGHS / SuperLU / ... in the 82 scipy `.so`;
+  aom / dav1d / libyuv in PIL; HACL*, libb2, mt19937 and SipHash in CPython) sit in Mac hosts with different
+  paths and bytes. On macOS, libpython (17.8 MB) also holds the standard-library extensions, and with them,
+  very likely, the third-party code that Windows ships as separate rows or hosts: OpenSSL, libffi, SQLite,
+  xz, bzip2, expat, mpdecimal. The listing cannot prove which; a host census must. The Mac host
+  identities exist only as runner-built bytes, because PyInstaller rewrites and re-signs every Mach-O
+  (`build.py:4109-4265`). The laptop has neither the Mac wheels nor the Mac interpreter, and the
+  dispatch forbids fetching binaries. The census is therefore DR-144-sized: on the order of 100 hosts,
+  with a source-evidence pass per host. It is not the brief's "S".
+- **Options for the ruling** (cell's recommendation first):
+  1. **Split F0-2.**
+     - **F0-2a** (this cell, now): the first half as briefed (inventory, location, FFmpeg rows,
+       name tables, P1). Two additions:
+       - `embedded_hosts` keyed per platform, so Windows stays byte-identical. A darwin plan then refuses with ONE named reason, "macOS embedded census pending", in place of 110 Windows-host refusals.
+       - A validation-mode evidence step in `macos-build.yml`, an owned file (a listing extension rather than the otool branch, so it needs the ruling's word). It records each Mach-O's whole-file SHA-256, size and the build's `macho:` identity. Run 7 then delivers the Mac host identities, with the switch still OFF.
+     - **F0-2b**: the Mac embedded census on those identities (the DR-144 method), then the switch ON.
+  2. **Bind Mac embedded components by ORIGIN, not by bundled bytes.** Declare them per
+     (distribution, version, origin RECORD path), and verify at notices time on the runner that
+     the bundled file's `macho:` identity equals its installed origin's. No Mac hash is committed.
+     This changes the DR-144 host model and the `_check_embedded_parents` contract, so it needs
+     CHARC. The source-evidence census per host is still needed.
+  3. Something else CHARC rules.
+
+**Ledger (round 0):** 0 CRITICAL, 1 MAJOR (D1, scope / sizing dispute, in-envelope, NEW),
+2 MINOR premise corrections (P1 `_python_file_names` glob; the per-folder counts), 0 reverts,
+0 product or test edits. Depth: dispatcher-read (not available to the cell).
