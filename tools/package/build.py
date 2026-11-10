@@ -4687,19 +4687,74 @@ def _macos_link_on_path(root: Path, path: Path) -> bool:
     return False
 
 
+def _macos_candidate_behind_a_link(roots: Sequence[Path], candidate: Path) -> bool:
+    """Whether ``candidate``, read as written, passes a link or junction below a release root.
+
+    A diagnostic PATH candidate inside a ``.app`` (WP6.5 A r14 #1): its components are taken
+    in turn from the anchor (``..`` lexically, which matches the system's reading up to the
+    first link, where this one stops), and every component strictly below one of ``roots``
+    is read with ``lstat`` and the junction test, never followed. Names are compared
+    case-folded, so a case-insensitive volume's spelling of a root is recognised. A
+    component that cannot be read ends the reading: the system's own lookup stops there too.
+
+    Args:
+        roots: The release root as given and as canonicalised.
+        candidate: ``<PATH entry>/<name>``, absolute or relative to the working folder.
+
+    Returns:
+        ``True`` when a link or junction below a root lies on the candidate's path.
+    """
+    folded = [tuple(part.casefold() for part in root.parts) for root in roots]
+
+    def below(path: Path) -> bool:
+        parts = tuple(part.casefold() for part in path.parts)
+        return any(len(parts) > len(root) and parts[: len(root)] == root for root in folded)
+
+    written = candidate if candidate.is_absolute() else Path.cwd() / candidate
+    current = Path(written.anchor)
+    for part in written.parts[1:]:
+        current = current.parent if part == ".." else current / part
+        if not below(current):
+            continue
+        if current.is_junction():
+            return True
+        try:
+            if stat.S_ISLNK(os.lstat(current).st_mode):
+                return True
+        except OSError:
+            return False
+    return False
+
+
 def _macos_native_origin_violations(
     executable: Path, *, original_path: str, ffmpeg_hashes: Iterable[str]
 ) -> list[str]:
     hashes = _native_origin_hashes() | set(ffmpeg_hashes)
     errors = []
     root, contents = _macos_layout(executable)
+    in_app = root.suffix == ".app"
+    app_roots: list[Path] = []  # the .app as given and canonicalised, read on first need
+
+    def linked(candidate: Path) -> bool:
+        """Inside a .app, whether a link lies on a PATH candidate below the release root.
+
+        Such a candidate is skipped as a diagnostic, never resolved (WP6.5 A r14 #1): the
+        walk admits or refuses the link on its own pass. Onedir makes no extra call.
+        """
+        if not in_app:
+            return False
+        if not app_roots:
+            app_roots.extend((root, Path(os.path.realpath(root))))
+        return _macos_candidate_behind_a_link(app_roots, candidate)
 
     def unknown(label: str, name: str) -> str:
         likely = next(
             (
                 Path(part) / Path(name).name
                 for part in original_path.split(os.pathsep)
-                if part and (Path(part) / Path(name).name).is_file()
+                if part
+                and not linked(Path(part) / Path(name).name)
+                and (Path(part) / Path(name).name).is_file()
             ),
             None,
         )
@@ -4724,9 +4779,9 @@ def _macos_native_origin_violations(
                             None,
                         )
 
-    in_app = root.suffix == ".app"
-    # Inside a .app the executable is opened only when no link lies on its path (A r13): a
-    # link there is refused by the walk below and never followed here.
+    # Inside a .app the executable is opened only when no link lies on its path (A r13). It
+    # is never read behind a link, independently of the shared rule: the walk below refuses
+    # that link, or admits it when the rule does (a class-(C) cross-link; A r14 advisory 3).
     behind_a_link = in_app and _macos_link_on_path(root, executable)
     if behind_a_link:
         errors.append(f"native origin: {executable} lies behind a link in the bundle; not read")

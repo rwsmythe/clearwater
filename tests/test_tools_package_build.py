@@ -13,6 +13,7 @@ tested.
 from __future__ import annotations
 
 import base64
+import builtins
 import hashlib
 import importlib.metadata
 import importlib.util
@@ -3176,17 +3177,43 @@ def test_a_missing_return_file_still_refuses_with_the_chain(tmp_path, link):
 # been admitted by the component walk; only lstat / readlink / is_symlink / is_junction and
 # non-following DirEntry queries precede admission.
 
-_REAL_FS = {
+_REAL_FS: dict[str, Any] = {
     "stat": os.stat,
     "lstat": os.lstat,
     "readlink": os.readlink,
     "scandir": os.scandir,
+    "listdir": os.listdir,
     "realpath": os.path.realpath,
+    "exists": os.path.exists,
+    "isfile": os.path.isfile,
+    "isdir": os.path.isdir,
+    "open": builtins.open,
+    "io.open": io.open,
+    "os.open": os.open,
 }
 
 
 class _FsRecorder:
-    """Record every filesystem call the link rule's callers make: (call, path, following)."""
+    """Record the filesystem calls the link rule's callers make, with the walk's admissions.
+
+    EVIDENCE FOR ITS COVERED SHAPES, not a proof of every following call (WP6.5 A r14 #2).
+    It records, as ``(call, path, following)`` in one ordered sequence:
+
+    - ``os.stat`` (its ``follow_symlinks``), ``os.lstat``, ``os.readlink``,
+      ``os.path.realpath``, ``os.scandir`` and ``os.listdir``;
+    - ``os.path.exists`` / ``isfile`` / ``isdir`` (the Windows fast paths bypass ``os.stat``);
+    - every ``DirEntry`` of a recorded listing: ``is_dir`` / ``is_file`` / ``stat`` with
+      their ``follow_symlinks``;
+    - ``Path.exists`` / ``is_file`` / ``is_dir`` / ``resolve`` / ``open`` (``read_bytes``
+      and ``read_text`` open through ``Path.open`` and ``io.open``);
+    - the real opens: ``builtins.open``, ``io.open`` and ``os.open`` (following unless
+      ``O_NOFOLLOW``);
+    - ``admit``: the component walk (``build._macos_link_chain_problem``) admitting a link,
+      at the moment it returns.
+
+    Not covered: opens made in C below these names (``io.FileIO`` constructed directly, an
+    extension module's own ``fopen``), child processes, and calls on a file descriptor.
+    """
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, bool]] = []
@@ -3202,17 +3229,16 @@ class _FsRecorder:
             recorder.note("stat", path, follow_symlinks)
             return _REAL_FS["stat"](path, *args, follow_symlinks=follow_symlinks, **kwargs)
 
-        def lstat_(path, *args, **kwargs):
-            recorder.note("lstat", path, False)
-            return _REAL_FS["lstat"](path, *args, **kwargs)
+        def plain(name: str, following: bool) -> Any:
+            def call(path=".", *args, **kwargs):
+                recorder.note(name, path, following)
+                return _REAL_FS[name](path, *args, **kwargs)
 
-        def readlink_(path, *args, **kwargs):
-            recorder.note("readlink", path, False)
-            return _REAL_FS["readlink"](path, *args, **kwargs)
+            return call
 
-        def realpath_(path, *args, **kwargs):
-            recorder.note("realpath", path, True)
-            return _REAL_FS["realpath"](path, *args, **kwargs)
+        def os_open_(path, flags, *args, **kwargs):
+            recorder.note("os.open", path, not flags & getattr(os, "O_NOFOLLOW", 0))
+            return _REAL_FS["os.open"](path, flags, *args, **kwargs)
 
         class Entry:
             def __init__(self, entry: os.DirEntry) -> None:
@@ -3263,20 +3289,64 @@ class _FsRecorder:
 
             return query
 
-        patch.setattr(os, "stat", stat_)
-        patch.setattr(os, "lstat", lstat_)
-        patch.setattr(os, "readlink", readlink_)
-        patch.setattr(os, "scandir", scandir_)
-        patch.setattr(os.path, "realpath", realpath_)
-        for name in ("exists", "is_file", "is_dir", "resolve"):
-            patch.setattr(Path, name, following(name, getattr(Path, name)))
+        real_walk = build._macos_link_chain_problem
 
-    def violations(self, root: Path, admitted: set[str], zone: Path) -> list[tuple[str, str]]:
-        """Calls that touch ``zone`` (outside the bundle) at all, or FOLLOW a path under the
-        release root on which a link not in ``admitted`` (relative names) lies."""
-        bases = [root, Path(_REAL_FS["realpath"](root))]
+        def walk_(root: Path, physical: Path) -> str | None:
+            problem = real_walk(root, physical)
+            if problem is None:
+                recorder.note("admit", physical, False)
+            return problem
+
+        patch.setattr(os, "stat", stat_)
+        patch.setattr(os, "lstat", plain("lstat", False))
+        patch.setattr(os, "readlink", plain("readlink", False))
+        patch.setattr(os, "scandir", scandir_)
+        patch.setattr(os, "listdir", plain("listdir", True))
+        patch.setattr(os, "open", os_open_)
+        patch.setattr(os.path, "realpath", plain("realpath", True))
+        for name in ("exists", "isfile", "isdir"):
+            patch.setattr(os.path, name, plain(name, True))
+        patch.setattr(builtins, "open", plain("open", True))
+        patch.setattr(io, "open", plain("io.open", True))
+        for name in ("exists", "is_file", "is_dir", "resolve", "open"):
+            patch.setattr(Path, name, following(name, getattr(Path, name)))
+        patch.setattr(build, "_macos_link_chain_problem", walk_)
+
+    @staticmethod
+    def _bases(root: Path) -> list[Path]:
+        return [root, Path(_REAL_FS["realpath"](root))]
+
+    def admitted(self, root: Path) -> list[str]:
+        """The links the walk admitted, in order, relative to the release root."""
+        found = []
+        for name, raw, _ in self.calls:
+            if name != "admit":
+                continue
+            path = Path(os.path.normpath(raw))
+            for base in self._bases(root):
+                if path.is_relative_to(base):
+                    found.append(path.relative_to(base).as_posix())
+                    break
+        return found
+
+    def violations(self, root: Path, zone: Path) -> list[tuple[str, str]]:
+        """Calls, in their recorded order, that break the invariant on this shape.
+
+        A call is a violation when it touches ``zone`` (outside the bundle) at all, or when
+        it FOLLOWS a path under the release root on which a link lies (a symlink, or a
+        junction by ``os.path.isjunction``, looked up per call) that the walk has not
+        admitted EARLIER in the sequence: an admission after the call does not excuse it.
+        """
+        bases = self._bases(root)
+        admitted: set[str] = set()
         found = []
         for name, raw, follows in self.calls:
+            if name == "admit":
+                path = Path(os.path.normpath(raw))
+                admitted.update(
+                    path.relative_to(base).as_posix() for base in bases if path.is_relative_to(base)
+                )
+                continue
             if Path(os.path.normpath(raw)).is_relative_to(zone):
                 found.append((name, raw))
                 continue
@@ -3291,9 +3361,10 @@ class _FsRecorder:
                     if not current.is_relative_to(base) or current == base:
                         continue
                     try:
-                        is_link = stat.S_ISLNK(_REAL_FS["lstat"](current).st_mode)
+                        mode = _REAL_FS["lstat"](current).st_mode
                     except OSError:
                         break
+                    is_link = stat.S_ISLNK(mode) or os.path.isjunction(current)
                     if is_link and current.relative_to(base).as_posix() not in admitted:
                         found.append((name, raw))
                         break
@@ -3352,15 +3423,12 @@ LINK_SHAPES = {
 }
 
 
-@pytest.mark.parametrize("shape", sorted(LINK_SHAPES))
-def test_no_following_call_before_the_walk_admits_the_links(tmp_path, monkeypatch, shape):
-    """A r13: the public entry points (the origin check, the release ZIP, the shared rule)
-    on three shapes; every filesystem call recorded. Each refuses, and none FOLLOWS a path
-    under the release root through a link the walk has not admitted, or touches the outside
-    alias at all. The notices inventory is onedir-only (it requires ``_internal``), so it
-    never enumerates a ``.app``."""
-    folder, links, admitted = LINK_SHAPES[shape](tmp_path)
-    zone = tmp_path / "wrapper" / "outside"
+def _recorded_entry_points(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, folder: Path, links: list[str], path: str
+) -> tuple[_FsRecorder, list[str], list[str | None]]:
+    """The public entry points on a ``.app`` under the recorder: the origin check (with
+    ``original_path=path``), the release ZIP (which must refuse) and the shared rule on each
+    link. The bootloader comparison and ``read_package`` are stubs that record an ``open``."""
     executable = folder / "Contents/MacOS/Clearwater"
     contents = folder / "Contents/Frameworks"
     empty = tmp_path / "python"
@@ -3382,21 +3450,211 @@ def test_no_following_call_before_the_walk_admits_the_links(tmp_path, monkeypatc
     trusted = {hashlib.sha256(LINK_BLOB).hexdigest()}
     with pytest.MonkeyPatch.context() as patch:
         recorder.install(patch)
-        found = build.native_origin_violations(executable, original_path="", ffmpeg_hashes=trusted)
+        found = build.native_origin_violations(
+            executable, original_path=path, ffmpeg_hashes=trusted
+        )
         with pytest.raises(ValueError, match="release ZIP refuses linked/junction/outside"):
             build.write_release_zip(folder, out=tmp_path / "out", source_epoch=1793908801)
         problems = [build.macos_link_problem(folder, contents, folder / link) for link in links]
+    return recorder, found, problems
+
+
+@pytest.mark.parametrize("shape", sorted(LINK_SHAPES))
+def test_no_following_call_before_the_walk_admits_the_links(tmp_path, monkeypatch, shape):
+    """A r13 / A r14 #2: the public entry points (the origin check, the release ZIP, the
+    shared rule) under the recorder (:class:`_FsRecorder`), on the COVERED SHAPES: r11's
+    out-and-back, r13's nested ``pkg/evil`` (the folder cross-link admitted) and r13's
+    linked ``Contents``; A r14's linked PATH directory is
+    :func:`test_a_linked_path_candidate_is_never_followed`. Each refuses; no call FOLLOWS a
+    path under the release root through a link before the walk's admission of that link
+    (in the recorded order), and none touches the outside alias. The walk admits exactly the
+    shape's admitted links. Evidence for these shapes, not a proof of every following call.
+    The notices inventory is onedir-only (it requires ``_internal``), so it never
+    enumerates a ``.app``."""
+    folder, links, admitted = LINK_SHAPES[shape](tmp_path)
+    zone = tmp_path / "wrapper" / "outside"
+    executable = folder / "Contents/MacOS/Clearwater"
+    recorder, found, problems = _recorded_entry_points(tmp_path, monkeypatch, folder, links, "")
     assert found and all(line.startswith("native origin: ") for line in found), found
     assert all(problem is not None for problem in problems), problems
     assert recorder.calls
-    assert recorder.violations(folder, admitted, zone) == []
+    assert set(recorder.admitted(folder)) == admitted
+    assert recorder.violations(folder, zone) == []
     if shape == "r13-linked-contents":
         assert problems == ["link chain meets a linked boundary: Contents -> '../outside/back'"]
         assert found == [
             f"native origin: {executable} lies behind a link in the bundle; not read",
             f"native origin: linked file {folder / 'Contents'}: {problems[0]}",
         ]
-        assert not [call for call in recorder.calls if call[0] == "open"]
+        assert not [
+            call
+            for call in recorder.calls
+            if call[0] in _OPENS and Path(call[1]).is_relative_to(folder)
+        ]
+
+
+_OPENS = {"open", "io.open", "os.open", "Path.open"}
+
+
+@pytest.mark.parametrize("case", ["linked-only", "linked-then-host", "through-dotdot"])
+def test_a_linked_path_candidate_is_never_followed(tmp_path, monkeypatch, case):
+    """A r14 #1: the origin check's diagnostic PATH lookup (``likely PATH source``) never
+    follows a link in the bundle. A's shape: an unknown native ``Contents/Aaa.dylib`` met
+    before ``Contents/Resources/bin -> ../../../outside/bin``, and ``original_path`` naming
+    the linked folder (as written, or through ``..`` past the link). That candidate is
+    skipped unresolved; a host PATH entry outside the release root is still queried and
+    named; the link itself is refused exactly as before."""
+    folder, _ = link_release(
+        tmp_path, "app", [], [("Contents/Resources/bin", "../../../outside/bin", True)]
+    )
+    tree(folder, ["Contents/Aaa.dylib"], b"payload")
+    tree(folder.parent, ["outside/bin/Aaa.dylib"], b"unknown")
+    host = tree(tmp_path / "host" / "bin", ["Aaa.dylib"], b"unknown")
+    linked = folder / "Contents/Resources/bin"
+    entries = {
+        "linked-only": [linked],
+        "linked-then-host": [linked, host],
+        "through-dotdot": [linked / ".." / "bin"],
+    }[case]
+    recorder, found, problems = _recorded_entry_points(
+        tmp_path,
+        monkeypatch,
+        folder,
+        ["Contents/Resources/bin"],
+        os.pathsep.join(str(entry) for entry in entries),
+    )
+    heading = Path(os.path.realpath(folder.parent)) / "outside" / "bin"
+    refusal = (
+        f"link chain leaves the bundle: Contents/Resources/bin -> '../../../outside/bin'; {heading}"
+    )
+    source = f"; likely PATH source: {host / 'Aaa.dylib'}" if case == "linked-then-host" else ""
+    assert problems == [refusal]
+    assert found == [
+        f"native origin unknown: Contents/Aaa.dylib{source}",
+        f"native origin: linked file {linked}: {refusal}",
+    ]
+    assert recorder.admitted(folder) == []
+    assert recorder.violations(folder, tmp_path / "wrapper" / "outside") == []
+    if case == "linked-then-host":
+        assert ("Path.is_file", str(host / "Aaa.dylib"), True) in recorder.calls
+
+
+def test_a_path_candidate_is_read_below_the_root_in_any_spelling(tmp_path):
+    """A r14 #1: a PATH candidate is recognised as lying in the bundle whether it names the
+    release root as given, as canonicalised (an alias above the root), in another letter
+    case, or through ``..``; a link below the root on it is found by ``lstat`` alone. A
+    candidate outside the root is never read by this check."""
+    folder, _ = link_release(
+        tmp_path, "app", [], [("Contents/Resources/bin", "../../../outside/bin", True)]
+    )
+    alias = tmp_path / "alias"
+    _symlink(alias, os.path.join(str(tmp_path), "wrapper"), folder=True)
+    given = alias / "Clearwater.app"
+    roots = [given, Path(os.path.realpath(given))]
+    assert roots[1] == Path(os.path.realpath(folder))
+    behind = build._macos_candidate_behind_a_link
+    linked = "Contents/Resources/bin/Aaa.dylib"
+    assert behind(roots, given / linked)
+    assert behind(roots, folder / linked)  # the canonical spelling
+    if os.path.exists(str(folder).upper()):  # a case-insensitive volume (macOS, Windows)
+        assert behind(roots, Path(str(folder / linked).upper()))
+    assert behind(roots, given / "Contents/Resources/bin/../bin/Aaa.dylib")
+    assert not behind(roots, given / "Contents/MacOS/Aaa.dylib")
+    assert not behind(roots, given / "Contents/Missing/bin/Aaa.dylib")
+    # Out through the link and lexically back outside: still found at the link.
+    assert behind(roots, given / "Contents/Resources/bin/../../../../host/Aaa.dylib")
+    assert not behind(roots, tmp_path / "host" / "Aaa.dylib")
+
+
+# --- A r14 #2: the recorder's own three gaps, each shown caught -----------------------------
+
+
+def test_the_recorder_records_an_ordinary_read(tmp_path):
+    """A r14 #2 gap 1: a real read is recorded as a following ``open``, whichever API makes
+    it (A's probe was ``Path.read_bytes()``, invisible to the A r13 recorder)."""
+    path = tree(tmp_path, ["data.bin"], b"payload") / "data.bin"
+    reads = {
+        "Path.read_bytes": lambda: path.read_bytes(),
+        "Path.read_text": lambda: path.read_text(encoding="ascii"),
+        "builtins.open": lambda: builtins.open(path, "rb").close(),
+        "io.open": lambda: io.open(path, "rb").close(),  # noqa: UP020 (io.open itself)
+        "os.open": lambda: os.close(os.open(path, os.O_RDONLY)),
+    }
+    for api, read in reads.items():
+        recorder = _FsRecorder()
+        with pytest.MonkeyPatch.context() as patch:
+            recorder.install(patch)
+            read()
+        opens = [call for call in recorder.calls if call[0] in _OPENS]
+        assert opens and all(call[1:] == (str(path), True) for call in opens), (api, opens)
+
+
+def test_the_recorder_orders_admission_events(tmp_path):
+    """A r14 #2 gap 2: a following call through a link BEFORE the walk admits it is a
+    violation, though the link is admitted later; after the admission it is not."""
+    folder, _ = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/pkg/data"],
+        [("Contents/Resources/pkg", "../Frameworks/pkg", True)],
+    )
+    link = str(folder / "Contents/Resources/pkg")
+    zone = tmp_path / "wrapper" / "outside"
+    recorder = _FsRecorder()
+    recorder.calls = [("realpath", link, True), ("admit", link, False)]
+    assert recorder.violations(folder, zone) == [("realpath", link)]
+    recorder.calls.reverse()
+    assert recorder.violations(folder, zone) == []
+    assert recorder.admitted(folder) == ["Contents/Resources/pkg"]
+
+
+def test_the_recorder_records_the_walks_admissions(tmp_path):
+    """A r14 #2 gap 2: the admission events come from the component walk itself, in the
+    sequence of the filesystem calls, after the walk's own calls."""
+    folder, _ = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/pkg/data"],
+        [("Contents/Resources/pkg", "../Frameworks/pkg", True)],
+    )
+    recorder = _FsRecorder()
+    with pytest.MonkeyPatch.context() as patch:
+        recorder.install(patch)
+        problem = build.macos_link_problem(
+            folder, folder / "Contents/Frameworks", folder / "Contents/Resources/pkg"
+        )
+    assert problem is None
+    names = [call[0] for call in recorder.calls]
+    assert names.count("admit") == 1
+    assert names.index("admit") > names.index("readlink")
+    assert recorder.admitted(folder) == ["Contents/Resources/pkg"]
+    assert recorder.violations(folder, tmp_path / "wrapper" / "outside") == []
+
+
+@pytest.mark.parametrize("kind", ["modeled", "real"])
+def test_the_recorder_sees_a_junction_as_a_link(tmp_path, monkeypatch, kind):
+    """A r14 #2 gap 3: a directory junction on a followed path is a link (A's modeled
+    ``Contents/MacOS`` junction, and a real one where the host makes junctions)."""
+    folder = tmp_path / "wrapper" / "Clearwater.app"
+    executable = folder / "Contents/MacOS/Clearwater"
+    if kind == "modeled":
+        tree(executable.parent, [executable.name], b"bootloader stand-in")
+        junction = executable.parent
+        real = os.path.isjunction
+        monkeypatch.setattr(os.path, "isjunction", lambda path: path == junction or real(path))
+    else:
+        if sys.platform != "win32":
+            pytest.skip("Windows junction regression")
+        import _winapi
+
+        target = tree(tmp_path / "elsewhere", ["Clearwater"], b"bootloader stand-in")
+        (folder / "Contents").mkdir(parents=True)
+        _winapi.CreateJunction(str(target), str(executable.parent))
+    recorder = _FsRecorder()
+    recorder.calls = [("open", str(executable), True)]
+    assert recorder.violations(folder, tmp_path / "wrapper" / "outside") == [
+        ("open", str(executable))
+    ]
 
 
 @pytest.mark.parametrize("kind", ["link", "junction"])
