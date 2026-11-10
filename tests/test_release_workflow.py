@@ -25,7 +25,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/release.yml"
-MACOS_WORKFLOW = ROOT / ".github/workflows/macos-build.yml"
+MACOS_WORKFLOW = Path(
+    os.environ.get("WP65_MACOS_WORKFLOW", ROOT / ".github/workflows/macos-build.yml")
+)
 PINS = {
     "actions/checkout": "11bd71901bbe5b1630ceea73d27597364c9af683",
     "astral-sh/setup-uv": "6b9c6063abd6010835644d4c2e1bef4cf5cd0fca",
@@ -1986,7 +1988,7 @@ def test_the_identity_step_runs_in_validation_mode_only(macos, switch, failing):
     assert IDENTITY_STEP not in _walk(macos, {"release-version": "1.2.0"}, switch, failing)
 
 
-def _run_identity_step(macos, tmp_path, monkeypatch):
+def _run_identity_step(macos, tmp_path, monkeypatch, *, exit_code=0):
     """Execute the step's real script in ``tmp_path`` with ``file -b`` modelled by magic."""
     (tmp_path / "tools/package").mkdir(parents=True)
     (tmp_path / "tools/package/build.py").write_bytes(
@@ -2008,7 +2010,9 @@ def _run_identity_step(macos, tmp_path, monkeypatch):
     try:
         exec(compile(script(macos, IDENTITY_STEP), "macho-identities", "exec"), {})
     except SystemExit as stop:
-        assert stop.code == 0
+        assert stop.code == exit_code
+    else:
+        assert exit_code == 0
     return asked
 
 
@@ -2062,3 +2066,37 @@ def test_the_identity_step_says_when_there_is_no_bundle(macos, tmp_path, monkeyp
     assert asked == []
     text = (tmp_path / IDENTITIES).read_text(encoding="utf-8")
     assert text.startswith("No app bundle at work") and text.endswith(": no identities.\n")
+
+
+@pytest.mark.parametrize("kind", ["symlink", "junction"])
+def test_identity_step_refuses_linked_app_root_before_any_follow(
+    macos, tmp_path, monkeypatch, kind
+):
+    """A r1 F6: a root link must not be scanned, queried by is_dir, or hashed."""
+    import test_tools_package_build as build_tests
+
+    app = tmp_path / "work/release/dist-onedir/Clearwater-1.2.0-macos-onedir/Clearwater.app"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "payload").write_bytes(build_tests.built_native())
+    app.parent.mkdir(parents=True)
+    if kind == "symlink":
+        build_tests._symlink(app, str(outside), folder=True)
+    else:
+        # Model the Windows junction flag without invoking a shell or following a target.
+        app.mkdir()
+        original = Path.is_junction
+        monkeypatch.setattr(Path, "is_junction", lambda p: p == app or original(p))
+    original_is_dir = Path.is_dir
+
+    def is_dir(path):
+        assert path != app and path != app.relative_to(tmp_path), "followed linked app root"
+        return original_is_dir(path)
+
+    monkeypatch.setattr(Path, "is_dir", is_dir)
+    # The workflow path is relative; the modeled junction flag recognises both forms.
+    if kind == "junction":
+        monkeypatch.setattr(Path, "is_junction", lambda p: p in (app, app.relative_to(tmp_path)))
+    asked = _run_identity_step(macos, tmp_path, monkeypatch, exit_code=1)
+    assert asked == []
+    assert (tmp_path / IDENTITIES).read_text().startswith("Refused linked app bundle root:")

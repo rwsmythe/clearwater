@@ -190,6 +190,9 @@ jobs:
           out.parent.mkdir(parents=True, exist_ok=True)
           version = os.environ["RELEASE_VERSION"]
           app = Path(f"work/release/dist-onedir/Clearwater-{version}-macos-onedir/Clearwater.app")
+          if app.is_symlink() or app.is_junction():
+              out.write_text(f"Refused linked app bundle root: {app}\n", encoding="utf-8")
+              raise SystemExit(1)
           if not app.is_dir():
               out.write_text(f"No app bundle at {app}: no identities.\n", encoding="utf-8")
               raise SystemExit(0)

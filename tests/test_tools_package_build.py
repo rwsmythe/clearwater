@@ -7663,11 +7663,15 @@ def run6_app(tmp_path: Path) -> tuple[Path, Path, list[str], dict[str, str]]:
 
 def _notices_with(module: ModuleType) -> ModuleType:
     """Load notices.py bound to ``module`` as its build tool (the recorder's instance)."""
-    path = REPO_ROOT / "tools" / "package" / "notices.py"
+    path = Path(os.environ.get("WP65_NOTICES_SCRIPT", REPO_ROOT / "tools/package/notices.py"))
     spec = importlib.util.spec_from_file_location("wp65_f02_notices", path)
     assert spec is not None and spec.loader is not None
     notices = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(notices)
+    if "WP65_NOTICES_SCRIPT" in os.environ:
+        notices.__file__ = str(REPO_ROOT / "tools/package/notices.py")
+        exec(compile(path.read_bytes(), str(path), "exec"), notices.__dict__)
+    else:
+        spec.loader.exec_module(notices)
     notices._build_tool = lambda: module
     return notices
 
@@ -7782,3 +7786,27 @@ def test_app_python_runtime_is_admitted_by_its_macho_identity(tmp_path):
     assert notices._same_macho(built / "libpython3.12.dylib", original)
     assert not notices._same_macho(other / "libpython3.12.dylib", original)
     assert not notices._same_macho(built / "libpython3.12.dylib", tmp_path / "absent")
+
+
+@pytest.mark.parametrize("linked", ["Contents", "root"])
+@pytest.mark.parametrize("start", ["release", "macos"])
+def test_app_inventory_refuses_linked_discovery_before_following(tmp_path, linked, start):
+    """A r1 F5/F6: linked discovery boundaries are refused before executable is_file."""
+    root = tmp_path / "release"
+    app = root / "Clearwater.app"
+    outside = tmp_path / "outside"
+    (outside / "MacOS").mkdir(parents=True)
+    (outside / "MacOS/Clearwater").write_bytes(b"not executed")
+    if linked == "Contents":
+        app.mkdir(parents=True)
+        _symlink(app / "Contents", str(outside), folder=True)
+    else:
+        root.mkdir()
+        _symlink(app, str(outside), folder=True)
+    recorder = _FsRecorder()
+    notices = _notices_with(build)
+    with pytest.MonkeyPatch.context() as patch:
+        recorder.install(patch)
+        with pytest.raises(ValueError, match="unsafe linked entry"):
+            app_inventory(notices, root if start == "release" else app / "Contents/MacOS", app)
+    assert recorder.violations(root, outside) == []

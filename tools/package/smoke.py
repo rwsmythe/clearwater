@@ -1106,6 +1106,7 @@ def _macos_static_checks(bundle: Path, executable: Path) -> None:
     print(f"hidden-imports: PASS ({len(wanted)} modules re-read from built bundle)")
     try:
         tool = _notices_tool()
+        tool.census_preflight()
         path = bundle / "Contents" / "Resources" / "THIRD_PARTY_NOTICES.md"
         if not path.is_file() or path.is_symlink():
             raise ValueError("THIRD_PARTY_NOTICES.md is missing from Contents/Resources")

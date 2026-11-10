@@ -77,8 +77,8 @@ _APP_FFMPEG_TOOLS = ("Contents/MacOS/ffmpeg", "Contents/MacOS/ffprobe")
 _APP_FFMPEG_TEXTS = ("Contents/Resources/ffmpeg-BUILD.txt", "Contents/Resources/ffmpeg-LICENSE.txt")
 _DOT_FOLDER = "__dot__"
 EMBEDDED_CENSUS_PENDING = (
-    "notices: macOS embedded census pending: native-licences/manifest.json declares no "
-    "darwin embedded_hosts (WP6.5 F0-2b)"
+    "notices: macOS embedded census pending: native-licences/manifest.json requires an "
+    "evidenced complete darwin census and non-empty darwin embedded_hosts (WP6.5 F0-2b)"
 )
 """The ONE refusal of a macOS bundle plan until its embedded-host census lands."""
 _PROVENANCE_FIELDS = frozenset(
@@ -837,6 +837,7 @@ def _native_document(folder: Path) -> dict[str, Any]:
             "components",
             "vendored_paths",
             "embedded_hosts",
+            "embedded_census",
             "limits",
         }
         or type(document.get("schema_version")) is not int
@@ -844,6 +845,39 @@ def _native_document(folder: Path) -> dict[str, Any]:
         or not isinstance(document.get("components"), list)
     ):
         raise ValueError("notices: native licence manifest schema is invalid")
+    return document
+
+
+def census_preflight(
+    native_licences_path: Path = ROOT / "tools/package/native-licences",
+) -> dict[str, Any] | None:
+    """Refuse a pending macOS embedded census before artifact notices are accessed.
+
+    Windows has an implicit completed census and performs no additional I/O here.
+
+    Args:
+        native_licences_path: The committed native manifest and licence inputs.
+
+    Returns:
+        The checked macOS manifest, or None for the unchanged Windows path.
+
+    Raises:
+        ValueError: The manifest is invalid or macOS completion lacks evidence or hosts.
+        OSError: The native manifest cannot be read.
+    """
+    if _host_platform() != "darwin":
+        return None
+    document = _native_document(native_licences_path)
+    census = document.get("embedded_census")
+    declaration = census.get("darwin") if isinstance(census, dict) else None
+    if (
+        not isinstance(declaration, dict)
+        or declaration.get("status") != "complete"
+        or not _single_line_text(declaration.get("evidence"))
+    ):
+        raise ValueError(EMBEDDED_CENSUS_PENDING)
+    if not any(host.platform == "darwin" for host in _embedded_declarations(document)):
+        raise ValueError(EMBEDDED_CENSUS_PENDING)
     return document
 
 
@@ -1318,13 +1352,15 @@ def _vendored_claims(
     installed: dict[str, importlib.metadata.Distribution],
     versions: dict[str, set[str]],
     runtime: dict[str, _AuditRow],
+    *,
+    in_app: bool = False,
 ) -> dict[str, list[str]]:
     claims: dict[str, list[str]] = defaultdict(list)
     by_name = {record.component: record for record in records}
     for entry in entries:
         if entry.kind == "file" and entry.label.startswith("file:"):
             for distribution, prefix, component in declarations:
-                relative = _bundle_relative(entry.name)
+                relative = _bundle_relative(entry.name, in_app=in_app)
                 if relative is None or not relative.startswith(prefix.replace(".", "/") + "/"):
                     continue
                 record = by_name.get(component)
@@ -1537,7 +1573,7 @@ def _app_inventory(tool: ModuleType, executable: Path, app: Path) -> list[_Entry
 
 def _inventory(folder: Path) -> tuple[list[_Entry], Path]:
     tool = _build_tool()
-    executable = cast(Path, tool.find_executable(folder))
+    executable = _find_notices_executable(folder)
     if sys.platform == "darwin" and (app := tool._macos_content_app(executable)) is not None:
         # WP6.5 F0-2: the macOS release is the bundle; its home is the .app itself.
         return _app_inventory(tool, executable, app), app
@@ -1571,6 +1607,38 @@ def _inventory(folder: Path) -> tuple[list[_Entry], Path]:
     return entries, home
 
 
+def _find_notices_executable(folder: Path) -> Path:
+    """Admit bundle discovery components before the build's following file checks."""
+    tool = _build_tool()
+    if sys.platform == "darwin":
+        # Mirror find_executable's candidates without probing any candidate by following.
+        candidates = (
+            folder / "Clearwater.app/Contents/MacOS/Clearwater",
+            folder / "Clearwater/Clearwater",
+            folder / "Clearwater",
+        )
+        apps = {
+            cast(Path, app)
+            for executable in candidates
+            if (app := tool._macos_content_app(executable)) is not None
+        }
+        # Starting at Contents/MacOS also creates a nested .app candidate. Admit the
+        # enclosing bundle FIRST, before even lstat'ing that nested candidate.
+        for app in sorted(apps, key=lambda path: len(path.parts)):
+            if app.is_symlink() or app.is_junction():
+                raise ValueError("notices: unsafe linked entry .app root")
+            executable = app / "Contents/MacOS/Clearwater"
+            for path in (app / "Contents", executable.parent, executable):
+                if path.is_symlink() or path.is_junction():
+                    problem = tool.macos_link_problem(app, app / "Contents/Frameworks", path)
+                    if problem is not None:
+                        raise ValueError(
+                            f"notices: unsafe linked entry {path.relative_to(app).as_posix()}: "
+                            f"{problem}"
+                        )
+    return cast(Path, tool.find_executable(folder))
+
+
 def _licence_inputs(
     distribution: importlib.metadata.Distribution, name: str, audit: Path
 ) -> tuple[LicenceInput, ...]:
@@ -1601,13 +1669,13 @@ def _licence_inputs(
     return tuple(sorted(set(found)))
 
 
-def _bundle_relative(name: str) -> str | None:
+def _bundle_relative(name: str, *, in_app: bool = False) -> str | None:
     """A bundled file's site-relative (RECORD) path, or ``None`` outside the content folders.
 
     The content folders are onedir's ``_internal`` and a ``.app``'s ``Contents/Frameworks``
     and ``Contents/Resources``.
     """
-    for prefix in ("_internal/", *_APP_CONTENT_PREFIXES):
+    for prefix in _APP_CONTENT_PREFIXES if in_app else ("_internal/",):
         if name.startswith(prefix):
             return name.removeprefix(prefix)
     return None
@@ -1691,6 +1759,29 @@ def _app_entry_owner(
     runtime = _python_runtime_dylib()
     if relative == runtime.name:
         return ("python",) if _same_macho(home / name, runtime) else None
+    # Path ownership alone cannot authenticate code rewritten by PyInstaller. Verify
+    # each native's installed origin against its wheel RECORD, then its Mach-O identity.
+    # Framework executables have no extension; the build parser recognises those too.
+    data = (home / name).read_bytes()
+    origins = [
+        (distribution, Path(str(distribution.locate_file(relative))))
+        for distribution in installed.values()
+        if any(str(item).replace("\\", "/") == relative for item in distribution.files or ())
+    ]
+    native = _build_tool()._macho_identity(data) is not None or any(
+        origin.is_file() and _build_tool()._macho_identity(origin.read_bytes()) is not None
+        for _distribution, origin in origins
+    )
+    if native or Path(relative).suffix.lower() in {".so", ".dylib"}:
+        owners = []
+        for distribution, origin in origins:
+            if (
+                origin.is_file()
+                and _record_digest_matches(distribution, relative, origin)
+                and _same_macho(home / name, origin)
+            ):
+                owners.append(distribution)
+        return relative if len(owners) == 1 else None
     return relative
 
 
@@ -1772,8 +1863,10 @@ def _ffmpeg_rows(
     home: Path,
     lock_path: Path,
     native_licences_path: Path = ROOT / "tools/package/native-licences",
+    *,
+    in_app: bool = False,
 ) -> list[NoticeRow]:
-    if home.suffix == ".app":
+    if in_app:
         return _macos_ffmpeg_rows(home, lock_path, native_licences_path)
     tools = [home / "ffmpeg.exe", home / "ffprobe.exe"]
     material = [home / "ffmpeg-BUILD.txt", home / "ffmpeg-LICENSE.txt"]
@@ -2199,10 +2292,16 @@ def plan_notices(
         OSError: Required files cannot be read.
     """
     _build_tool().check_build_environment()
+    census_document = census_preflight(native_licences_path)
     entries, home = _inventory(folder)
+    in_app = (
+        sys.platform == "darwin"
+        and home.suffix == ".app"
+        and any(entry.name == _APP_BOOTLOADER for entry in entries)
+    )
     if ffmpeg_lock_path is None:
         ffmpeg_lock_path = default_ffmpeg_lock()
-    ffmpeg = _ffmpeg_rows(home, ffmpeg_lock_path, native_licences_path)
+    ffmpeg = _ffmpeg_rows(home, ffmpeg_lock_path, native_licences_path, in_app=in_app)
     audit = _audit_rows(audit_path)
     versions = _locked_versions(uv_lock_path)
     if distribution is None:
@@ -2213,13 +2312,12 @@ def plan_notices(
         distribution = trusted.__getitem__
     # Read declarations independently: a removed row/text must not let parent
     # RECORD/interpreter ownership absorb a carried host's embedded terms.
-    document = _native_document(native_licences_path)
+    document = (
+        census_document if census_document is not None else _native_document(native_licences_path)
+    )
     declared_hosts = _embedded_declarations(document)
-    # WP6.5 F0-2: each platform reads its own census (an absent "platform" key is Windows);
-    # a macOS plan refuses once, by name, while only another platform's census exists.
+    # The shared preflight requires explicit evidenced completion independently of hosts.
     embedded_hosts = tuple(host for host in declared_hosts if host.platform == _host_platform())
-    if declared_hosts and not embedded_hosts and _host_platform() == "darwin":
-        raise ValueError(EMBEDDED_CENSUS_PENDING)
     embedded_claims, carried_hosts = _embedded_claims(entries, home, embedded_hosts, document)
     native_records = load_native_licences(native_licences_path)
     declarations = _vendored_declarations(document)
@@ -2277,21 +2375,28 @@ def plan_notices(
                 ):
                     modules[runtime_module].add(name)
     module_claims = _vendored_claims(
-        entries, native_records, declarations, modules, directories, installed, versions, runtime
+        entries,
+        native_records,
+        declarations,
+        modules,
+        directories,
+        installed,
+        versions,
+        runtime,
+        in_app=in_app,
     )
     native_rows = _native_rows(entries, home, native_records, module_claims, embedded_claims)
     native_labels = {label for row in native_rows for label in row.entries} - carried_hosts.keys()
     selected: dict[str, list[str]] = defaultdict(list)
     ffmpeg_labels = {entry for row in ffmpeg for entry in row.entries}
     python_names = _python_file_names()
-    app = home.suffix == ".app"
-    dot_links = _dot_folder_links(entries) if app else frozenset()
+    dot_links = _dot_folder_links(entries) if in_app else frozenset()
     unknown: list[str] = []
     for entry in entries:
         if entry.label in ffmpeg_labels or entry.label in native_labels:
             continue
         name = entry.name
-        if app and entry.kind in {"file", "link"}:
+        if in_app and entry.kind in {"file", "link"}:
             # WP6.5 F0-2: the darwin name tables; RECORD ownership on the bundle-rooted path.
             verdict = _app_entry_owner(entry, home, installed, dot_links)
             if verdict is None:
@@ -3173,8 +3278,9 @@ def write_notices(
             )
         )
 
+    census_preflight(native_licences_path)
     document = prepare()
-    path = notices_path(cast(Path, _build_tool().find_executable(folder)))
+    path = notices_path(_find_notices_executable(folder))
     reserved = False
     temporary: Path | None = None
     try:

@@ -102,11 +102,15 @@ raise RuntimeError('stub received an unexpected/GUI argument set')
 
 
 def load_smoke():
-    path = ROOT / "tools/package/smoke.py"
+    path = Path(os.environ.get("WP65_SMOKE_SCRIPT", ROOT / "tools/package/smoke.py"))
     assert path.is_file(), "headless smoke implementation is absent"
     spec = importlib.util.spec_from_file_location("wp63b_smoke_checks", path)
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    if "WP65_SMOKE_SCRIPT" in os.environ:
+        module.__file__ = str(ROOT / "tools/package/smoke.py")
+        exec(compile(path.read_bytes(), str(path), "exec"), module.__dict__)
+    else:
+        spec.loader.exec_module(module)
     return module
 
 
@@ -1328,6 +1332,7 @@ def darwin_app(tmp_path, monkeypatch):
     notices = SimpleNamespace(
         plan_notices=lambda folder: plans.append(folder) or SimpleNamespace(entries=[1], rows=[1]),
         render_notices=lambda plan: b"NOTICES",
+        census_preflight=lambda: None,
     )
     content_checks = []
 
@@ -1551,3 +1556,13 @@ def test_smoke_on_linux_is_refused_by_name(monkeypatch, tmp_path):
     smoke = _smoke_for(monkeypatch, "linux")
     with pytest.raises(smoke.SmokeError, match=r"platform: .*Linux is not a supported build host"):
         smoke.run_smoke(tmp_path, out=tmp_path / "out")
+
+
+def test_macos_smoke_reports_pending_census_before_missing_notices(darwin_app, monkeypatch):
+    """A r1 F2: the real census preflight wins before the notices existence check."""
+    case = darwin_app
+    notices = support.load_notices()
+    monkeypatch.setattr(case.smoke, "_notices_tool", lambda: notices)
+    (case.app / "Contents/Resources/THIRD_PARTY_NOTICES.md").unlink()
+    with pytest.raises(case.smoke.SmokeError, match="macOS embedded census pending"):
+        case.smoke._macos_static_checks(case.app, case.app / "Contents/MacOS/Clearwater")

@@ -141,11 +141,15 @@ def test_native_licence_manifest_hash_matches_committed_blob():
 
 
 def load_notices():
-    path = ROOT / "tools/package/notices.py"
+    path = Path(os.environ.get("WP65_NOTICES_SCRIPT", ROOT / "tools/package/notices.py"))
     spec = importlib.util.spec_from_file_location("wp63b_notices_checks", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    if "WP65_NOTICES_SCRIPT" in os.environ:
+        module.__file__ = str(ROOT / "tools/package/notices.py")
+        exec(compile(path.read_bytes(), str(path), "exec"), module.__dict__)
+    else:
+        spec.loader.exec_module(module)
     return module
 
 
@@ -4226,6 +4230,18 @@ def app_release(tmp_path, monkeypatch):
         ),
         "pyinstaller": pyinstaller,
     }
+    complete_app_census(surface, app, site)
+    # Native origins need actual RECORD identities, including synthetic fixture bytes.
+    numpy_record = site / "numpy-2.5.4.dist-info/RECORD"
+    records = []
+    for line in numpy_record.read_text().splitlines():
+        relative = line.split(",", 1)[0]
+        if relative.endswith((".so", ".dylib")):
+            data = (site / relative).read_bytes()
+            digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).decode().rstrip("=")
+            line = f"{relative},sha256={digest},{len(data)}"
+        records.append(line)
+    numpy_record.write_text("\n".join(records) + "\n")
     audit = tmp_path / "audit.md"
     audit.write_text(
         """# Synthetic notices
@@ -4291,12 +4307,53 @@ def app_plan(app_release, **kwargs):
     )
 
 
+def complete_app_census(surface, app, site):
+    """Bind the synthetic numpy host to its actually carried licence text."""
+    path = surface / "manifest.json"
+    document = json.loads(path.read_text())
+    relative = "Contents/Frameworks/numpy/_core/test.cpython-312-darwin.so"
+    data = (app / relative).read_bytes()
+    text = (site / "numpy-2.5.4.dist-info/licenses/LICENSE.txt").read_bytes()
+    source = {
+        "carried_notice": {
+            "row": "numpy",
+            "inputs": [{"sha256": hashlib.sha256(text).hexdigest(), "size_bytes": len(text)}],
+        }
+    }
+    document["embedded_census"] = {
+        "darwin": {"status": "complete", "evidence": "synthetic run 7 head " + "b" * 40}
+    }
+    document["embedded_hosts"] = [
+        {
+            "platform": "darwin",
+            "relpath": relative,
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "size_bytes": len(data),
+            "parent": "numpy",
+            "parent_version": "2.5.4",
+            "components": [{"component": "synthetic embedded numpy", "source": source}],
+        }
+    ]
+    document["components"].append(
+        {
+            "component": "synthetic embedded numpy",
+            "upstream_version": "2.5.4",
+            "spdx": "BSD-3-Clause",
+            "embedded_in": [relative],
+            "version_evidence": {"method": "embedded_string", "value": "synthetic"},
+            **source,
+        }
+    )
+    path.write_text(json.dumps(document))
+
+
 def test_app_plan_applies_the_darwin_name_tables(app_release):
     """F0-2: every .app file and link is covered by its darwin row, bundle-rooted; the RECORD
     path undoes PyInstaller's ``__dot__`` folder only beside its admitted ``.x`` link."""
     result = app_plan(app_release)
     rows = {row.name: set(row.entries) for row in result.rows}
     assert set(rows) == {
+        "synthetic embedded numpy",
         "Clearwater",
         "Python",
         "numpy",
@@ -4477,3 +4534,151 @@ def test_embedded_hosts_are_read_per_platform(app_release, monkeypatch):
         module._embedded_claims(entries, home, (dylib_host,), {"components": []})
     monkeypatch.setattr(sys, "platform", "win32")
     assert module._host_platform() == "win32"
+
+
+@pytest.mark.parametrize("census", ["empty", "one", "several", "no-evidence", "zero-complete"])
+@pytest.mark.parametrize("entrypoint", ["plan", "write"])
+def test_app_census_declaration_cannot_be_bypassed(app_release, census, entrypoint):
+    """A r1 F1/F2: no host count substitutes for an evidenced completion claim."""
+    path = app_release["native_surface"] / "manifest.json"
+    document = json.loads(path.read_text())
+    if census in {"empty", "zero-complete"}:
+        document["embedded_hosts"] = []
+        document["components"] = document["components"][:1]
+    elif census in {"one", "several"}:
+        host = document["embedded_hosts"][0]
+        document["embedded_hosts"] = [
+            {**host, "relpath": f"Contents/Frameworks/unrelated-{i}.so", "sha256": "0" * 64}
+            for i in range(1 if census == "one" else 3)
+        ]
+        document["components"] = document["components"][:1]
+        if census == "one":
+            production = json.loads(
+                (ROOT / "tools/package/native-licences/manifest.json").read_text()
+            )
+            document["embedded_hosts"] = [
+                *production["embedded_hosts"],
+                *document["embedded_hosts"],
+            ]
+    if census == "no-evidence":
+        document["embedded_census"] = {"darwin": {"status": "complete"}}
+    elif census != "zero-complete":
+        document.pop("embedded_census")
+    path.write_text(json.dumps(document))
+    module = app_release["module"]
+    with pytest.raises(ValueError, match="macOS embedded census pending") as error:
+        if entrypoint == "plan":
+            app_plan(app_release)
+        else:
+            module.write_notices(
+                app_release["root"],
+                native_licences_path=path.parent,
+                audit_path=app_release["audit"],
+                uv_lock_path=app_release["uv_lock"],
+                distribution=app_release["distributions"].__getitem__,
+            )
+    assert str(error.value) == module.EMBEDDED_CENSUS_PENDING
+    assert not (app_release["app"] / "Contents/Resources/THIRD_PARTY_NOTICES.md").exists()
+
+
+def test_complete_app_census_still_requires_each_carried_parent_host(app_release):
+    """A r1 F1: completion does not bypass the existing absent-host refusal."""
+    path = app_release["native_surface"] / "manifest.json"
+    document = json.loads(path.read_text())
+    document["embedded_hosts"].append(
+        {**document["embedded_hosts"][0], "relpath": "Contents/Frameworks/numpy/missing.so"}
+    )
+    path.write_text(json.dumps(document))
+    with pytest.raises(ValueError, match=r"missing\.so absent while parent numpy is carried"):
+        app_plan(app_release)
+
+
+@pytest.mark.parametrize("suffix", ["ordinary", "X.app"])
+def test_windows_notices_bytes_equal_pre_f02(release, suffix):
+    """A r1 F4: artifact bytes equal 200dffd8, including a Windows onedir named X.app."""
+    source = subprocess.run(
+        ["git", "show", "200dffd8:tools/package/notices.py"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+        timeout=30,
+    ).stdout
+    spec = importlib.util.spec_from_file_location(
+        "wp65_base_notices", ROOT / "tools/package/notices.py"
+    )
+    base = importlib.util.module_from_spec(spec)
+    exec(compile(source, "200dffd8:tools/package/notices.py", "exec"), base.__dict__)
+    if suffix == "X.app":
+        home = release["folder"].with_name(suffix)
+        release["folder"].rename(home)
+        release["folder"] = home
+    module = load_notices()
+    assert module.render_notices(plan(module, release)) == base.render_notices(plan(base, release))
+
+
+def test_windows_app_suffix_keeps_onedir_ffmpeg_failure(release):
+    """A r1 F4: a Windows onedir named X.app still requires all four FFmpeg files."""
+    module = load_notices()
+    home = release["folder"].with_name("X.app")
+    release["folder"].rename(home)
+    (home / "ffmpeg.exe").write_bytes(b"synthetic tool")
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "notices: FFmpeg missing ffprobe.exe, ffmpeg-BUILD.txt, ffmpeg-LICENSE.txt"
+        ),
+    ):
+        module._ffmpeg_rows(home, release["ffmpeg_path"])
+
+
+def test_windows_contents_prefix_does_not_claim_vendored_path():
+    """A r1 F4: Contents prefixes have no special meaning in a Windows inventory."""
+    module = load_notices()
+    document = module._native_document(ROOT / "tools/package/native-licences")
+    name = "Contents/Frameworks/scipy/_external/array_api_compat/alien.dll"
+    claims = module._vendored_claims(
+        [module._Entry("file:" + name, name, "file")],
+        (),
+        module._vendored_declarations(document),
+        {},
+        {},
+        {},
+        {},
+        {},
+    )
+    assert claims == {}
+
+
+@pytest.mark.parametrize("damage", ["rewritten", "replacement", "origin", "not-macho"])
+@pytest.mark.parametrize(
+    "relative", ["_pillow_heif.cpython-312-darwin.so", "Qt/lib/QtCore.framework/Versions/A/QtCore"]
+)
+def test_app_record_native_requires_verified_macho_origin(tmp_path, damage, relative):
+    """A r1 F3: rewritten _pillow_heif passes; changed code or an untrusted origin fails."""
+    import test_tools_package_build as build_tests
+
+    module = load_notices()
+    module._build_tool()
+    home = tmp_path / "Clearwater.app"
+    name = "Contents/Frameworks/" + relative
+    path = home / name
+    path.parent.mkdir(parents=True)
+    origin_data = build_tests.original_native()
+    dist = installed(tmp_path / "site", "pillow-heif", "1.4.0", {relative: "placeholder"})
+    origin = Path(dist.locate_file(relative))
+    origin.write_bytes(origin_data)
+    digest = base64.urlsafe_b64encode(hashlib.sha256(origin_data).digest()).decode().rstrip("=")
+    record = tmp_path / "site/pillow_heif-1.4.0.dist-info/RECORD"
+    record.write_text(f"{relative},sha256={digest},{len(origin_data)}\n")
+    data = build_tests.built_native()
+    if damage == "replacement":
+        data = build_tests.built_native(code=build_tests.X86_CODE)
+    if damage == "not-macho":
+        data = b"not a Mach-O"
+    if damage == "origin":
+        origin.write_bytes(build_tests.original_native(code=build_tests.X86_CODE))
+    path.write_bytes(data)
+    verdict = module._app_entry_owner(
+        module._Entry("file:" + name, name, "file"), home, {"pillow-heif": dist}, frozenset()
+    )
+    assert verdict == (relative if damage == "rewritten" else None)
