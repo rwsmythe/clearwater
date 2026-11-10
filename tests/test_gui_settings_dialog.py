@@ -54,6 +54,9 @@ pytestmark = pytest.mark.gui
 NVENC = EncoderCapability("hevc_nvenc", False, "No NVIDIA encoder was found.", (), True)
 X265 = EncoderCapability("libx265", True, None, (8, 10), False)
 CAPS = (NVENC, X265)
+WINDOWS_ROSTER = capability.encoder_roster("win32")
+"""The NVENC roster the default-rule expectations below are stated for (AD-35: macOS offers
+hevc_videotoolbox, so the host roster would resolve otherwise there; WP6.5 run 2, as C4)."""
 
 
 class CapsSink(StubVideoSink):
@@ -773,7 +776,8 @@ def test_auto_is_resolved_by_a_rule_that_disagrees_with_the_default_rule(
     note: str,
 ) -> None:
     """The injected resolver, rather than a restated rule, controls 10-bit support."""
-    assert capability.resolve_encoder("auto", capabilities) == default != resolved
+    assert capability.resolve_encoder("auto", capabilities, roster=WINDOWS_ROSTER) == default
+    assert default != resolved
     window = env.start(caps=capabilities, resolve=lambda setting, caps: resolved)
     dialog = env.open(window)
     assert env.resolve_calls
