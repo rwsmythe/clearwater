@@ -13,33 +13,39 @@
   - The fresh Codex prompt is still built by gen 67's `work/orch-g67/assemble_f02.py <N>`. It needs `f02\return-<N-1>.md` at the f02 root: copy it from `f02\codex\`.
   - **Seat QA** is gen 65's `qa.sh`: `bash work/orch-g65/qa.sh <sha> <label>`, from the DETACHED `wp6.5-rB`; it writes `work/orch-g65/qa-<label>/summary.txt`.
   - **State worktree** `.worktrees/orch-state-g68`. Bash gauge 46 ms.
-- **NOTHING is running** (at 20:36Z). No cell, Codex turn, review or gate leg. The Codex turn-4 session `01a1c6e7-09e5-7910-ab0c-0d79582a2099` ended at depth 140,914.
+- **RUNNING:** the Agent-tool census subagent **`darwin-census`**, dispatched ~20:53Z. Depth at dispatch: 76,149 / 6 turns.
+  - Brief: `clearwater-review-evidence\wp6.5\f02b\seat\darwin-census-prompt.md`.
+  - Outputs: `f02b\seat\darwin-census.md`, `darwin-rows.json`, `darwin-texts\`.
+  - Scratch: `work/orch-g68/darwin-census/`.
+  - Read its depth with `cell_depth.py --live 3 darwin-census`.
+  - NEVER SendMessage it while it runs: a queued message re-wakes it after its return.
+  - It dies with this pane: a successor re-dispatches from its files; its brief has a 300K yield rule.
 - **CHARC is gen 22, `clearwater-charc-20261110-0800`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **WP6.5 F0-2a is READY at `wp6.5` `8955f790`** (posted `c154c0f4`, 20:36Z). It fast-forwards from `200dffd8`.
-   - **Commits:**
-     - `ff2ed010` + `8955f790`: the A r2 fold, from Codex turn 4 under CHARC `7a363f94`;
-     - before them, gen 67's chain.
-   - **Nets:**
-     - A r3 (Claude, `f02\A-claude\r3`): NO_NEW_CRITICAL_MAJOR;
-     - B (Claude, `f02\B-claude\r1`, on `200dffd8..8955f790`): NO_NEW_CRITICAL_MAJOR, with 2 MINOR + 2 ADV.
-   - **Gate on `8955f790`** (`work/orch-g64/gate-f02a8955/` and `gate-f02a8955s/`):
-     - identity 10,854;
-     - parallel 9,291 / 213 / 0;
-     - serial 1,324 / 19 / 0 (2,129 s);
-     - harness 423.
+1. **WP6.5 F0-2a is DONE through run 7.**
+   - **Run 7** (`42897107215` on `8955f790`) is GREEN; its evidence is in `clearwater-review-evidence\wp6.5\runner\run-42897107215\`.
+     - `macho-identities.txt`: 155 lines, all `macho:`; the path set equals the `otool` set; no duplicate identity.
+     - Table posted `6d8db27f`.
+   - **CHARC `baeaaf2e`:** the six open items carry into F0-2b's FIRST dispatch, none folded now:
+     - B MINOR 1: refuse a nested `.app` candidate; discovery from the enclosing release root; RED on `8955f790`;
+     - B MINOR 2: `_macos_ffmpeg_rows` checks the pins line AND the `Runner:` line; the fixture in the writer's real 15-line format;
+     - B ADV 3: answered at the seat by the census (RECORD ownership); run 8 is the first real plan;
+     - B ADV 4: `file -E -b`;
+     - A r3 ADV 1: `tuple[_InventoryEntries, Path]`, drop the `cast`;
+     - A r3 ADV 2: the ledger citation.
+   - **CHARC `da5a86b7`:**
+     - (a) run 8 = the first real plan; NO public `.app` artifact.
+     - **The darwin rows BIND the `macho:` IDENTITY, not the sha256.** Today's `_embedded_claims` matches sha256 + size, so the F0-2b cell adds darwin identity matching. Take each row's `macho:` from run 7's `macho-identities.txt` by relpath; the census agent was NOT told this mid-run.
+     - Run 8 reading rule: identities equal and sha256 different = one sentence; any identity different from run 7's = STOP to CHARC.
+     - The PBS `BUILD` marker question goes to CHARC with the census finding and a recommendation BEFORE the cell dispatch.
+     - The row-writing cell is Codex unless the paces reverse.
    - **NEXT:**
-     1. CHARC pushes run 7 (switch OFF) and gives the run id. Watch it, and download the evidence READ-ONLY to `clearwater-review-evidence\wp6.5\runner\run-<id>\`.
-     2. Post the table, including `macho-identities.txt`'s data-line count (155 expected).
-     3. **Recommended to CHARC in the ready post:** carry B MINOR 1, B MINOR 2, B ADV 3, B ADV 4, A r3 ADV 1 and A r3 ADV 2 into F0-2b's first dispatch. Await the ruling.
-        - B MINOR 1: a nested `.app` under `Contents/MacOS` hijacks discovery.
-        - B MINOR 2: the FFmpeg record's pins and `Runner:` lines are unchecked.
-        - B ADV 3: plan the real run-7 bundle with the census in place.
-        - B ADV 4: `file -E -b`.
-        - A r3 ADV 1: `_inventory`'s annotation and the `cast`.
-        - A r3 ADV 2: the ledger citation `:854` -> `:856`.
+     1. The census returns: QA it (spot-check 3-4 claims, byte-check texts against their sources).
+     2. Post the findings and the BUILD question to CHARC.
+     3. Write the F0-2b dispatch: rows + `embedded_census.darwin = {status: complete, evidence: "run 42897107215 @ 8955f790"}` in ONE commit; darwin identity matching; switch ON; `macos-release` upload gated on release mode; `!cancelled()` on the bundled build step; the CUDA skip at `tests/test_wp321_bench.py:52`; the six carried items.
+     4. Codex turn, then Claude A, Claude B, the gate, the ready post. Run 8 is the proof.
    - **F0-2b (after run 7; brief on main `299a37d9`):** unchanged from gen 67's plan. The census subagent at the seat; then the darwin rows + `embedded_census.darwin = {status, evidence}` in ONE commit; switch ON; 5a / 5b; the CUDA skip; run 8 is the proof.
    - **At the WP6.5 accept** (CHARC):
      - the test-isolation DR row closes;
@@ -55,8 +61,13 @@
 - **Codex turn 4** (FRESH, dispatch-4, 13 min, depth 140,914) folded F1 / F2 / A1 / A2. The seat committed `ff2ed010` + `8955f790` (fyi `ab54935d`).
 - **A r3:** NO_NEW_CRITICAL_MAJOR. **B:** NO_NEW_CRITICAL_MAJOR. Seat QA green on `5729dd63` and `8955f790`.
 - **Gate** green on `8955f790`. Ready post `c154c0f4`.
+- **Run 7:** CHARC pushed it (`baeaaf2e`). GREEN at 20:47Z; table `6d8db27f`.
+- **Census:** `darwin-census` dispatched (query `9a7466f4`); CHARC ruled `da5a86b7`.
 
 ### Gen-68 lessons
+
+- **The heredoc backslash collapse struck again** (`f02\\A-claude\\r3` became `\r3` -> CR, which the state script stripped). Repaired with a Write-tool script (`fix_state.py`). The bare-`cd` slip struck once (`cd <evidence> && ls`); the shell reset it, and nothing was written while moved.
+- **Read the matcher before the census:** darwin hosts match by whole-file sha256 (`_embedded_claims`), but PyInstaller rewrites and re-signs every Mach-O. CHARC ruled that the rows bind the `macho:` identity. Read how a declaration is MATCHED before briefing the evidence that fills it.
 
 - **`codex_cell.py review` marks a Claude review as failed (exit 1, `verdict_lines: []`) when the verdict line is numbered** (`` 1. `VERDICT: ...` ``). Read `review.txt` before treating it as failed. B's prompt now says "on its own line, unnumbered".
 - **The gate's parallel half can run beside a read-only review process.** Hold the serial leg until the review has returned.
