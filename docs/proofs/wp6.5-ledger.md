@@ -4114,9 +4114,10 @@ Base `6dc8c000`; folded under CHARC `7a246dfd`. No STOP or dispute.
   F1-c shapes with nine literal run-4 NumPy random extensions. Every result must equal
   its materialised physical copy line-for-line: nine unexpected-module lines for five
   shapes and nine shadow lines for Frameworks/io. Each runs the existing recorder
-  (covered shape 7) with zero invariant violations; explicit own-admission/view events
-  additionally prove the nested link's own call precedes its first following stat or
-  view. These direct nested links do not hit A1's intermediate-chain limitation; the
+  (covered shape 7) with zero invariant violations. The A r4 fold replaces the global
+  first-admission assertion: each nested access is paired with the latest own admission
+  in that same descent, so an earlier physical walk cannot excuse a missing alias call.
+  These direct nested links do not hit A1's intermediate-chain limitation; the
   recorder logic is unchanged. Existing shapes and direct alias regressions also pass.
   `:937` proves holder/inner alone, two sibling aliases and numpy/io -> random stay 0.
   `:947` refuses the folder cycle both physically and through an alias. `:959` injects
@@ -4173,3 +4174,121 @@ no commit, shared admission/listing, src/interface/workflow/dependency/notices/f
 debt/C14 change, frozen run, real bin/FFmpeg access, desktop input, network action,
 other-worktree read or footage/profile write. All evidence is inside this worktree.
 Dispatcher-read depth not supplied.
+
+
+### A r4 fold
+
+Claude Reviewer A r4 and r3 read in full from
+`C:/Users/rwsmy/clearwater-review-evidence/wp6.5/A-codex/r4/review.txt` and
+`.../r3/review.txt`. Base `29f9305f`; folded under CHARC `37ba6ba9`.
+No STOP or dispute; this is the fourth Codex-lane review fold, below the round-5 gate.
+
+| Round | Severity counts | Scope / disposition | NEW / REOPENED | Reverts | Fix kind | Reviewer / depth |
+| --- | --- | --- | --- | --- | --- | --- |
+| Codex lane A r4 | 1 MAJOR, 2 ADVISORY | F1-d, A-r4-2 and A-r4-1 in-envelope, confirmed / fixed | 3 / 0 | 0 | Product code + tests; ledger correction | Claude at seat; CLI/transport version and dispatcher-read depth not supplied |
+
+- **F1-d MAJOR, confirmed / fixed:** `tools/package/build.py:622` retains a single
+  top-level link entry point and uses local recursive `judge` (`:628`) for the descent.
+  After that link's own successful admission, `real_app` is canonicalised once per
+  top-level descent (`:654`), never before admission. View entries inside `real_app`
+  are re-rooted to `app / entry.relative_to(real_app)` using path TEXT only (`:662`),
+  before the nested link's own admission/stat/resolve/view. Entries outside `real_app`
+  keep their real paths and the existing outside-app refusal. The resolved-real-target
+  stack and its equal-or-ancestor loop comparison are unchanged. Shared admission,
+  chain, class, listing and view helpers are unchanged.
+- **A-r4-2 ADVISORY, confirmed / fixed as ruled:** measured the full captured graph
+  BEFORE editing product code (`measure.log`), and again at the fold head
+  (`measure-final.log`). Of 86 top-level links the largest recursive view contains
+  **198 entries**, at `Contents/Frameworks/PySide6/Qt/translations` (next: 164 for
+  `Contents/Resources/scipy`). Thus 10x = 1,980 < 4,096; the named
+  `_MACOS_LINK_CONTENT_ENTRIES = 4096` sits beside `_MACOS_LINK_HOPS` (`:4442`),
+  with more than 20x measured headroom. One shared counter counts each re-rooted
+  entry judged, including nested folder links and their entries, across all levels
+  of ONE top-level link. Before the next entry would pass N (`:656`), it stops that
+  entire descent and emits exactly ONE `(link: folder fan-out)` line at the original
+  top-level label (`:679`). Earlier findings remain; the next top-level link starts
+  with a fresh counter. Physical folders are not entries in the shared view contract;
+  physical-folder contents and folder-link entries are counted as returned and judged.
+- **A-r4-1 ADVISORY, confirmed / fixed:** `tests/test_tools_package_build.py:930-938`
+  compares EVERY nested own-view/following-stat access with the latest own admission
+  in its same descent. An alias's own admission supersedes an earlier physical walk,
+  so the earlier call cannot excuse a skipped nested own admission. A HEAD mutation
+  (`build_mutation.py`, `problem = None if targets else (...)`) fails **all six**
+  F1-c parameters at the new equality assertion (`:937`), **6 failed, 765 deselected
+  in 2.33s**, `mutation.log`. The r3 fold's order sentence above is replaced accordingly.
+- **Tests / model / recorder:** `model_posix_realpath` (`tests:941`) uses real
+  component-by-component lstat/readlink on the fixture, matching the existing
+  above-root-alias link-rule test's Windows limitation. It models only realpath;
+  product admission, listing and the existing POSIX-text-link stat fallback remain.
+  Four `test_ar4_content_under_aliased_release_root` cases (`:985`) compare both
+  root forms and both canonical/aliased spellings: the legitimate nested graph gives
+  0 and F1-c's foo-bar/holder/inner gives nine identical refusal lines. The 13-level
+  diamond (`:1000`) exercises one top-level link with real linked suffixes; only the
+  outer release listing is narrowed, avoiding unrelated repeated top-level descents.
+  The small-budget test (`:1028`) proves cross-level sharing, preservation of earlier
+  GPU-name findings, stopping before the next entry, and reset for sibling top-level
+  links. All existing recorder shapes, including shape 7's six direct nested aliases,
+  run unchanged apart from the stronger order assertion. The A1 chain-recorder
+  limitation remains disclosed; no broader recorder proof is claimed.
+
+**RED / GREEN**, logs and scratch probes under `work/wp6.5/f7/`:
+
+- `git show 29f9305f:tools/package/build.py` copied as bytes to `build_r4.py`, loaded
+  via `WP61_BUILD_SCRIPT`. Final initial five r4 tests: **5 failed, 765 deselected
+  in 104.76s**, `red-final.log`. Four fail at `aliased == canonical` (the old nested
+  paths receive outside-app refusals); the diamond fails at `found.count(label) == 1`
+  (0 fan-out lines). The added small-budget parent check: **1 failed, 770 deselected
+  in 0.33s**, `red-budget.log`, at the assertion that the second nested subtree was
+  not judged. Thus all six new cases distinguish the parent. The earlier broad
+  diamond attempt hit its 120s test timeout (`red.log`) and has NO completion count;
+  narrowing only the outer listing made the final parent proof complete normally.
+- Initial targeted r4 plus all six F1-c order cases: **11 passed, 759 deselected
+  in 18.27s**, `green.log` (before the extra small-budget case).
+- Final r1/r2/r3/r4/run-4/recorder selection: **63 passed, 708 deselected
+  in 21.42s**, `targeted-final.log`. The **13-level diamond is refused in 17.95s**
+  (pytest call duration), within the run's 120s hang ceiling; exactly one fan-out line
+  is emitted for its top-level alias. This is a synthetic test wall, not a product
+  performance figure or a Mac hardware claim.
+- Build + notices, **-n 3 --dist loadfile: 1191 passed in 126.87s** (771 build,
+  420 notices), `build-notices.log`. The out-of-scope `macos_bundle` Popen fixture
+  remains source-identical to `29f9305f` (`fixture-identity.log`); no fixture edit or
+  default-distribution rerun was made.
+- Official smoke: **74 passed, 1 skipped in 81.68s**, `smoke.log` (native POSIX
+  process-group proof skipped). Portability: **226 skipped in 0.17s** on Windows,
+  `portability.log`; every skip is the native macOS leg.
+- Ruff check clean; format check **339 files already formatted**; mypy and mypy darwin
+  each clean in **166 source files** (`ruff-check.log`, `ruff-format.log`, `mypy.log`,
+  `mypy-darwin.log`). `git diff --check` exits 0; all three changed files have
+  zero CR bytes (`diff-check.log`, `line-endings.log`).
+- Onedir nine-case census at `29f9305f` versus the fold head: **372 = 372**, identical
+  calls, order, following flags, results and messages (`onedir-census.json/.log`).
+  `source-identity.log` confirms byte-identical source for the default content loop,
+  `_bundle_parts`, shared listing, link rule, chain/class helpers, link view and
+  onedir smoke `_static_checks`.
+- Full run-4 graph rebuilt from staged listing with **293 files, 114 folders and
+  86 real symlinks**, captured link text, inert file bytes and valid empty ZIPs:
+  **0 violations** from both release/app roots, canonical AND aliased (`rebuild.log`).
+  The SAME graph/model on the parent gives **0 / 0 canonical, 20 / 20 aliased**
+  (`rebuild-parent.log`), exactly reproducing F1-d. A separate full rebuild with
+  foo-bar -> numpy/holder and holder/inner -> ../random gives **nine unexpected-module
+  lines** in all four root/spelling combinations (`rebuild-f1c.log`).
+
+All pytest runs use `PYTHONPATH=scripts` to bootstrap the unchanged shim runner, load
+`-p sandbox_mkdir_shim -p no:cacheprovider`, keep the forbidden GUI-startup-test
+exclusion, use bounded timeouts and separate basetemps under `work/wp6.5/f7/`.
+The entry-point grep is archived as `entrypoint-audit.log`; selected build regressions
+call no product entry point, the smoke source-routing child blocks Qt/stubs GUI and
+worker effects with disposable profile roots and a timeout, and portability skips
+natively on this Windows host. No native Mac or frozen-bundle proof is claimed.
+
+**Verification loop:** pass 1 independently confirmed F1-d with the canonical/aliased
+fixture and full graph on the parent, confirmed fan-out and the order-assertion gap,
+then applied the exact ruled mapping/budget and assertion. Pass 2: final targeted
+regressions/recorder, full requested module suites, captured and planted graphs,
+protected source/fixture identity and onedir census found no new product issue.
+No rejected false positive, sandbox-limited rerun or open design question remains.
+Next Reviewer A pass is the seat's action; convergence is not claimed. One logical
+fold plus tests and ledger; no commit, shared admission/listing, src/interface/workflow,
+dependency/notices/committed-fixture/debt/C14 change, frozen run, real bin/FFmpeg access,
+desktop input, network action, other-worktree read or footage/profile write.
+All evidence is inside this worktree. Dispatcher-read depth not supplied.
