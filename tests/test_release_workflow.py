@@ -1081,9 +1081,12 @@ def evaluate_if(expression, *, failed, env, inputs):
 
     The job is never cancelled here. A condition without a status function is read as
     ``success() && (...)`` (GitHub's rule); None (no ``if:``) is ``success()``. Truthiness:
-    None, False and ``''`` are false. ``==`` / ``!=`` compare two strings case-insensitively;
-    any other operand pair, function, context, operator or literal is refused
-    (UnknownExpressionError), so a future condition cannot slip past the model.
+    None, False and ``''`` are false. Precedence is GitHub's: ``!`` binds tighter than ``==`` /
+    ``!=``, which bind tighter than ``&&``, then ``||`` (A r9 minor); one comparison per
+    operand pair (a chained one is refused). ``==`` / ``!=`` compare two strings
+    case-insensitively; any other operand pair (a boolean such as ``!env.X``, or a null) is
+    refused rather than coerced, as is any other function, context, operator or literal
+    (UnknownExpressionError), so a condition outside these forms cannot slip past the model.
 
     Args:
         expression: The ``if:`` text, or None.
@@ -1137,11 +1140,11 @@ def evaluate_if(expression, *, failed, env, inputs):
         raise UnknownExpressionError(f"{expression!r}: unknown {value!r}")
 
     def comparison():
-        left = primary()
+        left = negation()
         kind, value = peek()
         if (kind, value) in (("op", "=="), ("op", "!=")):
             take()
-            right = primary()
+            right = negation()
             if not (isinstance(left, str) and isinstance(right, str)):
                 raise UnknownExpressionError(f"{expression!r}: compares {left!r} with {right!r}")
             equal = left.casefold() == right.casefold()
@@ -1152,13 +1155,13 @@ def evaluate_if(expression, *, failed, env, inputs):
         if peek() == ("op", "!"):
             take()
             return not truthy(negation())
-        return comparison()
+        return primary()
 
     def conjunction():
-        result = negation()
+        result = comparison()
         while peek() == ("op", "&&"):
             take()
-            right = negation()
+            right = comparison()
             result = truthy(result) and truthy(right)
         return result
 
@@ -1329,6 +1332,23 @@ def test_the_step_evaluator_refuses_forms_it_does_not_know(expression):
     literal, a broken expression or wrapper raises instead of being read as true or false."""
     with pytest.raises(UnknownExpressionError):
         evaluate_if(expression, failed=False, env={"X": "b"}, inputs={})
+
+
+@pytest.mark.parametrize("expression", ["!env.X == 'false'", "${{ !env.X == 'false' }}"])
+def test_negation_binds_tighter_than_a_comparison_and_a_boolean_operand_is_refused(expression):
+    """A r9 minor: GitHub reads ``!env.X == 'false'`` as ``(!env.X) == 'false'``, a boolean
+    against a string; the evaluator refuses that comparison rather than emulate the coercion
+    (it read ``!(env.X == 'false')`` before, True for X = 'true')."""
+    with pytest.raises(UnknownExpressionError, match="compares False with 'false'"):
+        evaluate_if(expression, failed=False, env={"X": "true"}, inputs={})
+
+
+@pytest.mark.parametrize(("value", "runs"), [("a", False), ("A", False), ("b", True)])
+def test_negation_of_a_parenthesized_comparison_is_evaluated(value, runs):
+    """A r9 minor: ``!`` bound to a parenthesized comparison negates its result."""
+    for expression in ("!(env.X == 'a')", "${{ !(env.X == 'a') }}"):
+        assert evaluate_if(expression, failed=False, env={"X": value}, inputs={}) is runs
+    assert evaluate_if("!(env.X == 'a')", failed=True, env={"X": "b"}, inputs={}) is False
 
 
 @pytest.mark.parametrize(
