@@ -3448,6 +3448,9 @@ admission changed (the shared rule `macos_link_problem` and its walk are untouch
 
 ### M1 MINOR: the diagnostic PATH lookup (`tools/package/build.py`)
 
+As committed in `b38e7420`; the root comparison below is SUPERSEDED by the residual fold
+(`976f8c26`, `### Residual fold` below): any link on the path now skips the candidate.
+
 - `:4690` `_macos_candidate_behind_a_link(roots, candidate)`: reads a PATH candidate as
   WRITTEN, component by component from its anchor (`..` lexically, which matches the
   system's reading up to the first link, where the reading stops). Every component strictly
@@ -3587,7 +3590,8 @@ Pass 1:
   check's `read_bytes` of physical files). **REJECTED**: shapes 1-3 are green under it.
 - **Suspected:** onedir calls change (the moved `in_app` line, `linked()`). **REJECTED** by
   the nonempty-PATH probe (identical).
-- **Not fixed, outside the dispatch's scope (for the dispatcher):** a HOST PATH entry that
+- **Folded in `976f8c26` (dispatch-19b, `### Residual fold` below), was open here:** a
+  HOST PATH entry that
   reaches into the bundle through a link OUTSIDE the release root (for example
   `/tmp/alias -> <root>/Contents/Resources`, then `/tmp/alias/bin`) is lexically outside
   the root, so it keeps today's `is_file()` per the dispatch ("candidates outside the
@@ -3598,3 +3602,72 @@ Pass 1:
 Pass 2: nothing new.
 
 Depth at A-r14-fold yield: DISPATCHER TO FILL
+
+### Residual fold (`wp65-cell18`, dispatch-19b; base `d1ecd039`)
+
+The A r14 fold's own open item (a host PATH alias into the bundle), folded as a MINOR under
+CHARC `4ed56fcb`; dispatch-19b overrides dispatch-19's "candidates outside the release root
+keep today's query" for the `.app` form only. Commit `976f8c26` (`tools/package/build.py`,
+`tests/test_tools_package_build.py`). No admission change; no `src/`, `release.yml`,
+`MACOS_FFMPEG_BUNDLED`, `notices.py`, debt-register or C14 change.
+
+- **Change:** `tools/package/build.py:4690` `_macos_candidate_behind_a_link(candidate)`: a
+  link or junction ANYWHERE on the candidate's path, from the anchor, read as written
+  (`..` lexically, exact because the reading stops at the first link) with `os.lstat` /
+  `is_junction()` only, marks it linked; a component that cannot be read ends the reading.
+  The release-root comparison (both root spellings, case folding, `realpath(root)`) is
+  REMOVED: with any link deciding, it served nothing, and the fold makes one following call
+  fewer. `:4728` `linked()` is `in_app and _macos_candidate_behind_a_link(candidate)`; a
+  linked candidate is skipped as a diagnostic (no "likely PATH source"), never resolved.
+  The lost hint for a PATH entry behind a host alias (macOS `/tmp` -> `/private/tmp`) is
+  accepted (dispatch-19b).
+- **Recorder:** `tests/test_tools_package_build.py:3332` `violations()` now reads EVERY
+  component of a followed path from the anchor: a link under the release root must be
+  admitted earlier (as before); a link OUTSIDE it is a violation when it resolves at or
+  under the release root (a host alias into the bundle). An alias above the root (macOS
+  `/var`) resolves to an ancestor of the root and is not one. Covered shape 4 gains the
+  two host cases below.
+- **Regressions:**
+  - `:3521` `test_a_linked_path_candidate_is_never_followed`, two new cases:
+    `host-alias-into-bundle` (`<real tmp>/alias -> <root>/Contents/Resources`,
+    `original_path = <real tmp>/alias/bin`, the bundle's `Contents/Resources/bin` a link)
+    and `host-link-elsewhere` (`<real tmp>/hostlink -> <real tmp>/host/bin`, which holds the
+    file): no "likely PATH source"; no following call through either host link (asserted
+    directly) or through the bundle link (the recorder); the bundle link's refusal
+    unchanged. `linked-then-host` still names the physical host folder.
+  - `:3579` `test_a_path_candidate_with_any_link_on_it_is_skipped` (replaces the spelling
+    test): linked through the bundle link, through `..` past it, out through it and
+    lexically back, through an alias above the root, in upper case (case-insensitive
+    volume), and as a path relative to the working folder; not linked: a physical path, a
+    missing component, an absent host folder.
+- **macOS exposure (dispatch-19b):** every host or physical path a new test expects to be
+  queried or "not linked" is built under `Path(os.path.realpath(tmp_path))` (the named host
+  folder, the host link and alias, the helper test's physical paths). Checked the fold's
+  other new tests: the linked-only / through-dotdot cases expect a skip anyway; the recorder
+  unit tests (read, order, admissions, junction) never call the helper, and the new
+  checker reads the `/var` link as an alias above the root (no violation); the shape tests
+  pass `original_path=""`; the one other test with a nonempty `original_path` (`:299`) is
+  an onedir `.exe` layout, untouched. Nothing else exposed.
+- **RED on `d1ecd039`** (a throwaway detached worktree; the fold's tests with
+  `WP61_BUILD_SCRIPT` naming its `build.py`): **3 failed, 11 passed** over the new and
+  recorder tests: `host-alias-into-bundle` (the recorder: a following `Path.is_file` and
+  its `os.stat` on `<real tmp>/alias/bin/Aaa.dylib`), `host-link-elsewhere` (named "likely
+  PATH source: `<real tmp>/hostlink/Aaa.dylib`") and the helper test (the old signature).
+- **Onedir identity, re-run:** the nonempty-`original_path` probe over the nine onedir
+  `LINK_CASES`, `bce8bddc`'s `build.py` against `976f8c26`'s: 2,188 recorded calls and
+  every result and message IDENTICAL.
+- **GREEN** (`976f8c26`):
+  - `test_tools_package_build.py` + `test_tools_package_notices.py` (`-n 3`): **1133
+    passed** (1131 + 2);
+  - `test_tools_package_smoke.py`: 74 passed, 1 skipped;
+  - `test_macos_portability.py`: 226 skipped (darwin-only on this host);
+  - `ruff check .`, `ruff format --check .` (339 files), `mypy`, `mypy --platform darwin`
+    (166 source files): clean; committed blobs 0 CR, 0 NUL.
+- **Verification loop:** suspected the new checker flags the shapes' ordinary calls through
+  a host ancestor link: REJECTED (an ancestor alias resolves above the root; all green, and
+  the reasoning holds for macOS `/var`). Suspected the dropped `realpath(root)` changes
+  onedir: REJECTED (onedir never called it; probe identical). Pass 2: nothing new.
+- **Slips (declared at the A r14 return):** one Bash call ended with a bare `cd` (no
+  effect, agent cwd resets), and scratch went to the main repo's `work\wp6.5\ar14fold\`.
+
+Depth at residual-fold yield: DISPATCHER TO FILL
