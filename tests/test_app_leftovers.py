@@ -413,6 +413,7 @@ def test_a_settings_file_with_an_output_folder_the_os_refuses_still_starts(
 
 
 @pytest.mark.gui
+@pytest.mark.usefixtures("ffmpeg_tools")  # the clip is opened and exported
 def test_start_up_never_scans_a_folder_because_a_source_lies_there(
     make_app, qtbot, tmp_path, monkeypatch, sample
 ) -> None:

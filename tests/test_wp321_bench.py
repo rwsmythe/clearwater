@@ -49,6 +49,7 @@ def _run(
 
 
 @pytest.mark.gpu
+@pytest.mark.usefixtures("ffmpeg_tools")
 def test_a_device_frame_run_gives_the_sink_device_frames(
     sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

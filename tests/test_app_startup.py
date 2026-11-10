@@ -135,6 +135,7 @@ def latest_analysis(application: Application) -> EngineClipAnalysis:
 
 
 @pytest.mark.gui
+@pytest.mark.usefixtures("ffmpeg_tools")  # both clips are opened and analysed
 def test_the_application_keeps_only_the_latest_analysis(make_app, qtbot, tmp_path, sample) -> None:
     """R1-8: opening a second clip leaves the first clip's adapter to the garbage collector."""
     application = make_app(cpu_settings())
@@ -348,9 +349,12 @@ def test_the_device_reason_shows_before_a_file_is_open_and_follows_force_cpu(
 
 
 def test_a_failed_cache_open_is_shown_once_and_photos_still_work(
-    make_app, qtbot, monkeypatch, sample, tmp_path
+    make_app, qtbot, monkeypatch, sample, tmp_path, request
 ) -> None:
-    """S1 condition 2: members refuse readably, the reason is shown once, photos export."""
+    """S1 condition 2: members refuse readably, the reason is shown once, photos export.
+
+    The photo half runs without FFmpeg; the video half (opening a clip) skips there.
+    """
 
     def refuse(folder: Path, limit: int = 0) -> DiskProxyCache:
         raise OSError("the cache volume is not mounted")
@@ -370,6 +374,7 @@ def test_a_failed_cache_open_is_shown_once_and_photos_still_work(
     job = application.exports.job(_photo_request(photo, application))
     result = job(_Progress())
     assert result.ok, result.failure
+    request.getfixturevalue("ffmpeg_tools")  # the video half opens a clip
     open_source(qtbot, application, sample(CLIP))
     wait_analysis(qtbot, application, "failed")
     assert "the cache volume is not mounted" in application.window.session.analysis().message

@@ -951,6 +951,7 @@ def test_presets_export_product_starters_without_expanding_serialized_maps(
 
 
 @pytest.mark.slow(reason="runs the headless runner and FFmpeg")
+@pytest.mark.usefixtures("ffmpeg_tools")  # one runner call exports the photos and the clip
 def test_all_tiny_set(roots: OutputRoots) -> None:
     """Exercise all stages end to end while recording source byte immutability."""
     inputs = [
