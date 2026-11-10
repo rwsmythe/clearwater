@@ -445,6 +445,10 @@ records its ruled content:
 | `v4-bench-hevc62r.json` | throughput / V4-only | `SCUBA vids2.mp4` | true | PASS | 0 | 0 | 5 |
 | `v4-hevc62r2.json` | spawned-export / V4-only | `SCUBA vids2.mp4` | true | PASS | 0 | 0 | 5 |
 
+The three records judge two outputs: `v4-hevc62r2` re-runs V4 on
+`export-hevc62r2`'s output and `v4-bench-hevc62r` on `bench-hevc62r`'s output
+(each V4-only record's `from_export_record`).
+
 `R/bench-hevc62r.json` is the throughput leg with `--defer-v4`: `v4.status` is
 `deferred`, `v4.pass` is null, and that record supplies no V4 verdict. The five
 BEST-EFFORT differences are the known classes from section 4: camera atoms
@@ -467,8 +471,9 @@ For example, `R/export-hevc62r2.json`, `v4.summary.notes`, records:
 > output vide#0 entry 0: D=926927/15000, V=926927/15000, tick=1/240000
 
 The raw item record reached through each `v4.path` also reads `video stream
-duration` SAME: source and output are both `926927/15000` s. MANDATORY differences
-are zero, so WP7.2's video-track-end fix holds on the re-export.
+duration` SAME: source and output are both `926927/15000` s, versus the pre-fix
+1,853,854 -> 1,853,855 ticks in section 4. That row is compared exactly, outside
+the reading, so WP7.2's video-track-end fix holds on the 62 s re-exports.
 
 **Owner's look verdict (2026-11-10), verbatim:**
 
@@ -502,8 +507,10 @@ record, put to the owner at the accept.
 min/min (`R/bench-hevc62q.json`, `R/bench-hevc439.json`; section 3).
 
 Exclusivity broke in the EXPORT leg. The staged overlap log records an implementer
-cell's pytest at 09:26:40-46Z, then at 54 nominal five-second polls from 09:27:29Z
-to 09:39:33Z on 2026-11-10. These all fall inside the export leg,
+cell's pytest at 09:26:40-46Z, then at 54 sightings of a nominally five-second poll
+from 09:27:29Z to 09:39:33Z on 2026-11-10 (observed spacing 6-19 s except for
+a 214 s gap, with no sightings between 09:28:16Z and 09:31:50Z).
+These all fall inside the export leg,
 09:26:28-09:44:39Z; none fall inside the bench leg, 09:44:39-09:56:51Z. Evidence:
 `work/wp7.1/seat-stage/pytest-overlap.log` (header and timestamped sightings),
 md5 `592557d1898b79af80989021d712ba9f`; seat original
@@ -518,10 +525,15 @@ and was relaunched as `export-hevc62r2` with `--timeout-s 8100`
 `export-hevc62r.failure.json`, refusal; `R/export-hevc62r2.json`, `timeout_s`,
 `v4_timeout_s`; seat `window3.log:6`).
 
-**Correction of sections 4 and 8.** "V4 = FAIL" in section 4 is the HISTORICAL
+**Correction of the earlier sections.** "V4 = FAIL" in section 4 is the HISTORICAL
 finding on the pre-WP7.2 exports and stays as written; the re-exports PASS above.
 Section 8's open items are now closed as follows: owner look verdict (given above);
 owner movie-level reading (given above); WP7.2 and the short re-runs (done, as shown
 by the fix, PASS records and movie-tick notes above); ProRes (answered "No" above).
 Its other items (spawned-worker timing, E's historical FAIL, long clip, coverage,
-the scratch Ruff note) stand as written.
+the scratch Ruff note) stand as written. The same holds for the report's opening
+summary (lines 3-6: "V4 FAIL", "Acceptance is pending", the movie-level reading
+"held for the owner", "The look verdict is also pending"), section 4's "The owner's
+word is **PENDING**" paragraph and section 5's "Owner look verdict: PENDING": each
+records the state before 2026-11-10 and stays as written; the reading, the re-run
+PASS records and the look verdict are given in this section.
