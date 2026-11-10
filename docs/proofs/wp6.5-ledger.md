@@ -3497,7 +3497,14 @@ Not covered: opens made in C below these names (`io.FileIO` built directly, an e
 module's own `fopen`), child processes, calls on a file descriptor; from the A r15 fold
 (below) also named: calls with `dir_fd`, and `DirEntry.is_symlink` / `is_junction`
 (cached from the listing, whose `scandir` is recorded). The reading of a recorded path
-was changed by the A r15 fold (below).
+was changed by the A r15 fold (below). From A r16 (advisories, CHARC `d13c6ce4`):
+non-strict `realpath` continuing after a MISSING component (the reading stops at the
+first unreadable component, while POSIX `realpath(strict=False)` goes on, takes `..` and
+can follow a later unadmitted link: a false negative; shape
+`Contents/Resources/missing/../pkg/data` with `pkg` an unadmitted link); and a REGULAR-FILE
+ancestor followed by further components (the reading continues past it, while the kernel
+stops with `ENOTDIR`: a false positive; shape `Contents/Resources/plain/../pkg/data`).
+Neither occurs in a listed covered shape or in a product call.
 
 `:3332` `violations(root, zone)` walks the calls IN ORDER: a call is a violation when it
 touches the outside zone at all, or FOLLOWS a path under the release root through a link
@@ -3605,7 +3612,7 @@ Pass 1:
 
 Pass 2: nothing new.
 
-Depth at A-r14-fold yield: DISPATCHER TO FILL
+Depth at A-r14-fold yield: 144,199 (wp65-cell18, read by the dispatcher with cell_depth.py at its A-r14-fold return)
 
 ### Residual fold (`wp65-cell18`, dispatch-19b; base `d1ecd039`)
 
@@ -3674,7 +3681,7 @@ keep today's query" for the `.app` form only. Commit `976f8c26` (`tools/package/
 - **Slips (declared at the A r14 return):** one Bash call ended with a bare `cd` (no
   effect, agent cwd resets), and scratch went to the main repo's `work\wp6.5\ar14fold\`.
 
-Depth at residual-fold yield: DISPATCHER TO FILL
+Depth at residual-fold yield: 178,735 (wp65-cell18, read by the dispatcher with cell_depth.py at its residual-fold return)
 
 ### A r15 fold (recorder)
 
@@ -3743,4 +3750,17 @@ Windows change.
   early `False`): REJECTED by the three RED -> GREEN cases, the late-admission and junction
   tests, and the `d1ecd039` cross-check. Pass 2: nothing new.
 
-Depth at A-r15-fold yield: DISPATCHER TO FILL
+Depth at A-r15-fold yield: 216,833 (wp65-cell18, read by the dispatcher with cell_depth.py at its A-r15-fold return)
+
+### A r16 (no fold; CHARC `d13c6ce4`)
+
+Codex Reviewer A r16 on `4a1ccd69..49232840` (test-only delta): `VERDICT: NO_NEW_CRITICAL_MAJOR`,
+two ADVISORY recorder limitations, no product finding. CHECK 1 (the r15 gaps close), CHECK 2
+(no vacuous pass on the listed covered shapes), CHECK 3 (no product following call: 656
+recorded events over the covered shapes, violations `[]`) and CHECK 4 (product unchanged;
+0 CR) PASS. Under CHARC's stop rule `d13c6ce4`, recorder-only findings from A r16 on are
+advisories recorded in the uncovered list (above, after `Not covered:`) with no fold round;
+CHARC opens one debt-register row for that list at the WP6.5 accept. The recorder is
+evidence for its LISTED covered shapes, not proof of the invariant; the invariant text
+(`4ed56fcb`) is the rule of record and the product's walk enforces it. Seat QA on
+`49232840`: all green (`work/orch-g65/qa-4923/summary.txt`).
