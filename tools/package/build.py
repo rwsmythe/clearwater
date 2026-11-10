@@ -4224,11 +4224,49 @@ def _walk_error(error: OSError) -> None:
     raise error
 
 
-def _macos_entries(root: Path) -> list[tuple[Path, str]]:
+def _macos_app_entries(root: Path) -> list[tuple[Path, str]]:
+    """:func:`_macos_entries` for the ``.app`` form: ONE listing that never follows a link.
+
+    Each entry is classified as a link (a symlink or junction) BEFORE any folder query, and
+    the folder and file queries never follow (``follow_symlinks=False``); ``os.walk`` asks
+    ``DirEntry.is_dir()``, which follows a link to its target (WP6.5 A r13 #1). Only a
+    physical folder is listed further.
+
+    Returns:
+        ``(path, kind)`` pairs, sorted, as :func:`_macos_entries`.
+
+    Raises:
+        OSError: A folder under ``root`` (or ``root`` itself) cannot be listed.
+    """
+    entries = []
+    pending = [root]
+    while pending:
+        with os.scandir(pending.pop()) as listing:
+            for entry in listing:
+                path = Path(entry.path)
+                if entry.is_symlink() or entry.is_junction():
+                    entries.append((path, "link"))
+                elif entry.is_dir(follow_symlinks=False):
+                    pending.append(path)
+                elif entry.is_file(follow_symlinks=False):
+                    entries.append((path, "file"))
+                else:
+                    entries.append((path, "special"))
+    return sorted(entries, key=lambda item: item[0].relative_to(root).as_posix())
+
+
+def _macos_entries(root: Path, *, in_app: bool | None = None) -> list[tuple[Path, str]]:
     """Every non-folder entry under ``root``, sorted, never descending into a linked folder.
 
     A folder that cannot be listed (the root included) raises instead of silently dropping
-    its subtree from the origin check, the ZIP and the notices (WP6.5 A r1 #1).
+    its subtree from the origin check, the ZIP and the notices (WP6.5 A r1 #1). In the
+    ``.app`` form the listing never follows a link (:func:`_macos_app_entries`); the onedir
+    form keeps its ``os.walk``.
+
+    Args:
+        root: The folder to list.
+        in_app: Whether ``root`` lies in the ``.app`` form; by default, whether it is a
+            ``.app`` itself.
 
     Returns:
         ``(path, kind)`` pairs, kind ``link`` (a symlink or junction, file or folder),
@@ -4237,6 +4275,8 @@ def _macos_entries(root: Path) -> list[tuple[Path, str]]:
     Raises:
         OSError: A folder under ``root`` (or ``root`` itself) cannot be listed.
     """
+    if root.suffix == ".app" if in_app is None else in_app:
+        return _macos_app_entries(root)
     entries = []
     for parent, folders, files in os.walk(root, onerror=_walk_error, followlinks=False):
         for name in [*folders, *files]:
@@ -4268,8 +4308,11 @@ def _not_posix_relative(target: str) -> bool:
 def _macos_link_chain_problem(root: Path, physical: Path) -> str | None:
     """Inside a ``.app``: walk a link's target component by component; say why it is refused.
 
-    The boundary, the bundle's ``Contents`` folder, is canonicalised ONCE, at the start, so a
-    legitimate alias above the release root (macOS ``/var`` -> ``/private/var``) is untouched.
+    The boundary, the bundle's ``Contents`` folder, is first read WITHOUT following (``lstat``,
+    a junction test): a linked or junction ``Contents`` is refused by its text, never
+    resolved (WP6.5 A r13 #2). It is then canonicalised ONCE, as the real release root's
+    ``Contents``, so a legitimate alias above the release root (macOS ``/var`` ->
+    ``/private/var``) is untouched.
     From the link's own canonical folder, every component of the stored text is taken in
     turn (WP6.5 A r11 #1): ``..`` steps to the canonical parent, a name steps into it, and a
     component that lands outside ``Contents`` is refused AT THAT POINT, before any later
@@ -4288,8 +4331,21 @@ def _macos_link_chain_problem(root: Path, physical: Path) -> str | None:
     Returns:
         ``None`` when the walk is admitted, else the reason with the full chain.
     """
+    boundary = root / "Contents"
+    # The boundary itself must be a physical folder, read without following (A r13 #2): a
+    # linked Contents is refused by its text, never resolved.
+    if boundary.is_junction():
+        return "link chain meets a linked boundary: Contents (junction)"
+    try:
+        mode: int | None = os.lstat(boundary).st_mode
+    except FileNotFoundError:
+        mode = None
+    if mode is not None and stat.S_ISLNK(mode):
+        return f"link chain meets a linked boundary: Contents -> {os.readlink(boundary)!r}"
+    if mode is None or not stat.S_ISDIR(mode):
+        return "link chain finds no Contents folder"
     real_root = Path(os.path.realpath(root))
-    bundle = Path(os.path.realpath(root / "Contents"))
+    bundle = real_root / "Contents"
     hops: list[str] = []
 
     def refused(reason: str, last: str | None = None) -> str:
@@ -4387,7 +4443,13 @@ def _macos_link_class_problem(
     framework = framework_link_problem(PurePosixPath(location.relative_to(root).as_posix()), target)
     if framework is None:
         return None
-    real_contents = Path(os.path.realpath(contents))
+    # Inside a .app the walk proved Contents physical; its folders are read from the real root
+    # without following them (A r13), so a linked Frameworks admits nothing under it.
+    real_contents = (
+        Path(os.path.realpath(root)) / contents.relative_to(root)
+        if in_app
+        else Path(os.path.realpath(contents))
+    )
     if (
         location.parent == contents
         and PurePosixPath(target).name == location.name
@@ -4396,7 +4458,7 @@ def _macos_link_class_problem(
     ):
         return None  # (B) PyInstaller's bindepend top-level link to a collected dependency
     folders = _macos_bundle_folders(root)
-    real_folders = [Path(os.path.realpath(folder)) for folder in folders]
+    real_folders = [Path(os.path.realpath(root)) / folder.relative_to(root) for folder in folders]
     if (
         _within(location, folders)
         and _within(resolved, real_folders)
@@ -4406,11 +4468,13 @@ def _macos_link_class_problem(
     return f"{framework}; not a top-level dependency link or a bundle cross-link"
 
 
-def macos_link_view(path: Path) -> list[tuple[PurePosixPath, Path, str]]:
+def macos_link_view(path: Path, *, in_app: bool = False) -> list[tuple[PurePosixPath, Path, str]]:
     """The entries a folder link shows: ``(path under the link, physical entry, kind)``.
 
     Args:
         path: An admitted link (:func:`macos_link_problem`).
+        in_app: The link lies in a ``.app``: its folder target is listed without following
+            any link under it (:func:`_macos_app_entries`, WP6.5 A r13 #1).
 
     Returns:
         Every non-folder entry under the link's folder target (never through a further
@@ -4424,7 +4488,7 @@ def macos_link_view(path: Path) -> list[tuple[PurePosixPath, Path, str]]:
         return []
     return [
         (PurePosixPath(entry.relative_to(resolved).as_posix()), entry, kind)
-        for entry, kind in _macos_entries(resolved)
+        for entry, kind in _macos_entries(resolved, in_app=in_app)
     ]
 
 
@@ -4478,7 +4542,7 @@ def macos_link_problem(root: Path, contents: Path, path: Path) -> str | None:
     problem = _macos_link_class_problem(root, contents, path, path)
     if problem is not None:
         return problem
-    for relative, entry, kind in macos_link_view(path):
+    for relative, entry, kind in macos_link_view(path, in_app=root.suffix == ".app"):
         if kind == "special":
             return f"special file {relative} under the linked folder"
         if kind == "link":
@@ -4603,6 +4667,26 @@ def seal_macos_bundle(
             )
 
 
+def _macos_link_on_path(root: Path, path: Path) -> bool:
+    """Whether a link or junction lies on ``path`` below ``root``, read without following.
+
+    Each component is ``lstat``-ed from ``root`` down, stopping at the first link, so no
+    link is ever followed; a missing component ends the reading (the caller's own read then
+    reports it).
+    """
+    current = root
+    for part in path.relative_to(root).parts:
+        current = current / part
+        if current.is_junction():
+            return True
+        try:
+            if stat.S_ISLNK(os.lstat(current).st_mode):
+                return True
+        except FileNotFoundError:
+            return False
+    return False
+
+
 def _macos_native_origin_violations(
     executable: Path, *, original_path: str, ffmpeg_hashes: Iterable[str]
 ) -> list[str]:
@@ -4640,7 +4724,13 @@ def _macos_native_origin_violations(
                             None,
                         )
 
-    if not _is_clearwater_bootloader(executable):
+    in_app = root.suffix == ".app"
+    # Inside a .app the executable is opened only when no link lies on its path (A r13): a
+    # link there is refused by the walk below and never followed here.
+    behind_a_link = in_app and _macos_link_on_path(root, executable)
+    if behind_a_link:
+        errors.append(f"native origin: {executable} lies behind a link in the bundle; not read")
+    elif not _is_clearwater_bootloader(executable):
         errors.append(
             f"native origin: {executable.name} differs from locked PyInstaller bootloader"
         )
@@ -4652,7 +4742,7 @@ def _macos_native_origin_violations(
                 errors.append(f"native origin: linked file {path}: {problem}")
                 continue
             # A folder link's files are checked as if they sat at the link's location.
-            for relative, shown, shown_kind in macos_link_view(path):
+            for relative, shown, shown_kind in macos_link_view(path, in_app=in_app):
                 if shown_kind == "file":
                     seen = path.joinpath(*relative.parts)
                     depth = _macos_depth(root, contents, seen)
@@ -4660,6 +4750,8 @@ def _macos_native_origin_violations(
         elif kind == "file" and path != executable:
             depth = _macos_depth(root, contents, path)
             inspect(label, path.name, path.read_bytes(), depth)
+    if behind_a_link:
+        return errors
     package = read_package(executable)
     for name, entry in package.toc.items():
         if entry[-1] not in {"o", "z"}:

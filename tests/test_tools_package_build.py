@@ -3169,6 +3169,287 @@ def test_a_missing_return_file_still_refuses_with_the_chain(tmp_path, link):
     assert problem == "link chain leaves the bundle: " + "; ".join(hops)
 
 
+# --- WP6.5 A r13: no FOLLOWING call before the walk admits every link on the path ----------
+# The invariant (CHARC 4ed56fcb): inside a .app no filesystem call that follows a link
+# (stat, realpath, exists, is_file / is_dir with following, DirEntry.is_dir() by default,
+# open) is made on a path at or under the release root until every link on that path has
+# been admitted by the component walk; only lstat / readlink / is_symlink / is_junction and
+# non-following DirEntry queries precede admission.
+
+_REAL_FS = {
+    "stat": os.stat,
+    "lstat": os.lstat,
+    "readlink": os.readlink,
+    "scandir": os.scandir,
+    "realpath": os.path.realpath,
+}
+
+
+class _FsRecorder:
+    """Record every filesystem call the link rule's callers make: (call, path, following)."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, bool]] = []
+
+    def note(self, name: str, path: Any, following: bool) -> None:
+        if not isinstance(path, int):
+            self.calls.append((name, os.fspath(path), following))
+
+    def install(self, patch: pytest.MonkeyPatch) -> None:
+        recorder = self
+
+        def stat_(path, *args, follow_symlinks=True, **kwargs):
+            recorder.note("stat", path, follow_symlinks)
+            return _REAL_FS["stat"](path, *args, follow_symlinks=follow_symlinks, **kwargs)
+
+        def lstat_(path, *args, **kwargs):
+            recorder.note("lstat", path, False)
+            return _REAL_FS["lstat"](path, *args, **kwargs)
+
+        def readlink_(path, *args, **kwargs):
+            recorder.note("readlink", path, False)
+            return _REAL_FS["readlink"](path, *args, **kwargs)
+
+        def realpath_(path, *args, **kwargs):
+            recorder.note("realpath", path, True)
+            return _REAL_FS["realpath"](path, *args, **kwargs)
+
+        class Entry:
+            def __init__(self, entry: os.DirEntry) -> None:
+                self._entry, self.name, self.path = entry, entry.name, entry.path
+
+            def __getattr__(self, name: str) -> Any:
+                return getattr(self._entry, name)
+
+            def is_dir(self, *, follow_symlinks: bool = True) -> bool:
+                recorder.note("DirEntry.is_dir", self.path, follow_symlinks)
+                return self._entry.is_dir(follow_symlinks=follow_symlinks)
+
+            def is_file(self, *, follow_symlinks: bool = True) -> bool:
+                recorder.note("DirEntry.is_file", self.path, follow_symlinks)
+                return self._entry.is_file(follow_symlinks=follow_symlinks)
+
+            def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
+                recorder.note("DirEntry.stat", self.path, follow_symlinks)
+                return self._entry.stat(follow_symlinks=follow_symlinks)
+
+        class Listing:
+            def __init__(self, listing: Any) -> None:
+                self._listing = listing
+
+            def __enter__(self) -> Listing:
+                return self
+
+            def __exit__(self, *exc: object) -> None:
+                self._listing.close()
+
+            def __iter__(self) -> Listing:
+                return self
+
+            def __next__(self) -> Entry:
+                return Entry(next(self._listing))
+
+            def close(self) -> None:
+                self._listing.close()
+
+        def scandir_(path=".", *args, **kwargs):
+            recorder.note("scandir", path, True)
+            return Listing(_REAL_FS["scandir"](path, *args, **kwargs))
+
+        def following(name: str, real: Any) -> Any:
+            def query(self, *args, **kwargs):
+                recorder.note(f"Path.{name}", self, kwargs.get("follow_symlinks", True))
+                return real(self, *args, **kwargs)
+
+            return query
+
+        patch.setattr(os, "stat", stat_)
+        patch.setattr(os, "lstat", lstat_)
+        patch.setattr(os, "readlink", readlink_)
+        patch.setattr(os, "scandir", scandir_)
+        patch.setattr(os.path, "realpath", realpath_)
+        for name in ("exists", "is_file", "is_dir", "resolve"):
+            patch.setattr(Path, name, following(name, getattr(Path, name)))
+
+    def violations(self, root: Path, admitted: set[str], zone: Path) -> list[tuple[str, str]]:
+        """Calls that touch ``zone`` (outside the bundle) at all, or FOLLOW a path under the
+        release root on which a link not in ``admitted`` (relative names) lies."""
+        bases = [root, Path(_REAL_FS["realpath"](root))]
+        found = []
+        for name, raw, follows in self.calls:
+            if Path(os.path.normpath(raw)).is_relative_to(zone):
+                found.append((name, raw))
+                continue
+            if not follows:
+                continue
+            for base in bases:
+                if not Path(raw).is_relative_to(base):
+                    continue
+                current = base
+                for part in Path(raw).relative_to(base).parts:
+                    current = current.parent if part == ".." else current / part
+                    if not current.is_relative_to(base) or current == base:
+                        continue
+                    try:
+                        is_link = stat.S_ISLNK(_REAL_FS["lstat"](current).st_mode)
+                    except OSError:
+                        break
+                    if is_link and current.relative_to(base).as_posix() not in admitted:
+                        found.append((name, raw))
+                        break
+                break
+        return found
+
+
+def _shape_out_and_back(tmp_path: Path) -> tuple[Path, list[str], set[str]]:
+    folder, _ = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/pkg/data"],
+        [
+            ("Contents/Resources/data", "../Frameworks/data", False),
+            ("Contents/Frameworks/data", "../../../outside/back/data", False),
+        ],
+    )
+    outside_alias(folder, "back")
+    return folder, ["Contents/Resources/data", "Contents/Frameworks/data"], set()
+
+
+def _shape_nested_evil(tmp_path: Path) -> tuple[Path, list[str], set[str]]:
+    folder, _ = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/pkg/data"],
+        [
+            ("Contents/Resources/pkg", "../Frameworks/pkg", True),
+            ("Contents/Frameworks/pkg/evil", "../../../../outside/back/data", False),
+        ],
+    )
+    outside_alias(folder, "back")
+    # The folder cross-link is admitted by its own walk; only evil, under it, is refused.
+    return (
+        folder,
+        ["Contents/Resources/pkg", "Contents/Frameworks/pkg/evil"],
+        {"Contents/Resources/pkg"},
+    )
+
+
+def _shape_linked_contents(tmp_path: Path) -> tuple[Path, list[str], set[str]]:
+    folder = tmp_path / "wrapper" / "Clearwater.app"
+    folder.mkdir(parents=True)
+    payload = tmp_path / "wrapper" / "outside" / "payload"
+    tree(payload, ["MacOS/Clearwater"], b"bootloader stand-in")
+    tree(payload, ["Frameworks/data"], LINK_BLOB)
+    _symlink(payload.parent / "back", os.path.join("..", "payload"), folder=True)
+    _symlink(folder / "Contents", "../outside/back", folder=True)
+    return folder, ["Contents"], set()
+
+
+LINK_SHAPES = {
+    "r11-out-and-back": _shape_out_and_back,
+    "r13-nested-evil": _shape_nested_evil,
+    "r13-linked-contents": _shape_linked_contents,
+}
+
+
+@pytest.mark.parametrize("shape", sorted(LINK_SHAPES))
+def test_no_following_call_before_the_walk_admits_the_links(tmp_path, monkeypatch, shape):
+    """A r13: the public entry points (the origin check, the release ZIP, the shared rule)
+    on three shapes; every filesystem call recorded. Each refuses, and none FOLLOWS a path
+    under the release root through a link the walk has not admitted, or touches the outside
+    alias at all. The notices inventory is onedir-only (it requires ``_internal``), so it
+    never enumerates a ``.app``."""
+    folder, links, admitted = LINK_SHAPES[shape](tmp_path)
+    zone = tmp_path / "wrapper" / "outside"
+    executable = folder / "Contents/MacOS/Clearwater"
+    contents = folder / "Contents/Frameworks"
+    empty = tmp_path / "python"
+    empty.mkdir()
+    recorder = _FsRecorder()
+
+    def opener(result: Any) -> Any:
+        def opened(path: Path) -> Any:  # the real ones read the file
+            recorder.note("open", path, True)
+            return result
+
+        return opened
+
+    monkeypatch.setattr(build.sys, "base_prefix", str(empty))
+    monkeypatch.setattr(build, "_locked_native_distributions", lambda: [])
+    monkeypatch.setattr(build, "_is_clearwater_bootloader", opener(True))
+    monkeypatch.setattr(build, "read_package", opener(SimpleNamespace(toc={})))
+    monkeypatch.setattr(build.sys, "platform", "darwin")
+    trusted = {hashlib.sha256(LINK_BLOB).hexdigest()}
+    with pytest.MonkeyPatch.context() as patch:
+        recorder.install(patch)
+        found = build.native_origin_violations(executable, original_path="", ffmpeg_hashes=trusted)
+        with pytest.raises(ValueError, match="release ZIP refuses linked/junction/outside"):
+            build.write_release_zip(folder, out=tmp_path / "out", source_epoch=1793908801)
+        problems = [build.macos_link_problem(folder, contents, folder / link) for link in links]
+    assert found and all(line.startswith("native origin: ") for line in found), found
+    assert all(problem is not None for problem in problems), problems
+    assert recorder.calls
+    assert recorder.violations(folder, admitted, zone) == []
+    if shape == "r13-linked-contents":
+        assert problems == ["link chain meets a linked boundary: Contents -> '../outside/back'"]
+        assert found == [
+            f"native origin: {executable} lies behind a link in the bundle; not read",
+            f"native origin: linked file {folder / 'Contents'}: {problems[0]}",
+        ]
+        assert not [call for call in recorder.calls if call[0] == "open"]
+
+
+@pytest.mark.parametrize("kind", ["link", "junction"])
+def test_a_linked_contents_boundary_is_refused_by_its_text(tmp_path, kind):
+    """A r13 #2: a ``Contents`` that is a link (or junction) is refused without resolving it,
+    naming Contents and its text; an alias above the release root stays untouched (above)."""
+    folder = tmp_path / "wrapper" / "Clearwater.app"
+    folder.mkdir(parents=True)
+    target = tree(tmp_path / "elsewhere", ["Frameworks/data"], LINK_BLOB)
+    if kind == "link":
+        _symlink(folder / "Contents", "../elsewhere", folder=True)
+        expected = "link chain meets a linked boundary: Contents -> '../elsewhere'"
+    else:
+        if sys.platform != "win32":
+            pytest.skip("Windows junction regression")
+        import _winapi
+
+        _winapi.CreateJunction(str(target), str(folder / "Contents"))
+        expected = "junction"  # the rule's first check, before any walk
+        # A link reached through the junction is refused at the boundary, unresolved.
+        _symlink(target / "Frameworks/lnk", "data", folder=False)
+        assert build._macos_link_chain_problem(folder, folder / "Contents/Frameworks/lnk") == (
+            "link chain meets a linked boundary: Contents (junction)"
+        )
+    problem = build.macos_link_problem(folder, folder / "Contents/Frameworks", folder / "Contents")
+    assert problem == expected
+
+
+def test_the_app_listing_never_follows_and_matches_the_walk(tmp_path):
+    """A r13 #1: the .app listing classifies a link before any folder query; on a physical
+    tree it lists exactly what the onedir ``os.walk`` lists (files, links, no folders)."""
+    folder, _ = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/pkg/data", "Contents/Resources/x.txt"],
+        [
+            ("Contents/Resources/pkg", "../Frameworks/pkg", True),
+            ("Contents/Frameworks/data", "pkg/data", False),
+        ],
+    )
+    assert build._macos_entries(folder) == build._macos_entries(folder, in_app=False)
+    kinds = {
+        path.relative_to(folder).as_posix(): kind for path, kind in build._macos_entries(folder)
+    }
+    assert kinds == {
+        "Contents/Frameworks/data": "link",
+        "Contents/Frameworks/pkg/data": "file",
+        "Contents/MacOS/Clearwater": "file",
+        "Contents/Resources/pkg": "link",
+        "Contents/Resources/x.txt": "file",
+    }
+
+
 def test_a_folder_link_that_leaves_and_comes_back_is_refused(tmp_path):
     """A folder link in mid-path whose target leaves Contents is refused before it returns."""
     folder, _ = link_release(
