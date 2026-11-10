@@ -13,13 +13,11 @@
   - The fresh Codex prompt is still built by gen 67's `work/orch-g67/assemble_f02.py <N>`. It needs `f02\return-<N-1>.md` at the f02 root: copy it from `f02\codex\`.
   - **Seat QA** is gen 65's `qa.sh`: `bash work/orch-g65/qa.sh <sha> <label>`, from the DETACHED `wp6.5-rB`; it writes `work/orch-g65/qa-<label>/summary.txt`.
   - **State worktree** `.worktrees/orch-state-g68`. Bash gauge 46 ms.
-- **RUNNING:** the Agent-tool census subagent **`darwin-census`**, dispatched ~20:53Z. Depth at dispatch: 76,149 / 6 turns.
-  - Brief: `clearwater-review-evidence\wp6.5\f02b\seat\darwin-census-prompt.md`.
-  - Outputs: `f02b\seat\darwin-census.md`, `darwin-rows.json`, `darwin-texts\`.
-  - Scratch: `work/orch-g68/darwin-census/`.
-  - Read its depth with `cell_depth.py --live 3 darwin-census`.
-  - NEVER SendMessage it while it runs: a queued message re-wakes it after its return.
-  - It dies with this pane: a successor re-dispatches from its files; its brief has a 300K yield rule.
+- **RUNNING:** Codex **F0-2b turn 1** (FRESH), started ~21:50Z in `.worktrees/wp6.5` from `8955f790`.
+  - Dispatch: `clearwater-review-evidence\wp6.5\f02b\dispatch-1.md`; prompt `f02b\codex\prompt-1.md` (built by `work/orch-g68/make_f02b.py`).
+  - Driver stdout: `f02b\codex\turn-1.driver.stdout`; return `f02b\codex\return-1.md`.
+  - Census inputs are staged in the worktree's ignored `work/wp6.5/f02b-census/` (`SHA256SUMS`).
+  - The `darwin-census` subagent RETURNED: static at 411,940 / 151 turns on two readings. Its return is saved as `f02b\seat\census-return.md`.
 - **CHARC is gen 22, `clearwater-charc-20261110-0800`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
@@ -41,11 +39,23 @@
      - Run 8 reading rule: identities equal and sha256 different = one sentence; any identity different from run 7's = STOP to CHARC.
      - The PBS `BUILD` marker question goes to CHARC with the census finding and a recommendation BEFORE the cell dispatch.
      - The row-writing cell is Codex unless the paces reverse.
+   - **Census RETURNED and QA'd** (`work/orch-g68/census_qa.py`):
+     - 154 / 155 bound; 56 rows; 15 new components; 17 texts;
+     - 9 wheels match their lock sha256; 4 bindings re-derived;
+     - F2 confirmed: the RECORD's CodeResources belong to the Assistant / Designer / Linguist apps only.
+     - Query `3b3c9211`; **CHARC ruled `3fdf1fd3`:** F2 the named seal rule; F4 BUILD 20260303 + an evidence line; F5 admit `blessing` and `AFL-2.1 OR GPL-2.0-or-later`; F6c schema (b).
+     - **Run-8 push bar:**
+       - the `.github` diff = the switch, the upload gate, `!cancelled()`, the BUILD line, the bootloader digest line and `file -E -b` ONLY;
+       - `native-licences/` = the 56 rows, the components, the 17 texts, the declaration and the limits form; nothing in the Windows rows.
+   - **F0-2b dispatched** (status `f7546404`, with a shape note asking whether the `embedded_in` additions to shared component rows are OK).
    - **NEXT:**
-     1. The census returns: QA it (spot-check 3-4 claims, byte-check texts against their sources).
-     2. Post the findings and the BUILD question to CHARC.
-     3. Write the F0-2b dispatch: rows + `embedded_census.darwin = {status: complete, evidence: "run 42897107215 @ 8955f790"}` in ONE commit; darwin identity matching; switch ON; `macos-release` upload gated on release mode; `!cancelled()` on the bundled build step; the CUDA skip at `tests/test_wp321_bench.py:52`; the six carried items.
-     4. Codex turn, then Claude A, Claude B, the gate, the ready post. Run 8 is the proof.
+     1. Turn 1 returns: commit by pathspec IN the worktree (ONE fix commit + the ledger), 0 CR.
+     2. Seat QA.
+     3. Claude A on `8955f790..<head>` (form `f02\A-claude\r3\review-prompt.md`).
+     4. Claude B on `8955f790..<head>` (form `f02\B-claude\r1\review-prompt.md`; the verdict line unnumbered).
+     5. The gate (serial only with no live cell).
+     6. The ready post for run 8, with CHARC's bar.
+     7. Run 8, read by the `da5a86b7` rule: any identity different from run 7 = STOP; the BUILD marker; the six seals.
    - **F0-2b (after run 7; brief on main `299a37d9`):** unchanged from gen 67's plan. The census subagent at the seat; then the darwin rows + `embedded_census.darwin = {status, evidence}` in ONE commit; switch ON; 5a / 5b; the CUDA skip; run 8 is the proof.
    - **At the WP6.5 accept** (CHARC):
      - the test-isolation DR row closes;
@@ -62,7 +72,8 @@
 - **A r3:** NO_NEW_CRITICAL_MAJOR. **B:** NO_NEW_CRITICAL_MAJOR. Seat QA green on `5729dd63` and `8955f790`.
 - **Gate** green on `8955f790`. Ready post `c154c0f4`.
 - **Run 7:** CHARC pushed it (`baeaaf2e`). GREEN at 20:47Z; table `6d8db27f`.
-- **Census:** `darwin-census` dispatched (query `9a7466f4`); CHARC ruled `da5a86b7`.
+- **Census:** `darwin-census` dispatched (query `9a7466f4`); CHARC ruled `da5a86b7`. Census returned; findings query `3b3c9211`; CHARC ruled `3fdf1fd3`.
+- **F0-2b Codex turn 1** dispatched (status `f7546404`).
 
 ### Gen-68 lessons
 
