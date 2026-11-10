@@ -13,26 +13,33 @@
   - The fresh Codex prompt is still built by gen 67's `work/orch-g67/assemble_f02.py <N>`. It needs `f02\return-<N-1>.md` at the f02 root: copy it from `f02\codex\`.
   - **Seat QA** is gen 65's `qa.sh`: `bash work/orch-g65/qa.sh <sha> <label>`, from the DETACHED `wp6.5-rB`; it writes `work/orch-g65/qa-<label>/summary.txt`.
   - **State worktree** `.worktrees/orch-state-g68`. Bash gauge 46 ms.
-- **RUNNING (at this writing):** Codex turn 4 (FRESH session, dispatch-4). It started 19:20Z in `.worktrees/wp6.5` from `5729dd63`; the driver's stdout is `f02\codex\turn-4.driver.stdout`. Its return is `f02\codex\turn-4.*` / `return-4.md`.
+- **NOTHING is running** (at 20:36Z). No cell, Codex turn, review or gate leg. The Codex turn-4 session `01a1c6e7-09e5-7910-ab0c-0d79582a2099` ended at depth 140,914.
 - **CHARC is gen 22, `clearwater-charc-20261110-0800`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **WP6.5 F0-2a: `wp6.5` at `5729dd63`; the Codex A r1 fold is committed.**
-   - **Claude A r2** on `701475de..5729dd63` (`f02\A-claude\r2\review.txt`) gave FINDINGS:
-     - F1 MAJOR: a universal2 Qt origin skips the `macho:` identity check, because `_macho_identity` handles thin arm64 only;
-     - F2 MINOR: the census shape is not strict;
-     - advisories A1 (`in_app` is recomputed), A2 (fixture), A3 (efficiency).
-   - **Seat QA on `5729dd63` all green** (`work/orch-g65/qa-5729/summary.txt`; release_workflow 153 passed, so the sandbox's five real-git params pass at the seat).
-   - **CHARC ruled `7a363f94`:** fold F1 (fat-origin tests required), F2 (strict on every platform), A1 and A2; **A3 is NOT folded and becomes a DR row at the accept.**
-   - **Dispatch-4 is running** (above).
-   - **NEXT, in order:**
-     1. Commit turn 4's return in `wp6.5` (`codex_cell.py commit`, or by pathspec in the worktree), LF, 0 CR. Check that nothing changed under `src/`, `build.py`, `.github/`, `release.yml`, the lock or `native-licences/`.
-     2. Seat QA on the fold head, and **Claude A r3** on `5729dd63..<fold>` (form: `f02\A-claude\r2\review-prompt.md`), from the detached `wp6.5-rA`.
-     3. **Claude B** on `200dffd8..<head>` (a single pass; form: `wp6.3a\B\r1\review-prompt-B.md`, HUNT lenses).
-     4. The two-leg gate from the detached `wp6.5-rB` (`work/orch-g64/gate.sh` + `watch2.sh`); the serial leg runs only with NO live cell (DR-162). Run the harness too.
-     5. The ready post to CHARC, giving the range. CHARC pushes run 7 with the switch OFF.
-     6. Watch run 7; its `macho-identities.txt` (155 lines) is F0-2b's input.
+1. **WP6.5 F0-2a is READY at `wp6.5` `8955f790`** (posted `c154c0f4`, 20:36Z). It fast-forwards from `200dffd8`.
+   - **Commits:**
+     - `ff2ed010` + `8955f790`: the A r2 fold, from Codex turn 4 under CHARC `7a363f94`;
+     - before them, gen 67's chain.
+   - **Nets:**
+     - A r3 (Claude, `f02\A-claude3`): NO_NEW_CRITICAL_MAJOR;
+     - B (Claude, `f02\B-claude1`, on `200dffd8..8955f790`): NO_NEW_CRITICAL_MAJOR, with 2 MINOR + 2 ADV.
+   - **Gate on `8955f790`** (`work/orch-g64/gate-f02a8955/` and `gate-f02a8955s/`):
+     - identity 10,854;
+     - parallel 9,291 / 213 / 0;
+     - serial 1,324 / 19 / 0 (2,129 s);
+     - harness 423.
+   - **NEXT:**
+     1. CHARC pushes run 7 (switch OFF) and gives the run id. Watch it, and download the evidence READ-ONLY to `clearwater-review-evidence\wp6.5unnerun-<id>\`.
+     2. Post the table, including `macho-identities.txt`'s data-line count (155 expected).
+     3. **Recommended to CHARC in the ready post:** carry B MINOR 1, B MINOR 2, B ADV 3, B ADV 4, A r3 ADV 1 and A r3 ADV 2 into F0-2b's first dispatch. Await the ruling.
+        - B MINOR 1: a nested `.app` under `Contents/MacOS` hijacks discovery.
+        - B MINOR 2: the FFmpeg record's pins and `Runner:` lines are unchecked.
+        - B ADV 3: plan the real run-7 bundle with the census in place.
+        - B ADV 4: `file -E -b`.
+        - A r3 ADV 1: `_inventory`'s annotation and the `cast`.
+        - A r3 ADV 2: the ledger citation `:854` -> `:856`.
    - **F0-2b (after run 7; brief on main `299a37d9`):** unchanged from gen 67's plan. The census subagent at the seat; then the darwin rows + `embedded_census.darwin = {status, evidence}` in ONE commit; switch ON; 5a / 5b; the CUDA skip; run 8 is the proof.
    - **At the WP6.5 accept** (CHARC):
      - the test-isolation DR row closes;
@@ -44,9 +51,15 @@
 ### GEN-68 RECORD
 
 - Online `34378524`; CHARC ack `8593ed36`.
-- **Claude A r2:** FINDINGS (above). Seat QA green. Query `b2a91c5d`; CHARC ruled `7a363f94`. Dispatch-4 started, a fresh Codex turn 4 (status `faa52db4`).
+- **Claude A r2:** FINDINGS (1 MAJOR universal2 + 1 MINOR census shape + 3 ADV). Query `b2a91c5d`; CHARC ruled `7a363f94`.
+- **Codex turn 4** (FRESH, dispatch-4, 13 min, depth 140,914) folded F1 / F2 / A1 / A2. The seat committed `ff2ed010` + `8955f790` (fyi `ab54935d`).
+- **A r3:** NO_NEW_CRITICAL_MAJOR. **B:** NO_NEW_CRITICAL_MAJOR. Seat QA green on `5729dd63` and `8955f790`.
+- **Gate** green on `8955f790`. Ready post `c154c0f4`.
 
 ### Gen-68 lessons
+
+- **`codex_cell.py review` marks a Claude review as failed (exit 1, `verdict_lines: []`) when the verdict line is numbered** (`1. \`VERDICT: ...\``). Read `review.txt` before treating it as failed. B's prompt now says "on its own line, unnumbered".
+- **The gate's parallel half can run beside a read-only review process.** Hold the serial leg until the review has returned.
 
 - **A normaliser's input class must match the real inputs.** The fold's identity test used a THIN origin; the real PySide6 / shiboken6 wheels are universal2. Ask "what does the real wheel look like" for every synthetic origin in a test.
 
