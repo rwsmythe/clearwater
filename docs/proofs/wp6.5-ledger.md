@@ -2642,4 +2642,375 @@ A r9 on `eeefd4cf` found no critical or major issue and passed CHECKs 1 and 3-6.
 
 Depth at A-r8-fold yield: 239,708 (wp65-cell15, read by the dispatcher with cell_depth.py at its A-r8-fold return)
 
-Depth at A-r9-fold yield: DISPATCHER TO FILL
+Depth at A-r9-fold yield: 251,366 (wp65-cell15, read by the dispatcher with cell_depth.py at its A-r9-fold return)
+
+## Run-3 fix (`wp65-cell16`, dispatch-17; base `a93a0ab7`)
+
+Runner run 3 (`42781244075`, on `a93a0ab7`; macOS 26.7.2 arm64, ImageOS macos26, image
+20261102.0473.1; validation mode, `MACOS_FFMPEG_BUNDLED` false): parallel **0 failed / 7827
+passed / 1227 skipped** (248.5 s); serial **15 failed / 518 passed / 784 skipped** (134.9 s);
+the bundle build without FFmpeg FAILED at the one-hop link rule (`build.log:115`, after
+BUNDLE completed and signed); the bundle's macOS tests **1 failed / 133 passed** (65.1 s);
+the skip-reason check failed as a consequence. CHARC's rulings `d6981092` applied as given.
+No `src/` change; `release.yml` byte-identical (its pinned sha256 test passes);
+`MACOS_FFMPEG_BUNDLED` stays "false"; `notices.py`, the debt register, the C14 rows, the
+committed fixtures and the Windows notices annex untouched. Scratch `work\wp6.5\run3fix\`.
+
+### Commits
+
+| Item | Commit | Files |
+|---|---|---|
+| 1 S1 FFmpeg guards | `3c4c0a15` | `tests/test_app_leftovers.py`, `tests/test_app_startup.py`, `tests/test_reviewpack.py`, `tests/test_wp321_bench.py` |
+| 3 S3 settings cache jobs | `4f236be1` | `tests/test_gui_settings_dialog.py` |
+| 2 S2 GPU pack lock skip | `40296214` | `tests/test_gui_gpu_pack_dialog.py` |
+| 4 (b) `.app` link chain | `27d443a1`, `cb37f6d3`, `85f2739d` | `tools/package/build.py`, `tests/test_tools_package_build.py` |
+| 6 + 7 workflow | `bfccb8e6`, `1e275359` | `.github/workflows/macos-build.yml`, `tests/test_release_workflow.py` |
+| 5 T14 cleanup | `f6c84722` | `tests/test_macos_portability.py` |
+| 8 census file | `725423a4` | `tests/test_tools_package_smoke.py` |
+
+Items 6 and 7 share one commit (both edit the one workflow file and its one test module).
+`cb37f6d3` adds the junction case; `85f2739d` and `1e275359` are the verification pass's
+fixes (below).
+
+### Item 1: S1, FFmpeg absent (`3c4c0a15`)
+
+- **Anchor drift:** `test_start_up_never_scans_a_folder_because_a_source_lies_there` lives
+  in `tests/test_app_leftovers.py:416`, not `tests/test_app_startup.py` (runner
+  `serial.log:46`, `tests/test_app_leftovers.py:430`). Guarded there; test-only, as ruled.
+- The existing session fixture `ffmpeg_tools` (`tests/fixture_plugin.py:274`, reason
+  `SKIP_NO_FFMPEG` at `:47`) is the one guard; no second helper.
+  - `tests/test_app_leftovers.py:416` and `tests/test_app_startup.py:138`
+    (`..._keeps_only_the_latest_analysis`): `@pytest.mark.usefixtures("ffmpeg_tools")`;
+    each test is wholly video.
+  - `tests/test_app_startup.py:377` (`test_a_failed_cache_open_is_shown_once_and_photos_still_work`):
+    **the photo half still runs**; `request.getfixturevalue("ffmpeg_tools")` sits just
+    before the clip is opened, so the start-up warning and the photo export are asserted
+    without FFmpeg and only the video half (and the closing once-only count) skips. No
+    rewrite was needed.
+  - `tests/test_reviewpack.py:954` (`test_all_tiny_set`): whole-test guard; one `build.main`
+    call exports the photos and the clip together, so a partial guard would be a rewrite.
+  - `tests/test_wp321_bench.py:52` (the `gpu` test): whole-test guard.
+- **RED on the parent** (`a93a0ab7`'s four files swapped in, restored, `cmp` equal; FFmpeg
+  dropped from PATH by removing `WinGet\Links`): 4 failed (`test_app_startup.py:120` x3 with
+  "ffprobe was not found on the PATH", `test_reviewpack.py:998` with `failed=1`) and the bench
+  test 1 failed (`VideoProbeError`, `probe.py:116`): run 3's five failures, line for line.
+- **GREEN, FFmpeg dropped:** the five SKIP with "ffmpeg and ffprobe are not on the PATH
+  (needed to generate or probe video)". **Normal PATH:** the four non-GPU tests 4 passed.
+- The bench test is `gpu`-marked; its skip proof ran with FFmpeg dropped AND
+  `CUDA_VISIBLE_DEVICES=-1`, so the fixture skipped at setup and nothing reached a device.
+  It was not run with the normal PATH (no GPU test at a cell).
+
+### Item 2: S2, the GPU pack lock (`40296214`, test-only)
+
+- `tests/test_gui_gpu_pack_dialog.py:53` `lock_gap(tags=None)`: for
+  `gpu_pack.platform_tags()` (or the given pair) a locked distribution none of whose
+  wheels has a tag that `gpu_pack.tag_fits` (expanded by `gpu_pack_install._wheel_tags`,
+  the expansion `plan()` uses at `gpu_pack_install.py:158-163`) gives "GPU pack lock carries
+  no wheels for `<os>/<machine>` (`<distribution>`; tags `<interpreter>`, `<platform>`)".
+  More than one fitting wheel is a lock defect, not a gap, so it does not skip.
+- `:36` `_PLATFORM_TAG` / `_platform_words`: the words come from the tag
+  (`macosx_14_0_arm64` -> `darwin/arm64`, `win_amd64` -> `win32/amd64`,
+  `linux_x86_64` -> `linux/x86_64`); never `sys.platform`.
+- `:86` `require_locked_wheels()`, `:94` fixture `locked_wheels`; applied to the seven
+  tests (`usefixtures` at `:168`, `:187`, `:210`, `:226`, `:294`, `:327`, `:337`) and, in
+  `test_pending_reason_clears_after_marker_is_gone`, only to the `install` branch (`:389`).
+  Every other test keeps running without the lock.
+- `:517` `test_the_lock_decides_the_skip_as_plan_does` (5 cases): cp312 win_amd64 and
+  cp312 linux_x86_64 -> no skip AND `plan()` succeeds; macosx_14_0_arm64,
+  macosx_15_0_x86_64 and cp313 win_amd64 -> the exact reason AND `plan()` raises
+  "cupy-cuda12x: 0 compatible locked wheels" AND `require_locked_wheels()` skips.
+- **RED on the parent** (scratch plugin `run3fix\sim\simmac_tags.py` sets
+  `platform_tags` to `("cp312", "macosx_14_0_arm64")`; the parent file swapped in,
+  restored): **8 failed, 16 passed**, exactly run 3's eight.
+- **GREEN, same plugin:** 21 passed, **8 skipped** with "GPU pack lock carries no wheels for
+  darwin/arm64 (cupy-cuda12x; tags cp312, macosx_14_0_arm64)". **Real Windows:** 29 passed
+  (24 + 5), none skipped.
+
+**What a Mac user sees TODAY (read from the code; no GUI launched):**
+
+- `gpu_pack.pack_root()` returns None on darwin (`gpu_pack.py:421`).
+- `MainWindow._update_gpu_actions` (`shell.py:513`) then hides AND disables both "Install GPU
+  support..." and "Remove GPU support" (`shell.py:538-541`); the Tools menu shows only
+  Settings. `_open_gpu_pack` (`:548`) and `_confirm_gpu_remove` (`:560`) return at once when
+  `pack_root()` is None. The idle "Tools > Install GPU support..." tooltip needs a pack root
+  (`shell.py:669`).
+- Were the dialog built, it raises "GPU support is not available on this platform" before
+  `plan()` (`gpu_pack_dialog.py:126`) and catches `plan()`'s `ValueError` into its status
+  line with Install disabled (`:143-145`): no exception dialog, no traceback.
+- Headless `--install-gpu-pack` (`__main__.py:463`): `install()` prints the licence text,
+  then returns "GPU support is not available on this platform" (`gpu_pack_install.py:665-667`)
+  before `plan()`.
+- So `plan()` is never reached on darwin in the product. The eight tests reached it only
+  because their autouse `isolated_pack` fixture monkeypatches `pack_root` to a temporary
+  folder (a supported platform), on a host whose tags the lock does not carry.
+  `test_platform_visibility_and_idle_hint[False]` (`:280`) pins the hidden actions and
+  passed on the runner.
+
+**Debt row, for the follow-on product package (DR number: CHARC assigns at the accept):**
+"On macOS the GUI offers the GPU pack menu and dialog, and `gpu_pack_install.plan()` raises
+`cupy-cuda12x: 0 compatible locked wheels` (`gpu_pack_install.py:165`); the pack is None by
+design on macOS (brief), but the product does not say so." Must be fixed before the 1.2.0
+macOS release. **PREMISE REFUTED by the code above:** the GUI does NOT offer the menu or the
+dialog on macOS, and `plan()` is not reached there. Raised to the dispatcher for CHARC's
+ruling (bank, reword or drop); `docs/debt-register.md` untouched.
+
+### Item 3: S3, settings cache-job errors (`4f236be1`, test-side)
+
+**Diagnosis: NOT a product race; an environment difference in how the test drives the
+dialog.**
+
+- `cpu_settings()` stores `video_encoder="libx265"` (`tests/test_app_startup.py:65`).
+- Without FFmpeg the sink reports every encoder unavailable ("ffmpeg was not found on the
+  PATH"), so `_encoder_unacceptable` (`settings_dialog.py:656`; its D74 table: "a name |
+  reported, unavailable | stored or picked | refused") refuses the stored libx265.
+- `_refresh_ok` disables OK (`settings_dialog.py:699`), and `dialog.ok_button.click()` on a
+  disabled button does nothing: `accept()` never runs and no limit job is queued.
+- `window.jobs.active() >= 2` still held: the slow, failing cache open is itself a start-up
+  job (`app/main.py:201`), plus the clear.
+- Hence one `job failed` line, only "The cache could not be cleared:", and `[window-open]`
+  reaching `jobs.active() == 0`. The product follows its documented rule; nothing is
+  dropped.
+- Trace (scratch `run3fix\sim\diag_s3.py` under simulated darwin): `refresh_ok
+  enabled=False ... enc='libx265' ... caps=[('hevc_nvenc', False, 'ffmpeg was not found on
+  the PATH...'), ('libx265', False, ...)]`; `accept` never called.
+
+**RED on the parent, deterministic (no timing):** on real Windows with FFmpeg dropped from
+PATH, both params fail exactly as on the runner: `[window-closing]` at `:1435`;
+`[window-open]` at `:1437` ("Right contains one more item: 'The cache limit could not be
+set:'"). Simulated darwin also reproduces them (the run-2 ledger's open item).
+
+**Fix (test only):**
+
+- `tests/test_gui_settings_dialog.py:1413` stores `module.AUTO` ("auto": allowed whatever
+  the sink reports).
+- `:1423` asserts OK is enabled (showing the encoder note if not).
+- `:1425` asserts the dialog was accepted.
+- `:1427` asserts `jobs.active() >= 3` (the open, the clear and the limit).
+- The test's assertions about presented and logged errors are unchanged.
+
+**GREEN:** 2 passed with FFmpeg dropped, with the normal PATH and under simulated darwin. The
+whole module: 95 passed in each of the three (Windows unchanged).
+
+### Item 4: (b) the `.app` link chain (`27d443a1`, `cb37f6d3`, `85f2739d`)
+
+`tools/package/build.py`:
+
+- `:4259` `_MACOS_LINK_HOPS = 8`.
+- `:4263` `_not_posix_relative` (today's text test, shared).
+- `:4268` `_macos_link_chain_problem(root, physical)`: inside a `.app`, hop by hop:
+  - each hop's text is relative POSIX;
+  - each hop lands (parent resolved physically, the final name kept) inside the real
+    `Contents`;
+  - no hop repeats (loop);
+  - a junction refuses;
+  - the end is an existing regular file;
+  - at most 8 hops.
+  Refusals read "link chain `<reason>`: `<hop>` -> `'<text>'`; ...; `<end>`", every hop
+  named.
+- `_macos_link_class_problem` (`:4336`): when `root` is a `.app` (`:4347`) and the target is
+  a link, the chain decides first. Then today's outside / dangling checks run on the final
+  target, then the class (framework / B / C) is read on it. Outside a `.app` a link to a
+  link still returns "link to a link (one hop only)" (`:4358`), byte for byte.
+- Still THE one function, shared by the origin check, the ZIP and the notices. The
+  docstring (`:4404` onward) states the chain reading.
+
+`tests/test_tools_package_build.py`:
+
+- `:2585` `PYSIDE_LIB`.
+- `LINK_CASES`:
+  - `C-app-pyinstaller-chain` (`:2678`): Resources -> Frameworks B link -> file,
+    ADMITTED. Run through the origin walk and the ZIP.
+  - `onedir-two-hop-chain` (`:2687`): refused with today's message. Run through the origin
+    walk, the ZIP and the notices.
+  - **`C-app-link-to-a-link` (`:2669`) is now ADMITTED** (MacOS -> Frameworks -> Resources
+    file, all inside Contents, ending in a file): the ruling's change, so its expectation
+    moved from "link to a link (one hop only)" to admitted.
+- Dedicated tests:
+  - `:2846`: the PyInstaller chain admitted per link and by the origin walk.
+  - `:2856`: the onedir two-hop line pinned whole:
+    `native origin: linked file <path>: link to a link (one hop only)`.
+  - `:2936` `CHAIN_REFUSALS` (5): out of the release; out of `Contents` but inside the
+    `.app`; dangling; a loop; a folder end. Each checks the reason and every hop in order.
+  - `:2952`: 8 hops admitted, 9 refused with all hops.
+  - `:2971`: an absolute second hop.
+  - `:2993` (win32): a junction hop.
+  - `:3016` (win32): a link handed over as its real path under an aliased root.
+
+Symlinks are available at this seat: **0 skipped**. Module 686 passed (669 + 17); notices 420
+passed.
+
+**RED on the parent** (`a93a0ab7`'s `build.py` swapped in, restored, `cmp` equal; `-k "link or
+chain"`): **13 failed, 116 passed**. Failing:
+
+- the accepted shape `C-app-pyinstaller-chain` in the origin walk, the ZIP and the dedicated
+  test ("link to a link (one hop only)", run 3's refusal);
+- `C-app-link-to-a-link` in the origin walk and the ZIP;
+- both bound cases;
+- the five refusals and the absolute hop: the parent refuses them too, but with one-hop or
+  dangling text instead of the chain.
+
+The onedir two-hop tests PASS on the parent: the unchanged message. The junction test fails
+on the parent the same way ("link to a link (one hop only)").
+
+**GREEN:** `-k "link or chain"` 131 passed.
+
+### Item 5: T14's exFAT cleanup (`f6c84722`)
+
+- `tests/test_macos_portability.py:1149` `_vanished_entry(function, path, error)`: swallows
+  exactly `FileNotFoundError` from `os.unlink` (a listed non-folder entry, `shutil`'s
+  `onexc(os.unlink, fullname, err)`); every other error, and a `FileNotFoundError` from any
+  other call (the folder's own `rmdir`, `lstat`, `scandir`), is re-raised.
+- `:1183` `shutil.rmtree(root, onexc=_vanished_entry)`; T14's assertions unchanged.
+- Unit checks:
+  - `:1350`: swallow vs five propagating cases; the same exception object re-raised.
+  - `:1366`: a simulated exFAT pair (unlinking either file removes its partner). Plain
+    `rmtree` raises run 3's `FileNotFoundError` (the parent's cleanup, the RED form); with
+    the `onexc` the folder is gone.
+- The module is darwin-only: on Windows it collects 226, all skipped (224 + 2), as before.
+  The two unit checks were run on Windows by lifting the module's skips for them alone
+  (scratch plugin `run3fix\sim\unskip_mac.py`): 2 passed.
+- Parent RED: collection-level (`_vanished_entry` absent). Run 3 is the parent's darwin
+  RED.
+
+### Item 6: the skip-reason check's summary reading (`bfccb8e6`)
+
+- `.github/workflows/macos-build.yml:198`: `SUMMARY` matches any pytest summary
+  (`<n> <word>` parts in any order, then ` in <seconds>s`, optional `=` banner). The LAST
+  summary is read into counts.
+- `:208`: any failed or error count fails: "macOS leg: `<f>` failed, `<e>` errors:
+  `<parts>`".
+- No summary at all, or no passed count, also fails, each saying so.
+- The skip allowlist is unchanged; the success line is "macOS leg: `<n>` passed; `<k>`
+  skipped, all allowed".
+- Kept inline: the workflow has no tested module home.
+- `tests/test_release_workflow.py`:
+  - `:1562` `RUN_SUMMARIES`: the four real lines, copied as literals from run 2
+    `parallel.log:1254` and run 3 `parallel.log:887`, `serial.log:930` and `macos.log:102`.
+  - `:1595`: the step's REAL script run on each line; the passed count is read and printed,
+    and a failed count fails with its words.
+  - `:1625`: seven synthetic orders (skipped first, warnings, banner, an error, errors first,
+    nothing passed, no tests ran).
+  - `:1630`: an off-allowlist reason is still refused under a reordered passing summary.
+
+### Item 7: the listing step (`bfccb8e6`, `1e275359`)
+
+- `.github/workflows/macos-build.yml:137` "List the app bundle", right after "Build app
+  bundle without FFmpeg", with `if: ${{ !cancelled() && !inputs.release-version }}`
+  (CHARC's form; the A r8 / A r9 evaluator reads it unchanged).
+- It writes `work/evidence/app-listing.txt`, inside the existing `Upload evidence`
+  `path: work/evidence/`, so no path change. The listing holds:
+  - `find <app> -ls` (a failure recorded, not fatal: `1e275359`);
+  - `otool -L` over every regular file whose `file -b` starts with `Mach-O`. The check is
+    by type, never by name, so the extensionless `Contents/MacOS/Clearwater` counts.
+- A missing `.app` writes "No app bundle at `<app>`: nothing to list." and exits 0.
+- No `continue-on-error` anywhere; release mode never reaches the step.
+- `tests/test_release_workflow.py`:
+  - `:976` `VALIDATION_ONLY`; `MACOS_STEP_CONDITIONS`, the step order, `MODE_REACHED`
+    (both validation cases) and `SWITCH_GATES` gain the step.
+  - `:1645`: the step pinned (position, `if:`, env, the commands, by type not name, the
+    upload path).
+  - `:1697`: the evaluated-condition table. Validation (no input / empty input; ok or
+    after a failure) RUNS. Release (`1.2.0`; ok or after a failure) does NOT. Each for
+    both switch values.
+
+**RED on the parent** (items 6-7; `a93a0ab7`'s workflow swapped in, restored): **20 failed,
+120 passed**:
+
+- the step order, the condition map and both validation mode cases;
+- the four real summaries: run 3's `1 failed, 133 passed` gets "no passing summary line"
+  instead of the failed count, and run 3's parallel line passes but prints the old words;
+- five of the seven orders (e.g. "2 skipped, 133 passed" refused);
+- the reordered allowlist case;
+- the listing pin and its five condition rows.
+
+**GREEN:** module 140 passed (122 + 18).
+
+### Item 8: the darwin containment census to a file (`725423a4`)
+
+- `tests/test_tools_package_smoke.py:770` `CENSUS_FILE` =
+  `work/evidence/containment-census.txt`, inside the evidence upload.
+- In `test_non_windows_containment_never_silently_skips`, on darwin only (Windows and Linux
+  return before it, as today):
+  - `:866`: the real `os.killpg` and the smoke's own `_group_census` are wrapped to record,
+    per 0-signal probe, its outcome (`ProcessLookupError` / `PermissionError` / answered)
+    and the live count and `_listing` of the census that followed. No second census runs;
+    the smoke still decides.
+  - The lines the smoke printed are taken from `capsys` (re-emitted to stdout).
+  - In a `finally`, so a failing row still leaves it, `:905` writes `census_text`: one line
+    per probe naming its branch (`census_branch` `:775`: "ProcessLookupError (empty
+    group)", "EPERM with no live member", "SURVIVORS (a live member)", "answered, no live
+    member", "EPERM with a live member") with the listing, then the printed lines.
+- `:814` `test_the_census_text_names_each_branch` pins the text (runs everywhere).
+- Windows: module 74 passed, 1 skipped (73 + 1; the skip = the native POSIX proof, as
+  today). No `work/evidence/` was written at this seat.
+- Parent RED: collection-level (`census_text` absent).
+
+### Static and tests at the head (`1e275359`; `-m "not gpu"`, every run `-k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'` where it applies)
+
+Static:
+
+- `ruff check .` all passed;
+- `ruff format --check .` 339 files already formatted;
+- `mypy` and `mypy --platform darwin` no issues in 166 source files;
+- every committed blob 0 CR and 0 NUL (counted in Python).
+
+| Module | Normal PATH | FFmpeg dropped |
+|---|---|---|
+| `tests/test_app_startup.py` (offscreen) | 9 passed, 1 deselected | 7 passed, 2 skipped |
+| `tests/test_app_leftovers.py` (offscreen) | 27 passed | 26 passed, 1 skipped |
+| `tests/test_reviewpack.py` (offscreen) | 177 passed | 150 passed, 27 skipped |
+| `tests/test_wp321_bench.py` | 11 passed, 1 deselected (gpu) | 9 passed, 2 skipped |
+| `tests/test_gui_gpu_pack_dialog.py` (offscreen) | 29 passed | - |
+| `tests/test_gui_settings_dialog.py` (offscreen) | 95 passed | 95 passed |
+| `tests/test_tools_package_build.py` (`-n 3`) | 686 passed (669 + 17) | - |
+| `tests/test_tools_package_notices.py` (`-n 3`) | 420 passed | - |
+| `tests/test_tools_package_smoke.py` | 74 passed, 1 skipped | - |
+| `tests/test_release_workflow.py` | 140 passed | - |
+| `tests/test_macos_portability.py` | 226 skipped (platform) | - |
+| `tests/test_wp65_conftest_home.py` | 1 passed, 3 skipped | - |
+
+Every skip with FFmpeg dropped has the one reason "ffmpeg and ffprobe are not on the PATH
+(needed to generate or probe video)". Simulated darwin: `test_gui_settings_dialog.py` 95
+passed (the run-2 ledger's two open failures are gone). No write under
+`C:\Users\rwsmy\Library`.
+
+### Verification loop (self)
+
+Pass 1:
+
+- **Suspected:** the chain walk's first label used `physical.relative_to(root)`. A folder
+  link's view (`macos_link_view`) hands nested links over as REAL paths, so under a root named
+  through an alias (macOS `/var` -> `/private/var`) it raises `ValueError` instead of
+  refusing. **CONFIRMED** (`27d443a1`'s `build.py` swapped in: `ValueError ... is not in the
+  subpath of ...`). **FIXED** in `85f2739d`: the label falls back to the real `.app`; test
+  `:3016`.
+- **Suspected:** `find -ls` failing would fail an evidence step in an otherwise green run.
+  **FIXED** in `1e275359` (`|| echo`), pinned.
+- **Suspected:** `file -b | grep` under `pipefail` gives a SIGPIPE false negative. Avoided by
+  design: `case "$(file -b ...)"`, no pipeline.
+- **Suspected:** the S3 fix hides a product defect. **REJECTED:** OK refusing a reported-
+  unavailable stored encoder is the D74 table. Noted for the dispatcher: on a Mac without
+  FFmpeg, Settings' OK stays disabled until "auto" or an available encoder is chosen. This is
+  by design; with bundling ON it does not arise.
+- **Suspected:** the S2 skip could mask a lock defect. **REJECTED:** only zero fitting wheels
+  skips; more than one still reaches `plan()`'s error.
+- **Slips, fixed before commit:**
+  - a misplaced insertion split the smoke test's `skipif` decorator from its function
+    (`SyntaxError`), corrected before commit;
+  - a heredoc collapsed `\\n` in one scripted edit (the known trap), caught by the failing
+    test and redone with the Edit tool;
+  - four test files checked out CRLF were normalised to LF (HEAD blobs 0 CR).
+
+Pass 2 over the eight items, the ledger's claims and the commits: nothing new. Loop ended.
+
+**For the dispatcher:**
+
+- (a) S2's dictated debt-row premise is refuted (above).
+- (b) `test_wp321_bench.py::test_a_device_frame_run_gives_the_sink_device_frames` is
+  `gpu`-marked and not skipped without CUDA. With FFmpeg bundled ON on the runner it would
+  pass the new guard and fail at `CupyBackend` (no CUDA on macOS); outside this dispatch.
+- (c) `test_macos_portability.py` now collects 226 (the brief's 224 M cases plus two unit
+  checks).
+- (d) the listing and the census files are first produced by the next runner run.
+
+Depth at run-3-fix yield: DISPATCHER TO FILL
