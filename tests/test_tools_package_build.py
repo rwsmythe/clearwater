@@ -925,13 +925,124 @@ def test_ar3_nested_folder_alias_matches_materialised_copy(
     assert found == physical
     assert recorder.violations(root, tmp_path / "outside") == []
     nested = app / f"Contents/Frameworks/numpy/{holder}/{inner}"
-    own = next(i for i, call in enumerate(recorder.calls) if call[:2] == ("own-admit", str(nested)))
-    accesses = [
-        i
-        for i, (name, path, follows) in enumerate(recorder.calls)
-        if path == str(nested) and (name == "own-view" or (name == "stat" and follows))
-    ]
-    assert accesses and own < min(accesses)
+    # An earlier physical walk must not excuse a missing own admission in a later
+    # alias descent. Pair every access with the latest own call, in that descent.
+    latest_own = None
+    accesses = 0
+    for name, path, follows in recorder.calls:
+        if name == "own-admit":
+            latest_own = path
+        if path == str(nested) and (name == "own-view" or (name == "stat" and follows)):
+            accesses += 1
+            assert latest_own == str(nested)
+    assert accesses
+
+
+def model_posix_realpath(monkeypatch):
+    """Resolve the fixture's POSIX-text links component by component on any host.
+
+    Windows realpath cannot follow slash-separated link text under a folder alias
+    (as in test_an_alias_above_the_release_root_is_untouched). Use real lstat/readlink
+    on the same fixture; the product's admission, listing and stat calls remain real.
+    """
+    query, readlink = os.lstat, os.readlink
+
+    def realpath(path, **kwargs):
+        named = Path(path)
+        if not named.is_absolute():
+            named = Path.cwd() / named
+        current = Path(named.anchor)
+        pending = list(reversed(named.parts[1:]))
+        hops = 0
+        while pending:
+            part = pending.pop()
+            if part == "..":
+                current = current.parent
+                continue
+            entry = current / part
+            try:
+                is_link = stat.S_ISLNK(query(entry).st_mode)
+            except FileNotFoundError:
+                is_link = False
+            if is_link:
+                hops += 1
+                assert hops < 100, "fixture link cycle"
+                target = Path(readlink(entry))
+                if target.is_absolute():
+                    current = Path(target.anchor)
+                    pending.extend(reversed(target.parts[1:]))
+                else:
+                    pending.extend(reversed(target.parts))
+            else:
+                current = entry
+        return str(current)
+
+    monkeypatch.setattr(build.os.path, "realpath", realpath)
+
+
+@pytest.mark.parametrize("root_is_app", [False, True], ids=["release", "app"])
+@pytest.mark.parametrize("plant", [False, True], ids=["legitimate", "forbidden"])
+def test_ar4_content_under_aliased_release_root(tmp_path, monkeypatch, root_is_app, plant):
+    """F1-d: canonical nested view entries are mapped back before their own admission."""
+    root, app = ar3_nested_folder_release(tmp_path / "rr-base")
+    if plant:
+        _symlink(app / "Contents/Frameworks/foo-bar", "numpy/holder", folder=True)
+    _symlink(tmp_path / "rr-alias", "rr-base", folder=True)
+    lexical_root = tmp_path / "rr-alias" / root.name
+    lexical_app = lexical_root / app.name
+    model_posix_realpath(monkeypatch)
+    canonical = app_content_paths(app if root_is_app else root, app)
+    aliased = app_content_paths(lexical_app if root_is_app else lexical_root, lexical_app)
+    assert len(canonical) == (9 if plant else 0)
+    assert aliased == canonical
+
+
+def test_ar4_folder_diamond_is_refused_with_one_budget_line(tmp_path, monkeypatch):
+    """A non-cyclic 13-level diamond is bounded per top-level link, across all levels."""
+    root, app = run4_content_release(tmp_path, [])
+    for level in range(13):
+        for side in ("a", "b"):
+            _symlink(
+                app / f"Contents/Frameworks/numpy/d{level}/{side}",
+                f"../d{level + 1}",
+                folder=True,
+            )
+    tree(app, ["Contents/Frameworks/numpy/d13/data.txt"])
+    alias = app / "Contents/Resources/numpy"
+    _symlink(alias, "../Frameworks/numpy/d0", folder=True)
+    listing = build._macos_app_entries
+    # Exercise ONE top-level descent; separately enumerating every physical link
+    # would repeat the same diamond once for each of its suffixes.
+    monkeypatch.setattr(
+        build,
+        "_macos_app_entries",
+        lambda path: [(alias, "link")] if path == root else listing(path),
+    )
+    found = app_content_paths(root, app)
+    label = "dist:Clearwater.app/Contents/Resources/numpy (link: folder fan-out)"
+    assert found.count(label) == 1
+    # No descent can emit a second refusal at the same top-level label.
+    assert len(found) == len(set(found))
+
+
+def test_ar4_budget_is_shared_across_levels_and_resets_per_link(tmp_path, monkeypatch):
+    """Exhaustion keeps earlier rule lines and does not consume a sibling link's budget."""
+    root, app = run4_content_release(tmp_path, [])
+    tree(app, ["Contents/Frameworks/numpy/leaf/cupy.so", "Contents/Frameworks/numpy/leaf/data.txt"])
+    for name in ("a", "b"):
+        _symlink(app / f"Contents/Frameworks/numpy/holder/{name}", "../leaf", folder=True)
+    for name in ("first", "second"):
+        _symlink(app / f"Contents/Resources/{name}", "../Frameworks/numpy/holder", folder=True)
+    # One nested link plus its two files uses all three entries. The next nested
+    # link exceeds the SAME counter, before any of its contents can be judged.
+    monkeypatch.setattr(build, "_MACOS_LINK_CONTENT_ENTRIES", 3, raising=False)
+    found = app_content_paths(root, app)
+    for name in ("first", "second"):
+        prefix = f"Contents/Resources/{name}"
+        assert hits(found, f"{prefix}/a/cupy.so (gpu-module)")
+        assert not hits(found, f"{prefix}/b/")
+        assert hits(found, f"{prefix} (link: folder fan-out)")
+    assert len(hits(found, " (link: folder fan-out)")) == 2
 
 
 def test_ar3_holder_alone_and_sibling_aliases_stay_allowed(tmp_path):

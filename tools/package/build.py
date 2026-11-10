@@ -619,39 +619,64 @@ def _app_content_rules(root: Path, app: Path, path: Path, *, is_file: bool) -> s
     return rules
 
 
-def _app_link_content(
-    root: Path, app: Path, physical: Path, shown: Path, targets: tuple[Path, ...] = ()
-) -> list[str]:
-    """Admit a link, then judge its recursively re-rooted content with a target stack."""
-    label = f"dist:{shown.relative_to(root).as_posix()}"
-    problem = (
-        macos_link_problem(app, app / "Contents/Frameworks", physical)
-        if physical.is_relative_to(app) and physical != app
-        else "link at or outside the .app root"
-    )
-    # A nested link receives its OWN admission before any following kind query,
-    # resolution or view, even when its parent link's admission already checked it.
-    is_file = problem is None and stat.S_ISREG(os.stat(physical).st_mode)
-    found = [f"{label} ({rule})" for rule in _app_content_rules(root, app, shown, is_file=is_file)]
-    if problem is not None:
-        return [*found, f"{label} (link: {problem})"]
-    if is_file:
+def _app_link_content(root: Path, app: Path, physical: Path, shown: Path) -> list[str]:
+    """Judge one link's recursive content, bounded by a target stack and entry budget."""
+    real_app: Path | None = None
+    judged = 0
+    exhausted = False
+
+    def judge(physical: Path, shown: Path, targets: tuple[Path, ...]) -> list[str]:
+        nonlocal real_app, judged, exhausted
+        label = f"dist:{shown.relative_to(root).as_posix()}"
+        problem = (
+            macos_link_problem(app, app / "Contents/Frameworks", physical)
+            if physical.is_relative_to(app) and physical != app
+            else "link at or outside the .app root"
+        )
+        # A nested link receives its OWN admission before any following kind query,
+        # resolution or view, even when its parent link's admission already checked it.
+        is_file = problem is None and stat.S_ISREG(os.stat(physical).st_mode)
+        found = [
+            f"{label} ({rule})" for rule in _app_content_rules(root, app, shown, is_file=is_file)
+        ]
+        if problem is not None:
+            return [*found, f"{label} (link: {problem})"]
+        if is_file:
+            return found
+        resolved = Path(os.path.realpath(physical))
+        if any(previous.is_relative_to(resolved) for previous in targets):
+            # Equal targets and ancestors of a target on THIS descent path contain a loop.
+            # Siblings get the same incoming stack, so two aliases may share a target.
+            return [*found, f"{label} (link: folder loop)"]
+        if real_app is None:
+            # The admission above proved the path's bundle boundary. Resolve the app
+            # once per top-level descent, never before that admission (A r4 F1-d).
+            real_app = Path(os.path.realpath(app))
+        for relative, entry, kind in macos_link_view(physical, in_app=True):
+            if judged >= _MACOS_LINK_CONTENT_ENTRIES:
+                exhausted = True
+                break
+            judged += 1
+            # Views use canonical paths. Restore only in-app entries to the caller's
+            # lexical spelling before admission; outside entries remain outside.
+            if entry.is_relative_to(real_app):
+                entry = app / entry.relative_to(real_app)
+            location = shown.joinpath(*relative.parts)
+            if kind == "link":
+                found += judge(entry, location, (*targets, resolved))
+            else:
+                entry_label = f"dist:{location.relative_to(root).as_posix()}"
+                found += [
+                    f"{entry_label} ({rule})"
+                    for rule in _app_content_rules(root, app, location, is_file=kind == "file")
+                ]
+            if exhausted:
+                break
         return found
-    resolved = Path(os.path.realpath(physical))
-    if any(previous.is_relative_to(resolved) for previous in targets):
-        # Equal targets and ancestors of a target on THIS descent path contain a loop.
-        # Siblings get the same incoming stack, so two aliases may share a target.
-        return [*found, f"{label} (link: folder loop)"]
-    for relative, entry, kind in macos_link_view(physical, in_app=True):
-        location = shown.joinpath(*relative.parts)
-        if kind == "link":
-            found += _app_link_content(root, app, entry, location, (*targets, resolved))
-        else:
-            entry_label = f"dist:{location.relative_to(root).as_posix()}"
-            found += [
-                f"{entry_label} ({rule})"
-                for rule in _app_content_rules(root, app, location, is_file=kind == "file")
-            ]
+
+    found = judge(physical, shown, ())
+    if exhausted:
+        found.append(f"dist:{shown.relative_to(root).as_posix()} (link: folder fan-out)")
     return found
 
 
@@ -661,7 +686,8 @@ def _app_forbidden_paths(root: Path, app: Path) -> list[str]:
     Only physical files are opened for ZIP checks. After admission, file links are judged
     at their own location; a folder link's non-following view is re-rooted there and its
     entries receive the physical tree's rules, without a name-shape gate. Nested links
-    receive their own admission before resolution or descent; folder loops are refused.
+    receive their own admission before resolution or descent; folder loops and excessive
+    per-link fan-out are refused.
     """
     entries = _macos_app_entries(root)
     found: list[str] = []
@@ -4412,6 +4438,9 @@ def _within(path: Path, folders: Iterable[Path]) -> bool:
 
 _MACOS_LINK_HOPS = 8
 """The longest link chain a ``.app`` admits (PyInstaller's BUNDLE makes two hops)."""
+
+_MACOS_LINK_CONTENT_ENTRIES = 4096
+"""Maximum re-rooted entries judged per top-level folder link (WP6.5 A r4)."""
 
 
 def _not_posix_relative(target: str) -> bool:
