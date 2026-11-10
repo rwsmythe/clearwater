@@ -24,6 +24,7 @@ footage only: the owner's footage folder is never read.
 
 from __future__ import annotations
 
+import contextlib
 import errno
 import functools
 import importlib
@@ -1145,6 +1146,28 @@ def _fs_presets(volumes: dict[str, Path]) -> None:
             shutil.rmtree(folder)
 
 
+def _vanished_entry(function: Any, path: str, error: BaseException) -> None:
+    """``shutil.rmtree``'s ``onexc`` for T14's exFAT folder: a listed entry may be gone.
+
+    On exFAT macOS removes a file's AppleDouble ``._`` companion together with the file, so a
+    companion the folder scan listed can be missing at its own unlink (runner run 3,
+    ``macos.log``). Exactly ``FileNotFoundError`` from the unlink of a listed entry is
+    swallowed; every other error, and a ``FileNotFoundError`` from any other call (the
+    folder's own removal, its listing), is raised again.
+
+    Args:
+        function: The call that failed (``os.unlink`` for a listed non-folder entry).
+        path: The path it was called on.
+        error: The exception it raised.
+
+    Raises:
+        BaseException: ``error`` itself, unless it is a vanished listed entry.
+    """
+    if function is os.unlink and isinstance(error, FileNotFoundError):
+        return
+    raise error
+
+
 def _fs_appledouble(volumes: dict[str, Path], monkeypatch: pytest.MonkeyPatch) -> None:
     """T14: macOS writes ``._`` files on exFAT; the inventory counts them apart, never as clips."""
     inventory = _w()._stub_probes(monkeypatch)
@@ -1157,7 +1180,7 @@ def _fs_appledouble(volumes: dict[str, Path], monkeypatch: pytest.MonkeyPatch) -
     assert (root / "._clip.MP4").exists()  # the AppleDouble companion is real on exFAT
     result = inventory.scan_tree(root)
     assert [r.path.name for r in result.records] == ["clip.MP4"] and result.appledouble >= 1
-    shutil.rmtree(root)
+    shutil.rmtree(root, onexc=_vanished_entry)
 
 
 def _fs_exfat_links(volumes: dict[str, Path]) -> None:
@@ -1322,6 +1345,53 @@ def test_macos_filesystem_semantics(
     with pytest.MonkeyPatch.context() as w_patch:  # the W stubs end before the native half
         _w().FS_CASES[site](w_patch, tmp_path / "w")
     _fs_native(site, request, monkeypatch, tmp_path)
+
+
+def test_the_exfat_cleanup_swallows_only_a_vanished_listed_entry() -> None:
+    """Run 3 item 5: ``_vanished_entry`` swallows exactly ``FileNotFoundError`` from an unlink;
+    another ``OSError``, or a ``FileNotFoundError`` from another call, propagates unchanged."""
+    _vanished_entry(os.unlink, "footage/._clip.MP4", FileNotFoundError(2, "gone"))
+    for function, error in (
+        (os.unlink, PermissionError(13, "denied")),
+        (os.unlink, OSError(5, "input/output error")),
+        (os.rmdir, FileNotFoundError(2, "the folder itself")),
+        (os.lstat, FileNotFoundError(2, "a listed folder")),
+        (os.scandir, FileNotFoundError(2, "the listing")),
+    ):
+        with pytest.raises(type(error)) as caught:
+            _vanished_entry(function, "footage/x", error)
+        assert caught.value is error
+
+
+def test_the_exfat_cleanup_removes_a_pair_that_vanishes_together(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Run 3 item 5: a file and its ``._`` companion removed together (exFAT's behaviour,
+    simulated): plain ``rmtree`` raises run 3's ``FileNotFoundError``; with the ``onexc`` the
+    folder is gone."""
+    real_unlink = os.unlink
+    partners = {"clip.MP4": "._clip.MP4", "._clip.MP4": "clip.MP4"}
+
+    def unlink_pair(path: Any, *, dir_fd: int | None = None) -> None:
+        real_unlink(path, dir_fd=dir_fd)
+        partner = partners.get(os.path.basename(os.fspath(path)))
+        if partner is not None:
+            with contextlib.suppress(FileNotFoundError):
+                real_unlink(os.path.join(os.path.dirname(os.fspath(path)), partner), dir_fd=dir_fd)
+
+    for onexc in (None, _vanished_entry):
+        root = tmp_path / ("plain" if onexc is None else "tolerant")
+        root.mkdir()
+        (root / "clip.MP4").write_bytes(b"x")
+        (root / "._clip.MP4").write_bytes(b"x")
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "unlink", unlink_pair)
+            if onexc is None:
+                with pytest.raises(FileNotFoundError):
+                    shutil.rmtree(root)
+            else:
+                shutil.rmtree(root, onexc=onexc)
+        assert root.exists() is (onexc is None)
 
 
 # --- M-GUARD ---------------------------------------------------------------------------------
