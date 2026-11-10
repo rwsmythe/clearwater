@@ -3039,6 +3039,152 @@ def test_a_chain_handed_over_as_its_real_path_is_labelled_from_the_real_app(tmp_
     )
 
 
+# --- WP6.5 A r11 #1: the walk is component by component from the canonical Contents ------
+# realpath(named.parent) collapsed the traversal, so an alias OUTSIDE the bundle (never
+# walked) could carry an escaping hop back inside, and folder links escaped the hop count.
+
+
+def outside_alias(folder: Path, name: str) -> Path:
+    """``outside/<name>`` beside the ``.app`` (in the test's tmp folder), as A's probe had,
+    leading back to ``Contents/Frameworks/pkg``.
+
+    Its text uses the host's separator: the alias is outside the bundle, so the rule never
+    reads it, and a Windows host follows a folder link only through backslash text.
+    """
+    alias = folder.parent / "outside" / name
+    _symlink(alias, os.path.join("..", folder.name, "Contents", "Frameworks", "pkg"), folder=True)
+    assert Path(os.path.realpath(alias)) == Path(
+        os.path.realpath(folder / "Contents/Frameworks/pkg")
+    )
+    return alias
+
+
+def test_a_chain_through_an_outside_alias_is_refused_where_it_leaves(tmp_path, monkeypatch):
+    """A r11's exact shape: both bundle links refused, the outside hop named in the message."""
+    folder, executable = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/pkg/data"],
+        [
+            ("Contents/Resources/data", "../Frameworks/data", False),
+            ("Contents/Frameworks/data", "../../../outside/back/data", False),
+        ],
+    )
+    # The alias really does lead back in: the escaping text names a contained file.
+    assert (outside_alias(folder, "back") / "data").is_file()
+    heading = str(Path(os.path.realpath(folder.parent)) / "outside" / "back" / "data")
+    contents = folder / "Contents/Frameworks"
+    outward = "Contents/Frameworks/data -> '../../../outside/back/data'"
+    assert build.macos_link_problem(folder, contents, folder / "Contents/Resources/data") == (
+        f"link chain leaves the bundle: Contents/Resources/data -> '../Frameworks/data'; "
+        f"{outward}; {heading}"
+    )
+    assert build.macos_link_problem(folder, contents, folder / "Contents/Frameworks/data") == (
+        f"link chain leaves the bundle: {outward}; {heading}"
+    )
+    found = link_origin_check(tmp_path, monkeypatch, executable)
+    assert len(found) == 2 and all(heading in line for line in found), found
+    with pytest.raises(ValueError, match="release ZIP refuses linked/junction/outside") as error:
+        build.write_release_zip(folder, out=tmp_path / "out", source_epoch=1793908801)
+    assert heading in str(error.value)
+    assert not (tmp_path / "out").exists()
+
+
+def test_a_folder_link_that_leaves_and_comes_back_is_refused(tmp_path):
+    """A folder link in mid-path whose target leaves Contents is refused before it returns."""
+    folder, _ = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/pkg/x.dylib"],
+        [
+            ("Contents/Resources/x.dylib", "../Frameworks/F/x.dylib", False),
+            ("Contents/Frameworks/F", "../../../outside/back", True),
+        ],
+    )
+    assert (outside_alias(folder, "back") / "x.dylib").is_file()
+    heading = Path(os.path.realpath(folder.parent)) / "outside" / "back" / "x.dylib"
+    problem = build.macos_link_problem(
+        folder, folder / "Contents/Frameworks", folder / "Contents/Resources/x.dylib"
+    )
+    assert problem == (
+        "link chain leaves the bundle: Contents/Resources/x.dylib -> '../Frameworks/F/x.dylib'; "
+        f"Contents/Frameworks/F -> '../../../outside/back'; {heading}"
+    )
+
+
+def test_a_single_hop_that_steps_out_of_contents_and_back_is_refused(tmp_path):
+    """No link outside at all: the hop's own ``..`` above Contents refuses at that point."""
+    folder, _ = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/y.dylib"],
+        [("Contents/Resources/y.dylib", "../../Contents/Frameworks/y.dylib", False)],
+    )
+    problem = build.macos_link_problem(
+        folder, folder / "Contents/Frameworks", folder / "Contents/Resources/y.dylib"
+    )
+    assert problem == (
+        "link chain leaves the bundle: "
+        "Contents/Resources/y.dylib -> '../../Contents/Frameworks/y.dylib'; "
+        "Contents/Frameworks/y.dylib"
+    )
+
+
+@pytest.mark.parametrize("met", [8, 9])
+def test_folder_links_count_against_the_hop_bound(tmp_path, met):
+    """Five file hops through four folder links are nine links: refused; eight are admitted."""
+    links = [("Contents/Frameworks/c0", "f1/c1", False)]
+    links += [(f"Contents/Frameworks/f{index}", "lib", True) for index in range(1, 5)]
+    links += [
+        (f"Contents/Frameworks/lib/c{index}", f"../f{index + 1}/c{index + 1}", False)
+        for index in range(1, 3)
+    ]
+    if met == 9:
+        links += [
+            ("Contents/Frameworks/lib/c3", "../f4/c4", False),
+            ("Contents/Frameworks/lib/c4", "data.bin", False),
+        ]
+    else:
+        links.append(("Contents/Frameworks/lib/c3", "../f4/data.bin", False))
+    folder, _ = link_release(tmp_path, "app", ["Contents/Frameworks/lib/data.bin"], links)
+    problem = build.macos_link_problem(
+        folder, folder / "Contents/Frameworks", folder / "Contents/Frameworks/c0"
+    )
+    if met == 8:
+        assert problem is None
+        return
+    shown = ["Contents/Frameworks/c0 -> 'f1/c1'"]
+    for index in range(1, 4):
+        shown.append(f"Contents/Frameworks/f{index} -> 'lib'")
+        shown.append(f"Contents/Frameworks/lib/c{index} -> '../f{index + 1}/c{index + 1}'")
+    shown += ["Contents/Frameworks/f4 -> 'lib'", "Contents/Frameworks/lib/c4"]
+    assert problem == "link chain is longer than 8 hops: " + "; ".join(shown)
+
+
+def test_an_alias_above_the_release_root_is_untouched(tmp_path, monkeypatch):
+    """The boundary is canonicalised once: a release root named through a link above it
+    (macOS ``/var`` -> ``/private/var``) still admits the PyInstaller chain and a plain hop.
+
+    The chain is checked through the walk itself: on a Windows host ``realpath`` cannot
+    follow a POSIX-text file link under an alias (the host, not the rule), so the whole
+    rule and the origin walk take the single-hop cross-link, which needs no such follow.
+    """
+    _, files, links, _ = LINK_CASES["C-app-pyinstaller-chain"]
+    _, more, plain, _ = LINK_CASES["C-data-file-cross-link"]
+    link_release(tmp_path / "real", "app", [*files, *more], [*links, *plain])
+    _symlink(tmp_path / "alias", "real", folder=True)
+    folder = tmp_path / "alias/wrapper/Clearwater.app"
+    for path, _, _ in links:
+        assert build._macos_link_chain_problem(folder, folder / path) is None
+    (hop, _, _) = plain[0]
+    assert build._macos_link_chain_problem(folder, folder / hop) is None
+    contents = folder / "Contents/Frameworks"
+    assert build.macos_link_problem(folder, contents, folder / hop) is None
+    for path, _, _ in links:  # the chain, removed so the origin walk sees the plain hop only
+        (tmp_path / "real/wrapper/Clearwater.app" / path).unlink()
+    assert link_origin_check(tmp_path, monkeypatch, folder / "Contents/MacOS/Clearwater") == []
+
+
 def test_folder_link_files_are_checked_at_the_links_location(tmp_path, monkeypatch):
     """A transformed native seen through a cross-link must fit the mirrored location."""
     base = tree(tmp_path / "python", ["lib/libbar.dylib"], original_native())

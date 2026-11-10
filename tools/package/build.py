@@ -4266,71 +4266,94 @@ def _not_posix_relative(target: str) -> bool:
 
 
 def _macos_link_chain_problem(root: Path, physical: Path) -> str | None:
-    """Inside a ``.app``: follow a link chain hop by hop; say why it is refused, or ``None``.
+    """Inside a ``.app``: walk a link's target component by component; say why it is refused.
 
-    Every hop's stored text must be relative POSIX text, every hop must land inside the
-    bundle's real ``Contents`` folder, and the chain must end in a regular file there within
-    :data:`_MACOS_LINK_HOPS` hops; a junction, a loop, a missing end or a folder end is
-    refused. Folder links inside a hop's path are resolved physically (they are not hops);
-    only a link at the hop's final name is a further hop. The message lists every hop.
+    The boundary, the bundle's ``Contents`` folder, is canonicalised ONCE, at the start, so a
+    legitimate alias above the release root (macOS ``/var`` -> ``/private/var``) is untouched.
+    From the link's own canonical folder, every component of the stored text is taken in
+    turn (WP6.5 A r11 #1): ``..`` steps to the canonical parent, a name steps into it, and a
+    component that lands outside ``Contents`` is refused AT THAT POINT, before any later
+    component (a return hop through an outside alias) is read. Every link met on the way, a
+    folder link in mid-path as much as a further hop at the final name, is counted against
+    :data:`_MACOS_LINK_HOPS` and validated as the first one is: relative POSIX text, never a
+    junction, never met twice (a loop); its text is then walked in place. A CHAIN (a link
+    met at the final name) must end in an existing regular file; a single hop's end is left
+    to the caller's class rule. The message lists every link met, the departing one
+    included, and for a departure ends with where the hop was heading, read lexically.
 
     Args:
         root: The ``.app`` folder.
         physical: The first link, a physical path under ``root``.
 
     Returns:
-        ``None`` when the chain is admitted, else the reason with the full chain.
+        ``None`` when the walk is admitted, else the reason with the full chain.
     """
     real_root = Path(os.path.realpath(root))
     bundle = Path(os.path.realpath(root / "Contents"))
     hops: list[str] = []
 
-    def refused(reason: str) -> str:
-        return f"link chain {reason}: {'; '.join(hops)}"
+    def refused(reason: str, last: str | None = None) -> str:
+        return f"link chain {reason}: {'; '.join([*hops, *([last] if last else [])])}"
 
     def shown(real: Path) -> str:
-        """A hop's real path, relative to the real ``.app`` when it lies inside it."""
+        """A canonical path, relative to the real ``.app`` when it lies inside it."""
         return (
             real.relative_to(real_root).as_posix() if real.is_relative_to(real_root) else str(real)
         )
 
-    start = Path(os.path.realpath(physical.parent)) / physical.name
+    folder = Path(os.path.realpath(physical.parent))
     # A link seen through a linked folder arrives as its real path (macos_link_view).
-    current = physical
-    label = physical.relative_to(root).as_posix() if physical.is_relative_to(root) else shown(start)
-    seen = {start}
-    for _ in range(_MACOS_LINK_HOPS):
-        if current.is_junction():
-            hops.append(f"{label} (junction)")
-            return refused("meets a junction")
-        target = os.readlink(current)
+    label = (
+        physical.relative_to(root).as_posix()
+        if physical.is_relative_to(root)
+        else shown(folder / physical.name)
+    )
+    link = physical
+    seen = {folder / physical.name}
+    met = 1
+    chained = False
+    pending: list[str] = []  # the components still to walk, the next one LAST
+    while True:
+        if link.is_junction():
+            return refused("meets a junction", f"{label} (junction)")
+        target = os.readlink(link)
         hops.append(f"{label} -> {target!r}")
         if _not_posix_relative(target):
             return refused(f"hop target {target!r} is absolute or not POSIX")
-        named = current.parent / target
-        if named.name in {"", ".", ".."}:
-            hop = Path(os.path.realpath(named))
+        pending.extend(reversed(PurePosixPath(target).parts))
+        while pending:
+            part = pending.pop()
+            if part in {"", "."}:
+                continue
+            step = folder.parent if part == ".." else folder / part
+            if not step.is_relative_to(bundle):
+                heading = step
+                for rest in reversed(pending):
+                    heading = heading.parent if rest == ".." else heading / rest
+                return refused("leaves the bundle", shown(heading))
+            if step.is_junction():
+                return refused("meets a junction", f"{shown(step)} (junction)")
+            if step.is_symlink():
+                if step in seen:
+                    return refused("loops", shown(step))
+                met += 1
+                if met > _MACOS_LINK_HOPS:
+                    return refused(f"is longer than {_MACOS_LINK_HOPS} hops", shown(step))
+                seen.add(step)
+                chained = chained or not pending
+                link, label = step, shown(step)
+                break  # read this link's text; it is walked from ``folder``, its own folder
+            folder = step
         else:
-            hop = Path(os.path.realpath(named.parent)) / named.name
-        label = shown(hop)
-        if not hop.is_relative_to(bundle):
-            hops.append(label)
-            return refused("leaves the bundle")
-        if hop in seen:
-            hops.append(label)
-            return refused("loops")
-        seen.add(hop)
-        if hop.is_symlink() or hop.is_junction():
-            current = hop
-            continue
-        hops.append(label)
-        if not hop.exists():
-            return refused("ends in a missing entry")
-        if not hop.is_file():
-            return refused("does not end in a regular file")
+            break
+    if not chained:
         return None
-    hops.append(label)
-    return refused(f"is longer than {_MACOS_LINK_HOPS} hops")
+    end = shown(folder)
+    if not folder.exists():
+        return refused("ends in a missing entry", end)
+    if not folder.is_file():
+        return refused("does not end in a regular file", end)
+    return None
 
 
 def _macos_link_class_problem(
@@ -4357,6 +4380,12 @@ def _macos_link_class_problem(
         return "dangling link"
     if to_a_link and not in_app:
         return "link to a link (one hop only)"
+    if in_app and not to_a_link:
+        # realpath collapses the traversal: a single hop is walked component by component
+        # too, so a folder link (or an outside alias) on its way is counted and confined.
+        walked = _macos_link_chain_problem(root, physical)
+        if walked is not None:
+            return walked
     framework = framework_link_problem(PurePosixPath(location.relative_to(root).as_posix()), target)
     if framework is None:
         return None
@@ -4413,9 +4442,13 @@ def macos_link_problem(root: Path, contents: Path, path: Path) -> str | None:
     chain ends in a regular file there within :data:`_MACOS_LINK_HOPS` hops (PyInstaller's
     ``Contents/Resources`` cross-link to a ``Contents/Frameworks`` bindepend link); a
     chain that leaves the bundle, loops, ends missing or in a folder, or meets a junction
-    or an absolute or non-POSIX hop is refused with every hop named. Outside a ``.app``
-    (onedir) a link to a link is refused as before. Then exactly three classes are
-    admitted, read on the link's final target:
+    or an absolute or non-POSIX hop is refused with every hop named. Inside a ``.app``
+    every link's target, a single hop's included, is walked component by component from
+    the canonical ``Contents`` boundary (WP6.5 A r11 #1, :func:`_macos_link_chain_problem`):
+    a component outside ``Contents`` refuses at that point, before any return hop, and
+    every folder link met on the way counts against the bound and is validated as a hop
+    is. Outside a ``.app`` (onedir) a link to a link is refused as before. Then exactly
+    three classes are admitted, read on the link's final target:
 
     - the framework-structure links (:func:`framework_link_problem`);
     - (B) PyInstaller's bindepend top-level link: directly in the contents root, named
