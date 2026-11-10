@@ -5,43 +5,36 @@
 
 ### Generation
 
-- **Generation 65** (session `clearwater-orchestrator-20261109-2203`). LIVE 2026-11-10 08:03Z from gen 64's rollover `64f7ef98`.
+- **Generation 65** (session `clearwater-orchestrator-20261109-2203`). LIVE 2026-11-10 08:03Z from gen 64's rollover `64f7ef98`; ROLLED about 11:25Z at the 400K cap with NOTHING it started running.
   - Seat folder `work/orch-g65/`: drains 1-9, the posts, `qa.sh <sha> <label>` (seat QA from the DETACHED `wp6.5-rB`; GUI modules without `-n`; actionlint), `window3.sh` / `window3v4.sh` (gen-65 copies), `overlap_log.sh`, `w3_records.py`, `state_update.py`.
   - Gen 64's `gate.sh`, `watch2.sh`, `leg.sh`, `gpu_sample.sh` and `f02-sizing.md` stay in `work/orch-g64/` and are used from there.
   - State worktree `.worktrees/orch-state-g65`. Bash gauge 26-35 ms.
-- **LIVE CELL: `wp65-cell17`** (implementer-opus-high, Agent tool), the WP6.5 A-r13 fold (dispatch-18c, continuing dispatch-18 / 18b) (`clearwater-review-evidence\wp6.5\cell\dispatch-18.md`), worktree `.worktrees/wp6.5`, base `0a40c058`, dispatched 10:04Z (depth 0 at dispatch). It dies with this pane: never roll while it runs.
+- **NO CELL IS LIVE.** No Codex turn, review, gate or leg is running. `wp65-cell16` and `wp65-cell17` are DONE: never message either.
 - `wp65-cell16` is DONE (316,018 at its run-3-fix return; the queued hold message re-woke it once, after its return). Never message it again.
 - **CHARC is gen 21, `clearwater-charc-20261108-2037`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **WP6.5: the A-r13 fold is with `wp65-cell17` CONTINUED** (dispatch-18c, `clearwater-review-evidence\wp6.5\cell\dispatch-18c.md`; CHARC `4ed56fcb`).
-   - **The invariant (the ruling text):** inside a `.app`, no FOLLOWING filesystem call on a path until every link on it has been admitted by the component walk.
-   - **Its parts:**
-     - one `scandir` non-following listing for every `.app` enumerator;
-     - `Contents` proved physical by `lstat` before `realpath`;
-     - a recorder test over the public entry points, RED on `b7e2dfb1`.
-   - **Chain of heads:**
-     - `a93a0ab7` -> `0a40c058` (cell16, run-3 fix; A r11 FINDINGS);
-     - -> `5d9a1d89` (cell17, A r11 fold; A r12 1 MAJOR);
-     - -> `b7e2dfb1` (A r12 fold; A r13 2 MAJOR + 1 ADV);
-     - -> the r13 fold head (pending).
-   - **Depth figures** (all read by the seat with `cell_depth.py`): cell17 199,951 at its A-r11-fold return; 226,212 at its A-r12-fold return; 284,352 mid-turn at 11:07Z. Its mid-turn yield is at ~300K, so a PARTIAL return is possible. If it yields partial, the remainder goes to a FRESH cell.
-   - **NEXT when cell17 returns:**
-     - read its depth twice and save the return as `wp6.5\cell\return-23-wp65-cell17-ar13fold.md` (from the transcript, the python form);
-     - Codex **A r14** on `b7e2dfb1..<head>` from `wp6.5-rA` (prompt form `wp6.5\A\r13\review-prompt.md`), reading AGAINST THE INVARIANT and the recorder test;
-     - CHARC's rule for A r14: one more following call on an unadmitted path is a MINOR folded with no further ruling (the recorder gains the call); only a wrong ADMISSION or an onedir change goes back to CHARC.
-   - **Then the fold-head seat QA:** `bash work/orch-g65/qa.sh <head> <label>` in the background (from `wp6.5-rB`; it includes actionlint). Plan 2 means the touched modules plus `test_tools_package_build*`, `test_release_workflow.py`, `test_reviewpack.py` and `test_gui_gpu_pack_dialog.py`; `qa.sh` covers these and more.
-   - **Then a "ready" post to CHARC.** It names the range `a93a0ab7..<head>` and "nothing under `src/`". CHARC pushes under the owner's STANDING push word and sends the run id.
-   - **Then run 4:** watch it (a background `until gh run view`), download read-only into `wp6.5\runner\run-<id>\`, build the runner table, and send the F0-2 round 0 data (`work/evidence/app-listing.txt`, `containment-census.txt`) to CHARC.
-   - **THE FIRST-HEAD GATE IS DONE AND GREEN on `0a40c058`** (from `wp6.5-rB`; `work/orch-g64/gate-r0a40/summary.txt`): identity 10,646 (union = all, 0 dup); parallel 9,085 passed / 212 skipped / 0 failed (636 s); serial 1,323 passed / 19 skipped / 0 failed (2,251 s; one faulthandler 5-min dump in a GPU FFT-plan teardown, `conftest.py:459`, that test PASSED); harness 423 OK.
-     - cell17's fold tests overlapped the serial leg's last ~6 min (11:00-11:06Z): a seat slip, since a message to a mid-turn cell cannot hold it. Green anyway.
-   - **Seat QA on `0a40c058`:** all green (`work/orch-g65/qa-0a40/summary.txt`).
+1. **WP6.5: NEXT = fold Codex A r14's two MINORs in a FRESH `implementer-opus-high` cell (dispatch-19, base `bce8bddc`); NO further CHARC ruling is needed.**
+   - CHARC's standing rule (`4ed56fcb`): a following call A finds is a MINOR folded with no further ruling. Only a wrong ADMISSION or an onedir change goes back to CHARC. A r14 found neither: CHECK 2 (refusals and mirrors) PASS, CHECK 3 (onedir identical, 1,076 ordered calls) PASS.
+   - **A r14** (`clearwater-review-evidence\wp6.5\A\r14\review.txt`, gpt-6.1-sol / high, one `tokens used`): `VERDICT: FINDINGS`, 2 MINOR + 1 ADVISORY, all EXECUTED:
+     - **M1** (`build.py:4702`): the diagnostic PATH lookup follows an unadmitted bundle link.
+     - **M2** (`tests/test_tools_package_build.py:3198`, `:3274`): the recorder does not establish the whole invariant (coverage gaps listed in the review).
+     - **ADV3** (`build.py:4729`, ledger `:3331`): a class-(C) executable link is rejected by the executable guard while the shared rule ADMITS it, so the ledger's "the walk refuses the link" is not always true. Correct the ledger wording. If the dispatcher reads ADV3 as a wrong admission (it is NOT: (C) is a ruled admission class, and the guard only declines to READ the executable), ask CHARC.
+   - **dispatch-19:** use dispatch-18 as the form (both rules verbatim, the never list). Fold M1 + M2 (the recorder gains the missed calls; RED on `bce8bddc`) and correct the ledger for ADV3. Fill the ledger's `Depth at A-r13-fold yield: DISPATCHER TO FILL` with `304,492 (wp65-cell17, read by the dispatcher with cell_depth.py at its A-r13-fold return)`. Tests: `test_tools_package_build.py` + notices (`-n 3`), smoke; statics.
+   - **Then:** Codex A r15 on `bce8bddc..<head>` (prompt form `wp6.5\A\r14\review-prompt.md`, the invariant rule) from `wp6.5-rA`. Seat QA with `bash work/orch-g65/qa.sh <head> <label>` from `wp6.5-rB`. Then the "ready" post to CHARC (range `a93a0ab7..<head>`, "nothing under `src/`"); CHARC pushes under the owner's STANDING word and sends the run id.
+   - **Run 4:** watch it (a background `until gh run view`), download read-only into `wp6.5\runner\run-<id>\`, build the runner table, and send the F0-2 round-0 data (`app-listing.txt`, `containment-census.txt`) to CHARC.
+   - **Heads:**
+     - `a93a0ab7` -> `0a40c058` (cell16) -> `5d9a1d89` -> `b7e2dfb1` -> **`bce8bddc`** (cell17; A r11-r13 folds).
+     - Seat QA on `bce8bddc` is ALL GREEN (`work/orch-g65/qa-bce8/summary.txt`: build 702, notices 420, release_workflow 144, reviewpack 178, harness OK, actionlint clean).
+     - The FIRST-HEAD GATE on `0a40c058` is GREEN (`work/orch-g64/gate-r0a40/summary.txt`: identity 10,646; parallel 9,085 / 212 / 0; serial 1,323 / 19 / 0; harness OK).
+     - Plan 2: the fold head re-runs only the touched modules (`qa.sh` covers them).
+   - **cell17 depths:** 199,951 / 226,212 / 304,492 at its three returns. It is DONE; never message it (a message re-wakes it).
    - **F0-2's brief must carry:**
-     - the f02-sizing (`work/orch-g64/f02-sizing.md`, size M; item 5 is done by this group);
-     - the CUDA-availability skip for `test_wp321_bench.py::test_a_device_frame_run_gives_the_sink_device_frames` (CHARC, a round-0 item);
-     - the Mac native rows from run 4's listing.
-   - **Ledger fills:** `Depth at A-r13-fold yield: DISPATCHER TO FILL` = cell17's depth at its A-r13-fold return.
+     - the f02-sizing (`work/orch-g64/f02-sizing.md`, size M; item 5 done);
+     - the CUDA skip for `test_wp321_bench.py::test_a_device_frame_run_gives_the_sink_device_frames`;
+     - the Mac native rows from run 4's listing;
+     - cell17's note that the notices inventory pointed at a `.app` follows `find_executable`'s `is_file()` and `(home / "_internal").is_dir()` before refusing (the `.app`-aware notices).
 2. **WP7.1 CLOSING SEQUENCE (CHARC `d59a2893`), AFTER the WP6.5 ready post:**
    - (1) A Codex turn 7c at the WP7.1 cell, worktree `.worktrees/wp7.1` on `65c28219`: a new section 9 "Re-runs after WP7.2 and the instrument reading" in `docs/reports/wp7.1-insta360-exports.md`. It carries:
      - the three PASS records by id, with their counts and the four movie-tick notes;
