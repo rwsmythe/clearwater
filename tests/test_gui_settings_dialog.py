@@ -1407,7 +1407,10 @@ def test_cache_job_errors_are_not_presented_once_the_main_window_closes(
     monkeypatch.setattr(composition, "proxy_cache", slow_failing_open)
     monkeypatch.setattr(shell, "SHUTDOWN_TIMEOUT_S", 0.2)
     choosers = FakeChoosers()
-    application = make_app(cpu_settings(), choosers=choosers)
+    # "auto" keeps OK enabled whatever the sink reports. With the stored "libx265", a host
+    # without FFmpeg (the macOS runner) reports it unavailable, so OK is refused (the D74
+    # table in ``SettingsDialog._encoder_unacceptable``) and no limit job is ever queued.
+    application = make_app(cpu_settings(video_encoder=module.AUTO), choosers=choosers)
     window = application.window
     assert opening.wait(30)
     window.shell_actions.settings.trigger()
@@ -1417,8 +1420,11 @@ def test_cache_job_errors_are_not_presented_once_the_main_window_closes(
     dialog.clear_button.click()  # the clear job waits for the open
     assert choosers.confirms
     dialog.cache_spin.setValue(dialog.cache_spin.value() + 1)
+    assert dialog.ok_button.isEnabled(), dialog.encoder_note.text()
     dialog.ok_button.click()  # the limit job waits for the open
-    assert window.jobs.active() >= 2
+    assert dialog.result() == QDialog.DialogCode.Accepted
+    # The slow open is a start-up job too: the open, the clear and the limit.
+    assert window.jobs.active() >= 3
     texts = ("The cache could not be cleared:", "The cache limit could not be set:")
     with caplog.at_level(logging.WARNING, logger=module.__name__):
         if closing:
