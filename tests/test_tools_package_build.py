@@ -28,7 +28,7 @@ import struct
 import subprocess
 import sys
 import zipfile
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path, PurePosixPath
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -3206,13 +3206,21 @@ class _FsRecorder:
       their ``follow_symlinks``;
     - ``Path.exists`` / ``is_file`` / ``is_dir`` / ``resolve`` / ``open`` (``read_bytes``
       and ``read_text`` open through ``Path.open`` and ``io.open``);
-    - the real opens: ``builtins.open``, ``io.open`` and ``os.open`` (following unless
-      ``O_NOFOLLOW``);
+    - the real opens: ``builtins.open``, ``io.open`` and ``os.open`` (the final component
+      not followed under ``O_NOFOLLOW``);
     - ``admit``: the component walk (``build._macos_link_chain_problem``) admitting a link,
       at the moment it returns.
 
+    ``following`` says whether the FINAL component is followed; every call follows its
+    ancestors, so :meth:`violations` checks them for every call, the non-following ones
+    (``lstat``, ``readlink``, ``O_NOFOLLOW``, ``DirEntry`` queries with
+    ``follow_symlinks=False``) included (A r15 #3). A relative path is recorded joined to
+    the working folder at the moment of the call, ``..`` kept as written (A r15 #1).
+
     Not covered: opens made in C below these names (``io.FileIO`` constructed directly, an
-    extension module's own ``fopen``), child processes, and calls on a file descriptor.
+    extension module's own ``fopen``), child processes, calls on a file descriptor or with
+    ``dir_fd``, and ``DirEntry.is_symlink`` / ``is_junction`` (cached from the listing, whose
+    ``scandir`` is recorded).
     """
 
     def __init__(self) -> None:
@@ -3220,7 +3228,10 @@ class _FsRecorder:
 
     def note(self, name: str, path: Any, following: bool) -> None:
         if not isinstance(path, int):
-            self.calls.append((name, os.fspath(path), following))
+            raw = os.fspath(path)
+            if not os.path.isabs(raw):
+                raw = os.path.join(os.getcwd(), raw)  # joined, never normalised
+            self.calls.append((name, raw, following))
 
     def install(self, patch: pytest.MonkeyPatch) -> None:
         recorder = self
@@ -3333,17 +3344,24 @@ class _FsRecorder:
         """Calls, in their recorded order, that break the invariant on this shape.
 
         A call is a violation when it touches ``zone`` (outside the bundle) at all, or when
-        it FOLLOWS a path on which a link lies (a symlink, or a junction by
-        ``os.path.isjunction``, looked up per call), read from the anchor, that is either:
+        the system's reading of its path FOLLOWS a link (a symlink, or a junction by
+        ``os.path.isjunction``, looked up per call) that is either:
 
         - under the release root and not admitted by the walk EARLIER in the sequence (an
-          admission after the call does not excuse it); or
-        - outside the release root and resolving AT OR UNDER it (a host alias into the
-          bundle, A r14's residual). An alias above the root (macOS ``/var``) resolves to an
-          ancestor of the root and is not one.
+          admission after the call does not excuse it; a link met while following an
+          admitted link's text was validated by that walk); or
+        - outside the release root with text leading STRICTLY under it (a host alias into
+          the bundle, A r14's residual). An alias to the root or above it (macOS ``/var``)
+          is not one.
+
+        The path is read as the system reads it (:meth:`_followed`): from its anchor, every
+        ancestor followed, the final component only when the call follows (A r15 #3); a link
+        is replaced by its text at its PHYSICAL position, so a component after an allowed
+        alias is still recognised under the release root (A r15 #2), and ``..`` steps from
+        the physical position. A relative path (a hand-built call) is joined to the working
+        folder (A r15 #1).
         """
         bases = self._bases(root)
-        real_root = bases[1]
         admitted: set[str] = set()
         found = []
 
@@ -3354,34 +3372,74 @@ class _FsRecorder:
             return None
 
         for name, raw, follows in self.calls:
+            written = raw if os.path.isabs(raw) else os.path.join(os.getcwd(), raw)
             if name == "admit":
-                admitted.add(inside(Path(os.path.normpath(raw))) or raw)
+                admitted.add(inside(Path(os.path.normpath(written))) or written)
                 continue
-            if Path(os.path.normpath(raw)).is_relative_to(zone):
+            if Path(os.path.normpath(written)).is_relative_to(zone):
                 found.append((name, raw))
                 continue
-            if not follows:
-                continue
-            written = Path(raw)
-            current = Path(written.anchor)
-            for part in written.parts[1:]:
-                current = current.parent if part == ".." else current / part
-                try:
-                    mode = _REAL_FS["lstat"](current).st_mode
-                except OSError:
-                    break
-                if not (stat.S_ISLNK(mode) or os.path.isjunction(current)):
-                    continue
-                relative = inside(current)
-                if relative is None:
-                    entered = Path(_REAL_FS["realpath"](current)).is_relative_to(real_root)
-                    if entered:
-                        found.append((name, raw))
-                        break
-                elif relative not in admitted:
-                    found.append((name, raw))
-                    break
+            if self._followed(Path(written), follows, inside, admitted):
+                found.append((name, raw))
         return found
+
+    @staticmethod
+    def _followed(
+        written: Path,
+        follows: bool,
+        inside: Callable[[Path], str | None],
+        admitted: set[str],
+    ) -> bool:
+        """Whether reading ``written`` follows a forbidden link (see :meth:`violations`).
+
+        Uses the unpatched ``lstat`` / ``readlink`` only; a component that cannot be read
+        ends the reading, as the system's lookup ends there.
+        """
+        position = Path(written.anchor)
+        # (component, origin): origin "covered" = from an admitted link's text, "alias" =
+        # from a link's text outside the release root.
+        pending: list[tuple[str, str]] = [(part, "") for part in reversed(written.parts[1:])]
+        hops = 0
+        while pending:
+            part, origin = pending.pop()
+            if part in {"", "."}:
+                continue
+            if part == "..":
+                position = position.parent
+                continue
+            step = position / part
+            if origin == "alias" and inside(step) is not None:
+                return True  # an outside link whose text leads under the release root
+            if not pending and not follows:
+                return False  # the final component is not followed
+            try:
+                mode = _REAL_FS["lstat"](step).st_mode
+            except OSError:
+                return False
+            if not (stat.S_ISLNK(mode) or os.path.isjunction(step)):
+                position = step
+                continue
+            relative = inside(step)
+            if relative is not None and origin != "covered" and relative not in admitted:
+                return True
+            hops += 1
+            if hops > 40:
+                return False  # a loop: the system gives up too
+            target = _REAL_FS["readlink"](step)
+            for prefix in ("\\\\?\\", "\\??\\"):
+                target = target.removeprefix(prefix)
+            text_ = Path(target)
+            tag = "covered" if relative is not None else "alias"
+            if origin == "covered":
+                tag = "covered"
+            if text_.is_absolute():
+                position = Path(text_.anchor)
+                parts = text_.parts[1:]
+            else:
+                position = step.parent
+                parts = text_.parts
+            pending.extend((piece, tag) for piece in reversed(parts))
+        return False
 
 
 def _shape_out_and_back(tmp_path: Path) -> tuple[Path, list[str], set[str]]:
@@ -3681,9 +3739,10 @@ def test_the_recorder_sees_a_junction_as_a_link(tmp_path, monkeypatch, kind):
     executable = folder / "Contents/MacOS/Clearwater"
     if kind == "modeled":
         tree(executable.parent, [executable.name], b"bootloader stand-in")
-        junction = executable.parent
+        # Both spellings: the checker reads the physical path (macOS /var -> /private/var).
+        junctions = {executable.parent, Path(os.path.realpath(executable.parent))}
         real = os.path.isjunction
-        monkeypatch.setattr(os.path, "isjunction", lambda path: path == junction or real(path))
+        monkeypatch.setattr(os.path, "isjunction", lambda path: path in junctions or real(path))
     else:
         if sys.platform != "win32":
             pytest.skip("Windows junction regression")
@@ -3696,6 +3755,74 @@ def test_the_recorder_sees_a_junction_as_a_link(tmp_path, monkeypatch, kind):
     recorder.calls = [("open", str(executable), True)]
     assert recorder.violations(folder, tmp_path / "wrapper" / "outside") == [
         ("open", str(executable))
+    ]
+
+
+# --- A r15: the recorder's reading of a path, three more gaps -------------------------------
+
+
+def _pkg_release(tmp_path: Path) -> tuple[Path, Path]:
+    """A ``.app`` with the folder link ``Contents/Resources/pkg -> ../Frameworks/pkg``."""
+    folder, _ = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/pkg/data"],
+        [("Contents/Resources/pkg", "../Frameworks/pkg", True)],
+    )
+    return folder, folder / "Contents/Resources/pkg"
+
+
+def test_the_recorder_reads_a_relative_path_from_the_working_folder(tmp_path, monkeypatch):
+    """A r15 #1: a relative followed path through an unadmitted link is a violation (A's
+    probe: the working folder beside the ``.app``), and a relative call is recorded joined
+    to the working folder of the moment."""
+    folder, _ = _pkg_release(tmp_path)
+    monkeypatch.chdir(folder.parent)
+    relative = os.path.join("Clearwater.app", "Contents", "Resources", "pkg", "data")
+    recorder = _FsRecorder()
+    recorder.calls = [("open", relative, True)]
+    assert recorder.violations(folder, tmp_path / "wrapper" / "outside") == [("open", relative)]
+    recorder = _FsRecorder()
+    with pytest.MonkeyPatch.context() as patch:
+        recorder.install(patch)
+        os.lstat("Clearwater.app")
+    assert recorder.calls == [("lstat", os.path.join(os.getcwd(), "Clearwater.app"), False)]
+
+
+def test_the_recorder_reads_on_from_an_allowed_alias_physical_target(tmp_path):
+    """A r15 #2: an alias ABOVE the release root is allowed, and the components after it are
+    read at its physical target, so an unadmitted bundle link behind it is still caught
+    (A's probe: ``alias -> <wrapper>``, then ``Contents/Resources/bin``)."""
+    folder, _ = link_release(
+        tmp_path, "app", [], [("Contents/Resources/bin", "../../../outside/bin", True)]
+    )
+    tree(folder.parent, ["outside/bin/data"], b"payload")
+    alias = Path(os.path.realpath(tmp_path)) / "alias"
+    _symlink(alias, str(Path(os.path.realpath(folder.parent))), folder=True)
+    through = str(alias / "Clearwater.app/Contents/Resources/bin/data")
+    physical = str(alias / "Clearwater.app/Contents/MacOS/Clearwater")
+    recorder = _FsRecorder()
+    recorder.calls = [("open", through, True), ("open", physical, True)]
+    assert recorder.violations(folder, tmp_path / "wrapper" / "outside") == [("open", through)]
+
+
+def test_the_recorder_checks_the_ancestors_of_a_non_following_call(tmp_path, monkeypatch):
+    """A r15 #3: ``O_NOFOLLOW`` (like ``lstat``) spares only the FINAL component; an
+    ancestor link is still followed. Modeled flags and a stubbed open backend (A's probe);
+    ``lstat`` of the link itself follows nothing."""
+    folder, link = _pkg_release(tmp_path)
+    monkeypatch.setattr(os, "O_NOFOLLOW", getattr(os, "O_NOFOLLOW", 0x20000), raising=False)
+    monkeypatch.setitem(_REAL_FS, "os.open", lambda *args, **kwargs: 7)
+    target = str(link / "data")
+    recorder = _FsRecorder()
+    with pytest.MonkeyPatch.context() as patch:
+        recorder.install(patch)
+        assert os.open(target, os.O_RDONLY | os.O_NOFOLLOW) == 7
+    assert recorder.calls == [("os.open", target, False)]
+    recorder.calls += [("lstat", target, False), ("lstat", str(link), False)]
+    assert recorder.violations(folder, tmp_path / "wrapper" / "outside") == [
+        ("os.open", target),
+        ("lstat", target),
     ]
 
 
