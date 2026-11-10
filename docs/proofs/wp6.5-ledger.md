@@ -3045,8 +3045,15 @@ Scratch `work\wp6.5\ar11fold\`.
     bundle"), before any later component is read, so an outside alias's return hop is never
     followed. **Correction (A r12):** for the whole rule this claim was FALSE at `5d9a1d89`
     (Codex A r12 finding 1): the single-link preflight at `:4371` (`named.is_symlink()`,
-    `realpath(named)`) ran BEFORE the walk and resolved the outside alias first. It is true
-    from the A r12 fold head (`## A r12 fold` below);
+    `realpath(named)`) ran BEFORE the walk and resolved the outside alias first; and at
+    `b7e2dfb1` it was still false for the callers (Codex A r13 findings 1 and 2: `os.walk`'s
+    following `DirEntry.is_dir()`, and `realpath(root / "Contents")` on a linked boundary).
+    **The invariant (CHARC `4ed56fcb`):** inside a `.app`, no filesystem call that FOLLOWS a
+    link (`stat`, `realpath`, `exists`, `is_file` / `is_dir` with following,
+    `DirEntry.is_dir()` default, `open`) is made on any path at or under the release root
+    until every link on that path has been admitted by the component walk; only `lstat` /
+    `readlink` / `is_symlink` / `is_junction` and non-following `DirEntry` queries precede
+    admission. Proved by the recorder test from `30d9ccde` (`## A r13 fold` below);
   - EVERY link met (a folder link in mid-path as much as a further hop at the final name)
     counts against `_MACOS_LINK_HOPS` = 8 and is validated as the first: relative POSIX text,
     never a junction, never met twice (a loop); its text is then walked in place;
@@ -3281,4 +3288,141 @@ the C14 rows untouched.
   release root and the link's own folder, never the target; the recorder admits only the
   root and its ancestors outside `Contents` and passes. A second pass found nothing new.
 
-Depth at A-r12-fold yield: DISPATCHER TO FILL
+Depth at A-r12-fold yield: 226,212 (wp65-cell17, read by the dispatcher with cell_depth.py at its A-r12-fold return)
+
+## A r13 fold (`wp65-cell17`, continuation 2 of dispatch-18; base `b7e2dfb1`)
+
+Codex Reviewer A r13 on `5d9a1d89..b7e2dfb1`: `VERDICT: FINDINGS`, 2 MAJOR + 1 advisory,
+ruled by CHARC (`4ed56fcb`, the invariant above). Commit `30d9ccde`
+(`tools/package/build.py`, `tests/test_tools_package_build.py`). No `src/` change;
+`notices.py` untouched (it enumerates through `build._macos_entries`, and only for an onedir
+home: it requires `_internal`, so it never lists a `.app`); `release.yml`,
+`MACOS_FFMPEG_BUNDLED`, the debt register and the C14 rows untouched.
+
+### Changes (`tools/package/build.py`)
+
+- **F1, the listing.** `:4227` `_macos_app_entries(root)`: ONE `os.scandir` listing that
+  never follows a link. Each entry is classified as a link (`is_symlink()` /
+  `is_junction()`) BEFORE any folder query; the folder and file queries pass
+  `follow_symlinks=False`, and only a physical folder is listed further. `:4258`
+  `_macos_entries(root, *, in_app=None)` uses it for the `.app` form (default: `root` is a
+  `.app`) and keeps `os.walk` for onedir. It serves:
+  - the origin check (its loop over `_macos_entries(root)`);
+  - the release ZIP (`_macos_release_files`);
+  - `macos_link_view(path, *, in_app=False)` (`:4471`), whose folder-target listing passes
+    `in_app` (`:4491`), from `macos_link_problem` (`:4545`) and the origin check (`:4745`).
+- **F2, the boundary.** `_macos_link_chain_problem` (`:4334`) reads `root / "Contents"`
+  with `is_junction()` and `os.lstat` first:
+  - a junction gives "link chain meets a linked boundary: Contents (junction)";
+  - a symlink gives "link chain meets a linked boundary: Contents -> '<text>'";
+  - a missing or non-folder entry gives "link chain finds no Contents folder".
+
+  Only then is the boundary canonicalised as `realpath(root) / "Contents"`. An alias ABOVE
+  the release root is untouched. A `Contents` link met as an entry is refused by the rule's
+  first junction test or by the walk.
+- **Under the same invariant, two more following calls in the `.app` form:**
+  - `_macos_link_class_problem` (`:4448`, `:4461`) reads the real contents root and the
+    three bundle folders as `realpath(root) / <relative>` instead of `realpath()`-ing
+    `Contents/Frameworks|Resources|MacOS`, so a linked Frameworks is never followed and
+    admits nothing under it.
+  - The origin check (`:4730`) opens the executable (the bootloader comparison and
+    `read_package`) only when `_macos_link_on_path` (`:4670`, an `lstat` reading from the
+    root down, stopping at the first link) finds no link on its path. Otherwise it records
+    "native origin: `<executable>` lies behind a link in the bundle; not read" and the walk
+    refuses the link itself.
+- Onedir and Windows: unchanged. The listing keeps `os.walk`; the class rule's onedir
+  branch makes the same calls. **Evidence:** scratch probe `ar11fold\onedir_calls_probe.py`
+  recorded every filesystem call (the test's recorder) of the origin check, the ZIP, the
+  shared rule and the notices inventory on all nine onedir `LINK_CASES`. Against
+  `b7e2dfb1`'s `build.py` and the fold's, the 2,129 recorded calls (names, paths, order,
+  following flags) and every result and message are IDENTICAL, once the folder the scratch
+  copy of `notices.py` was loaded from is normalised.
+
+### Regressions (`tests/test_tools_package_build.py`)
+
+- `:3188` `_FsRecorder` instruments:
+  - `os.stat` (its `follow_symlinks`), `os.lstat`, `os.readlink`, `os.path.realpath`;
+  - `os.scandir`, wrapping each `DirEntry` so that `is_dir` / `is_file` / `stat` record
+    their `follow_symlinks`;
+  - `Path.exists` / `is_file` / `is_dir` / `resolve`.
+
+  A violation is either of:
+  - ANY call whose (lexically normalised) path lies in the outside zone
+    (`wrapper/outside`);
+  - a FOLLOWING call on a path under the release root through a link component not
+    admitted for that shape.
+
+  The release root and its ancestors may be canonicalised.
+- `:3356` `test_no_following_call_before_the_walk_admits_the_links`, three shapes
+  (`LINK_SHAPES`, `:3348`):
+  - r11's out-and-back;
+  - r13's nested `pkg/evil`: the folder cross-link `Contents/Resources/pkg` is admitted,
+    and `evil -> ../../../../outside/back/data` is refused;
+  - r13's linked `Contents -> ../outside/back`, with the alias to an outside payload that
+    holds `MacOS/Clearwater`.
+
+  Each runs the PUBLIC entry points: `native_origin_violations` (the bootloader and
+  `read_package` stubs record an `open`), `write_release_zip` and `macos_link_problem` on
+  each link. Each refuses; the recorder finds no violation. For the linked `Contents`, the
+  rule's text and both origin lines are pinned, and no `open` is recorded.
+- `:3403` `test_a_linked_contents_boundary_is_refused_by_its_text`:
+  - a link `Contents` gives "link chain meets a linked boundary: Contents -> '../elsewhere'";
+  - a junction `Contents` gives "junction" from the rule's first test, and a link reached
+    through it is refused by the walk with "Contents (junction)". The junction case ran on
+    this host.
+- `:3428` `test_the_app_listing_never_follows_and_matches_the_walk`: on a physical tree, the
+  `.app` listing equals the onedir `os.walk` listing, entry for entry.
+- The earlier regressions (r11's four refusals and bound, r12's recorder and missing return)
+  and every mirror stay green:
+  - admitted: the PyInstaller chain, `C-app-link-to-a-link`, the aliased-root label, the
+    alias above the release root, the framework links;
+  - the onedir two-hop message unchanged.
+
+### RED / GREEN
+
+- **RED on `b7e2dfb1`** (its `build.py` swapped in, restored, `cmp` equal): **6 failed, 4
+  passed** over the new tests and r12's:
+  - the recorder on all three shapes:
+    - out-and-back: a following `DirEntry.is_dir` on `Contents/Resources/data`;
+    - nested: a following `DirEntry.is_dir` on `pkg/evil`;
+    - linked Contents: an `open` of the executable and more;
+  - both boundary cases ("link chain leaves the bundle" for the link; `None` for the link
+    through the junction);
+  - the listing test (no `in_app`).
+
+  r12's four still pass there.
+- **GREEN:**
+  - `test_tools_package_build.py` + `test_tools_package_notices.py` (`-n 3`): **1122
+    passed** (1116 + 6).
+  - `test_tools_package_smoke.py`: 74 passed, 1 skipped.
+  - `ruff check .`, `ruff format --check .` (339 files), `mypy`, `mypy --platform darwin`
+    (166 source files): clean.
+  - Committed blobs 0 CR.
+
+### F3 (advisory): the onedir call order
+
+Recorded: the fold's onedir call order equals `5d9a1d89`'s (and `b7e2dfb1`'s, above).
+`5d9a1d89` had already added `is_symlink(T)` / `is_junction(T)` before `realpath(T)`
+relative to `a93a0ab7`, with identical messages, so identity with `a93a0ab7`'s call order
+is not claimed.
+
+### Verification loop
+
+Pass 1:
+
+- **Suspected:** the origin check's bootloader comparison and `read_package` open the
+  executable through a linked `Contents` before any walk. **CONFIRMED** (the linked-Contents
+  shape's recorded `open` at `b7e2dfb1`); **FIXED** with the `lstat` path guard.
+- **Suspected:** `realpath(contents)` / `realpath(folder)` in the class rule follow an
+  unadmitted Frameworks link. **CONFIRMED** by reading. **FIXED**: the folders are read from
+  the real root, in the `.app` form only (onedir's calls unchanged, by the probe).
+- **Suspected:** the new listing differs from `os.walk` on a legitimate tree. **REJECTED** by
+  the equality test.
+- **Not fixed, outside scope:** the notices inventory on a `.app` folder
+  (`find_executable`'s `is_file()` on `Clearwater.app/Contents/MacOS/Clearwater`, then
+  `(home / "_internal").is_dir()` in `notices.py`) follows before raising "expected an onedir
+  folder"; the `.app`-aware notices is F0-2.
+
+Pass 2: nothing new.
+
+Depth at A-r13-fold yield: DISPATCHER TO FILL
