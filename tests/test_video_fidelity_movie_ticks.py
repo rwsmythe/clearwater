@@ -14,6 +14,11 @@ from container_spike import compare
 NON_VIDEO = "edit lists as written, non-video tracks (media_time in media seconds)"
 MOVIE_ROWS = (vf.MOVIE_DURATION, vf.VIDEO_EDIT_AS_WRITTEN, vf.EDIT_EFFECT, NON_VIDEO)
 READING = "movie-tick rounding of the exact track value (owner 2026-11-10, AD-22)"
+AD22_NOTE = (
+    "AD-22: the media_time differs only by the composition-offset convention "
+    "(source 0.066667 (1/15), output 0.066733 (1001/15000), "
+    "each its track's earliest composition time)"
+)
 
 
 def _facts(*, source: bool, exact: bool = False) -> compare.Facts:
@@ -309,3 +314,151 @@ def test_rounding_cannot_hide_a_one_sided_composition_offset_convention(monkeypa
     )
     rows, _ = _rows(monkeypatch, source, output)
     assert rows[vf.VIDEO_EDIT_AS_WRITTEN].status == compare.DIFFERENT
+
+
+def _convention_pair(segment):
+    source, output = _facts(source=True), _facts(source=False)
+    source = replace(source, movie=replace(source.movie, timescale=1000))
+    output = replace(output, movie=replace(output.movie, timescale=1000))
+    source = _track(
+        source,
+        0,
+        media_timescale=15360,
+        media_duration=154624,
+        earliest_composition=1024,
+        edits=(compare.Edit(segment, 1024, Fraction(1)),),
+    )
+    output = _track(
+        output,
+        0,
+        media_timescale=30000,
+        media_duration=302002,
+        earliest_composition=2002,
+        edits=(compare.Edit(segment, 2002, Fraction(1)),),
+    )
+    return source, output
+
+
+@pytest.mark.parametrize("segment", [10000, 9000], ids=["exact-tails", "trimmed-tails"])
+def test_ad22_keeps_the_parent_item_byte_identical_before_the_tick_reading(segment):
+    source, output = _convention_pair(segment)
+    item = compare._edit_item(
+        vf.VIDEO_EDIT_AS_WRITTEN,
+        compare.MANDATORY,
+        "D94, 7.5",
+        compare._keyed_edits(source, compare._edits_as_written, ("vide",)),
+        compare._keyed_edits(output, compare._edits_as_written, ("vide",)),
+    )
+    got, note = vf.video_edit_reading(source, output, item)
+    assert asdict(got) == asdict(replace(item, status=compare.SAME, note=AD22_NOTE))
+    assert note == AD22_NOTE
+
+
+def test_ad22_keeps_its_parent_note_when_equal_written_tails_were_both_rounded(monkeypatch):
+    source, output = _convention_pair(10000)
+    source = _track(
+        source,
+        0,
+        media_timescale=30000,
+        media_duration=302001,
+        earliest_composition=2000,
+        edits=(compare.Edit(10000, 2000, Fraction(1)),),
+    )
+    output = _track(output, 0, media_duration=302003)
+    rows, notes = _rows(monkeypatch, source, output)
+    item = rows[vf.VIDEO_EDIT_AS_WRITTEN]
+    assert item.status == compare.SAME and item.note == AD22_NOTE and item.note in notes
+
+
+def test_a_real_rounding_with_conventional_offsets_discloses_both_readings(monkeypatch):
+    source, output = _facts(source=True), _facts(source=False)
+    track = output.movie.tracks[0]
+    output = _track(
+        output,
+        0,
+        media_duration=track.media_duration + 2002,
+        earliest_composition=2002,
+        edits=(replace(track.edits[0], media_time=2002),),
+    )
+    rows, notes = _rows(monkeypatch, source, output)
+    item = rows[vf.VIDEO_EDIT_AS_WRITTEN]
+    assert item.status == compare.SAME and item.note in notes
+    assert READING in item.note and "D=" in item.note and "V=" in item.note
+    assert (
+        "AD-22: the media_time differs only by the composition-offset convention "
+        "(source 0.000000 (0/1), output 0.066733 (1001/15000), "
+        "each its track's earliest composition time)"
+    ) in item.note
+
+
+@pytest.mark.parametrize("segment", [10000, 9000])
+def test_the_tick_helper_cannot_claim_a_rounding_when_no_tail_was_reduced(segment):
+    source, output = _convention_pair(segment)
+    item = compare._edit_item(
+        vf.VIDEO_EDIT_AS_WRITTEN,
+        compare.MANDATORY,
+        "D94, 7.5",
+        compare._keyed_edits(source, compare._edits_as_written, ("vide",)),
+        compare._keyed_edits(output, compare._edits_as_written, ("vide",)),
+    )
+    got, note = vf._movie_tick_reading(source, output, item)
+    assert got == item and note is None
+
+
+def test_mvhd_near_each_other_but_ten_microseconds_past_v_still_differs(monkeypatch):
+    source, output = _facts(source=True), _facts(source=False)
+    for_source = _track(source, 0, media_duration=300000, edits=None)
+    for_output = _track(output, 0, media_duration=300000, edits=None)
+    source = replace(
+        for_source,
+        movie=replace(for_source.movie, timescale=1_000_000, tracks=for_source.movie.tracks[:1]),
+    )
+    output = replace(
+        for_output,
+        movie=replace(for_output.movie, timescale=1_050_000, tracks=for_output.movie.tracks[:1]),
+    )
+    # About 10 us past V on different grids, but less than either movie tick apart.
+    durations = {
+        source.path: Fraction(10_000_010, 1_000_000),
+        output.path: Fraction(10_500_011, 1_050_000),
+    }
+    for facts in (source, output):
+        assert durations[facts.path] - 10 > Fraction(1, facts.movie.timescale)
+        assert abs(durations[source.path] - durations[output.path]) < Fraction(
+            1, facts.movie.timescale
+        )
+    monkeypatch.setattr(vf, "movie_duration", durations.__getitem__)
+    assert vf.movie_duration_item(source, output, end=None, cut=False).status == compare.DIFFERENT
+
+
+def test_a_longer_output_media_tail_trimmed_to_the_sources_v_is_not_rounding(monkeypatch):
+    source, output = _facts(source=True), _facts(source=False)
+    output = _track(output, 0, media_duration=output.movie.tracks[0].media_duration + 30000)
+    rows, _ = _rows(monkeypatch, source, output)
+    assert rows[vf.VIDEO_EDIT_AS_WRITTEN].status == compare.DIFFERENT
+    assert rows[vf.EDIT_EFFECT].status == compare.DIFFERENT
+
+
+def test_a_mid_list_segment_near_a_v_like_value_stays_exact(monkeypatch):
+    source, output = _facts(source=True), _facts(source=False)
+    # Both media entries are near the media end: only the last can be reduced.
+    for index in (0, 1):
+        source = _track(source, index, edits=source.movie.tracks[index].edits * 2)
+        output = _track(output, index, edits=output.movie.tracks[index].edits * 2)
+    rows, _ = _rows(monkeypatch, source, output)
+    for name in (vf.VIDEO_EDIT_AS_WRITTEN, vf.EDIT_EFFECT, NON_VIDEO):
+        assert rows[name].status == compare.DIFFERENT
+
+
+def test_two_sided_rate_two_tails_keep_the_parent_verdict(monkeypatch):
+    source, output = _facts(source=True), _facts(source=False)
+    for index in (0, 1):
+        source = _track(
+            source, index, edits=(replace(source.movie.tracks[index].edits[0], rate=Fraction(2)),)
+        )
+        output = _track(
+            output, index, edits=(replace(output.movie.tracks[index].edits[0], rate=Fraction(2)),)
+        )
+    rows, _ = _rows(monkeypatch, source, output)
+    for name in MOVIE_ROWS:
+        assert rows[name].status == compare.DIFFERENT

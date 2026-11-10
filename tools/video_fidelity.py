@@ -806,7 +806,8 @@ def _movie_tick_reading(
     and empty edits stay exact. For mvhd, V is the longest exact presentation
     across ALL movie tracks, with empty edits counted by their written duration.
     Both sides must have the same tracks. D86 cut-short paths never call this
-    helper and are unchanged.
+    helper and are unchanged. At least one duration must actually be rounded
+    (D != V); the existing AD-22 reading takes precedence in ``fidelity_items``.
     """
     if item.status == compare.SAME:
         return item, None
@@ -826,6 +827,7 @@ def _movie_tick_reading(
         return item, None
     canonical: list[Any] = []
     figures: list[str] = []
+    rounded = False
     track_sets: list[set[str]] = []
     conventional_keys: list[set[str]] = []
     for side, (label, facts, written) in enumerate(
@@ -884,6 +886,7 @@ def _movie_tick_reading(
                         return item, None
                     continue  # A trimmed tail keeps its exact written duration.
                 tail_value = value
+                rounded = rounded or duration != value
                 rows[position] = (value, media, rate)
                 figures.append(
                     f"{label} {key} entry {position}: D={duration}, V={value}, tick={tick}"
@@ -899,23 +902,33 @@ def _movie_tick_reading(
             if longest is None or movie_values is None or abs(movie_values[side] - longest) >= tick:
                 return item, None
             canonical.append(longest)
+            rounded = rounded or movie_values[side] != longest
             figures.append(f"{label} mvhd: D={movie_values[side]}, V={longest}, tick={tick}")
         else:
             canonical.append(normalized)
         conventional_keys.append(conventional)
+    composition_notes: list[str] = []
     if item.name == VIDEO_EDIT_AS_WRITTEN:
         # AD-22 permits differing offsets only when BOTH sides use the convention.
         for key in conventional_keys[0] & conventional_keys[1]:
+            source_at = next(m for _, m, _ in canonical[0][key][0] if m is not None)
+            output_at = next(m for _, m, _ in canonical[1][key][0] if m is not None)
+            if source_at != output_at:
+                composition_notes.append(
+                    "AD-22: the media_time differs only by the composition-offset convention "
+                    f"(source {compare.exact(source_at)}, output {compare.exact(output_at)}, "
+                    "each its track's earliest composition time)"
+                )
             for normalized in canonical:
                 rows, tail_value = normalized[key]
                 normalized[key] = (
                     [(d, None if m is None else Fraction(0), r) for d, m, r in rows],
                     tail_value,
                 )
-    if track_sets[0] != track_sets[1] or canonical[0] != canonical[1]:
+    if not rounded or not figures or track_sets[0] != track_sets[1] or canonical[0] != canonical[1]:
         return item, None
     note = "movie-tick rounding of the exact track value (owner 2026-11-10, AD-22); " + "; ".join(
-        figures
+        (*figures, *composition_notes)
     )
     return replace(item, status=compare.SAME, note=note), note
 
@@ -934,8 +947,8 @@ def video_edit_reading(
     one media entry each, and each media time equal to its own track's earliest composition
     time. An absent source list (Q-C) is SAME when the output's list is conventional and the
     presentation effect is the same. For a cut-short source the source's list is first cut at
-    the readable end ``end``. Whole files also apply the owner's movie-tick reading;
-    the D86 cut-short paths are unchanged.
+    the readable end ``end``. For whole files, ``fidelity_items`` applies the
+    owner's movie-tick reading only after this reading; D86 paths are unchanged.
 
     Args:
         source: The source's facts.
@@ -949,10 +962,6 @@ def video_edit_reading(
     """
     if item.status == compare.SAME:
         return item, None
-    if end is None:
-        rounded, note = _movie_tick_reading(source, output, item)
-        if note is not None:
-            return rounded, note
     src, out = _video_track(source), _video_track(output)
     if src is None or out is None:
         return item, None
@@ -1426,6 +1435,8 @@ def fidelity_items(
     for position, item in enumerate(items):
         if item.name == VIDEO_EDIT_AS_WRITTEN:
             items[position], note = video_edit_reading(source, output, item, end=end)
+            if end is None and items[position].status != compare.SAME:
+                items[position], note = _movie_tick_reading(source, output, items[position])
             if note is not None:
                 notes.append(note)
         elif item.name == EDIT_EFFECT and end is None and src_video and out_video:
