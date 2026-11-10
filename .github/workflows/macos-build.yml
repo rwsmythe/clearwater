@@ -39,7 +39,8 @@ jobs:
     # input, the serial leg, the bundle's macOS tests, the skip-reason check and the facts
     # capture also run after an earlier failure (`!cancelled() && !inputs.release-version`),
     # and so does the bundle build without FFmpeg while the switch is off; one push reads
-    # every test leg AND the .app. Release mode (release.yml's workflow_call) runs every
+    # every test leg AND the .app. The app listing (find -ls and otool -L, run 3) runs in
+    # validation mode only. Release mode (release.yml's workflow_call) runs every
     # step under success() as before. No step is allowed to fail softly, so the job still
     # fails when any leg fails, and the release job's needs still gate on success. `shell: bash` runs as
     # `bash --noprofile --norc -eo pipefail {0}`: a failing pytest before `| tee` fails its step.
@@ -133,6 +134,34 @@ jobs:
         run: |
           uv run python tools/package/build.py --form onedir --out work/release 2>&1 | tee work/evidence/build.log
 
+      - name: List the app bundle
+        if: ${{ !cancelled() && !inputs.release-version }}
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p work/evidence
+          listing=work/evidence/app-listing.txt
+          app="work/release/dist-onedir/Clearwater-${RELEASE_VERSION}-macos-onedir/Clearwater.app"
+          if [ ! -d "$app" ]; then
+            echo "No app bundle at $app: nothing to list." > "$listing"
+            exit 0
+          fi
+          {
+            echo "# find $app -ls"
+            find "$app" -ls
+            echo
+            echo "# otool -L over every Mach-O file in the bundle (found by file type)"
+            while IFS= read -r -d '' entry; do
+              kind=$(file -b "$entry" || true)
+              case "$kind" in
+                Mach-O*)
+                  echo "## $entry: $kind"
+                  otool -L "$entry" || echo "otool -L failed for $entry"
+                  ;;
+              esac
+            done < <(find "$app" -type f -print0)
+          } > "$listing" 2>&1
+
       - name: Build release bundle and zip
         if: env.MACOS_FFMPEG_BUNDLED == 'true'
         run: |
@@ -165,14 +194,28 @@ jobs:
           from pathlib import Path
 
           ALLOWED = ("VideoToolbox unavailable on this Mac: ",)
+          # pytest's summary: "<n> <word>" parts in any order, then " in <seconds>s".
+          SUMMARY = re.compile(r"^(?:=+ )?((?:\d+ [a-z]+, )*\d+ [a-z]+) in [0-9.]+s\b", re.MULTILINE)
           log = Path("work/evidence/macos.log").read_text(encoding="utf-8", errors="replace")
-          if not re.search(r"^(?:=+ )?\d+ passed\b.* in [0-9.]+s\b", log, re.MULTILINE):
-              raise SystemExit("macOS leg: no passing summary line in macos.log")
+          summaries = SUMMARY.findall(log)
+          if not summaries:
+              raise SystemExit("macOS leg: no pytest summary line in macos.log")
+          counts = {}
+          for count, word in re.findall(r"(\d+) ([a-z]+)", summaries[-1]):
+              counts[word] = counts.get(word, 0) + int(count)
+          failed = counts.get("failed", 0)
+          errors = counts.get("error", 0) + counts.get("errors", 0)
+          if failed or errors:
+              raise SystemExit(f"macOS leg: {failed} failed, {errors} errors: {summaries[-1]}")
+          passed = counts.get("passed", 0)
+          if not passed:
+              raise SystemExit(f"macOS leg: no test passed: {summaries[-1]}")
           skipped = re.findall(r"^SKIPPED \[(\d+)\] [^:]+:\d+: (.*)$", log, re.MULTILINE)
           refused = [reason for _count, reason in skipped if not reason.startswith(ALLOWED)]
           if refused:
               raise SystemExit("macOS leg: skip reasons outside the allowlist: " + " | ".join(refused))
-          print(f"macOS leg: {sum(int(count) for count, _ in skipped)} skipped, all allowed")
+          total = sum(int(count) for count, _ in skipped)
+          print(f"macOS leg: {passed} passed; {total} skipped, all allowed")
 
       - name: Capture runner and encoder facts
         if: ${{ success() || (!cancelled() && !inputs.release-version) }}

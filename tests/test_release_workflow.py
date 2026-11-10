@@ -904,6 +904,7 @@ def test_macos_job_steps_mirror_the_windows_order(macos):
         "Run parallel tests",
         "Run serial tests",
         "Build app bundle without FFmpeg",
+        "List the app bundle",
         "Build release bundle and zip",
         "Run macOS tests on the built bundle",
         "Check macOS skip reasons",
@@ -972,6 +973,8 @@ def test_macos_test_legs_follow_the_windows_gate_with_the_ruled_differences(maco
 
 VALIDATION_CONTINUES = "${{ success() || (!cancelled() && !inputs.release-version) }}"
 VALIDATION_CONTINUES_OFF = "${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}"
+VALIDATION_ONLY = "${{ !cancelled() && !inputs.release-version }}"
+"""Run 3 (CHARC's exact form): the app listing runs in validation mode only, after any failure."""
 MACOS_STEP_CONDITIONS = {
     "Checkout source": None,
     "Set up uv": None,
@@ -981,6 +984,7 @@ MACOS_STEP_CONDITIONS = {
     "Run parallel tests": None,
     "Run serial tests": VALIDATION_CONTINUES,
     "Build app bundle without FFmpeg": VALIDATION_CONTINUES_OFF,
+    "List the app bundle": VALIDATION_ONLY,
     "Build release bundle and zip": "env.MACOS_FFMPEG_BUNDLED == 'true'",
     "Run macOS tests on the built bundle": VALIDATION_CONTINUES,
     "Check macOS skip reasons": VALIDATION_CONTINUES,
@@ -1215,6 +1219,7 @@ MODE_REACHED = {
         *FIRST_SIX,
         "Run serial tests",
         "Build app bundle without FFmpeg",
+        "List the app bundle",
         "Run macOS tests on the built bundle",
         "Check macOS skip reasons",
         "Capture runner and encoder facts",
@@ -1223,6 +1228,7 @@ MODE_REACHED = {
     "validation-on-failed-leg": [
         *FIRST_SIX,
         "Run serial tests",
+        "List the app bundle",
         "Run macOS tests on the built bundle",
         "Check macOS skip reasons",
         "Capture runner and encoder facts",
@@ -1551,6 +1557,153 @@ def test_macos_skip_allowlist_refuses_every_other_reason(
             exec(code, {})
 
 
+# --- WP6.5 run 3 (CHARC d6981092 items 6 and 7): the summary reading and the app listing --------
+
+RUN_SUMMARIES = {
+    # name: (the summary line exactly as the runner logged it, passed, failed)
+    "run2-parallel": (
+        "4 failed, 7762 passed, 1227 skipped, 1 warning in 187.60s (0:03:07)",
+        7762,
+        4,
+    ),
+    "run3-parallel": ("7827 passed, 1227 skipped, 1 warning in 248.53s (0:04:08)", 7827, 0),
+    "run3-serial": (
+        "15 failed, 518 passed, 784 skipped, 9286 deselected in 134.87s (0:02:14)",
+        518,
+        15,
+    ),
+    "run3-macos": ("1 failed, 133 passed, 10469 deselected in 65.12s (0:01:05)", 133, 1),
+}
+"""The real pytest summary lines of runs 2 (``42764505729``) and 3 (``42781244075``): run 2's
+``parallel.log:1254``; run 3's ``parallel.log:887``, ``serial.log:930`` and ``macos.log:102``."""
+
+
+def _skip_check(macos, tmp_path, monkeypatch, log):
+    """Run the real "Check macOS skip reasons" script on ``log``; return its SystemExit or None."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "work/evidence").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "work/evidence/macos.log").write_text(log, encoding="utf-8")
+    code = compile(script(macos, "Check macOS skip reasons"), "macos-skips", "exec")
+    try:
+        exec(code, {})
+    except SystemExit as stop:
+        return str(stop)
+    return None
+
+
+@pytest.mark.parametrize("name", list(RUN_SUMMARIES))
+def test_the_skip_check_reads_the_real_run_summaries(macos, tmp_path, monkeypatch, capsys, name):
+    """Run 3 item 6: the passed count is read from each real summary form; a failed count
+    fails the step, saying so (run 3's ``1 failed, 133 passed`` was misread as "no passing
+    summary line")."""
+    line, passed, failed = RUN_SUMMARIES[name]
+    stop = _skip_check(macos, tmp_path, monkeypatch, "....F..\n" + line + "\n")
+    if failed:
+        parts = line.split(" in ", 1)[0]
+        assert stop == f"macOS leg: {failed} failed, 0 errors: {parts}"
+    else:
+        assert stop is None
+        assert capsys.readouterr().out == f"macOS leg: {passed} passed; 0 skipped, all allowed\n"
+
+
+@pytest.mark.parametrize(
+    ("line", "outcome"),
+    [
+        ("2 skipped, 133 passed in 1.00s", None),
+        ("133 passed, 3 deselected, 2 warnings in 1.00s", None),
+        ("========= 133 passed, 1 xfailed in 1.00s =========", None),
+        ("133 passed, 1 error in 1.00s", "macOS leg: 0 failed, 1 errors: 133 passed, 1 error"),
+        (
+            "2 errors, 1 failed, 5 passed in 1.00s",
+            "macOS leg: 1 failed, 2 errors: 2 errors, 1 failed, 5 passed",
+        ),
+        ("3 deselected in 0.50s", "macOS leg: no test passed: 3 deselected"),
+        ("no tests ran in 0.01s", "macOS leg: no pytest summary line in macos.log"),
+    ],
+    ids=["skipped-first", "warnings", "banner", "error", "errors-first", "none-passed", "no-tests"],
+)
+def test_the_skip_check_reads_any_summary_order(macos, tmp_path, monkeypatch, line, outcome):
+    """Run 3 item 6: the parts in any order; any failed or error count fails, saying so."""
+    assert _skip_check(macos, tmp_path, monkeypatch, line + "\n") == outcome
+
+
+def test_the_skip_check_still_refuses_a_reason_outside_the_allowlist(macos, tmp_path, monkeypatch):
+    """Run 3 item 6: a passing summary in another order does not admit another skip reason."""
+    log = (
+        "SKIPPED [2] tests/test_macos_portability.py:282: hdiutil could not create a APFS image\n"
+        "2 skipped, 10 passed in 9.01s\n"
+    )
+    stop = _skip_check(macos, tmp_path, monkeypatch, log)
+    assert stop == (
+        "macOS leg: skip reasons outside the allowlist: hdiutil could not create a APFS image"
+    )
+
+
+LISTING = "work/evidence/app-listing.txt"
+
+
+def test_the_app_listing_step_lists_the_bundle_and_every_mach_o_file(macos):
+    """Run 3 item 7: after the build without FFmpeg, ``find -ls`` of the .app and ``otool -L``
+    over every Mach-O file found by file type (an extensionless Mach-O counts), written into the
+    evidence upload; a missing .app is said in the listing and the step exits 0."""
+    names = re.findall(r"^      - name: (.+)$", macos, re.MULTILINE)
+    assert names.index("List the app bundle") == names.index("Build app bundle without FFmpeg") + 1
+    body = step(macos, "List the app bundle")
+    assert f"        if: {VALIDATION_ONLY}\n" in body
+    assert "continue-on-error" not in body and "shell:" not in body
+    assert "RELEASE_VERSION: ${{ steps.version.outputs.version }}" in body
+    lines = script(macos, "List the app bundle").splitlines()
+    assert lines[:3] == [
+        "mkdir -p work/evidence",
+        f"listing={LISTING}",
+        'app="work/release/dist-onedir/Clearwater-${RELEASE_VERSION}-macos-onedir/Clearwater.app"',
+    ]
+    assert lines[3:7] == [
+        'if [ ! -d "$app" ]; then',
+        '  echo "No app bundle at $app: nothing to list." > "$listing"',
+        "  exit 0",
+        "fi",
+    ]
+    text = "\n".join(lines)
+    assert '  find "$app" -ls\n' in text
+    # By file type, never by name: every regular file is asked, Mach-O ones get otool -L.
+    assert 'done < <(find "$app" -type f -print0)' in text
+    assert '    kind=$(file -b "$entry" || true)' in text
+    assert "      Mach-O*)" in text
+    assert '        otool -L "$entry" || echo "otool -L failed for $entry"' in text
+    assert "-name" not in text and ".dylib" not in text and ".so" not in text
+    assert lines[-1] == '} > "$listing" 2>&1'
+    upload = step(macos, "Upload evidence")
+    assert "path: work/evidence/\n" in upload and "if: always()" in upload
+
+
+@pytest.mark.parametrize(
+    ("mode", "inputs", "failed", "runs"),
+    [
+        ("validation", {}, False, True),
+        ("validation", {}, True, True),
+        ("validation", {"release-version": ""}, True, True),
+        ("release", {"release-version": "1.2.0"}, False, False),
+        ("release", {"release-version": "1.2.0"}, True, False),
+    ],
+    ids=[
+        "validation-ok",
+        "validation-failed",
+        "validation-empty-input",
+        "release-ok",
+        "release-failed",
+    ],
+)
+def test_the_app_listing_condition_by_mode(macos, mode, inputs, failed, runs):
+    """Run 3 item 7: the listing's real ``if:`` evaluated in both modes, with and without an
+    earlier failure, for both switch values: validation always lists; release never does."""
+    condition = _conditions(macos)["List the app bundle"]
+    assert condition == VALIDATION_ONLY
+    for switch in ("false", "true"):
+        env = {"MACOS_FFMPEG_BUNDLED": switch}
+        assert evaluate_if(condition, failed=failed, env=env, inputs=inputs) is runs, mode
+
+
 # --- WP6.5 group 2a part 2: the switch's lock fields follow the macOS lock's shape ---------
 
 MACOS_LOCK_FIXTURE = ROOT / "tests/ffmpeg_lock/ffmpeg-macos.fixture.json"
@@ -1598,6 +1751,7 @@ SWITCH_GATES = {
     "always()": True,
     "${{ success() || (!cancelled() && !inputs.release-version) }}": True,
     "${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}": True,
+    "${{ !cancelled() && !inputs.release-version }}": True,
     "env.MACOS_FFMPEG_BUNDLED == 'true'": False,
 }
 """Each step condition the macOS job uses -> whether the step runs with the switch "false"."""
