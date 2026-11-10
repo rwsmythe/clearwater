@@ -4368,11 +4368,15 @@ def _macos_link_class_problem(
     # Resolve from the link's own (physical) folder: the walk never enters a linked folder.
     named = physical.parent / target
     in_app = root.suffix == ".app"
+    if in_app:
+        # Inside a .app the component walk comes FIRST, before any call that depends on the
+        # target (is_symlink, realpath, exists): those resolve the whole traversal at once and
+        # would follow an outside alias's return hop (WP6.5 A r12 #1). Only an admitted walk,
+        # every component of which stays inside Contents, reaches the checks below.
+        walked = _macos_link_chain_problem(root, physical)
+        if walked is not None:
+            return walked
     to_a_link = named.is_symlink() or named.is_junction()
-    if in_app and to_a_link:
-        chain = _macos_link_chain_problem(root, physical)
-        if chain is not None:
-            return chain
     resolved = Path(os.path.realpath(named))
     if not resolved.is_relative_to(Path(os.path.realpath(root))):
         return "link resolves outside the release folder"
@@ -4380,12 +4384,6 @@ def _macos_link_class_problem(
         return "dangling link"
     if to_a_link and not in_app:
         return "link to a link (one hop only)"
-    if in_app and not to_a_link:
-        # realpath collapses the traversal: a single hop is walked component by component
-        # too, so a folder link (or an outside alias) on its way is counted and confined.
-        walked = _macos_link_chain_problem(root, physical)
-        if walked is not None:
-            return walked
     framework = framework_link_problem(PurePosixPath(location.relative_to(root).as_posix()), target)
     if framework is None:
         return None
@@ -4444,11 +4442,13 @@ def macos_link_problem(root: Path, contents: Path, path: Path) -> str | None:
     chain that leaves the bundle, loops, ends missing or in a folder, or meets a junction
     or an absolute or non-POSIX hop is refused with every hop named. Inside a ``.app``
     every link's target, a single hop's included, is walked component by component from
-    the canonical ``Contents`` boundary (WP6.5 A r11 #1, :func:`_macos_link_chain_problem`):
-    a component outside ``Contents`` refuses at that point, before any return hop, and
-    every folder link met on the way counts against the bound and is validated as a hop
-    is. Outside a ``.app`` (onedir) a link to a link is refused as before. Then exactly
-    three classes are admitted, read on the link's final target:
+    the canonical ``Contents`` boundary (WP6.5 A r11 #1, :func:`_macos_link_chain_problem`),
+    FIRST, before any check that resolves the target (A r12 #1): a component outside
+    ``Contents`` refuses at that point, before any return hop, and every folder link met on
+    the way counts against the bound and is validated as a hop is; so inside a ``.app`` a
+    link leaving the bundle is refused with its chain, never as "outside the release
+    folder" or "dangling". Outside a ``.app`` (onedir) a link to a link is refused as
+    before. Then exactly three classes are admitted, read on the link's final target:
 
     - the framework-structure links (:func:`framework_link_problem`);
     - (B) PyInstaller's bindepend top-level link: directly in the contents root, named

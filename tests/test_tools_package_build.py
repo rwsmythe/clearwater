@@ -2825,7 +2825,11 @@ def test_notices_still_refuse_every_link_on_windows(tmp_path, monkeypatch):
 
 
 def test_folder_link_checks_nested_links_as_if_at_its_location(tmp_path, monkeypatch):
-    """(C) a folder target is walked: a bad link inside it refuses the folder link too."""
+    """(C) a folder target is walked: a bad link inside it refuses the folder link too.
+
+    Inside a .app the escaping link is refused by the component walk, which runs first
+    (WP6.5 A r12 #1), so the reason is its chain, not "outside the release folder".
+    """
     folder, executable = link_release(
         tmp_path,
         "app",
@@ -2838,9 +2842,14 @@ def test_folder_link_checks_nested_links_as_if_at_its_location(tmp_path, monkeyp
     problem = build.macos_link_problem(
         folder, folder / "Contents/Frameworks", folder / "Contents/Resources/pkg"
     )
-    assert problem == "evil under the linked folder: link resolves outside the release folder"
+    heading = Path(os.path.realpath(folder.parent)) / "outside"
+    escape = (
+        "link chain leaves the bundle: Contents/Frameworks/pkg/evil -> '../../../../outside'; "
+        f"{heading}"
+    )
+    assert problem == f"evil under the linked folder: {escape}"
     found = link_origin_check(tmp_path, monkeypatch, executable)
-    assert len(found) == 2 and all("outside the release folder" in line for line in found)
+    assert len(found) == 2 and all(escape in line for line in found), found
 
 
 def test_the_pyinstaller_chain_is_admitted_in_the_origin_walk(tmp_path, monkeypatch):
@@ -3088,6 +3097,76 @@ def test_a_chain_through_an_outside_alias_is_refused_where_it_leaves(tmp_path, m
         build.write_release_zip(folder, out=tmp_path / "out", source_epoch=1793908801)
     assert heading in str(error.value)
     assert not (tmp_path / "out").exists()
+
+
+def _outside_contents(folder: Path, path: str) -> bool:
+    """Whether a path handed to the filesystem lies (lexically) outside ``Contents`` and is
+    not the release root or one of its ancestors (canonicalising the boundary may stat those).
+    """
+    seen = Path(os.path.normpath(path))
+    for root in (folder, Path(os.path.realpath(folder))):
+        if seen.is_relative_to(root / "Contents") or root.is_relative_to(seen):
+            return False
+    return True
+
+
+@pytest.mark.parametrize("link", ["Contents/Resources/data", "Contents/Frameworks/data"])
+def test_the_walk_resolves_nothing_outside_contents(tmp_path, monkeypatch, link):
+    """A r12 #1: on A's out-and-back shape the whole rule resolves, reads and stats nothing
+    outside ``Contents`` (``os.path.realpath``, ``os.readlink``, ``os.stat``, ``os.lstat``
+    recorded): the walk refuses before any call that follows the outside alias."""
+    folder, _ = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/pkg/data"],
+        [
+            ("Contents/Resources/data", "../Frameworks/data", False),
+            ("Contents/Frameworks/data", "../../../outside/back/data", False),
+        ],
+    )
+    outside_alias(folder, "back")
+    calls: list[tuple[str, str]] = []
+
+    def recorder(name, real):
+        def recorded(path, *args, **kwargs):
+            calls.append((name, os.fspath(path)))
+            return real(path, *args, **kwargs)
+
+        return recorded
+
+    for name in ("readlink", "stat", "lstat"):
+        monkeypatch.setattr(build.os, name, recorder(name, getattr(os, name)))
+    monkeypatch.setattr(build.os.path, "realpath", recorder("realpath", os.path.realpath))
+    try:
+        problem = build.macos_link_problem(folder, folder / "Contents/Frameworks", folder / link)
+    finally:
+        monkeypatch.undo()
+    assert problem is not None and problem.startswith("link chain leaves the bundle: "), problem
+    assert calls
+    assert [call for call in calls if _outside_contents(folder, call[1])] == []
+
+
+@pytest.mark.parametrize("link", ["Contents/Resources/data", "Contents/Frameworks/data"])
+def test_a_missing_return_file_still_refuses_with_the_chain(tmp_path, link):
+    """A r12 #1: with the file the alias returns to removed, the shape is still refused as
+    leaving the bundle, with its chain, never as a bare "dangling link"."""
+    folder, _ = link_release(
+        tmp_path,
+        "app",
+        [],
+        [
+            ("Contents/Resources/data", "../Frameworks/data", False),
+            ("Contents/Frameworks/data", "../../../outside/back/data", False),
+        ],
+    )
+    (folder / "Contents/Frameworks/pkg").mkdir(parents=True)
+    outside_alias(folder, "back")
+    heading = Path(os.path.realpath(folder.parent)) / "outside" / "back" / "data"
+    hops = ["Contents/Frameworks/data -> '../../../outside/back/data'", str(heading)]
+    if link == "Contents/Resources/data":
+        hops.insert(0, "Contents/Resources/data -> '../Frameworks/data'")
+    problem = build.macos_link_problem(folder, folder / "Contents/Frameworks", folder / link)
+    assert problem == "link chain leaves the bundle: " + "; ".join(hops)
 
 
 def test_a_folder_link_that_leaves_and_comes_back_is_refused(tmp_path):
