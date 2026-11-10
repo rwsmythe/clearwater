@@ -3764,3 +3764,115 @@ CHARC opens one debt-register row for that list at the WP6.5 accept. The recorde
 evidence for its LISTED covered shapes, not proof of the invariant; the invariant text
 (`4ed56fcb`) is the rule of record and the product's walk enforces it. Seat QA on
 `49232840`: all green (`work/orch-g65/qa-4923/summary.txt`).
+
+## Run-4 fix (Codex cell, dispatch 1 of the Codex lane; base `ae128116`)
+
+Turn 1's discovery STOP was answered by dispatch 2: select the `.app` LEXICALLY from
+the executable already held by the caller, with no filesystem discovery.
+
+### Changes under CHARC `200f9645`, items 1-4
+
+1. **Mapping:** `tools/package/build.py:586` `_app_bundle_parts` maps paths relative to
+   the app: `Contents/Frameworks/<x>` and `Contents/Resources/<x>` to `<x>`, frozen-path
+   true; `Contents/MacOS/<x>` to `<x>`, false. `:594` `_app_forbidden_paths` exempts
+   `Info.plist`, `PkgInfo` and `_CodeSignature/...` from the module-root rule only;
+   GPU-name, metadata and CUDA-library checks remain. Modules outside the two frozen
+   folders are refused even if their top-level name is allowed. The old `_bundle_parts`
+   is unchanged.
+2. **Listing / links:** `:645` `forbidden_paths(root, *, app=None)` immediately selects
+   the new branch when `app` is provided. The branch lists the ENTIRE release folder
+   with `_macos_app_entries(root)`, retaining `dist:` labels relative to the supplied
+   root; smoke can also supply the app itself as root. Links are checked by the shared
+   rule BEFORE resolution. An admitted target's kind comes from the canonical index of
+   that same listing (physical folders are implicit). A linked app child is refused
+   before it can become the walk boundary. ZIP suffix/magic checks open PHYSICAL files
+   only, never links. No shared admission or listing behaviour was changed.
+   `:4276` `_macos_content_app` selects from path TEXT: parent `MacOS`, grandparent
+   `Contents`, great-grandparent suffix `.app`. The three callers:
+   - `build.py:5472`: passes that app to `forbidden_paths(root, app=app)`; for a non-app
+     executable it retains the old `forbidden_paths(root)` invocation.
+   - `smoke.py:916` `_static_checks`: onedir-only, still passes NO keyword; byte-identical.
+   - `smoke.py:1091` `_macos_static_checks`: passes the lexically derived app explicitly;
+     its root is the already validated app folder, preserving smoke's label convention.
+3. **Regressions:** `tests/test_tools_package_build.py:680` names and `:687` link texts
+   are literal reductions of `work/wp6.5/run4-stage/app-listing.txt`, with real files
+   and `os.symlink` links (available here, no model fallback): NumPy `_generator`, SciPy
+   `_flapack`, PIL `_imaging`, PySide6 `QtCore`, `_pillow_heif`. The NumPy/SciPy/PIL
+   mirrors are FOLDER links, exactly as captured; the other two are file links.
+   `:722` onward tests both release and app roots, forbidden names at six depths,
+   forbidden FILE/FOLDER alias names, extensions in MacOS/Contents, metadata, ZIP-link
+   non-opening and the run-4 recorder shape. `:806` also refuses a linked app child.
+   `:3639` `_recorded_entry_points` now includes the content check alongside origin,
+   ZIP and the shared rule on the existing covered shapes. Its covered-shape docstring
+   names the new run-4 content shape. The recorder itself is unchanged.
+4. **Full printer:** `build.py:5491` prints ALL app violations to stdout, which the
+   existing workflow tees to `work/evidence/build.log`. The non-app printer still caps
+   at 50. `tests/test_tools_package_build.py:4434` plants 115 violations and verifies
+   that all 115 reach the captured log stream. Workflow bytes unchanged.
+
+### RED / GREEN and byte identity
+
+Evidence root for this turn: `work/wp6.5/f4/` (inside this worktree; not the seat archive).
+All pytest runs use the sandbox shim, `-p no:cacheprovider`, the required startup-test
+exclusion and an individual basetemp under this evidence root. For the full module runs,
+`run_pytest.py` retains the `PYTHONPATH=scripts` bootstrap on `sys.path` but removes that
+environment value before invoking pytest with `-p sandbox_mkdir_shim`: the build tool
+correctly refuses a nonempty PYTHONPATH, so retaining the bootstrap would test its guard
+rather than the intended build rows. No shim or harness file changed.
+
+- **Parent RED:** `git show ae128116:tools/package/build.py` copied byte-for-byte to
+  `build_parent.py`, loaded via `WP61_BUILD_SCRIPT`. Final new-test selection:
+  **15 failed, 10 passed, 716 deselected**, `red-final-all.log`. Failures: all TEN
+  Frameworks/package mapping cases (release/app roots), metadata exemption, physical
+  ZIP versus mirror-link handling, the run-4 recorder case, linked app refusal and full
+  printer. The compatibility helper calls the parent's old API for this record, so
+  these are behavioural failures, not unexpected-keyword failures.
+- **Final GREEN:** build + notices, `-n 3`: **1161 passed in 66.89s** (741 build,
+  420 notices), `build-notices-verified.log`. An earlier 1160-pass run preceded the
+  added linked-app regression and is superseded for the final-state claim.
+- **Onedir census:** `census_content.py`, parent via `WP61_BUILD_SCRIPT` versus current
+  source on the SAME nine onedir `LINK_CASES`, NO `app` argument: **372 = 372**, calls,
+  order, following flags, results and messages IDENTICAL. Full events and results in
+  `onedir-census.json`; summary `onedir-census.log`.
+- **Protected source identity:** `source-identity.log`: `_bundle_parts`,
+  `_macos_app_entries`, `macos_link_problem`, both link-walk/class helpers, the default
+  `forbidden_paths` loop and `smoke._static_checks` are byte-identical source segments
+  to `ae128116`. The latter is the unchanged onedir smoke call site.
+- **Actual smoke suite:** **16 failed, 58 passed, 1 skipped**, `smoke.log`. All 16
+  failures are the same fixture mismatch described below; the skip is native POSIX
+  process-group proof. No Windows/onedir fixture failure was observed.
+- **Scratch smoke diagnosis:** an untracked copy changes only that fixture signature
+  (plus relocates its ROOT/import path for the copied test file): **74 passed, 1 skipped
+  in 78.36s**, `smoke-compat.log`. This does NOT replace the actual-suite result above.
+- **macOS portability module:** **226 skipped in 0.17s**, `macos-portability.log`, all
+  native-macOS skips on this Windows seat. No native Mac validation is claimed.
+- **Static:** `ruff-check.log`: All checks passed; `ruff-format.log`: 339 files already
+  formatted; `mypy-windows.log` and `mypy-darwin.log`: no issues in 166 source files each.
+  `git diff --check` clean; all four changed files have zero CR bytes.
+
+### Verification loop and remaining scope flag
+
+Pass 1: mapping false positives CONFIRMED by parent RED, FIXED; following ZIP-mirror
+opens CONFIRMED by parent regression, FIXED by physical-file-only checks. Fixture
+fidelity check found individual file mirrors where the capture has three folder mirrors;
+FIXED in the tests before the final RED/GREEN. A linked app child used as the walk root
+was CONFIRMED by `app-link-red.log` (attempted lstat through the link, WinError 123),
+FIXED in the NEW caller only; `app-link-green.log`: 1 passed. Shared rule unchanged.
+Pass 2: no new product issue found; protected-source audit and onedir census pass.
+
+**MINOR / test-only scope flag for the seat:** `tests/test_tools_package_smoke.py:1333`
+stubs `forbidden_paths` as `lambda root: []`; it must accept the new keyword, e.g.
+`lambda root, *, app=None: []`. This existing fixture edit is outside the dispatch's
+named test-edit file (`tests/test_tools_package_build.py`), so it is NOT made. The
+scratch-only adaptation independently confirms the cause and all smoke rows pass there.
+The official smoke suite therefore remains red until the seat adapts or grants this
+fixture edit. No sandbox-limited failure needs a repeat. No independent review round
+occurred; Reviewer A remains the seat's Claude pass. Dispatcher-read depth not supplied.
+
+One logical product fix plus its tests and ledger is ready for the seat's commit; no
+commit was made. No src, frozen interface, workflow, dependency, shared admission,
+notices, committed fixture byte, debt-register or C14 change. No bundle/frozen run,
+real bin/FFmpeg access, desktop input, push/tag/dispatch, footage/profile write or read
+of another worktree. All probes, logs and basetemps remain under `work/wp6.5/f4/`.
+
+Dispatch 3 closes the preceding scope flag: the sole smoke `forbidden_paths` stub now accepts and records `app=`, asserted by `test_darwin_smoke_runs_every_row_on_the_app_and_preserves_its_bytes`; the OFFICIAL smoke module passes **74 passed, 1 skipped in 78.11s** (`work/wp6.5/f4/smoke-official-dispatch3.log`, sandbox shim and required exclusion); ruff check, format check (339 files) and mypy (166 source files) pass (`*-dispatch3.log`); no product change or commit in this turn.
