@@ -2989,6 +2989,29 @@ def test_a_chain_with_an_absolute_hop_is_refused(tmp_path):
     )
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows junction regression")
+def test_a_chain_that_meets_a_junction_is_refused(tmp_path):
+    """Run 3 (b): a junction hop refuses the chain even when it stays inside the bundle."""
+    import _winapi
+
+    folder, _ = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/pkg2/data.txt"],
+        [("Contents/Resources/pkg", "../Frameworks/pkg", True)],
+    )
+    _winapi.CreateJunction(
+        str(folder / "Contents/Frameworks/pkg2"), str(folder / "Contents/Frameworks/pkg")
+    )
+    problem = build.macos_link_problem(
+        folder, folder / "Contents/Frameworks", folder / "Contents/Resources/pkg"
+    )
+    assert problem == (
+        "link chain meets a junction: Contents/Resources/pkg -> '../Frameworks/pkg'; "
+        "Contents/Frameworks/pkg (junction)"
+    )
+
+
 def test_folder_link_files_are_checked_at_the_links_location(tmp_path, monkeypatch):
     """A transformed native seen through a cross-link must fit the mirrored location."""
     base = tree(tmp_path / "python", ["lib/libbar.dylib"], original_native())
