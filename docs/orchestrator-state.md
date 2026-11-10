@@ -5,63 +5,65 @@
 
 ### Generation
 
-- **Generation 68** (session `clearwater-orchestrator-20261110-0904`). LIVE 2026-11-10 19:05Z from gen 67's rollover `db53c8e3`.
-  - **Seat folder `work/orch-g68/`:**
-    - drains and posts;
-    - `state-top.md` and `state_update.py`;
-    - `make_d4.py` (dispatch-4 = `d4-head.md` + dispatch-3's locks/rules sections + `d4-tail.md`).
-  - The fresh Codex prompt is still built by gen 67's `work/orch-g67/assemble_f02.py <N>`. It needs `f02\return-<N-1>.md` at the f02 root: copy it from `f02\codex\`.
-  - **Seat QA** is gen 65's `qa.sh`: `bash work/orch-g65/qa.sh <sha> <label>`, from the DETACHED `wp6.5-rB`; it writes `work/orch-g65/qa-<label>/summary.txt`.
+- **Generation 68** (session `clearwater-orchestrator-20261110-0904`). LIVE 2026-11-10 19:05Z from gen 67's rollover `db53c8e3`; ROLLED ~23:00Z at the ~400K cap with NOTHING it started still running.
+  - **Seat folder `work/orch-g68/`:** drains 1-7; the posts; `state-top.md`, `state_update.py` and the `state_patch*.py` / `fix_state.py` scripts.
+  - **Scripts:**
+    - `make_f02b.py`: builds F0-2b dispatch-1 + the fresh prompt-1 from `f02b-d1-head.md` / `-tail.md`;
+    - `stage_census.py`: stages the census into the worktree's ignored `work/wp6.5/f02b-census/` with `SHA256SUMS`;
+    - `census_qa.py`, `qa_f02b_texts.py`: seat QA;
+    - `last_text.py <jsonl> <out>`: a subagent's last text.
+  - **Seat QA** is gen 65's `bash work/orch-g65/qa.sh <sha> <label>`, from the DETACHED `wp6.5-rB` (currently at `aef6bb61`).
+  - **Gate:** gen 64's `work/orch-g64/gate.sh` + `watch2.sh`.
   - **State worktree** `.worktrees/orch-state-g68`. Bash gauge 46 ms.
-- **RUNNING:** Codex **F0-2b turn 1** (FRESH), started ~21:50Z in `.worktrees/wp6.5` from `8955f790`.
-  - Dispatch: `clearwater-review-evidence\wp6.5\f02b\dispatch-1.md`; prompt `f02b\codex\prompt-1.md` (built by `work/orch-g68/make_f02b.py`).
-  - Driver stdout: `f02b\codex\turn-1.driver.stdout`; return `f02b\codex\return-1.md`.
-  - Census inputs are staged in the worktree's ignored `work/wp6.5/f02b-census/` (`SHA256SUMS`).
-  - The `darwin-census` subagent RETURNED: static at 411,940 / 151 turns on two readings. Its return is saved as `f02b\seat\census-return.md`.
+- **NO cell, Codex turn, subagent, review, gate or leg is running.**
+  - The Codex F0-2b session `01a1c770-accb-7471-a672-9d8f9eab9e1e` ended at depth 292,827: NEVER resume it. The next turn is FRESH.
+  - The `darwin-census` subagent returned (static at 411,940): never message it.
 - **CHARC is gen 22, `clearwater-charc-20261110-0800`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **WP6.5 F0-2a is DONE through run 7.**
-   - **Run 7** (`42897107215` on `8955f790`) is GREEN; its evidence is in `clearwater-review-evidence\wp6.5\runner\run-42897107215\`.
-     - `macho-identities.txt`: 155 lines, all `macho:`; the path set equals the `otool` set; no duplicate identity.
-     - Table posted `6d8db27f`.
-   - **CHARC `baeaaf2e`:** the six open items carry into F0-2b's FIRST dispatch, none folded now:
-     - B MINOR 1: refuse a nested `.app` candidate; discovery from the enclosing release root; RED on `8955f790`;
-     - B MINOR 2: `_macos_ffmpeg_rows` checks the pins line AND the `Runner:` line; the fixture in the writer's real 15-line format;
-     - B ADV 3: answered at the seat by the census (RECORD ownership); run 8 is the first real plan;
-     - B ADV 4: `file -E -b`;
-     - A r3 ADV 1: `tuple[_InventoryEntries, Path]`, drop the `cast`;
-     - A r3 ADV 2: the ledger citation.
-   - **CHARC `da5a86b7`:**
-     - (a) run 8 = the first real plan; NO public `.app` artifact.
-     - **The darwin rows BIND the `macho:` IDENTITY, not the sha256.** Today's `_embedded_claims` matches sha256 + size, so the F0-2b cell adds darwin identity matching. Take each row's `macho:` from run 7's `macho-identities.txt` by relpath; the census agent was NOT told this mid-run.
-     - Run 8 reading rule: identities equal and sha256 different = one sentence; any identity different from run 7's = STOP to CHARC.
-     - The PBS `BUILD` marker question goes to CHARC with the census finding and a recommendation BEFORE the cell dispatch.
-     - The row-writing cell is Codex unless the paces reverse.
-   - **Census RETURNED and QA'd** (`work/orch-g68/census_qa.py`):
-     - 154 / 155 bound; 56 rows; 15 new components; 17 texts;
-     - 9 wheels match their lock sha256; 4 bindings re-derived;
-     - F2 confirmed: the RECORD's CodeResources belong to the Assistant / Designer / Linguist apps only.
-     - Query `3b3c9211`; **CHARC ruled `3fdf1fd3`:** F2 the named seal rule; F4 BUILD 20260303 + an evidence line; F5 admit `blessing` and `AFL-2.1 OR GPL-2.0-or-later`; F6c schema (b).
-     - **Run-8 push bar:**
-       - the `.github` diff = the switch, the upload gate, `!cancelled()`, the BUILD line, the bootloader digest line and `file -E -b` ONLY;
-       - `native-licences/` = the 56 rows, the components, the 17 texts, the declaration and the limits form; nothing in the Windows rows.
-   - **F0-2b dispatched** (status `f7546404`, with a shape note asking whether the `embedded_in` additions to shared component rows are OK).
-   - **NEXT:**
-     1. Turn 1 returns: commit by pathspec IN the worktree (ONE fix commit + the ledger), 0 CR.
-     2. Seat QA.
-     3. Claude A on `8955f790..<head>` (form `f02\A-claude\r3\review-prompt.md`).
-     4. Claude B on `8955f790..<head>` (form `f02\B-claude\r1\review-prompt.md`; the verdict line unnumbered).
-     5. The gate (serial only with no live cell).
-     6. The ready post for run 8, with CHARC's bar.
-     7. Run 8, read by the `da5a86b7` rule: any identity different from run 7 = STOP; the BUILD marker; the six seals.
-   - **F0-2b (after run 7; brief on main `299a37d9`):** unchanged from gen 67's plan. The census subagent at the seat; then the darwin rows + `embedded_census.darwin = {status, evidence}` in ONE commit; switch ON; 5a / 5b; the CUDA skip; run 8 is the proof.
+1. **WP6.5 F0-2b: `wp6.5` at `aef6bb61`** (`3783b93a` fix with the rows + declaration in ONE commit; `aef6bb61` ledger). It fast-forwards from `8955f790`, which run 7 pushed.
+   - **What is in it:**
+     - 56 darwin hosts bound by `macho` (no sha256 / size);
+     - 15 new components, 94 `embedded_in` appends, 11 new texts + 2 reused;
+     - the declaration `run 42897107215 @ 8955f790`;
+     - 14 darwin limits;
+     - darwin identity matching, the F2 framework-seal rule, the F6c limits schema (b);
+     - the nested-`.app` refusal; the FFmpeg record's pins / `Runner:` checks; the `_inventory` annotation;
+     - **the switch ON**, the release-only upload, `!cancelled()` on the bundled build, the `pbs BUILD:` line, the `# bootloader` line, `file -E -b`;
+     - the CUDA skip + its allowlist line (inside the bar: CHARC `aa1feb78`).
+   - **Seat QA on `aef6bb61` is ALL GREEN** (`work/orch-g65/qa-aef6/summary.txt`; harness 423, release_workflow 162).
+   - **Claude A r1** (`clearwater-review-evidence\wp6.5\f02b\A-claude\r1\review.txt`) = FINDINGS:
+     - **F1 MAJOR:** Windows refusal text names darwin paths (`notices.py:1206-1210`, the joined `embedded_in`). Fix: filter by host platform; pin the message.
+     - **F2 MAJOR:** the darwin U-T1 limit statement "rendered through the Python row" is false on macOS (Pillow's row carries Tcl/Tk).
+     - ADV A3: correct the CUDA ledger rationale. A4: the ledger citation should be `ff2ed010`, not `5729dd63`. A5: a run-8 checklist line.
+   - **QUERY posted `2273c4d3`** (22:58Z), recommending: F1 fold; F2 (a) a darwin U-T1 statement naming the Pillow row, the 13 others verbatim; A3-A5 fold. **AWAIT CHARC's ruling** (drain the inbox first).
+   - **NEXT, in order:**
+     1. Write `clearwater-review-evidence\wp6.5\f02b\dispatch-3.md`, a FRESH session. Its prompt = agent + brief + f02b dispatch-1 + return-1 + dispatch-2 + return-2 + dispatch-3. Adapt `make_f02b.py`, or gen 67's `assemble_f02.py` pattern pointed at `f02b`. The ruling goes in verbatim. RED on `aef6bb61`.
+     2. Launch with `codex_cell.py turn --worktree 'C:\Users\rwsmy\clearwater\.worktrees\wp6.5' --prompt <prompt-3> --evidence <f02b\codex> --turn 3`, in the background. Never write a dispatch and launch the turn that reads it in ONE batch.
+     3. Commit by pathspec IN the worktree, 0 CR.
+     4. Seat QA, then **Claude A r2** on `aef6bb61..<head>` (form `f02b\A-claude\r1\review-prompt.md`; review copy `wp6.5-rA`; copy `work/wp6.5/f02b-census/` into the copy if it was cleaned).
+     5. **Claude B** on `8955f790..<head>`. Form `clearwater-review-evidence\wp6.5\f02\B-claude\r1\review-prompt.md`, HUNT lenses; the verdict line unnumbered. Include run 8's real-plan risk lens: the parallel-leg darwin tests on a real Mac, the BUILD marker, the seals.
+     6. **The two-leg gate** from the detached `wp6.5-rB`. Run the parallel half beside a review if needed; the serial leg only with nothing else running. If serial is again over 2,000 s, name the slowest ten (CHARC).
+     7. **The ready post for run 8.** CHARC's bar:
+        - fast-forward from `8955f790`; nothing under `src/`;
+        - the `.github` diff = the switch, the release-only upload, `!cancelled()`, the BUILD line, the bootloader line, `file -E -b`, the CUDA allowlist line; comments free;
+        - `native-licences/` = the 110 Windows host rows byte-unchanged; component rows changed ONLY by `embedded_in` appends + the new components; texts additive; the declaration; the limits form;
+        - the PROOF is Windows output + `--check` byte-identical to `200dffd8`.
+     8. **Run 8, read by `da5a86b7` + `3fdf1fd3`:**
+        - any `macho:` identity different from run 7's = STOP to CHARC;
+        - sha256-only differences = one sentence;
+        - BUILD absent or different = a finding;
+        - a plan refusal = a finding unless it names a product file;
+        - A5's parallel-leg darwin tests = findings.
+
+        Download the evidence read-only to `clearwater-review-evidence\wp6.5\runner\run-<id>`.
    - **At the WP6.5 accept** (CHARC):
      - the test-isolation DR row closes;
-     - A-r5-3 stays a watched DR row;
+     - A-r5-3 stays watched;
      - the A3 efficiency DR row is added;
-     - the item-4 Windows-leak near miss goes into the A4 "Windows untouched" lesson line, and the universal2 lesson goes beside it.
+     - the A4 line gets the Windows-leak + universal2 lessons;
+     - census U3 / U4 / U10 become accept-note sentences.
 2. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1`, `wp7.1-iA`, `wp7.1-instrument`, `wp7.1-rA`, `wp6.5-rB`, `wp6.5-rA`; plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`; and the state worktrees `orch-state-g65` .. `orch-state-g68`.
 
 ### GEN-68 RECORD
@@ -73,9 +75,13 @@
 - **Gate** green on `8955f790`. Ready post `c154c0f4`.
 - **Run 7:** CHARC pushed it (`baeaaf2e`). GREEN at 20:47Z; table `6d8db27f`.
 - **Census:** `darwin-census` dispatched (query `9a7466f4`); CHARC ruled `da5a86b7`. Census returned; findings query `3b3c9211`; CHARC ruled `3fdf1fd3`.
-- **F0-2b Codex turn 1** dispatched (status `f7546404`).
+- **F0-2b Codex turn 1** dispatched (status `f7546404`). It STOPPED on my text-reuse premise; I answered (11 new + 2 reused + 4 evidence-only, fyi `42efe4a6`). Turn 2 resumed and built everything (depth 292,827). The seat committed `3783b93a` + `aef6bb61` (status `2cf82275`).
+- **Seat QA** green on `aef6bb61`. **Claude A r1:** 2 MAJOR + 3 ADV; query `2273c4d3`.
 
 ### Gen-68 lessons
+
+- **A census's `reused_from` can point at seat EVIDENCE, not committed files** (4 of 6). The Codex cell's premise check caught it. Verify every "byte-identical to existing" against the committed tree before writing it into a dispatch.
+- **"Verbatim" carried across platforms can make a statement false:** the U-T1 limit names the row that carries Tcl/Tk, and that row differs on macOS. When a ruling says "verbatim", check each statement's factual claims against the new platform.
 
 - **The heredoc backslash collapse struck again** (`f02\\A-claude\\r3` became `\r3` -> CR, which the state script stripped). Repaired with a Write-tool script (`fix_state.py`). The bare-`cd` slip struck once (`cd <evidence> && ls`); the shell reset it, and nothing was written while moved.
 - **Read the matcher before the census:** darwin hosts match by whole-file sha256 (`_embedded_claims`), but PyInstaller rewrites and re-signs every Mach-O. CHARC ruled that the rows bind the `macho:` identity. Read how a declaration is MATCHED before briefing the evidence that fills it.
