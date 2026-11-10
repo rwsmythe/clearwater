@@ -968,10 +968,130 @@ def test_macos_test_legs_follow_the_windows_gate_with_the_ruled_differences(maco
             assert "| tee work/evidence/" in line
 
 
+# --- WP6.5 run 2 (CHARC option (i)): validation mode continues after a failed leg -------------
+
+VALIDATION_CONTINUES = "${{ !cancelled() }}"
+VALIDATION_CONTINUES_OFF = "${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}"
+MACOS_STEP_CONDITIONS = {
+    "Checkout source": None,
+    "Set up uv": None,
+    "Sync build environment": None,
+    "Check version and record the run": None,
+    "Static checks": None,
+    "Run parallel tests": None,
+    "Run serial tests": VALIDATION_CONTINUES,
+    "Build app bundle without FFmpeg": VALIDATION_CONTINUES_OFF,
+    "Build release bundle and zip": "env.MACOS_FFMPEG_BUNDLED == 'true'",
+    "Run macOS tests on the built bundle": VALIDATION_CONTINUES_OFF,
+    "Check macOS skip reasons": None,
+    "Capture runner and encoder facts": VALIDATION_CONTINUES_OFF,
+    "Stage release assets": "env.MACOS_FFMPEG_BUNDLED == 'true'",
+    "Upload release assets": "env.MACOS_FFMPEG_BUNDLED == 'true'",
+    "Upload evidence": "always()",
+}
+"""Every macOS step's ``if:`` exactly (None = no condition, i.e. ``success()``): the serial
+leg and, with the switch OFF, the bundle build, its macOS tests and the facts capture run
+after an earlier failure; the skip-reason check and the release-only steps are as before."""
+
+RELEASE_WORKFLOW_SHA256 = "dd91eae3ccb63ca735dcb252375a8373ea946e87ba92803678e30c66352a8151"
+"""sha256 of release.yml (text, LF) at 69538abe: run 2's fix leaves it byte-identical."""
+
+MACOS_TEST_STEPS = (
+    "Run parallel tests",
+    "Run serial tests",
+    "Run macOS tests on the built bundle",
+)
+
+
+def _conditions(macos):
+    """Each step's ``if:`` (None when it has none), in workflow order."""
+    found = {}
+    for name in re.findall(r"^      - name: (.+)$", macos, re.MULTILINE):
+        gates = re.findall(r"^        if: (.+)$", step(macos, name), re.MULTILINE)
+        assert len(gates) <= 1, f"{name}: {gates}"
+        found[name] = gates[0].strip() if gates else None
+    return found
+
+
+def _validation_violations(macos, workflow):
+    """What breaks the run-2 ruling: a step condition other than ``MACOS_STEP_CONDITIONS``, a
+    ``continue-on-error`` anywhere, a test step off the job's bash or without its ``| tee``,
+    the job's bash default gone, or release.yml not byte-identical."""
+    problems = []
+    conditions = _conditions(macos)
+    if conditions != MACOS_STEP_CONDITIONS:
+        problems.extend(
+            f"condition {name}: {conditions.get(name)!r}"
+            for name in sorted(set(conditions) | set(MACOS_STEP_CONDITIONS))
+            if conditions.get(name, "absent") != MACOS_STEP_CONDITIONS.get(name, "absent")
+        )
+    if "continue-on-error" in macos:
+        problems.append("continue-on-error")
+    for name in MACOS_TEST_STEPS:
+        body = step(macos, name)
+        if "shell:" in body or "| tee work/evidence/" not in body:
+            problems.append(f"shell or tee: {name}")
+    if not re.search(
+        r"^    defaults:\n      run:\n        shell: bash\n", job(macos, "macos"), re.MULTILINE
+    ):
+        problems.append("job shell")
+    if _sha(workflow) != RELEASE_WORKFLOW_SHA256:
+        problems.append("release.yml changed")
+    return problems
+
+
+def test_validation_mode_continues_after_a_failed_leg_and_still_fails_the_job(macos, workflow):
+    """WP6.5 run 2 (CHARC option (i)): each step carries exactly its ruled condition; no
+    step (no test step above all) has ``continue-on-error``, so a failed leg still fails the
+    job; the test legs run in the job's ``bash`` (Actions runs it as ``bash --noprofile
+    --norc -eo pipefail {0}``, so a failing pytest before ``| tee`` fails its step); and
+    release.yml is unchanged."""
+    assert _validation_violations(macos, workflow) == []
+
+
+@pytest.mark.parametrize(
+    ("plant", "expected"),
+    [
+        ("serial-gated-on-success", "condition Run serial tests: None"),
+        (
+            "capture-unswitched",
+            "condition Capture runner and encoder facts: '${{ !cancelled() }}'",
+        ),
+        ("continue-on-error", "continue-on-error"),
+        ("test-step-own-shell", "shell or tee: Run parallel tests"),
+        ("release-edited", "release.yml changed"),
+    ],
+)
+def test_the_validation_guard_sees_each_planted_breach(macos, workflow, plant, expected):
+    """The run-2 guard's controls: a condition moved, a ``continue-on-error`` on a test step,
+    a test step given its own shell, or a byte of release.yml changed is each reported."""
+    if plant == "serial-gated-on-success":
+        macos = macos.replace(f"        if: {VALIDATION_CONTINUES}\n", "", 1)
+    elif plant == "capture-unswitched":
+        head, tail = macos.split("      - name: Capture runner and encoder facts", 1)
+        tail = tail.replace(VALIDATION_CONTINUES_OFF, VALIDATION_CONTINUES, 1)
+        macos = head + "      - name: Capture runner and encoder facts" + tail
+    elif plant == "continue-on-error":
+        macos = macos.replace(
+            "      - name: Run serial tests\n",
+            "      - name: Run serial tests\n        continue-on-error: true\n",
+            1,
+        )
+    elif plant == "test-step-own-shell":
+        macos = macos.replace(
+            "      - name: Run parallel tests\n",
+            "      - name: Run parallel tests\n        shell: sh\n",
+            1,
+        )
+    else:
+        workflow = workflow.replace("needs: [windows, macos]", "needs: [macos, windows]", 1)
+    assert expected in _validation_violations(macos, workflow)
+
+
 def test_macos_build_steps_are_gated_by_the_named_ffmpeg_switch(macos):
     """Before group 2a: the .app without FFmpeg; after: the release flags from the lock."""
     off = step(macos, "Build app bundle without FFmpeg")
-    assert "if: env.MACOS_FFMPEG_BUNDLED != 'true'" in off
+    assert f"if: {VALIDATION_CONTINUES_OFF}" in off
     command = next(line for line in script(macos, "Build app bundle without FFmpeg").splitlines())
     assert command.startswith("uv run python tools/package/build.py --form onedir --out ")
     assert not re.search(r"--(ffmpeg|notices|smoke|zip)", command)
@@ -1153,7 +1273,8 @@ def test_macos_release_build_reads_the_macos_lock_fields_and_the_switch_stays_of
 SWITCH_GATES = {
     "": True,
     "always()": True,
-    "env.MACOS_FFMPEG_BUNDLED != 'true'": True,
+    "${{ !cancelled() }}": True,
+    "${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}": True,
     "env.MACOS_FFMPEG_BUNDLED == 'true'": False,
 }
 """Each step condition the macOS job uses -> whether the step runs with the switch "false"."""
