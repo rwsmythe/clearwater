@@ -1,5 +1,9 @@
 """Synthetic movie-tick readings (WP7.1); no media, FFmpeg, GPU or entry point."""
 
+import json
+import os
+import subprocess
+import sys
 from dataclasses import asdict, replace
 from fractions import Fraction
 from pathlib import Path
@@ -462,3 +466,109 @@ def test_two_sided_rate_two_tails_keep_the_parent_verdict(monkeypatch):
     rows, _ = _rows(monkeypatch, source, output)
     for name in MOVIE_ROWS:
         assert rows[name].status == compare.DIFFERENT
+
+
+def _multi_video_tick_note(*, second_output_offset=1001):
+    source, output = _facts(source=True), _facts(source=False)
+    for_source = tuple(
+        replace(
+            source.movie.tracks[0],
+            track_id=index + 1,
+            media_timescale=16000,
+            media_duration=160008 + offset,
+            earliest_composition=offset,
+            edits=(compare.Edit(10001, offset, Fraction(1)),),
+        )
+        for index, offset in enumerate((1024, 512))
+    )
+    for_output = tuple(
+        replace(
+            output.movie.tracks[0],
+            track_id=index + 1,
+            media_duration=300015 + offset,
+            earliest_composition=offset,
+            edits=(compare.Edit(10000, offset, Fraction(1)),),
+        )
+        for index, offset in enumerate((2002, second_output_offset))
+    )
+    streams = [dict(source.probe["streams"][0], index=index, id=hex(index + 1)) for index in (0, 1)]
+    source = replace(
+        source,
+        movie=replace(source.movie, timescale=1000, tracks=for_source),
+        probe={"streams": streams},
+        keys={0: "vide#0", 1: "vide#1"},
+    )
+    output = replace(
+        output,
+        movie=replace(output.movie, timescale=1000, tracks=for_output),
+        probe={"streams": streams},
+        keys={0: "vide#0", 1: "vide#1"},
+    )
+    item = compare._edit_item(
+        vf.VIDEO_EDIT_AS_WRITTEN,
+        compare.MANDATORY,
+        "D94, 7.5",
+        compare._keyed_edits(source, compare._edits_as_written, ("vide",)),
+        compare._keyed_edits(output, compare._edits_as_written, ("vide",)),
+    )
+    got, note = vf._movie_tick_reading(source, output, item)
+    assert got.status == compare.SAME and note == got.note
+    return note
+
+
+def test_multi_video_disclosures_are_keyed_and_identical_across_hash_seeds():
+    script = (
+        "import json, sys; sys.path[:0] = ['tools', 'tests']; "
+        "from test_video_fidelity_movie_ticks import _multi_video_tick_note; "
+        "print(json.dumps(_multi_video_tick_note()))"
+    )
+    notes = []
+    for seed in (0, 1):
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            env={**os.environ, "PYTHONHASHSEED": str(seed)},
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        notes.append(json.loads(result.stdout))
+    assert notes[0] == notes[1]
+    disclosures = [part for part in notes[0].split("; ") if "AD-22:" in part]
+    assert len(disclosures) == 2
+    assert disclosures[0].startswith("vide#0: AD-22:")
+    assert disclosures[1].startswith("vide#1: AD-22:")
+
+
+def test_one_disclosure_among_multiple_tracks_keeps_single_track_wording():
+    note = _multi_video_tick_note(second_output_offset=960)
+    disclosures = [part for part in note.split("; ") if "AD-22:" in part]
+    assert disclosures == [
+        "AD-22: the media_time differs only by the composition-offset convention "
+        "(source 0.064000 (8/125), output 0.066733 (1001/15000), "
+        "each its track's earliest composition time)"
+    ]
+
+
+def test_mvhd_only_rounding_without_edit_lists_reads_same(monkeypatch):
+    source, output = _facts(source=True), _facts(source=False)
+    for facts_name, facts in (("source", source), ("output", output)):
+        track = replace(facts.movie.tracks[0], media_duration=300001, edits=None)
+        facts = replace(facts, movie=replace(facts.movie, timescale=1000, tracks=(track,)))
+        if facts_name == "source":
+            source = facts
+        else:
+            output = facts
+    durations = {source.path: Fraction(10001, 1000), output.path: Fraction(10)}
+    monkeypatch.setattr(vf, "movie_duration", durations.__getitem__)
+    item = vf.movie_duration_item(source, output, end=None, cut=False)
+    assert item.status == compare.SAME and READING in item.note
+    assert "source mvhd: D=10001/1000, V=300001/30000, tick=1/1000" in item.note
+    assert "output mvhd: D=10, V=300001/30000, tick=1/1000" in item.note
+
+
+def test_equal_insta360_offsets_add_no_composition_offset_disclosure(monkeypatch):
+    rows, _ = _rows(monkeypatch, _facts(source=True), _facts(source=False))
+    item = rows[vf.VIDEO_EDIT_AS_WRITTEN]
+    assert item.status == compare.SAME and READING in item.note
+    assert "AD-22: the media_time differs" not in item.note

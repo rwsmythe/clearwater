@@ -907,14 +907,14 @@ def _movie_tick_reading(
         else:
             canonical.append(normalized)
         conventional_keys.append(conventional)
-    composition_notes: list[str] = []
+    composition_notes: dict[str, str] = {}
     if item.name == VIDEO_EDIT_AS_WRITTEN:
         # AD-22 permits differing offsets only when BOTH sides use the convention.
-        for key in conventional_keys[0] & conventional_keys[1]:
+        for key in sorted(conventional_keys[0] & conventional_keys[1]):
             source_at = next(m for _, m, _ in canonical[0][key][0] if m is not None)
             output_at = next(m for _, m, _ in canonical[1][key][0] if m is not None)
             if source_at != output_at:
-                composition_notes.append(
+                composition_notes[key] = (
                     "AD-22: the media_time differs only by the composition-offset convention "
                     f"(source {compare.exact(source_at)}, output {compare.exact(output_at)}, "
                     "each its track's earliest composition time)"
@@ -927,8 +927,12 @@ def _movie_tick_reading(
                 )
     if not rounded or not figures or track_sets[0] != track_sets[1] or canonical[0] != canonical[1]:
         return item, None
+    disclosures = [
+        f"{key}: {text}" if len(composition_notes) > 1 else text
+        for key, text in composition_notes.items()
+    ]
     note = "movie-tick rounding of the exact track value (owner 2026-11-10, AD-22); " + "; ".join(
-        (*figures, *composition_notes)
+        (*figures, *disclosures)
     )
     return replace(item, status=compare.SAME, note=note), note
 
