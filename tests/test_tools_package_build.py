@@ -698,10 +698,34 @@ RUN4_MIRRORS = (
 
 
 def app_content_paths(root: Path, app: Path) -> list[str]:
-    """Use the explicit app form, or the old API for the parent's RED record."""
-    if "app" in inspect.signature(build.forbidden_paths).parameters:
-        return build.forbidden_paths(root, app=app)
-    return build.forbidden_paths(root)
+    """Use the app API, modelling POSIX link stat on Windows' real POSIX-text links.
+
+    Windows can create/read these links but its kernel rejects their slash-separated
+    target on a following stat (WinError 123). Only that failure is modelled, by reading
+    the same target from the link's physical parent. The original following stat is
+    still called first, so the recorder checks its admission order. Onedir probes never
+    use this helper, and native POSIX hosts need no fallback.
+    """
+    query = os.stat
+
+    def posix_link_stat(path, *args, **kwargs):
+        try:
+            return query(path, *args, **kwargs)
+        except OSError as error:
+            if (
+                getattr(error, "winerror", None) != 123
+                or not kwargs.get("follow_symlinks", True)
+                or not Path(path).is_relative_to(app)
+            ):
+                raise
+            target = Path(path).parent / os.readlink(path)
+            return query(os.path.realpath(target), *args, **kwargs)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(os, "stat", posix_link_stat)
+        if "app" in inspect.signature(build.forbidden_paths).parameters:
+            return build.forbidden_paths(root, app=app)
+        return build.forbidden_paths(root)
 
 
 def run4_content_release(tmp_path: Path, names=RUN4_EXTENSIONS) -> tuple[Path, Path]:
@@ -762,12 +786,104 @@ def test_run4_content_checks_the_links_own_gpu_name(tmp_path, folder):
 
 
 def test_run4_content_metadata_exempts_only_the_module_root_rule(tmp_path):
-    """Info/PkgInfo and signature metadata are allowed; other name rules remain."""
+    """Only non-module signature metadata is exempt; all other name rules remain."""
     root, app = run4_content_release(tmp_path, [])
-    tree(app, ["Contents/_CodeSignature/private.so"])
+    tree(app, ["Contents/_CodeSignature/CodeResources"])
     assert app_content_paths(root, app) == []
+    tree(app, ["Contents/_CodeSignature/private.so"])
+    assert hits(app_content_paths(root, app), "_CodeSignature/private.so (unexpected-module)")
     tree(app, ["Contents/_CodeSignature/libnvrtc.so"])
     assert hits(app_content_paths(root, app), "_CodeSignature/libnvrtc.so (cuda-library)")
+
+
+@pytest.mark.parametrize(
+    "where, target, rule",
+    [
+        ("Contents/Frameworks/foo", "numpy", "unexpected-module"),
+        ("Contents/Frameworks/io", "numpy", "shadow"),
+        ("Contents/MacOS/numpy", "../Frameworks/numpy", "unexpected-module"),
+    ],
+)
+def test_ar1_folder_alias_matches_the_physical_package_rule(tmp_path, where, target, rule):
+    """F1: an admitted folder alias creates the same package name as a physical folder."""
+    root, app = run4_content_release(tmp_path / "alias", [RUN4_EXTENSIONS[0]])
+    alias = app / where
+    _symlink(alias, target, folder=True)
+    assert build.macos_link_problem(app, app / "Contents/Frameworks", alias) is None
+    physical_root, physical_app = run4_content_release(tmp_path / "physical", [])
+    tree(physical_app, [f"{where}/__init__.py"])
+    assert hits(app_content_paths(physical_root, physical_app), f"{where}/__init__.py ({rule})")
+    assert hits(app_content_paths(root, app), f"{where} ({rule})")
+
+
+def test_ar1_case_variant_file_link_uses_the_admitted_filesystem_kind(tmp_path, monkeypatch):
+    """F2: model case-insensitive I/O with POSIX-style case-sensitive path keys on any OS."""
+    root, app = run4_content_release(tmp_path, [RUN4_EXTENSIONS[0]])
+    physical = app / "Contents/Frameworks" / RUN4_EXTENSIONS[0]
+    variant = app / "Contents/Frameworks/NUMPY/random/_generator.cpython-312-darwin.so"
+    alias = app / "Contents/MacOS/evil.so"
+    _symlink(alias, "../Frameworks/NUMPY/random/_generator.cpython-312-darwin.so", folder=False)
+    real_stat, real_lstat, realpath = os.stat, os.lstat, os.path.realpath
+
+    def lookup(path):
+        if isinstance(path, int):
+            return path
+        return Path(*("numpy" if part == "NUMPY" else part for part in Path(path).parts))
+
+    def stat_lookup(path, *args, **kwargs):
+        # The fixture's volume ignores case, including when stat follows the file link.
+        mapped = (
+            physical
+            if Path(path) == alias and kwargs.get("follow_symlinks", True)
+            else lookup(path)
+        )
+        return real_stat(mapped, *args, **kwargs)
+
+    def lstat_lookup(path, *args, **kwargs):
+        return real_lstat(lookup(path), *args, **kwargs)
+
+    def written_case(path, *args, **kwargs):
+        if Path(path) == alias:
+            return str(variant)
+        return realpath(path, *args, **kwargs)
+
+    class CaseSensitivePath(type(Path())):
+        # WindowsPath normally folds dictionary keys. Preserve their written case to
+        # model POSIX Python on a case-insensitive macOS volume, as Reviewer A's probe did.
+        def __eq__(self, other):
+            if not isinstance(other, Path):
+                return NotImplemented
+            return self.as_posix() == other.as_posix()
+
+        def __hash__(self):
+            return hash(self.as_posix())
+
+    monkeypatch.setattr(os, "stat", stat_lookup)
+    monkeypatch.setattr(os, "lstat", lstat_lookup)
+    monkeypatch.setattr(os.path, "realpath", written_case)
+    monkeypatch.setattr(build, "Path", CaseSensitivePath)
+    assert build.macos_link_problem(app, app / "Contents/Frameworks", alias) is None
+    assert hits(app_content_paths(root, app), "MacOS/evil.so (unexpected-module)")
+
+
+@pytest.mark.parametrize(
+    "where",
+    ["Contents/tests/data.txt", "Contents/PlugIns/tests/x", "Contents/_CodeSignature/tests/x.py"],
+)
+def test_ar1_contents_containers_refuse_test_payloads(tmp_path, where):
+    """F3: test payloads cannot hide beneath a non-frozen Contents container."""
+    root, app = run4_content_release(tmp_path, [])
+    tree(app, [where])
+    assert hits(app_content_paths(root, app), f"{where} (tests)")
+
+
+def test_ar1_info_plist_exempts_only_the_actual_metadata_name(tmp_path):
+    """F3: Info.plist/PkgInfo remain metadata, while Info.plist.so is a loose module."""
+    root, app = run4_content_release(tmp_path, [])
+    assert app_content_paths(root, app) == []
+    tree(app, ["Contents/Info.plist.so"])
+    assert hits(app_content_paths(root, app), "Contents/Info.plist.so (unexpected-module)")
+    assert build._app_bundle_parts(("Contents", "Info.plist")) == (["Info.plist"], False)
 
 
 def test_run4_content_checks_only_physical_archives(tmp_path, monkeypatch):
@@ -3363,7 +3479,11 @@ class _FsRecorder:
     Not covered: opens made in C below these names (``io.FileIO`` constructed directly, an
     extension module's own ``fopen``), child processes, calls on a file descriptor or with
     ``dir_fd``, and ``DirEntry.is_symlink`` / ``is_junction`` (cached from the listing, whose
-    ``scandir`` is recorded).
+    ``scandir`` is recorded). Also uncovered (A r1, CHARC 0317f4cb): a chain's admission
+    records only its first link, not each intermediate link admitted by the walk. On the
+    pre-fold run-4 app Reviewer A observed 105 false alarms on 25 paths, all shared-rule
+    post-admission calls (QtCore.framework/Versions/Current/QtCore, pillow_heif .dylibs).
+    Covered shape 5 remains the direct run-4 mirrors; no recorder logic is changed.
     """
 
     def __init__(self) -> None:

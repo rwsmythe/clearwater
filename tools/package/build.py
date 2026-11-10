@@ -588,6 +588,8 @@ def _app_bundle_parts(parts: Sequence[str]) -> tuple[list[str], bool]:
     rest = list(parts)
     if len(rest) > 2 and rest[0] == "Contents" and rest[1] in _APP_FOLDERS:
         return rest[2:], rest[1] != "MacOS"
+    if len(rest) > 1 and rest[0] == "Contents":
+        return rest[1:], False
     return rest, False
 
 
@@ -595,12 +597,11 @@ def _app_forbidden_paths(root: Path, app: Path) -> list[str]:
     """Check the shared non-following release listing, admitting links before resolution.
 
     Only physical files are opened for ZIP checks. A link is checked by its own name and
-    its admitted target's kind in the same listing; it is never opened. Physical folders
-    are implicit in that listing, so their names are checked as ancestors of its entries.
+    its target's kind, read by stat only AFTER admission; it is never opened. Identifier
+    folder aliases are also checked as package names. Physical folders are implicit in
+    the listing, so their names are checked as ancestors of its entries.
     """
     entries = _macos_app_entries(root)
-    real_root = Path(os.path.realpath(root))
-    kinds = {real_root / path.relative_to(root): kind for path, kind in entries}
     found: list[str] = []
     for path, kind in entries:
         relative = path.relative_to(root)
@@ -610,7 +611,10 @@ def _app_forbidden_paths(root: Path, app: Path) -> list[str]:
         parts, frozen = _app_bundle_parts(local) if inside_app else _bundle_parts(local)
         metadata = inside_app and (
             local in (("Contents", "Info.plist"), ("Contents", "PkgInfo"))
-            or local[:2] == ("Contents", "_CodeSignature")
+            or (
+                local[:2] == ("Contents", "_CodeSignature")
+                and not path.name.lower().endswith(MODULE_SUFFIXES)
+            )
         )
         file_kind = kind
         if kind == "link":
@@ -623,19 +627,33 @@ def _app_forbidden_paths(root: Path, app: Path) -> list[str]:
                 found.append(f"{label} (link: {problem})")
                 file_kind = "link"
             else:
-                # The component walk has admitted every link on this path. The canonical
-                # listing gives the target kind without an is_file/is_dir query; physical
-                # folders have no entry, and the rule already proved the target exists.
-                file_kind = kinds.get(Path(os.path.realpath(path)), "folder")
-        rules = name_violations(parts, module_root=file_kind == "file" and not metadata)
+                # The walk has admitted every link on this path. A following stat is now
+                # allowed; path-text keys would misclassify files on case-insensitive or
+                # Unicode-normalising volumes (WP6.5 A r1 F2).
+                file_kind = "file" if stat.S_ISREG(os.stat(path).st_mode) else "folder"
+        rules = set(name_violations(parts, module_root=file_kind == "file" and not metadata))
+        if kind == "link" and file_kind == "folder" and path.name.isidentifier():
+            if frozen:
+                # At the frozen-path root this is [name, __init__.py]; nested framework
+                # structure and mirror links keep their already-mapped top-level package.
+                rules.update(name_violations([*parts, "__init__.py"], module_root=True))
+            else:
+                rules.add("unexpected-module")
+        if (
+            inside_app
+            and not frozen
+            and any(part.lower().split(".", 1)[0] == "tests" for part in parts)
+        ):
+            # Contents' non-frozen containers (PlugIns, _CodeSignature, etc.) cannot
+            # conceal test payloads below the container name (WP6.5 A r1 F3).
+            rules.add("tests")
         if (
             file_kind == "file"
             and not frozen
             and not metadata
             and path.name.lower().endswith(MODULE_SUFFIXES)
-            and "unexpected-module" not in rules
         ):
-            rules.append("unexpected-module")
+            rules.add("unexpected-module")
         found += [f"{label} ({rule})" for rule in rules]
         if kind == "file" and (_is_zip_name(path.name) or _starts_with_zip_magic(path)):
             found += zip_violations(path, label, module_root=frozen and len(parts) == 1)
