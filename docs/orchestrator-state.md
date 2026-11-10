@@ -5,64 +5,79 @@
 
 ### Generation
 
-- **Generation 63** (session `clearwater-orchestrator-20261109-1052`). LIVE 2026-11-09 20:52Z; ROLLED about 23:15Z at the 400K cap with NOTHING running.
-  - Seat folder `work/orch-g63/` holds:
-    - drains 1-4 and the posts;
-    - `qa.sh` / `qa2.sh` (the 7-module QA), `gate.sh`, `watch2.sh`, `regate65.sh`;
-    - `gpu_sample.sh` (APPENDS), `v4e.sh`, `leg8.sh` (FROZEN = frozen-t8), `follow.sh`;
-    - `assemble12.py` / `assemble14.py` (FRESH Codex prompt form), `state_update.py`, `rep1.txt` / `rep2.txt`.
-  - Gen 64: make `work/orch-g64/`; state worktree `.worktrees/orch-state-g63` (remove it and add your own).
-- **NO CELL IS LIVE.** `wp72-cell1` (150,961) and `wp65-cell14` (122,607) have returned (they die with this pane). No Codex turn, review or leg is running.
-- **GEN-64 PICKUP, in order:**
-  1. **WP6.5:** the re-gate on `69538abe` (cell14's QA-fix) ended: QA green (ruff, format 339, mypy and mypy darwin 166, harness 423 OK, build 669, ffmpeg 290, smoke 66+1s, release_workflow 87, portability 192, macos 224 skip, notices 420); PARALLEL 8988 passed / 210 skipped, NO error (the regression is gone); SERIAL 1 failed / 1317 passed / 19 skipped: the ONE failure is `tests/test_gui_startup.py::test_shutdown_stops_every_worker_when_one_overruns_its_timeout` (:159, is_alive False) = the KNOWN flake DR-96 (OPEN; 0.05 s timeout vs 1.0 s delay under load), 3/3 pass alone at the head, WP6.5 touches neither that test nor src/clearwater/gui; every test_io_video_encode_bench node PASSED (bench :591 is NOT failing on Windows: drop it from the post-runner list). Gate folder `work/orch-g63/qa6953/` + `gate-r6953/`. CHARC rules whether the gate stands with DR-96. Counts were posted to CHARC.
-     - CHARC's next act is the owner's re-push ask: `git push origin wp6.5:refs/heads/macos-validation/wp6.5`, made by the owner or by the seat on the owner's explicit word.
-     - The second runner run is read with `gh run view` / `gh run download`, read-only, into `wp6.5\runner\`.
-     - Then the F0-2 sizing to CHARC:
-       - the `.app` layout `Contents/Frameworks` / `Resources` / `MacOS`, and ONE notices location;
-       - ONE commit carrying the `.app`-aware census, the Mac notices rows, the C14 darwin rows and the switch ON;
-       - `build.py:3725 _is_native` must type-check Mach-O magic (CHARC: in F0-2's scope, plus a register row at the accept if F0-2 has not landed).
-     - The post-runner fix list: `test_gui_settings_dialog.py:776`, and the bench `:591` if the serial leg showed it. (The XDG redirect is DONE in cell14.)
-     - The ledger line `Depth at QA-fix yield: DISPATCHER TO FILL` = `122,607 (wp65-cell14, read by the dispatcher with cell_depth.py at its QA-fix return)`. Fill it in the next build dispatch.
-     - A r7 advisory (release ordering vs class/module-scoped patches, same as main): reported to CHARC; record only.
-  2. **WP7.1** (branch `wp7.1`, head `d6f81410`, report `docs/reports/wp7.1-insta360-exports.md`):
-     - BOTH NETS DONE: Reviewer A `wp7.1\A\report-r1\` (folded, turn 14) and Reviewer B `wp7.1\B\r1\` (single remediation, turn 15). The branch is based on OLD main `626e30f0`: rebase onto main at the accept.
-     - The accept gate is report-only: static (ruff, format, mypy, mypy darwin) + harness on the merged head.
-     - The ACCEPT WAITS ON:
-       - (a) the post-WP7.2 V4 re-run: two re-exports of the 62 s clip on main (WP7.1 run-A and leg-D settings, about 25 min EXCLUSIVE GPU) in an owner quiet window CHARC asks for. Then V4 with the frozen-t8 drivers under NEW ids. Expect the video stream duration SAME; the three movie-level rows are judged per the owner's word.
-       - (b) the owner's word on CHARC's movie-level reading (Q1(b): "SAME when within one movie tick of each side's grid; track-level items stay exact"); no instrument change before it.
-       - (c) the owner's look verdict (`work/wp7.1/look/index.html`).
-       - (d) the ProRes / 4:2:2 owner question (report §8).
-     - Codex sessions: `01a1c242` at 120,065 after turn 15. A resume adds 30-40K, so resume only for a small turn; otherwise FRESH with `assemble14.py`'s form (returns 1-15 + dispatches 2-15).
-     - Instrument DR candidates for CHARC's accept: supervision (row (a), CHARC text verbatim in the report); V16 idle-not-subtracted; the spawned-worker path has no clean timing of record (B's minor, in the report).
-  3. **WP7.2 ACCEPTED and merged** (`e438123c`; `docs/proofs/wp7.2-accept.md`). CHARC adds the AD-22 line. The re-run above is its post-package V4.
-- **GEN-63 RECORD:**
-  - **WP7.1:**
-    - V4-E: the same class only.
-    - 7b admission (CHARC `fd88e96c`): turn 12 (FRESH `01a1c22a`), seat read CLEAN, frozen-t8; F1-I all ok with `v4_admitted` / `v4_pass: false`.
-    - Report: turn 13 -> A (Claude) -> turn 14 fold (FRESH `01a1c242`) -> B (Claude) -> turn 15 fold.
-  - **WP7.2:**
-    - round-0 STOP: the movie-level rows do not clear inside `verify.py`; CHARC `708c3a6b` (a) build, (b) owner.
-    - build `wp72-cell1`; A r1/r2 converged; B clean; gate green; ACCEPTED.
-  - **WP6.5:**
-    - QA on `00e18e71`: parallel RED, a conftest fixture-order regression from G3-fix A4 (`_posix_home_redirect` requested `monkeypatch`, so `_release_fft_plans` ran before monkeypatch undo; reproduced with `-p cupy`).
-    - A r6 converged (2 minors + x264 advisory, closed at the seat with the upstream COPYING).
-    - CHARC `77c70316` -> `wp65-cell14` fix (`69538abe`, plus the XDG names); A r7 converged.
-  - **Slips:** one bare `cd` into the wp7.1 worktree (restored next call, nothing written).
-- **Gen-63 lessons:**
-  - **An autouse fixture that requests `monkeypatch` reorders every test's teardown,** even when its body is a no-op on that platform: the requested fixture is set up earlier, so finalizers registered later run BEFORE the monkeypatch undo. An order-dependent defect like this hides from module runs and shows in the xdist leg. `-p <module>` preloads a module as a plugin, making such a failure deterministic.
-  - **Read the follow-up drivers' input gates before a FAIL verdict reaches them:** both `load_export` and `project_long` refused a V4-FAIL record. The pickup rule ("STOP if they refuse") caught it before any blind run.
-  - **A review transcript can contain OTHER sessions' transcripts** (B printed A's review files with `cat`): count `^session id:` headers before reading the "tokens used" count.
-  - **A cell's round 0 can show that a fix clears fewer rows than the brief's Done line assumed** (the source file's own movie-level roundings): the brief's STOP clause did its job. Amend the Done line by ruling, never silently.
+- **Generation 64** (session `clearwater-orchestrator-20261109-1309`). LIVE 2026-11-09 23:10Z; ROLLED about 07:50Z on 2026-11-10 at the 400K cap, with NOTHING it started running.
+  - Seat folder `work/orch-g64/` holds:
+    - drains 1-6 and the posts;
+    - `qa.sh` (11 modules; the gui module runs WITHOUT `-n`), `gate.sh`, `watch2.sh`, `leg.sh`, `gpu_sample.sh`;
+    - `window3.sh` (EXPORTS only) and `window3v4.sh` (the V4 legs);
+    - `assemble_i1.py` / `assemble_i5.py` (the Codex prompt forms), `f02-sizing.md`.
+  - Gen 65: make `work/orch-g65/`; state worktree `.worktrees/orch-state-g64` (remove it and add your own).
+- **NO CELL IS LIVE.** `wp65-cell15` returned (251,366; DONE, never message it again: a message re-wakes it). No Codex turn, review, gate or leg is running.
 - **CHARC is gen 21, `clearwater-charc-20261108-2037`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
-- **Seat folder `work/orch-g61/`:** `gate.sh` + `watch2.sh` + `window1.sh` + `gpu_sample.sh` (copied from orch-g60, repointed to orch-g61); `state_update.py` (LF splice from `repN.txt` blocks, worktree orch-state-g61); posts (`post-*.md`) and drains (`drain-N.txt`). Gen 60's `work/orch-g60/` still holds `register_macos_build.py`, `brief_note4.py`, `ledger-a186.md`. The CI-shaped rehearsal is still `work/orch-g58/rehearsal.py` (md5 `b93db3bf`). actionlint is `work/tools/actionlint-1.7.12/actionlint.exe`.
-- **State worktree:** `.worktrees/orch-state-g61` (branch `orch-state-g61`; remove it and add your own).
-- **Gen-61 events so far:** (1) WP7.1 V16 READ: the memory check genuinely fails by the product's rule (device peak 6,483 vs job estimate 4,065 MiB) because idle was 3,467 MiB (WP5.2: ~700); the job's own increment 3,016 vs 2,951 MiB. `nvidia-smi` at 09:53Z showed `Wow.exe` (a 3D game) + Brave on the GPU, 49-62 % utilization with no Clearwater job. CHARC RULED (`e6a411f4`): no product STOP; window-1 figures (D, and C1 / C3 carry the confound) NOT of record; DR row 4 HELD; a quiet-GPU window asked of the owner by CHARC; my gate before it: no foreground 3D process, under ~1 GiB used, near 0 % utilization, recorded; in the window: N6 control GX011627 (WP5.2 form) -> D re-run -> E; C1 re-run only if time remains; until then NOTHING exclusive and A2b / V4 HELD too; no driver change for V16; a candidate instrument DR (idle never subtracted) at the accept. (2) WP6.5 G2a part 1 DISPATCHED 10:01Z to FRESH `wp65-cell4` (dispatch `wp6.5\cell\dispatch-4.md`; depth 89,082 at dispatch); Claude 0 % after the 10:00Z reset, Codex 16 % pace 0.224.
-- **Gen-61 WP6.5 board (17:10Z):** branch `wp6.5` head `ae96a4e2` (+ `wp65-cell8` live on it). Chain since `b76066e1`: `cfeaae44` fork patch (cell4) -> `7d4ab969` ledger -> `1ef10536` SEAT `.gitattributes -text` for the macOS patch -> `51b7e76a` / `34c16c24` / `d23c2856` / `dd9c734a` / `de3d68a0` part 2 (cell5: macOS lock shape + validator, darwin bundle + smoke, switch fields) -> `ea578805` / `23e28fbe` / `2be3d775` patch folds (cell6) -> `d81549fc` / `ae96a4e2` A r3 fold (cell7). Cells 4-7 RETIRED (depths at return: 302,932 / 368,353 / 299,052 / 271,885). Returns + dispatches 4-9 in `wp6.5\cell\` (returns 5-9 extracted from transcripts when the chat return was truncated or never delivered: `subagents/agent-a<name>-*.jsonl`, last assistant text).
-  - **Fork:** Codex reads `wp6.5\seat\g2a-codex-read\` r1 FINDINGS -> delta1 FINDINGS -> **delta2 CLEAN** (residuals accepted by CHARC: aside edge case, plain sudo, restore step). Acts in `wp6.5\seat\fork-recipe-macos.md`: commit `9cb0fa81` (tree `2e004671`) pushed to `wp6.5-macos`, now the fork's DEFAULT; first dispatch REFUSED (422, fork Actions web-disabled; unspent); owner re-enabled; **ONE dispatch made 17:07Z: run `42661533922`**. A failed run needing a recipe change = STOP to CHARC (second dispatch = new owner word). A background `gh run view` loop at the seat announces the end.
-  - **Reviews:** A r3 (`wp6.5\A\r3\`, on de3d68a0) FINDINGS 3M+2m -> cell7 fold; seat QA ae96a4e2 green (`work/orch-g61/qa4br1/`); **A r4 (`wp6.5\A\r4\`) FINDINGS 3 MAJOR** (encoder-pattern semantics; a second `cc=` configuration unseen; C-string boundaries) -> `wp65-cell8` dispatched 17:12Z (dispatch-9, steer: conservative refusal). Then seat QA + A r5 on `.worktrees/wp6.5-rB` (detached review copy; `wp6.5-rA` is the fork-read copy).
-  - **Open for CHARC:** G2a2r1-F1 the Windows validator accepts disabling switches (recommended a DR row).
-  - **NEXT after the run:** download the release asset read-only into `wp6.5\seat\fork-run\`, three-way digest (GitHub asset digest, `checksums.sha256`, seat sha256), the tag peels to `9cb0fa81`, `-version` / encoders from the run log; then PART 3 (fresh cell): the real `tools/package/ffmpeg-macos.lock.json`, the complete-census rules + component texts census from the runner's actual link (configure line + otool), the Apple toolchain marker, the Mac notices, the switch ON; then the owner's stage-1 push (still pending with CHARC) and G3.
-- **Worktrees (12):** main, orch-state-g61, wp6.5-rB (detached review copy, gen 61), wp-dr125, wp6.1, wp6.3a, wp6.3b, wp6.4, **wp6.5** (branch `wp6.5`, head `b76066e1`), **wp6.5-rA** (DETACHED review copy, at `e0fb933c`, synced venv + toml: reuse it for every WP6.5 Reviewer A/B round with `git -C .worktrees/wp6.5-rA checkout -q --detach <sha>`), **wp7.1** (branch `wp7.1`, head `81ab1600`; drivers under its gitignored `work/wp7.1/`). Nothing owed to prune.
+
+### GEN-65 PICKUP, in order
+
+1. **WP6.5: READY for the re-push, waiting on the OWNER's word through CHARC** (no standing push word yet).
+   - Command: `git push origin wp6.5:refs/heads/macos-validation/wp6.5` (`69538abe` -> `a93a0ab7`, 11 commits, nothing under `src/`). CHARC runs it and sends the remote head and the run id.
+   - Then watch the run: a background `until` loop on `gh run view <id> --json status,conclusion` (the gen-64 form). Download read-only into `clearwater-review-evidence\wp6.5\runner\run-<id>\` (`gh run download`, `gh run view --log`), and build the runner table (the form: `runner\run-42764505729\runner-table.md`).
+   - **Expect:**
+     - C2 / C16 pass under their non-Windows bounds;
+     - items 3 and 4 pass;
+     - item 4's census listing in the log CONFIRMS or refutes the EPERM-on-zombie hypothesis; a LIVE member after SIGKILL = STOP to CHARC;
+     - with the mode-keyed continuation, the serial leg, the bundle-without-FFmpeg build, the bundle tests, the skip reasons and the facts all run even if a leg fails, so run 3 yields the `.app` listing and otool for **F0-2**.
+   - Then F0-2 to CHARC: `work/orch-g64/f02-sizing.md` (size M) + the runner table, and a FRESH cell for the next WP6.5 group.
+   - Ledger fill for the next WP6.5 dispatch: `Depth at A-r9-fold yield: DISPATCHER TO FILL` = `251,366 (wp65-cell15, read by the dispatcher with cell_depth.py at its A-r9-fold return)`.
+   - The DR-96 third recurrence is recorded (gate on `69538abe`). The gen-64 gate on `2e98ca1c` had NO DR-96 failure.
+2. **WP7.1 instrument** (the owner's "reading", AD-22; CHARC rulings `351a1c1c`, `7910e7df`, `c18599a4`).
+   - Branch `wp7.1-instrument` in `.worktrees/wp7.1-instrument`, off `wp7.1` `4ddf4841`.
+   - Head **`65c28219`**. Chain: `09838991` I1 -> `2dde0b77` I2-I3 (A r1 F1 / F2) -> `ad36c021` I4 (A r2 N1 / N2) -> `8eac86d1` I5 (B F1 + the F2 extension: a no-edit-list source on the as-written row) -> `65c28219` I6 (A r3 N1: identity conversion per key only where the output has a list; both-absent stays `None == None`).
+   - Seat QA at `65c28219`: ruff / format / mypy clean, 186 passed (four modules). The cell's census: 0 tightenings against `4ddf4841`, `ad36c021` and `8eac86d1`.
+   - **NEXT: Claude Reviewer A r4 (delta `8eac86d1..65c28219`)**, prompt form `instrument\A\r3\review-prompt.md`, review copy `.worktrees/wp7.1-iA` (`git -C .worktrees/wp7.1-iA checkout -q --detach 65c28219`), run with `codex_cell.py review --base 8eac86d1` in the background.
+     - A r3 (on `ad36c021..8eac86d1`) was NO_NEW_CRITICAL_MAJOR with ONE MINOR (a both-absent video key falsely FAILED the as-written row, and a ruled F2 SAME was refused next to such a key), which is what I6 fixes.
+     - If r4 is clean: fast-forward `wp7.1` onto `wp7.1-instrument` (`git -C .worktrees/wp7.1 merge --ff-only wp7.1-instrument`, one ledger line), then `uv sync --frozen` and an md5 check of frozen-t8 in `wp7.1`.
+   - **Reviewer B was ALREADY RUN** (`instrument\B\r1\`, NO_NEW_CRITICAL_MAJOR on `ad36c021`; its F1 / F2 are I5). CHARC has not asked for a second B pass. Ask if in doubt.
+   - Codex session `01a1c45c-9d95-75a3-b7bd-8f09d0bbf23e` at 139,178 after I6 (resume OK for one small turn). Earlier session `01a1c40d` at 170K: do not resume.
+   - The commit helper REFUSES these returns (the block parse); commit by pathspec in the worktree with LF-only working files (check CR = 0 per blob).
+3. **WP7.1 window 3** (CHARC `a92441a6` Plan X, split `351a1c1c`).
+   - `wp7.1` is rebased onto main at `4ddf4841` (range-diff all "=", `work/orch-g64/wp71-range-diff.txt`), venv synced, frozen-t8 MD5 OK.
+   - **On the OWNER's quiet-window word** (not given yet): first the gate check (no foreground 3D process, under ~1 GiB used, ~0 % utilization, no cell testing), then `bash work/orch-g64/window3.sh` in the background: the two EXCLUSIVE export legs `export-hevc62r` + `bench-hevc62r`, the 5 s series, the raw gate archive in `wp7.1\seat\window3\`.
+   - After the ff of `wp7.1` onto the instrument: `bash work/orch-g64/window3v4.sh` (`v4-bench-hevc62r`, `v4-hevc62r`, non-exclusive; the log names the `wp7.1` head).
+   - Expected: video stream duration SAME (WP7.2), and the four movie-level rows SAME under the reading. Any new difference class = STOP to CHARC.
+   - Then WP7.1's accept: the owner's look verdict + the ProRes / 4:2:2 question still open with the owner.
+4. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1-iA` and `wp6.5-rB` (detached review copies with venvs), `wp6.5-rA`, plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`, `wp7.1-rA`.
+
+### GEN-64 RECORD
+
+- **WP6.5:**
+  - CHARC ruled the `69538abe` gate STANDS with DR-96. The owner said "push"; CHARC pushed and **run 2** (`42764505729`) ran: parallel 4 failed / 7762 passed / 1227 skipped (run 1: 63). The four: C2 (HEIC max 2-3 / p99 1), C16 (FFT max 1.79e-7, inside 1e-5), the NEW beat-file test, the NEW darwin containment EPERM. Serial and bundle steps were skipped.
+  - CHARC ruled each item. `wp65-cell15` (dispatch-16) fixed all six (`2e98ca1c`).
+  - **A r8 MAJOR:** CHARC's switch-keyed continuation skipped the bundle tests in RELEASE mode (`macos.log` missing). Re-ruled MODE-keyed (`success() || (!cancelled() && !inputs.release-version)`) with a four-case EVALUATED guard. Fold `eeefd4cf`.
+  - **A r9 MINOR:** evaluator precedence; fold `a93a0ab7`. **A r10: zero findings.**
+  - **Gate on `2e98ca1c`** from the detached `wp6.5-rB`: identity 10,574; parallel 9,020 / 210 / 0; serial 1,318 / 19 / 0. On `a93a0ab7`: release_workflow 122, harness 423 OK, actionlint clean, statics clean.
+- **WP7.1:**
+  - Plan R (V4-only on the retained outputs) was REFUSED: `frame_end` is called by `encode.py:1312`, so WP7.2 changed the EXPORT path.
+  - The owner's "reading" became the instrument sub-package above.
+- **Slips:**
+  - one bare `cd` into `wp7.1-instrument` (restored the next call; nothing written; no live cell affected);
+  - a seat QA basetemp without its parent (45 errors, re-run green);
+  - my restated probe swapped the media and movie timescales (the Codex cell STOPPED correctly at I2).
+
+### Gen-64 lessons
+
+- **Read a diff by CALLER, not by file:** `verify.py` hosts both instrument helpers and the encoder's end-of-stream arithmetic (`frame_end`). "Only verify.py changed" did not mean "only the instrument changed". Grep the callers of every changed function before claiming a change's reach.
+- **A ruling's WORDING can name the wrong axis** (the bundling switch instead of the run MODE); the reviewer caught it as a release-mode regression. When a ruling conditions on a flag, ask which axis the distinction really is, and check both modes of a workflow before relaying.
+- **A gate leg must not run from a worktree a cell is editing:** run it from a detached copy at the gate sha (`wp6.5-rB`, with toml + `uv sync --frozen`). Then the cell folds in parallel, and the fold head re-runs only the touched ids (CHARC plan 2).
+- **Do not run a Qt / GUI test module under xdist `-n`** at the seat: a 5-min timeout left a hung worker tree (`taskkill /T` on the pytest root).
+- **The `codex_cell.py commit` parser refuses returns** whose block sits after prose in the same line run; commit by pathspec in the worktree, and count CRs per blob. The CRLF-checkout trap struck once more (I1: 1,600 CRs; amended before use).
+- **When restating a reviewer's probe, copy its facts exactly** or point at the file: "timescale 30000" lost its "media" and cost a Codex turn.
+- **A Claude review's `review.json` keeps only the final message:** its probe code is gone. Ask reviewers to inline the probe's inputs in the finding.
+
+### Gen-63 lessons
+
+- **An autouse fixture that requests `monkeypatch` reorders every test's teardown,** even when its body is a no-op on that platform: the requested fixture is set up earlier, so finalizers registered later run BEFORE the monkeypatch undo. An order-dependent defect like this hides from module runs and shows in the xdist leg. `-p <module>` preloads a module as a plugin, making such a failure deterministic.
+- **Read the follow-up drivers' input gates before a FAIL verdict reaches them:** both `load_export` and `project_long` refused a V4-FAIL record. The pickup rule ("STOP if they refuse") caught it before any blind run.
+- **A review transcript can contain OTHER sessions' transcripts** (B printed A's review files with `cat`): count `^session id:` headers before reading the "tokens used" count.
+- **A cell's round 0 can show that a fix clears fewer rows than the brief's Done line assumed** (the source file's own movie-level roundings): the brief's STOP clause did its job. Amend the Done line by ruling, never silently.
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/` or CLAUDE.md)
 
@@ -78,6 +93,7 @@
 - **Codex turns:** `uv run python scripts/codex_cell.py turn --worktree <ABS> --prompt <p> --evidence <dir> --turn N [--session=<id>] > <dir>\turn-N.driver.stdout 2>&1` with run_in_background; commit with `codex_cell.py commit --worktree <ABS> --return-file <return-N.md>` (it refuses a return without a parseable block: then `git -C <wt> add <file>` + commit by pathspec in the worktree). Depth = the footer's `depth_input_tokens`; evaluate ~200K, STOP ~250K; a resumed turn adds 30-40K: resume only below ~160K. FRESH prompt = `.claude/agents/implementer-codex-sol-high.md` + the brief at HEAD + every prior return and dispatch (2..N) + `dispatch-N.md`, joined, `tr -d '\r'`; RESUMED = `dispatch-N.md` alone. Never Write a dispatch and launch the turn that reads it in ONE batch. The first (non-resumed) turn needs an ABSOLUTE `--worktree`.
 - **Claude cells (Agent tool):** depth with `uv run --no-sync python scripts/cell_depth.py --live 3 <name>` at dispatch, every yield, before any ruling; ~250K evaluate, ~400K STOP; build dispatches name a mid-turn yield at ~300K. A SendMessage to a cell that has already yielded RE-WAKES it (it re-sends its return): read depth first; if it has returned, do not message it. Their reviewer is CODEX: `cat review-prompt.md review-diff.txt | tr -d '\r' | codex exec -p strong -s read-only --skip-git-repo-check -o review.txt - > review.out 2>&1` from the DETACHED copy (`( cd <copy> && ... )`); assert banner `gpt-6.1-sol` / `high`, `grep -ac '^tokens used'` = 1, the verdict.
 - **Claude review of a Codex cell:** `codex_cell.py review --worktree <DETACHED copy> --base <sha> --prompt <p> --out <dir>`, background, at the seat (forms `wp6.3a\B\r1\review-prompt-B.md`, `wp6.3a\B\delta2\review-prompt-delta2.md`).
+- **A gate runs from a DETACHED copy at the gate sha when a cell may edit the package worktree** (gen 64; `wp6.5-rB`). Never run a Qt / GUI module under `-n` at the seat.
 - **Gates:** `bash work/<seat>/gate.sh <worktree> <run-id> <legs...>` (background) + a Monitor on `watch2.sh <run-id> <summary line count>`, re-armed at 30 min; run `uv run mypy --platform darwin` beside the static leg. Copy the toml and `uv sync --frozen` in a new worktree first.
 - **Backslash-bearing Python goes through the Write tool**, never a heredoc (it struck AGAIN in gen 60: `wp6.5\\A\\r1` in a heredoc became `\A` + CR; fixed forward `41ef6dd5`).
 - **A bare `cd` moves the session's cwd.** ONLY `( cd X && ... )`, `git -C`, absolute paths. (Gen 60 slipped three times; each restored next call.)
@@ -88,28 +104,6 @@
 - **A NEW WORKTREE'S `.venv` IS AN EMPTY SHELL** (`uv sync --frozen` first).
 - **CLAUDE.md is CHARC's**; the orchestrator never appends to it.
 - **Claude lane:** the ~95 % hold ended at the 2026-11-09 10:00Z weekly reset; read `scripts/usage_claude.py` before each Claude dispatch and report the share.
-
-### Live board (RESUME HERE)
-
-**WP6.5 macOS validation** (brief `docs/briefs/wp6.5-brief.md`, note 4 corrected `520a4a7e`; Claude `implementer-opus-high`; both nets Codex; evidence `clearwater-review-evidence\wp6.5\`; ledger `docs/proofs/wp6.5-ledger.md` on `wp6.5`):
-- **Rulings in force (all in `comms/orchestrator/read/`):** Q5 revised = ONE `.github/workflows/macos-build.yml` (workflow_call + workflow_dispatch + `push: branches: ["macos-validation/**"]`), `release.yml` `macos` job `needs: windows` + release job `needs: [windows, macos]`; Q1 `macos-26`; F0-2..F0-11 concurred (`-n 3`, `-k` QUIT_SCRIPT exclusion, uv darwin sha `a92f61e9...f376`); run-sheet clip GX011592; owner "1. Yes; 2. app": fork exception EXTENDED for ONE macOS-recipe commit + ONE build dispatch at the seat (the cell prepares the patch; a read-only Codex cross-model read; the seat commits; acts recorded in `wp6.5\seat\`), the Mac artifact = `.app` zipped; G1-F1 = link classes (B) and (C), ONE HOP, ONE shared predicate; G1-F3 exec bits concurred; README = the user page (merge main first; done `8ca7aeaf`).
-- **G1** built by `wp65-cell2` (`80f429e5`; depth 254,025 r0 / 369,005 at G1 yield; RETIRED). Reviewer A r1 (Codex) on `80f429e5`: one MAJOR (walk swallowed scan errors), one minor, one advisory -> folded in G2b.
-- **G2b** built by `wp65-cell3` (`e0fb933c`; depth 22,324 at dispatch, 381,605 at return; RETIRED): A r1 fold (A1-A3 FIXED), link classes via `build.py:3071` `macos_link_problem` (origin walk, zip, `notices.py:1419`), darwin exec bits (Windows mixed-run zip sha pinned to base `0d3bfbfb...`), `.app` shape (`place_macos_tools`, `seal_macos_bundle`), the workflow with switch `MACOS_FFMPEG_BUNDLED: "false"`, README prerequisites, a darwin GPU-pack scan fix `a8b0132c`. Seat QA at `e0fb933c`: 1,004 passed / 225 skipped; statics clean. Seat acts: `b76066e1` registration of `macos-build.yml`; harness 423 OK on the package head; actionlint clean on both workflows.
-- **Disclosed (with CHARC, no ruling asked):** ONE-HOP reading (a target path may pass THROUGH an admitted folder link); G2b-F1 (a PyInstaller two-hop pair for a binary-only dotted folder under a mixed parent would be refused: the runner decides); G2b-F2 (until G2a merges a tag push makes NO draft); G2b-F3 (a Mac source run's FFmpeg source: the stage-2 sheet / guide must say).
-- **POSTED to CHARC 08:51Z: READY for the owner's stage-1 push** `git push origin wp6.5:refs/heads/macos-validation/wp6.5` (branch head `b76066e1`; recommendation: ask now, A r2 in parallel). CHARC asks the owner; the owner (or the seat on the owner's explicit word) pushes; the run is read with `gh run view` / `gh run download` read-only into `wp6.5\runner\` (G3).
-- **Reviewer A r2** (Codex, `wp6.5\A\r2\`, on `wp6.5-rA` at `e0fb933c`, diff `8ca7aeaf..e0fb933c`): **CONVERGED: `VERDICT: NO_NEW_CRITICAL_MAJOR`, zero findings at any severity** (banner gpt-6.1-sol / high, 0 ERROR, 1 tokens used). A1 / A2 / A3 closed against their probes; the shared predicate at `build.py:3276` / `:3588` / `notices.py:1428`; the ONE-HOP reading sound; Windows zip bytes reproduce the base hash; the windows job and header byte-identical to base and the release job = base minus the three ruled edits; the darwin GPU-pack change leaves Windows unchanged (`build.py:3802-3811`; CHARC's condition for `a8b0132c` MET); G2b-F1 widened by A r2: PyInstaller's two-hop condition is a binary-only dotted directory whose parent is TOP-LEVEL OR MIXED; no current trigger found by source reading (the runner decides). Reviewer A for G1 + G2b is CONVERGED at `e0fb933c`; Reviewer B (Codex at the seat on the final package head) comes at the package's end.
-- **The ledger's `Depth at group-2b yield: DISPATCHER TO FILL`** is to be filled by the next WP6.5 cell's dispatch: `381,605 (wp65-cell3, read by the dispatcher with cell_depth.py at its group-2b return)`.
-- **NEXT:** fold A r2 (if findings) + the first runner run's findings in ONE fresh-cell turn (G3 form); G2a = a FRESH cell: the fork's macOS FFmpeg recipe as a PATCH FILE in the Clearwater worktree (`tools/package/` beside `ffmpeg-fork.patch`) + `tools/package/ffmpeg-macos.lock.json` (the name G2b's switch reads) + the Mac notices census from the runner's file listing; then a read-only Codex read of the patch; then the seat's ONE fork commit + ONE dispatch (record each act); then the switch on. Stage 2 = the run sheet (GX011592, min 8 GiB, Open Anyway path).
-
-**WP7.1 Insta360 Studio exports** (brief `docs/briefs/wp7.1-brief.md`, SCOPE CORRECTED `626e30f0`: HEVC-only; Codex `implementer-codex-sol-high`; both nets Claude; evidence `clearwater-review-evidence\wp7.1\`):
-- **Committed:** `81ab1600` `docs/reports/inventory-2026-11-09.md` (135 rows = 62 videos + 73 photos; the ProRes rows record the spec 5.2 refusal verbatim). Probe table + decode check (turn 2) clean: product decode of the full-range HEVC vs a plain-FFmpeg ProRes reference MAE ~0.003-0.005, max < 0.1; same-HEVC controls exact. `SCUBA vids(1).mp4` / `SCUBA vids.mp4` are LIMITED range; `SCUBA vids2.mp4` / `SCUBA vids 3.mp4` FULL (`yuvj420p`).
-- **Rulings (CHARC):** HEVC-only scope (ProRes = probe refusal rows + an independent plain-FFmpeg reference); timing = export_bench's named phases + decode-only rate; own-source comparison (no same-video pair); the 2,259 s clip recorded as LIMITED; seat-run plan: C1 + C3 + D in EXCLUSIVE window 1 with an nvidia-smi series; B DROPPED (E's retained output under c3 / Standard / auto takes its role, stated in the report); C2 only if C1 is "ambiguous" (C1 vs D rate differ > 2x, or C1 between ~1 fps and the N6 decode phase); E in a WP6.5 owner/runner wait, told first; the long-clip projection rests on C3 only.
-- **Seat run A** (spawned export, 62 s, 07:06-07:42Z): export OK (`out/export-hevc62/media/SCUBA vids2_corrected.mp4`, 232,415,145 B, device "GPU", 2,143 s = about 1 fps, ~3x the N6 record; not EXCLUSIVE); the driver's device check was wrong (fixed turn 4). **A2** (V4-only) TIMED OUT on a hard-coded 900 s V4 bound (fixed turn 5: `--v4-timeout-s`). V4 decodes every frame of source and output through the product conversion: ~1 h on this source.
-- **Codex sessions:** turn 3 fresh (161K), turn 4 resumed (188K), turn 5 fresh `01a1bf59-fd91-7a23-8376-c29d450ac047` (91K), turn 6 resumed (126,876 at yield): resume turn 7 only if under ~160K, else fresh with returns 1-6 + dispatches 2-6.
-- **Window 1 (EXCLUSIVE, `work/orch-g60/window1.sh`, started 08:51:30Z; logs `wp7.1\seat\window1\window1.log` + `gpu-series.csv`; per-leg logs in the worktree's `work/wp7.1/logs/`):** **C1** (decode-only `SCUBA vids2.mp4`, full range, 08:51:31-08:56:01Z): PASS, 1,852 frames, **7.487 fps**, `cuda: true` (`-hwaccel cuda`), 46,083,686,400 B drained; nvidia-smi during C1: GPU ~50-77 %, NVDEC ~0-3 %, NVENC 0 %. So the DECODE is NOT the ~1 fps of run A (C1 is ~7x run A's export rate): by CHARC's definition this is "ambiguous" only if D's frame rate also differs from C1 by > 2x (D decides; C2 is then due). **C3** (decode-only `SCUBA vids(1).mp4`, LIMITED range, first 3,000 frames, 08:56:01-09:03:30Z): PASS, capped, **7.548 fps**: full-range and limited-range decode run at the SAME rate (7.49 vs 7.55), so the full-range DECODE hypothesis is not supported; the slow part of run A lies after the decode (correction / encode / the pipeline), which D's native phases show. **D** (throughput `SCUBA vids2.mp4`, `--defer-v4`, 09:03:30-09:49:04Z, EXCLUSIVE): the EXPORT COMPLETED (1,852 frames, `hevc_nvenc`, device "GPU", output 232,415,145 B = run A's size; retained under `work/wp7.1/bench/bench-hevc62/out/`), wall 2,632 s = **~42.6 min/min**; native phases: probe 15.3 s, analysis 169.5 s, open 4.8 s, **frames 2,439.7 s (0.76 fps)**, close 2.6 s; then the DRIVER failed: `RuntimeError: V16 memory check failed or unavailable` (`throughput_driver.py:125`; `measured["memory_check"]` = `passes: False` with `peak_rss_bytes` / `peak_gpu_bytes` None): the successor reads `records/bench-hevc62.json`'s full `memory_check` dict and `tools/export_bench.py`'s `memory_check()` (`:348`) to tell a driver-vocabulary miss from a real V16 failure BEFORE any re-run (do not re-run D blind: 45 min EXCLUSIVE). **nvidia-smi series** (`wp7.1\seat\window1\gpu-series.csv`; timestamps are LOCAL = UTC-10): C1 GPU mean 52 % / NVDEC 2 % / NVENC 0 %; C3 GPU 64 / 2 / 0; D analysis GPU 62 / 0 / 0; **D frames GPU mean 77 % (max 100) / NVDEC ~0 % / NVENC ~0 % (max 51)**. Reading: decode runs at ~7.5 fps on BOTH ranges, the export at ~0.76 fps with the GPU's compute busy and NVENC mostly idle: the time is in the GPU correction stage (or the transfer around it), not the decode or the encoder. Both the full-range-decode hypothesis is NOT supported and C1 vs D differ ~10x: by CHARC's definition C2 is NOT needed for the decode question (C1 and C3 agree; D is the anomaly); put it to CHARC. **Results NOT yet posted to CHARC except via the gen-60 rollover announcement** (which carries them).
-- **NEXT (packet `work/wp7.1/seat-packet.md`, md5 `fdf28f69`):** non-exclusive A2b (`run_export.py --v4-only --from-record work/wp7.1/records/export-hevc62.json --v4-timeout-s 7408 --id v4-hevc62b --timeout-s 8100`) and V4-only on D's output; C2 only if ruled ambiguous; WINDOW 2 = E (`--defer-v4`, 21,600 s) in a WP6.5 owner/runner wait, CHARC told first; V4-only on E (54,000 s outer); then Codex turn 7 (comparisons, look pack, C3-based projection) and the report `docs/reports/wp7.1-insta360-exports.md`; Reviewer A (Claude) on a detached copy; Reviewer B. Post the window-1 figures to CHARC with the nvidia-smi series beside the rates (CHARC asked), and CHARC opens a DR at the accept if ~3x is confirmed.
-
-**Other standing items:** open rows DR-148..DR-153, DR-155, DR-157, DR-158 (watch), DR-159 (CHARC's checklist v3). C: about 2.6 TB free.
 
 ### Gen-61 lessons
 
