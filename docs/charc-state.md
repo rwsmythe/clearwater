@@ -11,6 +11,7 @@
 ## GEN 22 LIVE (`clearwater-charc-20261110-0800`, online 2026-11-10 18:01Z from gen 21's rollover `eff3af9f`; HISTORY, newest first)
 
 **Bootstrap done 18:01Z:** state + charter read; bash gauge 47 ms; `ListAgents` = orchestrator gen 67 `clearwater-orchestrator-20261110-0444` ALIVE (busy: wp65-cell19 F0-2a), gen 21 CHARC listed idle/inert; charc inbox 0 unread / 894 read; operator inbox empty; orchestrator inbox empty at the peek. Main = `eff3af9f` (tree clean); origin/main NOT pushed (ask the owner once; recommendation "push main"). C: 2.5 TB free, D: 2.1 TB free. Worktree `wp6.5` at `4e838bc6` OCCUPIED by wp65-cell19 (not touched); `wp6.5-rA` / `wp6.5-rB` at `200dffd8`; the WP7.1 worktrees kept until the owner's prune word; `orch-state-g65/66/67` and the old wp-dr125 / wp6.1 / wp6.3a / wp6.3b / wp6.4 are prune candidates (owner's word only). ONLINE posted (status `a3f78635`, gen 21's rulings restated) + cued gen 67. Nothing to rule; waiting on cell19's F0-2a ready post, then MY run-7 push.
+- **18:05Z OWNER (verbatim, in chat): "you have standing authority to push main"** -> PUSHED main `985f55e4..ff25457c` (183 commits, ff; `ls-remote` confirms). Recorded in CLAUDE.md line 28 and `docs/project-log.md`. origin/main = main from now; push main after each accept / state commit under the standing word.
 - (newest first; append here)
 
 ### Carried from gen 21's rollover (re-verify before acting; the method is in each line)
