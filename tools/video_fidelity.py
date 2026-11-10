@@ -808,6 +808,9 @@ def _movie_tick_reading(
     Both sides must have the same tracks. D86 cut-short paths never call this
     helper and are unchanged. At least one duration must actually be rounded
     (D != V); the existing AD-22 reading takes precedence in ``fidelity_items``.
+    An absent list is figured as an identity, not a written entry. On the video
+    "as written" row only a source-side absence can use Q-C: its implicit effect
+    is compared with the output's single conventional media entry.
     """
     if item.status == compare.SAME:
         return item, None
@@ -830,6 +833,8 @@ def _movie_tick_reading(
     rounded = False
     track_sets: list[set[str]] = []
     conventional_keys: list[set[str]] = []
+    identity_source_keys: set[str] = set()
+    has_identity = False
     for side, (label, facts, written) in enumerate(
         (("source", source, item.source), ("output", output, item.output))
     ):
@@ -864,10 +869,27 @@ def _movie_tick_reading(
                 else _written_entries(movie, track)
             )
             if entries is None:
-                normalized[key] = None
-                continue
+                if side == 0 and item.name == VIDEO_EDIT_AS_WRITTEN:
+                    entries = _effect_entries(movie, track)
+                    identity_source_keys.add(key)
+                else:
+                    normalized[key] = None
+                    continue
+            # Q-C admits only the output's single conventional media entry.
+            if (
+                side == 1
+                and key in identity_source_keys
+                and (len(entries) != 1 or entries[0][1] != _earliest_seconds(track))
+            ):
+                return item, None
             if any(rate != 1 for _, _, rate in entries):
                 return item, None
+            if track.edits is None:
+                has_identity = True
+                figures.append(
+                    f"{label} {key} (no edit list; identity): "
+                    f"V={Fraction(track.media_duration, track.media_timescale)}"
+                )
             rows = list(entries)
             tail_value = None
             for position, (duration, media, rate) in enumerate(entries):
@@ -888,9 +910,10 @@ def _movie_tick_reading(
                 tail_value = value
                 rounded = rounded or duration != value
                 rows[position] = (value, media, rate)
-                figures.append(
-                    f"{label} {key} entry {position}: D={duration}, V={value}, tick={tick}"
-                )
+                if track.edits is not None:
+                    figures.append(
+                        f"{label} {key} entry {position}: D={duration}, V={value}, tick={tick}"
+                    )
             if item.name == VIDEO_EDIT_AS_WRITTEN:
                 media_entries = [m for _, m, _ in rows if m is not None]
                 if media_entries == [_earliest_seconds(track)]:
@@ -931,6 +954,8 @@ def _movie_tick_reading(
         f"{key}: {text}" if len(composition_notes) > 1 else text
         for key, text in composition_notes.items()
     ]
+    if has_identity:
+        disclosures.append("an absent edit list is the identity from media time 0 (AD-22 extended)")
     note = "movie-tick rounding of the exact track value (owner 2026-11-10, AD-22); " + "; ".join(
         (*figures, *disclosures)
     )

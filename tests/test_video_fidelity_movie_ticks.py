@@ -97,12 +97,14 @@ def _track(facts: compare.Facts, index: int, **changes) -> compare.Facts:
     return replace(facts, movie=replace(facts.movie, tracks=tuple(tracks)))
 
 
-def _rows(monkeypatch, source, output, *, movie_delta=Fraction(0), end=None):
+def _rows(monkeypatch, source, output, *, movie_delta=Fraction(0), movie_values=None, end=None):
     # Only disk reads are replaced; all comparison and reading code is real.
     durations = {Path("source"): Fraction(926927, 15000), Path("output"): Fraction(926927, 15000)}
     if source.movie.timescale == 1_000_000:
         durations[Path("source")] = Fraction(30897567, 500000)
     durations[Path("source")] += movie_delta
+    if movie_values is not None:
+        durations = dict(zip((source.path, output.path), movie_values, strict=True))
     monkeypatch.setattr(vf, "movie_duration", durations.__getitem__)
     monkeypatch.setattr(compare, "run_ffprobe", lambda *args: {"streams": [], "packets": []})
     monkeypatch.setattr(vf, "_readable_end", lambda *args: end)
@@ -572,3 +574,154 @@ def test_equal_insta360_offsets_add_no_composition_offset_disclosure(monkeypatch
     item = rows[vf.VIDEO_EDIT_AS_WRITTEN]
     assert item.status == compare.SAME and READING in item.note
     assert "AD-22: the media_time differs" not in item.note
+
+
+def _listless_pair(*, output_scale=240000, offset=0, media_scale=30001):
+    source, output = _facts(source=True), _facts(source=False)
+    value = Fraction(300001, media_scale)
+    for_source = (
+        replace(
+            source.movie.tracks[0],
+            media_timescale=media_scale,
+            media_duration=300001,
+            earliest_composition=0,
+            edits=None,
+        ),
+        replace(
+            source.movie.tracks[1],
+            media_duration=240000,
+            earliest_composition=0,
+            edits=(compare.Edit(5000, 0, Fraction(1)),),
+        ),
+    )
+    for_output = (
+        replace(
+            output.movie.tracks[0],
+            media_timescale=media_scale,
+            media_duration=300001 + offset,
+            earliest_composition=offset,
+            edits=(compare.Edit((value * output_scale).__ceil__(), offset, Fraction(1)),),
+        ),
+        replace(
+            output.movie.tracks[1],
+            media_duration=240000,
+            earliest_composition=0,
+            edits=(compare.Edit(5 * output_scale, 0, Fraction(1)),),
+        ),
+    )
+    return (
+        replace(source, movie=replace(source.movie, timescale=1000, tracks=for_source)),
+        replace(output, movie=replace(output.movie, timescale=output_scale, tracks=for_output)),
+    )
+
+
+def _listless_rows(monkeypatch, source, output):
+    value = Fraction(300001, source.movie.tracks[0].media_timescale)
+    durations = (
+        Fraction((value * source.movie.timescale).__ceil__(), source.movie.timescale),
+        Fraction((value * output.movie.timescale).__floor__(), output.movie.timescale),
+    )
+    return _rows(monkeypatch, source, output, movie_values=durations)
+
+
+@pytest.mark.parametrize("output_scale", [1000, 240000])
+@pytest.mark.parametrize("offset", [0, 2002], ids=["media-zero", "conventional-offset"])
+def test_a_listless_source_reads_as_identity_against_a_rounded_written_tail(
+    monkeypatch, output_scale, offset
+):
+    """Q-C plus rounding is SAME on all three rows, with honest identity disclosures."""
+    source, output = _listless_pair(output_scale=output_scale, offset=offset)
+    rows, notes = _listless_rows(monkeypatch, source, output)
+    for name in (vf.VIDEO_EDIT_AS_WRITTEN, vf.EDIT_EFFECT, vf.MOVIE_DURATION):
+        item = rows[name]
+        assert item.status == compare.SAME
+        assert READING in item.note and item.note in notes
+        assert "source vide#0 (no edit list; identity): V=300001/30001" in item.note
+        assert "source vide#0 entry" not in item.note
+        assert (
+            "an absent edit list is the identity from media time 0 (AD-22 extended)"
+        ) in item.note
+    assert ("AD-22: the media_time differs" in rows[vf.VIDEO_EDIT_AS_WRITTEN].note) == bool(offset)
+
+
+def test_a_listless_track_movie_figure_never_invents_a_written_entry(monkeypatch):
+    """The mvhd and effect notes describe B's implicit source without a D figure."""
+    source, output = _listless_pair(output_scale=1000, media_scale=30000)
+    rows, _ = _listless_rows(monkeypatch, source, output)
+    for name in (vf.MOVIE_DURATION, vf.EDIT_EFFECT):
+        item = rows[name]
+        assert item.status == compare.SAME
+        assert "source vide#0 (no edit list; identity): V=300001/30000;" in item.note
+        assert "source vide#0 entry 0" not in item.note
+        assert (
+            "an absent edit list is the identity from media time 0 (AD-22 extended)"
+        ) in item.note
+
+
+def test_a_written_source_and_listless_output_stay_different_as_written(monkeypatch):
+    """The mirror remains DIFFERENT as written; its effect and mvhd remain SAME."""
+    source, output = _listless_pair()
+    source, output = replace(output, path=source.path), replace(source, path=output.path)
+    rows, _ = _listless_rows(monkeypatch, source, output)
+    assert rows[vf.VIDEO_EDIT_AS_WRITTEN].status == compare.DIFFERENT
+    assert READING not in rows[vf.VIDEO_EDIT_AS_WRITTEN].note
+    assert rows[vf.EDIT_EFFECT].status == compare.SAME
+    assert rows[vf.MOVIE_DURATION].status == compare.SAME
+
+
+@pytest.mark.parametrize("ticks", [1, 2])
+def test_a_listless_source_does_not_excuse_a_written_tail_at_least_one_tick_away(
+    monkeypatch, ticks
+):
+    """An implicit identity cannot loosen the output's strict own-grid tick boundary."""
+    source, output = _listless_pair()
+    # Use an exact output grid so +1 is precisely one tick, not a rounding plus one.
+    source = _track(source, 0, media_timescale=30000)
+    output = _track(
+        output,
+        0,
+        media_timescale=30000,
+        edits=(compare.Edit(2400008 + ticks, 0, Fraction(1)),),
+    )
+    rows, _ = _listless_rows(monkeypatch, source, output)
+    for name in (vf.VIDEO_EDIT_AS_WRITTEN, vf.EDIT_EFFECT, vf.MOVIE_DURATION):
+        assert rows[name].status == compare.DIFFERENT
+        assert READING not in rows[name].note
+
+
+def test_a_listless_source_on_an_exact_grid_keeps_the_qc_item_and_note(monkeypatch):
+    """An exact output still uses the original Q-C note, before the tick fallback."""
+    source, output = _listless_pair(media_scale=30000)
+    rows, notes = _listless_rows(monkeypatch, source, output)
+    item = rows[vf.VIDEO_EDIT_AS_WRITTEN]
+    assert item.status == compare.SAME
+    assert item.note == (
+        "AD-22 extended (Q-C): the source has no edit list (identity from media time 0); "
+        "the output writes the identity list explicitly -- same presentation"
+    )
+    assert item.note in notes
+
+
+@pytest.mark.parametrize("violation", ["rate", "media-time", "multiple-entries"])
+def test_a_listless_source_requires_a_single_conventional_rate_one_output(monkeypatch, violation):
+    """The Q-C tick fallback cannot excuse rate, media-start or entry-shape changes."""
+    source, output = _listless_pair()
+    edit = output.movie.tracks[0].edits[0]
+    entries = {
+        "rate": (replace(edit, rate=Fraction(2)),),
+        "media-time": (replace(edit, media_time=1),),
+        "multiple-entries": (compare.Edit(0, -1, Fraction(1)), edit),
+    }
+    output = _track(output, 0, edits=entries[violation])
+    rows, _ = _listless_rows(monkeypatch, source, output)
+    for name in (vf.VIDEO_EDIT_AS_WRITTEN, vf.EDIT_EFFECT):
+        assert rows[name].status == compare.DIFFERENT
+
+
+def test_a_listless_sources_implicit_dwell_is_not_dropped(monkeypatch):
+    """A source identity's positive composition dwell cannot match a lone output entry."""
+    source, output = _listless_pair()
+    source = _track(source, 0, earliest_composition=1000)
+    rows, _ = _listless_rows(monkeypatch, source, output)
+    for name in (vf.VIDEO_EDIT_AS_WRITTEN, vf.EDIT_EFFECT):
+        assert rows[name].status == compare.DIFFERENT
