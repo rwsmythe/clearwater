@@ -170,6 +170,82 @@ class _KillGroup(Protocol):
     def __call__(self, pgid: int, signal: int, /) -> None: ...
 
 
+class GroupMember(NamedTuple):
+    """One process in a row's process group, as the census lists it (WP6.5 run 2).
+
+    Attributes:
+        pid: The process id.
+        stat: Its ``ps`` state; a first letter ``Z`` is a zombie (dead, not yet reaped).
+        comm: Its command name.
+    """
+
+    pid: int
+    stat: str
+    comm: str
+
+
+_PS = "/bin/ps"
+"""The macOS ``ps`` (absolute: the smoke's PATH is not consulted)."""
+
+
+def _group_census(
+    pgid: int, run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run
+) -> list[GroupMember]:
+    """List the members of process group ``pgid`` with their state (macOS ``ps``).
+
+    ``ps -A -o pid=,pgid=,stat=,comm=`` lists every process; the rows of ``pgid`` are kept.
+    A zombie stays listed (stat ``Z...``) until its parent reaps it.
+
+    Args:
+        pgid: The process group.
+        run: ``subprocess.run`` (a stub in tests).
+
+    Returns:
+        The group's members, zombies included, in ``ps`` order.
+
+    Raises:
+        SmokeError: ``ps`` failed or printed a line that is not ``pid pgid stat [comm]``.
+    """
+    try:
+        listed = run(
+            [_PS, "-A", "-o", "pid=,pgid=,stat=,comm="],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise SmokeError(f"group census: {_PS} failed: {error}") from error
+    if listed.returncode != 0:
+        raise SmokeError(f"group census: {_PS} exited {listed.returncode}: {listed.stderr!r}")
+    members: list[GroupMember] = []
+    for line in listed.stdout.splitlines():
+        if not line.strip():
+            continue
+        fields = line.split(None, 3)
+        try:
+            pid, group = int(fields[0]), int(fields[1])
+            stat = fields[2]
+        except (IndexError, ValueError):
+            raise SmokeError(f"group census: unreadable {_PS} line {line!r}") from None
+        if group == pgid:
+            members.append(GroupMember(pid, stat, fields[3].strip() if len(fields) > 3 else ""))
+    return members
+
+
+def _live(members: Sequence[GroupMember]) -> list[GroupMember]:
+    """The members that are not zombies: containment means no LIVE process (WP6.5 run 2)."""
+    return [member for member in members if not member.stat.startswith("Z")]
+
+
+def _listing(members: Sequence[GroupMember]) -> str:
+    """The census for a message: ``pid stat comm`` per member, or ``no member listed``."""
+    if not members:
+        return "no member listed"
+    return ", ".join(f"pid {m.pid} {m.stat} {m.comm}".rstrip() for m in members)
+
+
 def _group_contained_process(
     executable: Path,
     arguments: Sequence[str],
@@ -181,6 +257,7 @@ def _group_contained_process(
     killpg: _KillGroup,
     kill_signal: int,
     own_group: int,
+    census: Callable[[int], list[GroupMember]],
     popen: Callable[..., subprocess.Popen[bytes]] = subprocess.Popen,
 ) -> subprocess.CompletedProcess[str]:
     """Run one row in its own session and process group; census and kill the group.
@@ -188,10 +265,18 @@ def _group_contained_process(
     The macOS containment (AD-37; WP6.5): ``start_new_session=True`` makes the root a
     session and group leader (pgid = its pid) before it executes, so every descendant that
     does not start its own session stays in that group. After the root exits and its pipes
-    reach EOF, ``killpg(pgid, 0)`` is the census: a group that still answers within the
-    deadline has SURVIVORS and the row fails. Cleanup always sends ``killpg(pgid, SIGKILL)``
-    and waits a bounded time for the group to empty. The group is never this process's own
-    (checked before any signal).
+    reach EOF, the group is probed with ``killpg(pgid, 0)`` and listed by ``census``: a group
+    with a LIVE member at the deadline has SURVIVORS and the row fails. Cleanup always sends
+    ``killpg(pgid, SIGKILL)`` and waits a bounded time for the group to hold no live member.
+    The group is never this process's own (checked before any signal).
+
+    The probe's outcomes (WP6.5 run 2, CHARC's ruling): ``ProcessLookupError`` = an empty
+    group; ``PermissionError`` (EPERM; read as macOS answering so for a group of zombies, a
+    hypothesis until the runner's census confirms it) = the census decides: no live member is
+    contained (the listing printed), a live member is the named failure "has a member this
+    process may not signal"; any other exception propagates. A zombie is not a survivor: only
+    members whose state is not ``Z`` count. Every SURVIVORS / EPERM message carries the
+    listing.
 
     Args:
         executable: The program to run.
@@ -203,25 +288,47 @@ def _group_contained_process(
         killpg: ``os.killpg`` (a stub in tests).
         kill_signal: ``signal.SIGKILL``.
         own_group: This process's group (``os.getpgrp()``), never signalled.
+        census: Lists a group's members with their state (``_group_census``; a stub in
+            tests).
         popen: ``subprocess.Popen`` (a stub in tests).
 
     Returns:
         The finished row (exit status and decoded output).
 
     Raises:
-        SmokeError: Timeout, survivors, a group that will not die, or an unsafe group.
+        SmokeError: Timeout, survivors, a group that will not die, a live member this
+            process may not signal, or an unsafe group.
+        OSError: The probe failed in a way not named above (propagated, never a pass).
     """
     env = _environment(root)
     argv = _command(executable, arguments, env)
     process: subprocess.Popen[bytes] | None = None
     pgid = 0
+    members: list[GroupMember] = []
 
     def group_alive() -> bool:
+        """True while the group holds a LIVE member; ``members`` keeps the last listing."""
+        nonlocal members
         try:
             killpg(pgid, 0)
         except ProcessLookupError:
+            members = []
             return False
-        return True
+        except PermissionError as error:
+            members = census(pgid)
+            if _live(members):
+                raise SmokeError(
+                    f"{name}: process group {pgid} has a member this process may not signal "
+                    f"(EPERM; members: {_listing(members)})"
+                ) from error
+            print(
+                f"{name}: process group {pgid} answers EPERM with no live member "
+                f"(members: {_listing(members)}): contained",
+                flush=True,
+            )
+            return False
+        members = census(pgid)
+        return bool(_live(members))
 
     try:
         process = popen(
@@ -246,14 +353,18 @@ def _group_contained_process(
                 ) from None
             if group_alive():
                 raise SmokeError(
-                    f"{name}: SURVIVORS (process group {pgid} holds the pipes after root exit)"
+                    f"{name}: SURVIVORS (process group {pgid} holds the pipes after root exit; "
+                    f"members: {_listing(members)})"
                 ) from None
             raise SmokeError(f"{name}: timeout waiting for pipe EOF after root exit") from None
         while group_alive():
             if time.monotonic() >= deadline:
-                raise SmokeError(f"{name}: SURVIVORS (process left in group {pgid})")
+                raise SmokeError(
+                    f"{name}: SURVIVORS (process left in group {pgid}; "
+                    f"members: {_listing(members)})"
+                )
             time.sleep(0.01)
-        print(f"{name}: group census PASS (0 processes; new session; group {pgid})")
+        print(f"{name}: group census PASS (0 live processes; new session; group {pgid})")
         return subprocess.CompletedProcess(
             argv,
             process.returncode,
@@ -275,7 +386,10 @@ def _group_contained_process(
                 raise SmokeError(f"{name}: root did not terminate after killpg") from None
             while group_alive():
                 if time.monotonic() >= cleanup_deadline:
-                    raise SmokeError(f"{name}: process group {pgid} did not terminate after killpg")
+                    raise SmokeError(
+                        f"{name}: process group {pgid} did not terminate after killpg "
+                        f"(members: {_listing(members)})"
+                    )
                 time.sleep(0.01)
             for stream in (process.stdin, process.stdout, process.stderr):
                 if stream is not None:
@@ -728,6 +842,7 @@ elif sys.platform == "darwin":
             killpg=os.killpg,
             kill_signal=signal.SIGKILL,
             own_group=os.getpgrp(),
+            census=_group_census,
         )
 
 else:

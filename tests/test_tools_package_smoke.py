@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import collections
 import ctypes
 import hashlib
 import importlib.util
@@ -791,7 +792,7 @@ def test_non_windows_containment_never_silently_skips(tmp_path, monkeypatch):
     assert done.returncode == 2
     assert done.stderr == "export worker: no request document on stdin\n"
     marker = tmp_path / "grandchild.pid"
-    with pytest.raises(smoke.SmokeError, match=r"b: SURVIVORS"):
+    with pytest.raises(smoke.SmokeError, match=r"b: SURVIVORS") as refused:
         smoke._process(
             executable,
             ["survivor", str(marker)],
@@ -801,6 +802,10 @@ def test_non_windows_containment_never_silently_skips(tmp_path, monkeypatch):
             name="b",
         )
     pid = int(marker.read_text())
+    # WP6.5 run 2: the census lists the live survivor in the message (the runner's log
+    # then shows what remained; the cleanup's EPERM, if any, is printed with the listing)
+    print(f"row b refused: {refused.value}", flush=True)
+    assert f"pid {pid} " in str(refused.value)
     deadline = time.monotonic() + 5
 
     def gone() -> bool:
@@ -822,15 +827,30 @@ STUB_KILL = 9
 class FakeGroup:
     """A scripted process group: ``popen`` and ``killpg`` answer from its state."""
 
-    def __init__(self, *, pid=4242, hangs=False, survivor=False, holds_pipes=False, immortal=False):
+    def __init__(
+        self,
+        *,
+        pid=4242,
+        hangs=False,
+        survivor=False,
+        holds_pipes=False,
+        immortal=False,
+        zombies=(),
+        probe_error=None,
+        unsignalable=False,
+    ):
         self.pid = pid
         self.root_alive = True
         self.members = survivor or holds_pipes
         self.hangs = hangs
         self.holds_pipes = holds_pipes
         self.immortal = immortal
+        self.zombies = list(zombies)  # (pid, stat, comm) rows the census lists as dead
+        self.probe_error = probe_error  # an exception the 0-signal probe raises while listed
+        self.unsignalable = unsignalable  # the live survivor answers EPERM, never dies
         self.signals: list[tuple[int, int]] = []
         self.popen_calls: list[tuple[list[str], dict]] = []
+        self.census_calls: list[int] = []
         self.input = None
 
     def popen(self, argv, **kwargs):
@@ -840,10 +860,25 @@ class FakeGroup:
     def killpg(self, pgid, signal):
         assert pgid == self.pid
         self.signals.append((pgid, signal))
-        if signal == STUB_KILL and not self.immortal:
+        if signal == STUB_KILL and not (self.immortal or self.unsignalable):
             self.root_alive = self.members = False
-        if signal == 0 and not (self.root_alive or self.members):
+        if signal == 0 and self.unsignalable and self.members:
+            raise PermissionError(1, "Operation not permitted")
+        if signal == 0 and self.probe_error is not None and self.zombies:
+            raise self.probe_error
+        if signal == 0 and not (self.root_alive or self.members or self.zombies):
             raise ProcessLookupError(3, "No such process")
+
+    def census(self, pgid):
+        """The ``ps`` listing of the group: the live root and survivor, then the zombies."""
+        assert pgid == self.pid
+        self.census_calls.append(pgid)
+        listed = []
+        if self.root_alive:
+            listed.append((self.pid, "Ss", "Clearwater"))
+        if self.members:
+            listed.append((self.pid + 1, "S", "survivor"))
+        return [STUB_MEMBER(*row) for row in [*listed, *self.zombies]]
 
 
 class FakeProcess:
@@ -886,6 +921,7 @@ def run_group(smoke, group, tmp_path, *, timeout=0.05, own_group=77):
         killpg=group.killpg,
         kill_signal=STUB_KILL,
         own_group=own_group,
+        census=group.census,
         popen=group.popen,
     )
 
@@ -916,7 +952,7 @@ def test_group_containment_clean_row_starts_a_new_session_and_censuses(
     assert env["PATH"] == os.pathsep.join(("/usr/bin", "/bin"))
     assert group.input == b"request"
     assert group.signals == [(4242, 0), (4242, STUB_KILL), (4242, 0)]
-    assert "worker: group census PASS (0 processes; new session; group 4242)" in (
+    assert "worker: group census PASS (0 live processes; new session; group 4242)" in (
         capsys.readouterr().out
     )
 
@@ -924,8 +960,15 @@ def test_group_containment_clean_row_starts_a_new_session_and_censuses(
 @pytest.mark.parametrize(
     "scenario, message",
     [
-        ({"survivor": True}, r"worker: SURVIVORS \(process left in group 4242\)"),
-        ({"holds_pipes": True}, r"SURVIVORS \(process group 4242 holds the pipes after root exit"),
+        (
+            {"survivor": True},
+            r"worker: SURVIVORS \(process left in group 4242; members: pid 4243 S survivor\)",
+        ),
+        (
+            {"holds_pipes": True},
+            r"SURVIVORS \(process group 4242 holds the pipes after root exit; "
+            r"members: pid 4243 S survivor\)",
+        ),
         ({"hangs": True}, r"worker: timeout after 0\.05 s \(root still alive\)"),
     ],
     ids=["survivor", "survivor-holding-pipes", "root-hangs"],
@@ -945,7 +988,10 @@ def test_group_containment_fails_by_name_and_kills_the_group(
 def test_group_that_survives_killpg_is_a_named_failure(darwin_smoke, tmp_path):
     """The cleanup is bounded: a group that will not die fails the row by name."""
     group = FakeGroup(survivor=True, immortal=True)
-    with pytest.raises(darwin_smoke.SmokeError, match="group 4242 did not terminate after killpg"):
+    with pytest.raises(
+        darwin_smoke.SmokeError,
+        match=r"group 4242 did not terminate after killpg \(members: pid 4243 S survivor\)",
+    ):
         run_group(darwin_smoke, group, tmp_path)
 
 
@@ -956,6 +1002,119 @@ def test_group_containment_never_signals_its_own_or_a_system_group(darwin_smoke,
     with pytest.raises(darwin_smoke.SmokeError, match=f"unsafe process group {pid}"):
         run_group(darwin_smoke, group, tmp_path, own_group=77)
     assert group.signals == []
+
+
+STUB_MEMBER = collections.namedtuple("STUB_MEMBER", "pid stat comm")
+"""A census row as the fake group lists it (the shape of ``smoke.GroupMember``)."""
+
+ZOMBIE = (4250, "Z", "(python3.12)")
+"""A dead member not yet reaped: listed by ``ps`` with state ``Z``."""
+
+
+def test_group_probe_lookup_error_is_an_empty_group_without_a_census(darwin_smoke, tmp_path):
+    """WP6.5 run 2 (item 4): ``ProcessLookupError`` from the probe = an empty group; the row
+    passes and the census is not needed for it."""
+    group = FakeGroup()
+    done = run_group(darwin_smoke, group, tmp_path)
+    assert done.returncode == 2
+    assert group.signals == [(4242, 0), (4242, STUB_KILL), (4242, 0)]
+    assert group.census_calls == []
+
+
+@pytest.mark.parametrize("probe", ["answers", "eperm"])
+def test_a_zombie_only_group_is_contained(darwin_smoke, tmp_path, capsys, probe):
+    """WP6.5 run 2 (item 4): a zombie is not a survivor. A group whose listing holds only
+    zombies is contained whether the probe answers or raises EPERM (macOS's answer for such
+    a group, the runner's hypothesis); the EPERM case prints its listing, never silently."""
+    error = PermissionError(1, "Operation not permitted") if probe == "eperm" else None
+    group = FakeGroup(zombies=[ZOMBIE], probe_error=error)
+    done = run_group(darwin_smoke, group, tmp_path)
+    assert done.returncode == 2
+    assert group.census_calls  # the listing decided, not the probe alone
+    out = capsys.readouterr().out
+    assert "worker: group census PASS (0 live processes; new session; group 4242)" in out
+    if probe == "eperm":
+        assert (
+            "worker: process group 4242 answers EPERM with no live member "
+            "(members: pid 4250 Z (python3.12)): contained"
+        ) in out
+
+
+def test_a_survivor_beside_zombies_is_survivors_with_the_listing(darwin_smoke, tmp_path):
+    """WP6.5 run 2 (item 4): one live member among zombies is SURVIVORS, the live member
+    and the zombies named in the message; the cleanup then kills the group."""
+    group = FakeGroup(survivor=True, zombies=[ZOMBIE])
+    with pytest.raises(
+        darwin_smoke.SmokeError,
+        match=r"worker: SURVIVORS \(process left in group 4242; "
+        r"members: pid 4243 S survivor, pid 4250 Z \(python3\.12\)\)",
+    ):
+        run_group(darwin_smoke, group, tmp_path)
+    assert (4242, STUB_KILL) in group.signals
+
+
+def test_eperm_with_a_live_member_is_the_named_failure(darwin_smoke, tmp_path):
+    """WP6.5 run 2 (item 4): EPERM from the probe while the census lists a LIVE member is
+    its own named failure ("a member this process may not signal"), carrying the listing."""
+    group = FakeGroup(survivor=True, unsignalable=True)
+    with pytest.raises(
+        darwin_smoke.SmokeError,
+        match=r"worker: process group 4242 has a member this process may not signal "
+        r"\(EPERM; members: pid 4243 S survivor\)",
+    ) as refused:
+        run_group(darwin_smoke, group, tmp_path)
+    assert isinstance(refused.value.__cause__, PermissionError)
+
+
+def test_another_probe_oserror_propagates(darwin_smoke, tmp_path):
+    """WP6.5 run 2 (item 4): a probe error that is neither ``ProcessLookupError`` nor EPERM
+    propagates (never a pass); ``_process`` names it as a containment failure."""
+    group = FakeGroup(zombies=[ZOMBIE], probe_error=OSError(5, "Input/output error"))
+    with pytest.raises(OSError, match="Input/output error") as raised:
+        run_group(darwin_smoke, group, tmp_path)
+    assert not isinstance(raised.value, darwin_smoke.SmokeError)
+    assert not isinstance(raised.value, (ProcessLookupError, PermissionError))
+
+
+PS_LISTING = """\
+    1     1 Ss   /sbin/launchd
+ 4086  4086 Z    (python3.12)
+ 4087  4086 S    /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 -c x
+ 4100  4100 R+   /bin/ps
+ 4101  4086 Z
+"""
+
+
+def test_group_census_reads_ps_by_group(tmp_path):
+    """WP6.5 run 2 (item 4): the census keeps the group's rows of ``/bin/ps -A -o
+    pid=,pgid=,stat=,comm=``, zombies included (an empty comm too); an unreadable line or a
+    failed ``ps`` is a named error."""
+    smoke = load_smoke()
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return subprocess.CompletedProcess(argv, 0, PS_LISTING, "")
+
+    members = smoke._group_census(4086, run=run)
+    assert members == [
+        smoke.GroupMember(4086, "Z", "(python3.12)"),
+        smoke.GroupMember(
+            4087, "S", "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 -c x"
+        ),
+        smoke.GroupMember(4101, "Z", ""),
+    ]
+    assert [m.pid for m in smoke._live(members)] == [4087]
+    assert calls[0][0] == ["/bin/ps", "-A", "-o", "pid=,pgid=,stat=,comm="]
+    assert calls[0][1]["timeout"] == 10
+    with pytest.raises(smoke.SmokeError, match=r"unreadable /bin/ps line 'x 1 S'"):
+        smoke._group_census(
+            1, run=lambda argv, **kw: subprocess.CompletedProcess(argv, 0, "x 1 S\n", "")
+        )
+    with pytest.raises(smoke.SmokeError, match=r"/bin/ps exited 1"):
+        smoke._group_census(
+            1, run=lambda argv, **kw: subprocess.CompletedProcess(argv, 1, "", "no")
+        )
 
 
 def _smoke_for(monkeypatch, platform):
@@ -981,6 +1140,7 @@ def test_darwin_binds_the_group_containment_to_killpg(monkeypatch, tmp_path):
     )
     assert seen["killpg"] is killpg
     assert (seen["kill_signal"], seen["own_group"]) == (STUB_KILL, 31337)
+    assert seen["census"] is smoke._group_census
     assert not hasattr(smoke, "_kernel32")
 
 
