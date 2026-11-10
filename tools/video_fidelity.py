@@ -25,7 +25,8 @@ product's readings applied:
   is listed in the summary's ``notes``;
 * the presentation-effect item models an absent edit list as the identity from media time 0;
 * the movie duration (``mvhd`` over its timescale, the presentation form, WP3.7's note) is a
-  MANDATORY item of its own, compared exactly;
+  MANDATORY item of its own; whole-file movie-level durations may read SAME for movie-tick
+  rounding of the same exact track value (owner 2026-11-10, AD-22), with per-side figures;
 * a cut-short source (D86) is compared on its readable part: the video ends at the readable end
   and, for a truncated file, each copied track at the end of its last packet before it. The
   expected video duration, the video edit list (its ``media_time`` and rate kept, AD-22's
@@ -790,6 +791,135 @@ def _video_track(facts: compare.Facts) -> compare.Track | None:
     return compare._track_of(facts, facts.video_index)
 
 
+def _movie_tick_reading(
+    source: compare.Facts,
+    output: compare.Facts,
+    item: compare.Item,
+    *,
+    movie_values: tuple[Fraction, Fraction] | None = None,
+) -> tuple[compare.Item, str | None]:
+    """Read whole-file movie-level rounding of equal exact track values (AD-22).
+
+    A final rate-1 media edit has exact value V = (mdhd duration - media_time) /
+    mdhd timescale. Its written D must satisfy abs(D - V) < 1 / movie timescale
+    on each side; directions of rounding are independent. Earlier media entries
+    and empty edits stay exact. For mvhd, V is the longest exact presentation
+    across ALL movie tracks, with empty edits counted by their written duration.
+    Both sides must have the same tracks. D86 cut-short paths never call this
+    helper and are unchanged.
+    """
+    if item.status == compare.SAME:
+        return item, None
+    is_movie = item.name == MOVIE_DURATION
+    handlers = {
+        VIDEO_EDIT_AS_WRITTEN: ("vide",),
+        EDIT_EFFECT: ("vide", "soun"),
+        "edit lists as written, non-video tracks (media_time in media seconds)": (
+            "soun",
+            "tmcd",
+            "meta",
+            "text",
+            "subt",
+        ),
+    }
+    if not is_movie and item.name not in handlers:
+        return item, None
+    canonical: list[Any] = []
+    figures: list[str] = []
+    track_sets: list[set[str]] = []
+    conventional_keys: list[set[str]] = []
+    for side, (label, facts, written) in enumerate(
+        (("source", source, item.source), ("output", output, item.output))
+    ):
+        movie = facts.movie
+        if movie.timescale <= 0:
+            return item, None
+        tick = Fraction(1, movie.timescale)
+        selected: dict[str, compare.Track] = {}
+        if is_movie:
+            counts: dict[str, int] = {}
+            for track in movie.tracks:
+                occurrence = counts.get(track.handler, 0)
+                selected[f"{track.handler}#{occurrence}"] = track
+                counts[track.handler] = occurrence + 1
+        else:
+            for index, key in facts.keys.items():
+                keyed_track = compare._track_of(facts, index)
+                if keyed_track is not None and keyed_track.handler in handlers[item.name]:
+                    selected[key] = keyed_track
+            if set(selected) != set(written):
+                return item, None
+        track_sets.append(set(selected))
+        conventional: set[str] = set()
+        normalized: dict[str, Any] = {}
+        presentations: list[Fraction] = []
+        for key, track in selected.items():
+            if track.media_timescale <= 0:
+                return item, None
+            entries = (
+                _effect_entries(movie, track)
+                if is_movie or item.name == EDIT_EFFECT
+                else _written_entries(movie, track)
+            )
+            if entries is None:
+                normalized[key] = None
+                continue
+            if any(rate != 1 for _, _, rate in entries):
+                return item, None
+            rows = list(entries)
+            tail_value = None
+            for position, (duration, media, rate) in enumerate(entries):
+                if media is None:
+                    continue  # An empty edit counts by its segment duration, exactly.
+                if position != len(entries) - 1:
+                    if is_movie:
+                        return item, None
+                    continue  # A mid-list segment is never a rounding of the media end.
+                media_time = track.edits[-1].media_time if track.edits else 0
+                value = Fraction(track.media_duration - media_time, track.media_timescale)
+                if track.edits is None:
+                    value = duration  # The existing implicit identity presentation.
+                if media_time < 0 or value < 0 or abs(duration - value) >= tick:
+                    if is_movie:
+                        return item, None
+                    continue  # A trimmed tail keeps its exact written duration.
+                tail_value = value
+                rows[position] = (value, media, rate)
+                figures.append(
+                    f"{label} {key} entry {position}: D={duration}, V={value}, tick={tick}"
+                )
+            if item.name == VIDEO_EDIT_AS_WRITTEN:
+                media_entries = [m for _, m, _ in rows if m is not None]
+                if media_entries == [_earliest_seconds(track)]:
+                    conventional.add(key)
+            normalized[key] = (rows, tail_value)
+            presentations.append(sum((d for d, _, _ in rows), Fraction(0)))
+        if is_movie:
+            longest = max(presentations, default=None)
+            if longest is None or movie_values is None or abs(movie_values[side] - longest) >= tick:
+                return item, None
+            canonical.append(longest)
+            figures.append(f"{label} mvhd: D={movie_values[side]}, V={longest}, tick={tick}")
+        else:
+            canonical.append(normalized)
+        conventional_keys.append(conventional)
+    if item.name == VIDEO_EDIT_AS_WRITTEN:
+        # AD-22 permits differing offsets only when BOTH sides use the convention.
+        for key in conventional_keys[0] & conventional_keys[1]:
+            for normalized in canonical:
+                rows, tail_value = normalized[key]
+                normalized[key] = (
+                    [(d, None if m is None else Fraction(0), r) for d, m, r in rows],
+                    tail_value,
+                )
+    if track_sets[0] != track_sets[1] or canonical[0] != canonical[1]:
+        return item, None
+    note = "movie-tick rounding of the exact track value (owner 2026-11-10, AD-22); " + "; ".join(
+        figures
+    )
+    return replace(item, status=compare.SAME, note=note), note
+
+
 def video_edit_reading(
     source: compare.Facts,
     output: compare.Facts,
@@ -804,7 +934,8 @@ def video_edit_reading(
     one media entry each, and each media time equal to its own track's earliest composition
     time. An absent source list (Q-C) is SAME when the output's list is conventional and the
     presentation effect is the same. For a cut-short source the source's list is first cut at
-    the readable end ``end``.
+    the readable end ``end``. Whole files also apply the owner's movie-tick reading;
+    the D86 cut-short paths are unchanged.
 
     Args:
         source: The source's facts.
@@ -818,6 +949,10 @@ def video_edit_reading(
     """
     if item.status == compare.SAME:
         return item, None
+    if end is None:
+        rounded, note = _movie_tick_reading(source, output, item)
+        if note is not None:
+            return rounded, note
     src, out = _video_track(source), _video_track(output)
     if src is None or out is None:
         return item, None
@@ -1105,11 +1240,12 @@ def _audio_side_item(
 def movie_duration_item(
     source: compare.Facts, output: compare.Facts, *, end: Fraction | None, cut: bool
 ) -> compare.Item:
-    """Compare the movie durations (``mvhd``, the presentation form), exactly (D94, WP3.7 note).
+    """Compare mvhd durations, with the owner's movie-tick reading for whole files (AD-22).
 
     For a cut-short source the expected duration is the longest readable track presentation
     (:func:`readable_tracks`; the timecode track is left out, the muxer regenerates it from the
     video); a track whose presentation cannot be cut makes the item DIFFERENT, never skipped.
+    D86 cut-short paths are unchanged; only ``end is None`` uses the movie-tick reading.
 
     Args:
         source: The source's facts.
@@ -1120,12 +1256,14 @@ def movie_duration_item(
     Returns:
         A MANDATORY item.
     """
-    whole = compare.exact(movie_duration(source.path))
+    whole_value = movie_duration(source.path)
+    whole = compare.exact(whole_value)
     got = movie_duration(output.path)
     if end is None:
-        return compare._item(
+        item = compare._item(
             MOVIE_DURATION, compare.MANDATORY, "D94, 7.5", whole, compare.exact(got)
         )
+        return _movie_tick_reading(source, output, item, movie_values=(whole_value, got))[0]
     tracks = [
         (key, entries)
         for key, (handler, entries) in readable_tracks(source, end, cut).items()
@@ -1301,7 +1439,17 @@ def fidelity_items(
             )
         elif item.name == VIDEO_DURATION:
             duration_at = position + 1
-    items.insert(duration_at, movie_duration_item(source, output, end=end, cut=cut))
+        if end is None and item.name in (
+            EDIT_EFFECT,
+            "edit lists as written, non-video tracks (media_time in media seconds)",
+        ):
+            items[position], note = _movie_tick_reading(source, output, items[position])
+            if note is not None:
+                notes.append(note)
+    duration = movie_duration_item(source, output, end=end, cut=cut)
+    items.insert(duration_at, duration)
+    if end is None and duration.status == compare.SAME and duration.note:
+        notes.append(duration.note)
     items = _colour_items(items, info)
     items = _depth_items(items, info, bit_depth)
     items.append(
