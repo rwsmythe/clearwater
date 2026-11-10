@@ -2,11 +2,12 @@
 
 ## Specification
 
-**Version:** 0.6.2 (draft)
-**Date:** 4 November 2026
+**Version:** 0.6.3 (draft)
+**Date:** 10 November 2026
 **Status:** Second review (10 concerns, 6 planning questions) worked through with the owner and incorporated. Requirements are stable for implementation planning. Items left to the design stage are listed in Section 14.1. Open decisions, including scope items that depend on test results, are listed in Section 14.2.
 
 **Change log**
+- 0.6.3 — Section 5.2 source note (owner-approved 2026-11-10 on CHARC's recommendation at the WP7.1 accept, verbatim: "add"): Insta360 Studio's flat SDR-tagged H.265/HEVC MP4 exports are a validated, supported source; its ProRes exports are refused under 5.2 (owner 2026-11-10, verbatim: "No for ProRes / 4:2:2 input"); native `.insv` is unsupported (owner 2026-11-05). No decision, test or requirement changes; the clause set is unchanged (D1-D117, V1-V18, G1-G13, N1-N14). Record: `docs/proofs/wp7.1-accept.md`.
 - 0.6.2 — N14: the Windows artifact shape RECORDED as the spec itself foresaw ("set from the WP6.1 spike's measurements at the owner's checkpoint CP6a and recorded here"): ONE-FOLDER (owner 2026-11-04, verbatim "onedir", on CHARC's recommendation; WP6.1 accept `b2eb4f74`, AD-33 / AD-34), with the measured figures of record. No requirement changed.
 - 0.6.1 — G12 encoder "auto" wording made platform-neutral (owner-approved 2026-11-04 on CHARC's recommendation from the WP6.2 portability audit, verbatim: "concur with your recommendation"): auto = the platform's hardware HEVC encoder when available (NVENC on Windows, VideoToolbox on macOS), else libx265. Behaviour on Windows unchanged; design AD-35.
 - 0.6.0 — Post-1.0.0 platform and distribution requirements (owner-approved 2026-11-04 on CHARC's Phase 6 proposal `docs/briefs/phase6-proposal.md`, verbatim: "D-A two releases, D-B spike, D-C two artifacts, D-D bundle, D-E arm64, D-F actions, D-G spec, D-H not, D-I prune, D-J push"): N1 gains the platform list (Windows 11 x64 from 1.0.0; macOS on Apple Silicon from 1.2.0, CPU path, VideoToolbox HEVC encoder); new N14 packaged distribution (a per-platform self-contained artifact built by a published workflow; one artifact per platform, the CUDA support downloaded on demand on Windows (owner amendment 2026-11-04: "auto-download of the cuda libraries rather than bundle"); FFmpeg bundled with its notices; the shape (one-folder or one-file) set from the WP6.1 spike at CP6a); N6 / D106 noted as the Windows NVIDIA figure, the macOS CPU figure reported as information; N13 extended to every bundled binary. No correction decision changed; 1.0.0 is unaffected.
@@ -219,6 +220,7 @@ Decisions marked *(amended)* were changed by a later decision; the body of the s
 - Standard color profiles only.
 - Resolutions and frame rates up to the camera's maximum (including 5.3K and 8:7 modes). 4K is the resolution at which the performance target is measured (D106).
 - Constant and variable frame rate accepted; timing preserved (Section 7.5).
+- **Source note, Insta360 (0.6.3; WP7.1, 2026-11-10):** Insta360 Studio's flat SDR-tagged H.265/HEVC MP4 exports are accepted as Clearwater inputs under this section. Clearwater uses their stream colour and range tags under D54, including full-range (`yuvj420p`) exports. Studio's ProRes exports are refused under this section (the codec is not admitted); use Studio's H.265 export setting. Native `.insv` input is not supported and is excluded from the supported-source scope by the owner's standing decision. Validated on the owner's real exports (`docs/reports/wp7.1-insta360-exports.md`; V4 PASS after WP7.2).
 
 ### 5.3 Unsupported video inputs
 - **HDR:** any stream tagged with an HLG or PQ transfer characteristic is refused with a clear message.

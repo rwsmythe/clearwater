@@ -21,7 +21,7 @@
 - "Pass with notes 8999/150: relatively strong blueish halo around scuba diver on left side; 16499/75: slight blue halo around scuba diver legs in the bottom right." -- the look verdict: PASS WITH NOTES (DR-160).
 - "No for ProRes / 4:2:2 input" -- spec 5.2 stands; no Phase 7 candidate.
 - "quiet window" -- window 3.
-- Pending: one word on adding the report's section 7 note to spec 5.2 ("add" or "no").
+- "add" -- the report's section 7 note went into spec 5.2 as the Insta360 source note, spec v0.6.3 (CHARC, same day).
 
 ## Instrument: the movie-level reading (`tools/video_fidelity.py`, branch `wp7.1-instrument` folded into `wp7.1`)
 
@@ -58,6 +58,5 @@
 
 ## Open after this accept
 
-- The owner's word on the spec note (section 7 text into spec 5.2, or the note lives here only).
 - WP6.5 continues (run 5 after the `.app` content-check fix; F0-2 next).
 - CHARC's Phase 7 proposals from the register, with DR-160 among them.

@@ -5,7 +5,7 @@ Desktop tool (Python, PySide6) that corrects color cast, contrast loss and haze 
 ## Read these first, in this order
 
 1. `docs/clearwater-implementation-plan.md` — how the work is organized: roles, working rules, work packages (WP0.1 onward), owner checkpoints, interfaces to freeze.
-2. `docs/underwater-correction-spec.md` — v0.6.2. The source of truth for what Clearwater does. Decisions are numbered D1–D117, tests V1–V18, GUI requirements G1–G13, non-functional requirements N1–N13.
+2. `docs/underwater-correction-spec.md` — v0.6.3. The source of truth for what Clearwater does. Decisions are numbered D1–D117, tests V1–V18, GUI requirements G1–G13, non-functional requirements N1–N13.
 3. `docs/underwater-imagery-correction-research.md` — background on the method family; not normative.
 4. `docs/project-log.md` — the dated history (accepts, releases, owner rulings), newest last; read when a `Current state` line needs its background.
 
@@ -14,11 +14,11 @@ If the plan and the spec disagree, the spec wins; raise the disagreement to the 
 ## Current state (rewritten by CHARC at each accept; narrative in `docs/project-log.md`)
 
 - **Released:** Clearwater **1.1.1**, the first download (tag `v1.1.1` = annotated `85cd0017` -> `c5ed8517`, published 2026-11-09; record `docs/proofs/release-1.1.1.md`): a PyInstaller one-folder Windows build with FFmpeg bundled, the GPU pack as an optional download, N13 satisfied on the artifact notices. Earlier: `v1.0.0` (`40d2ce04`, source install, 2026-11-04); `v1.1.0` is a tag on origin with NO release (its workflow run failed on the fresh checkout, DR-154; never moved).
-- **Phase:** 6 (distribution and platforms) with Phase 7 validation alongside, spec v0.6.2 (D1-D117, V1-V18, G1-G13, N1-N14). Plan `docs/clearwater-implementation-plan.md`. Last accept: WP7.1 (2026-11-10, main `5f684e58`, record `docs/proofs/wp7.1-accept.md`): Insta360 Studio HEVC exports validated as input; V4 PASS on the re-exports after WP7.2; the movie-level duration reading (AD-22); the owner's look verdict pass with notes (DR-160); ProRes / 4:2:2 input refused by the owner.
+- **Phase:** 6 (distribution and platforms) with Phase 7 validation alongside, spec v0.6.3 (D1-D117, V1-V18, G1-G13, N1-N14). Plan `docs/clearwater-implementation-plan.md`. Last accept: WP7.1 (2026-11-10, main `5f684e58`, record `docs/proofs/wp7.1-accept.md`): Insta360 Studio HEVC exports validated as input; V4 PASS on the re-exports after WP7.2; the movie-level duration reading (AD-22); the owner's look verdict pass with notes (DR-160); ProRes / 4:2:2 input refused by the owner.
 - **In flight (commissioned 2026-11-09):** WP6.5 macOS validation (Claude opus-high; stage 1 on the GitHub arm64 runner, stage 2 the owner's run sheet on the Mac; brief `docs/briefs/wp6.5-brief.md`): runner run 4 on `ae128116` reached the bundle content check with every test leg clean; the `.app` content-check fix (Codex) is in flight for run 5, then the `.app`-aware notices census (round-0 F0-2) and the bundled FFmpeg switch.
 - **Next:** the 1.2.0 macOS release after WP6.5 and CP6b (owner's look); DR-159 (release checklist v3) before any further release; CHARC's Phase 7 proposals from the register.
 - **Records:** accepts and releases `docs/proofs/`; debt `docs/debt-register.md` (DR-1..DR-162; watched rows DR-140, DR-158, DR-160); decisions `docs/decisions.md` (AD-1..AD-38); briefs `docs/briefs/`; the dated history `docs/project-log.md`.
-- **Open with the owner:** one word on the WP7.1 spec note (Insta360 Studio HEVC exports supported, ProRes refused, native `.insv` unsupported): "add" to put it in spec 5.2, or "no" to leave it in the accept record. Nothing else.
+- **Open with the owner:** nothing. (The WP7.1 spec note went into spec 5.2 as v0.6.3 on the owner's "add", 2026-11-10.)
 
 ## Inputs the owner has supplied (one line each; the full record is in `docs/project-log.md`)
 
