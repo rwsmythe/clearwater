@@ -4256,6 +4256,74 @@ def _within(path: Path, folders: Iterable[Path]) -> bool:
     return any(path != folder and path.is_relative_to(folder) for folder in folders)
 
 
+_MACOS_LINK_HOPS = 8
+"""The longest link chain a ``.app`` admits (PyInstaller's BUNDLE makes two hops)."""
+
+
+def _not_posix_relative(target: str) -> bool:
+    """Whether a link's stored text is empty, absolute or not POSIX."""
+    return not target or target.startswith("/") or "\\" in target or ":" in target
+
+
+def _macos_link_chain_problem(root: Path, physical: Path) -> str | None:
+    """Inside a ``.app``: follow a link chain hop by hop; say why it is refused, or ``None``.
+
+    Every hop's stored text must be relative POSIX text, every hop must land inside the
+    bundle's real ``Contents`` folder, and the chain must end in a regular file there within
+    :data:`_MACOS_LINK_HOPS` hops; a junction, a loop, a missing end or a folder end is
+    refused. Folder links inside a hop's path are resolved physically (they are not hops);
+    only a link at the hop's final name is a further hop. The message lists every hop.
+
+    Args:
+        root: The ``.app`` folder.
+        physical: The first link, a physical path under ``root``.
+
+    Returns:
+        ``None`` when the chain is admitted, else the reason with the full chain.
+    """
+    real_root = Path(os.path.realpath(root))
+    bundle = Path(os.path.realpath(root / "Contents"))
+    hops: list[str] = []
+
+    def refused(reason: str) -> str:
+        return f"link chain {reason}: {'; '.join(hops)}"
+
+    current, label = physical, physical.relative_to(root).as_posix()
+    seen = {Path(os.path.realpath(physical.parent)) / physical.name}
+    for _ in range(_MACOS_LINK_HOPS):
+        if current.is_junction():
+            hops.append(f"{label} (junction)")
+            return refused("meets a junction")
+        target = os.readlink(current)
+        hops.append(f"{label} -> {target!r}")
+        if _not_posix_relative(target):
+            return refused(f"hop target {target!r} is absolute or not POSIX")
+        named = current.parent / target
+        if named.name in {"", ".", ".."}:
+            hop = Path(os.path.realpath(named))
+        else:
+            hop = Path(os.path.realpath(named.parent)) / named.name
+        label = hop.relative_to(real_root).as_posix() if hop.is_relative_to(real_root) else str(hop)
+        if not hop.is_relative_to(bundle):
+            hops.append(label)
+            return refused("leaves the bundle")
+        if hop in seen:
+            hops.append(label)
+            return refused("loops")
+        seen.add(hop)
+        if hop.is_symlink() or hop.is_junction():
+            current = hop
+            continue
+        hops.append(label)
+        if not hop.exists():
+            return refused("ends in a missing entry")
+        if not hop.is_file():
+            return refused("does not end in a regular file")
+        return None
+    hops.append(label)
+    return refused(f"is longer than {_MACOS_LINK_HOPS} hops")
+
+
 def _macos_link_class_problem(
     root: Path, contents: Path, physical: Path, location: Path
 ) -> str | None:
@@ -4263,16 +4331,22 @@ def _macos_link_class_problem(
     if physical.is_junction():
         return "junction"
     target = os.readlink(physical)
-    if not target or target.startswith("/") or "\\" in target or ":" in target:
+    if _not_posix_relative(target):
         return f"link target {target!r} is absolute or not POSIX"
     # Resolve from the link's own (physical) folder: the walk never enters a linked folder.
     named = physical.parent / target
+    in_app = root.suffix == ".app"
+    to_a_link = named.is_symlink() or named.is_junction()
+    if in_app and to_a_link:
+        chain = _macos_link_chain_problem(root, physical)
+        if chain is not None:
+            return chain
     resolved = Path(os.path.realpath(named))
     if not resolved.is_relative_to(Path(os.path.realpath(root))):
         return "link resolves outside the release folder"
     if not resolved.exists():
         return "dangling link"
-    if named.is_symlink() or named.is_junction():
+    if to_a_link and not in_app:
         return "link to a link (one hop only)"
     framework = framework_link_problem(PurePosixPath(location.relative_to(root).as_posix()), target)
     if framework is None:
@@ -4324,7 +4398,15 @@ def macos_link_problem(root: Path, contents: Path, path: Path) -> str | None:
     THE one link rule (WP6.5, G1-F1 as ruled), shared by the origin check, the release ZIP
     and the artifact notices. Every link must be relative POSIX text, resolve (from its own
     physical folder) inside ``root`` to something that exists, and name a target that is
-    NOT itself a link (one hop). Then exactly three classes are admitted:
+    NOT itself a link (one hop). Inside a ``.app`` only (WP6.5 run 3, ruling (b)), a link
+    whose target is a link is read as a CHAIN instead: it is admitted when every hop is
+    relative POSIX text, every hop lands inside the bundle's ``Contents`` folder, and the
+    chain ends in a regular file there within :data:`_MACOS_LINK_HOPS` hops (PyInstaller's
+    ``Contents/Resources`` cross-link to a ``Contents/Frameworks`` bindepend link); a
+    chain that leaves the bundle, loops, ends missing or in a folder, or meets a junction
+    or an absolute or non-POSIX hop is refused with every hop named. Outside a ``.app``
+    (onedir) a link to a link is refused as before. Then exactly three classes are
+    admitted, read on the link's final target:
 
     - the framework-structure links (:func:`framework_link_problem`);
     - (B) PyInstaller's bindepend top-level link: directly in the contents root, named
@@ -4337,8 +4419,8 @@ def macos_link_problem(root: Path, contents: Path, path: Path) -> str | None:
       if it sat at this link's location (never entered further); a special file there is
       refused. Its files are origin-checked by the caller (:func:`macos_link_view`).
 
-    Everything else (a junction, an absolute or escaping target, a link to a link, any
-    other shape) is refused.
+    Everything else (a junction, an absolute or escaping target, a link to a link outside
+    a ``.app`` or a refused chain inside one, any other shape) is refused.
 
     Args:
         root: The release root (the ``.app``, or the folder holding ``_internal``).

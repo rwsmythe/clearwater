@@ -2582,6 +2582,8 @@ def test_release_snapshot_records_links_by_their_text(tmp_path, monkeypatch):
 LINK_BLOB = b"\xcf\xfa\xed\xfe trusted here by its whole-file hash"
 QT_BINARY = "PySide6/Qt/lib/QtCore.framework/Versions/A/QtCore"
 NOT_ADMITTED = "not a top-level dependency link or a bundle cross-link"
+PYSIDE_LIB = "libpyside6.abi3.6.12.dylib"
+"""The library run 3's build refused (``build.log:115``): a Resources -> Frameworks chain."""
 
 LINK_CASES: dict[str, tuple[str, list[str], list[tuple[str, str, bool]], str | None]] = {
     # name: (layout, files, links (path, target, folder), refusal reason or None)
@@ -2662,12 +2664,32 @@ LINK_CASES: dict[str, tuple[str, list[str], list[tuple[str, str, bool]], str | N
         ],
         "link to a link (one hop only)",
     ),
+    # Inside a .app a link to a link is a CHAIN (WP6.5 run 3, ruling (b)): admitted when every
+    # hop is relative POSIX text inside Contents and the chain ends in a regular file there.
     "C-app-link-to-a-link": (
         "app",
         ["Contents/Resources/data.txt"],
         [
             ("Contents/Frameworks/data.txt", "../Resources/data.txt", False),
             ("Contents/MacOS/data.txt", "../Frameworks/data.txt", False),
+        ],
+        None,
+    ),
+    "C-app-pyinstaller-chain": (
+        "app",
+        [f"Contents/Frameworks/PySide6/{PYSIDE_LIB}"],
+        [
+            (f"Contents/Frameworks/{PYSIDE_LIB}", f"PySide6/{PYSIDE_LIB}", False),
+            (f"Contents/Resources/{PYSIDE_LIB}", f"../Frameworks/{PYSIDE_LIB}", False),
+        ],
+        None,
+    ),
+    "onedir-two-hop-chain": (
+        "onedir",
+        [f"_internal/PySide6/{PYSIDE_LIB}"],
+        [
+            (f"_internal/{PYSIDE_LIB}", f"PySide6/{PYSIDE_LIB}", False),
+            (f"_internal/sub/{PYSIDE_LIB}", f"../{PYSIDE_LIB}", False),
         ],
         "link to a link (one hop only)",
     ),
@@ -2819,6 +2841,152 @@ def test_folder_link_checks_nested_links_as_if_at_its_location(tmp_path, monkeyp
     assert problem == "evil under the linked folder: link resolves outside the release folder"
     found = link_origin_check(tmp_path, monkeypatch, executable)
     assert len(found) == 2 and all("outside the release folder" in line for line in found)
+
+
+def test_the_pyinstaller_chain_is_admitted_in_the_origin_walk(tmp_path, monkeypatch):
+    """Run 3 (b): run 3's exact refusal, ``build.log:115``, is gone for the BUNDLE shape."""
+    layout, files, links, _ = LINK_CASES["C-app-pyinstaller-chain"]
+    folder, executable = link_release(tmp_path, layout, files, links)
+    contents = folder / "Contents/Frameworks"
+    for path, _, _ in links:
+        assert build.macos_link_problem(folder, contents, folder / path) is None
+    assert link_origin_check(tmp_path, monkeypatch, executable) == []
+
+
+def test_the_onedir_two_hop_chain_keeps_todays_message(tmp_path, monkeypatch):
+    """Run 3 (b): outside a .app the one-hop rule and its message are unchanged."""
+    layout, files, links, _ = LINK_CASES["onedir-two-hop-chain"]
+    _, executable = link_release(tmp_path, layout, files, links)
+    link = executable.parent / f"_internal/sub/{PYSIDE_LIB}"
+    assert link_origin_check(tmp_path, monkeypatch, executable) == [
+        f"native origin: linked file {link}: link to a link (one hop only)"
+    ]
+
+
+CHAIN_REFUSALS: dict[str, tuple[list[str], list[tuple[str, str, bool]], str, list[str]]] = {
+    # name: (files, links (path, target, folder), reason prefix, the hops the message lists)
+    "leaves-the-release": (
+        [],
+        [
+            ("Contents/Resources/libx.dylib", "../Frameworks/libx.dylib", False),
+            ("Contents/Frameworks/libx.dylib", "../../../../outside/libx.dylib", False),
+        ],
+        "link chain leaves the bundle: ",
+        [
+            "Contents/Resources/libx.dylib -> '../Frameworks/libx.dylib'",
+            "Contents/Frameworks/libx.dylib -> '../../../../outside/libx.dylib'",
+        ],
+    ),
+    "leaves-contents-inside-the-app": (
+        ["Info.plist"],
+        [
+            ("Contents/Resources/Info.plist", "../Frameworks/Info.plist", False),
+            ("Contents/Frameworks/Info.plist", "../../Info.plist", False),
+        ],
+        "link chain leaves the bundle: ",
+        [
+            "Contents/Resources/Info.plist -> '../Frameworks/Info.plist'",
+            "Contents/Frameworks/Info.plist -> '../../Info.plist'",
+            "Info.plist",
+        ],
+    ),
+    "dangling": (
+        [],
+        [
+            ("Contents/Resources/libx.dylib", "../Frameworks/libx.dylib", False),
+            ("Contents/Frameworks/libx.dylib", "PySide6/libx.dylib", False),
+        ],
+        "link chain ends in a missing entry: ",
+        [
+            "Contents/Resources/libx.dylib -> '../Frameworks/libx.dylib'",
+            "Contents/Frameworks/libx.dylib -> 'PySide6/libx.dylib'",
+            "Contents/Frameworks/PySide6/libx.dylib",
+        ],
+    ),
+    "loop": (
+        [],
+        [
+            ("Contents/Resources/libx.dylib", "../Frameworks/libx.dylib", False),
+            ("Contents/Frameworks/libx.dylib", "../Resources/libx.dylib", False),
+        ],
+        "link chain loops: ",
+        [
+            "Contents/Resources/libx.dylib -> '../Frameworks/libx.dylib'",
+            "Contents/Frameworks/libx.dylib -> '../Resources/libx.dylib'",
+            "Contents/Resources/libx.dylib",
+        ],
+    ),
+    "ends-in-a-folder": (
+        ["Contents/Frameworks/pkg2/data.txt"],
+        [
+            ("Contents/Resources/pkg", "../Frameworks/pkg", True),
+            ("Contents/Frameworks/pkg", "pkg2", True),
+        ],
+        "link chain does not end in a regular file: ",
+        [
+            "Contents/Resources/pkg -> '../Frameworks/pkg'",
+            "Contents/Frameworks/pkg -> 'pkg2'",
+            "Contents/Frameworks/pkg2",
+        ],
+    ),
+}
+
+
+@pytest.mark.parametrize("case", sorted(CHAIN_REFUSALS))
+def test_a_bad_chain_inside_a_app_is_refused_with_every_hop(tmp_path, monkeypatch, case):
+    """Run 3 (b): out of the bundle, dangling, a loop, a folder end; every hop is named."""
+    files, links, reason, hops = CHAIN_REFUSALS[case]
+    folder, executable = link_release(tmp_path, "app", files, links)
+    first = folder / links[0][0]
+    problem = build.macos_link_problem(folder, folder / "Contents/Frameworks", first)
+    assert problem is not None and problem.startswith(reason), problem
+    shown = problem.removeprefix(reason).split("; ")
+    assert shown[: len(hops)] == hops, shown
+    # Out of the release, the last hop is shown as its absolute path.
+    assert len(shown) == len(hops) + (case == "leaves-the-release"), shown
+    found = link_origin_check(tmp_path, monkeypatch, executable)
+    assert f"native origin: linked file {first}: {problem}" in found
+
+
+@pytest.mark.parametrize("count", [8, 9])
+def test_a_chain_is_bounded_in_length(tmp_path, count):
+    """Run 3 (b): eight hops ending in a file are admitted; a ninth is refused, every hop named."""
+    links = [
+        (f"Contents/Frameworks/c{index}", f"c{index + 1}", False) for index in range(count - 1)
+    ]
+    links.append((f"Contents/Frameworks/c{count - 1}", "data.bin", False))
+    folder, _ = link_release(tmp_path, "app", ["Contents/Frameworks/data.bin"], links)
+    problem = build.macos_link_problem(
+        folder, folder / "Contents/Frameworks", folder / "Contents/Frameworks/c0"
+    )
+    if count == 8:
+        assert problem is None
+    else:
+        hops = [f"Contents/Frameworks/c{index} -> 'c{index + 1}'" for index in range(8)]
+        assert problem == "link chain is longer than 8 hops: " + "; ".join(
+            [*hops, "Contents/Frameworks/c8"]
+        )
+
+
+def test_a_chain_with_an_absolute_hop_is_refused(tmp_path):
+    """Run 3 (b): a hop whose stored text is absolute (or not POSIX) refuses the chain."""
+    folder, _ = link_release(
+        tmp_path,
+        "app",
+        ["Contents/Frameworks/libx.dylib"],
+        [("Contents/Resources/libx.dylib", "../Frameworks/liby.dylib", False)],
+    )
+    second = folder / "Contents/Frameworks/liby.dylib"
+    _symlink(second, str(folder / "Contents/Frameworks/libx.dylib"), folder=False)
+    problem = build.macos_link_problem(
+        folder, folder / "Contents/Frameworks", folder / "Contents/Resources/libx.dylib"
+    )
+    target = os.readlink(second)
+    assert problem == (
+        f"link chain hop target {target!r} is absolute or not POSIX: "
+        f"Contents/Resources/libx.dylib -> '../Frameworks/liby.dylib'; "
+        f"Contents/Frameworks/liby.dylib -> {target!r}"
+    )
 
 
 def test_folder_link_files_are_checked_at_the_links_location(tmp_path, monkeypatch):
