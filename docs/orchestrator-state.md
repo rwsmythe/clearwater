@@ -23,15 +23,15 @@
      - `ff2ed010` + `8955f790`: the A r2 fold, from Codex turn 4 under CHARC `7a363f94`;
      - before them, gen 67's chain.
    - **Nets:**
-     - A r3 (Claude, `f02\A-claude3`): NO_NEW_CRITICAL_MAJOR;
-     - B (Claude, `f02\B-claude1`, on `200dffd8..8955f790`): NO_NEW_CRITICAL_MAJOR, with 2 MINOR + 2 ADV.
+     - A r3 (Claude, `f02\A-claude\r3`): NO_NEW_CRITICAL_MAJOR;
+     - B (Claude, `f02\B-claude\r1`, on `200dffd8..8955f790`): NO_NEW_CRITICAL_MAJOR, with 2 MINOR + 2 ADV.
    - **Gate on `8955f790`** (`work/orch-g64/gate-f02a8955/` and `gate-f02a8955s/`):
      - identity 10,854;
      - parallel 9,291 / 213 / 0;
      - serial 1,324 / 19 / 0 (2,129 s);
      - harness 423.
    - **NEXT:**
-     1. CHARC pushes run 7 (switch OFF) and gives the run id. Watch it, and download the evidence READ-ONLY to `clearwater-review-evidence\wp6.5unnerun-<id>\`.
+     1. CHARC pushes run 7 (switch OFF) and gives the run id. Watch it, and download the evidence READ-ONLY to `clearwater-review-evidence\wp6.5\runner\run-<id>\`.
      2. Post the table, including `macho-identities.txt`'s data-line count (155 expected).
      3. **Recommended to CHARC in the ready post:** carry B MINOR 1, B MINOR 2, B ADV 3, B ADV 4, A r3 ADV 1 and A r3 ADV 2 into F0-2b's first dispatch. Await the ruling.
         - B MINOR 1: a nested `.app` under `Contents/MacOS` hijacks discovery.
@@ -58,7 +58,7 @@
 
 ### Gen-68 lessons
 
-- **`codex_cell.py review` marks a Claude review as failed (exit 1, `verdict_lines: []`) when the verdict line is numbered** (`1. \`VERDICT: ...\``). Read `review.txt` before treating it as failed. B's prompt now says "on its own line, unnumbered".
+- **`codex_cell.py review` marks a Claude review as failed (exit 1, `verdict_lines: []`) when the verdict line is numbered** (`` 1. `VERDICT: ...` ``). Read `review.txt` before treating it as failed. B's prompt now says "on its own line, unnumbered".
 - **The gate's parallel half can run beside a read-only review process.** Hold the serial leg until the review has returned.
 
 - **A normaliser's input class must match the real inputs.** The fold's identity test used a THIN origin; the real PySide6 / shiboken6 wheels are universal2. Ask "what does the real wheel look like" for every synthetic origin in a test.
