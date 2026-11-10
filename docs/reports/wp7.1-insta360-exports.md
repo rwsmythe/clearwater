@@ -416,3 +416,112 @@ future change separately. The note does not waive the V4 failure documented abov
   the extra lower-rate MP4 is probe-only; native `.insv` is excluded.
 - **Verification:** broad scratch Ruff is not green (section 6); the report and
   package acceptance still require the seat's remaining review/gate disposition.
+
+## 9. Re-runs after WP7.2 and the instrument reading
+
+**Changes since the report.** WP7.2 is on main at `e438123c`. The output video
+track now ends exactly where the source track does: the last frame's end is the
+track's own last sample end (`start_pts + duration_ts`, exact in track ticks),
+under AD-22 extended 2026-11-09. The re-runs were judged by the movie-level reading
+in `tools/video_fidelity.py` at `65c28219` on `wp7.1`. The five instrument commits,
+in order, are `09838991`, `2dde0b77`, `ad36c021`, `8eac86d1`, `65c28219`
+(branch log; AD-22 in `C:/Users/rwsmy/clearwater/docs/decisions.md:31`).
+
+**Owner's reading.** The owner's word on 2026-11-10 was "reading". AD-22 on main
+records its ruled content:
+
+> a movie-level duration row (mvhd duration, edit-list segment duration) is SAME
+> when both sides reduce to the same exact track value and each side lies within
+> one movie tick of it on its own grid; the direction of the muxer's rounding is
+> not compared. Per-frame pts, the stream `duration_ts`, start offsets and audio
+> packets stay exact. An instrument reading, not a relaxation of D94.
+
+**Re-run V4 results.** Counts below are differences, read from each record's
+`v4.summary.different`; verdicts are `v4.pass`. Each source is `SCUBA vids2.mp4`.
+
+| Record (`R/`) | Kind / completion | Source | `ok` | V4 | MANDATORY | REQUIRED | BEST-EFFORT |
+|---|---|---|---|---|---:|---:|---:|
+| `export-hevc62r2.json` | spawned-export / inline V4 | `SCUBA vids2.mp4` | true | PASS | 0 | 0 | 5 |
+| `v4-bench-hevc62r.json` | throughput / V4-only | `SCUBA vids2.mp4` | true | PASS | 0 | 0 | 5 |
+| `v4-hevc62r2.json` | spawned-export / V4-only | `SCUBA vids2.mp4` | true | PASS | 0 | 0 | 5 |
+
+`R/bench-hevc62r.json` is the throughput leg with `--defer-v4`: `v4.status` is
+`deferred`, `v4.pass` is null, and that record supplies no V4 verdict. The five
+BEST-EFFORT differences are the known classes from section 4: camera atoms
+`moov/udta` children; `ftyp` brands; container tags other than `creation_time`;
+stream tags other than `creation_time` / `timecode`; video sample-entry child boxes.
+
+**Movie-tick notes.** Each of the three V4 records has four notes. The following
+rows are SAME under the reading, each with the note prefix "movie-tick rounding
+of the exact track value (owner 2026-11-10, AD-22)":
+
+- `movie duration: mvhd (presentation form, exact)`;
+- `edit list, video track, as written (media_time in media seconds)`;
+- `edit list, video and audio tracks (presentation effect)`;
+- `edit lists as written, non-video tracks (media_time in media seconds)`.
+
+For example, `R/export-hevc62r2.json`, `v4.summary.notes`, records:
+
+> movie-tick rounding of the exact track value (owner 2026-11-10, AD-22);
+> source vide#0 entry 0: D=30897567/500000, V=926927/15000, tick=1/1000000;
+> output vide#0 entry 0: D=926927/15000, V=926927/15000, tick=1/240000
+
+The raw item record reached through each `v4.path` also reads `video stream
+duration` SAME: source and output are both `926927/15000` s. MANDATORY differences
+are zero, so WP7.2's video-track-end fix holds on the re-export.
+
+**Owner's look verdict (2026-11-10), verbatim:**
+
+> Pass with notes 8999/150: relatively strong blueish halo around scuba diver on
+> left side; 16499/75: slight blue halo around scuba diver legs in the bottom right.
+
+Both frames are from the 439 s export of `SCUBA vids 3.mp4`: row 03 at requested
+60 s, exact PTS `8999/150`; row 04 at requested 220 s, exact PTS `16499/75`
+(`work/wp7.1/look/manifest.json`, `rows[3]`, `rows[4]`). The seat keeps the exhibits
+outside `work/`; these hashes are quoted from `work/wp7.1/seat-stage/MD5SUMS`:
+
+| Exhibit | MD5 |
+|---|---|
+| Row 03 before, `03-before-t060-before.png` | `c146316026afdf106e8fa43582008dfc` |
+| Row 03 after, `03-after-t060-after.png` | `82c3db8bcb33351c4318e815cd1ef864` |
+| Row 04 before, `04-before-t220-before.png` | `d6280d380e8b5a3eb480280ebcb00084` |
+| Row 04 after, `04-after-t220-after.png` | `88188e930025fa57cf06781db6186c9b` |
+| Look-pack `manifest.json` | `d832a1e39edafc2c5191d6e5f67c77e1` |
+
+The halo is a look note, not a failure; CHARC records a debt row at the accept.
+
+**ProRes decision.** The owner's word on 2026-11-10, verbatim: "No for ProRes /
+4:2:2 input". Spec 5.2 stands: HEVC / H.264 only. Section 7's note (Studio HEVC
+exports supported, ProRes refused, native `.insv` unsupported) is the proposal of
+record, put to the owner at the accept.
+
+**Window-3 timings: not exclusive, of no record** (CHARC `ae7c2e1e`). The bench leg
+`R/bench-hevc62r.json` records `bench.wall_s=711.8607500999933`: 711.9 s,
+11.52 min/min using its `duration_s=926927/15000`; its D106 bound is 12.0 min/min
+(`bench.d106_min_per_min`). D / E remain the figures of record at 10.35 / 11.04
+min/min (`R/bench-hevc62q.json`, `R/bench-hevc439.json`; section 3).
+
+Exclusivity broke in the EXPORT leg. The staged overlap log records an implementer
+cell's pytest at 09:26:40-46Z, then at 54 nominal five-second polls from 09:27:29Z
+to 09:39:33Z on 2026-11-10. These all fall inside the export leg,
+09:26:28-09:44:39Z; none fall inside the bench leg, 09:44:39-09:56:51Z. Evidence:
+`work/wp7.1/seat-stage/pytest-overlap.log` (header and timestamped sightings),
+md5 `592557d1898b79af80989021d712ba9f`; seat original
+`C:/Users/rwsmy/clearwater-review-evidence/wp7.1/seat/window3/pytest-overlap.log`.
+Leg boundaries are in that seat folder's `window3.log:8-12`. The V4 verdicts are
+bit-level facts of the output files and do not depend on contention; only the
+timings are of no record.
+
+The first launch refused `--timeout-s 3600` against the inline V4 bound of 7,408 s
+and was relaunched as `export-hevc62r2` with `--timeout-s 8100`
+(`work/wp7.1/logs/export-hevc62r.supervisor.json`, command;
+`export-hevc62r.failure.json`, refusal; `R/export-hevc62r2.json`, `timeout_s`,
+`v4_timeout_s`; seat `window3.log:6`).
+
+**Correction of sections 4 and 8.** "V4 = FAIL" in section 4 is the HISTORICAL
+finding on the pre-WP7.2 exports and stays as written; the re-exports PASS above.
+Section 8's open items are now closed as follows: owner look verdict (given above);
+owner movie-level reading (given above); WP7.2 and the short re-runs (done, as shown
+by the fix, PASS records and movie-tick notes above); ProRes (answered "No" above).
+Its other items (spawned-worker timing, E's historical FAIL, long clip, coverage,
+the scratch Ruff note) stand as written.
