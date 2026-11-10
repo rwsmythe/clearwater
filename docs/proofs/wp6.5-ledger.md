@@ -3053,7 +3053,12 @@ Scratch `work\wp6.5\ar11fold\`.
     `DirEntry.is_dir()` default, `open`) is made on any path at or under the release root
     until every link on that path has been admitted by the component walk; only `lstat` /
     `readlink` / `is_symlink` / `is_junction` and non-following `DirEntry` queries precede
-    admission. Proved by the recorder test from `30d9ccde` (`## A r13 fold` below);
+    admission. **Narrowed (A r14 M1):** the claim "proved by the recorder test from
+    `30d9ccde`" was NOT true at `bce8bddc` (Codex A r14 finding 1: the origin check's
+    diagnostic PATH lookup ran `is_file()` on a candidate through the unadmitted link
+    `Contents/Resources/bin`, and the recorder missed real opens, late admissions and
+    junctions). From `b38e7420` the invariant is EVIDENCED by the recorder test for its
+    covered shapes only, not proved for every following call (`## A r14 fold` below);
   - EVERY link met (a folder link in mid-path as much as a further hop at the final name)
     counts against `_MACOS_LINK_HOPS` = 8 and is validated as the first: relative POSIX text,
     never a junction, never met twice (a loop); its text is then walked in place;
@@ -3328,8 +3333,12 @@ home: it requires `_internal`, so it never lists a `.app`); `release.yml`,
   - The origin check (`:4730`) opens the executable (the bootloader comparison and
     `read_package`) only when `_macos_link_on_path` (`:4670`, an `lstat` reading from the
     root down, stopping at the first link) finds no link on its path. Otherwise it records
-    "native origin: `<executable>` lies behind a link in the bundle; not read" and the walk
-    refuses the link itself.
+    "native origin: `<executable>` lies behind a link in the bundle; not read".
+    **Corrected (A r14 advisory 3):** the executable guard declines to read an executable
+    behind a link INDEPENDENTLY of the shared link rule. The walk refuses that link only
+    when the rule refuses it: a class-(C) link (`Contents/MacOS/Clearwater ->
+    ../Frameworks/Clearwater`) stays ADMITTED by the rule, and its executable is still
+    not read. No code change; the class-(C) admission is preserved.
 - Onedir and Windows: unchanged. The listing keeps `os.walk`; the class rule's onedir
   branch makes the same calls. **Evidence:** scratch probe `ar11fold\onedir_calls_probe.py`
   recorded every filesystem call (the test's recorder) of the origin check, the ZIP, the
@@ -3425,4 +3434,167 @@ Pass 1:
 
 Pass 2: nothing new.
 
-Depth at A-r13-fold yield: DISPATCHER TO FILL
+Depth at A-r13-fold yield: 304,492 (wp65-cell17, read by the dispatcher with cell_depth.py at its A-r13-fold return)
+
+## A r14 fold (`wp65-cell18`, dispatch-19; base `bce8bddc`)
+
+Codex Reviewer A r14 on `b7e2dfb1..bce8bddc`: `VERDICT: FINDINGS`, 2 MINOR + 1 advisory, folded
+under CHARC's standing fold rule (`4ed56fcb`); no ruling needed. CHECK 2 (no wrong admission)
+and CHECK 3 (onedir identical) passed at r14 and stay so. Commit `b38e7420`
+(`tools/package/build.py`, `tests/test_tools_package_build.py`): M1 and M2 in ONE commit,
+because M1's regression runs under M2's recorder. No `src/` change; `release.yml`,
+`MACOS_FFMPEG_BUNDLED`, `notices.py`, the debt register and the C14 rows untouched. No
+admission changed (the shared rule `macos_link_problem` and its walk are untouched).
+
+### M1 MINOR: the diagnostic PATH lookup (`tools/package/build.py`)
+
+- `:4690` `_macos_candidate_behind_a_link(roots, candidate)`: reads a PATH candidate as
+  WRITTEN, component by component from its anchor (`..` lexically, which matches the
+  system's reading up to the first link, where the reading stops). Every component strictly
+  below a root is read with `is_junction()` and `os.lstat` only, never followed. Names
+  compare case-folded (a case-insensitive volume's spelling of the root). A component that
+  cannot be read ends the reading: the system's own lookup stops there too.
+- `:4738` `linked()` in `_macos_native_origin_violations`, used by `unknown()` (`:4750`):
+  - inside a `.app`, a candidate with a link or junction on its path below the release root
+    is SKIPPED as a diagnostic: no "likely PATH source" for it, never resolved, never routed
+    through the walk;
+  - the roots are the `.app` as given and `realpath(root)` (an alias above the root, the
+    one following call the invariant allows on the root), read once, on first need;
+  - a candidate outside the release root (the host's PATH) keeps today's `is_file()`.
+- Onedir: `linked()` returns `False` with no call, so the calls, their order and the
+  messages are those of `bce8bddc`. **Evidence:** scratch probe
+  `work\wp6.5\ar14fold\onedir_calls_probe_r14.py` (the A r13 probe with a NONEMPTY
+  `original_path`: the onedir `_internal`, an outside folder and an empty entry, so
+  `unknown()` queries candidates under the root) over the nine onedir `LINK_CASES` (the
+  origin check, the ZIP, the shared rule, the notices inventory), under the strengthened
+  recorder, against `bce8bddc`'s `build.py` and the fold's: 2,188 recorded calls (names,
+  paths, order, following flags) and every result and message IDENTICAL, once the two
+  checkout folders are normalised (`compare_probe.py`). Windows origin
+  (`_pe_native_origin_violations`) untouched.
+- The comment at `:4782` now says the executable guard works independently of the shared
+  rule (advisory 3); a comment only.
+
+### M2 MINOR: the recorder (`tests/test_tools_package_build.py`)
+
+`:3196` `_FsRecorder` is EVIDENCE FOR ITS COVERED SHAPES, not a proof of every following
+call. It records, as `(call, path, following)` in ONE ordered sequence:
+
+- `os.stat` (its `follow_symlinks`), `os.lstat`, `os.readlink`, `os.path.realpath`,
+  `os.scandir`, `os.listdir`;
+- `os.path.exists` / `isfile` / `isdir` (on Windows these bypass `os.stat`);
+- each listed `DirEntry`'s `is_dir` / `is_file` / `stat` with their `follow_symlinks`;
+- `Path.exists` / `is_file` / `is_dir` / `resolve` / `open` (`read_bytes` and `read_text`
+  open through `Path.open` and `io.open` on 3.12);
+- **gap 1, the real opens:** `builtins.open`, `io.open`, `os.open` (following unless
+  `O_NOFOLLOW`);
+- **gap 2, admissions as events:** `admit`, recorded when the component walk
+  (`build._macos_link_chain_problem`) returns admitted, after its own calls.
+
+Not covered: opens made in C below these names (`io.FileIO` built directly, an extension
+module's own `fopen`), child processes, calls on a file descriptor.
+
+`:3332` `violations(root, zone)` walks the calls IN ORDER: a call is a violation when it
+touches the outside zone at all, or FOLLOWS a path under the release root through a link
+not admitted EARLIER in the sequence (a later admission does not excuse it). **Gap 3:** a
+link is `S_ISLNK` by `lstat` OR a junction by `os.path.isjunction` (looked up per call; on
+POSIX it is `False`). `:3319` `admitted(root)` lists the admissions in order; the shape
+test now asserts the walk admits exactly the shape's admitted links instead of whitelisting
+them.
+
+**The covered shapes** (each through the public entry points: `native_origin_violations`,
+`write_release_zip`, `macos_link_problem` on each link; `:3426` `_recorded_entry_points`):
+
+1. r11's out-and-back (`Resources/data -> ../Frameworks/data`,
+   `Frameworks/data -> ../../../outside/back/data`, the outside alias back in): nothing
+   admitted;
+2. r13's nested `pkg/evil` (`Resources/pkg -> ../Frameworks/pkg` admitted,
+   `Frameworks/pkg/evil -> ../../../../outside/back/data` refused);
+3. r13's linked `Contents -> ../outside/back`: nothing admitted, and no open of any kind
+   under the release root;
+4. A r14's linked PATH folder (`Contents/Resources/bin -> ../../../outside/bin`, an unknown
+   `Contents/Aaa.dylib` met first), with `original_path` naming the linked folder as
+   written, through `..` past the link, and followed by a host folder holding the file.
+
+### Regressions
+
+- `:3500` `test_a_linked_path_candidate_is_never_followed[linked-only | linked-then-host |
+  through-dotdot]` (shape 4): `found` is exactly "native origin unknown:
+  Contents/Aaa.dylib" (with "; likely PATH source: `<host>/Aaa.dylib`" for the host case,
+  whose `Path.is_file` is recorded) and the link's refusal, unchanged: "link chain leaves the
+  bundle: Contents/Resources/bin -> '../../../outside/bin'; `<real wrapper>/outside/bin`".
+  Nothing admitted; no violation.
+- `:3542` `test_a_path_candidate_is_read_below_the_root_in_any_spelling`: the helper finds
+  the link through the root as given, through its canonical spelling (an alias above the
+  root, made in the test), in upper case (on a case-insensitive volume), through `..`, and
+  out through the link and lexically back outside; a physical path, a missing component and
+  a host path are not "behind a link".
+- `:3572` `test_the_recorder_records_an_ordinary_read`: `Path.read_bytes`, `Path.read_text`,
+  `builtins.open`, `io.open`, `os.open` each record a following open of the file (A's
+  probe).
+- `:3592` `test_the_recorder_orders_admission_events`: `realpath` on `Resources/pkg` before
+  its admission is a violation; after it, none.
+- `:3611` `test_the_recorder_records_the_walks_admissions`: the walk's admission is recorded
+  once, after its `readlink`.
+- `:3635` `test_the_recorder_sees_a_junction_as_a_link[modeled | real]`: an `open` of
+  `Contents/MacOS/Clearwater` through a junction `Contents/MacOS` is a violation (A's
+  modeled case on every host; a real junction on Windows, which ran here).
+- `:3463` `test_no_following_call_before_the_walk_admits_the_links` (shapes 1-3) moves to
+  the ordered checker and the admission assertion; its docstring says evidence for the
+  covered shapes.
+
+### RED / GREEN
+
+- **RED, M1 on `bce8bddc`'s `build.py`** (a throwaway detached worktree at `bce8bddc` under
+  `work\wp6.5\ar14fold\red-wt`; the fold's tests run with `WP61_BUILD_SCRIPT` naming its
+  `build.py`): **4 failed, 8 passed** over the new and recorder tests. Failing: the three
+  shape-4 cases, each by the recorder (a following `Path.is_file` and its `os.stat` on
+  `Contents/Resources/bin/Aaa.dylib`, through the unadmitted link), and the spelling test
+  (no helper). On this Windows host the POSIX-text folder link is not followed by the OS,
+  so the old messages happened to match; the recorder is what catches it (on macOS the old
+  code also NAMED the linked candidate, as A's probe showed). Shapes 1-3 pass there under
+  the strengthened recorder, as A's CHECK 1 reruns found.
+- **RED, M2 on `bce8bddc`'s recorder** (scratch `test_ar14_old_recorder_red.py`, the three
+  gap cases in the OLD recorder's API, run in the throwaway worktree against its own test
+  module): **4 failed**: `read_bytes` recorded nothing; the late admission (whitelisted)
+  gave no violation; the modeled and the real junction gave no violation.
+- **GREEN** (`b38e7420`):
+  - `test_tools_package_build.py` + `test_tools_package_notices.py` (`-n 3`): **1131
+    passed** (1122 + 9);
+  - `test_tools_package_smoke.py`: 74 passed, 1 skipped;
+  - `test_macos_portability.py`: 226 skipped (darwin-only on this host);
+  - `ruff check .`, `ruff format --check .` (339 files), `mypy`, `mypy --platform darwin`
+    (166 source files): clean;
+  - committed blobs 0 CR, 0 NUL.
+
+### ADV3 (advisory): ledger wording only
+
+`## A r13 fold`'s executable-guard bullet is corrected in place (above): the guard rejects
+reading an executable behind a link independently of the shared rule; a class-(C) link stays
+admitted. No code change beyond the matching comment (`:4782`).
+
+### Verification loop
+
+Pass 1:
+
+- **Suspected:** `..` in a PATH entry after a bundle link (`<root>/.../bin/../bin`) escapes
+  a check on the normalised path. **CONFIRMED** by reading (a normalised path would hide the
+  link the system follows); **FIXED** by reading the components as written
+  (`through-dotdot`, and the spelling test's out-and-back).
+- **Suspected:** a PATH entry naming the canonical root (an alias above it) or another
+  letter case is taken for a host path and followed. **CONFIRMED** by reading; **FIXED**
+  (both roots, case-folded); the spelling test.
+- **Suspected:** the strengthened recorder flags legitimate reads in shapes 1-3 (the origin
+  check's `read_bytes` of physical files). **REJECTED**: shapes 1-3 are green under it.
+- **Suspected:** onedir calls change (the moved `in_app` line, `linked()`). **REJECTED** by
+  the nonempty-PATH probe (identical).
+- **Not fixed, outside the dispatch's scope (for the dispatcher):** a HOST PATH entry that
+  reaches into the bundle through a link OUTSIDE the release root (for example
+  `/tmp/alias -> <root>/Contents/Resources`, then `/tmp/alias/bin`) is lexically outside
+  the root, so it keeps today's `is_file()` per the dispatch ("candidates outside the
+  release root keep today's query"), and that query follows the bundle's `bin` link.
+  Closing it needs a non-following resolver of host links (`readlink` per component),
+  i.e. a change to the outside-candidate query the dispatch fixed as unchanged.
+
+Pass 2: nothing new.
+
+Depth at A-r14-fold yield: DISPATCHER TO FILL
