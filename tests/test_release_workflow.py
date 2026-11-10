@@ -975,6 +975,8 @@ def test_macos_test_legs_follow_the_windows_gate_with_the_ruled_differences(maco
 # --- WP6.5 run 2 (CHARC option (i); A r8 fold, CHARC 7910e7df): the two modes ------------------
 
 VALIDATION_CONTINUES = "${{ success() || (!cancelled() && !inputs.release-version) }}"
+VALIDATION_CONTINUES_ON = "${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED == 'true' }}"
+RELEASE_UPLOAD = "inputs.release-version && env.MACOS_FFMPEG_BUNDLED == 'true'"
 VALIDATION_CONTINUES_OFF = "${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}"
 VALIDATION_ONLY = "${{ !cancelled() && !inputs.release-version }}"
 """Run 3 (CHARC's exact form): the app listing runs in validation mode only, after any failure."""
@@ -989,19 +991,19 @@ MACOS_STEP_CONDITIONS = {
     "Build app bundle without FFmpeg": VALIDATION_CONTINUES_OFF,
     "List the app bundle": VALIDATION_ONLY,
     "Record the Mach-O identities": VALIDATION_ONLY,
-    "Build release bundle and zip": "env.MACOS_FFMPEG_BUNDLED == 'true'",
+    "Build release bundle and zip": VALIDATION_CONTINUES_ON,
     "Run macOS tests on the built bundle": VALIDATION_CONTINUES,
     "Check macOS skip reasons": VALIDATION_CONTINUES,
     "Capture runner and encoder facts": VALIDATION_CONTINUES,
     "Stage release assets": "env.MACOS_FFMPEG_BUNDLED == 'true'",
-    "Upload release assets": "env.MACOS_FFMPEG_BUNDLED == 'true'",
+    "Upload release assets": RELEASE_UPLOAD,
     "Upload evidence": "always()",
 }
 """Every macOS step's ``if:`` exactly (None = no condition, i.e. ``success()``). With no
 release-version input (validation mode) the serial leg, the bundle's macOS tests, the
 skip-reason check and the facts capture run after an earlier failure, and the bundle build
-without FFmpeg does while the switch is off; in release mode every step is under
-``success()`` as at 69538abe."""
+without FFmpeg does while the switch is off. Staging/upload require success in
+release mode; the bundled build also runs after a failure."""
 
 RELEASE_WORKFLOW_SHA256 = "dd91eae3ccb63ca735dcb252375a8373ea946e87ba92803678e30c66352a8151"
 """sha256 of release.yml (text, LF) at 69538abe: run 2's fix leaves it byte-identical."""
@@ -1218,7 +1220,7 @@ MODE_REACHED = {
         "Upload release assets",
         "Upload evidence",
     ],
-    "release-failed-leg": [*FIRST_SIX, "Upload evidence"],
+    "release-failed-leg": [*FIRST_SIX, "Build release bundle and zip", "Upload evidence"],
     "validation-off-failed-leg": [
         *FIRST_SIX,
         "Run serial tests",
@@ -1233,6 +1235,7 @@ MODE_REACHED = {
     "validation-on-failed-leg": [
         *FIRST_SIX,
         "Run serial tests",
+        "Build release bundle and zip",
         "List the app bundle",
         "Record the Mach-O identities",
         "Run macOS tests on the built bundle",
@@ -1241,7 +1244,7 @@ MODE_REACHED = {
         "Upload evidence",
     ],
 }
-"""The steps each mode case reaches, in order (release-failed-leg = 69538abe's behaviour)."""
+"""The steps each mode case reaches, including F0-2b's build after a failed release leg."""
 
 
 def _walk(macos, inputs, switch, failing):
@@ -1291,9 +1294,10 @@ def test_both_modes_reach_the_ruled_steps_by_evaluation(macos, case):
     """A r8 fold (CHARC 7910e7df): the real ``if:`` expressions EVALUATED, step by step:
     (1) release, all success: the bundle tests (``macos.log``'s producer) run before the
     skip-reason check reads it, and staging and upload are reached; (2) release, a failed
-    leg: only the evidence upload after it (69538abe); (3) validation, switch off, a failed
+    leg: the bundled build and evidence upload run, but staging/upload stay blocked;
+    (3) validation, switch off, a failed
     leg: serial, the build without FFmpeg, the bundle tests, the skip reasons and the facts;
-    (4) validation, switch on, a failed leg: the same without the build, and no staging or
+    (4) validation, switch on, a failed leg: the bundled build also runs, with no staging or
     upload."""
     assert _mode_violations(macos, case) == []
 
@@ -1431,7 +1435,7 @@ def test_macos_build_steps_are_gated_by_the_named_ffmpeg_switch(macos):
     assert command.startswith("uv run python tools/package/build.py --form onedir --out ")
     assert not re.search(r"--(ffmpeg|notices|smoke|zip)", command)
     on = script(macos, "Build release bundle and zip")
-    assert "if: env.MACOS_FFMPEG_BUNDLED == 'true'" in step(macos, "Build release bundle and zip")
+    assert f"if: {VALIDATION_CONTINUES_ON}" in step(macos, "Build release bundle and zip")
     flags = set(re.findall(r"--[a-z][a-z0-9-]*", on.splitlines()[-1]))
     assert flags == {
         "--form",
@@ -1443,7 +1447,12 @@ def test_macos_build_steps_are_gated_by_the_named_ffmpeg_switch(macos):
         "--out",
     }
     for name in ("Stage release assets", "Upload release assets"):
-        assert "if: env.MACOS_FFMPEG_BUNDLED == 'true'" in step(macos, name)
+        condition = (
+            RELEASE_UPLOAD
+            if name == "Upload release assets"
+            else "env.MACOS_FFMPEG_BUNDLED == 'true'"
+        )
+        assert f"if: {condition}" in step(macos, name)
     assert "if: always()" in step(macos, "Upload evidence")
     upload = step(macos, "Upload release assets")
     assert "name: macos-release" in upload and "if-no-files-found: error" in upload
@@ -1485,6 +1494,10 @@ def test_macos_version_step_records_or_checks_the_release_version(
     assert "shell: uv run python {0}" in gate
     assert "RELEASE_VERSION: ${{ inputs.release-version }}" in gate
     output = tmp_path / "output"
+    interpreter = tmp_path / "python"
+    interpreter.mkdir()
+    (interpreter / "BUILD").write_text("20260303\n")
+    monkeypatch.setattr(sys, "base_prefix", str(interpreter))
     monkeypatch.chdir(tmp_path)
     for name, value in {
         "RELEASE_VERSION": requested,
@@ -1522,6 +1535,7 @@ def test_macos_version_step_records_or_checks_the_release_version(
             "GITHUB_SHA: " + "a" * 40,
         ]
         assert "ImageVersion: 20261026.0455.2" in record and "BuildVersion:\t25G83" in record
+        assert ("pbs BUILD: 20260303" in record) is (outcome == "validation")
         assert calls == [["sw_vers"]]
     else:
         with pytest.raises(SystemExit, match=outcome):
@@ -1533,6 +1547,11 @@ def test_macos_version_step_records_or_checks_the_release_version(
     "log, allowed",
     [
         ("12 passed, 30 deselected in 81.20s\n", True),
+        (
+            "SKIPPED [1] tests/test_wp321_bench.py:61: CUDA unavailable for device-frame "
+            "benchmark: CPU: no CUDA device\n10 passed, 1 skipped in 9.01s\n",
+            True,
+        ),
         (
             "SKIPPED [2] tests/test_macos_portability.py:230: VideoToolbox unavailable on this "
             "Mac: no hardware session\n10 passed, 2 skipped in 9.01s\n",
@@ -1551,12 +1570,12 @@ def test_macos_version_step_records_or_checks_the_release_version(
         ("1 failed, 3 passed in 1.00s\n", False),
         ("", False),
     ],
-    ids=["clean", "vt-absent", "hdiutil", "bundle-unset", "failed", "empty"],
+    ids=["clean", "cuda-absent", "vt-absent", "hdiutil", "bundle-unset", "failed", "empty"],
 )
 def test_macos_skip_allowlist_refuses_every_other_reason(
     macos, tmp_path, monkeypatch, log, allowed
 ):
-    """Only "VideoToolbox unavailable on this Mac: ..." may skip in the macOS leg."""
+    """Only the named VideoToolbox and CUDA availability reasons may skip the macOS leg."""
     assert "shell: uv run python {0}" in step(macos, "Check macOS skip reasons")
     monkeypatch.chdir(tmp_path)
     (tmp_path / "work/evidence").mkdir(parents=True)
@@ -1728,15 +1747,14 @@ def test_the_app_listing_follows_whichever_build_ran(macos, switch, built_by, fa
     switch on and every step green, the FFmpeg-ON build makes the .app and the listing is
     reached AFTER it (before this fold it ran first and found no bundle); with the switch off,
     after the build without FFmpeg. A failed leg still lists (the release build, gated on
-    success, is then not reached). Release mode never lists."""
+    !cancelled(), is also reached). Release mode never lists."""
     reached = _walk(macos, {}, switch, failing)
     assert "List the app bundle" in reached
     later = reached[reached.index("List the app bundle") :]
     for name in ("Build app bundle without FFmpeg", "Build release bundle and zip"):
         assert name not in later
-    if failing is None or built_by != "Build release bundle and zip":
-        assert built_by in reached
-        assert reached.index(built_by) < reached.index("List the app bundle")
+    assert built_by in reached
+    assert reached.index(built_by) < reached.index("List the app bundle")
     assert "List the app bundle" not in _walk(macos, {"release-version": "1.2.0"}, switch, None)
 
 
@@ -1754,10 +1772,9 @@ def _build_tool():
     return module
 
 
-def test_macos_release_build_reads_the_macos_lock_fields_and_the_switch_stays_off(macos):
+def test_macos_release_build_reads_the_macos_lock_fields_and_the_switch_is_on(macos):
     """The step reads asset_url / seat_sha256 from ffmpeg-macos.lock.json, the fields the
-    validator's macOS shape names. Part 3c committed the real lock; the switch stays OFF
-    until the F0-2 group (the .app census, the Mac notices, the C14 darwin rows; CHARC)."""
+    validator's macOS shape names. F0-2b enables the switch after the darwin census lands."""
     build = _build_tool()
     lines = script(macos, "Build release bundle and zip").splitlines()
     assert lines[0] == "lock=tools/package/ffmpeg-macos.lock.json"
@@ -1774,7 +1791,7 @@ def test_macos_release_build_reads_the_macos_lock_fields_and_the_switch_stays_of
     assert set(fixture) == fields
     assert '--ffmpeg-from "$url" --ffmpeg-sha256 "$sha"' in lines[-1]
     assert fixture["asset_url"] not in macos and fixture["seat_sha256"] not in macos
-    assert re.findall(r'^      MACOS_FFMPEG_BUNDLED: "(\w+)"$', macos, re.MULTILINE) == ["false"]
+    assert re.findall(r'^      MACOS_FFMPEG_BUNDLED: "(\w+)"$', macos, re.MULTILINE) == ["true"]
     real = build.load_macos_ffmpeg_lock()
     assert build.FFMPEG_MACOS_LOCK_PATH.is_file()
     assert real["asset_url"] not in macos and real["seat_sha256"] not in macos
@@ -1789,6 +1806,8 @@ SWITCH_GATES = {
     "${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}": True,
     "${{ !cancelled() && !inputs.release-version }}": True,
     "env.MACOS_FFMPEG_BUNDLED == 'true'": False,
+    VALIDATION_CONTINUES_ON: False,
+    RELEASE_UPLOAD: False,
 }
 """Each step condition the macOS job uses -> whether the step runs with the switch "false"."""
 
@@ -1871,6 +1890,7 @@ def test_the_lock_with_the_switch_off_is_inert(macos):
     no step that runs calls --notices on a bundle, reads the lock's asset or downloads it, and
     the one build it runs parses to no FFmpeg pair, no notices, no smoke and no zip. Read
     statically from the workflow text; the workflow is never run."""
+    macos = macos.replace('MACOS_FFMPEG_BUNDLED: "true"', 'MACOS_FFMPEG_BUNDLED: "false"')
     build = _build_tool()
     lock = build.load_macos_ffmpeg_lock()
     problems, ran = _switch_off_violations(macos, lock)
@@ -1911,6 +1931,7 @@ def test_the_switch_off_guard_sees_each_planted_breach(macos, plant):
     ``else-asset-download`` is A r6 minor 2's executed probe (a download of the lock's asset
     in an OFF ``else`` arm of the capture step's switch branch); ``elif-arm`` and
     ``nested-branch`` are the other shapes the OFF reading refuses."""
+    macos = macos.replace('MACOS_FFMPEG_BUNDLED: "true"', 'MACOS_FFMPEG_BUNDLED: "false"')
     build = _build_tool()
     lock = build.load_macos_ffmpeg_lock()
     if plant == "switch-on":
@@ -1920,7 +1941,7 @@ def test_the_switch_off_guard_sees_each_planted_breach(macos, plant):
             "--form onedir --out work/release", "--form onedir --notices --out work/release", 1
         )
     elif plant == "release-step-ungated":
-        gate = "\n        if: env.MACOS_FFMPEG_BUNDLED == 'true'\n"
+        gate = f"\n        if: {VALIDATION_CONTINUES_ON}\n"
         head, tail = macos.split("      - name: Build release bundle and zip", 1)
         planted = head + "      - name: Build release bundle and zip" + tail.replace(gate, "\n", 1)
     elif plant == "capture-runs-the-tool":
@@ -1972,7 +1993,8 @@ def test_the_identity_step_is_pinned_after_the_listing_in_validation_mode(macos)
     assert "for path, kind in build._macos_app_entries(app):" in text
     assert "identity = build._macho_identity(data)" in text
     assert 'macho = "none" if identity is None else build._macho_digest(identity)' in text
-    assert '["file", "-b", str(path)]' in text and 'startswith("Mach-O")' in text
+    assert '["file", "-E", "-b", str(path)]' in text and 'startswith("Mach-O")' in text
+    assert "build._macho_identity(data, bootloader=True)" in text
     assert "-name" not in text and ".dylib" not in text and "os.walk" not in text
     upload = step(macos, "Upload evidence")
     assert "path: work/evidence/\n" in upload and "if: always()" in upload
@@ -1988,8 +2010,8 @@ def test_the_identity_step_runs_in_validation_mode_only(macos, switch, failing):
     assert IDENTITY_STEP not in _walk(macos, {"release-version": "1.2.0"}, switch, failing)
 
 
-def _run_identity_step(macos, tmp_path, monkeypatch, *, exit_code=0):
-    """Execute the step's real script in ``tmp_path`` with ``file -b`` modelled by magic."""
+def _run_identity_step(macos, tmp_path, monkeypatch, *, exit_code=0, file_error=False):
+    """Execute the real script with ``file -E -b`` modelled by magic or a read error."""
     (tmp_path / "tools/package").mkdir(parents=True)
     (tmp_path / "tools/package/build.py").write_bytes(
         (ROOT / "tools/package/build.py").read_bytes()
@@ -2000,9 +2022,11 @@ def _run_identity_step(macos, tmp_path, monkeypatch, *, exit_code=0):
     asked = []
 
     def file_type(args, **kwargs):
-        assert args[:2] == ["file", "-b"] and kwargs["timeout"] == 60
-        asked.append(args[2])
-        data = Path(args[2]).read_bytes()
+        assert args[:3] == ["file", "-E", "-b"] and kwargs["timeout"] == 60
+        asked.append(args[3])
+        if file_error:
+            return subprocess.CompletedProcess(args, 1, "cannot read", "permission denied")
+        data = Path(args[3]).read_bytes()
         kind = "Mach-O 64-bit bundle arm64" if data[:4] == b"\xcf\xfa\xed\xfe" else "data"
         return subprocess.CompletedProcess(args, 0, kind + "\n", "")
 
@@ -2014,6 +2038,65 @@ def _run_identity_step(macos, tmp_path, monkeypatch, *, exit_code=0):
     else:
         assert exit_code == 0
     return asked
+
+
+def test_f02b_identity_step_reports_file_errors_without_hashing(macos, tmp_path, monkeypatch):
+    """The file command's nonzero status reaches the named failure branch before reads."""
+    app = tmp_path / "work/release/dist-onedir/Clearwater-1.2.0-macos-onedir/Clearwater.app"
+    binary = app / "Contents/MacOS/Clearwater"
+    binary.parent.mkdir(parents=True)
+    binary.write_bytes(b"unreadable stand-in")
+    read = Path.read_bytes
+
+    def guarded_read(path):
+        assert path != binary, "the failed file query must prevent a hashing read"
+        return read(path)
+
+    monkeypatch.setattr(Path, "read_bytes", guarded_read)
+    assert len(_run_identity_step(macos, tmp_path, monkeypatch, file_error=True)) == 1
+    text = (tmp_path / IDENTITIES).read_text()
+    assert "# file -b failed for Contents/MacOS/Clearwater\n" in text
+
+
+@pytest.mark.parametrize("marker", [None, "20260303\n", "different-build\n"])
+def test_f02b_version_evidence_records_build_marker(macos, tmp_path, monkeypatch, marker):
+    """Validation evidence records the stripped interpreter marker, including its absence."""
+    interpreter = tmp_path / "python"
+    interpreter.mkdir()
+    if marker is not None:
+        (interpreter / "BUILD").write_text(marker)
+    monkeypatch.setattr(sys, "base_prefix", str(interpreter))
+    real_run = subprocess.run
+
+    def sw_vers(args, **kwargs):
+        if args != ["sw_vers"]:
+            return real_run(args, **kwargs)
+        return subprocess.CompletedProcess(args, 0, "macOS\n")
+
+    monkeypatch.setattr(subprocess, "run", sw_vers)
+    monkeypatch.setattr("platform.machine", lambda: "arm64")
+    monkeypatch.chdir(tmp_path)
+    for name, value in {
+        "RELEASE_VERSION": "",
+        "GITHUB_SHA": "a" * 40,
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+    }.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setitem(sys.modules, "clearwater", SimpleNamespace(__version__="1.2.0"))
+    exec(compile(script(macos, "Check version and record the run"), "version-evidence", "exec"), {})
+    expected = "absent" if marker is None else marker.strip()
+    assert f"pbs BUILD: {expected}\n" in (tmp_path / "work/evidence/run-record.txt").read_text()
+
+
+@pytest.mark.parametrize("release", [False, True], ids=["validation", "release"])
+@pytest.mark.parametrize("failed", [False, True], ids=["success", "failed-leg"])
+def test_f02b_release_assets_require_success_and_upload_requires_release(macos, release, failed):
+    """Both modes build after failure; success gates staging and release mode gates upload."""
+    inputs = {"release-version": "1.2.0"} if release else {}
+    reached = _walk(macos, inputs, "true", "Run parallel tests" if failed else None)
+    assert "Build release bundle and zip" in reached
+    assert ("Stage release assets" in reached) is (not failed)
+    assert ("Upload release assets" in reached) is (release and not failed)
 
 
 def test_the_identity_step_records_each_mach_o_once_by_type(macos, tmp_path, monkeypatch):
@@ -2058,7 +2141,16 @@ def test_the_identity_step_records_each_mach_o_once_by_type(macos, tmp_path, mon
         macho = build_tests.build._macho_digest(identity)
         assert macho.startswith("macho:")
         expected.append(f"{name}\t{len(data)}\t{hashlib.sha256(data).hexdigest()}\t{macho}")
-    assert lines[2:] == expected and len(expected) == 3
+    assert [line for line in lines[2:] if not line.startswith("#")] == expected and len(
+        expected
+    ) == 3
+    identity = build_tests.build._macho_identity(
+        files["Contents/MacOS/Clearwater"], bootloader=True
+    )
+    assert (
+        "# bootloader\tContents/MacOS/Clearwater\t" + build_tests.build._macho_digest(identity)
+        in lines
+    )
 
 
 def test_the_identity_step_says_when_there_is_no_bundle(macos, tmp_path, monkeypatch):

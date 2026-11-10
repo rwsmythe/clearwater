@@ -22,6 +22,7 @@ import json
 import os
 import re
 import ssl
+import stat
 import sys
 import tempfile
 import tomllib
@@ -69,6 +70,11 @@ _APP_NOTICES = "Contents/Resources/THIRD_PARTY_NOTICES.md"
 _APP_BASE_LIBRARY = "Contents/Resources/base_library.zip"
 # Written by the build itself (PyInstaller's BUNDLE plist, the bundle's code seal).
 _APP_BUILD_METADATA = frozenset({"Contents/Info.plist", "Contents/_CodeSignature/CodeResources"})
+# PyInstaller building/osx.py calls codesign --deep; these physical XML seals are
+# generated metadata only when the same plan attributes the framework executable.
+_APP_FRAMEWORK_SEAL = re.compile(
+    r"(Contents/Frameworks/(?:[^/]+/)*([^/]+)\.framework/Versions/A)/_CodeSignature/CodeResources"
+)
 # PyInstaller's default bundle icon, verified against its RECORD hash (never by name alone).
 _APP_PYINSTALLER_FILES = {
     "Contents/Resources/icon-windowed.icns": "PyInstaller/bootloader/images/icon-windowed.icns",
@@ -205,11 +211,13 @@ class NoticeRow(NamedTuple):
 
 
 class NoticeLimit(NamedTuple):
-    """A verbatim limits statement bound to declared, census-verified host paths."""
+    """A verbatim limit bound to censused hosts or darwin RECORD-owned parent paths."""
 
     component: str
     hosts: tuple[str, ...]
     statement: str
+    platform: str = "win32"
+    parent: str = ""
 
 
 class NoticePlan(NamedTuple):
@@ -243,7 +251,7 @@ class _InventoryEntries(list[_Entry]):
 
 
 class _EmbeddedHost(NamedTuple):
-    """An exact carried-host identity and its independently declared source set."""
+    """A carried host's whole-file or Mach-O identity and independent source set."""
 
     relpath: str
     sha256: str
@@ -252,6 +260,7 @@ class _EmbeddedHost(NamedTuple):
     parent_version: str
     components: tuple[tuple[str, str], ...]
     platform: str = "win32"
+    macho: str = ""
 
 
 _HOST_FIELDS = frozenset(
@@ -404,17 +413,31 @@ def _embedded_declarations(document: dict[str, Any]) -> tuple[_EmbeddedHost, ...
         # WP6.5 F0-2: an optional, additive "platform" key; absent means the Windows census.
         if (
             not isinstance(item, dict)
-            or set(item) - {"platform"} != _HOST_FIELDS
+            or set(item) - {"platform"}
+            != (
+                (_HOST_FIELDS - {"sha256", "size_bytes"}) | {"macho"}
+                if item.get("platform") == "darwin"
+                else _HOST_FIELDS
+            )
             or item.get("platform", "win32") not in _HOST_PLATFORMS
             or (
                 item.get("platform") == "darwin"
                 and not str(item.get("relpath", "")).startswith("Contents/")
             )
             or not _exact_host_path(item.get("relpath"))
-            or not isinstance(item.get("sha256"), str)
-            or re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) is None
-            or type(item.get("size_bytes")) is not int
-            or item["size_bytes"] <= 0
+            or (
+                (
+                    not isinstance(item.get("macho"), str)
+                    or re.fullmatch(r"macho:[0-9a-f]{64}", item["macho"]) is None
+                )
+                if item.get("platform") == "darwin"
+                else (
+                    not isinstance(item.get("sha256"), str)
+                    or re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) is None
+                    or type(item.get("size_bytes")) is not int
+                    or item["size_bytes"] <= 0
+                )
+            )
             or not isinstance(item.get("parent"), str)
             or re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", item["parent"]) is None
             or not _single_line_text(item.get("parent_version"))
@@ -454,12 +477,13 @@ def _embedded_declarations(document: dict[str, Any]) -> tuple[_EmbeddedHost, ...
         result.append(
             _EmbeddedHost(
                 item["relpath"],
-                item["sha256"],
-                item["size_bytes"],
+                item.get("sha256", ""),
+                item.get("size_bytes", 0),
                 item["parent"],
                 item["parent_version"],
                 tuple(components),
                 item.get("platform", "win32"),
+                item.get("macho", ""),
             )
         )
     return tuple(result)
@@ -472,14 +496,31 @@ def _limit_declarations(
     if not isinstance(values, list):
         raise ValueError("notices: limits must be a list")
     declared = {host.relpath for host in hosts}
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     result: list[NoticeLimit] = []
     for item in values:
         if (
             not isinstance(item, dict)
-            or set(item) != {"component", "hosts", "statement"}
-            or any(not _single_line_text(item.get(key)) for key in ("component", "statement"))
+            or set(item)
+            != (
+                {"component", "hosts", "statement", "platform", "parent"}
+                if item.get("platform") == "darwin"
+                else {"component", "hosts", "statement"}
+            )
             or not isinstance(item.get("hosts"), list)
+            or (
+                item.get("platform") == "darwin"
+                and (
+                    not isinstance(item.get("parent"), str)
+                    or re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", item["parent"]) is None
+                    or any(
+                        not path.startswith("Contents/")
+                        for path in item.get("hosts", [])
+                        if isinstance(path, str)
+                    )
+                )
+            )
+            or any(not _single_line_text(item.get(key)) for key in ("component", "statement"))
             or not item["hosts"]
             or any(not _exact_host_path(host) for host in item["hosts"])
         ):
@@ -488,12 +529,17 @@ def _limit_declarations(
         if paths != sorted(paths) or len({path.casefold() for path in paths}) != len(paths):
             raise ValueError("notices: limits hosts must be sorted and duplicate-free")
         for path in paths:
-            if path not in declared:
+            if item.get("platform") != "darwin" and path not in declared:
                 raise ValueError(f"notices: limits {item['component']} host {path} is undeclared")
-        if item["component"] in seen:
+        key = (item.get("platform", "win32"), item["component"])
+        if key in seen:
             raise ValueError("notices: limits has duplicate component names")
-        seen.add(item["component"])
-        result.append(NoticeLimit(item["component"], tuple(paths), item["statement"]))
+        seen.add(key)
+        result.append(
+            NoticeLimit(
+                item["component"], tuple(paths), item["statement"], key[0], item.get("parent", "")
+            )
+        )
     return tuple(sorted(result))
 
 
@@ -586,6 +632,13 @@ def _embedded_bindings(row: dict[str, Any], hosts: tuple[_EmbeddedHost, ...]) ->
     return tuple(values)
 
 
+def _embedded_macho(data: bytes) -> str:
+    """Return the build's signature-invariant identity, or a named non-image reading."""
+    tool = _build_tool()
+    identity = tool._macho_identity(data)
+    return "non-Mach-O" if identity is None else str(tool._macho_digest(identity))
+
+
 def _embedded_claims(
     entries: list[_Entry], home: Path, hosts: tuple[_EmbeddedHost, ...], document: dict[str, Any]
 ) -> tuple[dict[str, list[tuple[str, str]]], dict[str, _EmbeddedHost]]:
@@ -603,10 +656,26 @@ def _embedded_claims(
     inventory = {entry.name.casefold(): entry for entry in entries if entry.kind == "file"}
     identities: dict[tuple[str, int], list[_EmbeddedHost]] = defaultdict(list)
     for host in hosts:
-        identities[(host.sha256, host.size_bytes)].append(host)
+        if host.platform == "win32":
+            identities[(host.sha256, host.size_bytes)].append(host)
     sizes = {size for _digest, size in identities}
+    darwin_identities: dict[str, list[_EmbeddedHost]] = defaultdict(list)
+    for host in hosts:
+        if host.platform == "darwin":
+            darwin_identities[host.macho].append(host)
     for candidate in inventory.values():
         path = home / candidate.name
+        if darwin_identities:
+            actual = _embedded_macho(path.read_bytes())
+            matches = darwin_identities.get(actual, [])
+            if matches and candidate.name.casefold() not in {
+                host.relpath.casefold() for host in matches
+            }:
+                raise ValueError(
+                    f"notices: embedded {matches[0].relpath} moved to undeclared path "
+                    f"{candidate.name}; re-census required"
+                )
+            continue
         size = path.stat().st_size
         if size not in sizes:
             continue
@@ -626,7 +695,14 @@ def _embedded_claims(
             continue
         data = (home / entry.name).read_bytes()
         digest = hashlib.sha256(data).hexdigest()
-        if (digest, len(data)) != (host.sha256, host.size_bytes):
+        if host.platform == "darwin":
+            actual = _embedded_macho(data)
+            if actual != host.macho:
+                raise ValueError(
+                    f"notices: embedded {entry.name} identity differs: expected {host.macho}; "
+                    f"actual {actual}; re-census required"
+                )
+        elif (digest, len(data)) != (host.sha256, host.size_bytes):
             raise ValueError(
                 f"notices: embedded {entry.name} identity differs: expected SHA-256 {host.sha256} "
                 f"size {host.size_bytes}; actual SHA-256 {digest} size {len(data)}; "
@@ -923,18 +999,21 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     proprietary runtime). Version sources alone never claim bundled files.
     OpenSSL additionally checks the build interpreter's OpenSSL, CPython and
     build-release versions; proprietary excerpts bind to its actual LICENSE.txt.
-    Optional embedded_hosts declares exact relative host paths, hashes, sizes,
-    normalized parent owners and required component/source records, and an
+    Optional embedded_hosts declares exact relative paths, normalized parent owners
+    and required component/source records. Windows uses sha256/size_bytes; darwin
+    uses only the build's signature-invariant macho identity. There is an
     optional platform ("win32" when absent, or "darwin" for a bundle-rooted
     Contents/... host; WP6.5 F0-2): a plan reads only its own platform's hosts.
     Component rows use embedded_in (a list of declared paths) instead of another binding
     kind. Carried hosts require all rows and matching source pins before parent
     ownership is considered; absent hosts produce no embedded claims.
-    Optional limits is a list of exact component/hosts/statement objects.
+    Optional limits is a list of component/hosts/statement objects. Darwin rows
+    additionally require platform="darwin" and a parent distribution; their paths
+    must be censused hosts or resolve by RECORD to that parent in the actual plan.
     Component and statement are nonempty, unpadded strings; hosts is a nonempty,
-    sorted, duplicate-free list of declared embedded host paths. Component names
-    are unique. Planning retains only carried hosts after the same identity
-    checks as embedded rows; all-absent statements are omitted. Limits carry no
+    sorted, duplicate-free path list. Component names are unique per platform.
+    Windows retains only carried census hosts and omits all-absent statements;
+    every darwin limit path must be carried and attributed to its parent. Limits carry no
     text file or provenance kind and do not replace a component's text row.
     Git-tree excerpts require text_kind="excerpt" and text_lines: file (a local
     full-blob filename), lines (one-based inclusive pair), git_blob_sha1, sha256
@@ -1591,7 +1670,7 @@ def _app_inventory(tool: ModuleType, executable: Path, app: Path) -> list[_Entry
     return [*entries, *_archive_entries(tool, executable)]
 
 
-def _inventory(folder: Path) -> tuple[list[_Entry], Path]:
+def _inventory(folder: Path) -> tuple[_InventoryEntries, Path]:
     tool = _build_tool()
     executable = _find_notices_executable(folder)
     if sys.platform == "darwin" and (app := tool._macos_content_app(executable)) is not None:
@@ -1631,6 +1710,17 @@ def _find_notices_executable(folder: Path) -> Path:
     """Admit bundle discovery components before the build's following file checks."""
     tool = _build_tool()
     if sys.platform == "darwin":
+        # Discovery begun inside an app uses the enclosing release root. A nested app
+        # must never displace that app's executable in find_executable's candidate order.
+        enclosing = (
+            folder.parent.parent
+            if folder.name == "MacOS"
+            and folder.parent.name == "Contents"
+            and folder.parent.parent.suffix == ".app"
+            else None
+        )
+        if enclosing is not None:
+            folder = enclosing.parent
         # Mirror find_executable's candidates without probing any candidate by following.
         candidates = (
             folder / "Clearwater.app/Contents/MacOS/Clearwater",
@@ -1642,8 +1732,8 @@ def _find_notices_executable(folder: Path) -> Path:
             for executable in candidates
             if (app := tool._macos_content_app(executable)) is not None
         }
-        # Starting at Contents/MacOS also creates a nested .app candidate. Admit the
-        # enclosing bundle FIRST, before even lstat'ing that nested candidate.
+        # Admit the enclosing bundle before any query below Contents/MacOS, where
+        # a planted nested .app formerly took precedence in executable discovery.
         for app in sorted(apps, key=lambda path: len(path.parts)):
             if app.is_symlink() or app.is_junction():
                 raise ValueError("notices: unsafe linked entry .app root")
@@ -1656,6 +1746,13 @@ def _find_notices_executable(folder: Path) -> Path:
                             f"notices: unsafe linked entry {path.relative_to(app).as_posix()}: "
                             f"{problem}"
                         )
+        if enclosing is not None:
+            for path, _kind in tool._macos_app_entries(enclosing):
+                macos = enclosing / "Contents/MacOS"
+                if path.is_relative_to(macos) and any(
+                    part.endswith(".app") for part in path.relative_to(macos).parts
+                ):
+                    raise ValueError("notices: nested .app candidate in enclosing bundle")
     return cast(Path, tool.find_executable(folder))
 
 
@@ -1748,6 +1845,22 @@ def _record_digest_matches(
     return False
 
 
+def _app_framework_seal(entry: _Entry, home: Path) -> str | None:
+    """Identify a physical XML framework seal; the planner must attribute its executable."""
+    # PyInstaller building/osx.py calls codesign --deep, which writes these framework
+    # seals after wheel collection. They are generated build metadata, absent from RECORD.
+    match = _APP_FRAMEWORK_SEAL.fullmatch(entry.name)
+    if entry.kind != "file" or match is None:
+        return None
+    path = home / entry.name
+    if not stat.S_ISREG(path.lstat().st_mode):
+        return None
+    with path.open("rb") as stream:
+        if stream.read(5) != b"<?xml":
+            return None
+    return f"{match[1]}/{match[2]}"
+
+
 def _app_entry_owner(
     entry: _Entry,
     home: Path,
@@ -1761,6 +1874,8 @@ def _app_entry_owner(
     """
     name = entry.name
     if entry.kind == "link":
+        if _APP_FRAMEWORK_SEAL.fullmatch(name):
+            return None
         # Admitted links carry no bytes; PyInstaller's BUNDLE made each one.
         return ("pyinstaller",)
     if name == _APP_BOOTLOADER:
@@ -2009,6 +2124,10 @@ def _macos_ffmpeg_rows(app: Path, lock_path: Path, native_licences_path: Path) -
         "Build run": lock["build_run_url"],
         "Per-component source recipes": lock["source_record_url"],
         "macOS deployment target": lock["macos_deployment_target"],
+        "Per-component pins and licence readings": (
+            "tools/package/ffmpeg-macos.lock.json in Clearwater source"
+        ),
+        "Runner": f"{lock['runner_label']} image {lock['runner_image_version']}",
     }
     lines = material[0].read_text(encoding="utf-8").splitlines()
     for key, value in expected.items():
@@ -2288,7 +2407,7 @@ def plan_notices(
     exact RECORD directory prefixes. Declared vendored paths need their own
     version-bound licence blocks. Native/data entries must match a RECORD path
     or a flattened, SHA-256-verified native basename.
-    Independently licensed natives need their own exact-byte manifest row.
+    Independently licensed natives need their own manifest identity row.
     Declared embedded hosts require their measured identity and every embedded
     source/text row before interpreter or RECORD ownership is considered. Their
     parent must still cover the host, with explicit component attributions.
@@ -2315,7 +2434,7 @@ def plan_notices(
     _build_tool().check_build_environment()
     census_document = census_preflight(native_licences_path)
     entries, home = _inventory(folder)
-    in_app = cast(_InventoryEntries, entries).in_app
+    in_app = entries.in_app
     if ffmpeg_lock_path is None:
         ffmpeg_lock_path = default_ffmpeg_lock()
     ffmpeg = _ffmpeg_rows(home, ffmpeg_lock_path, native_licences_path, in_app=in_app)
@@ -2409,12 +2528,20 @@ def plan_notices(
     python_names = _python_file_names()
     dot_links = _dot_folder_links(entries) if in_app else frozenset()
     unknown: list[str] = []
+    framework_seals: list[tuple[_Entry, str]] = []
     for entry in entries:
         if entry.label in ffmpeg_labels or entry.label in native_labels:
             continue
         name = entry.name
         if in_app and entry.kind in {"file", "link"}:
             # WP6.5 F0-2: the darwin name tables; RECORD ownership on the bundle-rooted path.
+            framework_executable = _app_framework_seal(entry, home)
+            if framework_executable is not None:
+                framework_seals.append((entry, framework_executable))
+                continue
+            if _APP_FRAMEWORK_SEAL.fullmatch(entry.name):
+                unknown.append(f"unknown or ambiguous bundled entry {entry.label}")
+                continue
             verdict = _app_entry_owner(entry, home, installed, dot_links)
             if verdict is None:
                 unknown.append(f"unknown or ambiguous bundled entry {entry.label}")
@@ -2484,6 +2611,12 @@ def plan_notices(
         ):
             owner += "-runtime"
         selected[owner].append(entry.label)
+    attributed = {label for labels in selected.values() for label in labels} | native_labels
+    for seal, executable_name in framework_seals:
+        if "file:" + executable_name in attributed:
+            selected["clearwater"].append(seal.label)
+        else:
+            unknown.append(f"unknown or ambiguous bundled entry {seal.label}")
     _check_embedded_parents(
         embedded_hosts, carried_hosts, selected, installed, set(runtime) & set(versions)
     )
@@ -2595,19 +2728,48 @@ def plan_notices(
             "FFmpeg / ffprobe: user-obtained, not redistributed; "
             "obtain licence and source from its publisher."
         )
-    # Select only hosts that passed the existing census preflight. Declarations
-    # alone do not assert redistribution, just as for embedded component rows.
+    # Windows limits retain only census-verified carried hosts. Darwin additionally
+    # admits paths whose actual RECORD parent is attributed in this same plan.
     carried_paths = {
         host.relpath: label.removeprefix("file:") for label, host in carried_hosts.items()
     }
+    limit_declarations = _limit_declarations(document, declared_hosts)
+    if _host_platform() == "darwin":
+        inventory_files = {entry.name for entry in entries if entry.kind == "file"}
+        for limit in limit_declarations:
+            if limit.platform != "darwin":
+                continue
+            for limit_path in limit.hosts:
+                declared = next(
+                    (host for host in embedded_hosts if host.relpath == limit_path), None
+                )
+                if (
+                    declared is not None
+                    and limit_path in carried_paths
+                    and declared.parent == limit.parent
+                ):
+                    continue
+                limit_relative = _app_record_path(limit_path, dot_links)
+                if (
+                    not in_app
+                    or limit_path not in inventory_files
+                    or limit_relative is None
+                    or paths.get(limit_relative.casefold()) != {limit.parent}
+                    or "file:" + limit_path not in selected.get(limit.parent, [])
+                ):
+                    raise ValueError(
+                        f"notices: limits {limit.component} host {limit_path} "
+                        f"missing/ambiguous RECORD parent attribution: {limit.parent}"
+                    )
+                carried_paths[limit_path] = limit_path
     limits = tuple(
         limit._replace(
             hosts=tuple(
                 sorted(carried_paths[path] for path in limit.hosts if path in carried_paths)
             )
         )
-        for limit in _limit_declarations(document, declared_hosts)
-        if any(path in carried_paths for path in limit.hosts)
+        for limit in limit_declarations
+        if limit.platform == _host_platform() and any(path in carried_paths for path in limit.hosts)
     )
     return NoticePlan(inventory_labels, ordered, tuple(statements), limits)
 

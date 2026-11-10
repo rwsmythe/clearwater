@@ -17,6 +17,7 @@ import sys
 import sysconfig
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -151,6 +152,438 @@ def load_notices():
     else:
         spec.loader.exec_module(module)
     return module
+
+
+def test_f02b_real_manifest_census_and_platform_limits():
+    """Run-7 identities and additive limits must be usable without the staging evidence."""
+    module = load_notices()
+    surface = ROOT / "tools/package/native-licences"
+    document = json.loads(
+        Path(os.environ.get("WP65_MANIFEST", surface / "manifest.json")).read_bytes()
+    )
+    assert document["embedded_census"]["darwin"] == {
+        "status": "complete",
+        "evidence": "run 42897107215 @ 8955f790",
+    }
+    hosts = module._embedded_declarations(document)
+    assert len([host for host in hosts if host.platform == "darwin"]) == 56
+    for host in hosts:
+        if host.platform == "darwin":
+            assert re.fullmatch(r"macho:[0-9a-f]{64}", host.macho)
+    limits = module._limit_declarations(document, hosts)
+    assert len([limit for limit in limits if limit.platform == "darwin"]) == 14
+
+
+@pytest.mark.parametrize("change", ["resigned", "code", "not-macho"])
+def test_f02b_darwin_identity_is_signature_invariant(tmp_path, change):
+    """Real Mach-O parsing accepts signing changes and refuses code/non-image changes."""
+    import test_tools_package_build as bt
+
+    module = load_notices()
+    original = bt.original_native()
+    tool = module._build_tool()
+    expected = tool._macho_digest(tool._macho_identity(original))
+    relative = "Contents/Frameworks/host.so"
+    path = tmp_path / relative
+    path.parent.mkdir(parents=True)
+    data = {
+        "resigned": bt.built_native(signature=b"new-signature" * 12),
+        "code": bt.built_native(code=b"changed-code"),
+        "not-macho": b"not a Mach-O",
+    }[change]
+    path.write_bytes(data)
+    host = SimpleNamespace(
+        relpath=relative,
+        sha256=hashlib.sha256(original).hexdigest(),
+        size_bytes=len(original),
+        parent="numpy",
+        parent_version="2.5.4",
+        components=(),
+        platform="darwin",
+        macho=expected,
+    )
+    entries = [module._Entry("file:" + relative, relative, "file")]
+    if change == "resigned":
+        _claims, carried = module._embedded_claims(entries, tmp_path, (host,), {})
+        assert list(carried) == ["file:" + relative]
+    else:
+        with pytest.raises(ValueError, match=r"identity differs: expected macho:.*actual"):
+            module._embedded_claims(entries, tmp_path, (host,), {})
+
+
+@pytest.mark.parametrize("moved", [False, True])
+def test_f02b_shared_macho_identity_matches_each_declared_path(tmp_path, moved):
+    """Identical images at two declared hosts remain valid; an extra copy needs a census."""
+    import test_tools_package_build as bt
+
+    module = load_notices()
+    data = bt.built_native()
+    tool = module._build_tool()
+    identity = tool._macho_digest(tool._macho_identity(data))
+    entries, hosts = [], []
+    for name in ("first", "second"):
+        relative = f"Contents/Frameworks/{name}.so"
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        entries.append(module._Entry("file:" + relative, relative, "file"))
+        hosts.append(
+            SimpleNamespace(
+                relpath=relative,
+                sha256=hashlib.sha256(data).hexdigest(),
+                size_bytes=len(data),
+                parent="numpy",
+                parent_version="2.5.4",
+                components=(),
+                platform="darwin",
+                macho=identity,
+            )
+        )
+    if moved:
+        path = tmp_path / "Contents/Frameworks/extra.so"
+        path.write_bytes(data)
+        entries.append(
+            module._Entry(
+                "file:Contents/Frameworks/extra.so", "Contents/Frameworks/extra.so", "file"
+            )
+        )
+        with pytest.raises(ValueError, match="moved to undeclared path"):
+            module._embedded_claims(entries, tmp_path, tuple(hosts), {})
+    else:
+        _claims, carried = module._embedded_claims(entries, tmp_path, tuple(hosts), {})
+        assert len(carried) == 2
+
+
+@pytest.mark.parametrize("damage", ["missing", "sha256", "malformed"])
+def test_f02b_darwin_schema_requires_only_macho_identity(damage):
+    """Darwin declarations reject whole-file pins and missing or malformed Mach-O pins."""
+    module = load_notices()
+    host = {
+        "platform": "darwin",
+        "relpath": "Contents/Frameworks/host.so",
+        "parent": "numpy",
+        "parent_version": "2.5.4",
+        "macho": "macho:" + "a" * 64,
+        "components": REAL_HOST_COMPONENTS,
+    }
+    if damage == "missing":
+        host.pop("macho")
+    elif damage == "sha256":
+        host.update(sha256="a" * 64, size_bytes=1)
+    else:
+        host["macho"] = "not-an-identity"
+    with pytest.raises(ValueError, match="embedded host declaration is invalid"):
+        module._embedded_declarations({"embedded_hosts": [host]})
+
+
+@pytest.mark.parametrize(
+    "framework", ["QtCore", "QtDBus", "QtGui", "QtNetwork", "QtSvg", "QtWidgets"]
+)
+def test_f02b_framework_seals_are_generated_metadata(app_release, framework):
+    """A physical XML framework seal needs its executable attributed in the same plan."""
+    app = app_release["app"]
+    relative = f"Contents/Frameworks/numpy/{framework}.framework/Versions/A/{framework}"
+    executable = app / relative
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"RECORD-owned stand-in")
+    site = app_release["distributions"]["numpy"]._path.parent
+    origin = site / relative.removeprefix("Contents/Frameworks/")
+    origin.parent.mkdir(parents=True, exist_ok=True)
+    origin.write_bytes(executable.read_bytes())
+    record = site / "numpy-2.5.4.dist-info/RECORD"
+    record.write_text(record.read_text() + relative.removeprefix("Contents/Frameworks/") + ",,\n")
+    app_release["distributions"]["numpy"] = importlib.metadata.PathDistribution(record.parent)
+    assert relative.removeprefix("Contents/Frameworks/") in {
+        str(item) for item in app_release["distributions"]["numpy"].files
+    }
+    seal = executable.parent / "_CodeSignature/CodeResources"
+    seal.parent.mkdir()
+    seal.write_bytes(b'<?xml version="1.0"?><plist/>')
+    result = app_plan(app_release)
+    row = next(row for row in result.rows if row.name == "Clearwater")
+    assert "file:" + seal.relative_to(app).as_posix() in row.entries
+
+
+@pytest.mark.parametrize(
+    "damage",
+    ["non-framework", "unowned-executable", "non-plist", "linked", "record-owned-non-plist"],
+)
+def test_f02b_framework_seal_rule_refuses_other_files(app_release, damage):
+    """A path, bytes or ownership lookalike cannot claim the framework metadata rule."""
+    app = app_release["app"]
+    base = "Contents/Frameworks/numpy/QtCore.framework/Versions/A"
+    if damage == "non-framework":
+        base = base.replace("QtCore.framework", "ordinary")
+    seal = app / base / "_CodeSignature/CodeResources"
+    seal.parent.mkdir(parents=True)
+    executable = seal.parent.parent / "QtCore"
+    executable.write_bytes(b"owned framework stand-in")
+    if damage != "unowned-executable":
+        dist = app_release["distributions"]["numpy"]
+        relative = executable.relative_to(app / "Contents/Frameworks").as_posix()
+        origin = Path(str(dist.locate_file(relative)))
+        origin.parent.mkdir(parents=True, exist_ok=True)
+        origin.write_bytes(executable.read_bytes())
+        record = dist._path / "RECORD"
+        record.write_text(record.read_text() + relative + ",,\n")
+    if damage == "linked":
+        target = app / "Contents/Info.plist"
+        target.write_bytes(b"<?xml <plist/>")
+        _app_symlink(seal, str(target), folder=False)
+    else:
+        seal.write_bytes(
+            b"bad plist" if damage in {"non-plist", "record-owned-non-plist"} else b"<?xml <plist/>"
+        )
+        if damage == "record-owned-non-plist":
+            relative = seal.relative_to(app / "Contents/Frameworks").as_posix()
+            origin = Path(str(dist.locate_file(relative)))
+            origin.parent.mkdir(parents=True, exist_ok=True)
+            origin.write_bytes(seal.read_bytes())
+            record.write_text(record.read_text() + relative + ",,\n")
+    with pytest.raises(ValueError, match=r"unknown or ambiguous bundled entry|unsafe linked"):
+        app_plan(app_release)
+
+
+def test_f02b_framework_seal_rule_is_not_an_onedir_exemption(release):
+    """The framework metadata rule only operates in a walked app layout."""
+    path = release["folder"] / "_internal/QtCore.framework/Versions/A/_CodeSignature/CodeResources"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"<?xml <plist/>")
+    with pytest.raises(ValueError, match=r"unknown or ambiguous bundled entry.*CodeResources"):
+        plan(load_notices(), release)
+
+
+@pytest.mark.parametrize("damage", [None, "wrong-owner", "absent"])
+def test_f02b_darwin_limits_require_record_parent_in_plan(app_release, damage):
+    """A limit-only path must exist and resolve by RECORD to its declared parent."""
+    surface = app_release["native_surface"]
+    manifest = surface / "manifest.json"
+    document = json.loads(manifest.read_text())
+    relative = "Contents/Frameworks/numpy/limit-only.dat"
+    path = app_release["app"] / relative
+    path.write_bytes(b"RECORD owned limit-only file")
+    dist = app_release["distributions"]["numpy"]
+    record = dist._path / "RECORD"
+    (dist._path.parent / "numpy/limit-only.dat").write_bytes(path.read_bytes())
+    record.write_text(record.read_text() + "numpy/limit-only.dat,,\n")
+    app_release["distributions"]["numpy"] = importlib.metadata.PathDistribution(record.parent)
+    assert relative.removeprefix("Contents/Frameworks/") in {
+        str(item) for item in app_release["distributions"]["numpy"].files
+    }
+    document["limits"] = [
+        {
+            "platform": "darwin",
+            "parent": "pillow" if damage == "wrong-owner" else "numpy",
+            "component": "limit-only subject",
+            "hosts": [relative],
+            "statement": "Verbatim limit.",
+        }
+    ]
+    if damage == "absent":
+        path.unlink()
+    manifest.write_text(json.dumps(document))
+    if damage:
+        with pytest.raises(ValueError, match=r"limits.*limit-only"):
+            app_plan(app_release)
+    else:
+        assert app_plan(app_release).limits[0].hosts == (relative,)
+
+
+def test_f02b_nested_app_cannot_hijack_macos_start(app_release):
+    """Discovery from MacOS refuses the nested candidate that formerly took precedence."""
+    app = app_release["app"]
+    nested = app / "Contents/MacOS/Clearwater.app/Contents/MacOS/Clearwater"
+    nested.parent.mkdir(parents=True)
+    nested.write_bytes(b"nested stand-in")
+    module = app_release["module"]
+    with pytest.raises(ValueError, match=r"nested \.app"):
+        module._find_notices_executable(app / "Contents/MacOS")
+
+
+def test_f02b_run7_all_file_classes_plan_with_real_manifest(app_release, tmp_path, monkeypatch):
+    """All 293 files and 86 links, including six seals and six RECORD plists, get owners.
+
+    Stand-in Mach-O images exercise real RECORD and origin verification. Only the
+    census identity reading and the two wheel-carried text inputs are substituted:
+    synthetic bytes cannot have run-7 identities or the wheel texts' pinned hashes.
+    Run 8 performs those two checks on real bytes without these substitutions.
+    """
+    import test_tools_package_build as bt
+
+    module = app_release["module"]
+    surface = ROOT / "tools/package/native-licences"
+    manifest = json.loads((surface / "manifest.json").read_text())
+    hosts = {
+        row["relpath"]: row for row in manifest["embedded_hosts"] if row.get("platform") == "darwin"
+    }
+    root = tmp_path / "run7"
+    app = root / "Clearwater.app"
+    site = tmp_path / "run7-site"
+    files, links, identities = {}, [], {}
+    for line in _RUN7_APP_TREE.strip().splitlines():
+        kind, relative = line.split(" ", 1)
+        if kind == "l":
+            name, target = relative.split(" -> ")
+            links.append((name, target))
+            continue
+        data = bt.built_native(code=relative.encode()) if kind == "m" else b"synthetic data"
+        if relative.endswith("/_CodeSignature/CodeResources"):
+            data = b'<?xml version="1.0"?><plist/>'
+        path = app / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        files[relative] = data
+        if relative in hosts:
+            identities[data] = hosts[relative]["macho"]
+    assert len(files) == 293 and len(links) == 86
+    # Build archives, never execute their stand-in bootloader or product entry points.
+    make_app_executable(app / "Contents/MacOS/Clearwater", ["clearwater", "json"])
+    with zipfile.ZipFile(app / "Contents/Resources/base_library.zip", "w") as archive:
+        archive.writestr("json/__init__.pyc", b"")
+    for name, target in links:
+        _app_symlink(
+            app / name,
+            target,
+            folder=not Path(name).suffix or Path(name).name in {".dylibs", "Current"},
+        )
+    entries, _home = module._inventory(root)
+    dot_links = module._dot_folder_links(entries)
+    owned = {
+        name: {}
+        for name in (
+            "numpy",
+            "scipy",
+            "pillow",
+            "pillow-heif",
+            "pyside6-essentials",
+            "shiboken6",
+            "pyinstaller",
+        )
+    }
+    for name, data in files.items():
+        relative = module._app_record_path(name, dot_links)
+        if (
+            relative is None
+            or name in module._APP_BUILD_METADATA
+            or name in {module._APP_BASE_LIBRARY, "Contents/Frameworks/libpython3.12.dylib"}
+        ):
+            continue
+        if name.endswith("/_CodeSignature/CodeResources"):
+            continue
+        if name in module._APP_PYINSTALLER_FILES:
+            owned["pyinstaller"][module._APP_PYINSTALLER_FILES[name]] = data
+            continue
+        first = relative.split("/", 1)[0]
+        owner = next(
+            (owner for owner in owned if first.lower().startswith(owner.replace("-", "_"))), None
+        )
+        if first == "PIL":
+            owner = "pillow"
+        elif first == "PySide6":
+            owner = "pyside6-essentials"
+        elif first == "pillow_heif" or first.startswith("_pillow_heif."):
+            owner = "pillow-heif"
+        assert owner is not None, name
+        owned[owner][relative] = data
+    versions = {
+        "numpy": "2.5.4",
+        "scipy": "1.18.1",
+        "pillow": "12.3.0",
+        "pillow-heif": "1.8.1",
+        "pyside6-essentials": "6.12.0",
+        "shiboken6": "6.12.0",
+        "pyinstaller": "6.22.3",
+    }
+    distributions = {}
+    for name, contents in owned.items():
+        version = versions[name]
+        info = site / f"{name.replace('-', '_')}-{version}.dist-info"
+        info.mkdir(parents=True, exist_ok=True)
+        (info / "METADATA").write_text(f"Name: {name}\nVersion: {version}\n")
+        licence = f"{info.name}/licenses/LICENSE.txt"
+        contents[licence] = b"GNU LESSER GENERAL PUBLIC LICENSE\nSynthetic wheel terms\n"
+        if name == "pyinstaller":
+            contents["PyInstaller/loader/pyimod01_archive.py"] = b""
+            contents["PyInstaller/hooks/rthooks/pyi_rth_inspect.py"] = b""
+        if name == "pillow-heif":
+            contents[f"{info.name}/licenses/LICENSES_bundled.txt"] = (
+                VENV_SITE_PACKAGES / info.name / "licenses/LICENSES_bundled.txt"
+            ).read_bytes()
+        record = []
+        for relative, data in contents.items():
+            path = site / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+            digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).decode().rstrip("=")
+            record.append(f"{relative},sha256={digest},{len(data)}")
+        (info / "METADATA").write_text(f"Name: {name}\nVersion: {version}\n")
+        (info / "RECORD").write_text("\n".join(record) + "\n")
+        distributions[name] = importlib.metadata.PathDistribution(info)
+    runtime = tmp_path / "run7-python" / "libpython3.12.dylib"
+    runtime.parent.mkdir()
+    runtime.write_bytes(files["Contents/Frameworks/libpython3.12.dylib"])
+    monkeypatch.setattr(module, "_python_runtime_dylib", lambda: runtime)
+
+    def measured_identity(data):
+        tool = module._build_tool()
+        image = tool._macho_identity(data)
+        return "non-Mach-O" if image is None else tool._macho_digest(image)
+
+    monkeypatch.setattr(
+        module,
+        "_embedded_macho",
+        lambda data: identities.get(data, measured_identity(data)),
+        raising=False,
+    )
+
+    def carried_texts(document, claims, rows):
+        result = []
+        for row in document["components"]:
+            if "carried_notice" in row and claims.get(row["component"]):
+                result.append(
+                    module.NoticeRow(
+                        row["component"],
+                        row["upstream_version"],
+                        row["spdx"],
+                        ("synthetic carried-text stand-in",),
+                        tuple(label for label, _digest in claims[row["component"]]),
+                        (module.LicenceInput(ROOT / "LICENSE"),),
+                    )
+                )
+        assert len(result) == 2
+        return result
+
+    monkeypatch.setattr(module, "_carried_notice_rows", carried_texts)
+    result = module.plan_notices(
+        root, native_licences_path=surface, distribution=distributions.__getitem__
+    )
+    assert len([entry for entry in result.entries if entry.startswith("file:")]) == 293
+    assert len([entry for entry in result.entries if entry.startswith("link:")]) == 86
+    assert len(result.limits) == 14
+    for framework in ("QtCore", "QtDBus", "QtGui", "QtNetwork", "QtSvg", "QtWidgets"):
+        prefix = f"file:Contents/Frameworks/PySide6/Qt/lib/{framework}.framework/Versions/A/"
+        qt = next(row for row in result.rows if row.name == "pyside6-essentials")
+        assert prefix + "Resources/Info.plist" in qt.entries
+        clearwater = next(row for row in result.rows if row.name == "Clearwater")
+        assert prefix + "_CodeSignature/CodeResources" in clearwater.entries
+
+
+@pytest.mark.parametrize("line", ["Runner:", "Per-component pins and licence readings:"])
+def test_f02b_ffmpeg_provenance_checks_runner_and_pins(app_release, line):
+    """The writer's fifteen-line record binds the runner and component pin pointer."""
+    add_app_ffmpeg(app_release["app"], app_release["native_surface"])
+    record = app_release["app"] / "Contents/Resources/ffmpeg-BUILD.txt"
+    text = record.read_text()
+    assert len(text.splitlines()) == 15
+    assert line in text
+    record.write_text(
+        "\n".join(
+            line + " tampered" if item.startswith(line) else item for item in text.splitlines()
+        )
+        + "\n"
+    )
+    with pytest.raises(ValueError, match="FFmpeg build provenance differs"):
+        app_plan(app_release)
 
 
 def installed(site, name, version, files):
@@ -1501,6 +1934,7 @@ def _make_native_surface(destination):
     document["components"] = [document["components"][0]]
     document.pop("vendored_paths", None)
     document.pop("embedded_hosts", None)
+    document.pop("embedded_census", None)
     document.pop("limits", None)
     for text in destination.iterdir():
         if text.name not in {"manifest.json", document["components"][0]["text_file"]}:
@@ -1523,6 +1957,7 @@ def omit_production_embedded_census(surface):
     document = json.loads(path.read_text())
     document["components"] = [row for row in document["components"] if "embedded_in" not in row]
     document.pop("embedded_hosts", None)
+    document.pop("embedded_census", None)
     document.pop("limits", None)
     keep = {"manifest.json", *(name for name, _sha, _size in native_surface_inputs(document))}
     for item in surface.iterdir():
@@ -3300,7 +3735,9 @@ def test_production_limits_bind_every_commissioned_host_to_its_census():
     folder = ROOT / "tools/package/native-licences"
     document = json.loads((folder / "manifest.json").read_bytes())
     module.load_native_licences(folder)
-    entries = document.get("limits", [])
+    entries = [
+        limit for limit in document.get("limits", []) if limit.get("platform", "win32") == "win32"
+    ]
     assert len(entries) == 17
     assert [entry["component"] for entry in entries] == sorted(
         entry["component"] for entry in entries
@@ -3802,7 +4239,11 @@ def test_production_wheel_census_binds_every_scipy_native_runtime():
     module = load_notices()
     document = json.loads((ROOT / "tools/package/native-licences/manifest.json").read_text())
     hosts = {host.relpath: host for host in module._embedded_declarations(document)}
-    scipy = {path: host for path, host in hosts.items() if host.parent == "scipy"}
+    scipy = {
+        path: host
+        for path, host in hosts.items()
+        if host.parent == "scipy" and host.platform == "win32"
+    }
     assert len(scipy) == 83
     extensions = {path: host for path, host in scipy.items() if path.endswith(".pyd")}
     assert len(extensions) == 82
@@ -3834,7 +4275,10 @@ def test_production_wheel_texts_bind_exact_censused_hosts(component, expected):
         row.component: row
         for row in module.load_native_licences(ROOT / "tools/package/native-licences")
     }
-    assert records[component].embedded_in == expected
+    assert (
+        tuple(path for path in records[component].embedded_in if path.startswith("_internal/"))
+        == expected
+    )
     if component == "libaom (Pillow)":
         assert (
             records[component].licence_input.sha256
@@ -3892,7 +4336,9 @@ def test_production_tnc_retains_original_tnbc_attribution():
     row = next((row for row in records if row.component == "TNBC original credit (TNC)"), None)
     assert row is not None
     assert b"STEPHEN G. NASH" in row.licence_input.path.read_bytes()
-    assert row.embedded_in == ("_internal/scipy/optimize/_moduleTNC.cp312-win_amd64.pyd",)
+    assert tuple(path for path in row.embedded_in if path.startswith("_internal/")) == (
+        "_internal/scipy/optimize/_moduleTNC.cp312-win_amd64.pyd",
+    )
 
 
 @pytest.mark.parametrize(
@@ -3982,7 +4428,7 @@ def test_originals_and_patents_bind_verified_texts_to_carried_hosts(
     assert component in records
     row = records[component]
     expected = {f"_internal/{stem}.cp312-win_amd64.pyd" for stem in stems}
-    assert set(row.embedded_in) == expected
+    assert {path for path in row.embedded_in if path.startswith("_internal/")} == expected
     assert row.spdx == spdx
     assert hashlib.sha256(row.licence_input.path.read_bytes()).hexdigest() == text_sha256
     document = json.loads((folder / "manifest.json").read_text())
@@ -4161,7 +4607,10 @@ def add_app_ffmpeg(app, native_surface):
                 f"Build repository commit: {pin['build_repository_commit']}",
                 f"Build run: {pin['build_run_url']}",
                 f"Per-component source recipes: {pin['source_record_url']}",
+                "Per-component pins and licence readings: "
+                "tools/package/ffmpeg-macos.lock.json in Clearwater source",
                 f"macOS deployment target: {pin['macos_deployment_target']}",
+                f"Runner: {pin['runner_label']} image {pin['runner_image_version']}",
                 pin["configure_line"],
                 "",
             ]
@@ -4178,12 +4627,14 @@ def app_release(tmp_path, monkeypatch):
     target (WinError 123); only that failure is modelled, as in the build tests' content
     check (``app_content_paths``): the target is read from the link's own folder.
     """
-    if sys.platform != "win32":
-        pytest.skip(WINDOWS_RELEASE_SKIP)
     root = tmp_path / "release" / "Clearwater-1.2.0-macos-onedir"
     app = root / "Clearwater.app"
     make_app_executable(app / "Contents/MacOS/Clearwater", ["clearwater", "json", "numpy"])
+    import test_tools_package_build as bt
+
     for name, body in APP_FILES.items():
+        if name.endswith(".so"):
+            body = bt.built_native()
         (app / name).parent.mkdir(parents=True, exist_ok=True)
         (app / name).write_bytes(body)
     archive = app / "Contents/Resources/base_library.zip"
@@ -4230,6 +4681,7 @@ def app_release(tmp_path, monkeypatch):
         ),
         "pyinstaller": pyinstaller,
     }
+    (site / "numpy/_core/test.cpython-312-darwin.so").write_bytes(bt.built_native())
     complete_app_census(surface, app, site)
     # Native origins need actual RECORD identities, including synthetic fixture bytes.
     numpy_record = site / "numpy-2.5.4.dist-info/RECORD"
@@ -4281,7 +4733,17 @@ def app_release(tmp_path, monkeypatch):
     # raising=False: the RED run on the parent (which has neither) reaches its real refusal.
     monkeypatch.setattr(module, "_python_runtime_dylib", lambda: origin, raising=False)
     monkeypatch.setattr(
-        module, "_python_licence", lambda: Path(sys.base_prefix) / "LICENSE.txt", raising=False
+        module,
+        "_python_licence",
+        lambda: next(
+            path
+            for path in (
+                Path(sys.base_prefix) / "LICENSE.txt",
+                Path(sysconfig.get_path("stdlib")) / "LICENSE.txt",
+            )
+            if path.is_file()
+        ),
+        raising=False,
     )
     monkeypatch.setattr(os, "stat", posix_link_stat)
     monkeypatch.setattr(sys, "platform", "darwin")
@@ -4334,6 +4796,11 @@ def complete_app_census(surface, app, site):
             "components": [{"component": "synthetic embedded numpy", "source": source}],
         }
     ]
+    if "macho" in load_notices()._EmbeddedHost._fields:
+        host = document["embedded_hosts"][0]
+        host.pop("sha256")
+        host.pop("size_bytes")
+        host["macho"] = load_notices()._embedded_macho(data)
     document["components"].append(
         {
             "component": "synthetic embedded numpy",
@@ -4478,6 +4945,10 @@ def test_app_plan_refuses_once_while_the_macos_embedded_census_is_pending(app_re
     surface = app_release["native_surface"]
     shutil.rmtree(surface)
     shutil.copytree(ROOT / "tools/package/native-licences", surface)
+    path = surface / "manifest.json"
+    document = json.loads(path.read_text())
+    document.pop("embedded_census", None)
+    path.write_text(json.dumps(document))
     module = app_release["module"]
     with pytest.raises(ValueError) as error:
         app_plan(app_release)
@@ -4497,7 +4968,6 @@ def test_embedded_hosts_are_read_per_platform(app_release, monkeypatch):
     surface = app_release["native_surface"]
     path = surface / "manifest.json"
     document = json.loads(path.read_text())
-    dylib = app_release["app"] / "Contents/Frameworks/numpy/_core/test.cpython-312-darwin.so"
     windows = {
         "relpath": "_internal/numpy/_core/test.pyd",
         "sha256": "0" * 64,
@@ -4509,10 +4979,11 @@ def test_embedded_hosts_are_read_per_platform(app_release, monkeypatch):
     darwin = {
         **windows,
         "relpath": "Contents/Frameworks/numpy/_core/test.cpython-312-darwin.so",
-        "sha256": "1" * 64,
-        "size_bytes": dylib.stat().st_size,
+        "macho": "macho:" + "1" * 64,
         "platform": "darwin",
     }
+    darwin.pop("sha256")
+    darwin.pop("size_bytes")
     module = app_release["module"]
     hosts = [
         (windows, "win32"),
@@ -4527,7 +4998,7 @@ def test_embedded_hosts_are_read_per_platform(app_release, monkeypatch):
         with pytest.raises(ValueError, match="embedded host declaration is invalid"):
             module._embedded_declarations(document)
     dylib_host = module._EmbeddedHost(
-        darwin["relpath"], darwin["sha256"], darwin["size_bytes"], "numpy", "2.5.4", (), "darwin"
+        darwin["relpath"], "", 0, "numpy", "2.5.4", (), "darwin", darwin["macho"]
     )
     entries, home = module._inventory(app_release["root"])
     with pytest.raises(ValueError, match="identity differs"):
@@ -4792,7 +5263,7 @@ def test_windows_production_manifest_without_census_is_unchanged(monkeypatch):
     path = ROOT / "tools/package/native-licences/manifest.json"
     data = path.read_bytes()
     module = load_notices()
-    assert "embedded_census" not in module._native_document(path.parent)
+    assert module._native_document(path.parent)["embedded_census"]["darwin"]["status"] == "complete"
     assert module.census_preflight(path.parent) is None
     assert path.read_bytes() == data
     committed = subprocess.run(
@@ -4802,7 +5273,17 @@ def test_windows_production_manifest_without_census_is_unchanged(monkeypatch):
         check=True,
         timeout=30,
     ).stdout
-    assert data == committed
+    current = json.loads(data)
+    previous = json.loads(committed)
+    assert [
+        r for r in current["embedded_hosts"] if r.get("platform", "win32") == "win32"
+    ] == previous["embedded_hosts"]
+    for old in previous["components"]:
+        now = next(row for row in current["components"] if row["component"] == old["component"])
+        assert {k: v for k, v in now.items() if k != "embedded_in"} == {
+            k: v for k, v in old.items() if k != "embedded_in"
+        }
+        assert all(path in now.get("embedded_in", []) for path in old.get("embedded_in", []))
 
 
 def test_darwin_onedir_app_suffix_carries_inventory_layout(tmp_path, monkeypatch):
@@ -4829,3 +5310,390 @@ def test_darwin_onedir_app_suffix_carries_inventory_layout(tmp_path, monkeypatch
     monkeypatch.setattr(module, "_ffmpeg_rows", check_context)
     with pytest.raises(ContextObservedError):
         module.plan_notices(home)
+
+
+# Run 7 (42897107215 @ 8955f790), app-listing fb083d71..., identities 7b633fb7... .
+# Physical files and admitted links only; folders are reconstructed from their paths.
+_RUN7_APP_TREE = """
+f Contents/Frameworks/PySide6/Qt/lib/QtCore.framework/Versions/A/Resources/Info.plist
+f Contents/Frameworks/PySide6/Qt/lib/QtCore.framework/Versions/A/_CodeSignature/CodeResources
+f Contents/Frameworks/PySide6/Qt/lib/QtDBus.framework/Versions/A/Resources/Info.plist
+f Contents/Frameworks/PySide6/Qt/lib/QtDBus.framework/Versions/A/_CodeSignature/CodeResources
+f Contents/Frameworks/PySide6/Qt/lib/QtGui.framework/Versions/A/Resources/Info.plist
+f Contents/Frameworks/PySide6/Qt/lib/QtGui.framework/Versions/A/_CodeSignature/CodeResources
+f Contents/Frameworks/PySide6/Qt/lib/QtNetwork.framework/Versions/A/Resources/Info.plist
+f Contents/Frameworks/PySide6/Qt/lib/QtNetwork.framework/Versions/A/_CodeSignature/CodeResources
+f Contents/Frameworks/PySide6/Qt/lib/QtSvg.framework/Versions/A/Resources/Info.plist
+f Contents/Frameworks/PySide6/Qt/lib/QtSvg.framework/Versions/A/_CodeSignature/CodeResources
+f Contents/Frameworks/PySide6/Qt/lib/QtWidgets.framework/Versions/A/Resources/Info.plist
+f Contents/Frameworks/PySide6/Qt/lib/QtWidgets.framework/Versions/A/_CodeSignature/CodeResources
+f Contents/Info.plist
+f Contents/Resources/PySide6/Qt/translations/qt_ar.qm
+f Contents/Resources/PySide6/Qt/translations/qt_bg.qm
+f Contents/Resources/PySide6/Qt/translations/qt_ca.qm
+f Contents/Resources/PySide6/Qt/translations/qt_cs.qm
+f Contents/Resources/PySide6/Qt/translations/qt_da.qm
+f Contents/Resources/PySide6/Qt/translations/qt_de.qm
+f Contents/Resources/PySide6/Qt/translations/qt_en.qm
+f Contents/Resources/PySide6/Qt/translations/qt_es.qm
+f Contents/Resources/PySide6/Qt/translations/qt_fa.qm
+f Contents/Resources/PySide6/Qt/translations/qt_fi.qm
+f Contents/Resources/PySide6/Qt/translations/qt_fr.qm
+f Contents/Resources/PySide6/Qt/translations/qt_gd.qm
+f Contents/Resources/PySide6/Qt/translations/qt_gl.qm
+f Contents/Resources/PySide6/Qt/translations/qt_he.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_ar.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_bg.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_ca.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_cs.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_da.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_de.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_en.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_es.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_fr.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_gl.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_hr.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_hu.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_it.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_ja.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_ka.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_kk.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_ko.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_nl.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_nn.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_pl.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_pt_BR.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_ru.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_sk.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_sl.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_sv.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_tr.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_uk.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_zh_CN.qm
+f Contents/Resources/PySide6/Qt/translations/qt_help_zh_TW.qm
+f Contents/Resources/PySide6/Qt/translations/qt_hr.qm
+f Contents/Resources/PySide6/Qt/translations/qt_hu.qm
+f Contents/Resources/PySide6/Qt/translations/qt_it.qm
+f Contents/Resources/PySide6/Qt/translations/qt_ja.qm
+f Contents/Resources/PySide6/Qt/translations/qt_ka.qm
+f Contents/Resources/PySide6/Qt/translations/qt_kk.qm
+f Contents/Resources/PySide6/Qt/translations/qt_ko.qm
+f Contents/Resources/PySide6/Qt/translations/qt_lg.qm
+f Contents/Resources/PySide6/Qt/translations/qt_lt.qm
+f Contents/Resources/PySide6/Qt/translations/qt_lv.qm
+f Contents/Resources/PySide6/Qt/translations/qt_nl.qm
+f Contents/Resources/PySide6/Qt/translations/qt_nn.qm
+f Contents/Resources/PySide6/Qt/translations/qt_pl.qm
+f Contents/Resources/PySide6/Qt/translations/qt_pt_BR.qm
+f Contents/Resources/PySide6/Qt/translations/qt_pt_PT.qm
+f Contents/Resources/PySide6/Qt/translations/qt_ru.qm
+f Contents/Resources/PySide6/Qt/translations/qt_sk.qm
+f Contents/Resources/PySide6/Qt/translations/qt_sl.qm
+f Contents/Resources/PySide6/Qt/translations/qt_sv.qm
+f Contents/Resources/PySide6/Qt/translations/qt_tr.qm
+f Contents/Resources/PySide6/Qt/translations/qt_uk.qm
+f Contents/Resources/PySide6/Qt/translations/qt_zh_CN.qm
+f Contents/Resources/PySide6/Qt/translations/qt_zh_TW.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_ar.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_bg.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_ca.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_cs.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_da.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_de.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_en.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_es.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_fa.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_fi.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_fr.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_gd.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_he.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_hr.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_hu.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_it.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_ja.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_ka.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_kk.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_ko.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_lg.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_lv.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_nl.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_nn.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_pl.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_pt_BR.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_ru.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_sk.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_sv.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_tr.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_uk.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_zh_CN.qm
+f Contents/Resources/PySide6/Qt/translations/qtbase_zh_TW.qm
+f Contents/Resources/base_library.zip
+f Contents/Resources/icon-windowed.icns
+f Contents/Resources/numpy-2.5.4.dist-info/INSTALLER
+f Contents/Resources/numpy-2.5.4.dist-info/METADATA
+f Contents/Resources/numpy-2.5.4.dist-info/RECORD
+f Contents/Resources/numpy-2.5.4.dist-info/REQUESTED
+f Contents/Resources/numpy-2.5.4.dist-info/WHEEL
+f Contents/Resources/numpy-2.5.4.dist-info/entry_points.txt
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/LICENSE.txt
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/_core/include/numpy/libdivide/LICENSE.txt
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/_core/src/common/pythoncapi-compat/COPYING
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/_core/src/highway/LICENSE
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/_core/src/multiarray/dragon4_LICENSE.txt
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/_core/src/npysort/x86-simd-sort/LICENSE.md
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/_core/src/umath/svml/LICENSE
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/fft/pocketfft/LICENSE.md
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/linalg/lapack_lite/LICENSE.txt
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/ma/LICENSE
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/random/LICENSE.md
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/random/src/distributions/LICENSE.md
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/random/src/mt19937/LICENSE.md
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/random/src/pcg64/LICENSE.md
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/random/src/philox/LICENSE.md
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/random/src/sfc64/LICENSE.md
+f Contents/Resources/numpy-2.5.4.dist-info/licenses/numpy/random/src/splitmix64/LICENSE.md
+f Contents/_CodeSignature/CodeResources
+l Contents/Frameworks/PIL/.dylibs -> __dot__dylibs
+l Contents/Frameworks/PySide6/Qt/lib/QtCore.framework/QtCore -> Versions/Current/QtCore
+l Contents/Frameworks/PySide6/Qt/lib/QtCore.framework/Resources -> Versions/Current/Resources
+l Contents/Frameworks/PySide6/Qt/lib/QtCore.framework/Versions/Current -> A
+l Contents/Frameworks/PySide6/Qt/lib/QtDBus.framework/QtDBus -> Versions/Current/QtDBus
+l Contents/Frameworks/PySide6/Qt/lib/QtDBus.framework/Resources -> Versions/Current/Resources
+l Contents/Frameworks/PySide6/Qt/lib/QtDBus.framework/Versions/Current -> A
+l Contents/Frameworks/PySide6/Qt/lib/QtGui.framework/QtGui -> Versions/Current/QtGui
+l Contents/Frameworks/PySide6/Qt/lib/QtGui.framework/Resources -> Versions/Current/Resources
+l Contents/Frameworks/PySide6/Qt/lib/QtGui.framework/Versions/Current -> A
+l Contents/Frameworks/PySide6/Qt/lib/QtNetwork.framework/QtNetwork -> Versions/Current/QtNetwork
+l Contents/Frameworks/PySide6/Qt/lib/QtNetwork.framework/Resources -> Versions/Current/Resources
+l Contents/Frameworks/PySide6/Qt/lib/QtNetwork.framework/Versions/Current -> A
+l Contents/Frameworks/PySide6/Qt/lib/QtSvg.framework/QtSvg -> Versions/Current/QtSvg
+l Contents/Frameworks/PySide6/Qt/lib/QtSvg.framework/Resources -> Versions/Current/Resources
+l Contents/Frameworks/PySide6/Qt/lib/QtSvg.framework/Versions/Current -> A
+l Contents/Frameworks/PySide6/Qt/lib/QtWidgets.framework/QtWidgets -> Versions/Current/QtWidgets
+l Contents/Frameworks/PySide6/Qt/lib/QtWidgets.framework/Resources -> Versions/Current/Resources
+l Contents/Frameworks/PySide6/Qt/lib/QtWidgets.framework/Versions/Current -> A
+l Contents/Frameworks/PySide6/Qt/translations -> ../../../Resources/PySide6/Qt/translations
+l Contents/Frameworks/QtCore -> PySide6/Qt/lib/QtCore.framework/Versions/A/QtCore
+l Contents/Frameworks/QtDBus -> PySide6/Qt/lib/QtDBus.framework/Versions/A/QtDBus
+l Contents/Frameworks/QtGui -> PySide6/Qt/lib/QtGui.framework/Versions/A/QtGui
+l Contents/Frameworks/QtNetwork -> PySide6/Qt/lib/QtNetwork.framework/Versions/A/QtNetwork
+l Contents/Frameworks/QtSvg -> PySide6/Qt/lib/QtSvg.framework/Versions/A/QtSvg
+l Contents/Frameworks/QtWidgets -> PySide6/Qt/lib/QtWidgets.framework/Versions/A/QtWidgets
+l Contents/Frameworks/base_library.zip -> ../Resources/base_library.zip
+l Contents/Frameworks/libXau.6.dylib -> PIL/.dylibs/libXau.6.dylib
+l Contents/Frameworks/libavif.16.4.2.dylib -> PIL/.dylibs/libavif.16.4.2.dylib
+l Contents/Frameworks/libde265.0.2.3.dylib -> pillow_heif/.dylibs/libde265.0.2.3.dylib
+l Contents/Frameworks/libheif.1.23.6.dylib -> pillow_heif/.dylibs/libheif.1.23.6.dylib
+l Contents/Frameworks/libjpeg.62.4.0.dylib -> PIL/.dylibs/libjpeg.62.4.0.dylib
+l Contents/Frameworks/liblcms2.2.dylib -> PIL/.dylibs/liblcms2.2.dylib
+l Contents/Frameworks/liblzma.5.dylib -> PIL/.dylibs/liblzma.5.dylib
+l Contents/Frameworks/libopenjp2.2.5.4.dylib -> PIL/.dylibs/libopenjp2.2.5.4.dylib
+l Contents/Frameworks/libpyside6.abi3.6.12.dylib -> PySide6/libpyside6.abi3.6.12.dylib
+l Contents/Frameworks/libsharpyuv.0.dylib -> PIL/.dylibs/libsharpyuv.0.dylib
+l Contents/Frameworks/libshiboken6.abi3.6.12.dylib -> shiboken6/libshiboken6.abi3.6.12.dylib
+l Contents/Frameworks/libtiff.6.dylib -> PIL/.dylibs/libtiff.6.dylib
+l Contents/Frameworks/libwebp.7.dylib -> PIL/.dylibs/libwebp.7.dylib
+l Contents/Frameworks/libwebpdemux.2.dylib -> PIL/.dylibs/libwebpdemux.2.dylib
+l Contents/Frameworks/libwebpmux.3.dylib -> PIL/.dylibs/libwebpmux.3.dylib
+l Contents/Frameworks/libx265.217.dylib -> pillow_heif/.dylibs/libx265.217.dylib
+l Contents/Frameworks/libxcb.1.1.0.dylib -> PIL/.dylibs/libxcb.1.1.0.dylib
+l Contents/Frameworks/libz.1.3.1.zlib-ng.dylib -> PIL/.dylibs/libz.1.3.1.zlib-ng.dylib
+l Contents/Frameworks/numpy-2.5.4.dist-info -> ../Resources/numpy-2.5.4.dist-info
+l Contents/Frameworks/pillow_heif/.dylibs -> __dot__dylibs
+l Contents/Resources/PIL -> ../Frameworks/PIL
+l Contents/Resources/PySide6/Qt/lib -> ../../../Frameworks/PySide6/Qt/lib
+l Contents/Resources/PySide6/Qt/plugins -> ../../../Frameworks/PySide6/Qt/plugins
+l Contents/Resources/PySide6/QtCore.abi3.so -> ../../Frameworks/PySide6/QtCore.abi3.so
+l Contents/Resources/PySide6/QtDBus.abi3.so -> ../../Frameworks/PySide6/QtDBus.abi3.so
+l Contents/Resources/PySide6/QtGui.abi3.so -> ../../Frameworks/PySide6/QtGui.abi3.so
+l Contents/Resources/PySide6/QtNetwork.abi3.so -> ../../Frameworks/PySide6/QtNetwork.abi3.so
+l Contents/Resources/PySide6/QtWidgets.abi3.so -> ../../Frameworks/PySide6/QtWidgets.abi3.so
+l Contents/Resources/PySide6/libpyside6.abi3.6.12.dylib -> \
+../../Frameworks/PySide6/libpyside6.abi3.6.12.dylib
+l Contents/Resources/QtCore -> PySide6/Qt/lib/QtCore.framework/Versions/A/QtCore
+l Contents/Resources/QtDBus -> PySide6/Qt/lib/QtDBus.framework/Versions/A/QtDBus
+l Contents/Resources/QtGui -> PySide6/Qt/lib/QtGui.framework/Versions/A/QtGui
+l Contents/Resources/QtNetwork -> PySide6/Qt/lib/QtNetwork.framework/Versions/A/QtNetwork
+l Contents/Resources/QtSvg -> PySide6/Qt/lib/QtSvg.framework/Versions/A/QtSvg
+l Contents/Resources/QtWidgets -> PySide6/Qt/lib/QtWidgets.framework/Versions/A/QtWidgets
+l Contents/Resources/_pillow_heif.cpython-312-darwin.so -> \
+../Frameworks/_pillow_heif.cpython-312-darwin.so
+l Contents/Resources/libXau.6.dylib -> PIL/.dylibs/libXau.6.dylib
+l Contents/Resources/libavif.16.4.2.dylib -> PIL/.dylibs/libavif.16.4.2.dylib
+l Contents/Resources/libde265.0.2.3.dylib -> pillow_heif/.dylibs/libde265.0.2.3.dylib
+l Contents/Resources/libheif.1.23.6.dylib -> pillow_heif/.dylibs/libheif.1.23.6.dylib
+l Contents/Resources/libjpeg.62.4.0.dylib -> PIL/.dylibs/libjpeg.62.4.0.dylib
+l Contents/Resources/liblcms2.2.dylib -> PIL/.dylibs/liblcms2.2.dylib
+l Contents/Resources/liblzma.5.dylib -> PIL/.dylibs/liblzma.5.dylib
+l Contents/Resources/libopenjp2.2.5.4.dylib -> PIL/.dylibs/libopenjp2.2.5.4.dylib
+l Contents/Resources/libpyside6.abi3.6.12.dylib -> PySide6/libpyside6.abi3.6.12.dylib
+l Contents/Resources/libpython3.12.dylib -> ../Frameworks/libpython3.12.dylib
+l Contents/Resources/libsharpyuv.0.dylib -> PIL/.dylibs/libsharpyuv.0.dylib
+l Contents/Resources/libshiboken6.abi3.6.12.dylib -> shiboken6/libshiboken6.abi3.6.12.dylib
+l Contents/Resources/libtiff.6.dylib -> PIL/.dylibs/libtiff.6.dylib
+l Contents/Resources/libwebp.7.dylib -> PIL/.dylibs/libwebp.7.dylib
+l Contents/Resources/libwebpdemux.2.dylib -> PIL/.dylibs/libwebpdemux.2.dylib
+l Contents/Resources/libwebpmux.3.dylib -> PIL/.dylibs/libwebpmux.3.dylib
+l Contents/Resources/libx265.217.dylib -> pillow_heif/.dylibs/libx265.217.dylib
+l Contents/Resources/libxcb.1.1.0.dylib -> PIL/.dylibs/libxcb.1.1.0.dylib
+l Contents/Resources/libz.1.3.1.zlib-ng.dylib -> PIL/.dylibs/libz.1.3.1.zlib-ng.dylib
+l Contents/Resources/numpy -> ../Frameworks/numpy
+l Contents/Resources/pillow_heif -> ../Frameworks/pillow_heif
+l Contents/Resources/scipy -> ../Frameworks/scipy
+l Contents/Resources/shiboken6 -> ../Frameworks/shiboken6
+m Contents/Frameworks/PIL/__dot__dylibs/libXau.6.dylib
+m Contents/Frameworks/PIL/__dot__dylibs/libavif.16.4.2.dylib
+m Contents/Frameworks/PIL/__dot__dylibs/libjpeg.62.4.0.dylib
+m Contents/Frameworks/PIL/__dot__dylibs/liblcms2.2.dylib
+m Contents/Frameworks/PIL/__dot__dylibs/liblzma.5.dylib
+m Contents/Frameworks/PIL/__dot__dylibs/libopenjp2.2.5.4.dylib
+m Contents/Frameworks/PIL/__dot__dylibs/libsharpyuv.0.dylib
+m Contents/Frameworks/PIL/__dot__dylibs/libtiff.6.dylib
+m Contents/Frameworks/PIL/__dot__dylibs/libwebp.7.dylib
+m Contents/Frameworks/PIL/__dot__dylibs/libwebpdemux.2.dylib
+m Contents/Frameworks/PIL/__dot__dylibs/libwebpmux.3.dylib
+m Contents/Frameworks/PIL/__dot__dylibs/libxcb.1.1.0.dylib
+m Contents/Frameworks/PIL/__dot__dylibs/libz.1.3.1.zlib-ng.dylib
+m Contents/Frameworks/PIL/_avif.cpython-312-darwin.so
+m Contents/Frameworks/PIL/_imaging.cpython-312-darwin.so
+m Contents/Frameworks/PIL/_imagingcms.cpython-312-darwin.so
+m Contents/Frameworks/PIL/_imagingmath.cpython-312-darwin.so
+m Contents/Frameworks/PIL/_imagingtk.cpython-312-darwin.so
+m Contents/Frameworks/PIL/_webp.cpython-312-darwin.so
+m Contents/Frameworks/PySide6/Qt/lib/QtCore.framework/Versions/A/QtCore
+m Contents/Frameworks/PySide6/Qt/lib/QtDBus.framework/Versions/A/QtDBus
+m Contents/Frameworks/PySide6/Qt/lib/QtGui.framework/Versions/A/QtGui
+m Contents/Frameworks/PySide6/Qt/lib/QtNetwork.framework/Versions/A/QtNetwork
+m Contents/Frameworks/PySide6/Qt/lib/QtSvg.framework/Versions/A/QtSvg
+m Contents/Frameworks/PySide6/Qt/lib/QtWidgets.framework/Versions/A/QtWidgets
+m Contents/Frameworks/PySide6/Qt/plugins/generic/libqtuiotouchplugin.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/iconengines/libqsvgicon.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/imageformats/libqgif.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/imageformats/libqicns.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/imageformats/libqico.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/imageformats/libqjpeg.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/imageformats/libqmacheif.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/imageformats/libqmacjp2.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/imageformats/libqsvg.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/imageformats/libqtga.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/imageformats/libqtiff.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/imageformats/libqwbmp.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/imageformats/libqwebp.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/networkinformation/libqapplenetworkinformation.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/platforms/libqcocoa.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/platforms/libqminimal.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/platforms/libqoffscreen.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/styles/libqmacstyle.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/tls/libqcertonlybackend.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/tls/libqopensslbackend.dylib
+m Contents/Frameworks/PySide6/Qt/plugins/tls/libqsecuretransportbackend.dylib
+m Contents/Frameworks/PySide6/QtCore.abi3.so
+m Contents/Frameworks/PySide6/QtDBus.abi3.so
+m Contents/Frameworks/PySide6/QtGui.abi3.so
+m Contents/Frameworks/PySide6/QtNetwork.abi3.so
+m Contents/Frameworks/PySide6/QtWidgets.abi3.so
+m Contents/Frameworks/PySide6/libpyside6.abi3.6.12.dylib
+m Contents/Frameworks/_pillow_heif.cpython-312-darwin.so
+m Contents/Frameworks/libpython3.12.dylib
+m Contents/Frameworks/numpy/_core/_multiarray_tests.cpython-312-darwin.so
+m Contents/Frameworks/numpy/_core/_multiarray_umath.cpython-312-darwin.so
+m Contents/Frameworks/numpy/fft/_pocketfft_umath.cpython-312-darwin.so
+m Contents/Frameworks/numpy/linalg/_umath_linalg.cpython-312-darwin.so
+m Contents/Frameworks/numpy/random/_bounded_integers.cpython-312-darwin.so
+m Contents/Frameworks/numpy/random/_common.cpython-312-darwin.so
+m Contents/Frameworks/numpy/random/_generator.cpython-312-darwin.so
+m Contents/Frameworks/numpy/random/_mt19937.cpython-312-darwin.so
+m Contents/Frameworks/numpy/random/_pcg64.cpython-312-darwin.so
+m Contents/Frameworks/numpy/random/_philox.cpython-312-darwin.so
+m Contents/Frameworks/numpy/random/_sfc64.cpython-312-darwin.so
+m Contents/Frameworks/numpy/random/bit_generator.cpython-312-darwin.so
+m Contents/Frameworks/numpy/random/mtrand.cpython-312-darwin.so
+m Contents/Frameworks/pillow_heif/__dot__dylibs/libde265.0.2.3.dylib
+m Contents/Frameworks/pillow_heif/__dot__dylibs/libheif.1.23.6.dylib
+m Contents/Frameworks/pillow_heif/__dot__dylibs/libx265.217.dylib
+m Contents/Frameworks/scipy/_cyutility.cpython-312-darwin.so
+m Contents/Frameworks/scipy/_lib/_ccallback_c.cpython-312-darwin.so
+m Contents/Frameworks/scipy/_lib/_fpumode.cpython-312-darwin.so
+m Contents/Frameworks/scipy/_lib/_uarray/_uarray.cpython-312-darwin.so
+m Contents/Frameworks/scipy/_lib/messagestream.cpython-312-darwin.so
+m Contents/Frameworks/scipy/fft/_duccfft/pyduccfft.cpython-312-darwin.so
+m Contents/Frameworks/scipy/integrate/_dop.cpython-312-darwin.so
+m Contents/Frameworks/scipy/integrate/_odepack.cpython-312-darwin.so
+m Contents/Frameworks/scipy/integrate/_quadpack.cpython-312-darwin.so
+m Contents/Frameworks/scipy/integrate/_vode.cpython-312-darwin.so
+m Contents/Frameworks/scipy/interpolate/_dierckx.cpython-312-darwin.so
+m Contents/Frameworks/scipy/interpolate/_fitpack.cpython-312-darwin.so
+m Contents/Frameworks/scipy/interpolate/_interpnd.cpython-312-darwin.so
+m Contents/Frameworks/scipy/interpolate/_ppoly.cpython-312-darwin.so
+m Contents/Frameworks/scipy/interpolate/_rbfinterp_pythran.cpython-312-darwin.so
+m Contents/Frameworks/scipy/interpolate/_rgi_cython.cpython-312-darwin.so
+m Contents/Frameworks/scipy/linalg/_batched_linalg.cpython-312-darwin.so
+m Contents/Frameworks/scipy/linalg/_cythonized_array_utils.cpython-312-darwin.so
+m Contents/Frameworks/scipy/linalg/_decomp_interpolative.cpython-312-darwin.so
+m Contents/Frameworks/scipy/linalg/_decomp_update.cpython-312-darwin.so
+m Contents/Frameworks/scipy/linalg/_fblas.cpython-312-darwin.so
+m Contents/Frameworks/scipy/linalg/_flapack.cpython-312-darwin.so
+m Contents/Frameworks/scipy/linalg/_internal_matfuncs.cpython-312-darwin.so
+m Contents/Frameworks/scipy/linalg/_linalg_pythran.cpython-312-darwin.so
+m Contents/Frameworks/scipy/linalg/_matfuncs_sqrtm_triu.cpython-312-darwin.so
+m Contents/Frameworks/scipy/linalg/_solve_toeplitz.cpython-312-darwin.so
+m Contents/Frameworks/scipy/linalg/cython_blas.cpython-312-darwin.so
+m Contents/Frameworks/scipy/linalg/cython_lapack.cpython-312-darwin.so
+m Contents/Frameworks/scipy/ndimage/_nd_image.cpython-312-darwin.so
+m Contents/Frameworks/scipy/ndimage/_ni_label.cpython-312-darwin.so
+m Contents/Frameworks/scipy/ndimage/_rank_filter_1d.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_bglu_dense.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_direct.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_group_columns.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_highspy/_core.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_highspy/_highs_options.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_lbfgsb.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_lsap.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_lsq/givens_elimination.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_minpack.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_moduleTNC.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_pava_pybind.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_slsqplib.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_trlib/_trlib.cpython-312-darwin.so
+m Contents/Frameworks/scipy/optimize/_zeros.cpython-312-darwin.so
+m Contents/Frameworks/scipy/sparse/_csparsetools.cpython-312-darwin.so
+m Contents/Frameworks/scipy/sparse/_sparsetools.cpython-312-darwin.so
+m Contents/Frameworks/scipy/sparse/csgraph/_flow.cpython-312-darwin.so
+m Contents/Frameworks/scipy/sparse/csgraph/_matching.cpython-312-darwin.so
+m Contents/Frameworks/scipy/sparse/csgraph/_min_spanning_tree.cpython-312-darwin.so
+m Contents/Frameworks/scipy/sparse/csgraph/_reordering.cpython-312-darwin.so
+m Contents/Frameworks/scipy/sparse/csgraph/_shortest_path.cpython-312-darwin.so
+m Contents/Frameworks/scipy/sparse/csgraph/_tools.cpython-312-darwin.so
+m Contents/Frameworks/scipy/sparse/csgraph/_traversal.cpython-312-darwin.so
+m Contents/Frameworks/scipy/sparse/linalg/_dsolve/_superlu.cpython-312-darwin.so
+m Contents/Frameworks/scipy/sparse/linalg/_eigen/arpack/_arpacklib.cpython-312-darwin.so
+m Contents/Frameworks/scipy/sparse/linalg/_propack.cpython-312-darwin.so
+m Contents/Frameworks/scipy/spatial/_ckdtree.cpython-312-darwin.so
+m Contents/Frameworks/scipy/spatial/_distance_pybind.cpython-312-darwin.so
+m Contents/Frameworks/scipy/spatial/_distance_wrap.cpython-312-darwin.so
+m Contents/Frameworks/scipy/spatial/_hausdorff.cpython-312-darwin.so
+m Contents/Frameworks/scipy/spatial/_qhull.cpython-312-darwin.so
+m Contents/Frameworks/scipy/spatial/_voronoi.cpython-312-darwin.so
+m Contents/Frameworks/scipy/spatial/transform/_rigid_transform_cy.cpython-312-darwin.so
+m Contents/Frameworks/scipy/spatial/transform/_rotation_cy.cpython-312-darwin.so
+m Contents/Frameworks/scipy/special/_comb.cpython-312-darwin.so
+m Contents/Frameworks/scipy/special/_ellip_harm_2.cpython-312-darwin.so
+m Contents/Frameworks/scipy/special/_gufuncs.cpython-312-darwin.so
+m Contents/Frameworks/scipy/special/_specfun.cpython-312-darwin.so
+m Contents/Frameworks/scipy/special/_special_ufuncs.cpython-312-darwin.so
+m Contents/Frameworks/scipy/special/_ufuncs.cpython-312-darwin.so
+m Contents/Frameworks/scipy/special/_ufuncs_cxx.cpython-312-darwin.so
+m Contents/Frameworks/scipy/special/cython_special.cpython-312-darwin.so
+m Contents/Frameworks/scipy/stats/_ansari_swilk_statistics.cpython-312-darwin.so
+m Contents/Frameworks/scipy/stats/_biasedurn.cpython-312-darwin.so
+m Contents/Frameworks/scipy/stats/_levy_stable/levyst.cpython-312-darwin.so
+m Contents/Frameworks/scipy/stats/_qmc_cy.cpython-312-darwin.so
+m Contents/Frameworks/scipy/stats/_qmvnt_cy.cpython-312-darwin.so
+m Contents/Frameworks/scipy/stats/_rcont/rcont.cpython-312-darwin.so
+m Contents/Frameworks/scipy/stats/_sobol.cpython-312-darwin.so
+m Contents/Frameworks/scipy/stats/_stats.cpython-312-darwin.so
+m Contents/Frameworks/scipy/stats/_stats_pythran.cpython-312-darwin.so
+m Contents/Frameworks/shiboken6/Shiboken.abi3.so
+m Contents/Frameworks/shiboken6/libshiboken6.abi3.6.12.dylib
+m Contents/MacOS/Clearwater
+"""

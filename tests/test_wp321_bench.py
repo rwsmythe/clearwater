@@ -8,6 +8,7 @@ tool-side (Q-R7): the analysis thread's end and the frame loop's stall on its re
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ import pytest
 
 import export_bench as bench
 from clearwater.analysis import AnalysisEngine
+from clearwater.core.backend import _probe_gpu
 from clearwater.interfaces.image import Frame
 from export_bench import SUBDIR, _OverlapStamps, bench_folder
 
@@ -53,12 +55,33 @@ def _run(
 def test_a_device_frame_run_gives_the_sink_device_frames(
     sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    gpu, reason = _probe_gpu()
+    if gpu is None:
+        pytest.skip("CUDA unavailable for device-frame benchmark: " + reason)
     record, devices = _run(sample, tmp_path, monkeypatch, force_cpu=False)
     assert record["ok"], record["failure"]
     assert record["frames"] == 45 and record["sink_report"]["frames_written"] == 45
     assert record["device_frames"] is True
     assert record["device_backend"].startswith("CupyBackend")
     assert devices and "cpu" not in devices
+
+
+def test_device_frame_gpu_benchmark_skips_without_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An unavailable CUDA device skips before starting a benchmark or opening a sample."""
+    namespace = globals()
+    if source := os.environ.get("WP65_BENCH_TEST"):
+        namespace = {"__name__": "wp65_old_bench_test", "__file__": source}
+        exec(compile(Path(source).read_bytes(), source, "exec"), namespace)
+    monkeypatch.setitem(namespace, "_probe_gpu", lambda: (None, "CPU: no CUDA device"))
+
+    def refused_run(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("GPU benchmark ran with no CUDA device")
+
+    monkeypatch.setitem(namespace, "_run", refused_run)
+    with pytest.raises(pytest.skip.Exception, match="CUDA unavailable for device-frame benchmark:"):
+        namespace["test_a_device_frame_run_gives_the_sink_device_frames"](
+            None, Path("unused"), monkeypatch
+        )
 
 
 @pytest.mark.usefixtures("ffmpeg_tools")

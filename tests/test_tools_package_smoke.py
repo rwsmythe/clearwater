@@ -1558,11 +1558,23 @@ def test_smoke_on_linux_is_refused_by_name(monkeypatch, tmp_path):
         smoke.run_smoke(tmp_path, out=tmp_path / "out")
 
 
-def test_macos_smoke_reports_pending_census_before_missing_notices(darwin_app, monkeypatch):
-    """A r1 F2: the real census preflight wins before the notices existence check."""
+@pytest.mark.parametrize("pending", [True, False], ids=["pending", "complete"])
+def test_macos_smoke_reports_pending_census_before_missing_notices(
+    darwin_app, monkeypatch, tmp_path, pending
+):
+    """Real preflight reports pending first; a complete census reaches the notices check."""
     case = darwin_app
     notices = support.load_notices()
+    folder = tmp_path / "census"
+    folder.mkdir()
+    document = json.loads((ROOT / "tools/package/native-licences/manifest.json").read_text())
+    if pending:
+        document.pop("embedded_census", None)
+    (folder / "manifest.json").write_text(json.dumps(document))
+    preflight = notices.census_preflight
+    monkeypatch.setattr(notices, "census_preflight", lambda: preflight(folder))
     monkeypatch.setattr(case.smoke, "_notices_tool", lambda: notices)
     (case.app / "Contents/Resources/THIRD_PARTY_NOTICES.md").unlink()
-    with pytest.raises(case.smoke.SmokeError, match="macOS embedded census pending"):
+    reason = "macOS embedded census pending" if pending else "THIRD_PARTY_NOTICES.md is missing"
+    with pytest.raises(case.smoke.SmokeError, match=re.escape(reason)):
         case.smoke._macos_static_checks(case.app, case.app / "Contents/MacOS/Clearwater")

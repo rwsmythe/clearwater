@@ -26,13 +26,8 @@ jobs:
       UV_FROZEN: "1"
       UV_NO_SYNC: "1"
       UV_PYTHON_PREFERENCE: only-managed
-      # WP6.5 group 2a part 3 (the real tools/package/ffmpeg-macos.lock.json from the fork
-      # run, its census and the Mac notices) sets this to "true"; part 2 built the lock's
-      # shape and validator, the darwin bundling and the darwin smoke. Until then the build
-      # makes the .app WITHOUT FFmpeg, the FFmpeg-dependent macOS test families are
-      # deselected, no release asset is staged, and release mode (a call from release.yml)
-      # is refused by the version step.
-      MACOS_FFMPEG_BUNDLED: "false"
+      # WP6.5 F0-2b: the evidenced darwin census enables bundled FFmpeg and notices.
+      MACOS_FFMPEG_BUNDLED: "true"
     outputs:
       version: ${{ steps.version.outputs.version }}
     # Validation mode (WP6.5 run 2, CHARC option (i); A r8 fold): with no release-version
@@ -41,7 +36,8 @@ jobs:
     # and so does the bundle build without FFmpeg while the switch is off; one push reads
     # every test leg AND the .app. The app listing (find -ls and otool -L, run 3) runs in
     # validation mode only. Release mode (release.yml's workflow_call) runs every
-    # step under success() as before. No step is allowed to fail softly, so the job still
+    # step under success(), except that the bundle build still runs after a failed leg.
+    # Stage/upload still require success. No step is allowed to fail softly, so the job still
     # fails when any leg fails, and the release job's needs still gate on success. `shell: bash` runs as
     # `bash --noprofile --norc -eo pipefail {0}`: a failing pytest before `| tee` fails its step.
     defaults:
@@ -77,6 +73,7 @@ jobs:
           import os
           import platform
           import subprocess
+          import sys
           from pathlib import Path
           import clearwater
 
@@ -104,6 +101,9 @@ jobs:
               f"MACOS_FFMPEG_BUNDLED: {os.environ.get('MACOS_FFMPEG_BUNDLED', '')}",
               *system,
           ]
+          if not requested:
+              marker = Path(sys.base_prefix) / "BUILD"
+              record.append("pbs BUILD: " + (marker.read_text(encoding="utf-8").strip() if marker.is_file() else "absent"))
           evidence = Path("work/evidence")
           evidence.mkdir(parents=True, exist_ok=True)
           (evidence / "run-record.txt").write_text("\n".join(record) + "\n", encoding="utf-8")
@@ -135,7 +135,7 @@ jobs:
           uv run python tools/package/build.py --form onedir --out work/release 2>&1 | tee work/evidence/build.log
 
       - name: Build release bundle and zip
-        if: env.MACOS_FFMPEG_BUNDLED == 'true'
+        if: ${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED == 'true' }}
         run: |
           lock=tools/package/ffmpeg-macos.lock.json
           url=$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['asset_url'])" "$lock")
@@ -207,7 +207,7 @@ jobs:
               if kind != "file":
                   continue
               found = subprocess.run(
-                  ["file", "-b", str(path)], capture_output=True, text=True, timeout=60, check=False
+                  ["file", "-E", "-b", str(path)], capture_output=True, text=True, timeout=60, check=False
               )
               if found.returncode:
                   lines.append(f"# file -b failed for {path.relative_to(app).as_posix()}")
@@ -219,6 +219,10 @@ jobs:
               macho = "none" if identity is None else build._macho_digest(identity)
               digest = hashlib.sha256(data).hexdigest()
               lines.append(f"{path.relative_to(app).as_posix()}\t{len(data)}\t{digest}\t{macho}")
+              if path.relative_to(app).as_posix() == "Contents/MacOS/Clearwater":
+                  boot = build._macho_identity(data, bootloader=True)
+                  boot_digest = "none" if boot is None else build._macho_digest(boot)
+                  lines.append(f"# bootloader\tContents/MacOS/Clearwater\t{boot_digest}")
           out.write_text("\n".join(lines) + "\n", encoding="utf-8")
           print(f"{len([line for line in lines if not line.startswith('#')])} Mach-O files: {out}")
 
@@ -245,7 +249,7 @@ jobs:
           import re
           from pathlib import Path
 
-          ALLOWED = ("VideoToolbox unavailable on this Mac: ",)
+          ALLOWED = ("VideoToolbox unavailable on this Mac: ", "CUDA unavailable for device-frame benchmark: ")
           # pytest's summary: "<n> <word>" parts in any order, then " in <seconds>s".
           SUMMARY = re.compile(r"^(?:=+ )?((?:\d+ [a-z]+, )*\d+ [a-z]+) in [0-9.]+s\b", re.MULTILINE)
           log = Path("work/evidence/macos.log").read_text(encoding="utf-8", errors="replace")
@@ -308,7 +312,7 @@ jobs:
           cp "$notices" work/release-assets/THIRD_PARTY_NOTICES-macos.md
 
       - name: Upload release assets
-        if: env.MACOS_FFMPEG_BUNDLED == 'true'
+        if: inputs.release-version && env.MACOS_FFMPEG_BUNDLED == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: macos-release
