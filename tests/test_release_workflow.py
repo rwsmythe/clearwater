@@ -906,6 +906,7 @@ def test_macos_job_steps_mirror_the_windows_order(macos):
         "Build app bundle without FFmpeg",
         "Build release bundle and zip",
         "List the app bundle",
+        "Record the Mach-O identities",
         "Run macOS tests on the built bundle",
         "Check macOS skip reasons",
         "Capture runner and encoder facts",
@@ -985,6 +986,7 @@ MACOS_STEP_CONDITIONS = {
     "Run serial tests": VALIDATION_CONTINUES,
     "Build app bundle without FFmpeg": VALIDATION_CONTINUES_OFF,
     "List the app bundle": VALIDATION_ONLY,
+    "Record the Mach-O identities": VALIDATION_ONLY,
     "Build release bundle and zip": "env.MACOS_FFMPEG_BUNDLED == 'true'",
     "Run macOS tests on the built bundle": VALIDATION_CONTINUES,
     "Check macOS skip reasons": VALIDATION_CONTINUES,
@@ -1220,6 +1222,7 @@ MODE_REACHED = {
         "Run serial tests",
         "Build app bundle without FFmpeg",
         "List the app bundle",
+        "Record the Mach-O identities",
         "Run macOS tests on the built bundle",
         "Check macOS skip reasons",
         "Capture runner and encoder facts",
@@ -1229,6 +1232,7 @@ MODE_REACHED = {
         *FIRST_SIX,
         "Run serial tests",
         "List the app bundle",
+        "Record the Mach-O identities",
         "Run macOS tests on the built bundle",
         "Check macOS skip reasons",
         "Capture runner and encoder facts",
@@ -1937,3 +1941,124 @@ def test_the_switch_off_guard_sees_each_planted_breach(macos, plant):
     if plant in {"else-asset-download", "elif-arm", "nested-branch"}:
         assert any("unsupported switch branch shape" in problem for problem in problems)
         assert any(problem.endswith(": curl ") for problem in problems)
+
+
+# --- WP6.5 F0-2a (CHARC eb1fc893): the Mach-O identity evidence for F0-2b's census -----------
+
+IDENTITIES = "work/evidence/macho-identities.txt"
+IDENTITY_STEP = "Record the Mach-O identities"
+
+
+def test_the_identity_step_is_pinned_after_the_listing_in_validation_mode(macos):
+    """Right after the listing (so after whichever build ran), validation mode only, the
+    build's own listing and ``macho:`` identity code, its file inside the evidence upload."""
+    names = re.findall(r"^      - name: (.+)$", macos, re.MULTILINE)
+    assert names.index(IDENTITY_STEP) == names.index("List the app bundle") + 1
+    assert names.index(IDENTITY_STEP) + 1 == names.index("Run macOS tests on the built bundle")
+    body = step(macos, IDENTITY_STEP)
+    assert f"        if: {VALIDATION_ONLY}\n" in body
+    assert "        shell: uv run python {0}\n" in body
+    assert "RELEASE_VERSION: ${{ steps.version.outputs.version }}" in body
+    assert "continue-on-error" not in body
+    text = script(macos, IDENTITY_STEP)
+    assert f'out = Path("{IDENTITIES}")' in text
+    assert (
+        'spec = importlib.util.spec_from_file_location("macho_build", "tools/package/build.py")'
+        in text
+    )
+    # The build's own code: its non-following .app listing and the origin check's identity.
+    assert "for path, kind in build._macos_app_entries(app):" in text
+    assert "identity = build._macho_identity(data)" in text
+    assert 'macho = "none" if identity is None else build._macho_digest(identity)' in text
+    assert '["file", "-b", str(path)]' in text and 'startswith("Mach-O")' in text
+    assert "-name" not in text and ".dylib" not in text and "os.walk" not in text
+    upload = step(macos, "Upload evidence")
+    assert "path: work/evidence/\n" in upload and "if: always()" in upload
+
+
+@pytest.mark.parametrize("switch", ["false", "true"])
+@pytest.mark.parametrize("failing", [None, "Run parallel tests"], ids=["ok", "failed-leg"])
+def test_the_identity_step_runs_in_validation_mode_only(macos, switch, failing):
+    """Evaluated step by step: validation mode records after the listing, also after a failed
+    leg; release mode (a release-version input) never reaches it."""
+    reached = _walk(macos, {}, switch, failing)
+    assert reached.index(IDENTITY_STEP) == reached.index("List the app bundle") + 1
+    assert IDENTITY_STEP not in _walk(macos, {"release-version": "1.2.0"}, switch, failing)
+
+
+def _run_identity_step(macos, tmp_path, monkeypatch):
+    """Execute the step's real script in ``tmp_path`` with ``file -b`` modelled by magic."""
+    (tmp_path / "tools/package").mkdir(parents=True)
+    (tmp_path / "tools/package/build.py").write_bytes(
+        (ROOT / "tools/package/build.py").read_bytes()
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RELEASE_VERSION", "1.2.0")
+    monkeypatch.setenv("GITHUB_SHA", "b" * 40)
+    asked = []
+
+    def file_type(args, **kwargs):
+        assert args[:2] == ["file", "-b"] and kwargs["timeout"] == 60
+        asked.append(args[2])
+        data = Path(args[2]).read_bytes()
+        kind = "Mach-O 64-bit bundle arm64" if data[:4] == b"\xcf\xfa\xed\xfe" else "data"
+        return subprocess.CompletedProcess(args, 0, kind + "\n", "")
+
+    monkeypatch.setattr(subprocess, "run", file_type)
+    try:
+        exec(compile(script(macos, IDENTITY_STEP), "macho-identities", "exec"), {})
+    except SystemExit as stop:
+        assert stop.code == 0
+    return asked
+
+
+def test_the_identity_step_records_each_mach_o_once_by_type(macos, tmp_path, monkeypatch):
+    """The executed step: every regular Mach-O (an extensionless one included) gets path, size,
+    sha256 and the build's ``macho:`` digest; data files are asked and skipped; a link is
+    never asked or opened (the build's non-following listing)."""
+    import test_tools_package_build as build_tests
+
+    app = tmp_path / "work/release/dist-onedir/Clearwater-1.2.0-macos-onedir/Clearwater.app"
+    files = {
+        "Contents/MacOS/Clearwater": build_tests.macho(filetype=2),
+        "Contents/Frameworks/libpython3.12.dylib": build_tests.built_native(),
+        "Contents/Frameworks/numpy/_core/x.cpython-312-darwin.so": build_tests.built_native(2),
+        "Contents/Resources/base_library.zip": b"PK\x05\x06" + bytes(18),
+        "Contents/Info.plist": b"<plist/>",
+    }
+    for name, data in files.items():
+        (app / name).parent.mkdir(parents=True, exist_ok=True)
+        (app / name).write_bytes(data)
+    build_tests._symlink(
+        app / "Contents/Resources/libpython3.12.dylib",
+        "../Frameworks/libpython3.12.dylib",
+        folder=False,
+    )
+    asked = _run_identity_step(macos, tmp_path, monkeypatch)
+    bundle = app.relative_to(tmp_path).as_posix()
+    assert sorted(Path(path).as_posix() for path in asked) == [
+        f"{bundle}/{name}" for name in sorted(files)
+    ]
+    lines = (tmp_path / IDENTITIES).read_text(encoding="utf-8").splitlines()
+    assert lines[:2] == [
+        f"# Mach-O identities of {Path(bundle)} at {'b' * 40}",
+        "# path\tsize\tsha256\tmacho",
+    ]
+    expected = []
+    for name in sorted(files):
+        data = files[name]
+        if data[:4] != b"\xcf\xfa\xed\xfe":
+            continue
+        identity = build_tests.build._macho_identity(data)
+        assert identity is not None, name
+        macho = build_tests.build._macho_digest(identity)
+        assert macho.startswith("macho:")
+        expected.append(f"{name}\t{len(data)}\t{hashlib.sha256(data).hexdigest()}\t{macho}")
+    assert lines[2:] == expected and len(expected) == 3
+
+
+def test_the_identity_step_says_when_there_is_no_bundle(macos, tmp_path, monkeypatch):
+    asked = _run_identity_step(macos, tmp_path, monkeypatch)
+    assert asked == []
+    text = (tmp_path / IDENTITIES).read_text(encoding="utf-8")
+    assert text.startswith("No app bundle at work") and text.endswith(": no identities.\n")

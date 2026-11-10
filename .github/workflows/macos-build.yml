@@ -170,6 +170,55 @@ jobs:
             done < <(find "$app" -type f -print0)
           } > "$listing" 2>&1
 
+      - name: Record the Mach-O identities
+        # WP6.5 F0-2a (CHARC eb1fc893): validation mode only. Every Mach-O file of the .app,
+        # found by file type (`file -b`) on the build's own non-following listing, gets one
+        # line: bundle path, size, whole-file sha256 and the build's `macho:` identity (the
+        # origin check's _macho_identity / _macho_digest). F0-2b's embedded census reads it.
+        if: ${{ !cancelled() && !inputs.release-version }}
+        shell: uv run python {0}
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          import hashlib
+          import importlib.util
+          import os
+          import subprocess
+          from pathlib import Path
+
+          out = Path("work/evidence/macho-identities.txt")
+          out.parent.mkdir(parents=True, exist_ok=True)
+          version = os.environ["RELEASE_VERSION"]
+          app = Path(f"work/release/dist-onedir/Clearwater-{version}-macos-onedir/Clearwater.app")
+          if not app.is_dir():
+              out.write_text(f"No app bundle at {app}: no identities.\n", encoding="utf-8")
+              raise SystemExit(0)
+          spec = importlib.util.spec_from_file_location("macho_build", "tools/package/build.py")
+          build = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(build)
+          lines = [
+              f"# Mach-O identities of {app} at {os.environ.get('GITHUB_SHA', '')}",
+              "# path\tsize\tsha256\tmacho",
+          ]
+          for path, kind in build._macos_app_entries(app):
+              if kind != "file":
+                  continue
+              found = subprocess.run(
+                  ["file", "-b", str(path)], capture_output=True, text=True, timeout=60, check=False
+              )
+              if found.returncode:
+                  lines.append(f"# file -b failed for {path.relative_to(app).as_posix()}")
+                  continue
+              if not found.stdout.startswith("Mach-O"):
+                  continue
+              data = path.read_bytes()
+              identity = build._macho_identity(data)
+              macho = "none" if identity is None else build._macho_digest(identity)
+              digest = hashlib.sha256(data).hexdigest()
+              lines.append(f"{path.relative_to(app).as_posix()}\t{len(data)}\t{digest}\t{macho}")
+          out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          print(f"{len([line for line in lines if not line.startswith('#')])} Mach-O files: {out}")
+
       - name: Run macOS tests on the built bundle
         if: ${{ success() || (!cancelled() && !inputs.release-version) }}
         env:
