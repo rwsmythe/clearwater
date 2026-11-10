@@ -35,11 +35,13 @@ jobs:
       MACOS_FFMPEG_BUNDLED: "false"
     outputs:
       version: ${{ steps.version.outputs.version }}
-    # Validation mode (WP6.5 run 2, CHARC option (i)): the serial leg, the bundle build
-    # without FFmpeg, the bundle's macOS tests and the facts capture run after an earlier
-    # failure (`!cancelled()`), so one push reads every test leg AND the .app; no step is
-    # allowed to fail softly, so the job still fails when any leg fails, and release mode
-    # (the release job's needs) still gates on success. `shell: bash` runs as
+    # Validation mode (WP6.5 run 2, CHARC option (i); A r8 fold): with no release-version
+    # input, the serial leg, the bundle's macOS tests, the skip-reason check and the facts
+    # capture also run after an earlier failure (`!cancelled() && !inputs.release-version`),
+    # and so does the bundle build without FFmpeg while the switch is off; one push reads
+    # every test leg AND the .app. Release mode (release.yml's workflow_call) runs every
+    # step under success() as before. No step is allowed to fail softly, so the job still
+    # fails when any leg fails, and the release job's needs still gate on success. `shell: bash` runs as
     # `bash --noprofile --norc -eo pipefail {0}`: a failing pytest before `| tee` fails its step.
     defaults:
       run:
@@ -120,7 +122,7 @@ jobs:
           uv run pytest -q -rs -n 3 --timeout 600 -m "not gpu and not footage and not gui and not slow and not fullclip and not macos" -k "not test_python_m_clearwater_starts_the_shell_and_exits_0" --basetemp=work/ci-parallel 2>&1 | tee work/evidence/parallel.log
 
       - name: Run serial tests
-        if: ${{ !cancelled() }}
+        if: ${{ success() || (!cancelled() && !inputs.release-version) }}
         run: |
           unset PYTEST_ADDOPTS
           mkdir -p work/evidence
@@ -140,7 +142,7 @@ jobs:
           uv run python tools/package/build.py --form onedir --ffmpeg-from "$url" --ffmpeg-sha256 "$sha" --notices --smoke --zip --out work/release 2>&1 | tee work/evidence/build.log
 
       - name: Run macOS tests on the built bundle
-        if: ${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}
+        if: ${{ success() || (!cancelled() && !inputs.release-version) }}
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -156,6 +158,7 @@ jobs:
           uv run pytest -q -rs --timeout 1200 -m macos -k "$selection" --basetemp=work/ci-macos --junitxml=work/evidence/macos-junit.xml 2>&1 | tee work/evidence/macos.log
 
       - name: Check macOS skip reasons
+        if: ${{ success() || (!cancelled() && !inputs.release-version) }}
         shell: uv run python {0}
         run: |
           import re
@@ -172,7 +175,7 @@ jobs:
           print(f"macOS leg: {sum(int(count) for count, _ in skipped)} skipped, all allowed")
 
       - name: Capture runner and encoder facts
-        if: ${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}
+        if: ${{ success() || (!cancelled() && !inputs.release-version) }}
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |

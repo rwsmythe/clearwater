@@ -968,9 +968,9 @@ def test_macos_test_legs_follow_the_windows_gate_with_the_ruled_differences(maco
             assert "| tee work/evidence/" in line
 
 
-# --- WP6.5 run 2 (CHARC option (i)): validation mode continues after a failed leg -------------
+# --- WP6.5 run 2 (CHARC option (i); A r8 fold, CHARC 7910e7df): the two modes ------------------
 
-VALIDATION_CONTINUES = "${{ !cancelled() }}"
+VALIDATION_CONTINUES = "${{ success() || (!cancelled() && !inputs.release-version) }}"
 VALIDATION_CONTINUES_OFF = "${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}"
 MACOS_STEP_CONDITIONS = {
     "Checkout source": None,
@@ -982,16 +982,18 @@ MACOS_STEP_CONDITIONS = {
     "Run serial tests": VALIDATION_CONTINUES,
     "Build app bundle without FFmpeg": VALIDATION_CONTINUES_OFF,
     "Build release bundle and zip": "env.MACOS_FFMPEG_BUNDLED == 'true'",
-    "Run macOS tests on the built bundle": VALIDATION_CONTINUES_OFF,
-    "Check macOS skip reasons": None,
-    "Capture runner and encoder facts": VALIDATION_CONTINUES_OFF,
+    "Run macOS tests on the built bundle": VALIDATION_CONTINUES,
+    "Check macOS skip reasons": VALIDATION_CONTINUES,
+    "Capture runner and encoder facts": VALIDATION_CONTINUES,
     "Stage release assets": "env.MACOS_FFMPEG_BUNDLED == 'true'",
     "Upload release assets": "env.MACOS_FFMPEG_BUNDLED == 'true'",
     "Upload evidence": "always()",
 }
-"""Every macOS step's ``if:`` exactly (None = no condition, i.e. ``success()``): the serial
-leg and, with the switch OFF, the bundle build, its macOS tests and the facts capture run
-after an earlier failure; the skip-reason check and the release-only steps are as before."""
+"""Every macOS step's ``if:`` exactly (None = no condition, i.e. ``success()``). With no
+release-version input (validation mode) the serial leg, the bundle's macOS tests, the
+skip-reason check and the facts capture run after an earlier failure, and the bundle build
+without FFmpeg does while the switch is off; in release mode every step is under
+``success()`` as at 69538abe."""
 
 RELEASE_WORKFLOW_SHA256 = "dd91eae3ccb63ca735dcb252375a8373ea946e87ba92803678e30c66352a8151"
 """sha256 of release.yml (text, LF) at 69538abe: run 2's fix leaves it byte-identical."""
@@ -1040,6 +1042,226 @@ def _validation_violations(macos, workflow):
     return problems
 
 
+class UnknownExpressionError(ValueError):
+    """An ``if:`` form the step evaluator does not know: refused, never guessed."""
+
+
+EXPRESSION_TOKEN = re.compile(
+    r"\s*(?:(?P<op>\|\||&&|==|!=|!|\(|\))"
+    r"|(?P<string>'(?:[^']|'')*')"
+    r"|(?P<name>[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*))"
+)
+STATUS_FUNCTIONS = ("success", "cancelled", "always")
+"""The status functions the evaluator knows; ``failure()`` and every other function refuse."""
+EXPRESSION_CONTEXTS = ("env", "inputs")
+"""The contexts the evaluator knows (``env.X``, ``inputs.X``); every other context refuses."""
+
+
+def _tokens(expression):
+    """The tokens of one ``if:`` (its ``${{ }}`` wrapper removed), or UnknownExpressionError."""
+    text = expression.strip()
+    if text.startswith("${{"):
+        if not text.endswith("}}"):
+            raise UnknownExpressionError(expression)
+        text = text[3:-2]
+    found, position = [], 0
+    text = text.rstrip()
+    while position < len(text):
+        match = EXPRESSION_TOKEN.match(text, position)
+        if not match or match.end() == position:
+            raise UnknownExpressionError(f"{expression!r} at {text[position:]!r}")
+        kind = match.lastgroup
+        found.append((kind, match[kind]))
+        position = match.end()
+    return found
+
+
+def evaluate_if(expression, *, failed, env, inputs):
+    """Evaluate one GitHub Actions step ``if:`` over {success, cancelled, always, env, inputs}.
+
+    The job is never cancelled here. A condition without a status function is read as
+    ``success() && (...)`` (GitHub's rule); None (no ``if:``) is ``success()``. Truthiness:
+    None, False and ``''`` are false. ``==`` / ``!=`` compare two strings case-insensitively;
+    any other operand pair, function, context, operator or literal is refused
+    (UnknownExpressionError), so a future condition cannot slip past the model.
+
+    Args:
+        expression: The ``if:`` text, or None.
+        failed: Whether an earlier step failed (``success()`` false, the job not cancelled).
+        env: The job's ``env`` values.
+        inputs: The workflow inputs (empty in a push / validation run).
+
+    Returns:
+        Whether the step runs.
+    """
+    tokens = _tokens(expression or "success()")
+    at = 0
+
+    def peek():
+        return tokens[at] if at < len(tokens) else (None, None)
+
+    def take(kind=None, value=None):
+        nonlocal at
+        token = peek()
+        if token[0] is None or (kind and token[0] != kind) or (value and token[1] != value):
+            raise UnknownExpressionError(
+                f"{expression!r}: expected {value or kind}, got {token[1]}"
+            )
+        at += 1
+        return token
+
+    def truthy(value):
+        return value not in (None, False, "")
+
+    def primary():
+        kind, value = peek()
+        if (kind, value) == ("op", "("):
+            take()
+            result = disjunction()
+            take("op", ")")
+            return result
+        if kind == "string":
+            take()
+            return value[1:-1].replace("''", "'")
+        if kind == "name" and value in STATUS_FUNCTIONS:
+            take()
+            take("op", "(")
+            take("op", ")")
+            return {"success": not failed, "cancelled": False, "always": True}[value]
+        if kind == "name" and value.split(".", 1)[0] in EXPRESSION_CONTEXTS and "." in value:
+            take()
+            context, key = value.split(".", 1)
+            if "." in key:
+                raise UnknownExpressionError(f"{expression!r}: nested {value}")
+            return (env if context == "env" else inputs).get(key)
+        raise UnknownExpressionError(f"{expression!r}: unknown {value!r}")
+
+    def comparison():
+        left = primary()
+        kind, value = peek()
+        if (kind, value) in (("op", "=="), ("op", "!=")):
+            take()
+            right = primary()
+            if not (isinstance(left, str) and isinstance(right, str)):
+                raise UnknownExpressionError(f"{expression!r}: compares {left!r} with {right!r}")
+            equal = left.casefold() == right.casefold()
+            return equal if value == "==" else not equal
+        return left
+
+    def negation():
+        if peek() == ("op", "!"):
+            take()
+            return not truthy(negation())
+        return comparison()
+
+    def conjunction():
+        result = negation()
+        while peek() == ("op", "&&"):
+            take()
+            right = negation()
+            result = truthy(result) and truthy(right)
+        return result
+
+    def disjunction():
+        result = conjunction()
+        while peek() == ("op", "||"):
+            take()
+            right = conjunction()
+            result = truthy(result) or truthy(right)
+        return result
+
+    value = disjunction()
+    if at != len(tokens):
+        raise UnknownExpressionError(f"{expression!r}: trailing {tokens[at][1]!r}")
+    if not any(kind == "name" and name in STATUS_FUNCTIONS for kind, name in tokens):
+        return (not failed) and truthy(value)
+    return truthy(value)
+
+
+MACOS_LOG = "work/evidence/macos.log"
+MODE_CASES = {
+    "release-all-success": ({"release-version": "1.2.0"}, "true", None),
+    "release-failed-leg": ({"release-version": "1.2.0"}, "true", "Run parallel tests"),
+    "validation-off-failed-leg": ({}, "false", "Run parallel tests"),
+    "validation-on-failed-leg": ({}, "true", "Run parallel tests"),
+}
+"""(inputs, MACOS_FFMPEG_BUNDLED, the step that fails or None) per mode case."""
+
+FIRST_SIX = [
+    "Checkout source",
+    "Set up uv",
+    "Sync build environment",
+    "Check version and record the run",
+    "Static checks",
+    "Run parallel tests",
+]
+MODE_REACHED = {
+    "release-all-success": [
+        *FIRST_SIX,
+        "Run serial tests",
+        "Build release bundle and zip",
+        "Run macOS tests on the built bundle",
+        "Check macOS skip reasons",
+        "Capture runner and encoder facts",
+        "Stage release assets",
+        "Upload release assets",
+        "Upload evidence",
+    ],
+    "release-failed-leg": [*FIRST_SIX, "Upload evidence"],
+    "validation-off-failed-leg": [
+        *FIRST_SIX,
+        "Run serial tests",
+        "Build app bundle without FFmpeg",
+        "Run macOS tests on the built bundle",
+        "Check macOS skip reasons",
+        "Capture runner and encoder facts",
+        "Upload evidence",
+    ],
+    "validation-on-failed-leg": [
+        *FIRST_SIX,
+        "Run serial tests",
+        "Run macOS tests on the built bundle",
+        "Check macOS skip reasons",
+        "Capture runner and encoder facts",
+        "Upload evidence",
+    ],
+}
+"""The steps each mode case reaches, in order (release-failed-leg = 69538abe's behaviour)."""
+
+
+def _walk(macos, inputs, switch, failing):
+    """The steps a run reaches, in order: each ``if:`` evaluated against the outcomes so far
+    (a reached step succeeds unless it is ``failing``)."""
+    env = {"MACOS_FFMPEG_BUNDLED": switch}
+    reached, failed = [], False
+    for name, condition in _conditions(macos).items():
+        if evaluate_if(condition, failed=failed, env=env, inputs=inputs):
+            reached.append(name)
+            failed = failed or name == failing
+    return reached
+
+
+def _mode_violations(macos, case):
+    """What breaks one mode case: the reached steps differ from ``MODE_REACHED``, or a
+    reached step reads ``macos.log`` before any reached step has produced it."""
+    inputs, switch, failing = MODE_CASES[case]
+    reached = _walk(macos, inputs, switch, failing)
+    problems = []
+    if reached != MODE_REACHED[case]:
+        problems.append(
+            f"reached differs: missing {[n for n in MODE_REACHED[case] if n not in reached]}, "
+            f"extra {[n for n in reached if n not in MODE_REACHED[case]]}"
+        )
+    produced = False
+    for name in reached:
+        body = step(macos, name)
+        if f"tee {MACOS_LOG}" in body:
+            produced = True
+        elif MACOS_LOG in body and not produced:
+            problems.append(f"{name} reads {MACOS_LOG} before any reached step produced it")
+    return problems
+
+
 def test_validation_mode_continues_after_a_failed_leg_and_still_fails_the_job(macos, workflow):
     """WP6.5 run 2 (CHARC option (i)): each step carries exactly its ruled condition; no
     step (no test step above all) has ``continue-on-error``, so a failed leg still fails the
@@ -1049,13 +1271,94 @@ def test_validation_mode_continues_after_a_failed_leg_and_still_fails_the_job(ma
     assert _validation_violations(macos, workflow) == []
 
 
+@pytest.mark.parametrize("case", list(MODE_CASES))
+def test_both_modes_reach_the_ruled_steps_by_evaluation(macos, case):
+    """A r8 fold (CHARC 7910e7df): the real ``if:`` expressions EVALUATED, step by step:
+    (1) release, all success: the bundle tests (``macos.log``'s producer) run before the
+    skip-reason check reads it, and staging and upload are reached; (2) release, a failed
+    leg: only the evidence upload after it (69538abe); (3) validation, switch off, a failed
+    leg: serial, the build without FFmpeg, the bundle tests, the skip reasons and the facts;
+    (4) validation, switch on, a failed leg: the same without the build, and no staging or
+    upload."""
+    assert _mode_violations(macos, case) == []
+
+
+def test_the_a_r8_form_fails_release_all_success(macos):
+    """The control: 2e98ca1c's conditions (the bundle tests and the facts keyed on the
+    switch; the skip-reason check and the serial leg as then) skip ``macos.log``'s producer
+    in a successful release run, and the walk reports it (A r8 MAJOR)."""
+    old = macos
+    for name, condition in {
+        "Run serial tests": "${{ !cancelled() }}",
+        "Run macOS tests on the built bundle": VALIDATION_CONTINUES_OFF,
+        "Capture runner and encoder facts": VALIDATION_CONTINUES_OFF,
+    }.items():
+        head, tail = old.split(f"      - name: {name}\n", 1)
+        tail = tail.replace(
+            f"        if: {VALIDATION_CONTINUES}\n", f"        if: {condition}\n", 1
+        )
+        old = head + f"      - name: {name}\n" + tail
+    head, tail = old.split("      - name: Check macOS skip reasons\n", 1)
+    old = (
+        head
+        + "      - name: Check macOS skip reasons\n"
+        + tail.replace(f"        if: {VALIDATION_CONTINUES}\n", "", 1)
+    )
+    problems = _mode_violations(old, "release-all-success")
+    assert f"Check macOS skip reasons reads {MACOS_LOG} before any reached step produced it" in (
+        problems
+    )
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "failure()",
+        "${{ github.ref == 'refs/heads/main' }}",
+        "${{ steps.version.outcome == 'success' }}",
+        "contains(env.MACOS_FFMPEG_BUNDLED, 'true')",
+        "${{ inputs.release-version == null }}",
+        "${{ !cancelled() && env.X > 'a' }}",
+        "${{ success() || }}",
+        "${{ (success() }}",
+        "${{ success() }",
+    ],
+)
+def test_the_step_evaluator_refuses_forms_it_does_not_know(expression):
+    """The evaluator's conservative refusal: an unknown function, context, operator or
+    literal, a broken expression or wrapper raises instead of being read as true or false."""
+    with pytest.raises(UnknownExpressionError):
+        evaluate_if(expression, failed=False, env={"X": "b"}, inputs={})
+
+
+@pytest.mark.parametrize(
+    ("expression", "failed", "inputs", "runs"),
+    [
+        (None, False, {}, True),
+        (None, True, {}, False),
+        ("always()", True, {}, True),
+        ("env.MACOS_FFMPEG_BUNDLED == 'true'", True, {}, False),  # implicit success()
+        ("env.MACOS_FFMPEG_BUNDLED == 'TRUE'", False, {}, True),  # case-insensitive
+        (VALIDATION_CONTINUES, True, {}, True),
+        (VALIDATION_CONTINUES, True, {"release-version": ""}, True),
+        (VALIDATION_CONTINUES, True, {"release-version": "1.2.0"}, False),
+        (VALIDATION_CONTINUES, False, {"release-version": "1.2.0"}, True),
+        (VALIDATION_CONTINUES_OFF, True, {}, False),
+    ],
+)
+def test_the_step_evaluator_reads_the_known_forms(expression, failed, inputs, runs):
+    """The evaluator on the forms the workflow uses (switch "true")."""
+    env = {"MACOS_FFMPEG_BUNDLED": "true"}
+    assert evaluate_if(expression, failed=failed, env=env, inputs=inputs) is runs
+
+
 @pytest.mark.parametrize(
     ("plant", "expected"),
     [
         ("serial-gated-on-success", "condition Run serial tests: None"),
         (
-            "capture-unswitched",
-            "condition Capture runner and encoder facts: '${{ !cancelled() }}'",
+            "capture-keyed-on-the-switch",
+            f"condition Capture runner and encoder facts: {VALIDATION_CONTINUES_OFF!r}",
         ),
         ("continue-on-error", "continue-on-error"),
         ("test-step-own-shell", "shell or tee: Run parallel tests"),
@@ -1067,9 +1370,9 @@ def test_the_validation_guard_sees_each_planted_breach(macos, workflow, plant, e
     a test step given its own shell, or a byte of release.yml changed is each reported."""
     if plant == "serial-gated-on-success":
         macos = macos.replace(f"        if: {VALIDATION_CONTINUES}\n", "", 1)
-    elif plant == "capture-unswitched":
+    elif plant == "capture-keyed-on-the-switch":
         head, tail = macos.split("      - name: Capture runner and encoder facts", 1)
-        tail = tail.replace(VALIDATION_CONTINUES_OFF, VALIDATION_CONTINUES, 1)
+        tail = tail.replace(VALIDATION_CONTINUES, VALIDATION_CONTINUES_OFF, 1)
         macos = head + "      - name: Capture runner and encoder facts" + tail
     elif plant == "continue-on-error":
         macos = macos.replace(
@@ -1273,7 +1576,7 @@ def test_macos_release_build_reads_the_macos_lock_fields_and_the_switch_stays_of
 SWITCH_GATES = {
     "": True,
     "always()": True,
-    "${{ !cancelled() }}": True,
+    "${{ success() || (!cancelled() && !inputs.release-version) }}": True,
     "${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}": True,
     "env.MACOS_FFMPEG_BUNDLED == 'true'": False,
 }
