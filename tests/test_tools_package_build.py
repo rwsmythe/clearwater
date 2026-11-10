@@ -22,6 +22,7 @@ import io
 import json
 import marshal
 import os
+import posixpath
 import re
 import shutil
 import stat
@@ -7213,3 +7214,571 @@ def test_release_zip_refuses_smoke_mutations_on_darwin(tmp_path, monkeypatch, ca
     assert ("new-file.txt" if mutation == "added" else "THIRD_PARTY_NOTICES.md") in message
     assert not archive.exists()
     assert not archive.with_suffix(".zip.sha256").exists()
+
+
+# --- WP6.5 F0-2: the notices inventory of the run-6 .app (CHARC 4ed56fcb's link invariant) ---
+# The literal shape of runner run 6's bundle (42865170579, macos-evidence/app-listing.txt, the
+# `find -ls` section): every regular file ("f") and every link ("l", with its stored target
+# text). Folders are implied (all 114 of the listing are). Prefixes: F/ = Contents/Frameworks/,
+# R/ = Contents/Resources/, M/ = Contents/MacOS/, C/ = Contents/. Committed here, independent of
+# the uncommitted runner evidence; generated from the listing, not written by hand.
+RUN6_APP_SHAPE = """\
+f F/PIL/__dot__dylibs/libXau.6.dylib
+f F/PIL/__dot__dylibs/libavif.16.4.2.dylib
+f F/PIL/__dot__dylibs/libjpeg.62.4.0.dylib
+f F/PIL/__dot__dylibs/liblcms2.2.dylib
+f F/PIL/__dot__dylibs/liblzma.5.dylib
+f F/PIL/__dot__dylibs/libopenjp2.2.5.4.dylib
+f F/PIL/__dot__dylibs/libsharpyuv.0.dylib
+f F/PIL/__dot__dylibs/libtiff.6.dylib
+f F/PIL/__dot__dylibs/libwebp.7.dylib
+f F/PIL/__dot__dylibs/libwebpdemux.2.dylib
+f F/PIL/__dot__dylibs/libwebpmux.3.dylib
+f F/PIL/__dot__dylibs/libxcb.1.1.0.dylib
+f F/PIL/__dot__dylibs/libz.1.3.1.zlib-ng.dylib
+f F/PIL/_avif.cpython-312-darwin.so
+f F/PIL/_imaging.cpython-312-darwin.so
+f F/PIL/_imagingcms.cpython-312-darwin.so
+f F/PIL/_imagingmath.cpython-312-darwin.so
+f F/PIL/_imagingtk.cpython-312-darwin.so
+f F/PIL/_webp.cpython-312-darwin.so
+f F/PySide6/Qt/lib/QtCore.framework/Versions/A/QtCore
+f F/PySide6/Qt/lib/QtCore.framework/Versions/A/Resources/Info.plist
+f F/PySide6/Qt/lib/QtCore.framework/Versions/A/_CodeSignature/CodeResources
+f F/PySide6/Qt/lib/QtDBus.framework/Versions/A/QtDBus
+f F/PySide6/Qt/lib/QtDBus.framework/Versions/A/Resources/Info.plist
+f F/PySide6/Qt/lib/QtDBus.framework/Versions/A/_CodeSignature/CodeResources
+f F/PySide6/Qt/lib/QtGui.framework/Versions/A/QtGui
+f F/PySide6/Qt/lib/QtGui.framework/Versions/A/Resources/Info.plist
+f F/PySide6/Qt/lib/QtGui.framework/Versions/A/_CodeSignature/CodeResources
+f F/PySide6/Qt/lib/QtNetwork.framework/Versions/A/QtNetwork
+f F/PySide6/Qt/lib/QtNetwork.framework/Versions/A/Resources/Info.plist
+f F/PySide6/Qt/lib/QtNetwork.framework/Versions/A/_CodeSignature/CodeResources
+f F/PySide6/Qt/lib/QtSvg.framework/Versions/A/QtSvg
+f F/PySide6/Qt/lib/QtSvg.framework/Versions/A/Resources/Info.plist
+f F/PySide6/Qt/lib/QtSvg.framework/Versions/A/_CodeSignature/CodeResources
+f F/PySide6/Qt/lib/QtWidgets.framework/Versions/A/QtWidgets
+f F/PySide6/Qt/lib/QtWidgets.framework/Versions/A/Resources/Info.plist
+f F/PySide6/Qt/lib/QtWidgets.framework/Versions/A/_CodeSignature/CodeResources
+f F/PySide6/Qt/plugins/generic/libqtuiotouchplugin.dylib
+f F/PySide6/Qt/plugins/iconengines/libqsvgicon.dylib
+f F/PySide6/Qt/plugins/imageformats/libqgif.dylib
+f F/PySide6/Qt/plugins/imageformats/libqicns.dylib
+f F/PySide6/Qt/plugins/imageformats/libqico.dylib
+f F/PySide6/Qt/plugins/imageformats/libqjpeg.dylib
+f F/PySide6/Qt/plugins/imageformats/libqmacheif.dylib
+f F/PySide6/Qt/plugins/imageformats/libqmacjp2.dylib
+f F/PySide6/Qt/plugins/imageformats/libqsvg.dylib
+f F/PySide6/Qt/plugins/imageformats/libqtga.dylib
+f F/PySide6/Qt/plugins/imageformats/libqtiff.dylib
+f F/PySide6/Qt/plugins/imageformats/libqwbmp.dylib
+f F/PySide6/Qt/plugins/imageformats/libqwebp.dylib
+f F/PySide6/Qt/plugins/networkinformation/libqapplenetworkinformation.dylib
+f F/PySide6/Qt/plugins/platforms/libqcocoa.dylib
+f F/PySide6/Qt/plugins/platforms/libqminimal.dylib
+f F/PySide6/Qt/plugins/platforms/libqoffscreen.dylib
+f F/PySide6/Qt/plugins/styles/libqmacstyle.dylib
+f F/PySide6/Qt/plugins/tls/libqcertonlybackend.dylib
+f F/PySide6/Qt/plugins/tls/libqopensslbackend.dylib
+f F/PySide6/Qt/plugins/tls/libqsecuretransportbackend.dylib
+f F/PySide6/QtCore.abi3.so
+f F/PySide6/QtDBus.abi3.so
+f F/PySide6/QtGui.abi3.so
+f F/PySide6/QtNetwork.abi3.so
+f F/PySide6/QtWidgets.abi3.so
+f F/PySide6/libpyside6.abi3.6.12.dylib
+f F/_pillow_heif.cpython-312-darwin.so
+f F/libpython3.12.dylib
+f F/numpy/_core/_multiarray_tests.cpython-312-darwin.so
+f F/numpy/_core/_multiarray_umath.cpython-312-darwin.so
+f F/numpy/fft/_pocketfft_umath.cpython-312-darwin.so
+f F/numpy/linalg/_umath_linalg.cpython-312-darwin.so
+f F/numpy/random/_bounded_integers.cpython-312-darwin.so
+f F/numpy/random/_common.cpython-312-darwin.so
+f F/numpy/random/_generator.cpython-312-darwin.so
+f F/numpy/random/_mt19937.cpython-312-darwin.so
+f F/numpy/random/_pcg64.cpython-312-darwin.so
+f F/numpy/random/_philox.cpython-312-darwin.so
+f F/numpy/random/_sfc64.cpython-312-darwin.so
+f F/numpy/random/bit_generator.cpython-312-darwin.so
+f F/numpy/random/mtrand.cpython-312-darwin.so
+f F/pillow_heif/__dot__dylibs/libde265.0.2.3.dylib
+f F/pillow_heif/__dot__dylibs/libheif.1.23.6.dylib
+f F/pillow_heif/__dot__dylibs/libx265.217.dylib
+f F/scipy/_cyutility.cpython-312-darwin.so
+f F/scipy/_lib/_ccallback_c.cpython-312-darwin.so
+f F/scipy/_lib/_fpumode.cpython-312-darwin.so
+f F/scipy/_lib/_uarray/_uarray.cpython-312-darwin.so
+f F/scipy/_lib/messagestream.cpython-312-darwin.so
+f F/scipy/fft/_duccfft/pyduccfft.cpython-312-darwin.so
+f F/scipy/integrate/_dop.cpython-312-darwin.so
+f F/scipy/integrate/_odepack.cpython-312-darwin.so
+f F/scipy/integrate/_quadpack.cpython-312-darwin.so
+f F/scipy/integrate/_vode.cpython-312-darwin.so
+f F/scipy/interpolate/_dierckx.cpython-312-darwin.so
+f F/scipy/interpolate/_fitpack.cpython-312-darwin.so
+f F/scipy/interpolate/_interpnd.cpython-312-darwin.so
+f F/scipy/interpolate/_ppoly.cpython-312-darwin.so
+f F/scipy/interpolate/_rbfinterp_pythran.cpython-312-darwin.so
+f F/scipy/interpolate/_rgi_cython.cpython-312-darwin.so
+f F/scipy/linalg/_batched_linalg.cpython-312-darwin.so
+f F/scipy/linalg/_cythonized_array_utils.cpython-312-darwin.so
+f F/scipy/linalg/_decomp_interpolative.cpython-312-darwin.so
+f F/scipy/linalg/_decomp_update.cpython-312-darwin.so
+f F/scipy/linalg/_fblas.cpython-312-darwin.so
+f F/scipy/linalg/_flapack.cpython-312-darwin.so
+f F/scipy/linalg/_internal_matfuncs.cpython-312-darwin.so
+f F/scipy/linalg/_linalg_pythran.cpython-312-darwin.so
+f F/scipy/linalg/_matfuncs_sqrtm_triu.cpython-312-darwin.so
+f F/scipy/linalg/_solve_toeplitz.cpython-312-darwin.so
+f F/scipy/linalg/cython_blas.cpython-312-darwin.so
+f F/scipy/linalg/cython_lapack.cpython-312-darwin.so
+f F/scipy/ndimage/_nd_image.cpython-312-darwin.so
+f F/scipy/ndimage/_ni_label.cpython-312-darwin.so
+f F/scipy/ndimage/_rank_filter_1d.cpython-312-darwin.so
+f F/scipy/optimize/_bglu_dense.cpython-312-darwin.so
+f F/scipy/optimize/_direct.cpython-312-darwin.so
+f F/scipy/optimize/_group_columns.cpython-312-darwin.so
+f F/scipy/optimize/_highspy/_core.cpython-312-darwin.so
+f F/scipy/optimize/_highspy/_highs_options.cpython-312-darwin.so
+f F/scipy/optimize/_lbfgsb.cpython-312-darwin.so
+f F/scipy/optimize/_lsap.cpython-312-darwin.so
+f F/scipy/optimize/_lsq/givens_elimination.cpython-312-darwin.so
+f F/scipy/optimize/_minpack.cpython-312-darwin.so
+f F/scipy/optimize/_moduleTNC.cpython-312-darwin.so
+f F/scipy/optimize/_pava_pybind.cpython-312-darwin.so
+f F/scipy/optimize/_slsqplib.cpython-312-darwin.so
+f F/scipy/optimize/_trlib/_trlib.cpython-312-darwin.so
+f F/scipy/optimize/_zeros.cpython-312-darwin.so
+f F/scipy/sparse/_csparsetools.cpython-312-darwin.so
+f F/scipy/sparse/_sparsetools.cpython-312-darwin.so
+f F/scipy/sparse/csgraph/_flow.cpython-312-darwin.so
+f F/scipy/sparse/csgraph/_matching.cpython-312-darwin.so
+f F/scipy/sparse/csgraph/_min_spanning_tree.cpython-312-darwin.so
+f F/scipy/sparse/csgraph/_reordering.cpython-312-darwin.so
+f F/scipy/sparse/csgraph/_shortest_path.cpython-312-darwin.so
+f F/scipy/sparse/csgraph/_tools.cpython-312-darwin.so
+f F/scipy/sparse/csgraph/_traversal.cpython-312-darwin.so
+f F/scipy/sparse/linalg/_dsolve/_superlu.cpython-312-darwin.so
+f F/scipy/sparse/linalg/_eigen/arpack/_arpacklib.cpython-312-darwin.so
+f F/scipy/sparse/linalg/_propack.cpython-312-darwin.so
+f F/scipy/spatial/_ckdtree.cpython-312-darwin.so
+f F/scipy/spatial/_distance_pybind.cpython-312-darwin.so
+f F/scipy/spatial/_distance_wrap.cpython-312-darwin.so
+f F/scipy/spatial/_hausdorff.cpython-312-darwin.so
+f F/scipy/spatial/_qhull.cpython-312-darwin.so
+f F/scipy/spatial/_voronoi.cpython-312-darwin.so
+f F/scipy/spatial/transform/_rigid_transform_cy.cpython-312-darwin.so
+f F/scipy/spatial/transform/_rotation_cy.cpython-312-darwin.so
+f F/scipy/special/_comb.cpython-312-darwin.so
+f F/scipy/special/_ellip_harm_2.cpython-312-darwin.so
+f F/scipy/special/_gufuncs.cpython-312-darwin.so
+f F/scipy/special/_specfun.cpython-312-darwin.so
+f F/scipy/special/_special_ufuncs.cpython-312-darwin.so
+f F/scipy/special/_ufuncs.cpython-312-darwin.so
+f F/scipy/special/_ufuncs_cxx.cpython-312-darwin.so
+f F/scipy/special/cython_special.cpython-312-darwin.so
+f F/scipy/stats/_ansari_swilk_statistics.cpython-312-darwin.so
+f F/scipy/stats/_biasedurn.cpython-312-darwin.so
+f F/scipy/stats/_levy_stable/levyst.cpython-312-darwin.so
+f F/scipy/stats/_qmc_cy.cpython-312-darwin.so
+f F/scipy/stats/_qmvnt_cy.cpython-312-darwin.so
+f F/scipy/stats/_rcont/rcont.cpython-312-darwin.so
+f F/scipy/stats/_sobol.cpython-312-darwin.so
+f F/scipy/stats/_stats.cpython-312-darwin.so
+f F/scipy/stats/_stats_pythran.cpython-312-darwin.so
+f F/shiboken6/Shiboken.abi3.so
+f F/shiboken6/libshiboken6.abi3.6.12.dylib
+f C/Info.plist
+f M/Clearwater
+f R/PySide6/Qt/translations/qt_ar.qm
+f R/PySide6/Qt/translations/qt_bg.qm
+f R/PySide6/Qt/translations/qt_ca.qm
+f R/PySide6/Qt/translations/qt_cs.qm
+f R/PySide6/Qt/translations/qt_da.qm
+f R/PySide6/Qt/translations/qt_de.qm
+f R/PySide6/Qt/translations/qt_en.qm
+f R/PySide6/Qt/translations/qt_es.qm
+f R/PySide6/Qt/translations/qt_fa.qm
+f R/PySide6/Qt/translations/qt_fi.qm
+f R/PySide6/Qt/translations/qt_fr.qm
+f R/PySide6/Qt/translations/qt_gd.qm
+f R/PySide6/Qt/translations/qt_gl.qm
+f R/PySide6/Qt/translations/qt_he.qm
+f R/PySide6/Qt/translations/qt_help_ar.qm
+f R/PySide6/Qt/translations/qt_help_bg.qm
+f R/PySide6/Qt/translations/qt_help_ca.qm
+f R/PySide6/Qt/translations/qt_help_cs.qm
+f R/PySide6/Qt/translations/qt_help_da.qm
+f R/PySide6/Qt/translations/qt_help_de.qm
+f R/PySide6/Qt/translations/qt_help_en.qm
+f R/PySide6/Qt/translations/qt_help_es.qm
+f R/PySide6/Qt/translations/qt_help_fr.qm
+f R/PySide6/Qt/translations/qt_help_gl.qm
+f R/PySide6/Qt/translations/qt_help_hr.qm
+f R/PySide6/Qt/translations/qt_help_hu.qm
+f R/PySide6/Qt/translations/qt_help_it.qm
+f R/PySide6/Qt/translations/qt_help_ja.qm
+f R/PySide6/Qt/translations/qt_help_ka.qm
+f R/PySide6/Qt/translations/qt_help_kk.qm
+f R/PySide6/Qt/translations/qt_help_ko.qm
+f R/PySide6/Qt/translations/qt_help_nl.qm
+f R/PySide6/Qt/translations/qt_help_nn.qm
+f R/PySide6/Qt/translations/qt_help_pl.qm
+f R/PySide6/Qt/translations/qt_help_pt_BR.qm
+f R/PySide6/Qt/translations/qt_help_ru.qm
+f R/PySide6/Qt/translations/qt_help_sk.qm
+f R/PySide6/Qt/translations/qt_help_sl.qm
+f R/PySide6/Qt/translations/qt_help_sv.qm
+f R/PySide6/Qt/translations/qt_help_tr.qm
+f R/PySide6/Qt/translations/qt_help_uk.qm
+f R/PySide6/Qt/translations/qt_help_zh_CN.qm
+f R/PySide6/Qt/translations/qt_help_zh_TW.qm
+f R/PySide6/Qt/translations/qt_hr.qm
+f R/PySide6/Qt/translations/qt_hu.qm
+f R/PySide6/Qt/translations/qt_it.qm
+f R/PySide6/Qt/translations/qt_ja.qm
+f R/PySide6/Qt/translations/qt_ka.qm
+f R/PySide6/Qt/translations/qt_kk.qm
+f R/PySide6/Qt/translations/qt_ko.qm
+f R/PySide6/Qt/translations/qt_lg.qm
+f R/PySide6/Qt/translations/qt_lt.qm
+f R/PySide6/Qt/translations/qt_lv.qm
+f R/PySide6/Qt/translations/qt_nl.qm
+f R/PySide6/Qt/translations/qt_nn.qm
+f R/PySide6/Qt/translations/qt_pl.qm
+f R/PySide6/Qt/translations/qt_pt_BR.qm
+f R/PySide6/Qt/translations/qt_pt_PT.qm
+f R/PySide6/Qt/translations/qt_ru.qm
+f R/PySide6/Qt/translations/qt_sk.qm
+f R/PySide6/Qt/translations/qt_sl.qm
+f R/PySide6/Qt/translations/qt_sv.qm
+f R/PySide6/Qt/translations/qt_tr.qm
+f R/PySide6/Qt/translations/qt_uk.qm
+f R/PySide6/Qt/translations/qt_zh_CN.qm
+f R/PySide6/Qt/translations/qt_zh_TW.qm
+f R/PySide6/Qt/translations/qtbase_ar.qm
+f R/PySide6/Qt/translations/qtbase_bg.qm
+f R/PySide6/Qt/translations/qtbase_ca.qm
+f R/PySide6/Qt/translations/qtbase_cs.qm
+f R/PySide6/Qt/translations/qtbase_da.qm
+f R/PySide6/Qt/translations/qtbase_de.qm
+f R/PySide6/Qt/translations/qtbase_en.qm
+f R/PySide6/Qt/translations/qtbase_es.qm
+f R/PySide6/Qt/translations/qtbase_fa.qm
+f R/PySide6/Qt/translations/qtbase_fi.qm
+f R/PySide6/Qt/translations/qtbase_fr.qm
+f R/PySide6/Qt/translations/qtbase_gd.qm
+f R/PySide6/Qt/translations/qtbase_he.qm
+f R/PySide6/Qt/translations/qtbase_hr.qm
+f R/PySide6/Qt/translations/qtbase_hu.qm
+f R/PySide6/Qt/translations/qtbase_it.qm
+f R/PySide6/Qt/translations/qtbase_ja.qm
+f R/PySide6/Qt/translations/qtbase_ka.qm
+f R/PySide6/Qt/translations/qtbase_kk.qm
+f R/PySide6/Qt/translations/qtbase_ko.qm
+f R/PySide6/Qt/translations/qtbase_lg.qm
+f R/PySide6/Qt/translations/qtbase_lv.qm
+f R/PySide6/Qt/translations/qtbase_nl.qm
+f R/PySide6/Qt/translations/qtbase_nn.qm
+f R/PySide6/Qt/translations/qtbase_pl.qm
+f R/PySide6/Qt/translations/qtbase_pt_BR.qm
+f R/PySide6/Qt/translations/qtbase_ru.qm
+f R/PySide6/Qt/translations/qtbase_sk.qm
+f R/PySide6/Qt/translations/qtbase_sv.qm
+f R/PySide6/Qt/translations/qtbase_tr.qm
+f R/PySide6/Qt/translations/qtbase_uk.qm
+f R/PySide6/Qt/translations/qtbase_zh_CN.qm
+f R/PySide6/Qt/translations/qtbase_zh_TW.qm
+f R/base_library.zip
+f R/icon-windowed.icns
+f R/numpy-2.5.4.dist-info/INSTALLER
+f R/numpy-2.5.4.dist-info/METADATA
+f R/numpy-2.5.4.dist-info/RECORD
+f R/numpy-2.5.4.dist-info/REQUESTED
+f R/numpy-2.5.4.dist-info/WHEEL
+f R/numpy-2.5.4.dist-info/entry_points.txt
+f R/numpy-2.5.4.dist-info/licenses/LICENSE.txt
+f R/numpy-2.5.4.dist-info/licenses/numpy/_core/include/numpy/libdivide/LICENSE.txt
+f R/numpy-2.5.4.dist-info/licenses/numpy/_core/src/common/pythoncapi-compat/COPYING
+f R/numpy-2.5.4.dist-info/licenses/numpy/_core/src/highway/LICENSE
+f R/numpy-2.5.4.dist-info/licenses/numpy/_core/src/multiarray/dragon4_LICENSE.txt
+f R/numpy-2.5.4.dist-info/licenses/numpy/_core/src/npysort/x86-simd-sort/LICENSE.md
+f R/numpy-2.5.4.dist-info/licenses/numpy/_core/src/umath/svml/LICENSE
+f R/numpy-2.5.4.dist-info/licenses/numpy/fft/pocketfft/LICENSE.md
+f R/numpy-2.5.4.dist-info/licenses/numpy/linalg/lapack_lite/LICENSE.txt
+f R/numpy-2.5.4.dist-info/licenses/numpy/ma/LICENSE
+f R/numpy-2.5.4.dist-info/licenses/numpy/random/LICENSE.md
+f R/numpy-2.5.4.dist-info/licenses/numpy/random/src/distributions/LICENSE.md
+f R/numpy-2.5.4.dist-info/licenses/numpy/random/src/mt19937/LICENSE.md
+f R/numpy-2.5.4.dist-info/licenses/numpy/random/src/pcg64/LICENSE.md
+f R/numpy-2.5.4.dist-info/licenses/numpy/random/src/philox/LICENSE.md
+f R/numpy-2.5.4.dist-info/licenses/numpy/random/src/sfc64/LICENSE.md
+f R/numpy-2.5.4.dist-info/licenses/numpy/random/src/splitmix64/LICENSE.md
+f C/_CodeSignature/CodeResources
+l F/PIL/.dylibs -> __dot__dylibs
+l F/PySide6/Qt/lib/QtCore.framework/QtCore -> Versions/Current/QtCore
+l F/PySide6/Qt/lib/QtCore.framework/Resources -> Versions/Current/Resources
+l F/PySide6/Qt/lib/QtCore.framework/Versions/Current -> A
+l F/PySide6/Qt/lib/QtDBus.framework/QtDBus -> Versions/Current/QtDBus
+l F/PySide6/Qt/lib/QtDBus.framework/Resources -> Versions/Current/Resources
+l F/PySide6/Qt/lib/QtDBus.framework/Versions/Current -> A
+l F/PySide6/Qt/lib/QtGui.framework/QtGui -> Versions/Current/QtGui
+l F/PySide6/Qt/lib/QtGui.framework/Resources -> Versions/Current/Resources
+l F/PySide6/Qt/lib/QtGui.framework/Versions/Current -> A
+l F/PySide6/Qt/lib/QtNetwork.framework/QtNetwork -> Versions/Current/QtNetwork
+l F/PySide6/Qt/lib/QtNetwork.framework/Resources -> Versions/Current/Resources
+l F/PySide6/Qt/lib/QtNetwork.framework/Versions/Current -> A
+l F/PySide6/Qt/lib/QtSvg.framework/QtSvg -> Versions/Current/QtSvg
+l F/PySide6/Qt/lib/QtSvg.framework/Resources -> Versions/Current/Resources
+l F/PySide6/Qt/lib/QtSvg.framework/Versions/Current -> A
+l F/PySide6/Qt/lib/QtWidgets.framework/QtWidgets -> Versions/Current/QtWidgets
+l F/PySide6/Qt/lib/QtWidgets.framework/Resources -> Versions/Current/Resources
+l F/PySide6/Qt/lib/QtWidgets.framework/Versions/Current -> A
+l F/PySide6/Qt/translations -> ../../../Resources/PySide6/Qt/translations
+l F/QtCore -> PySide6/Qt/lib/QtCore.framework/Versions/A/QtCore
+l F/QtDBus -> PySide6/Qt/lib/QtDBus.framework/Versions/A/QtDBus
+l F/QtGui -> PySide6/Qt/lib/QtGui.framework/Versions/A/QtGui
+l F/QtNetwork -> PySide6/Qt/lib/QtNetwork.framework/Versions/A/QtNetwork
+l F/QtSvg -> PySide6/Qt/lib/QtSvg.framework/Versions/A/QtSvg
+l F/QtWidgets -> PySide6/Qt/lib/QtWidgets.framework/Versions/A/QtWidgets
+l F/base_library.zip -> ../Resources/base_library.zip
+l F/libXau.6.dylib -> PIL/.dylibs/libXau.6.dylib
+l F/libavif.16.4.2.dylib -> PIL/.dylibs/libavif.16.4.2.dylib
+l F/libde265.0.2.3.dylib -> pillow_heif/.dylibs/libde265.0.2.3.dylib
+l F/libheif.1.23.6.dylib -> pillow_heif/.dylibs/libheif.1.23.6.dylib
+l F/libjpeg.62.4.0.dylib -> PIL/.dylibs/libjpeg.62.4.0.dylib
+l F/liblcms2.2.dylib -> PIL/.dylibs/liblcms2.2.dylib
+l F/liblzma.5.dylib -> PIL/.dylibs/liblzma.5.dylib
+l F/libopenjp2.2.5.4.dylib -> PIL/.dylibs/libopenjp2.2.5.4.dylib
+l F/libpyside6.abi3.6.12.dylib -> PySide6/libpyside6.abi3.6.12.dylib
+l F/libsharpyuv.0.dylib -> PIL/.dylibs/libsharpyuv.0.dylib
+l F/libshiboken6.abi3.6.12.dylib -> shiboken6/libshiboken6.abi3.6.12.dylib
+l F/libtiff.6.dylib -> PIL/.dylibs/libtiff.6.dylib
+l F/libwebp.7.dylib -> PIL/.dylibs/libwebp.7.dylib
+l F/libwebpdemux.2.dylib -> PIL/.dylibs/libwebpdemux.2.dylib
+l F/libwebpmux.3.dylib -> PIL/.dylibs/libwebpmux.3.dylib
+l F/libx265.217.dylib -> pillow_heif/.dylibs/libx265.217.dylib
+l F/libxcb.1.1.0.dylib -> PIL/.dylibs/libxcb.1.1.0.dylib
+l F/libz.1.3.1.zlib-ng.dylib -> PIL/.dylibs/libz.1.3.1.zlib-ng.dylib
+l F/numpy-2.5.4.dist-info -> ../Resources/numpy-2.5.4.dist-info
+l F/pillow_heif/.dylibs -> __dot__dylibs
+l R/PIL -> ../Frameworks/PIL
+l R/PySide6/Qt/lib -> ../../../Frameworks/PySide6/Qt/lib
+l R/PySide6/Qt/plugins -> ../../../Frameworks/PySide6/Qt/plugins
+l R/PySide6/QtCore.abi3.so -> ../../Frameworks/PySide6/QtCore.abi3.so
+l R/PySide6/QtDBus.abi3.so -> ../../Frameworks/PySide6/QtDBus.abi3.so
+l R/PySide6/QtGui.abi3.so -> ../../Frameworks/PySide6/QtGui.abi3.so
+l R/PySide6/QtNetwork.abi3.so -> ../../Frameworks/PySide6/QtNetwork.abi3.so
+l R/PySide6/QtWidgets.abi3.so -> ../../Frameworks/PySide6/QtWidgets.abi3.so
+l R/PySide6/libpyside6.abi3.6.12.dylib -> ../../Frameworks/PySide6/libpyside6.abi3.6.12.dylib
+l R/QtCore -> PySide6/Qt/lib/QtCore.framework/Versions/A/QtCore
+l R/QtDBus -> PySide6/Qt/lib/QtDBus.framework/Versions/A/QtDBus
+l R/QtGui -> PySide6/Qt/lib/QtGui.framework/Versions/A/QtGui
+l R/QtNetwork -> PySide6/Qt/lib/QtNetwork.framework/Versions/A/QtNetwork
+l R/QtSvg -> PySide6/Qt/lib/QtSvg.framework/Versions/A/QtSvg
+l R/QtWidgets -> PySide6/Qt/lib/QtWidgets.framework/Versions/A/QtWidgets
+l R/_pillow_heif.cpython-312-darwin.so -> ../Frameworks/_pillow_heif.cpython-312-darwin.so
+l R/libXau.6.dylib -> PIL/.dylibs/libXau.6.dylib
+l R/libavif.16.4.2.dylib -> PIL/.dylibs/libavif.16.4.2.dylib
+l R/libde265.0.2.3.dylib -> pillow_heif/.dylibs/libde265.0.2.3.dylib
+l R/libheif.1.23.6.dylib -> pillow_heif/.dylibs/libheif.1.23.6.dylib
+l R/libjpeg.62.4.0.dylib -> PIL/.dylibs/libjpeg.62.4.0.dylib
+l R/liblcms2.2.dylib -> PIL/.dylibs/liblcms2.2.dylib
+l R/liblzma.5.dylib -> PIL/.dylibs/liblzma.5.dylib
+l R/libopenjp2.2.5.4.dylib -> PIL/.dylibs/libopenjp2.2.5.4.dylib
+l R/libpyside6.abi3.6.12.dylib -> PySide6/libpyside6.abi3.6.12.dylib
+l R/libpython3.12.dylib -> ../Frameworks/libpython3.12.dylib
+l R/libsharpyuv.0.dylib -> PIL/.dylibs/libsharpyuv.0.dylib
+l R/libshiboken6.abi3.6.12.dylib -> shiboken6/libshiboken6.abi3.6.12.dylib
+l R/libtiff.6.dylib -> PIL/.dylibs/libtiff.6.dylib
+l R/libwebp.7.dylib -> PIL/.dylibs/libwebp.7.dylib
+l R/libwebpdemux.2.dylib -> PIL/.dylibs/libwebpdemux.2.dylib
+l R/libwebpmux.3.dylib -> PIL/.dylibs/libwebpmux.3.dylib
+l R/libx265.217.dylib -> pillow_heif/.dylibs/libx265.217.dylib
+l R/libxcb.1.1.0.dylib -> PIL/.dylibs/libxcb.1.1.0.dylib
+l R/libz.1.3.1.zlib-ng.dylib -> PIL/.dylibs/libz.1.3.1.zlib-ng.dylib
+l R/numpy -> ../Frameworks/numpy
+l R/pillow_heif -> ../Frameworks/pillow_heif
+l R/scipy -> ../Frameworks/scipy
+l R/shiboken6 -> ../Frameworks/shiboken6
+"""
+
+
+RUN6_PREFIXES = {
+    "F/": "Contents/Frameworks/",
+    "R/": "Contents/Resources/",
+    "M/": "Contents/MacOS/",
+    "C/": "Contents/",
+}
+
+
+def run6_shape() -> tuple[list[str], dict[str, str]]:
+    """The run-6 bundle's files and links (bundle-rooted path -> stored target text)."""
+    files: list[str] = []
+    links: dict[str, str] = {}
+    for line in RUN6_APP_SHAPE.splitlines():
+        kind, rest = line.split(" ", 1)
+        path, _, target = rest.partition(" -> ")
+        path = RUN6_PREFIXES[path[:2]] + path[2:]
+        if kind == "l":
+            links[path] = target
+        else:
+            files.append(path)
+    return files, links
+
+
+def _run6_resolve(path: str, links: dict[str, str], hops: int = 0) -> str:
+    """Resolve a bundle path through the shape's links, lexically (no filesystem call)."""
+    parts = path.split("/")
+    for index in range(1, len(parts) + 1):
+        head = "/".join(parts[:index])
+        if head in links:
+            assert hops < 16, path
+            joined = posixpath.normpath(posixpath.join(posixpath.dirname(head), links[head]))
+            return _run6_resolve("/".join([joined, *parts[index:]]), links, hops + 1)
+    return path
+
+
+def run6_app(tmp_path: Path) -> tuple[Path, Path, list[str], dict[str, str]]:
+    """Materialise the run-6 .app: real files, real links (the stored text), a real CArchive."""
+    files, links = run6_shape()
+    root = tmp_path / "Clearwater-1.1.1-macos-onedir"
+    app = root / "Clearwater.app"
+    archive = make_exe(tmp_path / "archive", [], modules=["clearwater", "graphlib"])
+    for name in files:
+        if name == "Contents/MacOS/Clearwater":
+            (app / name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(archive, app / name)
+        elif name == "Contents/Resources/base_library.zip":
+            tree(app, [name], zip_bytes({"json/__init__.pyc": b""}))
+        else:
+            tree(app, [name])
+    for name, target in links.items():
+        resolved = _run6_resolve(name, links)
+        folder = any(path.startswith(resolved + "/") for path in files)
+        _symlink(app / name, target, folder=folder)
+    return root, app, files, links
+
+
+def _notices_with(module: ModuleType) -> ModuleType:
+    """Load notices.py bound to ``module`` as its build tool (the recorder's instance)."""
+    path = REPO_ROOT / "tools" / "package" / "notices.py"
+    spec = importlib.util.spec_from_file_location("wp65_f02_notices", path)
+    assert spec is not None and spec.loader is not None
+    notices = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(notices)
+    notices._build_tool = lambda: module
+    return notices
+
+
+def app_inventory(notices: ModuleType, root: Path, app: Path) -> Any:
+    """``_inventory`` on darwin, with the Windows POSIX-link stat model of app_content_paths."""
+    query = os.stat
+
+    def posix_link_stat(path, *args, **kwargs):
+        try:
+            return query(path, *args, **kwargs)
+        except OSError as error:
+            if (
+                getattr(error, "winerror", None) != 123
+                or not kwargs.get("follow_symlinks", True)
+                or not Path(path).is_relative_to(app)
+            ):
+                raise
+            target = Path(path).parent / os.readlink(path)
+            return query(os.path.realpath(target), *args, **kwargs)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(os, "stat", posix_link_stat)
+        patch.setattr(build.sys, "platform", "darwin")
+        return notices._inventory(root)
+
+
+def test_run6_app_inventory_labels_counts_and_each_link_once(tmp_path):
+    """F0-2: the .app is inventoried bundle-rooted (home = the .app): 293 files, 86 links,
+    each link once as ``link:<path> -> <stored text>``; the base library and the bootloader's
+    archive still read. On 200dffd8 ``_inventory`` raised "expected an onedir folder with
+    _internal" here."""
+    root, app, files, links = run6_app(tmp_path)
+    notices = _notices_with(build)
+    entries, home = app_inventory(notices, root, app)
+    assert home == app
+    labels = [entry.label for entry in entries]
+    assert len(labels) == len(set(labels))
+    assert sorted(label for label in labels if label.startswith("file:")) == sorted(
+        "file:" + name for name in files
+    )
+    linked = [label for label in labels if label.startswith("link:")]
+    assert len(linked) == len(links) == 86
+    assert sorted(linked) == sorted(f"link:{name} -> {target}" for name, target in links.items())
+    assert {entry.kind for entry in entries if entry.label in linked} == {"link"}
+    assert "base:json/__init__.pyc" in labels
+    assert {"archive:PYZ.pyz", "pyz:clearwater", "pyz:graphlib"} <= set(labels)
+    # The same bundle from its MacOS folder (the folder build() and the smoke pass).
+    again, again_home = app_inventory(notices, app / "Contents" / "MacOS", app)
+    assert again_home == app and [entry.label for entry in again] == labels
+
+
+def test_run6_app_inventory_never_follows_a_link_before_admission(tmp_path):
+    """CHARC 4ed56fcb on the inventory: one non-following listing; every link admitted by the
+    ONE rule before anything else touches it; no call of the inventory's own follows an
+    unadmitted link or leaves the bundle (the content-check recorder's shape, run-6 bundle).
+
+    The recorder's documented limit (its docstring; A r1, CHARC 0317f4cb) remains: a chain's
+    admission records only its first link, so the SHARED rule's own post-admission calls
+    through an intermediate link (``Versions/Current``, a dotted-folder or folder mirror)
+    read as alarms. Those are bracketed here as the rule's calls and must be the only ones.
+    """
+    root, app, _files, links = run6_app(tmp_path)
+    notices = _notices_with(build)
+    recorder = _FsRecorder()
+    real_rule = build.macos_link_problem
+
+    def rule(release: Path, contents: Path, path: Path) -> str | None:
+        recorder.note("rule-start", path, False)
+        try:
+            return real_rule(release, contents, path)
+        finally:
+            recorder.note("rule-end", path, False)
+
+    with pytest.MonkeyPatch.context() as patch:
+        recorder.install(patch)
+        patch.setattr(build, "macos_link_problem", rule)
+        entries, _home = app_inventory(notices, root, app)
+    assert len([entry for entry in entries if entry.kind == "link"]) == 86
+    assert set(links) <= set(recorder.admitted(app))
+    own, in_rule, depth = _FsRecorder(), set(), 0
+    for call in recorder.calls:
+        if call[0] in {"rule-start", "rule-end"}:
+            depth += 1 if call[0] == "rule-start" else -1
+            continue
+        if depth:
+            in_rule.add(call[:2])
+        if not depth or call[0] == "admit":
+            own.calls.append(call)
+    assert depth == 0 and [call for call in own.calls if call[0] == "readlink"]
+    assert own.violations(root, tmp_path / "outside") == []
+    assert set(recorder.violations(root, tmp_path / "outside")) <= in_rule
+
+
+def test_run6_app_refuses_an_unadmitted_link_by_the_one_rule(tmp_path):
+    """A link the ONE rule refuses (here leaving the bundle) fails the inventory, named."""
+    root, app, _files, _links = run6_app(tmp_path)
+    (tmp_path / "outside").mkdir()
+    _symlink(app / "Contents/Resources/escape", "../../../../outside", folder=True)
+    with pytest.raises(ValueError, match=r"unsafe linked entry Contents/Resources/escape"):
+        app_inventory(_notices_with(build), root, app)
+
+
+def test_app_python_runtime_is_admitted_by_its_macho_identity(tmp_path):
+    """P1: the re-signed libpython matches its interpreter original by the build's ``macho:``
+    identity (a whole-file hash cannot); other code does not."""
+    notices = _notices_with(build)
+    origin = tree(tmp_path / "python", ["lib/libpython3.12.dylib"], original_native())
+    built = tree(tmp_path / "app", ["libpython3.12.dylib"], built_native())
+    other = tree(tmp_path / "other", ["libpython3.12.dylib"], built_native(code=X86_CODE))
+    original = origin / "lib/libpython3.12.dylib"
+    assert notices._same_macho(built / "libpython3.12.dylib", original)
+    assert not notices._same_macho(other / "libpython3.12.dylib", original)
+    assert not notices._same_macho(built / "libpython3.12.dylib", tmp_path / "absent")

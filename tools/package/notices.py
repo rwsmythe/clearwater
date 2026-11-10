@@ -30,7 +30,7 @@ from collections import defaultdict
 from collections.abc import Callable, Sequence
 from datetime import date
 from functools import cache
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import ModuleType
 from typing import Any, NamedTuple, cast
 from urllib.parse import urlsplit
@@ -60,6 +60,27 @@ THIRD_PARTY_NATIVE_PATTERNS = (
     "libcrypto-*.dll",
     "libssl-*.dll",
 )
+# WP6.5 F0-2: the darwin name tables of a macOS ``Clearwater.app`` (labels bundle-rooted).
+# PyInstaller's BUNDLE puts code in Contents/Frameworks and data in Contents/Resources;
+# both mirror the onedir's _internal, so a RECORD path is the label minus that prefix.
+_APP_CONTENT_PREFIXES = ("Contents/Frameworks/", "Contents/Resources/")
+_APP_BOOTLOADER = "Contents/MacOS/Clearwater"
+_APP_NOTICES = "Contents/Resources/THIRD_PARTY_NOTICES.md"
+_APP_BASE_LIBRARY = "Contents/Resources/base_library.zip"
+# Written by the build itself (PyInstaller's BUNDLE plist, the bundle's code seal).
+_APP_BUILD_METADATA = frozenset({"Contents/Info.plist", "Contents/_CodeSignature/CodeResources"})
+# PyInstaller's default bundle icon, verified against its RECORD hash (never by name alone).
+_APP_PYINSTALLER_FILES = {
+    "Contents/Resources/icon-windowed.icns": "PyInstaller/bootloader/images/icon-windowed.icns",
+}
+_APP_FFMPEG_TOOLS = ("Contents/MacOS/ffmpeg", "Contents/MacOS/ffprobe")
+_APP_FFMPEG_TEXTS = ("Contents/Resources/ffmpeg-BUILD.txt", "Contents/Resources/ffmpeg-LICENSE.txt")
+_DOT_FOLDER = "__dot__"
+EMBEDDED_CENSUS_PENDING = (
+    "notices: macOS embedded census pending: native-licences/manifest.json declares no "
+    "darwin embedded_hosts (WP6.5 F0-2b)"
+)
+"""The ONE refusal of a macOS bundle plan until its embedded-host census lands."""
 _PROVENANCE_FIELDS = frozenset(
     {
         "provenance_kind",
@@ -222,6 +243,18 @@ class _EmbeddedHost(NamedTuple):
     parent: str
     parent_version: str
     components: tuple[tuple[str, str], ...]
+    platform: str = "win32"
+
+
+_HOST_FIELDS = frozenset(
+    {"relpath", "sha256", "size_bytes", "parent", "parent_version", "components"}
+)
+_HOST_PLATFORMS = frozenset({"win32", "darwin"})
+
+
+def _host_platform() -> str:
+    """The embedded census a plan on this host reads: ``darwin`` on macOS, else ``win32``."""
+    return "darwin" if sys.platform == "darwin" else "win32"
 
 
 @cache
@@ -360,10 +393,15 @@ def _embedded_declarations(document: dict[str, Any]) -> tuple[_EmbeddedHost, ...
     result: list[_EmbeddedHost] = []
     seen: set[str] = set()
     for item in values:
+        # WP6.5 F0-2: an optional, additive "platform" key; absent means the Windows census.
         if (
             not isinstance(item, dict)
-            or set(item)
-            != {"relpath", "sha256", "size_bytes", "parent", "parent_version", "components"}
+            or set(item) - {"platform"} != _HOST_FIELDS
+            or item.get("platform", "win32") not in _HOST_PLATFORMS
+            or (
+                item.get("platform") == "darwin"
+                and not str(item.get("relpath", "")).startswith("Contents/")
+            )
             or not _exact_host_path(item.get("relpath"))
             or not isinstance(item.get("sha256"), str)
             or re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) is None
@@ -413,6 +451,7 @@ def _embedded_declarations(document: dict[str, Any]) -> tuple[_EmbeddedHost, ...
                 item["parent"],
                 item["parent_version"],
                 tuple(components),
+                item.get("platform", "win32"),
             )
         )
     return tuple(result)
@@ -831,8 +870,10 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     OpenSSL additionally checks the build interpreter's OpenSSL, CPython and
     build-release versions; proprietary excerpts bind to its actual LICENSE.txt.
     Optional embedded_hosts declares exact relative host paths, hashes, sizes,
-    normalized parent owners and required component/source records. Component
-    rows use embedded_in (a list of declared paths) instead of another binding
+    normalized parent owners and required component/source records, and an
+    optional platform ("win32" when absent, or "darwin" for a bundle-rooted
+    Contents/... host; WP6.5 F0-2): a plan reads only its own platform's hosts.
+    Component rows use embedded_in (a list of declared paths) instead of another binding
     kind. Carried hosts require all rows and matching source pins before parent
     ownership is considered; absent hosts produce no embedded claims.
     Optional limits is a list of exact component/hosts/statement objects.
@@ -1283,7 +1324,8 @@ def _vendored_claims(
     for entry in entries:
         if entry.kind == "file" and entry.label.startswith("file:"):
             for distribution, prefix, component in declarations:
-                if not entry.name.startswith("_internal/" + prefix.replace(".", "/") + "/"):
+                relative = _bundle_relative(entry.name)
+                if relative is None or not relative.startswith(prefix.replace(".", "/") + "/"):
                     continue
                 record = by_name.get(component)
                 if (
@@ -1432,9 +1474,73 @@ def _module_name(path: str) -> str | None:
     return ".".join(parts[:-1] if stem == "__init__" else [*parts[:-1], stem])
 
 
+def _base_library_entries(path: Path) -> list[_Entry]:
+    entries = []
+    with zipfile.ZipFile(path) as archive:
+        for member in sorted(archive.namelist()):
+            if member.endswith("/"):
+                continue
+            module = _module_name(member)
+            if module is None:
+                raise ValueError(f"notices: unknown base-library entry {member}")
+            entries.append(_Entry("base:" + member, module, "module"))
+    return entries
+
+
+def _archive_entries(tool: ModuleType, executable: Path) -> list[_Entry]:
+    entries = []
+    try:
+        package = tool.read_package(executable)
+    except RuntimeError as error:
+        raise ValueError(f"notices: invalid executable archive: {error}") from error
+    for name, data in sorted(package.toc.items()):
+        typecode = data[-1]
+        if typecode == "z":
+            entries.append(_Entry("archive:" + name, name, "container"))
+            archive = package.open_embedded_archive(name)
+            for module in sorted(archive.toc):
+                entries.append(_Entry("pyz:" + module, module, "module"))
+        elif typecode in {"m", "M", "s"}:
+            entries.append(_Entry("archive:" + name, name, "module"))
+        else:
+            entries.append(_Entry("archive:" + name, name, "file"))
+    return entries
+
+
+def _app_inventory(tool: ModuleType, executable: Path, app: Path) -> list[_Entry]:
+    """Inventory a macOS ``.app`` through the build's ONE non-following listing (WP6.5 F0-2).
+
+    ``_macos_app_entries`` classifies every entry from its directory listing without
+    following a link and never descends into one. A link is admitted by the build's ONE
+    link rule (``macos_link_problem``) BEFORE anything else is done with it, then
+    inventoried once, as a link, naming its stored target text; it is never followed here
+    (its target's files are inventoried at their physical paths by the same listing).
+    Every label is rooted at the bundle: ``file:Contents/...``, ``link:Contents/... -> t``.
+    """
+    root, contents = tool._macos_layout(executable)
+    entries: list[_Entry] = []
+    for path, kind in tool._macos_app_entries(app):
+        name = path.relative_to(app).as_posix()
+        if kind == "link":
+            problem = tool.macos_link_problem(root, contents, path)
+            if problem is not None:
+                raise ValueError(f"notices: unsafe linked entry {name}: {problem}")
+            entries.append(_Entry(f"link:{name} -> {os.readlink(path)}", name, "link"))
+            continue
+        if kind != "file":
+            raise ValueError(f"notices: special entry in the app bundle: {name}")
+        entries.append(_Entry("file:" + name, name, "file"))
+        if name == _APP_BASE_LIBRARY:
+            entries.extend(_base_library_entries(path))
+    return [*entries, *_archive_entries(tool, executable)]
+
+
 def _inventory(folder: Path) -> tuple[list[_Entry], Path]:
     tool = _build_tool()
     executable = cast(Path, tool.find_executable(folder))
+    if sys.platform == "darwin" and (app := tool._macos_content_app(executable)) is not None:
+        # WP6.5 F0-2: the macOS release is the bundle; its home is the .app itself.
+        return _app_inventory(tool, executable, app), app
     home = executable.parent
     if not (home / "_internal").is_dir():
         raise ValueError("notices: expected an onedir folder with _internal")
@@ -1460,29 +1566,8 @@ def _inventory(folder: Path) -> tuple[list[_Entry], Path]:
         name = path.relative_to(home).as_posix()
         entries.append(_Entry("file:" + name, name, "file"))
         if name == "_internal/base_library.zip":
-            with zipfile.ZipFile(path) as archive:
-                for member in sorted(archive.namelist()):
-                    if member.endswith("/"):
-                        continue
-                    module = _module_name(member)
-                    if module is None:
-                        raise ValueError(f"notices: unknown base-library entry {member}")
-                    entries.append(_Entry("base:" + member, module, "module"))
-    try:
-        package = tool.read_package(executable)
-    except RuntimeError as error:
-        raise ValueError(f"notices: invalid executable archive: {error}") from error
-    for name, data in sorted(package.toc.items()):
-        typecode = data[-1]
-        if typecode == "z":
-            entries.append(_Entry("archive:" + name, name, "container"))
-            archive = package.open_embedded_archive(name)
-            for module in sorted(archive.toc):
-                entries.append(_Entry("pyz:" + module, module, "module"))
-        elif typecode in {"m", "M", "s"}:
-            entries.append(_Entry("archive:" + name, name, "module"))
-        else:
-            entries.append(_Entry("archive:" + name, name, "file"))
+            entries.extend(_base_library_entries(path))
+    entries.extend(_archive_entries(tool, executable))
     return entries, home
 
 
@@ -1516,6 +1601,140 @@ def _licence_inputs(
     return tuple(sorted(set(found)))
 
 
+def _bundle_relative(name: str) -> str | None:
+    """A bundled file's site-relative (RECORD) path, or ``None`` outside the content folders.
+
+    The content folders are onedir's ``_internal`` and a ``.app``'s ``Contents/Frameworks``
+    and ``Contents/Resources``.
+    """
+    for prefix in ("_internal/", *_APP_CONTENT_PREFIXES):
+        if name.startswith(prefix):
+            return name.removeprefix(prefix)
+    return None
+
+
+def _dot_folder_links(entries: Sequence[_Entry]) -> frozenset[str]:
+    """PyInstaller's dotted-folder links in a ``.app``: ``<p>/.x -> __dot__x`` (bundle paths).
+
+    BUNDLE renames a wheel folder ``.x`` (delocate's ``.dylibs``) to ``__dot__x`` and leaves
+    an admitted link of the original name; only such a pair maps a path back to RECORD.
+    """
+    found = set()
+    for entry in entries:
+        if entry.kind != "link":
+            continue
+        target = entry.label.split(" -> ", 1)[1]
+        folder = PurePosixPath(entry.name).name
+        if folder.startswith(".") and target == _DOT_FOLDER + folder[1:]:
+            found.add(entry.name)
+    return frozenset(found)
+
+
+def _app_record_path(name: str, dot_links: frozenset[str]) -> str | None:
+    """The RECORD path of a ``.app`` file in Frameworks / Resources, ``__dot__`` undone."""
+    for prefix in _APP_CONTENT_PREFIXES:
+        if not name.startswith(prefix):
+            continue
+        parts = name.removeprefix(prefix).split("/")
+        for index, part in enumerate(parts[:-1]):
+            dotted = "." + part.removeprefix(_DOT_FOLDER)
+            if (
+                part.startswith(_DOT_FOLDER)
+                and prefix + "/".join([*parts[:index], dotted]) in dot_links
+            ):
+                parts[index] = dotted
+        return "/".join(parts)
+    return None
+
+
+def _record_digest_matches(
+    distribution: importlib.metadata.Distribution | None, relative: str, path: Path
+) -> bool:
+    """Whether ``path``'s bytes are the RECORD's sha256 for ``relative`` in ``distribution``."""
+    if distribution is None:
+        return False
+    digest = base64.urlsafe_b64encode(hashlib.sha256(path.read_bytes()).digest())
+    for entry in distribution.files or ():
+        if str(entry).replace("\\", "/") == relative and entry.hash is not None:
+            return entry.hash.mode == "sha256" and entry.hash.value == digest.decode().rstrip("=")
+    return False
+
+
+def _app_entry_owner(
+    entry: _Entry,
+    home: Path,
+    installed: dict[str, importlib.metadata.Distribution],
+    dot_links: frozenset[str],
+) -> tuple[str, ...] | str | None:
+    """Classify one ``.app`` file or link (WP6.5 F0-2's darwin name tables).
+
+    Returns:
+        The selected owners, or the RECORD path to look up, or ``None`` (unknown).
+    """
+    name = entry.name
+    if entry.kind == "link":
+        # Admitted links carry no bytes; PyInstaller's BUNDLE made each one.
+        return ("pyinstaller",)
+    if name == _APP_BOOTLOADER:
+        return ("clearwater", "pyinstaller")
+    if name == _APP_NOTICES or name in _APP_BUILD_METADATA:
+        return ("clearwater",)
+    if name == _APP_BASE_LIBRARY:
+        return ("python",)
+    if name in _APP_PYINSTALLER_FILES:
+        source = _APP_PYINSTALLER_FILES[name]
+        matched = _record_digest_matches(installed.get("pyinstaller"), source, home / name)
+        return ("pyinstaller",) if matched else None
+    relative = _app_record_path(name, dot_links)
+    if relative is None:
+        return None
+    runtime = _python_runtime_dylib()
+    if relative == runtime.name:
+        return ("python",) if _same_macho(home / name, runtime) else None
+    return relative
+
+
+def _python_licence() -> Path:
+    """The build interpreter's PSF licence text.
+
+    At the installation root on Windows; a POSIX ``make install`` (python-build-standalone's
+    macOS build included) puts it in the standard-library folder instead (WP6.5 F0-2).
+    """
+    base = Path(sys.base_prefix)
+    stdlib = base / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}"
+    return (stdlib if sys.platform == "darwin" else base) / "LICENSE.txt"
+
+
+def _python_runtime_dylib() -> Path:
+    """The build interpreter's ``libpython3.X.dylib`` (python-build-standalone, macOS).
+
+    On macOS python-build-standalone builds the standard-library extensions INTO this
+    library (the run-6 bundle has no ``lib-dynload``), so it is the only Python runtime
+    file a ``.app`` carries (WP6.5 F0-2 round 0, P1).
+    """
+    minor = f"{sys.version_info.major}.{sys.version_info.minor}"
+    return Path(sys.base_prefix) / "lib" / f"libpython{minor}.dylib"
+
+
+def _same_macho(built: Path, origin: Path) -> bool:
+    """Whether a bundled Mach-O is ``origin`` as PyInstaller re-signed it.
+
+    PyInstaller rewrites dylib names and re-signs every collected Mach-O, so a whole-file
+    hash cannot match; the build's own ``macho:`` identity (the origin check's) is used.
+    """
+    if not origin.is_file():
+        return False
+    data = built.read_bytes()
+    original = origin.read_bytes()
+    if hashlib.sha256(data).digest() == hashlib.sha256(original).digest():
+        return True
+    tool = _build_tool()
+    identity = tool._macho_identity(data)
+    return identity is not None and tool._macho_digest(identity) in cast(
+        set[str], tool._macho_origin_identities(original)
+    )
+
+
 def _python_file_names() -> dict[str, str]:
     # Only standard-library extension modules and CPython's own DLLs have PSF
     # coverage here. Being shipped in the interpreter's DLLs folder is not a licence.
@@ -1539,11 +1758,23 @@ def _is_python_binary(relative: str, stdlib: dict[str, str], path: Path) -> bool
     return filename in stdlib and hashlib.sha256(path.read_bytes()).hexdigest() == stdlib[filename]
 
 
+def default_ffmpeg_lock() -> Path:
+    """This host's FFmpeg lock: ``ffmpeg-macos.lock.json`` on macOS, else the Windows lock.
+
+    Returns:
+        The committed lock the build bundles FFmpeg from (WP6.5 F0-2).
+    """
+    name = "ffmpeg-macos.lock.json" if sys.platform == "darwin" else "ffmpeg.lock.json"
+    return ROOT / "tools/package" / name
+
+
 def _ffmpeg_rows(
     home: Path,
     lock_path: Path,
     native_licences_path: Path = ROOT / "tools/package/native-licences",
 ) -> list[NoticeRow]:
+    if home.suffix == ".app":
+        return _macos_ffmpeg_rows(home, lock_path, native_licences_path)
     tools = [home / "ffmpeg.exe", home / "ffprobe.exe"]
     material = [home / "ffmpeg-BUILD.txt", home / "ffmpeg-LICENSE.txt"]
     if not any(path.exists() for path in tools):
@@ -1623,8 +1854,155 @@ def _ffmpeg_rows(
     return rows
 
 
+def _macos_ffmpeg_rows(app: Path, lock_path: Path, native_licences_path: Path) -> list[NoticeRow]:
+    """The FFmpeg rows of a macOS ``.app`` from ``ffmpeg-macos.lock.json`` (WP6.5 F0-2).
+
+    The tools sit in ``Contents/MacOS`` and their texts in ``Contents/Resources``
+    (``build.place_macos_tools``); the build record's lines are the ones the darwin
+    bundling writes, and every component and toolchain text is read from
+    ``ffmpeg-macos-components`` under its lock identity.
+    """
+    tools = [app / name for name in _APP_FFMPEG_TOOLS]
+    material = [app / name for name in _APP_FFMPEG_TEXTS]
+    if not any(path.exists() for path in tools):
+        if any(path.exists() for path in material):
+            raise ValueError("notices: FFmpeg missing executable pair beside provenance/licence")
+        return []
+    missing = [path.name for path in (*tools, *material) if not path.is_file()]
+    if missing:
+        raise ValueError("notices: FFmpeg missing " + ", ".join(missing))
+    texts_path = native_licences_path / "ffmpeg-macos-components"
+    lock = cast(
+        dict[str, Any],
+        _build_tool().validate_ffmpeg_lock(
+            json.loads(lock_path.read_text(encoding="utf-8")),
+            component_texts_path=texts_path,
+            platform="darwin",
+        ),
+    )
+    _refuse_gpl3_incompatible(lock)
+    script = lock["build_script"]
+    expected = {
+        "Provider": lock["provider"],
+        "Build script": f"{script['repository']} @ {script['commit']}",
+        "Release tag": lock["release_tag"],
+        "Asset": lock["asset_name"],
+        "SHA256": lock["github_sha256"],
+        "FFmpeg version": lock["version"],
+        "FFmpeg commit": lock["ffmpeg_commit"],
+        "FFmpeg ref": lock["ffmpeg_ref"],
+        "Build repository commit": lock["build_repository_commit"],
+        "Build run": lock["build_run_url"],
+        "Per-component source recipes": lock["source_record_url"],
+        "macOS deployment target": lock["macos_deployment_target"],
+    }
+    lines = material[0].read_text(encoding="utf-8").splitlines()
+    for key, value in expected.items():
+        if [line for line in lines if line.startswith(key + ": ")] != [key + ": " + value]:
+            raise ValueError(f"notices: FFmpeg build provenance differs: {key}")
+    if [line for line in lines if line.startswith("configuration:")] != [lock["configure_line"]]:
+        raise ValueError("notices: FFmpeg build provenance differs: configuration")
+    if not material[1].stat().st_size:
+        raise ValueError("notices: FFmpeg missing licence material")
+    entries = tuple("file:" + path.relative_to(app).as_posix() for path in (*tools, *material))
+    notes = (
+        f"Provider: {lock['provider']} @ {lock['build_repository_commit']}; "
+        f"built with {script['repository']} at {script['commit'][:8]} "
+        f"for macOS {lock['macos_deployment_target']} and later ({lock['platform']}); "
+        f"FFmpeg {lock['ffmpeg_ref']} at {lock['ffmpeg_commit'][:8]}.",
+        *(
+            f"{'Build stage' if row['status'] in {'BUILT', 'ENTRY'} else 'Excluded'} "
+            f"{row['stage']} ({row['status']}): {row['reason']}"
+            for row in lock["excluded"]
+        ),
+    )
+    rows = [
+        NoticeRow(
+            "FFmpeg / ffprobe",
+            lock["version"],
+            lock["licence"],
+            (f"{lock['ffmpeg_repository']} @ {lock['ffmpeg_commit']}", lock["source_record_url"]),
+            entries,
+            (LicenceInput(material[1]),),
+            notes,
+        )
+    ]
+    rows.extend(_ffmpeg_component_rows(lock, entries, native_licences_path, texts_path.name))
+    rows.extend(_macos_ffmpeg_runtime_rows(lock, entries, texts_path))
+    return rows
+
+
+def _macos_ffmpeg_runtime_rows(
+    lock: dict[str, Any], entries: tuple[str, ...], texts_path: Path
+) -> list[NoticeRow]:
+    """The macOS toolchain runtime rows; their texts live beside the component texts."""
+    rows: list[NoticeRow] = []
+    for runtime in lock["toolchain_runtime"]:
+        title = (
+            f"FFmpeg toolchain runtime: {runtime['name']} {runtime['version']} "
+            f"({runtime['reached_via']})"
+        )
+        sources = (f"{runtime['repository']} @ {runtime['pin']}", runtime["source_url"])
+        context = title + ": "
+        inputs = []
+        for text in runtime["texts"]:
+            path = texts_path / text["path"]
+            if not path.is_file() or path.is_symlink():
+                raise ValueError(f"notices: {context}missing/unsafe text {text['path']}")
+            data = path.read_bytes()
+            if not data or hashlib.sha256(data).hexdigest() != text["sha256"]:
+                raise ValueError(f"notices: {context}text hash differs: {text['path']}")
+            inputs.append(
+                LicenceInput(
+                    path,
+                    sha256=text["sha256"],
+                    size_bytes=len(data),
+                    context=context,
+                    provenance=f"{title}; {'; '.join(sources)}; text {text['path']}",
+                )
+            )
+        notes = [runtime["licence_note"]] if runtime["licence_note"] else []
+        if runtime["chosen"]:
+            notes.append("licence chosen: " + runtime["chosen"])
+        notes.extend(
+            (
+                f"Linkage: {runtime['linkage']} (macOS fork build at "
+                f"{lock['build_repository_commit']}).",
+                f"Census basis: {runtime['basis']}; {runtime['basis_note']}",
+                "Source evidence: " + runtime["evidence"],
+            )
+        )
+        rows.append(
+            NoticeRow(
+                title,
+                runtime["version"],
+                runtime["licence"],
+                sources,
+                entries,
+                tuple(inputs),
+                tuple(notes),
+            )
+        )
+    return rows
+
+
+def _refuse_gpl3_incompatible(lock: dict[str, Any]) -> None:
+    incompatible: list[str] = []
+    for component in lock["components"]:
+        if component["gpl3_compatible"] == "no":
+            incompatible.append(component["name"])
+        for extra in component["extra_repositories"]:
+            if extra["gpl3_compatible"] == "no":
+                incompatible.append(f"{component['name']} / {extra['repository']} @ {extra['pin']}")
+    if incompatible:
+        raise ValueError("notices: FFmpeg GPL-3.0-incompatible: " + "; ".join(incompatible))
+
+
 def _ffmpeg_component_rows(
-    lock: dict[str, Any], entries: tuple[str, ...], native_licences_path: Path
+    lock: dict[str, Any],
+    entries: tuple[str, ...],
+    native_licences_path: Path,
+    texts_folder: str = "ffmpeg-components",
 ) -> list[NoticeRow]:
     rows: list[NoticeRow] = []
     for component in lock["components"]:
@@ -1639,7 +2017,7 @@ def _ffmpeg_component_rows(
             source = f"{record['repository']} @ {record['pin']}"
             inputs = []
             for text in record["texts"]:
-                path = native_licences_path / "ffmpeg-components" / text["path"]
+                path = native_licences_path / texts_folder / text["path"]
                 inputs.append(
                     LicenceInput(
                         path,
@@ -1786,7 +2164,7 @@ def plan_notices(
     *,
     audit_path: Path = ROOT / "THIRD_PARTY_NOTICES.md",
     uv_lock_path: Path = ROOT / "uv.lock",
-    ffmpeg_lock_path: Path = ROOT / "tools/package/ffmpeg.lock.json",
+    ffmpeg_lock_path: Path | None = None,
     native_licences_path: Path = ROOT / "tools/package/native-licences",
     distribution: Callable[[str], importlib.metadata.Distribution] | None = None,
 ) -> NoticePlan:
@@ -1807,7 +2185,8 @@ def plan_notices(
         folder: The release folder or its executable's immediate folder.
         audit_path: The source-install audit's runtime table and audited texts.
         uv_lock_path: The build's locked distribution versions.
-        ffmpeg_lock_path: The FFmpeg identity and verified source/licence rows.
+        ffmpeg_lock_path: The FFmpeg identity and verified source/licence rows; None
+            selects this host's lock (:func:`default_ffmpeg_lock`).
         native_licences_path: The committed seat-verified native licence inputs.
         distribution: Explicit fixture resolver; None uses unique build-venv metadata.
 
@@ -1821,6 +2200,8 @@ def plan_notices(
     """
     _build_tool().check_build_environment()
     entries, home = _inventory(folder)
+    if ffmpeg_lock_path is None:
+        ffmpeg_lock_path = default_ffmpeg_lock()
     ffmpeg = _ffmpeg_rows(home, ffmpeg_lock_path, native_licences_path)
     audit = _audit_rows(audit_path)
     versions = _locked_versions(uv_lock_path)
@@ -1833,7 +2214,12 @@ def plan_notices(
     # Read declarations independently: a removed row/text must not let parent
     # RECORD/interpreter ownership absorb a carried host's embedded terms.
     document = _native_document(native_licences_path)
-    embedded_hosts = _embedded_declarations(document)
+    declared_hosts = _embedded_declarations(document)
+    # WP6.5 F0-2: each platform reads its own census (an absent "platform" key is Windows);
+    # a macOS plan refuses once, by name, while only another platform's census exists.
+    embedded_hosts = tuple(host for host in declared_hosts if host.platform == _host_platform())
+    if declared_hosts and not embedded_hosts and _host_platform() == "darwin":
+        raise ValueError(EMBEDDED_CENSUS_PENDING)
     embedded_claims, carried_hosts = _embedded_claims(entries, home, embedded_hosts, document)
     native_records = load_native_licences(native_licences_path)
     declarations = _vendored_declarations(document)
@@ -1898,11 +2284,28 @@ def plan_notices(
     selected: dict[str, list[str]] = defaultdict(list)
     ffmpeg_labels = {entry for row in ffmpeg for entry in row.entries}
     python_names = _python_file_names()
+    app = home.suffix == ".app"
+    dot_links = _dot_folder_links(entries) if app else frozenset()
     unknown: list[str] = []
     for entry in entries:
         if entry.label in ffmpeg_labels or entry.label in native_labels:
             continue
         name = entry.name
+        if app and entry.kind in {"file", "link"}:
+            # WP6.5 F0-2: the darwin name tables; RECORD ownership on the bundle-rooted path.
+            verdict = _app_entry_owner(entry, home, installed, dot_links)
+            if verdict is None:
+                unknown.append(f"unknown or ambiguous bundled entry {entry.label}")
+            elif isinstance(verdict, tuple):
+                for owner in verdict:
+                    selected[owner].append(entry.label)
+            else:
+                owners = paths.get(verdict.casefold(), set())
+                if len(owners) != 1:
+                    unknown.append(f"unknown or ambiguous bundled entry {entry.label}")
+                else:
+                    selected[next(iter(owners))].append(entry.label)
+            continue
         if (
             name in {"Clearwater.exe", "__main__", "clearwater.__main__", "THIRD_PARTY_NOTICES.md"}
             or name.startswith("clearwater.")
@@ -1983,7 +2386,7 @@ def plan_notices(
             version = ".".join(map(str, sys.version_info[:3]))
             if row.version.split()[0] != version:
                 raise ValueError("notices: Python version differs from the audited interpreter")
-            python_licence = Path(sys.base_prefix) / "LICENSE.txt"
+            python_licence = _python_licence()
             if not python_licence.is_file():
                 raise ValueError("notices: Python missing licence material")
             if not row.sources:
@@ -2081,7 +2484,7 @@ def plan_notices(
                 sorted(carried_paths[path] for path in limit.hosts if path in carried_paths)
             )
         )
-        for limit in _limit_declarations(document, embedded_hosts)
+        for limit in _limit_declarations(document, declared_hosts)
         if any(path in carried_paths for path in limit.hosts)
     )
     return NoticePlan(inventory_labels, ordered, tuple(statements), limits)
@@ -2706,12 +3109,30 @@ def render_notices(plan: NoticePlan) -> bytes:
     return rendered
 
 
+def notices_path(executable: Path) -> Path:
+    """The ONE location of an artifact's ``THIRD_PARTY_NOTICES.md`` (WP6.5 F0-2).
+
+    Beside the executable in the onedir form; in a macOS ``.app``, its
+    ``Contents/Resources`` (``Contents/MacOS`` holds only code under the bundle's seal),
+    where the smoke reads it and the release workflow stages it from.
+
+    Args:
+        executable: The built executable (``Clearwater.exe`` / ``Clearwater``).
+
+    Returns:
+        The notices file's path.
+    """
+    if sys.platform == "darwin" and (app := _build_tool()._macos_content_app(executable)):
+        return cast(Path, app) / "Contents" / "Resources" / "THIRD_PARTY_NOTICES.md"
+    return executable.parent / "THIRD_PARTY_NOTICES.md"
+
+
 def write_notices(
     folder: Path,
     *,
     audit_path: Path = ROOT / "THIRD_PARTY_NOTICES.md",
     uv_lock_path: Path = ROOT / "uv.lock",
-    ffmpeg_lock_path: Path = ROOT / "tools/package/ffmpeg.lock.json",
+    ffmpeg_lock_path: Path | None = None,
     native_licences_path: Path = ROOT / "tools/package/native-licences",
     distribution: Callable[[str], importlib.metadata.Distribution] | None = None,
 ) -> Path:
@@ -2726,12 +3147,14 @@ def write_notices(
         folder: The onedir release folder or a parent containing its executable.
         audit_path: The source-install audit table and verified upstream texts.
         uv_lock_path: The locked distribution versions.
-        ffmpeg_lock_path: The FFmpeg provenance and licence lock.
+        ffmpeg_lock_path: The FFmpeg provenance and licence lock; None selects this
+            host's lock (:func:`default_ffmpeg_lock`).
         native_licences_path: The committed seat-verified native licence inputs.
         distribution: Explicit fixture resolver; None uses unique build-venv metadata.
 
     Returns:
-        The written ``THIRD_PARTY_NOTICES.md`` beside Clearwater's executable.
+        The written ``THIRD_PARTY_NOTICES.md`` at :func:`notices_path` (beside Clearwater's
+        executable, or in a macOS bundle's ``Contents/Resources``).
 
     Raises:
         ValueError: The folder, coverage, versions or required materials are invalid.
@@ -2751,8 +3174,7 @@ def write_notices(
         )
 
     document = prepare()
-    executable = cast(Path, _build_tool().find_executable(folder))
-    path = executable.parent / "THIRD_PARTY_NOTICES.md"
+    path = notices_path(cast(Path, _build_tool().find_executable(folder)))
     reserved = False
     temporary: Path | None = None
     try:
@@ -2761,8 +3183,11 @@ def write_notices(
                 pass
             reserved = True
             document = prepare()
+        # In a .app the temporary file stays beside its target in Contents/Resources (the
+        # folder above it is the bundle's Contents); onedir keeps the release folder.
+        in_app = sys.platform == "darwin" and path.parent.parent.name == "Contents"
         with tempfile.NamedTemporaryFile(
-            dir=path.parent.parent, suffix=".tmp", delete=False
+            dir=path.parent if in_app else path.parent.parent, suffix=".tmp", delete=False
         ) as stream:
             temporary = Path(stream.name)
             stream.write(document)
@@ -2911,7 +3336,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     mode.add_argument("--check", action="store_true")
     parser.add_argument("--audit", type=Path, default=ROOT / "THIRD_PARTY_NOTICES.md")
     parser.add_argument("--uv-lock", type=Path, default=ROOT / "uv.lock")
-    parser.add_argument("--ffmpeg-lock", type=Path, default=ROOT / "tools/package/ffmpeg.lock.json")
+    parser.add_argument("--ffmpeg-lock", type=Path, default=None)
     options = parser.parse_args(argv)
     if options.root_annex and options.folder is not None:
         parser.error("--root-annex does not accept an artifact folder")
@@ -2920,7 +3345,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if options.root_annex:
             document = render_root_annex(
-                audit_path=options.audit, ffmpeg_lock_path=options.ffmpeg_lock
+                audit_path=options.audit,
+                ffmpeg_lock_path=options.ffmpeg_lock or ROOT / "tools/package/ffmpeg.lock.json",
             )
             if options.write:
                 options.audit.write_bytes(document)

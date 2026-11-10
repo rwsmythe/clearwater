@@ -9,11 +9,13 @@ import importlib.metadata
 import importlib.util
 import json
 import marshal
+import os
 import re
 import shutil
 import subprocess
 import sys
 import sysconfig
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -4069,3 +4071,409 @@ def test_original_obligations_render_verbatim_with_canonical_sources_and_citatio
         ),
     ]:
         assert url in output and digest in output
+
+
+# --- WP6.5 F0-2: a macOS Clearwater.app (darwin name tables, one notices location) ----------
+
+
+def _app_symlink(path, target, *, folder):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.symlink(target, path, target_is_directory=folder)
+    except (OSError, NotImplementedError) as error:
+        pytest.skip(f"os.symlink unavailable here (needs the symlink privilege): {error}")
+
+
+def make_app_executable(path, modules):
+    """A real CArchive (and PYZ) as the bundle's ``Contents/MacOS/Clearwater``."""
+    writers = pytest.importorskip("PyInstaller.archive.writers")
+    sources = path.parent.parent.parent.parent / "archive-sources"
+    sources.mkdir(parents=True, exist_ok=True)
+    script = sources / "module.pyc"
+    script.write_bytes(
+        importlib.util.MAGIC_NUMBER + bytes(12) + marshal.dumps(compile("", "m", "exec"))
+    )
+    pyz = sources / "PYZ.pyz"
+    writers.ZlibArchiveWriter(
+        str(pyz),
+        [(name, str(sources / "m.py"), "PYMODULE") for name in modules],
+        code_dict={name: compile("", name, "exec") for name in modules},
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    writers.CArchiveWriter(
+        str(path),
+        [
+            ("pyimod01_archive", str(script), True, "m"),
+            ("pyi_rth_inspect", str(script), True, "s"),
+            ("__main__", str(script), True, "s"),
+            ("PYZ.pyz", str(pyz), False, "z"),
+        ],
+        "libpython3.12.dylib",
+    )
+
+
+APP_FILES = {
+    "Contents/Info.plist": b"<plist/>",
+    "Contents/_CodeSignature/CodeResources": b"<plist>seal</plist>",
+    "Contents/Frameworks/libpython3.12.dylib": b"synthetic libpython",
+    "Contents/Frameworks/numpy/_core/test.cpython-312-darwin.so": b"synthetic extension",
+    "Contents/Frameworks/numpy/__dot__dylibs/libgfortran.5.dylib": b"synthetic vendored",
+    "Contents/Resources/numpy-2.5.4.dist-info/licenses/LICENSE.txt": b"synthetic BSD licence\n",
+    "Contents/Resources/icon-windowed.icns": b"synthetic icon",
+}
+APP_LINKS = {
+    "Contents/Frameworks/numpy/.dylibs": ("__dot__dylibs", True),
+    "Contents/Frameworks/libgfortran.5.dylib": ("numpy/.dylibs/libgfortran.5.dylib", False),
+    "Contents/Frameworks/base_library.zip": ("../Resources/base_library.zip", False),
+    "Contents/Frameworks/numpy-2.5.4.dist-info": ("../Resources/numpy-2.5.4.dist-info", True),
+    "Contents/Resources/numpy": ("../Frameworks/numpy", True),
+    "Contents/Resources/libpython3.12.dylib": ("../Frameworks/libpython3.12.dylib", False),
+}
+
+
+def add_app_ffmpeg(app, native_surface):
+    """The darwin bundling's four files, from the real macOS lock (never executed)."""
+    shutil.copytree(
+        ROOT / "tools/package/native-licences/ffmpeg-macos-components",
+        native_surface / "ffmpeg-macos-components",
+    )
+    pin = json.loads((ROOT / "tools/package/ffmpeg-macos.lock.json").read_text())
+    for name in ("ffmpeg", "ffprobe"):
+        (app / "Contents/MacOS" / name).write_bytes(b"synthetic tool; never executed")
+    resources = app / "Contents/Resources"
+    (resources / "ffmpeg-LICENSE.txt").write_text("synthetic GPL-3.0 licence")
+    script = pin["build_script"]
+    (resources / "ffmpeg-BUILD.txt").write_text(
+        "\n".join(
+            [
+                f"Provider: {pin['provider']}",
+                f"Build script: {script['repository']} @ {script['commit']}",
+                f"Release tag: {pin['release_tag']}",
+                f"Asset: {pin['asset_name']}",
+                f"SHA256: {pin['github_sha256']}",
+                f"FFmpeg version: {pin['version']}",
+                f"FFmpeg commit: {pin['ffmpeg_commit']}",
+                f"FFmpeg ref: {pin['ffmpeg_ref']}",
+                f"Build repository commit: {pin['build_repository_commit']}",
+                f"Build run: {pin['build_run_url']}",
+                f"Per-component source recipes: {pin['source_record_url']}",
+                f"macOS deployment target: {pin['macos_deployment_target']}",
+                pin["configure_line"],
+                "",
+            ]
+        )
+    )
+    return pin
+
+
+@pytest.fixture
+def app_release(tmp_path, monkeypatch):
+    """A synthetic macOS release (``.app``), planned with ``sys.platform`` read as darwin.
+
+    Windows creates the links with their POSIX text but refuses a following stat on such a
+    target (WinError 123); only that failure is modelled, as in the build tests' content
+    check (``app_content_paths``): the target is read from the link's own folder.
+    """
+    if sys.platform != "win32":
+        pytest.skip(WINDOWS_RELEASE_SKIP)
+    root = tmp_path / "release" / "Clearwater-1.2.0-macos-onedir"
+    app = root / "Clearwater.app"
+    make_app_executable(app / "Contents/MacOS/Clearwater", ["clearwater", "json", "numpy"])
+    for name, body in APP_FILES.items():
+        (app / name).parent.mkdir(parents=True, exist_ok=True)
+        (app / name).write_bytes(body)
+    archive = app / "Contents/Resources/base_library.zip"
+    with zipfile.ZipFile(archive, "w") as stream:
+        stream.writestr("json/__init__.pyc", b"")
+    for name, (target, folder) in APP_LINKS.items():
+        _app_symlink(app / name, target, folder=folder)
+    surface = _make_native_surface(tmp_path / "app-native-licences")
+    origin = tmp_path / "python-origin" / "libpython3.12.dylib"
+    origin.parent.mkdir()
+    origin.write_bytes(APP_FILES["Contents/Frameworks/libpython3.12.dylib"])
+    site = tmp_path / "site"
+    icon = APP_FILES["Contents/Resources/icon-windowed.icns"]
+    pyinstaller = installed(
+        site,
+        "pyinstaller",
+        "6.22.3",
+        {
+            "PyInstaller/loader/pyimod01_archive.py": "",
+            "PyInstaller/hooks/rthooks/pyi_rth_inspect.py": "",
+            "pyinstaller-6.22.3.dist-info/licenses/COPYING.txt": "synthetic COPYING\n",
+        },
+    )
+    digest = base64.urlsafe_b64encode(hashlib.sha256(icon).digest()).decode().rstrip("=")
+    icon_path = site / "PyInstaller/bootloader/images/icon-windowed.icns"
+    icon_path.parent.mkdir(parents=True)
+    icon_path.write_bytes(icon)
+    record = site / "pyinstaller-6.22.3.dist-info/RECORD"
+    record.write_text(
+        record.read_text()
+        + f"PyInstaller/bootloader/images/icon-windowed.icns,sha256={digest},{len(icon)}\n"
+    )
+    distributions = {
+        "numpy": installed(
+            site,
+            "numpy",
+            "2.5.4",
+            {
+                "numpy/__init__.py": "",
+                "numpy/_core/test.cpython-312-darwin.so": "synthetic extension",
+                "numpy/.dylibs/libgfortran.5.dylib": "synthetic vendored",
+                "numpy-2.5.4.dist-info/licenses/LICENSE.txt": "synthetic BSD licence\n",
+            },
+        ),
+        "pyinstaller": pyinstaller,
+    }
+    audit = tmp_path / "audit.md"
+    audit.write_text(
+        """# Synthetic notices
+## Runtime dependency audit
+| Component | Version | Licence | Verdict and required notice | Source / full text |
+| --- | --- | --- | --- | --- |
+| Python | 3.12.13 (outside lock) | PSF-2.0 | COMPATIBLE | [Source](https://python.org) |
+| numpy | 2.5.4 | BSD-3-Clause | COMPATIBLE | [Source](https://github.com/numpy/numpy/tree/v2.5.4) |
+### Native components and conditions
+""",
+        encoding="utf-8",
+    )
+    uv_lock = tmp_path / "uv.lock"
+    uv_lock.write_text(
+        'version = 1\n[[package]]\nname = "numpy"\nversion = "2.5.4"\n'
+        '[[package]]\nname = "pyinstaller"\nversion = "6.22.3"\n'
+    )
+    query = os.stat
+
+    def posix_link_stat(path, *args, **kwargs):
+        try:
+            return query(path, *args, **kwargs)
+        except OSError as error:
+            if (
+                getattr(error, "winerror", None) != 123
+                or not kwargs.get("follow_symlinks", True)
+                or not Path(path).is_relative_to(app)
+            ):
+                raise
+            target = Path(path).parent / os.readlink(path)
+            return query(os.path.realpath(target), *args, **kwargs)
+
+    module = load_notices()
+    # Its build tool (and urllib) imported BEFORE sys.platform reads darwin: urllib.request
+    # imports the macOS-only _scproxy at import time there.
+    module._build_tool()
+    # raising=False: the RED run on the parent (which has neither) reaches its real refusal.
+    monkeypatch.setattr(module, "_python_runtime_dylib", lambda: origin, raising=False)
+    monkeypatch.setattr(
+        module, "_python_licence", lambda: Path(sys.base_prefix) / "LICENSE.txt", raising=False
+    )
+    monkeypatch.setattr(os, "stat", posix_link_stat)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    return {
+        "module": module,
+        "root": root,
+        "app": app,
+        "native_surface": surface,
+        "audit": audit,
+        "uv_lock": uv_lock,
+        "distributions": distributions,
+    }
+
+
+def app_plan(app_release, **kwargs):
+    kwargs.setdefault("native_licences_path", app_release["native_surface"])
+    return app_release["module"].plan_notices(
+        app_release["root"],
+        audit_path=app_release["audit"],
+        uv_lock_path=app_release["uv_lock"],
+        distribution=app_release["distributions"].__getitem__,
+        **kwargs,
+    )
+
+
+def test_app_plan_applies_the_darwin_name_tables(app_release):
+    """F0-2: every .app file and link is covered by its darwin row, bundle-rooted; the RECORD
+    path undoes PyInstaller's ``__dot__`` folder only beside its admitted ``.x`` link."""
+    result = app_plan(app_release)
+    rows = {row.name: set(row.entries) for row in result.rows}
+    assert set(rows) == {
+        "Clearwater",
+        "Python",
+        "numpy",
+        "PyInstaller bootloader",
+        "PyInstaller run-time hooks",
+    }
+    assert {
+        "file:Contents/MacOS/Clearwater",
+        "file:Contents/Info.plist",
+        "file:Contents/_CodeSignature/CodeResources",
+        "pyz:clearwater",
+    } <= rows["Clearwater"]
+    assert {
+        "file:Contents/Frameworks/libpython3.12.dylib",
+        "file:Contents/Resources/base_library.zip",
+        "base:json/__init__.pyc",
+        "pyz:json",
+    } <= rows["Python"]
+    assert {
+        "file:Contents/Frameworks/numpy/_core/test.cpython-312-darwin.so",
+        "file:Contents/Frameworks/numpy/__dot__dylibs/libgfortran.5.dylib",
+        "file:Contents/Resources/numpy-2.5.4.dist-info/licenses/LICENSE.txt",
+        "pyz:numpy",
+    } <= rows["numpy"]
+    links = {f"link:{name} -> {target}" for name, (target, _folder) in APP_LINKS.items()}
+    assert (
+        links
+        | {
+            "file:Contents/MacOS/Clearwater",
+            "file:Contents/Resources/icon-windowed.icns",
+            "archive:PYZ.pyz",
+        }
+        <= rows["PyInstaller bootloader"]
+    )
+    assert not [label for label in result.entries if "_internal" in label]
+    assert not any(row.name.startswith("FFmpeg") for row in result.rows)
+    assert any("FFmpeg / ffprobe: user-obtained" in line for line in result.user_obtained)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    ["dot-link-absent", "icon-bytes", "libpython-bytes", "macos-stray", "contents-stray"],
+)
+def test_app_plan_admits_nothing_by_name_alone(app_release, damage):
+    """A ``__dot__`` folder without its link, an icon or libpython whose bytes are not the
+    verified originals, and a file outside the darwin tables are unknown, by label."""
+    app = app_release["app"]
+    label = {
+        "dot-link-absent": "file:Contents/Frameworks/numpy/__dot__dylibs/libgfortran.5.dylib",
+        "icon-bytes": "file:Contents/Resources/icon-windowed.icns",
+        "libpython-bytes": "file:Contents/Frameworks/libpython3.12.dylib",
+        "macos-stray": "file:Contents/MacOS/helper",
+        "contents-stray": "file:Contents/PkgInfo",
+    }[damage]
+    if damage == "dot-link-absent":
+        (app / "Contents/Frameworks/libgfortran.5.dylib").unlink()
+        os.rmdir(app / "Contents/Frameworks/numpy/.dylibs")
+    elif damage in {"icon-bytes", "libpython-bytes"}:
+        (app / label.removeprefix("file:")).write_bytes(b"other bytes")
+    else:
+        (app / label.removeprefix("file:")).write_bytes(b"stray")
+    with pytest.raises(ValueError, match=re.escape(f"unknown or ambiguous bundled entry {label}")):
+        app_plan(app_release)
+
+
+def test_app_plan_reads_the_macos_ffmpeg_lock_and_bundle_locations(app_release):
+    """F0-2: the FFmpeg rows on darwin come from ffmpeg-macos.lock.json (the default lock),
+    the tools in Contents/MacOS and their texts in Contents/Resources, each text by identity."""
+    module = app_release["module"]
+    assert module.default_ffmpeg_lock() == ROOT / "tools/package/ffmpeg-macos.lock.json"
+    pin = add_app_ffmpeg(app_release["app"], app_release["native_surface"])
+    result = app_plan(app_release)
+    rows = {row.name: row for row in result.rows}
+    main = rows["FFmpeg / ffprobe"]
+    assert main.version == pin["version"] and main.licence == pin["licence"]
+    assert set(main.entries) == {
+        "file:Contents/MacOS/ffmpeg",
+        "file:Contents/MacOS/ffprobe",
+        "file:Contents/Resources/ffmpeg-BUILD.txt",
+        "file:Contents/Resources/ffmpeg-LICENSE.txt",
+    }
+    assert main.notes[0].startswith(f"Provider: {pin['provider']} @ ")
+    components = [name for name in rows if name.startswith("FFmpeg component: ")]
+    assert len(components) == len(pin["components"]) == 12
+    runtimes = [name for name in rows if name.startswith("FFmpeg toolchain runtime: ")]
+    assert len(runtimes) == len(pin["toolchain_runtime"]) == 1
+    assert rows[runtimes[0]].licence == "Apache-2.0 WITH LLVM-exception"
+    assert not any("FFmpeg" in line for line in result.user_obtained)
+    module.render_notices(result)
+    record = app_release["app"] / "Contents/Resources/ffmpeg-BUILD.txt"
+    record.write_text(record.read_text().replace("Build run: ", "Build run: x"))
+    with pytest.raises(ValueError, match="FFmpeg build provenance differs: Build run"):
+        app_plan(app_release)
+
+
+def test_app_notices_have_one_location_in_contents_resources(app_release):
+    """F0-2: the writer puts THIRD_PARTY_NOTICES.md in Contents/Resources (never MacOS), its
+    temporary file beside it, and inventories it under Clearwater on the next plan."""
+    module = app_release["module"]
+    app = app_release["app"]
+    kwargs = {
+        "audit_path": app_release["audit"],
+        "uv_lock_path": app_release["uv_lock"],
+        "native_licences_path": app_release["native_surface"],
+        "distribution": app_release["distributions"].__getitem__,
+    }
+    path = module.write_notices(app / "Contents/MacOS", **kwargs)
+    assert path == app / "Contents/Resources/THIRD_PARTY_NOTICES.md"
+    assert not (app / "Contents/MacOS/THIRD_PARTY_NOTICES.md").exists()
+    assert not [n for _d, _f, names in os.walk(app.parent) for n in names if n.endswith(".tmp")]
+    plan_after = module.plan_notices(app / "Contents/MacOS", **kwargs)
+    clearwater = next(row for row in plan_after.rows if row.name == "Clearwater")
+    assert "file:Contents/Resources/THIRD_PARTY_NOTICES.md" in clearwater.entries
+    assert path.read_bytes() == module.render_notices(plan_after)
+    assert module.write_notices(app_release["root"], **kwargs) == path
+
+
+def test_app_plan_refuses_once_while_the_macos_embedded_census_is_pending(app_release):
+    """F0-2a (CHARC eb1fc893): with only the Windows embedded census (the production manifest),
+    a macOS plan refuses with ONE named reason, before any per-host check. On 200dffd8 the
+    darwin plan refused per Windows host (``embedded _internal/_bz2.pyd absent ...``)."""
+    surface = app_release["native_surface"]
+    shutil.rmtree(surface)
+    shutil.copytree(ROOT / "tools/package/native-licences", surface)
+    module = app_release["module"]
+    with pytest.raises(ValueError) as error:
+        app_plan(app_release)
+    assert str(error.value) == module.EMBEDDED_CENSUS_PENDING
+    assert "macOS embedded census pending" in str(error.value)
+    assert "_internal" not in str(error.value)
+
+
+REAL_HOST_COMPONENTS = json.loads(
+    (ROOT / "tools/package/native-licences/manifest.json").read_text(encoding="utf-8")
+)["embedded_hosts"][0]["components"]
+
+
+def test_embedded_hosts_are_read_per_platform(app_release, monkeypatch):
+    """F0-2a: a host's optional ``platform`` key (absent = Windows) selects the census a plan
+    reads. A darwin host is held to its exact identity on darwin, and Windows ignores it."""
+    surface = app_release["native_surface"]
+    path = surface / "manifest.json"
+    document = json.loads(path.read_text())
+    dylib = app_release["app"] / "Contents/Frameworks/numpy/_core/test.cpython-312-darwin.so"
+    windows = {
+        "relpath": "_internal/numpy/_core/test.pyd",
+        "sha256": "0" * 64,
+        "size_bytes": 1,
+        "parent": "numpy",
+        "parent_version": "2.5.4",
+        "components": REAL_HOST_COMPONENTS,
+    }
+    darwin = {
+        **windows,
+        "relpath": "Contents/Frameworks/numpy/_core/test.cpython-312-darwin.so",
+        "sha256": "1" * 64,
+        "size_bytes": dylib.stat().st_size,
+        "platform": "darwin",
+    }
+    module = app_release["module"]
+    hosts = [
+        (windows, "win32"),
+        (darwin, "darwin"),
+    ]
+    for item, platform in hosts:
+        document["embedded_hosts"] = [item]
+        parsed = module._embedded_declarations(document)
+        assert [host.platform for host in parsed] == [platform]
+    for bad in ({**darwin, "platform": "linux"}, {**windows, "platform": "darwin"}):
+        document["embedded_hosts"] = [bad]
+        with pytest.raises(ValueError, match="embedded host declaration is invalid"):
+            module._embedded_declarations(document)
+    dylib_host = module._EmbeddedHost(
+        darwin["relpath"], darwin["sha256"], darwin["size_bytes"], "numpy", "2.5.4", (), "darwin"
+    )
+    entries, home = module._inventory(app_release["root"])
+    with pytest.raises(ValueError, match="identity differs"):
+        module._embedded_claims(entries, home, (dylib_host,), {"components": []})
+    monkeypatch.setattr(sys, "platform", "win32")
+    assert module._host_platform() == "win32"
