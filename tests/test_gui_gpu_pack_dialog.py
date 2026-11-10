@@ -9,6 +9,7 @@ import os
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
+import re
 import threading
 from pathlib import Path
 
@@ -30,6 +31,69 @@ LICENSE = (
     "Agreement (the file `License.txt` in each NVIDIA package's `.dist-info` folder after the "
     "install); CuPy is MIT. Clearwater does not redistribute them."
 )
+
+
+_PLATFORM_TAG = re.compile(r"(?P<os>macosx|win|linux)(?:_\d+_\d+)?_(?P<arch>\w+)")
+"""A wheel platform tag as ``platform_tags()`` spells it: the OS, a macOS version, the machine."""
+
+_PLATFORM_OS = {"macosx": "darwin", "win": "win32", "linux": "linux"}
+
+
+def _platform_words(platform: str) -> str:
+    """Name a wheel platform tag as ``<os>/<machine>`` (``macosx_14_0_arm64`` -> ``darwin/arm64``).
+
+    A tag of another form is returned as it is.
+    """
+    match = _PLATFORM_TAG.fullmatch(platform)
+    if match is None:
+        return platform
+    return f"{_PLATFORM_OS[match['os']]}/{match['arch']}"
+
+
+def lock_gap(tags: tuple[str, str] | None = None) -> str | None:
+    """Return why the GPU pack lock cannot be planned for ``tags``, or None when it can.
+
+    The reading is the lock's own, through the tag fit ``gpu_pack_install.plan()`` uses: a locked
+    distribution none of whose wheels has a tag that ``gpu_pack.tag_fits`` the interpreter and
+    platform tags leaves ``plan()`` with "0 compatible locked wheels". More than one fitting
+    wheel is a lock defect, not a platform gap, so it is not a reason to skip.
+
+    Args:
+        tags: ``(interpreter, platform)`` as ``gpu_pack.platform_tags()`` returns them; the
+            running interpreter's when None.
+
+    Returns:
+        The skip reason naming the lock and the platform, or None.
+    """
+    interpreter, platform = gpu_pack.platform_tags() if tags is None else tags
+    for distribution in gpu_pack.LOCKED_DISTRIBUTIONS:
+        fits = [
+            row[0]
+            for row in distribution.wheels
+            if any(
+                gpu_pack.tag_fits(tag, interpreter, platform)
+                for tag in gpu_pack_install._wheel_tags(row[0])
+            )
+        ]
+        if not fits:
+            return (
+                f"GPU pack lock carries no wheels for {_platform_words(platform)} "
+                f"({distribution.name}; tags {interpreter}, {platform})"
+            )
+    return None
+
+
+def require_locked_wheels() -> None:
+    """Skip a test that reaches ``gpu_pack_install.plan()`` where the lock has no wheels."""
+    reason = lock_gap()
+    if reason is not None:
+        pytest.skip(reason)
+
+
+@pytest.fixture
+def locked_wheels() -> None:
+    """Skip the requesting test where the GPU pack lock carries no wheels (``lock_gap``)."""
+    require_locked_wheels()
 
 
 @pytest.fixture(autouse=True)
@@ -101,6 +165,7 @@ def _open(window, monkeypatch):
     return dialog, script, actions
 
 
+@pytest.mark.usefixtures("locked_wheels")
 def test_menu_opens_explicit_request_with_computed_plan(make_window, monkeypatch, isolated_pack):
     window = make_window()
     dialog, script, _ = _open(window, monkeypatch)
@@ -119,6 +184,7 @@ def test_menu_opens_explicit_request_with_computed_plan(make_window, monkeypatch
     assert not dialog.isVisible()
 
 
+@pytest.mark.usefixtures("locked_wheels")
 def test_progress_cancel_and_cleanup_completion(make_window, monkeypatch):
     window = make_window()
     dialog, script, actions = _open(window, monkeypatch)
@@ -141,6 +207,7 @@ def test_progress_cancel_and_cleanup_completion(make_window, monkeypatch):
     assert not dialog.isVisible()
 
 
+@pytest.mark.usefixtures("locked_wheels")
 def test_success_and_menu_presence(make_window, monkeypatch, isolated_pack):
     window = make_window()
     dialog, script, actions = _open(window, monkeypatch)
@@ -156,6 +223,7 @@ def test_success_and_menu_presence(make_window, monkeypatch, isolated_pack):
     assert actions["Remove GPU support"].isEnabled()
 
 
+@pytest.mark.usefixtures("locked_wheels")
 def test_close_while_running_requests_cancel(make_window, monkeypatch):
     window = make_window()
     dialog, script, _ = _open(window, monkeypatch)
@@ -223,6 +291,7 @@ def test_platform_visibility_and_idle_hint(make_window, monkeypatch, isolated_pa
     assert window.device_label.toolTip() == ""
 
 
+@pytest.mark.usefixtures("locked_wheels")
 def test_real_runner_adapter_is_qt_free_on_worker(make_window, monkeypatch, qtbot, isolated_pack):
     window = make_window()
     threads = []
@@ -255,6 +324,7 @@ def test_gui_paths_have_no_blocking_dialog_exec():
         assert ".exec(" not in text.replace("app.exec(", "application_event_loop(")
 
 
+@pytest.mark.usefixtures("locked_wheels")
 def test_rejected_pack_plan_warns_before_request(make_window, monkeypatch, isolated_pack):
     (isolated_pack / gpu_pack.STAMP).mkdir(parents=True)
     dialog, script, _ = _open(make_window(), monkeypatch)
@@ -264,6 +334,7 @@ def test_rejected_pack_plan_warns_before_request(make_window, monkeypatch, isola
     assert script.calls == []
 
 
+@pytest.mark.usefixtures("locked_wheels")
 def test_operation_in_progress_is_shown_by_dialog(make_window, monkeypatch):
     dialog, script, _ = _open(make_window(), monkeypatch)
     dialog.install_button.click()
@@ -315,6 +386,7 @@ def test_pending_reason_clears_after_marker_is_gone(
     window = make_window()
     assert window.device_label.text() == "Device: CPU: GPU pack removal pending"
     if completion == "install":
+        require_locked_wheels()  # the install dialog computes the plan
         dialog, script, _ = _open(window, monkeypatch)
         dialog.install_button.click()
         marker.unlink()
@@ -429,3 +501,35 @@ def test_without_loaded_status_gui_uses_normal_remove(
     script.finish(job(handle.progress))
     assert window.statusBar().currentMessage() == "normal removal"
     assert not (isolated_pack / (gpu_pack.STAMP + ".remove")).exists()
+
+
+@pytest.mark.parametrize(
+    ("tags", "words"),
+    [
+        (("cp312", "win_amd64"), None),
+        (("cp312", "linux_x86_64"), None),
+        (("cp312", "macosx_14_0_arm64"), "darwin/arm64"),
+        (("cp312", "macosx_15_0_x86_64"), "darwin/x86_64"),
+        (("cp313", "win_amd64"), "win32/amd64"),
+    ],
+    ids=["win-cp312", "linux-cp312", "mac-arm64", "mac-x86_64", "win-cp313"],
+)
+def test_the_lock_decides_the_skip_as_plan_does(monkeypatch, tags, words):
+    """WP6.5 run 3 S2: a tag pair the lock carries means no skip; one it does not means skip.
+
+    ``plan()`` is run on the same tags, so the skip reading and the planner agree.
+    """
+    monkeypatch.setattr(gpu_pack, "platform_tags", lambda: tags)
+    reason = lock_gap()
+    assert reason == lock_gap(tags)
+    if words is None:
+        assert reason is None
+        assert gpu_pack_install.plan().wheels
+    else:
+        assert reason == (
+            f"GPU pack lock carries no wheels for {words} (cupy-cuda12x; tags {tags[0]}, {tags[1]})"
+        )
+        with pytest.raises(ValueError, match="cupy-cuda12x: 0 compatible locked wheels"):
+            gpu_pack_install.plan()
+        with pytest.raises(pytest.skip.Exception, match=re.escape(reason)):
+            require_locked_wheels()
