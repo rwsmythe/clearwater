@@ -4687,35 +4687,26 @@ def _macos_link_on_path(root: Path, path: Path) -> bool:
     return False
 
 
-def _macos_candidate_behind_a_link(roots: Sequence[Path], candidate: Path) -> bool:
-    """Whether ``candidate``, read as written, passes a link or junction below a release root.
+def _macos_candidate_behind_a_link(candidate: Path) -> bool:
+    """Whether a link or junction lies anywhere on ``candidate``'s path, read as written.
 
-    A diagnostic PATH candidate inside a ``.app`` (WP6.5 A r14 #1): its components are taken
-    in turn from the anchor (``..`` lexically, which matches the system's reading up to the
-    first link, where this one stops), and every component strictly below one of ``roots``
-    is read with ``lstat`` and the junction test, never followed. Names are compared
-    case-folded, so a case-insensitive volume's spelling of a root is recognised. A
-    component that cannot be read ends the reading: the system's own lookup stops there too.
+    A diagnostic PATH candidate inside a ``.app`` (WP6.5 A r14 #1 and its residual): its
+    components are taken in turn from the anchor, ``..`` lexically (exact, since the reading
+    stops at the first link), each read with ``lstat`` and the junction test, never
+    followed. A link ANYWHERE counts, inside the release root or outside it: a host alias
+    can lead into the bundle, and only following it would tell. A component that cannot be
+    read ends the reading: the system's own lookup stops there too.
 
     Args:
-        roots: The release root as given and as canonicalised.
         candidate: ``<PATH entry>/<name>``, absolute or relative to the working folder.
 
     Returns:
-        ``True`` when a link or junction below a root lies on the candidate's path.
+        ``True`` when a link or junction lies on the candidate's path.
     """
-    folded = [tuple(part.casefold() for part in root.parts) for root in roots]
-
-    def below(path: Path) -> bool:
-        parts = tuple(part.casefold() for part in path.parts)
-        return any(len(parts) > len(root) and parts[: len(root)] == root for root in folded)
-
     written = candidate if candidate.is_absolute() else Path.cwd() / candidate
     current = Path(written.anchor)
     for part in written.parts[1:]:
         current = current.parent if part == ".." else current / part
-        if not below(current):
-            continue
         if current.is_junction():
             return True
         try:
@@ -4733,19 +4724,15 @@ def _macos_native_origin_violations(
     errors = []
     root, contents = _macos_layout(executable)
     in_app = root.suffix == ".app"
-    app_roots: list[Path] = []  # the .app as given and canonicalised, read on first need
 
     def linked(candidate: Path) -> bool:
-        """Inside a .app, whether a link lies on a PATH candidate below the release root.
+        """Inside a .app, whether a link or junction lies anywhere on a PATH candidate.
 
-        Such a candidate is skipped as a diagnostic, never resolved (WP6.5 A r14 #1): the
-        walk admits or refuses the link on its own pass. Onedir makes no extra call.
+        Such a candidate is skipped as a diagnostic, never resolved (WP6.5 A r14 #1 and its
+        residual): a link in the bundle is admitted or refused by the walk on its own pass,
+        and a host alias may lead into the bundle. Onedir makes no extra call.
         """
-        if not in_app:
-            return False
-        if not app_roots:
-            app_roots.extend((root, Path(os.path.realpath(root))))
-        return _macos_candidate_behind_a_link(app_roots, candidate)
+        return in_app and _macos_candidate_behind_a_link(candidate)
 
     def unknown(label: str, name: str) -> str:
         likely = next(

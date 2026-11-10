@@ -3333,42 +3333,54 @@ class _FsRecorder:
         """Calls, in their recorded order, that break the invariant on this shape.
 
         A call is a violation when it touches ``zone`` (outside the bundle) at all, or when
-        it FOLLOWS a path under the release root on which a link lies (a symlink, or a
-        junction by ``os.path.isjunction``, looked up per call) that the walk has not
-        admitted EARLIER in the sequence: an admission after the call does not excuse it.
+        it FOLLOWS a path on which a link lies (a symlink, or a junction by
+        ``os.path.isjunction``, looked up per call), read from the anchor, that is either:
+
+        - under the release root and not admitted by the walk EARLIER in the sequence (an
+          admission after the call does not excuse it); or
+        - outside the release root and resolving AT OR UNDER it (a host alias into the
+          bundle, A r14's residual). An alias above the root (macOS ``/var``) resolves to an
+          ancestor of the root and is not one.
         """
         bases = self._bases(root)
+        real_root = bases[1]
         admitted: set[str] = set()
         found = []
+
+        def inside(path: Path) -> str | None:
+            for base in bases:
+                if path != base and path.is_relative_to(base):
+                    return path.relative_to(base).as_posix()
+            return None
+
         for name, raw, follows in self.calls:
             if name == "admit":
-                path = Path(os.path.normpath(raw))
-                admitted.update(
-                    path.relative_to(base).as_posix() for base in bases if path.is_relative_to(base)
-                )
+                admitted.add(inside(Path(os.path.normpath(raw))) or raw)
                 continue
             if Path(os.path.normpath(raw)).is_relative_to(zone):
                 found.append((name, raw))
                 continue
             if not follows:
                 continue
-            for base in bases:
-                if not Path(raw).is_relative_to(base):
+            written = Path(raw)
+            current = Path(written.anchor)
+            for part in written.parts[1:]:
+                current = current.parent if part == ".." else current / part
+                try:
+                    mode = _REAL_FS["lstat"](current).st_mode
+                except OSError:
+                    break
+                if not (stat.S_ISLNK(mode) or os.path.isjunction(current)):
                     continue
-                current = base
-                for part in Path(raw).relative_to(base).parts:
-                    current = current.parent if part == ".." else current / part
-                    if not current.is_relative_to(base) or current == base:
-                        continue
-                    try:
-                        mode = _REAL_FS["lstat"](current).st_mode
-                    except OSError:
-                        break
-                    is_link = stat.S_ISLNK(mode) or os.path.isjunction(current)
-                    if is_link and current.relative_to(base).as_posix() not in admitted:
+                relative = inside(current)
+                if relative is None:
+                    entered = Path(_REAL_FS["realpath"](current)).is_relative_to(real_root)
+                    if entered:
                         found.append((name, raw))
                         break
-                break
+                elif relative not in admitted:
+                    found.append((name, raw))
+                    break
         return found
 
 
@@ -3496,25 +3508,45 @@ def test_no_following_call_before_the_walk_admits_the_links(tmp_path, monkeypatc
 _OPENS = {"open", "io.open", "os.open", "Path.open"}
 
 
-@pytest.mark.parametrize("case", ["linked-only", "linked-then-host", "through-dotdot"])
+@pytest.mark.parametrize(
+    "case",
+    [
+        "linked-only",
+        "linked-then-host",
+        "through-dotdot",
+        "host-alias-into-bundle",
+        "host-link-elsewhere",
+    ],
+)
 def test_a_linked_path_candidate_is_never_followed(tmp_path, monkeypatch, case):
-    """A r14 #1: the origin check's diagnostic PATH lookup (``likely PATH source``) never
-    follows a link in the bundle. A's shape: an unknown native ``Contents/Aaa.dylib`` met
-    before ``Contents/Resources/bin -> ../../../outside/bin``, and ``original_path`` naming
-    the linked folder (as written, or through ``..`` past the link). That candidate is
-    skipped unresolved; a host PATH entry outside the release root is still queried and
-    named; the link itself is refused exactly as before."""
+    """A r14 #1 and its residual: the origin check's diagnostic PATH lookup (``likely PATH
+    source``) never follows a link. A's shape: an unknown native ``Contents/Aaa.dylib`` met
+    before ``Contents/Resources/bin -> ../../../outside/bin``. A candidate with a link
+    ANYWHERE on its path is skipped unresolved: the linked folder (as written, or through
+    ``..`` past the link), a host alias leading into the bundle
+    (``<tmp>/alias -> <root>/Contents/Resources``, then ``<tmp>/alias/bin``) and a host link
+    that does not. A physical host PATH entry holding the file is still queried and named
+    (built under ``realpath(tmp_path)``: macOS's ``$TMPDIR`` lies under the ``/var``
+    link). The bundle link itself is refused exactly as before."""
     folder, _ = link_release(
         tmp_path, "app", [], [("Contents/Resources/bin", "../../../outside/bin", True)]
     )
     tree(folder, ["Contents/Aaa.dylib"], b"payload")
     tree(folder.parent, ["outside/bin/Aaa.dylib"], b"unknown")
-    host = tree(tmp_path / "host" / "bin", ["Aaa.dylib"], b"unknown")
+    real = Path(os.path.realpath(tmp_path))
+    host = tree(real / "host" / "bin", ["Aaa.dylib"], b"unknown")
+    alias = real / "alias"
+    _symlink(alias, str(Path(os.path.realpath(folder)) / "Contents" / "Resources"), folder=True)
+    hostlink = real / "hostlink"
+    _symlink(hostlink, str(host), folder=True)
+    assert (hostlink / "Aaa.dylib").is_file()
     linked = folder / "Contents/Resources/bin"
     entries = {
         "linked-only": [linked],
         "linked-then-host": [linked, host],
         "through-dotdot": [linked / ".." / "bin"],
+        "host-alias-into-bundle": [alias / "bin"],
+        "host-link-elsewhere": [hostlink],
     }[case]
     recorder, found, problems = _recorded_entry_points(
         tmp_path,
@@ -3537,33 +3569,43 @@ def test_a_linked_path_candidate_is_never_followed(tmp_path, monkeypatch, case):
     assert recorder.violations(folder, tmp_path / "wrapper" / "outside") == []
     if case == "linked-then-host":
         assert ("Path.is_file", str(host / "Aaa.dylib"), True) in recorder.calls
+    for watched in (alias, hostlink):
+        through = [
+            call for call in recorder.calls if call[2] and Path(call[1]).is_relative_to(watched)
+        ]
+        assert through == [], through
 
 
-def test_a_path_candidate_is_read_below_the_root_in_any_spelling(tmp_path):
-    """A r14 #1: a PATH candidate is recognised as lying in the bundle whether it names the
-    release root as given, as canonicalised (an alias above the root), in another letter
-    case, or through ``..``; a link below the root on it is found by ``lstat`` alone. A
-    candidate outside the root is never read by this check."""
+def test_a_path_candidate_with_any_link_on_it_is_skipped(tmp_path):
+    """A r14 #1 and its residual: a PATH candidate counts as linked when a link or junction
+    lies ANYWHERE on its path, read as written from the anchor by ``lstat`` alone: in the
+    bundle, through ``..`` past it, through an alias above the release root, or through a
+    host link outside it. A physical path (built under ``realpath(tmp_path)``), a missing
+    component and an absent host folder are not."""
     folder, _ = link_release(
         tmp_path, "app", [], [("Contents/Resources/bin", "../../../outside/bin", True)]
     )
-    alias = tmp_path / "alias"
-    _symlink(alias, os.path.join(str(tmp_path), "wrapper"), folder=True)
-    given = alias / "Clearwater.app"
-    roots = [given, Path(os.path.realpath(given))]
-    assert roots[1] == Path(os.path.realpath(folder))
+    real = Path(os.path.realpath(folder))
+    alias = Path(os.path.realpath(tmp_path)) / "alias"
+    _symlink(alias, str(real.parent), folder=True)
     behind = build._macos_candidate_behind_a_link
     linked = "Contents/Resources/bin/Aaa.dylib"
-    assert behind(roots, given / linked)
-    assert behind(roots, folder / linked)  # the canonical spelling
-    if os.path.exists(str(folder).upper()):  # a case-insensitive volume (macOS, Windows)
-        assert behind(roots, Path(str(folder / linked).upper()))
-    assert behind(roots, given / "Contents/Resources/bin/../bin/Aaa.dylib")
-    assert not behind(roots, given / "Contents/MacOS/Aaa.dylib")
-    assert not behind(roots, given / "Contents/Missing/bin/Aaa.dylib")
+    assert behind(real / linked)
+    assert behind(real / "Contents/Resources/bin/../bin/Aaa.dylib")
     # Out through the link and lexically back outside: still found at the link.
-    assert behind(roots, given / "Contents/Resources/bin/../../../../host/Aaa.dylib")
-    assert not behind(roots, tmp_path / "host" / "Aaa.dylib")
+    assert behind(real / "Contents/Resources/bin/../../../../host/Aaa.dylib")
+    assert behind(alias / "Clearwater.app/Contents/MacOS/Aaa.dylib")  # an alias above the root
+    if os.path.exists(str(real).upper()):  # a case-insensitive volume (macOS, Windows)
+        assert behind(Path(str(real / linked).upper()))
+    try:
+        relative = Path(os.path.relpath(real / linked))
+    except ValueError:  # another drive than the working folder's
+        pass
+    else:
+        assert not relative.is_absolute() and behind(relative)
+    assert not behind(real / "Contents/MacOS/Aaa.dylib")
+    assert not behind(real / "Contents/Missing/bin/Aaa.dylib")
+    assert not behind(real.parent.parent / "host" / "Aaa.dylib")
 
 
 # --- A r14 #2: the recorder's own three gaps, each shown caught -----------------------------
