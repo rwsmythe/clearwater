@@ -1492,8 +1492,14 @@ def test_macos_version_step_records_or_checks_the_release_version(
         monkeypatch.setenv(name, value)
     monkeypatch.setitem(sys.modules, "clearwater", SimpleNamespace(__version__=source))
     calls = []
+    real_run = subprocess.run
 
     def sw_vers(args, **kwargs):
+        # WP6.5 A-r6-2: only the step's own sw_vers call is the stand-in's. A cold
+        # platform query in the step body (uname -> win32_ver -> `ver` when WMI is off)
+        # reaches the real run instead of failing this call's kwargs assertion.
+        if args != ["sw_vers"]:
+            return real_run(args, **kwargs)
         calls.append(args)
         assert kwargs == {"capture_output": True, "text": True, "timeout": 30, "check": True}
         return subprocess.CompletedProcess(args, 0, "ProductName:\tmacOS\nBuildVersion:\t25G83\n")
