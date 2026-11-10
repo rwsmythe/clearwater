@@ -174,6 +174,64 @@ def test_f02b_real_manifest_census_and_platform_limits():
     assert len([limit for limit in limits if limit.platform == "darwin"]) == 14
 
 
+@pytest.mark.parametrize("platform", ["win32", "darwin"])
+def test_f02b_embedded_text_refusal_context_is_platform_local(tmp_path, monkeypatch, platform):
+    """A tampered shared text names only this platform's hosts (Windows lock)."""
+    module = load_notices()
+    surface = tmp_path / "native-licences"
+    shutil.copytree(ROOT / "tools/package/native-licences", surface)
+    if "WP65_MANIFEST" in os.environ:
+        shutil.copyfile(os.environ["WP65_MANIFEST"], surface / "manifest.json")
+    path = surface / "dr144-qtbase-src--3rdparty--freetype--LICENSE.txt"
+    path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+    monkeypatch.setattr(module, "_host_platform", lambda: platform)
+    with pytest.raises(ValueError) as refusal:
+        module.load_native_licences(surface)
+    if platform == "win32":
+        # Literal obtained by executing 200dffd8's loader with its own manifest
+        # and this CRLF tamper (work/wp6.5/f02b-fold/baseline-probe.log).
+        expected = (
+            "notices: embedded _internal/PySide6/Qt6Gui.dll component "
+            "Anti-aliasing rasterizer (grayraster, from FreeType): "
+            "native licence text byte count differs: "
+            "dr144-qtbase-src--3rdparty--freetype--LICENSE.txt"
+        )
+    else:
+        expected = (
+            "notices: embedded Contents/Frameworks/PySide6/Qt/lib/"
+            "QtGui.framework/Versions/A/QtGui component "
+            "Anti-aliasing rasterizer (grayraster, from FreeType): "
+            "native licence text byte count differs: "
+            "dr144-qtbase-src--3rdparty--freetype--LICENSE.txt"
+        )
+    assert str(refusal.value).encode("utf-8") == expected.encode("utf-8")
+
+
+def test_f02b_darwin_tcl_limit_names_pillow_and_preserves_other_statements():
+    """U-T1 discloses the actual terms source; the other 13 limits keep parity."""
+    surface = ROOT / "tools/package/native-licences"
+    document = json.loads(
+        Path(os.environ.get("WP65_MANIFEST", surface / "manifest.json")).read_bytes()
+    )
+    windows = {
+        row["component"]: row["statement"]
+        for row in document["limits"]
+        if row.get("platform", "win32") == "win32"
+    }
+    darwin = {
+        row["component"]: row["statement"]
+        for row in document["limits"]
+        if row.get("platform") == "darwin"
+    }
+    assert darwin.pop("Tcl/Tk header (U-T1)") == (
+        "The Tcl/Tk header declaration carries no copyrightable code into the binary; "
+        "Tcl/Tk terms are already rendered through the Pillow row. "
+        "No additional excerpt or text is carried."
+    )
+    assert len(darwin) == 13
+    assert darwin == {component: windows[component] for component in darwin}
+
+
 @pytest.mark.parametrize("change", ["resigned", "code", "not-macho"])
 def test_f02b_darwin_identity_is_signature_invariant(tmp_path, change):
     """Real Mach-O parsing accepts signing changes and refuses code/non-image changes."""
@@ -400,8 +458,9 @@ def test_f02b_nested_app_cannot_hijack_macos_start(app_release):
         module._find_notices_executable(app / "Contents/MacOS")
 
 
-def test_f02b_run7_all_file_classes_plan_with_real_manifest(app_release, tmp_path, monkeypatch):
-    """All 293 files and 86 links, including six seals and six RECORD plists, get owners.
+@pytest.fixture
+def run7_release(app_release, tmp_path, monkeypatch):
+    """Model all run-7 files and links with real manifest declarations.
 
     Stand-in Mach-O images exercise real RECORD and origin verification. Only the
     census identity reading and the two wheel-carried text inputs are substituted:
@@ -411,7 +470,10 @@ def test_f02b_run7_all_file_classes_plan_with_real_manifest(app_release, tmp_pat
     import test_tools_package_build as bt
 
     module = app_release["module"]
-    surface = ROOT / "tools/package/native-licences"
+    surface = tmp_path / "run7-native-licences"
+    shutil.copytree(ROOT / "tools/package/native-licences", surface)
+    if "WP65_MANIFEST" in os.environ:
+        shutil.copyfile(os.environ["WP65_MANIFEST"], surface / "manifest.json")
     manifest = json.loads((surface / "manifest.json").read_text())
     hosts = {
         row["relpath"]: row for row in manifest["embedded_hosts"] if row.get("platform") == "darwin"
@@ -502,6 +564,8 @@ def test_f02b_run7_all_file_classes_plan_with_real_manifest(app_release, tmp_pat
         (info / "METADATA").write_text(f"Name: {name}\nVersion: {version}\n")
         licence = f"{info.name}/licenses/LICENSE.txt"
         contents[licence] = b"GNU LESSER GENERAL PUBLIC LICENSE\nSynthetic wheel terms\n"
+        if name == "pillow":
+            contents[licence] += b"TCL_TK\nSynthetic Tcl/Tk terms\n"
         if name == "pyinstaller":
             contents["PyInstaller/loader/pyimod01_archive.py"] = b""
             contents["PyInstaller/hooks/rthooks/pyi_rth_inspect.py"] = b""
@@ -554,9 +618,27 @@ def test_f02b_run7_all_file_classes_plan_with_real_manifest(app_release, tmp_pat
         return result
 
     monkeypatch.setattr(module, "_carried_notice_rows", carried_texts)
-    result = module.plan_notices(
-        root, native_licences_path=surface, distribution=distributions.__getitem__
+    return {
+        "module": module,
+        "root": root,
+        "surface": surface,
+        "distributions": distributions,
+        "pillow_licence": site / "pillow-12.3.0.dist-info/licenses/LICENSE.txt",
+    }
+
+
+def run7_plan(run7_release):
+    """Plan the run-7 model using the manifest and installed distribution records."""
+    return run7_release["module"].plan_notices(
+        run7_release["root"],
+        native_licences_path=run7_release["surface"],
+        distribution=run7_release["distributions"].__getitem__,
     )
+
+
+def test_f02b_run7_all_file_classes_plan_with_real_manifest(run7_release):
+    """All 293 files and 86 links, including six seals and RECORD plists, get owners."""
+    result = run7_plan(run7_release)
     assert len([entry for entry in result.entries if entry.startswith("file:")]) == 293
     assert len([entry for entry in result.entries if entry.startswith("link:")]) == 86
     assert len(result.limits) == 14
@@ -566,6 +648,28 @@ def test_f02b_run7_all_file_classes_plan_with_real_manifest(app_release, tmp_pat
         assert prefix + "Resources/Info.plist" in qt.entries
         clearwater = next(row for row in result.rows if row.name == "Clearwater")
         assert prefix + "_CodeSignature/CodeResources" in clearwater.entries
+
+
+@pytest.mark.parametrize("heading", ["TCL_TK", "", " TCL_TK", "TCL_TK_EXTRA"])
+def test_f02b_darwin_tcl_limit_requires_rendered_pillow_section(run7_release, heading):
+    """A Pillow-backed U-T1 statement needs an exact heading in its rendered text."""
+    run7_release["pillow_licence"].write_bytes(
+        f"Synthetic Pillow licence\n{heading}\nSynthetic terms\n".encode()
+    )
+    if heading == "TCL_TK":
+        result = run7_plan(run7_release)
+        pillow = next(row for row in result.rows if row.name == "pillow")
+        assert any(
+            b"TCL_TK" in item.path.read_bytes().splitlines() for item in pillow.licence_inputs
+        )
+        assert "TCL_TK" in run7_release["module"].render_notices(result).decode()
+    else:
+        with pytest.raises(ValueError) as refusal:
+            run7_plan(run7_release)
+        assert str(refusal.value) == (
+            "notices: limits Tcl/Tk header (U-T1) requires Pillow row "
+            "licence text with an exact TCL_TK line"
+        )
 
 
 @pytest.mark.parametrize("line", ["Runner:", "Per-component pins and licence readings:"])

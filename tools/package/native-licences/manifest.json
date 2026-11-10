@@ -16050,7 +16050,7 @@
       "hosts": [
         "Contents/Frameworks/PIL/_imagingtk.cpython-312-darwin.so"
       ],
-      "statement": "The Tcl/Tk header declaration carries no copyrightable code into the binary; Tcl/Tk terms are already rendered through the Python row. No additional excerpt or text is carried.",
+      "statement": "The Tcl/Tk header declaration carries no copyrightable code into the binary; Tcl/Tk terms are already rendered through the Pillow row. No additional excerpt or text is carried.",
       "platform": "darwin",
       "parent": "pillow"
     },

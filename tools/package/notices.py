@@ -1046,6 +1046,7 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
     document = _native_document(folder)
     _vendored_declarations(document)
     embedded_hosts = _embedded_declarations(document)
+    context_hosts = {host.relpath for host in embedded_hosts if host.platform == _host_platform()}
     _limit_declarations(document, embedded_hosts)
     build = document.get("interpreter_build")
     if (
@@ -1203,9 +1204,10 @@ def load_native_licences(folder: Path) -> tuple[NativeLicence, ...]:
         if filename in {".", "..", "manifest.json"} or "/" in filename or "\\" in filename:
             raise ValueError("notices: native licence row has unsafe text_file")
         path = folder / filename
+        context_paths = tuple(path for path in embedded_in if path in context_hosts)
         context = (
-            f"embedded {', '.join(embedded_in)} component {row['component']}: "
-            if embedded_in
+            f"embedded {', '.join(context_paths)} component {row['component']}: "
+            if context_paths
             else ""
         )
         files.add(filename)
@@ -2771,6 +2773,30 @@ def plan_notices(
         for limit in limit_declarations
         if limit.platform == _host_platform() and any(path in carried_paths for path in limit.hosts)
     )
+    if _host_platform() == "darwin" and any(
+        limit.component == "Tcl/Tk header (U-T1)" for limit in limits
+    ):
+        # U-T1's darwin disclosure names Pillow, so require the section in the
+        # actual rendered inputs (CHARC c1339c28), not merely in wheel metadata.
+        pillow_rows = [row for row in ordered if row.name == "pillow"]
+        has_tcl_tk = False
+        if len(pillow_rows) == 1:
+            for item in pillow_rows[0].licence_inputs:
+                data = (
+                    _audited_material(item)[1]
+                    if item.block_id
+                    else _licence_bytes(item)
+                    if item.provenance or item.context
+                    else item.path.read_bytes()
+                )
+                if b"TCL_TK" in data.splitlines():
+                    has_tcl_tk = True
+                    break
+        if not has_tcl_tk:
+            raise ValueError(
+                "notices: limits Tcl/Tk header (U-T1) requires Pillow row "
+                "licence text with an exact TCL_TK line"
+            )
     return NoticePlan(inventory_labels, ordered, tuple(statements), limits)
 
 
