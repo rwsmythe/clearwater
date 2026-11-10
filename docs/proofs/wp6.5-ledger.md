@@ -3043,7 +3043,10 @@ Scratch `work\wp6.5\ar11fold\`.
     taken in turn: `..` steps to the canonical parent, a name steps into it;
   - a component outside `Contents` is refused AT THAT POINT ("link chain leaves the
     bundle"), before any later component is read, so an outside alias's return hop is never
-    followed;
+    followed. **Correction (A r12):** for the whole rule this claim was FALSE at `5d9a1d89`
+    (Codex A r12 finding 1): the single-link preflight at `:4371` (`named.is_symlink()`,
+    `realpath(named)`) ran BEFORE the walk and resolved the outside alias first. It is true
+    from the A r12 fold head (`## A r12 fold` below);
   - EVERY link met (a folder link in mid-path as much as a further hop at the final name)
     counts against `_MACOS_LINK_HOPS` = 8 and is validated as the first: relative POSIX text,
     never a junction, never met twice (a loop); its text is then walked in place;
@@ -3222,4 +3225,60 @@ new. Loop ended.
   outside alias's own text: reading the alias would be following a hop outside the bundle,
   which the ruling forbids.
 
-Depth at A-r11-fold yield: DISPATCHER TO FILL
+Depth at A-r11-fold yield: 199,951 (wp65-cell17, read by the dispatcher with cell_depth.py at its A-r11-fold return)
+
+## A r12 fold (`wp65-cell17`, continuation of dispatch-18; base `5d9a1d89`)
+
+Codex Reviewer A r12 on `0a40c058..5d9a1d89`: `VERDICT: FINDINGS`, 1 MAJOR, upheld by CHARC
+(`3d0e43ea`). Commit `ad73639a` (`tools/package/build.py`, `tests/test_tools_package_build.py`).
+No `src/` change; `release.yml`, `MACOS_FFMPEG_BUNDLED`, `notices.py`, the debt register and
+the C14 rows untouched.
+
+- **Change:** `tools/package/build.py:4371` `_macos_link_class_problem`: inside a `.app` the
+  component walk (`_macos_link_chain_problem`, `:4376`) now runs FIRST for every link, before
+  any call that depends on the target (`named.is_symlink()`, `realpath(named)`, `exists()`).
+  Only an admitted walk, every component of which stayed inside `Contents`, reaches those
+  checks. The two former walk call sites (before / after the preflight) are gone. Onedir
+  and Windows: `in_app` is false, so the same calls run in the same order with the same
+  messages ("link to a link (one hop only)" byte for byte). The `macos_link_problem`
+  docstring (`:4446`) states the order.
+- **Consequence, pinned:** inside a `.app` a link that leaves the bundle is refused with its
+  chain, never "link resolves outside the release folder".
+  `tests/test_tools_package_build.py:2827`
+  `test_folder_link_checks_nested_links_as_if_at_its_location` now expects
+  "evil under the linked folder: link chain leaves the bundle:
+  Contents/Frameworks/pkg/evil -> '../../../../outside'; `<tmp>/wrapper/outside`" (still a
+  refusal, in the rule and twice in the origin walk). The onedir "outside the release
+  folder" rows (`planted-escaping-link` and the rest) are unchanged.
+- **Regressions:**
+  - `:3114` `test_the_walk_resolves_nothing_outside_contents` (both bundle links of A's
+    out-and-back shape): `os.path.realpath`, `os.readlink`, `os.stat` and `os.lstat`
+    recorded during the whole rule; no recorded path (normalised lexically) lies outside
+    `Contents` except the release root and its ancestors (canonicalising the boundary;
+    `:3102` `_outside_contents`).
+  - `:3150` `test_a_missing_return_file_still_refuses_with_the_chain`: the same shape with
+    `Contents/Frameworks/pkg/data` absent: "link chain leaves the bundle" with the chain and
+    the lexical heading, for both links.
+- **RED on `5d9a1d89`** (its `build.py` swapped in, restored, `cmp` equal): **3 failed, 56
+  passed** over the link selection. Failing: the recorder for `Contents/Frameworks/data`
+  (3 recorded calls outside `Contents`, the first an `os.stat` of the path through
+  `outside/back/data`); the missing return for `Contents/Frameworks/data` ("dangling link");
+  and the nested-link test (the old "outside the release folder" text). The
+  `Contents/Resources/data` cases pass there, as A's probe found (its chain walk already
+  ran first).
+- **GREEN:** the mirrors stay admitted: `C-app-pyinstaller-chain`, `C-app-link-to-a-link`,
+  the aliased-root label case, the alias above the release root and the framework-structure
+  links (`framework_origin_check` and the release-ZIP framework tests). The onedir two-hop
+  message is unchanged.
+  - `test_tools_package_build.py` + `test_tools_package_notices.py` (`-n 3`): **1116
+    passed** (1112 + 4).
+  - `test_tools_package_smoke.py`: 74 passed, 1 skipped.
+  - `ruff check .` and `ruff format --check .` (339 files) clean; `mypy` and
+    `mypy --platform darwin` no issues in 166 source files.
+  - Committed blobs 0 CR.
+- **Verification loop:** suspected that the walker itself stats outside `Contents` (its
+  `realpath(root)` and `realpath(physical.parent)`): REJECTED, those canonicalise the
+  release root and the link's own folder, never the target; the recorder admits only the
+  root and its ancestors outside `Contents` and passes. A second pass found nothing new.
+
+Depth at A-r12-fold yield: DISPATCHER TO FILL
