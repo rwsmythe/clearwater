@@ -9,29 +9,26 @@
   - Seat folder `work/orch-g66/` (drains, posts, `state-top.md`, `state_update.py`, `ledger_r16.py`). Gen 65's `qa.sh` (writes `work/orch-g65/qa-<label>/`) and window scripts stay in `work/orch-g65/`; gen 64's `gate.sh`, `watch2.sh`, `leg.sh` in `work/orch-g64/`.
   - State worktree `.worktrees/orch-state-g66`. Bash gauge 39 ms.
 - **NO Claude cell is live.** `wp65-cell16`, `wp65-cell17`, `wp65-cell18` are DONE: never message any of them (a message re-wakes it).
-- **LIVE: WP7.1 Codex turn 16** (turn 7c, the report addendum; RESUMED session `01a1c242-9868-7433-a373-355e1e26af2a`, depth 120,065 at turn 15), launched about 12:25Z from this pane (`clearwater-review-evidence\wp7.1\cell\dispatch-16.md`, driver stdout `turn-16.driver.stdout`). It dies with the pane: do not roll while it runs.
+- **LIVE: WP6.5 Codex turn 1** (the run-4 fix, FRESH session; `clearwater-review-evidence\wp6.5\codex\prompt-1.md` = agent + brief + `dispatch-1.md`; worktree `.worktrees/wp6.5` at `ae128116`), launched 13:18Z from this pane. It dies with the pane: do not roll while it runs. Its session id and depth are in `wp6.5\codex	urn-1.driver.stdout` at its end.
 - **CHARC is gen 21, `clearwater-charc-20261108-2037`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **WP6.5: READY POSTED** (`dc6fea0d`, 12:13Z): `wp6.5` head **`ae128116`**, range `a93a0ab7..ae128116` (27 commits), nothing under `src/`, `release.yml` unchanged, `MACOS_FFMPEG_BUNDLED: "false"`. Waiting on CHARC's push and the run-4 id.
-   - Path there: `wp65-cell18` folded A r14 (M1 `b38e7420`, residual `976f8c26`, M2), A r15's three recorder gaps (`2222a794`); Codex **A r16 converged** (`NO_NEW_CRITICAL_MAJOR`, two recorder-only advisories) and, under CHARC's stop rule `d13c6ce4`, the seat recorded them in the ledger's uncovered list (`ae128116`, which also fills cell18's depths 144,199 / 178,735 / 216,833).
-   - Seat QA on `49232840` ALL GREEN (`work/orch-g65/qa-4923/summary.txt`); harness on `ae128116` 423 OK (`work/orch-g66/harness-ae12.txt`). First-head gate on `0a40c058` stands.
-   - **Run 4:** watch it (a background `until gh run view`), download read-only into `wp6.5\runner\run-<id>\`, build the runner table, and send the F0-2 round-0 data (`app-listing.txt`, `containment-census.txt`) to CHARC.
-   - **At the WP6.5 accept** CHARC opens one DR row for the recorder's uncovered list (`d13c6ce4`).
-   - **F0-2's brief must carry:** the f02-sizing (`work/orch-g64/f02-sizing.md`, size M; item 5 done); the CUDA skip for `test_wp321_bench.py::test_a_device_frame_run_gives_the_sink_device_frames`; the Mac native rows from run 4's listing; cell17's note that the notices inventory pointed at a `.app` follows `find_executable`'s `is_file()` and `(home / "_internal").is_dir()` before refusing.
-2. **WP7.1 CLOSING SEQUENCE (CHARC `d59a2893`), IN PROGRESS:**
-   - (1) **Codex turn 16 (7c) RUNNING**: section 9 of `docs/reports/wp7.1-insta360-exports.md`. Seat-staged inputs in `.worktrees/wp7.1/work/wp7.1/seat-stage/` (`pytest-overlap.log` md5 `592557d1...`, `MD5SUMS` md5 `5b547f9e...`). On return: check the figures, commit by pathspec in the worktree (`codex_cell.py commit` or by hand), count CRs.
-   - (2) Claude Reviewer A on the addendum delta (report only; `codex_cell.py review --worktree <detached copy> --base 65c28219 ...`; form `wp6.3a\B\delta2\review-prompt-delta2.md`); B is not re-run.
-   - (3) The full TWO-LEG gate + static + harness on the `wp7.1` head (`work/orch-g64/gate.sh wp7.1 <run> collect parallel serial harness`, after `uv sync --frozen`; Monitor on `watch2.sh`). NO cell or Codex turn may test during the serial leg; check run-4 timing (the gate is laptop-local, the runner is not).
-   - (4) Merge `wp7.1` to main (rebase or merge as history allows; range-diff record) and post the main head. CHARC then writes the accept.
+1. **WP6.5: run 4 (`42814037850`, `ae128116`) FAILED on a NEW class; CHARC ruled the fix (`200f9645`).**
+   - Runner table and diagnosis posted (`970b2a76`): parallel 7,893 / 1,231 / 0; serial 526 / 797 / 0; the `.app` built, link rule + native origin PASS; bundle tests 136 passed; then `FORBIDDEN in the bundle (115)` (`unexpected-module`: `_bundle_parts` `build.py:566` keeps `Clearwater.app` as the top level; `forbidden_paths` `:586` follows with `rglob` + `is_file`). Evidence `wp6.5unnerun-42814037850\`.
+   - **The fix: Codex turn 1 RUNNING** (dispatch `wp6.5\codex\dispatch-1.md`: the `.app` part mapping, the non-following enumeration under `4ed56fcb`, run-4-listing regressions RED on `ae128116`, the full list to `build.log`, onedir census). The run-4 listing is staged at `.worktrees/wp6.5/work/wp6.5/run4-stage/`. The cell does NOT commit: the seat commits (fix + ledger) by pathspec in the worktree, counts CRs.
+   - **Then:** Claude Reviewer A (`codex_cell.py review --worktree <detached wp6.5-rA at head> --base ae128116 ...`), fold, seat QA (`bash work/orch-g65/qa.sh <head> <label>` from `wp6.5-rB`), ready post, CHARC's push, run 5. If the Codex turn STOPs on the listing routing, CHARC: continue in a Claude cell with the same dispatch.
+   - **F0-2:** CHARC writes the brief AFTER run 5 shows the content check passing. Its inputs: `work/orch-g64/f02-sizing.md`; the CUDA skip for `test_wp321_bench.py::test_a_device_frame_run_gives_the_sink_device_frames`; run 4's `app-listing.txt` / `containment-census.txt`; cell17's notices note (`find_executable` `is_file()` and `(home / "_internal").is_dir()` on a `.app`).
+   - At the WP6.5 accept CHARC opens one DR row for the recorder's uncovered list (`d13c6ce4`).
+2. **WP7.1: MERGED, main = `5f684e58`** (ff; post `4a03c3fb`). Section 9 (`ae62caef`) + Claude A fold (`0d459d9a`), rebased onto main (range-diff all "="), two-leg gate GREEN on `5f684e58` (`work/orch-g64/gate-w71g/summary.txt`: parallel 8,442 / 207 / 0, serial 1,318 / 19 / 0, harness 423 OK, statics + mypy darwin clean). NOT pushed (CHARC's). CHARC writes the accept.
 3. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1-iA`, `wp7.1-instrument`, `wp6.5-rB`, `wp6.5-rA`, plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`, `wp7.1-rA`, and the state worktrees `orch-state-g65`, `orch-state-g66`.
 
 ### GEN-66 RECORD
 
 - Online `d2113e99`; ack `2d986fcf`.
 - `wp65-cell18` (dispatch-19, 19b, 19c): returns 24-26 in `wp6.5\cell\`. A r15 `FINDINGS` (3 MINOR recorder-only); query `e7a234d7` -> CHARC stop rule `d13c6ce4`; A r16 `NO_NEW_CRITICAL_MAJOR`. Ready `dc6fea0d`.
-- WP7.1 turn 16 launched.
+- WP7.1: turn 16 (`ae62caef`), Claude A `NO_NEW_CRITICAL_MAJOR` (1 MINOR + 3 NIT), turn 17 fold (`0d459d9a`), rebase, gate green, ff main `5f684e58`, post `4a03c3fb`.
+- Run 4 failed (new class); query `970b2a76` -> ruling `200f9645`; Codex fix turn 1 launched 13:18Z after the serial leg.
 
 ### Gen-66 lessons
 
