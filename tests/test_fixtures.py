@@ -1399,22 +1399,118 @@ def _decoded_pixels(path: Path) -> np.ndarray | None:
         return None
 
 
+def _pixel_figures(
+    fresh: Path, committed: Path
+) -> tuple[str, np.dtype[Any] | None, int | None, float | None]:
+    """The printed figure of ``|decoded fresh - decoded committed|`` and the numbers in it.
+
+    Args:
+        fresh: The regenerated file.
+        committed: The committed file it is compared with.
+
+    Returns:
+        ``(figure, dtype, max, p99)``: the row text ``_pixel_figure`` prints; the decoded
+        dtype, the max and the p99 of the difference, each None when either file does not
+        decode or the two decode to a different shape or dtype.
+    """
+    new, old = _decoded_pixels(fresh), _decoded_pixels(committed)
+    if new is None or old is None:
+        return "not decodable as an image (no pixel figure)", None, None, None
+    if new.shape != old.shape or new.dtype != old.dtype:
+        return (
+            f"decoded {new.dtype}{new.shape} vs committed {old.dtype}{old.shape}",
+            None,
+            None,
+            None,
+        )
+    diff = np.abs(new.astype(np.int64) - old.astype(np.int64))
+    worst = tuple(int(i) for i in np.unravel_index(int(np.argmax(diff)), diff.shape))
+    largest = int(diff.max())
+    p99 = float(np.percentile(diff, 99))
+    figure = (
+        f"decoded {new.dtype}{new.shape}: max {largest}, "
+        f"p99 {p99:g}, nonzero {int(np.count_nonzero(diff))}, "
+        f"worst at {worst}"
+    )
+    return figure, new.dtype, largest, p99
+
+
 def _pixel_figure(fresh: Path, committed: Path) -> str:
     """Max and p99 of ``|decoded fresh - decoded committed|`` in the decoded dtype's units
     (pillow_heif returns 10-bit HEIC scaled to 16 bits: one 10-bit step is 64), with the
     worst pixel's (row, col, channel) (WP6.5 G3, C2: the figure CHARC rules the bound on)."""
-    new, old = _decoded_pixels(fresh), _decoded_pixels(committed)
-    if new is None or old is None:
-        return "not decodable as an image (no pixel figure)"
-    if new.shape != old.shape or new.dtype != old.dtype:
-        return f"decoded {new.dtype}{new.shape} vs committed {old.dtype}{old.shape}"
-    diff = np.abs(new.astype(np.int64) - old.astype(np.int64))
-    worst = tuple(int(i) for i in np.unravel_index(int(np.argmax(diff)), diff.shape))
-    return (
-        f"decoded {new.dtype}{new.shape}: max {int(diff.max())}, "
-        f"p99 {float(np.percentile(diff, 99)):g}, nonzero {int(np.count_nonzero(diff))}, "
-        f"worst at {worst}"
-    )
+    return _pixel_figures(fresh, committed)[0]
+
+
+# WP6.5 run 2 (C2, CHARC's ruling): the Windows bytes are of record. On a NON-Windows host
+# the four HEIC AD-24 stills ONLY are compared with a bound on their decoded uint8 pixels
+# (that host's libheif / x265 / libde265 encode them differently: runner run 42764505729,
+# libheif 1.23.6, x265 4.3+1, libde265 1.1.3, gave max 2-3, p99 1); every other entry stays
+# byte-identical everywhere, and Windows stays byte-identical for all of them.
+HEIC_AD24_IDS = frozenset(
+    f"heic-ad24-{case}" for case in ("both", "irot-only", "exif-only", "neither")
+)
+HEIC_AD24_MAX_ABS = 4
+HEIC_AD24_P99 = 1.0
+HEIC_AD24_BOUND = (
+    f"the non-Windows HEIC AD-24 bound (uint8 max <= {HEIC_AD24_MAX_ABS}, p99 <= {HEIC_AD24_P99:g})"
+)
+REGENERATED_IDS = frozenset(
+    e["id"]
+    for e in MANIFEST["samples"]
+    if e["group"] in ("stills", "files") or e["id"] == "ad14-mask"
+)
+
+
+def _regeneration_report(
+    fresh_root: Path, committed_root: Path, host: str
+) -> tuple[int, list[str], list[str]]:
+    """Compare every regenerated still, dummy file and the mask with its committed bytes.
+
+    The rule (WP6.5 run 2, C2): on ``win32`` every entry must be byte-identical; on any
+    other host the same, except that a HEIC AD-24 entry whose bytes differ passes when its
+    decoded pixels are uint8 of the committed shape with max abs <= ``HEIC_AD24_MAX_ABS`` and
+    p99 <= ``HEIC_AD24_P99``. A byte-identical entry must also carry the manifest's md5.
+
+    Args:
+        fresh_root: The regenerated tree.
+        committed_root: The tree it is compared with (``FIXTURES_DIR``; a proof passes a
+            copy).
+        host: The platform the rule is read for (``sys.platform``; a proof passes another).
+
+    Returns:
+        ``(compared, failures, bounded)``: the number of entries compared; one row per entry
+        outside its rule (the test fails on any); one row per HEIC AD-24 entry that differs
+        but lies inside the bound (printed with its figures, not failed).
+    """
+    compared = 0
+    failures: list[str] = []
+    bounded: list[str] = []
+    for entry in MANIFEST["samples"]:
+        if entry["id"] not in REGENERATED_IDS:
+            continue
+        assert entry["byte_reproducible"] is True
+        fresh = fresh_root / entry["path"]
+        committed = committed_root / entry["path"]
+        compared += 1
+        if fresh.read_bytes() == committed.read_bytes():
+            if manifest.md5_of(fresh) != entry["md5"]:
+                failures.append(f"{entry['id']}: equal to the committed file, not its md5")
+            continue
+        figure, dtype, largest, p99 = _pixel_figures(fresh, committed)
+        if host == "win32" or entry["id"] not in HEIC_AD24_IDS:
+            failures.append(f"{entry['id']}: {figure}")
+        elif (
+            dtype == np.dtype(np.uint8)
+            and largest is not None
+            and p99 is not None
+            and largest <= HEIC_AD24_MAX_ABS
+            and p99 <= HEIC_AD24_P99
+        ):
+            bounded.append(f"{entry['id']}: {figure} -- inside {HEIC_AD24_BOUND}")
+        else:
+            failures.append(f"{entry['id']}: {figure} -- OUTSIDE {HEIC_AD24_BOUND}")
+    return compared, failures, bounded
 
 
 def test_stills_files_and_mask_regenerate_byte_identically(regenerated_cheap: Path) -> None:
@@ -1423,26 +1519,26 @@ def test_stills_files_and_mask_regenerate_byte_identically(regenerated_cheap: Pa
     WP6.5 G3 (C2, CHARC's ruling): the loop COLLECTS every mismatch instead of stopping at
     the first, and prints, per mismatched entry, the decoded-pixel max / p99 of the fresh
     against the committed file (plus ``pillow_heif.libheif_info()``), so one macOS run gives
-    the whole list and its figures. It still fails on any mismatch.
+    the whole list and its figures. WP6.5 run 2 (C2 ruled): off Windows the four HEIC AD-24
+    entries are held to a pixel bound instead (``_regeneration_report``); their rows are
+    printed with the figures whether inside or outside it. It fails on any entry outside its
+    rule.
     """
-    compared = 0
-    mismatches: list[str] = []
-    for entry in MANIFEST["samples"]:
-        if entry["group"] in ("stills", "files") or entry["id"] == "ad14-mask":
-            assert entry["byte_reproducible"] is True
-            fresh = regenerated_cheap / entry["path"]
-            committed = FIXTURES_DIR / entry["path"]
-            if fresh.read_bytes() != committed.read_bytes():
-                mismatches.append(f"{entry['id']}: {_pixel_figure(fresh, committed)}")
-            elif manifest.md5_of(fresh) != entry["md5"]:
-                mismatches.append(f"{entry['id']}: equal to the committed file, not its md5")
-            compared += 1
-    if mismatches:
+    compared, failures, bounded = _regeneration_report(
+        regenerated_cheap, FIXTURES_DIR, sys.platform
+    )
+    header = f"host {sys.platform}, libheif {pillow_heif.libheif_info()}"
+    if bounded:
+        print(
+            "\n".join([f"{len(bounded)} entries differ inside their bound ({header}):", *bounded]),
+            flush=True,
+        )
+    if failures:
         report = "\n".join(
             [
-                f"{len(mismatches)} of {compared} regenerated entries differ from the "
-                f"committed bytes (libheif {pillow_heif.libheif_info()}):",
-                *mismatches,
+                f"{len(failures)} of {compared} regenerated entries are outside their rule "
+                f"({header}):",
+                *failures,
             ]
         )
         print(report, flush=True)
@@ -1457,6 +1553,151 @@ def test_stills_files_and_mask_regenerate_byte_identically(regenerated_cheap: Pa
         for e in MANIFEST["samples"]
         if e["group"] in ("stills", "files") or e["id"] == "ad14-mask"
     }
+
+
+@pytest.fixture
+def committed_regeneration(tmp_path: Path) -> Path:
+    """A copy of the committed stills, dummy files and mask: a regeneration that matches,
+    for the planted proofs of ``_regeneration_report``."""
+    root = tmp_path / "fresh"
+    for entry in MANIFEST["samples"]:
+        if entry["id"] in REGENERATED_IDS:
+            target = root / entry["path"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(FIXTURES_DIR / entry["path"], target)
+    return root
+
+
+def _entry_path(entry_id: str) -> str:
+    """The manifest path of one entry."""
+    return next(e["path"] for e in MANIFEST["samples"] if e["id"] == entry_id)
+
+
+@pytest.mark.parametrize("host", ["win32", "darwin", "linux"])
+def test_regeneration_rule_passes_the_committed_tree_on_every_host(
+    committed_regeneration: Path, host: str
+) -> None:
+    """WP6.5 run 2 (C2): the committed bytes pass the rule on every host, all 78 compared."""
+    assert _regeneration_report(committed_regeneration, FIXTURES_DIR, host) == (78, [], [])
+
+
+@pytest.mark.parametrize("host", ["darwin", "linux"])
+def test_a_planted_heic_ad24_difference_over_the_bound_fails_off_windows(
+    committed_regeneration: Path, host: str
+) -> None:
+    """WP6.5 run 2 (C2): a real re-encoded HEIC AD-24 entry whose decoded pixels are the
+    committed ones inverted is far over the bound and fails on a simulated non-Windows host
+    (and on Windows), with its figures in the row."""
+    path = committed_regeneration / _entry_path("heic-ad24-neither")
+    pixels = np.asarray(pillow_heif.open_heif(str(path), convert_hdr_to_8bit=False))
+    assert pixels.dtype == np.uint8
+    inverted = np.ascontiguousarray(255 - pixels)
+    planted = pillow_heif.from_bytes(
+        mode="RGB", size=(inverted.shape[1], inverted.shape[0]), data=inverted.tobytes()
+    )
+    planted.save(str(path), quality=90)
+    for rule_host in (host, "win32"):
+        compared, failures, bounded = _regeneration_report(
+            committed_regeneration, FIXTURES_DIR, rule_host
+        )
+        assert compared == 78
+        assert bounded == []
+        assert len(failures) == 1
+        assert failures[0].startswith("heic-ad24-neither: decoded uint8")
+        assert ": max " in failures[0]
+        assert ("OUTSIDE" in failures[0]) is (rule_host != "win32")
+
+
+@pytest.mark.parametrize("host", ["darwin", "linux"])
+def test_a_planted_one_pixel_non_heic_difference_fails_off_windows(
+    committed_regeneration: Path, host: str
+) -> None:
+    """WP6.5 run 2 (C2): a non-HEIC entry stays byte-identical off Windows: one 8-bit PNG
+    pixel moved by one (well inside the HEIC bound) fails on a simulated non-Windows host,
+    with no bound applied."""
+    path = committed_regeneration / _entry_path("png8-gradient-none")
+    with Image.open(path) as image:
+        image.load()
+        planted = image.copy()
+    pixel = planted.getpixel((3, 5))
+    assert isinstance(pixel, tuple)
+    planted.putpixel((3, 5), tuple(v + 1 if v < 255 else v - 1 for v in pixel))
+    planted.save(path)
+    compared, failures, bounded = _regeneration_report(committed_regeneration, FIXTURES_DIR, host)
+    assert (compared, bounded) == (78, [])
+    assert len(failures) == 1
+    assert failures[0].startswith("png8-gradient-none: decoded uint8")
+    assert "max 1," in failures[0]
+    assert "nonzero 3, worst at (5, 3, " in failures[0]  # one pixel, its three channels
+    assert "OUTSIDE" not in failures[0]
+
+
+def _moved(base: np.ndarray, moves: dict[int, int]) -> np.ndarray:
+    """``base`` (uint8) with the flat sample at each key moved by its value (down where up
+    would leave uint8)."""
+    flat = base.astype(np.int64).reshape(-1).copy()
+    for index, step in moves.items():
+        flat[index] = flat[index] + step if flat[index] + step <= 255 else flat[index] - step
+    return flat.reshape(base.shape).astype(base.dtype)
+
+
+@pytest.mark.parametrize(
+    ("plant", "inside"),
+    [
+        ("max4-p99-1", True),
+        ("max5", False),
+        ("p99-2", False),
+        ("uint16", False),
+        ("shape", False),
+    ],
+)
+def test_the_heic_ad24_bound_edges(
+    committed_regeneration: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    plant: str,
+    inside: bool,
+) -> None:
+    """WP6.5 run 2 (C2): the bound's edges on a simulated darwin host, on a stubbed decode of
+    a byte-changed ``heic-ad24-both``: max 4 with p99 1 passes (its row in ``bounded``); max
+    5, p99 2, a uint16 decode and a different shape each fail; on Windows every plant fails.
+    """
+    fresh = committed_regeneration / _entry_path("heic-ad24-both")
+    fresh.write_bytes(fresh.read_bytes() + b"\0")
+    real = _decoded_pixels
+    base = real(FIXTURES_DIR / _entry_path("heic-ad24-both"))
+    assert base is not None and base.dtype == np.uint8
+    # 18,432 samples: p99 interpolates between sorted indices 18,246 and 18,247, so 186
+    # moved samples put it exactly on their step
+    one_percent = base.size // 100
+    planted = {
+        "max4-p99-1": _moved(base, {0: 4} | {i: 1 for i in range(1, one_percent + 2)}),
+        "max5": _moved(base, {0: 5}),
+        "p99-2": _moved(base, {i: 2 for i in range(one_percent + 2)}),
+        "uint16": base.astype(np.uint16),
+        "shape": base[:-1],
+    }[plant]
+
+    def decoded(path: Path) -> np.ndarray | None:
+        return planted if path == fresh else real(path)
+
+    monkeypatch.setattr(sys.modules[__name__], "_decoded_pixels", decoded)
+    compared, failures, bounded = _regeneration_report(
+        committed_regeneration, FIXTURES_DIR, "darwin"
+    )
+    assert compared == 78
+    assert (failures if inside else bounded) == []
+    rows = bounded if inside else failures
+    assert len(rows) == 1
+    assert rows[0].startswith("heic-ad24-both: decoded ")
+    assert ("-- inside the non-Windows" in rows[0]) is inside
+    if plant == "max4-p99-1":
+        assert "max 4, p99 1, nonzero 186," in rows[0]
+    _, win_failures, win_bounded = _regeneration_report(
+        committed_regeneration, FIXTURES_DIR, "win32"
+    )
+    assert win_bounded == []
+    assert len(win_failures) == 1
+    assert win_failures[0].startswith("heic-ad24-both: decoded ")
 
 
 @pytest.fixture(scope="module")
