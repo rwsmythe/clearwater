@@ -5,46 +5,33 @@
 
 ### Generation
 
-- **Generation 64** (session `clearwater-orchestrator-20261109-1309`). LIVE 2026-11-09 23:10Z; ROLLED about 07:50Z on 2026-11-10 at the 400K cap, with NOTHING it started running.
-  - Seat folder `work/orch-g64/` holds:
-    - drains 1-6 and the posts;
-    - `qa.sh` (11 modules; the gui module runs WITHOUT `-n`), `gate.sh`, `watch2.sh`, `leg.sh`, `gpu_sample.sh`;
-    - `window3.sh` (EXPORTS only) and `window3v4.sh` (the V4 legs);
-    - `assemble_i1.py` / `assemble_i5.py` (the Codex prompt forms), `f02-sizing.md`.
-  - Gen 65: make `work/orch-g65/`; state worktree `.worktrees/orch-state-g64` (remove it and add your own).
-- **NO CELL IS LIVE.** `wp65-cell15` returned (251,366; DONE, never message it again: a message re-wakes it). No Codex turn, review, gate or leg is running.
+- **Generation 65** (session `clearwater-orchestrator-20261109-2203`). LIVE 2026-11-10 08:03Z from gen 64's rollover `64f7ef98`.
+  - Seat folder `work/orch-g65/` (drains, posts). Gen 64's scripts stay in `work/orch-g64/` and are used from there: `gate.sh`, `watch2.sh`, `leg.sh`, `gpu_sample.sh`, `window3.sh`, `window3v4.sh`, `qa.sh`, `f02-sizing.md`.
+  - State worktree `.worktrees/orch-state-g65`.
+  - Bash gauge 26-35 ms.
+- **NO CELL IS LIVE.** No Codex turn, review, gate or leg is running.
 - **CHARC is gen 21, `clearwater-charc-20261108-2037`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
-### GEN-65 PICKUP, in order
+### PICKUP, in order
 
-1. **WP6.5: READY for the re-push, waiting on the OWNER's word through CHARC** (no standing push word yet).
-   - Command: `git push origin wp6.5:refs/heads/macos-validation/wp6.5` (`69538abe` -> `a93a0ab7`, 11 commits, nothing under `src/`). CHARC runs it and sends the remote head and the run id.
-   - Then watch the run: a background `until` loop on `gh run view <id> --json status,conclusion` (the gen-64 form). Download read-only into `clearwater-review-evidence\wp6.5\runner\run-<id>\` (`gh run download`, `gh run view --log`), and build the runner table (the form: `runner\run-42764505729\runner-table.md`).
-   - **Expect:**
-     - C2 / C16 pass under their non-Windows bounds;
-     - items 3 and 4 pass;
-     - item 4's census listing in the log CONFIRMS or refutes the EPERM-on-zombie hypothesis; a LIVE member after SIGKILL = STOP to CHARC;
-     - with the mode-keyed continuation, the serial leg, the bundle-without-FFmpeg build, the bundle tests, the skip reasons and the facts all run even if a leg fails, so run 3 yields the `.app` listing and otool for **F0-2**.
-   - Then F0-2 to CHARC: `work/orch-g64/f02-sizing.md` (size M) + the runner table, and a FRESH cell for the next WP6.5 group.
+1. **WP6.5: READY for the re-push, waiting on the OWNER's word through CHARC** (CHARC `d9f82775`: per-word until a standing word exists; CHARC performs the push and sends the remote head + run id).
+   - Command: `git push origin wp6.5:refs/heads/macos-validation/wp6.5` (`69538abe` -> `a93a0ab7`, 11 commits, nothing under `src/`).
+   - Then watch the run: a background `until` loop on `gh run view <id> --json status,conclusion`. Download read-only into `clearwater-review-evidence\wp6.5\runner\run-<id>\` (`gh run download`, `gh run view --log`), and build the runner table (form: `runner\run-42764505729\runner-table.md`).
+   - **Expect:** C2 / C16 pass under their non-Windows bounds; items 3 and 4 pass; item 4's census listing CONFIRMS or refutes the EPERM-on-zombie hypothesis (a LIVE member after SIGKILL = STOP to CHARC); with the mode-keyed continuation every later step runs even if a leg fails, so run 3 yields the `.app` listing and otool for **F0-2**.
+   - Then F0-2 to CHARC (`work/orch-g64/f02-sizing.md`, size M) + the runner table, and a FRESH cell for the next WP6.5 group.
    - Ledger fill for the next WP6.5 dispatch: `Depth at A-r9-fold yield: DISPATCHER TO FILL` = `251,366 (wp65-cell15, read by the dispatcher with cell_depth.py at its A-r9-fold return)`.
-   - The DR-96 third recurrence is recorded (gate on `69538abe`). The gen-64 gate on `2e98ca1c` had NO DR-96 failure.
-2. **WP7.1 instrument** (the owner's "reading", AD-22; CHARC rulings `351a1c1c`, `7910e7df`, `c18599a4`).
-   - Branch `wp7.1-instrument` in `.worktrees/wp7.1-instrument`, off `wp7.1` `4ddf4841`.
-   - Head **`65c28219`**. Chain: `09838991` I1 -> `2dde0b77` I2-I3 (A r1 F1 / F2) -> `ad36c021` I4 (A r2 N1 / N2) -> `8eac86d1` I5 (B F1 + the F2 extension: a no-edit-list source on the as-written row) -> `65c28219` I6 (A r3 N1: identity conversion per key only where the output has a list; both-absent stays `None == None`).
-   - Seat QA at `65c28219`: ruff / format / mypy clean, 186 passed (four modules). The cell's census: 0 tightenings against `4ddf4841`, `ad36c021` and `8eac86d1`.
-   - **NEXT: Claude Reviewer A r4 (delta `8eac86d1..65c28219`)**, prompt form `instrument\A\r3\review-prompt.md`, review copy `.worktrees/wp7.1-iA` (`git -C .worktrees/wp7.1-iA checkout -q --detach 65c28219`), run with `codex_cell.py review --base 8eac86d1` in the background.
-     - A r3 (on `ad36c021..8eac86d1`) was NO_NEW_CRITICAL_MAJOR with ONE MINOR (a both-absent video key falsely FAILED the as-written row, and a ruled F2 SAME was refused next to such a key), which is what I6 fixes.
-     - If r4 is clean: fast-forward `wp7.1` onto `wp7.1-instrument` (`git -C .worktrees/wp7.1 merge --ff-only wp7.1-instrument`, one ledger line), then `uv sync --frozen` and an md5 check of frozen-t8 in `wp7.1`.
-   - **Reviewer B was ALREADY RUN** (`instrument\B\r1\`, NO_NEW_CRITICAL_MAJOR on `ad36c021`; its F1 / F2 are I5). CHARC has not asked for a second B pass. Ask if in doubt.
-   - Codex session `01a1c45c-9d95-75a3-b7bd-8f09d0bbf23e` at 139,178 after I6 (resume OK for one small turn). Earlier session `01a1c40d` at 170K: do not resume.
-   - The commit helper REFUSES these returns (the block parse); commit by pathspec in the worktree with LF-only working files (check CR = 0 per blob).
-3. **WP7.1 window 3** (CHARC `a92441a6` Plan X, split `351a1c1c`).
-   - `wp7.1` is rebased onto main at `4ddf4841` (range-diff all "=", `work/orch-g64/wp71-range-diff.txt`), venv synced, frozen-t8 MD5 OK.
-   - **On the OWNER's quiet-window word** (not given yet): first the gate check (no foreground 3D process, under ~1 GiB used, ~0 % utilization, no cell testing), then `bash work/orch-g64/window3.sh` in the background: the two EXCLUSIVE export legs `export-hevc62r` + `bench-hevc62r`, the 5 s series, the raw gate archive in `wp7.1\seat\window3\`.
-   - After the ff of `wp7.1` onto the instrument: `bash work/orch-g64/window3v4.sh` (`v4-bench-hevc62r`, `v4-hevc62r`, non-exclusive; the log names the `wp7.1` head).
-   - Expected: video stream duration SAME (WP7.2), and the four movie-level rows SAME under the reading. Any new difference class = STOP to CHARC.
+2. **WP7.1 instrument: DONE.** A r4 (Claude, `8eac86d1..65c28219`) NO_NEW_CRITICAL_MAJOR with zero findings (`wp7.1\instrument\A\r4\`). `wp7.1` fast-forwarded `4ddf4841` -> **`65c28219`**; `uv sync --frozen` OK; frozen-t8 MD5 OK (ledger `wp7.1\instrument\ledger.md`). Reported to CHARC 08:12Z. B not re-run (CHARC: only if A r4 found).
+3. **WP7.1 window 3** (CHARC `a92441a6` Plan X, `351a1c1c`, `d9f82775`): on the OWNER's quiet-window word through CHARC (not given yet; allowed even during a turn in another worktree).
+   - First the gate check (no foreground 3D process, under ~1 GiB used, ~0 % utilization, no cell testing), then `bash work/orch-g64/window3.sh` in the background: the EXCLUSIVE export legs `export-hevc62r` + `bench-hevc62r`, the 5 s series, the raw gate archive in `wp7.1\seat\window3\`.
+   - Then `bash work/orch-g64/window3v4.sh` (`v4-bench-hevc62r`, `v4-hevc62r`, non-exclusive; its precondition, the ff, is MET).
+   - Expected: video stream duration SAME (WP7.2) and the four movie-level rows SAME under the reading. Any new difference class = STOP to CHARC.
    - Then WP7.1's accept: the owner's look verdict + the ProRes / 4:2:2 question still open with the owner.
-4. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1-iA` and `wp6.5-rB` (detached review copies with venvs), `wp6.5-rA`, plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`, `wp7.1-rA`.
+4. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1-iA` (now detached at `65c28219`), `wp7.1-instrument`, `wp6.5-rB`, `wp6.5-rA`, plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`, `wp7.1-rA`.
+
+### GEN-65 RECORD
+
+- Online post `27ee1878`; CHARC ack `d9f82775` (drain-1).
+- A r4 launched 08:04Z, returned clean; ff and checks 08:12Z; post `19308fc6`.
 
 ### GEN-64 RECORD
 
