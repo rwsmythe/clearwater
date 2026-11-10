@@ -767,13 +767,85 @@ sys.exit(2)
 """
 
 
+CENSUS_FILE = ROOT / "work" / "evidence" / "containment-census.txt"
+"""Where the darwin containment test leaves its census (WP6.5 run 3 item 8): the workflow's
+evidence upload carries ``work/evidence/``."""
+
+
+def census_branch(probe, live):
+    """Name the containment branch one group probe took (``smoke.group_alive``'s outcomes).
+
+    Args:
+        probe: ``ProcessLookupError``, ``PermissionError`` or ``answered`` (the 0-signal probe).
+        live: The live members the census that followed listed, or None when none ran.
+
+    Returns:
+        ``ProcessLookupError``, ``EPERM with no live member``, ``SURVIVORS`` and their kin.
+    """
+    if probe == "ProcessLookupError":
+        return "ProcessLookupError (empty group)"
+    if probe == "PermissionError":
+        return "EPERM with a live member" if live else "EPERM with no live member"
+    return "SURVIVORS (a live member)" if live else "answered, no live member"
+
+
+def census_text(platform, events, printed):
+    """The census file's text: each probe's branch with the listing, then the printed lines.
+
+    Args:
+        platform: ``sys.platform`` of the run.
+        events: ``[pgid, probe, live count or None, listing]`` per 0-signal probe, in order.
+        printed: What the smoke printed during the rows (its census lines).
+
+    Returns:
+        The text, ending with a newline.
+    """
+    lines = [
+        "# WP6.5 test_non_windows_containment_never_silently_skips: the containment census",
+        f"platform: {platform}",
+    ]
+    for pgid, probe, live, listing in events:
+        members = "no census" if live is None else f"{live} live; members: {listing}"
+        lines.append(f"group {pgid}: {census_branch(probe, live)} ({members})")
+    lines.extend(["", "# printed by tools/package/smoke.py", *printed.splitlines()])
+    return "\n".join(lines) + "\n"
+
+
+def test_the_census_text_names_each_branch():
+    """Run 3 item 8: the file names the branch of every probe with its listing."""
+    events = [
+        [11, "answered", 0, "no member listed"],
+        [11, "ProcessLookupError", None, ""],
+        [12, "answered", 1, "pid 13 S python3"],
+        [12, "PermissionError", 0, "pid 12 Z (python3)"],
+        [14, "PermissionError", 1, "pid 15 S python3"],
+    ]
+    text = census_text("darwin", events, "b: FAIL (b: SURVIVORS (...))\n")
+    assert text.splitlines() == [
+        "# WP6.5 test_non_windows_containment_never_silently_skips: the containment census",
+        "platform: darwin",
+        "group 11: answered, no live member (0 live; members: no member listed)",
+        "group 11: ProcessLookupError (empty group) (no census)",
+        "group 12: SURVIVORS (a live member) (1 live; members: pid 13 S python3)",
+        "group 12: EPERM with no live member (0 live; members: pid 12 Z (python3))",
+        "group 14: EPERM with a live member (1 live; members: pid 15 S python3)",
+        "",
+        "# printed by tools/package/smoke.py",
+        "b: FAIL (b: SURVIVORS (...))",
+    ]
+
+
 @pytest.mark.skipif(
     sys.platform == "win32",
     reason="native POSIX process-group proof (macOS runner); Windows proves it by stubs",
 )
-def test_non_windows_containment_never_silently_skips(tmp_path, monkeypatch):
+def test_non_windows_containment_never_silently_skips(tmp_path, monkeypatch, capsys):
     """darwin contains natively (a clean row; a survivor refused, then killed with its
-    group); any other POSIX platform is refused by name, never run uncontained."""
+    group); any other POSIX platform is refused by name, never run uncontained.
+
+    On darwin the census is also written to :data:`CENSUS_FILE` (WP6.5 run 3 item 8): each
+    0-signal probe's branch (ProcessLookupError, EPERM with no live member, SURVIVORS) with
+    the listing the smoke's own census returned, and the lines the smoke printed."""
     smoke = load_smoke()
     executable = tmp_path / "Clearwater" / "Clearwater"
     if sys.platform != "darwin":
@@ -786,21 +858,51 @@ def test_non_windows_containment_never_silently_skips(tmp_path, monkeypatch):
         "_command",
         lambda target, arguments, env: [sys.executable, "-c", NATIVE_GROUP_ROW, *arguments],
     )
-    done = smoke._process(
-        executable, ["clean"], stdin="", root=tmp_path / "a", timeout=10, name="a"
-    )
-    assert done.returncode == 2
-    assert done.stderr == "export worker: no request document on stdin\n"
-    marker = tmp_path / "grandchild.pid"
-    with pytest.raises(smoke.SmokeError, match=r"b: SURVIVORS") as refused:
-        smoke._process(
-            executable,
-            ["survivor", str(marker)],
-            stdin="",
-            root=tmp_path / "b",
-            timeout=3,
-            name="b",
+    # Record the branch each probe takes and what the smoke's own census listed; the smoke
+    # still decides (the wrappers call the real killpg and the real census unchanged).
+    events = []
+    real_killpg, real_census = os.killpg, smoke._group_census
+
+    def recording_killpg(pgid, signal_number):
+        if signal_number != 0:
+            return real_killpg(pgid, signal_number)
+        try:
+            real_killpg(pgid, 0)
+        except (ProcessLookupError, PermissionError) as error:
+            events.append([pgid, type(error).__name__, None, ""])
+            raise
+        events.append([pgid, "answered", None, ""])
+        return None
+
+    def recording_census(pgid):
+        members = real_census(pgid)
+        if events and events[-1][0] == pgid and events[-1][2] is None:
+            events[-1][2:] = [len(smoke._live(members)), smoke._listing(members)]
+        return members
+
+    monkeypatch.setattr(os, "killpg", recording_killpg)
+    monkeypatch.setattr(smoke, "_group_census", recording_census)
+    try:
+        done = smoke._process(
+            executable, ["clean"], stdin="", root=tmp_path / "a", timeout=10, name="a"
         )
+        assert done.returncode == 2
+        assert done.stderr == "export worker: no request document on stdin\n"
+        marker = tmp_path / "grandchild.pid"
+        with pytest.raises(smoke.SmokeError, match=r"b: SURVIVORS") as refused:
+            smoke._process(
+                executable,
+                ["survivor", str(marker)],
+                stdin="",
+                root=tmp_path / "b",
+                timeout=3,
+                name="b",
+            )
+    finally:
+        printed = capsys.readouterr().out
+        sys.stdout.write(printed)
+        CENSUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        CENSUS_FILE.write_text(census_text(sys.platform, events, printed), encoding="utf-8")
     pid = int(marker.read_text())
     # WP6.5 run 2: the census lists the live survivor in the message (the runner's log
     # then shows what remained; the cleanup's EPERM, if any, is printed with the listing)
