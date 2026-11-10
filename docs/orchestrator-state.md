@@ -6,32 +6,55 @@
 ### Generation
 
 - **Generation 65** (session `clearwater-orchestrator-20261109-2203`). LIVE 2026-11-10 08:03Z from gen 64's rollover `64f7ef98`.
-  - Seat folder `work/orch-g65/` (drains, posts). Gen 64's scripts stay in `work/orch-g64/` and are used from there: `gate.sh`, `watch2.sh`, `leg.sh`, `gpu_sample.sh`, `window3.sh`, `window3v4.sh`, `qa.sh`, `f02-sizing.md`.
-  - State worktree `.worktrees/orch-state-g65`.
-  - Bash gauge 26-35 ms.
-- **LIVE CELL: `wp65-cell16`** (implementer-opus-high, Agent tool), WP6.5 run-3 group, dispatch-17 (`clearwater-review-evidence\wp6.5\cell\dispatch-17.md`), worktree `.worktrees/wp6.5`, base `a93a0ab7`, depth 0 at dispatch 08:32Z. It dies with this pane: a successor re-dispatches from the ledger and `git log`.
+  - Seat folder `work/orch-g65/`: drains 1-9, the posts, `qa.sh <sha> <label>` (seat QA from the DETACHED `wp6.5-rB`; GUI modules without `-n`; actionlint), `window3.sh` / `window3v4.sh` (gen-65 copies), `overlap_log.sh`, `w3_records.py`, `state_update.py`.
+  - Gen 64's `gate.sh`, `watch2.sh`, `leg.sh`, `gpu_sample.sh` and `f02-sizing.md` stay in `work/orch-g64/` and are used from there.
+  - State worktree `.worktrees/orch-state-g65`. Bash gauge 26-35 ms.
+- **LIVE CELL: `wp65-cell17`** (implementer-opus-high, Agent tool), the WP6.5 A-r11 fold, dispatch-18 (`clearwater-review-evidence\wp6.5\cell\dispatch-18.md`), worktree `.worktrees/wp6.5`, base `0a40c058`, dispatched 10:04Z (depth 0 at dispatch). It dies with this pane: never roll while it runs.
+- `wp65-cell16` is DONE (316,018 at its run-3-fix return; the queued hold message re-woke it once, after its return). Never message it again.
 - **CHARC is gen 21, `clearwater-charc-20261108-2037`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **WP6.5: run 3 READ** (`42781244075`, runner table `wp6.5\runner\run-42781244075\runner-table.md`; CHARC rulings `d6981092`); the run-3 group is with `wp65-cell16`. On its return: seat QA, Codex A to convergence, re-gate (plan 2), a "ready" post; CHARC pushes under the owner's STANDING push word (2026-11-10). HISTORY of the run-3 push: (CHARC `d9f82775`: per-word until a standing word exists; CHARC performs the push and sends the remote head + run id).
-   - Command: `git push origin wp6.5:refs/heads/macos-validation/wp6.5` (`69538abe` -> `a93a0ab7`, 11 commits, nothing under `src/`).
-   - Then watch the run: a background `until` loop on `gh run view <id> --json status,conclusion`. Download read-only into `clearwater-review-evidence\wp6.5\runner\run-<id>\` (`gh run download`, `gh run view --log`), and build the runner table (form: `runner\run-42764505729\runner-table.md`).
-   - **Expect:** C2 / C16 pass under their non-Windows bounds; items 3 and 4 pass; item 4's census listing CONFIRMS or refutes the EPERM-on-zombie hypothesis (a LIVE member after SIGKILL = STOP to CHARC); with the mode-keyed continuation every later step runs even if a leg fails, so run 3 yields the `.app` listing and otool for **F0-2**.
-   - Then F0-2 to CHARC (`work/orch-g64/f02-sizing.md`, size M) + the runner table, and a FRESH cell for the next WP6.5 group.
-   - Ledger fill for the next WP6.5 dispatch: `Depth at A-r9-fold yield: DISPATCHER TO FILL` = `251,366 (wp65-cell15, read by the dispatcher with cell_depth.py at its A-r9-fold return)`.
-2. **WP7.1 instrument: DONE.** A r4 (Claude, `8eac86d1..65c28219`) NO_NEW_CRITICAL_MAJOR with zero findings (`wp7.1\instrument\A\r4\`). `wp7.1` fast-forwarded `4ddf4841` -> **`65c28219`**; `uv sync --frozen` OK; frozen-t8 MD5 OK (ledger `wp7.1\instrument\ledger.md`). Reported to CHARC 08:12Z. B not re-run (CHARC: only if A r4 found).
-3. **WP7.1 window 3** (CHARC `a92441a6` Plan X, `351a1c1c`, `d9f82775`): on the OWNER's quiet-window word through CHARC (not given yet; allowed even during a turn in another worktree).
-   - First the gate check (no foreground 3D process, under ~1 GiB used, ~0 % utilization, no cell testing), then `bash work/orch-g64/window3.sh` in the background: the EXCLUSIVE export legs `export-hevc62r` + `bench-hevc62r`, the 5 s series, the raw gate archive in `wp7.1\seat\window3\`.
-   - Then `bash work/orch-g64/window3v4.sh` (`v4-bench-hevc62r`, `v4-hevc62r`, non-exclusive; its precondition, the ff, is MET).
-   - Expected: video stream duration SAME (WP7.2) and the four movie-level rows SAME under the reading. Any new difference class = STOP to CHARC.
-   - Then WP7.1's accept: the owner's look verdict + the ProRes / 4:2:2 question still open with the owner.
-4. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1-iA` (now detached at `65c28219`), `wp7.1-instrument`, `wp6.5-rB`, `wp6.5-rA`, plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`, `wp7.1-rA`.
+1. **WP6.5, the A-r11 fold** (CHARC `75e7d765`):
+   - **The findings:** F1 MAJOR (the `.app` chain must stay inside `Contents/` component by component); F2 (`test_all_tiny_set`'s photo half runs without FFmpeg); F3 (skip only on a PLATFORM-tag gap; `win-cp313` fails); F4 (the listing step goes below both builds). Plus the S2 ledger line (premise refuted, CHARC `c1c14926`).
+   - **When cell17 returns:**
+     - read its depth and record it;
+     - save the return as `wp6.5\cell\return-21-wp65-cell17.md`;
+     - seat QA with `bash work/orch-g65/qa.sh <head> <label>` (background);
+     - Codex A r12 on `0a40c058..<head>` from `wp6.5-rA` (prompt form `wp6.5\A\r11\review-prompt.md`), with a CROSS-MODEL CHECK of F1 using r11's exact probe shape;
+     - then the re-gate (plan 2): the full gate on the first head with `work/orch-g64/gate.sh` from a detached copy at that head, or the touched modules plus `test_tools_package_build*`, `test_release_workflow.py`, `test_reviewpack.py` and `test_gui_gpu_pack_dialog.py` on a fold head;
+     - then a "ready" post to CHARC, who pushes under the owner's STANDING push word (2026-11-10) and sends the run id.
+   - **Seat QA on `0a40c058`** ran at about 10:05Z: `work/orch-g65/qa-0a40/summary.txt`.
+   - **Run 4 then gives F0-2 its round 0:** `work/evidence/app-listing.txt` and `containment-census.txt`.
+   - **F0-2's brief must carry:**
+     - the f02-sizing (size M, item 5 now done);
+     - the CUDA-availability skip for `test_wp321_bench.py::test_a_device_frame_run_gives_the_sink_device_frames` (CHARC, a round-0 item);
+     - the Mac native rows from the listing.
+   - Ledger fill for the next dispatch after cell17: `Depth at A-r11-fold yield: DISPATCHER TO FILL` = cell17's depth at its return.
+2. **WP7.1 window 3: DONE**, reported to CHARC (`e45d7eaf`) at 10:03Z.
+   - Four records on `wp7.1` `65c28219`: `export-hevc62r2`, `bench-hevc62r`, `v4-bench-hevc62r`, `v4-hevc62r2`.
+   - All three V4 verdicts PASS: MANDATORY 0 / REQUIRED 0 / BEST-EFFORT 5 (the known classes); the four movie-level rows read SAME under the reading.
+   - Timings NOT of record (CHARC `ae7c2e1e`; `wp7.1\seat\window3\pytest-overlap.log`). No re-run.
+   - The WP7.1 accept is CHARC's. The look verdict (PASS WITH NOTES; exhibits in `wp7.1\seat\look-exhibits\`) and the ProRes "No" are in.
+3. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1-iA`, `wp7.1-instrument`, `wp6.5-rB` (QA copy), `wp6.5-rA` (review copy), plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`, `wp7.1-rA`.
 
 ### GEN-65 RECORD
 
-- Online post `27ee1878`; CHARC ack `d9f82775` (drain-1).
-- A r4 launched 08:04Z, returned clean; ff and checks 08:12Z; post `19308fc6`.
+- **Online:** post `27ee1878`; CHARC ack `d9f82775`.
+- **WP7.1 instrument:** A r4 (Claude) clean with zero findings; `wp7.1` ff to `65c28219`; post `19308fc6`. Look exhibits kept (`a4cd23fe`).
+- **WP6.5 run 3** (`42781244075`): parallel clean; serial 15 failures (FFmpeg 5, GPU-pack 8, cache 2); the `.app` link rule; T14. Runner table built.
+- **Run-3 group:** `wp65-cell16` (dispatch-17) returned `0a40c058`. Its S2 dispute was RIGHT; my run-3 premise was false (a grep for `sys.platform` missed the `pack_root()` gate). The DR row and the XS package were DROPPED.
+- **Codex A r11:** FINDINGS, 1 MAJOR + 3 MINOR, all upheld; fold cell17 dispatched.
+- **Window 3:**
+  - the first launch refused `--timeout-s 3600` against the 7,408 s V4 bound (a staging defect; relaunched as `export-hevc62r2`);
+  - the hold message to cell16 never reached it (QUEUED mid-turn), so the cell's pytest overlapped the export leg.
+
+### Gen-65 lessons
+
+- **An exclusive window is gated on the cell having YIELDED, never on a hold message or on "no pytest at launch".** A message to a mid-turn Agent-tool cell is queued and NOT delivered until its turn ends; it then re-wakes the cell after its return. This is the second occurrence after gen 61. Dispatch an exclusive window only with no cell live, or launch the cell after the window.
+- **Read the product's gate before asserting a product defect:** "nothing checks the platform" came from a `sys.platform` grep. The real gate was `pack_root()`. Read the call path from the entry (menu action -> handler -> dialog -> plan) before posting a premise CHARC will rule on.
+- **A staged seat script must be dry-checked against the driver's own argument checks** (`run_export.py:51` `v4_bound`) before a window. Gen 64 staged `--timeout-s 3600` for a leg whose inline V4 needs more than 7,408 s.
+- **The heredoc backslash collapse struck again** (`\r` in a state-top path became CR); repaired with a Write-tool script. **The bare-`cd` slip struck twice** (into the look folder; into the wp7.1 worktree while cell16 was live); each was restored in the next call, and nothing was written while moved.
 
 ### GEN-64 RECORD
 
