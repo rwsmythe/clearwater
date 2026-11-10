@@ -16,6 +16,7 @@ the GPU backend's ``memory_estimate_bytes`` adds.
 from __future__ import annotations
 
 import math
+import sys
 from typing import Any
 
 import numpy as np
@@ -303,25 +304,118 @@ def _batch_mismatch_report(
     )
 
 
+NON_WINDOWS_REASON = (
+    "off Windows the CPU route is held to the AD-11 tier-2 bound, not bit-identity (WP6.5 "
+    "run 2, C16 as ruled by CHARC): on the darwin arm64 runner the 516-line control "
+    "(FFT_BATCH_LINES=516, a multiple of 4) is not bit-identical either (run 42764505729: "
+    "max 1.49e-07, nonzero 9,996), which settles that the difference comes from the "
+    "library's FFT path (pocketfft SIMD on arm64), not from the batch size"
+)
+"""Why a non-Windows host asserts the tier-2 bound instead of bit-identity (WP6.5 C16)."""
+
+
+def _cpu_batch_verdict(
+    monkeypatch: pytest.MonkeyPatch,
+    a: Any,
+    sigma: float,
+    batched: np.ndarray,
+    unbatched: np.ndarray,
+    host: str,
+) -> tuple[bool, str]:
+    """The CPU route's batched / unbatched rule (WP6.5 run 2, C16 as ruled).
+
+    On ``win32`` the batched route must be the unbatched one bit for bit. On any other host
+    a difference passes when its max abs is within the AD-11 tier-2 bound ``BOUND``
+    (``NON_WINDOWS_REASON``); a larger one fails. Every difference is reported with
+    ``_batch_mismatch_report``'s figures (max / p99 / nonzero, the control).
+
+    Args:
+        monkeypatch: Patches ``FFT_BATCH_LINES`` for the report's control only.
+        a: The input on the CPU backend.
+        sigma: The blur's sigma.
+        batched: The batched route's output.
+        unbatched: The one-batch-per-axis output.
+        host: The platform the rule is read for (``sys.platform``; a proof passes another).
+
+    Returns:
+        ``(passes, report)``; the report is empty when the two are bit-identical.
+    """
+    if np.array_equal(batched, unbatched):
+        return True, ""
+    report = _batch_mismatch_report(monkeypatch, a, sigma, batched, unbatched)
+    if host == "win32":
+        return False, f"{report}\n  host win32: the assertion is bit-for-bit"
+    largest = float(np.max(np.abs(batched.astype(np.float64) - unbatched.astype(np.float64))))
+    passes = largest <= BOUND
+    verdict = "inside" if passes else "OUTSIDE"
+    return passes, (
+        f"{report}\n  host {host}: {verdict} the tier-2 bound {BOUND:g} "
+        f"(max abs {largest:.9g}); {NON_WINDOWS_REASON}"
+    )
+
+
 @pytest.mark.parametrize(("shape", "sigma"), BATCHED[:2])
 def test_the_batched_route_is_the_unbatched_one_bit_for_bit_cpu(
     monkeypatch: pytest.MonkeyPatch, shape: tuple[int, ...], sigma: float
 ) -> None:
-    """Tier 1 (bit-identity) on the CPU route; on a mismatch the C16 diagnostic prints first.
+    """Tier 1 (bit-identity) on the CPU route on Windows; on a mismatch the C16 diagnostic
+    prints first.
 
     WP6.5 G3 (CHARC's C16 ruling, measurement first): the darwin arm64 runner failed
-    ``[shape1-32.0]``. The bound is unchanged (the test still FAILS on any difference); the
-    report says how large the difference is and whether a 516-line batch removes it.
+    ``[shape1-32.0]``. WP6.5 run 2 (C16 ruled): Windows keeps bit-for-bit; a non-Windows
+    host asserts the AD-11 tier-2 bound and prints the figures (``_cpu_batch_verdict``).
     """
     a = CPU.asarray(np.random.default_rng(9).random(shape, dtype=np.float32))
     batched = CPU.to_host(CPU.gaussian_blur(a, sigma))
     with monkeypatch.context() as patch:
         patch.setattr(backend_module, "FFT_BATCH_LINES", 10**9)  # one batch per axis
         unbatched = CPU.to_host(CPU.gaussian_blur(a, sigma))
-    if not np.array_equal(batched, unbatched):
-        report = _batch_mismatch_report(monkeypatch, a, sigma, batched, unbatched)
+    passes, report = _cpu_batch_verdict(monkeypatch, a, sigma, batched, unbatched, sys.platform)
+    if report:
         print(report, flush=True)
+    if not passes:
         pytest.fail(report)
+
+
+@pytest.mark.parametrize(
+    ("host", "step", "passes"),
+    [
+        ("win32", 0.0, True),
+        ("win32", "ulp", False),
+        ("darwin", 0.0, True),
+        ("darwin", "ulp", True),
+        ("darwin", 2e-5, False),
+        ("linux", "ulp", True),
+        ("linux", 2e-5, False),
+    ],
+)
+def test_the_cpu_batch_verdict_by_host(
+    monkeypatch: pytest.MonkeyPatch, host: str, step: float | str, passes: bool
+) -> None:
+    """WP6.5 run 2 (C16): on a planted difference at one sample, Windows stays bit-for-bit
+    (one ulp fails), and a simulated non-Windows host passes one ulp (inside the tier-2
+    bound, the reason printed) and fails 2e-5 (over ``BOUND``)."""
+    shape, sigma = BATCHED[1]
+    a = CPU.asarray(np.random.default_rng(9).random(shape, dtype=np.float32))
+    unbatched = CPU.to_host(CPU.gaussian_blur(a, sigma))
+    planted = unbatched.copy()
+    if step == "ulp":
+        planted[7, 11, 2] = np.nextafter(planted[7, 11, 2], np.float32(2.0))
+    elif isinstance(step, float) and step:
+        planted[7, 11, 2] = planted[7, 11, 2] + np.float32(step)
+    with monkeypatch.context() as patch:
+        verdict, report = _cpu_batch_verdict(patch, a, sigma, planted, unbatched, host)
+    assert verdict is passes
+    if step == 0.0:
+        assert report == ""
+        return
+    assert "nonzero 1 of" in report
+    if host == "win32":
+        assert report.endswith("host win32: the assertion is bit-for-bit")
+    else:
+        assert f"host {host}: {'inside' if passes else 'OUTSIDE'} the tier-2 bound" in report
+        assert "pocketfft SIMD on arm64" in report
+        assert "not from the batch size" in report
 
 
 def test_the_c16_diagnostic_reports_a_planted_difference(monkeypatch: pytest.MonkeyPatch) -> None:
