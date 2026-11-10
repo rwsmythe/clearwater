@@ -63,18 +63,40 @@ PRELUDE = textwrap.dedent(
 )
 """What every fake child runs first: read the one request line, then the protocol helpers."""
 
-GRANDCHILD = textwrap.dedent(
+BEAT_WRITER = textwrap.dedent(
     """\
-    import sys, time
-    from pathlib import Path
-    folder = Path(sys.argv[1])
-    beats = 0
-    while not (folder / "stop").exists() and beats < 600:
-        beats += 1
-        (folder / "beat").write_text(str(beats))
-        time.sleep(0.05)
-    (folder / "gone").write_text("gone")
+    def write_beat(beat, text):
+        tmp = beat.with_name(beat.name + ".tmp")
+        tmp.write_text(text)
+        for _ in range(200):
+            try:
+                os.replace(tmp, beat)
+                return
+            except PermissionError:  # Windows: a reader holds the old beat open
+                time.sleep(0.001)
+        os.replace(tmp, beat)
     """
+)
+"""The beat writers' one shape (WP6.5 run 2, item 3): each beat is written to ``beat.tmp``
+in the same folder and moved onto ``beat`` with ``os.replace``, so a reader never sees an
+empty or partial beat, and a writer killed mid-beat leaves the previous beat whole (a bare
+``write_text`` truncates first: killed between its truncate and its write, the file stays
+empty for good). Needs ``os`` and ``time`` imported."""
+
+GRANDCHILD = (
+    "import os, sys, time\nfrom pathlib import Path\n"
+    + BEAT_WRITER
+    + textwrap.dedent(
+        """\
+        folder = Path(sys.argv[1])
+        beats = 0
+        while not (folder / "stop").exists() and beats < 600:
+            beats += 1
+            write_beat(folder / "beat", str(beats))
+            time.sleep(0.05)
+        (folder / "gone").write_text("gone")
+        """
+    )
 )
 """A grandchild that beats a file every 50 ms until a ``stop`` file appears (at most 30 s)."""
 
@@ -166,9 +188,11 @@ def _messages(caplog: pytest.LogCaptureFixture, logger: str) -> list[str]:
 
 
 def _read_beat(beat: Path) -> int:
-    """Return the grandchild's last beat; a read that meets the rewrite's truncation is retried.
+    """Return the grandchild's last beat; an empty read is retried, never counted as a beat.
 
-    ``write_text`` truncates before it writes, so a read can see an empty file (R1 F13).
+    A bare ``write_text`` truncates before it writes, so a read could see an empty file (R1
+    F13); the writers now replace the file whole (``BEAT_WRITER``, WP6.5 run 2), and the retry
+    stays. An empty file is NOT beat 0 (CHARC): that would mask a writer that never wrote.
     """
     for _ in range(200):
         if text := beat.read_text():
@@ -1111,13 +1135,16 @@ def test_an_exception_from_the_progress_kills_the_worker(tmp_path: Path) -> None
     beat = tmp_path / "beat"
     command = _child(
         tmp_path,
-        """\
-        Path(ARGS[0]).write_text("0")  # the first beat before the progress that raises (F12)
-        send({"progress": [1, 100, "working"]})
-        for n in range(1, 600):
-            Path(ARGS[0]).write_text(str(n))
-            time.sleep(0.05)
-        """,
+        BEAT_WRITER
+        + textwrap.dedent(
+            """\
+            write_beat(Path(ARGS[0]), "0")  # the first beat before the progress that raises (F12)
+            send({"progress": [1, 100, "working"]})
+            for n in range(1, 600):
+                write_beat(Path(ARGS[0]), str(n))  # atomic: a kill never leaves it empty
+                time.sleep(0.05)
+            """
+        ),
         str(beat),
     )
 
