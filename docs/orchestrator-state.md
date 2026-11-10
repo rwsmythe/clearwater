@@ -5,36 +5,42 @@
 
 ### Generation
 
-- **Generation 66** (session `clearwater-orchestrator-20261110-0123`). LIVE 2026-11-10 11:25Z from gen 65's rollover `6001f924`.
-  - Seat folder `work/orch-g66/` (drains, posts, `state-top.md`, `state_update.py`, `ledger_r16.py`). Gen 65's `qa.sh` (writes `work/orch-g65/qa-<label>/`) and window scripts stay in `work/orch-g65/`; gen 64's `gate.sh`, `watch2.sh`, `leg.sh` in `work/orch-g64/`.
+- **Generation 66** (session `clearwater-orchestrator-20261110-0123`). LIVE 2026-11-10 11:25Z from gen 65's rollover `6001f924`; ROLLED at the 400K cap with NOTHING it started running (see the rollover post).
+  - Seat folder `work/orch-g66/`: drains 1-7, the posts, `state-top.md`, `state_update.py`, `ledger_r16.py`, `fix_top.py`, `assemble_f4.py`, `assemble_f4_5.py` (the fresh Codex prompt form for this lane: agent + brief + dispatches/returns 1..N-1 + dispatch-N).
+  - Gen 65's `qa.sh` (`bash work/orch-g65/qa.sh <sha> <label>`, from the DETACHED `wp6.5-rB`; writes `work/orch-g65/qa-<label>/summary.txt`) and gen 64's `gate.sh` / `watch2.sh` are used from their folders.
   - State worktree `.worktrees/orch-state-g66`. Bash gauge 39 ms.
-- **NO Claude cell is live.** `wp65-cell16`, `wp65-cell17`, `wp65-cell18` are DONE: never message any of them (a message re-wakes it).
-- **LIVE: WP6.5 Codex turn 1** (the run-4 fix, FRESH session; `clearwater-review-evidence\wp6.5\codex\prompt-1.md` = agent + brief + `dispatch-1.md`; worktree `.worktrees/wp6.5` at `ae128116`), launched 13:18Z from this pane. It dies with the pane: do not roll while it runs. Its session id and depth are in `wp6.5\codex\turn-1.driver.stdout` at its end.
+- **NO cell, Codex turn, review, gate or leg is running.** Claude cells `wp65-cell16/17/18` are DONE: never message any of them.
 - **CHARC is gen 21, `clearwater-charc-20261108-2037`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **WP6.5: run 4 (`42814037850`, `ae128116`) FAILED on a NEW class; CHARC ruled the fix (`200f9645`).**
-   - Runner table and diagnosis posted (`970b2a76`): parallel 7,893 / 1,231 / 0; serial 526 / 797 / 0; the `.app` built, link rule + native origin PASS; bundle tests 136 passed; then `FORBIDDEN in the bundle (115)` (`unexpected-module`: `_bundle_parts` `build.py:566` keeps `Clearwater.app` as the top level; `forbidden_paths` `:586` follows with `rglob` + `is_file`). Evidence `wp6.5\runner\run-42814037850\`.
-   - **The fix: Codex turn 1 RUNNING** (dispatch `wp6.5\codex\dispatch-1.md`: the `.app` part mapping, the non-following enumeration under `4ed56fcb`, run-4-listing regressions RED on `ae128116`, the full list to `build.log`, onedir census). The run-4 listing is staged at `.worktrees/wp6.5/work/wp6.5/run4-stage/`. The cell does NOT commit: the seat commits (fix + ledger) by pathspec in the worktree, counts CRs.
-   - **Then:** Claude Reviewer A (`codex_cell.py review --worktree <detached wp6.5-rA at head> --base ae128116 ...`), fold, seat QA (`bash work/orch-g65/qa.sh <head> <label>` from `wp6.5-rB`), ready post, CHARC's push, run 5. If the Codex turn STOPs on the listing routing, CHARC: continue in a Claude cell with the same dispatch.
-   - **F0-2:** CHARC writes the brief AFTER run 5 shows the content check passing. Its inputs: `work/orch-g64/f02-sizing.md`; the CUDA skip for `test_wp321_bench.py::test_a_device_frame_run_gives_the_sink_device_frames`; run 4's `app-listing.txt` / `containment-census.txt`; cell17's notices note (`find_executable` `is_file()` and `(home / "_internal").is_dir()` on a `.app`).
-   - At the WP6.5 accept CHARC opens one DR row for the recorder's uncovered list (`d13c6ce4`).
-2. **WP7.1: MERGED, main = `5f684e58`** (ff; post `4a03c3fb`). Section 9 (`ae62caef`) + Claude A fold (`0d459d9a`), rebased onto main (range-diff all "="), two-leg gate GREEN on `5f684e58` (`work/orch-g64/gate-w71g/summary.txt`: parallel 8,442 / 207 / 0, serial 1,318 / 19 / 0, harness 423 OK, statics + mypy darwin clean). NOT pushed (CHARC's). CHARC writes the accept.
-3. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1-iA`, `wp7.1-instrument`, `wp6.5-rB`, `wp6.5-rA`, plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`, `wp7.1-rA`, and the state worktrees `orch-state-g65`, `orch-state-g66`.
+1. **WP6.5 run-4 fix (the `.app` bundle CONTENT check), Codex lane, Claude Reviewer A.** Evidence `clearwater-review-evidence\wp6.5\codex\` (dispatches 1-5, returns, `turn-N.driver.stdout`) and `wp6.5\A-codex\r1`, `r2`.
+   - **Rulings:** `200f9645` (the fix), amended by `0317f4cb` (A r1: F2 kind by `os.stat` after admission, F3 every other `Contents/<x>` mapped like MacOS, A2 `_CodeSignature` exemption for non-module files only), whose F1 wording is REPLACED by `e162ad24` (A r2 F1-b: an admitted folder link is judged as its physical equivalent, by re-rooting its `macos_link_view` entries; no name-shape gate).
+   - **Heads on `wp6.5`:** `ae128116` (run 4) -> `82b9ae3e` + `2f69ad1d` (Codex turns 1-3) -> `1b6ec28d` + `eee896b6` (turn 4, A r1 fold) -> **`83df5ffe` + `6dc8c000`** (turn 5, FRESH session `01a1c5de-0968-7131-8e4a-b8cf4f15b179`, depth 117,391: the A r2 F1-b fold, the exact re-rooted check; cell: RED 5 failed on `eee896b6`, build + notices 1,175 passed with `--dist loadfile`, smoke 74/1, onedir 372 = 372 and 580 = 580, run-4 rebuild 0, 13 refusals per probe). Committed by the seat, 0 CR, nothing under `src/`. Seat QA NOT yet run on `6dc8c000`.
+   - **Turn 5's seat finding (MINOR, pre-existing):** under default xdist scheduling `tests/test_tools_package_build.py` showed 1 failed / 1,174 passed: a fixture blocks `Popen` during a cold PyInstaller import (order-dependent; the parent `eee896b6` reproduces it; the seat's own `-n 3` QA runs have been green). Details in the ledger's `### A r2 fold`. Report it in the ready post; ask CHARC whether it is a DR row or a fix in this package.
+   - **NEXT:** Claude Reviewer A r3 on `eee896b6..6dc8c000` (prompt form `wp6.5\A-codex\r2\review-prompt.md`: CHARC's ruling verbatim, the severity rule, the CHECKs; the reviewer rebuilds the run-4 `.app` from `runner\run-42814037850\macos-evidence\app-listing.txt` and re-runs its planted entries and the five F1-b probes). Run it with `codex_cell.py review --worktree 'C:\Users\rwsmy\clearwater\.worktrees\wp6.5-rA' --base eee896b6 --prompt <p> --out <dir>` after `git -C .worktrees/wp6.5-rA checkout -q --detach <head>`; seat QA beside it (`bash work/orch-g65/qa.sh <head> <label>`, which moves `wp6.5-rB` itself).
+   - **A finding:** a recorder-only gap is an ADVISORY to the ledger's uncovered list (`d13c6ce4`); a product following call is a MINOR folded without a ruling (`4ed56fcb`); a wrong admission or an onedir change goes to CHARC. A further fold goes to a FRESH Codex session if turn 5's depth is past ~200K (`depth_input_tokens` in `turn-5.driver.stdout`), resumed otherwise (`--session=<id>`).
+   - **Then:** the ready post to CHARC (range `ae128116..<head>`, nothing under `src/`, `release.yml` unchanged, `MACOS_FFMPEG_BUNDLED: "false"`, QA summary); CHARC pushes and sends the run-5 id; watch it (background `until gh run view <id> --repo rwsmythe/clearwater ...`), download read-only into `wp6.5\runner\run-<id>\`, `gh run view --log` into `full-job.log`, build the runner table against run 4's, post it.
+   - **Run 4's table (for comparison):** parallel 7,893 / 1,231 / 0; serial 526 / 797 / 0; the `.app` built (41.3 s, 506.4 MiB), link rule + native origin PASS; bundle tests 136 passed; content check FORBIDDEN 115.
+   - **F0-2:** CHARC writes the brief AFTER run 5 shows the content check passing (inputs: `work/orch-g64/f02-sizing.md`; the CUDA skip for `test_wp321_bench.py::test_a_device_frame_run_gives_the_sink_device_frames`; run 4's `app-listing.txt` / `containment-census.txt`; cell17's notices note). At the WP6.5 accept CHARC opens the DR row for the recorder's uncovered list.
+2. **WP7.1: ACCEPTED** by CHARC (`1b14aa9f`, main `5f684e58`; DR-160..162). Keep its worktrees and records until the owner's prune word.
+3. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1`, `wp7.1-iA`, `wp7.1-instrument`, `wp7.1-rA`, `wp6.5-rB`, `wp6.5-rA`, plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`, and the state worktrees `orch-state-g65`, `orch-state-g66`.
 
 ### GEN-66 RECORD
 
 - Online `d2113e99`; ack `2d986fcf`.
-- `wp65-cell18` (dispatch-19, 19b, 19c): returns 24-26 in `wp6.5\cell\`. A r15 `FINDINGS` (3 MINOR recorder-only); query `e7a234d7` -> CHARC stop rule `d13c6ce4`; A r16 `NO_NEW_CRITICAL_MAJOR`. Ready `dc6fea0d`.
-- WP7.1: turn 16 (`ae62caef`), Claude A `NO_NEW_CRITICAL_MAJOR` (1 MINOR + 3 NIT), turn 17 fold (`0d459d9a`), rebase, gate green, ff main `5f684e58`, post `4a03c3fb`.
-- Run 4 failed (new class); query `970b2a76` -> ruling `200f9645`; Codex fix turn 1 launched 13:18Z after the serial leg.
+- **WP6.5 A r14 fold:** `wp65-cell18` (dispatch-19, 19b, 19c; returns 24-26): M1 + its own residual (any link on a PATH candidate skips it), M2 recorder, A r15's three recorder gaps. A r15 query `e7a234d7` -> CHARC stop rule `d13c6ce4`; A r16 `NO_NEW_CRITICAL_MAJOR`; seat ledger `ae128116`. Ready `dc6fea0d`; CHARC pushed; **run 4** `42814037850` failed at the new content check (post `970b2a76`).
+- **Run-4 fix:** ruling `200f9645`; Codex turn 1 STOPped on my dispatch's discovery wording, answered lexically (`forbidden_paths(root, *, app=None)`, `_macos_content_app`; fyi `44087186`); turns 2-3 -> `82b9ae3e` + `2f69ad1d`; A r1 FINDINGS (2 MAJOR + 1 MINOR) -> `0317f4cb`; turn 4 -> `1b6ec28d` + `eee896b6`; A r2 FINDINGS (F1-b MAJOR) -> `e162ad24`; turn 5 (FRESH session, `prompt-5.md`) -> `83df5ffe` + `6dc8c000`. Next: A r3 (not started).
+- **WP7.1:** turn 16 section 9 (`ae62caef`), Claude A `NO_NEW_CRITICAL_MAJOR` (1 MINOR + 3 NIT), turn 17 fold (`0d459d9a`), rebase (range-diff all "="), two-leg gate green on `5f684e58` (parallel 8,442 / 207 / 0; serial 1,318 / 19 / 0; harness 423), ff main, post `4a03c3fb`; CHARC accepted `1b14aa9f`.
 
 ### Gen-66 lessons
 
 - **Fold a cell's own declared residual before the next review round** (dispatch-19b): it closed in the same cell and saved a round.
-- **A test instrument converges asymptotically:** after the product was clean, each review found a new recorder false-negative class (r13-r15). Ask the director for a stop rule (instrument-only findings become ledger advisories) as soon as the trend shows; CHARC accepted it at once.
-- **A cell's return can arrive in chat while its transcript's last text is mid-turn:** save the chat return to the evidence folder, not the transcript's last text.
+- **A test instrument converges asymptotically:** ask the director for a stop rule (instrument-only findings become ledger advisories) as soon as the trend shows.
+- **A dispatch's own wording can over-constrain a ruling:** "decide the form from the release folder's contents" forced a discovery call the onedir census forbade; the caller already held the answer lexically. Read the call sites before writing a "how" into a dispatch.
+- **A per-name gate in a ruling is wrong in both directions** (`isidentifier()` let `foo-bar` through and the dotted skip let `foo.bar` through): ask for "judge it as its physical equivalent" first.
+- **A cell's return can arrive in chat while its transcript's last text is mid-turn:** save the chat return.
+- **The heredoc backslash collapse struck again** (a runner path became CR, a turn path became TAB in a state edit); repaired with a Write-tool script. Any Python holding a Windows path goes through the Write tool.
 
 ### GEN-65 RECORD
 
