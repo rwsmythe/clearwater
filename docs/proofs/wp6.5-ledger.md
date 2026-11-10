@@ -4690,7 +4690,7 @@ its tests GREEN at head and RED on `200dffd8`. No STOP. The switch stays `MACOS_
 | `b23794f5` | `tools/package/notices.py` (the `.app` inventory, the one notices location, the macOS FFmpeg rows, the darwin name tables, the per-platform embedded census) plus its tests in `tests/test_tools_package_notices.py` and `tests/test_tools_package_build.py`. |
 | `87225d7b` | `.github/workflows/macos-build.yml`: the step "Record the Mach-O identities", pinned and executed in `tests/test_release_workflow.py`. |
 
-### What `notices.py` does now (the darwin form only; Windows paths unchanged)
+### What `notices.py` does now (corrected by the A r1 fold below)
 
 - **Inventory (item 1).** `_inventory(folder) -> (entries, home)` keeps its signature. On darwin, when
   `find_executable` names `Contents/MacOS/Clearwater` of a `.app` (`build._macos_content_app`),
@@ -4711,7 +4711,8 @@ its tests GREEN at head and RED on `200dffd8`. No STOP. The switch stays `MACOS_
   `write_notices` writes there, and its temporary file stays beside it in `Contents/Resources`.
   `plan_notices`, `write_notices` and the CLI default `ffmpeg_lock_path` to None, which resolves to
   `default_ffmpeg_lock()`: `ffmpeg-macos.lock.json` on darwin, `ffmpeg.lock.json` elsewhere.
-  `build.write_artifact_notices` and the smoke therefore need no change. `render_root_annex` keeps
+  `build.write_artifact_notices` needs no change; the macOS smoke now calls the shared census
+  preflight before checking the notices file (A r1 F2). `render_root_annex` keeps
   the Windows lock (the CLI `--root-annex` passes it explicitly).
 - **macOS FFmpeg rows (item 3).** `_macos_ffmpeg_rows` reads:
   - the tools `Contents/MacOS/ffmpeg` and `ffprobe`, and the texts `Contents/Resources/ffmpeg-BUILD.txt` and `ffmpeg-LICENSE.txt`;
@@ -4732,7 +4733,7 @@ its tests GREEN at head and RED on `200dffd8`. No STOP. The switch stays `MACOS_
   | `Contents/Resources/base_library.zip` | Python |
   | `Contents/Resources/icon-windowed.icns` | PyInstaller, only when its bytes match pyinstaller's RECORD sha256 for `PyInstaller/bootloader/images/icon-windowed.icns` |
   | `Contents/Frameworks/libpython3.12.dylib` | Python, only when the build's `macho:` identity (`_macho_identity` / `_macho_digest` against `_macho_origin_identities` of `sys.base_prefix/lib/libpython3.12.dylib`) or the whole-file hash matches |
-  | everything else under `Contents/Frameworks/` or `Contents/Resources/` | RECORD ownership on the path minus that prefix (one owner) |
+  | everything else under `Contents/Frameworks/` or `Contents/Resources/` | RECORD ownership on the path minus that prefix (one owner); every native additionally verifies the installed origin's RECORD hash and the bundled Mach-O identity (A r1 F3) |
 
   In that RECORD path, a `__dot__x` folder is read as `.x` ONLY where the admitted link `.x -> __dot__x` exists beside it.
   Anything else (for example `Contents/MacOS/helper` or `Contents/PkgInfo`) is unknown, by label.
@@ -4741,9 +4742,16 @@ its tests GREEN at head and RED on `200dffd8`. No STOP. The switch stays `MACOS_
 - **Per-platform embedded census.**
   - The format: an optional, additive `platform` key on an `embedded_hosts` entry (`"win32"` | `"darwin"`; absent means Windows). A `darwin` host must be `Contents/`-rooted. `manifest.json` is byte-unchanged, and the 110 Windows records with it.
   - What a plan reads: `plan_notices` reads only `_host_platform()`'s hosts. `_limit_declarations` still validates against all declared hosts.
-  - The darwin refusal: on darwin, with hosts declared but none for darwin, the plan raises the ONE reason `EMBEDDED_CENSUS_PENDING`: "notices: macOS embedded census pending: native-licences/manifest.json declares no darwin embedded_hosts (WP6.5 F0-2b)". It comes right after the manifest is read, before `_embedded_claims` or any per-host check.
-- **Vendored-path files.** These now compare the site-relative path (`_bundle_relative`: `_internal/`,
-  `Contents/Frameworks/`, `Contents/Resources/`). On Windows this is the same predicate as before.
+  - The darwin refusal: the shared `census_preflight` requires `embedded_census.darwin`
+    with `status: complete`, nonempty single-line `evidence`, and nonzero darwin hosts.
+    Otherwise it raises the ONE reason `EMBEDDED_CENSUS_PENDING` containing
+    `macOS embedded census pending`, before inventory, output access or per-host checks.
+    Host count alone never declares completion (A r1 F1/F2).
+- **Vendored-path files.** `_bundle_relative` recognises `Contents/Frameworks/` and
+  `Contents/Resources/` only under the plan's explicit darwin bundle-layout context.
+  Onedir keeps exactly the original `_internal/` predicate. A r1 F4 confirmed the prior
+  suffix-only decision changed Windows behavior; this fold restores it and proves byte
+  equality against `200dffd8` on ordinary and `X.app` Windows onedir fixtures.
 
 ### The identity evidence step (item 3), its format and an example
 
@@ -4751,7 +4759,8 @@ The step is "Record the Mach-O identities", placed right after "List the app bun
 - **Condition:** `if: ${{ !cancelled() && !inputs.release-version }}`, so it runs in validation mode only, including after a failed leg. It is never reached in release mode, under both switch values.
 - **How it runs:** `shell: uv run python {0}`.
 - **What it does:**
-  - It walks `build._macos_app_entries(app)`, which never follows a link.
+  - It first rejects a symlink or junction at the `.app` root without following, writing
+    one refusal line and exiting 1, then walks `build._macos_app_entries(app)` (A r1 F6).
   - It asks `file -b` of every regular file and keeps the ones whose answer starts with `Mach-O`. A `file -b` failure is written as a `#` line, never skipped silently.
   - It computes the identity with build.py's own `_macho_identity(data)` / `_macho_digest(identity)`, the functions `macho_built_problem` uses on built files. The step reimplements no hash.
 - **Output:** `work/evidence/macho-identities.txt`, inside the existing `macos-evidence` upload.
@@ -4854,4 +4863,123 @@ No false positives were rejected. The final static and module runs above found n
 - The Mac Python licence path, and the python-build-standalone `BUILD` marker `_check_embedded_parents` reads for `python`-parented hosts, need checking on a Mac interpreter.
 - libogg's lock status `built-not-linked` renders through the existing verdict "not compiled into this artifact". That holds for what ships, but F0-2b may want its own wording.
 - The `macos-release` upload gating (5a), the bundled build's `!cancelled()` (5b) and the CUDA skip stay F0-2b's.
-- Reviewer A has not run yet; the seat runs it on `4e838bc6..87225d7b`.
+- Reviewer A r1 ran on `200dffd8..701475de`, finding 4 MAJOR and 2 MINOR issues;
+  adjudication and fixes follow. The seat runs Claude A on this Codex fold's delta.
+
+### F0-2a A r1 fold
+
+Fresh Codex cell, dispatch F0-2 / 3, base/head `701475de` (uncommitted fold for the seat).
+All six A findings are CONFIRMED, NEW and in envelope; none rejected or deferred.
+Review evidence read only: `C:/Users/rwsmy/clearwater-review-evidence/wp6.5/f02/A/r1/review.txt`.
+CHARC ruling `e625a2113921103d` fixes the declaration and layout forms. Lane at dispatch:
+2026-11-10 18:41Z, Codex 33% / pace 0.363, Claude 40% / pace 2.056; Codex lower,
+so Codex implements and Claude A/B run at the seat. Dispatcher-read depth unavailable here.
+
+The completion declaration is additive; the production manifest and all 110 Windows host
+records remain byte-unchanged. F0-2b must write the declaration WITH its Mac rows:
+
+```json
+{"embedded_census": {"darwin": {"status": "complete", "evidence": "run <id>, head <sha>; macho-identities.txt"}}}
+```
+
+Absent declaration means Windows complete only. An absent/malformed/incomplete darwin
+claim, a completed claim without evidence, or a completed claim with zero darwin hosts
+refuses with `EMBEDDED_CENSUS_PENDING`. An evidenced nonempty census then undergoes all
+existing identity, component, parent-version and missing-host checks.
+
+| Finding | Adjudication and change | Regression surface |
+|---|---|---|
+| F1 MAJOR | CONFIRMED/FIXED: `notices.py:851` `census_preflight` enforces the declaration independently of host count, before per-host checks. | Empty, 110 Windows + one unrelated darwin, several darwin hosts, complete without evidence, complete with zero hosts; both planner and writer. Completed consistent fixture passes; completed missing carried-parent host still refuses. |
+| F2 MAJOR | CONFIRMED/FIXED: planner (`notices.py:2295`) and writer (`:3281`) call the shared preflight; `_macos_static_checks` (`smoke.py:1109`) calls it before its notices existence query. Windows smoke code unchanged. | Real preflight with production pending manifest and missing notices yields the named pending reason. |
+| F3 MAJOR | CONFIRMED/FIXED: `_app_entry_owner` (`notices.py:1731`) verifies each native's installed origin against RECORD, then `_same_macho` against the bundled bytes. | Real synthetic Mach-O rewrites pass; changed code, non-Mach-O replacement and changed origin refuse for `_pillow_heif` and extensionless QtCore. |
+| F4 MAJOR | CONFIRMED/FIXED: one `in_app` context (`notices.py:2297`) per plan requires darwin plus inventory's bundle home and bootloader label; explicitly passed to FFmpeg selection (`:1862`) and vendored path conversion (`:1672`), reused for classification. | Windows `X.app` retains missing FFmpeg pair/text message, Contents-prefixed alien has original vendored behavior, notices bytes equal `200dffd8` for ordinary and `X.app` onedir. |
+| F5 MINOR | CONFIRMED/FIXED inside notices only: `_find_notices_executable` (`notices.py:1610`) checks discovery components without following before `find_executable`; uses the shared rule for inner links and rejects a linked root. Outer bundle checked before nested candidates. | Filesystem recorder, linked Contents/root, starting from release and Contents/MacOS: no inventory-owned premature following calls. |
+| F6 MINOR | CONFIRMED/FIXED: workflow script (`macos-build.yml:193`) rejects root symlink/junction before is_dir/listing/read, writes one refusal line and exits 1. Notices likewise guards its call to the unchanged `_macos_app_entries`. | Executed workflow script, symlink and modeled junction; planted is_dir assertion ensures rejection precedes any following root query. |
+
+F3 applies to every RECORD-attributed `.so`/`.dylib` and every Mach-O identified in either
+the bundled file OR its installed origin, including extensionless framework executables.
+Libpython retains its interpreter-origin `_same_macho` check. Bootloader, generated
+metadata and link entries retain their separate rules; independently licensed natives
+still require their native manifest bindings. No `build.py` change.
+
+Verification evidence is under `work/wp6.5/f02a-fold/`. All pytest runs load
+`sandbox_mkdir_shim`, disable the cache provider, use disposable basetemps there, select
+`-m 'not gpu'` and retain `-k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`.
+The scratch `run_pytest.py` exposes `scripts` on sys.path then clears inherited PYTHONPATH
+before pytest starts, avoiding the build's legitimate environment-override refusal. Initial
+direct runs blocked by that guard are not counted as RED/GREEN evidence.
+
+**RED on 701475de:** extracted `notices_701475de.py`, `smoke_701475de.py`, and workflow YAML
+with `git show`; test loaders accept explicit `WP65_*` overrides while retaining the real
+module `__file__` for repository-root defaults. Branch never moved. Final selection:
+**27 failed, 3 passed** (`red-parent-final2.log`). Failures by control:
+
+- F1: 10 planner/writer parameters fail to deliver the pending reason: empty census does
+  not raise; partial census reaches per-host checks; new completed declaration forms hit
+  the old schema refusal. The completed/missing-host case also fails at the old schema.
+- F2: smoke emits missing-notices instead of the pending reason.
+- F3: six invalid-image/origin cases return RECORD paths instead of None. Two rewritten
+  valid images pass, the positive controls.
+- F4: Windows `X.app` FFmpeg check fails to raise, Contents-prefixed vendored path raises
+  the new unwanted message, and `X.app` artifact byte comparison fails. Ordinary Windows
+  bytes match the base, the third passing control.
+- F5: four linked-root/Contents cases (release and MacOS starting points) fail refusal or
+  the recorder's zero-premature-follow assertion.
+- F6: both workflow root-link cases reach the planted following `is_dir` assertion.
+
+**Windows byte proof:** the artifact test compiles `200dffd8:tools/package/notices.py` from
+read-only Git output with original path defaults, plans the same fixture twice, and
+compares rendered bytes. Both ordinary and `X.app` homes pass at the fold. Root annex CLI
+`--root-annex --check`: `root annex matches` (`annex.log`). Independent root renderer
+comparison against the extracted `200dffd8` source (`annex-bytes.log`): **854656 bytes**, both
+SHA-256 `cedaab4fcc6a27ed89c985cfc16b93ded8e2e8b20a1e83e69a155aee137f1541`, byte-equal.
+
+**Verification loop:** all six reported suspicions reproduced and fixed. A subsequent
+trace suspected nested candidates when discovery starts at Contents/MacOS: the recorder
+confirmed **2 failed, 2 passed** before ordering the outer bundle first
+(`red-macos-start.log`); after that fix all four cases pass. Native origin inspection also
+covers extensionless framework replacements by checking the original image, even when the
+replacement is no longer parseable as Mach-O. No false positive rejected. Final product
+review against the six findings found no further issue.
+
+**Locks checked:** `git diff --exit-code 701475de --` the unowned `build.py`, native licence
+surface, macOS lock, `src/`, and `release.yml` exits 0 (`locked-paths.log`). Switch remains
+`"false"`. All eight changed files have 0 CR bytes (`lf-check.log`). No commit, network,
+frozen run, GPU work, footage access or mailbox write; no other worktree read.
+
+**Validation results (fold working tree, base/head still `701475de`):**
+
+| Check | Result | Log under `work/wp6.5/f02a-fold/` |
+|---|---|---|
+| `ruff check .` | All checks passed | `ruff-final.log` |
+| `ruff format --check .` | 339 files already formatted | `format-final.log` |
+| `mypy` | Success, 166 source files | `mypy.log` |
+| `mypy --platform darwin` | Success, 166 source files | `mypy-darwin.log` |
+| Notices + build, `-n 3` plain | **1243 passed, 1 skipped** (77.08 s), final tests | `notices-build-final.log` |
+| Notices + build, `-n 3 --dist loadfile` | **1243 passed, 1 skipped** (135.80 s) | `notices-build-loadfile.log` |
+| Smoke + macOS portability + release workflow | **223 passed, 227 skipped, 5 failed** (86.31 s); all five failures are the existing real-Git gate's local push blocked by the sandbox | `smoke-port-workflow.log` |
+| New regression selection on parent `701475de` | **27 failed, 3 passed** | `red-parent-final2.log` |
+| Focused GREEN including prior app coverage | **39 passed** | `green-final-focused.log` |
+| Root annex CLI / Windows bytes versus `200dffd8` | matches / byte-equal (hash above) | `annex.log`, `annex-bytes.log` |
+
+The build skip is unchanged: `CPython sysconfig data is POSIX-only`. The other skips are
+226 macOS-native portability cases on Windows, plus the existing POSIX process-group smoke
+proof. No new skip added. The failed test is
+`test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`, all five parameters:
+`annotated`, `lightweight`, `wrong-commit`, `mismatched-name`, `deleted-origin`. Each runs a
+synthetic Git repository under its own basetemp; its local-only `git push origin
+HEAD:refs/heads/main --tags` exits 128 with `sh.exe: *** fatal error - CreateFileMapping ...`.
+No real remote was used. These are sandbox-limited controls, not product regressions;
+DISPOSITION: seat reruns those five outside the restricted token (explicitly allowed by
+dispatch 3), alongside Claude A/B and the two-leg package gate. They are not silently
+skipped or counted green here. No change to their tests or the release gate.
+
+The `--dist loadfile` run preceded a test-only improvement supplying full writer fixture
+arguments in pending-census RED cases; final plain reruns those same IDs with the improved
+inputs. Product source was identical for both full scheduling modes. Initial mypy's
+`SimplePath` type error was fixed with the existing `Path(str(...))` metadata convention;
+both final platform checks are green. No additional design choice is outstanding.
+
+| Round | Critical | Major | Minor | In/out | NEW/REOPENED | Reverts | Fix kind | Reviewer/transport | Depth |
+|---|---:|---:|---:|---|---|---:|---|---|---|
+| F0-2 A r1, fold | 0 | 4 | 2 | 6/0 | 6/0 | 0 | Product code + regression controls | Codex A from seat; subsequent Claude A/B pending | Dispatcher-read, not supplied |
