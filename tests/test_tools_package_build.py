@@ -7802,11 +7802,16 @@ def test_app_inventory_refuses_linked_discovery_before_following(tmp_path, linke
         _symlink(app / "Contents", str(outside), folder=True)
     else:
         root.mkdir()
+        (outside / "Contents/MacOS").mkdir(parents=True)
+        (outside / "Contents/MacOS/Clearwater").write_bytes(b"not executed")
         _symlink(app, str(outside), folder=True)
     recorder = _FsRecorder()
     notices = _notices_with(build)
     with pytest.MonkeyPatch.context() as patch:
         recorder.install(patch)
+        # Discovery is the control: an old walker reaching archive parsing must not
+        # turn the stand-in executable into an unrelated invalid-archive failure.
+        patch.setattr(notices, "_archive_entries", lambda *_args: [])
         with pytest.raises(ValueError, match="unsafe linked entry"):
             app_inventory(notices, root if start == "release" else app / "Contents/MacOS", app)
     assert recorder.violations(root, outside) == []

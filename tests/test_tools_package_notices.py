@@ -4566,7 +4566,12 @@ def test_app_census_declaration_cannot_be_bypassed(app_release, census, entrypoi
         document.pop("embedded_census")
     path.write_text(json.dumps(document))
     module = app_release["module"]
-    with pytest.raises(ValueError, match="macOS embedded census pending") as error:
+    reason = (
+        "notices: native licence manifest schema is invalid"
+        if census == "no-evidence"
+        else module.EMBEDDED_CENSUS_PENDING
+    )
+    with pytest.raises(ValueError, match=re.escape(reason)) as error:
         if entrypoint == "plan":
             app_plan(app_release)
         else:
@@ -4577,7 +4582,7 @@ def test_app_census_declaration_cannot_be_bypassed(app_release, census, entrypoi
                 uv_lock_path=app_release["uv_lock"],
                 distribution=app_release["distributions"].__getitem__,
             )
-    assert str(error.value) == module.EMBEDDED_CENSUS_PENDING
+    assert str(error.value) == reason
     assert not (app_release["app"] / "Contents/Resources/THIRD_PARTY_NOTICES.md").exists()
 
 
@@ -4649,12 +4654,20 @@ def test_windows_contents_prefix_does_not_claim_vendored_path():
     assert claims == {}
 
 
-@pytest.mark.parametrize("damage", ["rewritten", "replacement", "origin", "not-macho"])
 @pytest.mark.parametrize(
-    "relative", ["_pillow_heif.cpython-312-darwin.so", "Qt/lib/QtCore.framework/Versions/A/QtCore"]
+    "damage", ["rewritten", "replacement", "origin", "not-macho", "x86-thin", "fat-replacement"]
 )
-def test_app_record_native_requires_verified_macho_origin(tmp_path, damage, relative):
-    """A r1 F3: rewritten _pillow_heif passes; changed code or an untrusted origin fails."""
+@pytest.mark.parametrize("origin_kind", ["thin", "universal2"])
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "_pillow_heif.cpython-312-darwin.so",
+        "PySide6/libpyside6.abi3.6.12.dylib",
+        "PySide6/Qt/lib/QtCore.framework/Versions/A/QtCore",
+    ],
+)
+def test_app_record_native_requires_verified_macho_origin(tmp_path, damage, origin_kind, relative):
+    """A r2 F1: thin arm64 rewrites match thin/fat origins; replacements never own code."""
     import test_tools_package_build as build_tests
 
     module = load_notices()
@@ -4664,6 +4677,14 @@ def test_app_record_native_requires_verified_macho_origin(tmp_path, damage, rela
     path = home / name
     path.parent.mkdir(parents=True)
     origin_data = build_tests.original_native()
+    if origin_kind == "universal2":
+        origin_data = build_tests.fat(
+            (
+                build_tests.CPU_X86_64,
+                build_tests.original_native(cpu=build_tests.CPU_X86_64, code=build_tests.X86_CODE),
+            ),
+            (build_tests.CPU_ARM64, origin_data),
+        )
     dist = installed(tmp_path / "site", "pillow-heif", "1.4.0", {relative: "placeholder"})
     origin = Path(dist.locate_file(relative))
     origin.write_bytes(origin_data)
@@ -4675,6 +4696,12 @@ def test_app_record_native_requires_verified_macho_origin(tmp_path, damage, rela
         data = build_tests.built_native(code=build_tests.X86_CODE)
     if damage == "not-macho":
         data = b"not a Mach-O"
+    if damage == "x86-thin":
+        data = build_tests.built_native(cpu=build_tests.CPU_X86_64, code=build_tests.X86_CODE)
+    if damage == "fat-replacement":
+        data = build_tests.fat(
+            (build_tests.CPU_ARM64, build_tests.built_native(code=build_tests.X86_CODE))
+        )
     if damage == "origin":
         origin.write_bytes(build_tests.original_native(code=build_tests.X86_CODE))
     path.write_bytes(data)
@@ -4682,3 +4709,123 @@ def test_app_record_native_requires_verified_macho_origin(tmp_path, damage, rela
         module._Entry("file:" + name, name, "file"), home, {"pillow-heif": dist}, frozenset()
     )
     assert verdict == (relative if damage == "rewritten" else None)
+
+
+def test_app_record_non_native_data_keeps_record_path(tmp_path):
+    """A r2 F1: ordinary wheel data keeps its RECORD attribution without a native digest."""
+    module = load_notices()
+    relative = "PySide6/Qt/resources/data.dat"
+    dist = installed(tmp_path / "site", "pyside6-essentials", "6.12.0", {relative: "data"})
+    home = tmp_path / "Clearwater.app"
+    name = "Contents/Resources/" + relative
+    path = home / name
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"data")
+    assert (
+        module._app_entry_owner(
+            module._Entry("file:" + name, name, "file"),
+            home,
+            {"pyside6-essentials": dist},
+            frozenset(),
+        )
+        == relative
+    )
+
+
+@pytest.mark.parametrize("platform", ["darwin", "win32"])
+@pytest.mark.parametrize(
+    "census",
+    [
+        [],
+        {"win32": "complete"},
+        {"darwin": "complete"},
+        {"darwin": {"status": "complete"}},
+        {"darwin": {"status": "complete", "evidence": ""}},
+        {"darwin": {"status": "complete", "evidence": "   "}},
+        {"darwin": {"status": "complete", "evidence": 7}},
+        {"darwin": {"status": "complete", "evidence": "run 7\nhead abc"}},
+        {"darwin": {"status": "complete", "evidence": "run 7", "extra": 1}},
+        {"darwin": {"status": "complete", "evidence": "run 7"}, "linux": None},
+        {"darwin": {"status": "complete", "evidence": "run 7"}, "win32": "pending"},
+    ],
+)
+def test_embedded_census_schema_is_strict(app_release, monkeypatch, census, platform):
+    """A r2 F2: every platform rejects malformed or extended completion declarations."""
+    path = app_release["native_surface"] / "manifest.json"
+    document = json.loads(path.read_text())
+    document["embedded_census"] = census
+    path.write_text(json.dumps(document))
+    monkeypatch.setattr(sys, "platform", platform)
+    module = app_release["module"]
+    with pytest.raises(ValueError, match="native licence manifest schema is invalid"):
+        module._native_document(path.parent)
+    if platform == "darwin":
+        with pytest.raises(ValueError, match="native licence manifest schema is invalid"):
+            app_plan(app_release)
+
+
+def test_windows_plan_refuses_malformed_census(release):
+    """A r2 F2: the Windows planner validates a present declaration through the manifest."""
+    path = release["native_surface"] / "manifest.json"
+    document = json.loads(path.read_text())
+    document["embedded_census"] = []
+    path.write_text(json.dumps(document))
+    with pytest.raises(ValueError, match="native licence manifest schema is invalid"):
+        plan(load_notices(), release)
+
+
+def test_pending_app_census_with_evidence_keeps_named_refusal(app_release):
+    """A r2 F2: a well-shaped pending claim loads but refuses macOS notices by name."""
+    path = app_release["native_surface"] / "manifest.json"
+    document = json.loads(path.read_text())
+    document["embedded_census"] = {"darwin": {"status": "pending", "evidence": "run 7 pending"}}
+    path.write_text(json.dumps(document))
+    module = app_release["module"]
+    assert module._native_document(path.parent) == document
+    with pytest.raises(ValueError, match=re.escape(module.EMBEDDED_CENSUS_PENDING)):
+        app_plan(app_release)
+
+
+def test_windows_production_manifest_without_census_is_unchanged(monkeypatch):
+    """A r2 F2: the absent additive declaration preserves the committed Windows manifest."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    path = ROOT / "tools/package/native-licences/manifest.json"
+    data = path.read_bytes()
+    module = load_notices()
+    assert "embedded_census" not in module._native_document(path.parent)
+    assert module.census_preflight(path.parent) is None
+    assert path.read_bytes() == data
+    committed = subprocess.run(
+        ["git", "show", "200dffd8:tools/package/native-licences/manifest.json"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+        timeout=30,
+    ).stdout
+    assert data == committed
+
+
+def test_darwin_onedir_app_suffix_carries_inventory_layout(tmp_path, monkeypatch):
+    """A r2 A1: a planted Contents file cannot turn an inventoried onedir into an app."""
+    module = load_notices()
+    module._build_tool()
+    home = tmp_path / "X.app"
+    (home / "_internal").mkdir(parents=True)
+    (home / "Clearwater").write_bytes(b"not executed")
+    planted = home / "Contents/MacOS/Clearwater"
+    planted.parent.mkdir(parents=True)
+    planted.write_bytes(b"not executed")
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(module, "_archive_entries", lambda *_args: [])
+    monkeypatch.setattr(module, "census_preflight", lambda *_args: None)
+
+    class ContextObservedError(Exception):
+        """Stop the plan after checking the inventory's context at its first consumer."""
+
+    def check_context(*_args, in_app=False):
+        assert in_app is False, "onedir inventory was reclassified by its suffix and a planted file"
+        raise ContextObservedError
+
+    monkeypatch.setattr(module, "_ffmpeg_rows", check_context)
+    with pytest.raises(ContextObservedError):
+        module.plan_notices(home)

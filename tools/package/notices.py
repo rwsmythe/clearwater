@@ -234,6 +234,14 @@ class _Entry(NamedTuple):
     kind: str
 
 
+class _InventoryEntries(list[_Entry]):
+    """Inventory rows carrying the walk's layout without changing the two-value interface."""
+
+    def __init__(self, entries: Sequence[_Entry], *, in_app: bool) -> None:
+        super().__init__(entries)
+        self.in_app = in_app
+
+
 class _EmbeddedHost(NamedTuple):
     """An exact carried-host identity and its independently declared source set."""
 
@@ -845,6 +853,18 @@ def _native_document(folder: Path) -> dict[str, Any]:
         or not isinstance(document.get("components"), list)
     ):
         raise ValueError("notices: native licence manifest schema is invalid")
+    if "embedded_census" in document:
+        census = document["embedded_census"]
+        declaration = census.get("darwin") if isinstance(census, dict) else None
+        if (
+            not isinstance(census, dict)
+            or set(census) != {"darwin"}
+            or not isinstance(declaration, dict)
+            or set(declaration) != {"status", "evidence"}
+            or not _single_line_text(declaration["status"])
+            or not _single_line_text(declaration["evidence"])
+        ):
+            raise ValueError("notices: native licence manifest schema is invalid")
     return document
 
 
@@ -1576,7 +1596,7 @@ def _inventory(folder: Path) -> tuple[list[_Entry], Path]:
     executable = _find_notices_executable(folder)
     if sys.platform == "darwin" and (app := tool._macos_content_app(executable)) is not None:
         # WP6.5 F0-2: the macOS release is the bundle; its home is the .app itself.
-        return _app_inventory(tool, executable, app), app
+        return _InventoryEntries(_app_inventory(tool, executable, app), in_app=True), app
     home = executable.parent
     if not (home / "_internal").is_dir():
         raise ValueError("notices: expected an onedir folder with _internal")
@@ -1604,7 +1624,7 @@ def _inventory(folder: Path) -> tuple[list[_Entry], Path]:
         if name == "_internal/base_library.zip":
             entries.extend(_base_library_entries(path))
     entries.extend(_archive_entries(tool, executable))
-    return entries, home
+    return _InventoryEntries(entries, in_app=False), home
 
 
 def _find_notices_executable(folder: Path) -> Path:
@@ -1768,11 +1788,12 @@ def _app_entry_owner(
         for distribution in installed.values()
         if any(str(item).replace("\\", "/") == relative for item in distribution.files or ())
     ]
-    native = _build_tool()._macho_identity(data) is not None or any(
-        origin.is_file() and _build_tool()._macho_identity(origin.read_bytes()) is not None
+    tool = _build_tool()
+    native = tool._is_native(relative, data[:4]) or any(
+        origin.is_file() and tool._is_native(relative, origin.read_bytes()[:4])
         for _distribution, origin in origins
     )
-    if native or Path(relative).suffix.lower() in {".so", ".dylib"}:
+    if native:
         owners = []
         for distribution, origin in origins:
             if (
@@ -2294,11 +2315,7 @@ def plan_notices(
     _build_tool().check_build_environment()
     census_document = census_preflight(native_licences_path)
     entries, home = _inventory(folder)
-    in_app = (
-        sys.platform == "darwin"
-        and home.suffix == ".app"
-        and any(entry.name == _APP_BOOTLOADER for entry in entries)
-    )
+    in_app = cast(_InventoryEntries, entries).in_app
     if ffmpeg_lock_path is None:
         ffmpeg_lock_path = default_ffmpeg_lock()
     ffmpeg = _ffmpeg_rows(home, ffmpeg_lock_path, native_licences_path, in_app=in_app)
