@@ -4864,7 +4864,7 @@ def run5_collect_sibling(root):
         (f"{framework}/QtCore", "Versions/Current/QtCore", False),
         (f"{framework}/Resources", "Versions/Current/Resources", True),
         (f"{framework}/Versions/Current", "A", True),
-        ("QtCore", f"{framework}/Versions/Current/QtCore", False),
+        ("QtCore", f"{framework}/Versions/A/QtCore", False),
         ("libXau.6.dylib", "PIL/.dylibs/libXau.6.dylib", False),
         ("libx265.217.dylib", "pillow_heif/.dylibs/libx265.217.dylib", False),
     ):
