@@ -5,26 +5,51 @@
 
 ### Generation
 
-- **Generation 66** (session `clearwater-orchestrator-20261110-0123`). LIVE 2026-11-10 11:25Z from gen 65's rollover `6001f924`; ROLLED at the 400K cap with NOTHING it started running (see the rollover post).
-  - Seat folder `work/orch-g66/`: drains 1-7, the posts, `state-top.md`, `state_update.py`, `ledger_r16.py`, `fix_top.py`, `assemble_f4.py`, `assemble_f4_5.py` (the fresh Codex prompt form for this lane: agent + brief + dispatches/returns 1..N-1 + dispatch-N).
-  - Gen 65's `qa.sh` (`bash work/orch-g65/qa.sh <sha> <label>`, from the DETACHED `wp6.5-rB`; writes `work/orch-g65/qa-<label>/summary.txt`) and gen 64's `gate.sh` / `watch2.sh` are used from their folders.
-  - State worktree `.worktrees/orch-state-g66`. Bash gauge 39 ms.
-- **NO cell, Codex turn, review, gate or leg is running.** Claude cells `wp65-cell16/17/18` are DONE: never message any of them.
+- **Generation 67** (session `clearwater-orchestrator-20261110-0444`). LIVE 2026-11-10 14:45Z from gen 66's rollover `97b2404f`.
+  - Seat folder `work/orch-g67/`: drains 1-7, the posts, `state-top.md`, `state_update.py`, `assemble_f7.py` (the FRESH Codex prompt: `uv run --no-sync python work/orch-g67/assemble_f7.py <N>` joins the agent + brief + dispatches/returns 1..N-1 + dispatch-N into `codex\prompt-N.md`).
+  - Gen 65's `qa.sh` (`bash work/orch-g65/qa.sh <sha> <label>`, from the DETACHED `wp6.5-rB`; writes `work/orch-g65/qa-<label>/summary.txt`) is the seat QA.
+  - State worktree `.worktrees/orch-state-g67`. Bash gauge 37 ms.
+- **NO cell, Codex turn, review, gate or leg is running** at the time of this write.
 - **CHARC is gen 21, `clearwater-charc-20261108-2037`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **WP6.5 run-4 fix (the `.app` bundle CONTENT check), Codex lane, Claude Reviewer A.** Evidence `clearwater-review-evidence\wp6.5\codex\` (dispatches 1-5, returns, `turn-N.driver.stdout`) and `wp6.5\A-codex\r1`, `r2`.
-   - **Rulings:** `200f9645` (the fix), amended by `0317f4cb` (A r1: F2 kind by `os.stat` after admission, F3 every other `Contents/<x>` mapped like MacOS, A2 `_CodeSignature` exemption for non-module files only), whose F1 wording is REPLACED by `e162ad24` (A r2 F1-b: an admitted folder link is judged as its physical equivalent, by re-rooting its `macos_link_view` entries; no name-shape gate).
-   - **Heads on `wp6.5`:** `ae128116` (run 4) -> `82b9ae3e` + `2f69ad1d` (Codex turns 1-3) -> `1b6ec28d` + `eee896b6` (turn 4, A r1 fold) -> **`83df5ffe` + `6dc8c000`** (turn 5, FRESH session `01a1c5de-0968-7131-8e4a-b8cf4f15b179`, depth 117,391: the A r2 F1-b fold, the exact re-rooted check; cell: RED 5 failed on `eee896b6`, build + notices 1,175 passed with `--dist loadfile`, smoke 74/1, onedir 372 = 372 and 580 = 580, run-4 rebuild 0, 13 refusals per probe). Committed by the seat, 0 CR, nothing under `src/`. Seat QA NOT yet run on `6dc8c000`.
-   - **Turn 5's seat finding (MINOR, pre-existing):** under default xdist scheduling `tests/test_tools_package_build.py` showed 1 failed / 1,174 passed: a fixture blocks `Popen` during a cold PyInstaller import (order-dependent; the parent `eee896b6` reproduces it; the seat's own `-n 3` QA runs have been green). Details in the ledger's `### A r2 fold`. Report it in the ready post; ask CHARC whether it is a DR row or a fix in this package.
-   - **NEXT:** Claude Reviewer A r3 on `eee896b6..6dc8c000` (prompt form `wp6.5\A-codex\r2\review-prompt.md`: CHARC's ruling verbatim, the severity rule, the CHECKs; the reviewer rebuilds the run-4 `.app` from `runner\run-42814037850\macos-evidence\app-listing.txt` and re-runs its planted entries and the five F1-b probes). Run it with `codex_cell.py review --worktree 'C:\Users\rwsmy\clearwater\.worktrees\wp6.5-rA' --base eee896b6 --prompt <p> --out <dir>` after `git -C .worktrees/wp6.5-rA checkout -q --detach <head>`; seat QA beside it (`bash work/orch-g65/qa.sh <head> <label>`, which moves `wp6.5-rB` itself).
-   - **A finding:** a recorder-only gap is an ADVISORY to the ledger's uncovered list (`d13c6ce4`); a product following call is a MINOR folded without a ruling (`4ed56fcb`); a wrong admission or an onedir change goes to CHARC. A further fold goes to a FRESH Codex session if turn 5's depth is past ~200K (`depth_input_tokens` in `turn-5.driver.stdout`), resumed otherwise (`--session=<id>`).
-   - **Then:** the ready post to CHARC (range `ae128116..<head>`, nothing under `src/`, `release.yml` unchanged, `MACOS_FFMPEG_BUNDLED: "false"`, QA summary); CHARC pushes and sends the run-5 id; watch it (background `until gh run view <id> --repo rwsmythe/clearwater ...`), download read-only into `wp6.5\runner\run-<id>\`, `gh run view --log` into `full-job.log`, build the runner table against run 4's, post it.
-   - **Run 4's table (for comparison):** parallel 7,893 / 1,231 / 0; serial 526 / 797 / 0; the `.app` built (41.3 s, 506.4 MiB), link rule + native origin PASS; bundle tests 136 passed; content check FORBIDDEN 115.
-   - **F0-2:** CHARC writes the brief AFTER run 5 shows the content check passing (inputs: `work/orch-g64/f02-sizing.md`; the CUDA skip for `test_wp321_bench.py::test_a_device_frame_run_gives_the_sink_device_frames`; run 4's `app-listing.txt` / `containment-census.txt`; cell17's notices note). At the WP6.5 accept CHARC opens the DR row for the recorder's uncovered list.
-2. **WP7.1: ACCEPTED** by CHARC (`1b14aa9f`, main `5f684e58`; DR-160..162). Keep its worktrees and records until the owner's prune word.
-3. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1`, `wp7.1-iA`, `wp7.1-instrument`, `wp7.1-rA`, `wp6.5-rB`, `wp6.5-rA`, plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`, and the state worktrees `orch-state-g65`, `orch-state-g66`.
+1. **WP6.5 stage 1: run 6 (`42865170579`, `200dffd8`) is GREEN**, the first green macOS run. The runner table was posted to CHARC (`060c9bf0`). Evidence is in `clearwater-review-evidence\wp6.5\runner\run-42865170579\`.
+   - **Waiting on CHARC:** the F0-2 brief (the `.app`-aware notices census and the bundled-FFmpeg switch, sized M). Inputs: `work/orch-g64/f02-sizing.md`; run 6's `app-listing.txt` / `containment-census.txt`, the same file set as runs 4 and 5; the CUDA skip for `test_wp321_bench.py::test_a_device_frame_run_gives_the_sink_device_frames`; cell17's notices note.
+   - Then dispatch per the brief. Codex pace has been the lower: at 14:45Z Codex was 27 % used at pace 0.31 (reset 11-11 10:07Z) and Claude 30 % at pace 1.75. Re-read both before the dispatch.
+   - Then stage 2 (the owner's run sheet on the Mac).
+2. **Held for the WP6.5 accept's XS test/docs item** (CHARC `52932598`, `5f5cb8e6`):
+   - **A-r6-1:** the sibling fixture `tests/test_tools_package_build.py:4870` targets `Versions/Current/QtCore`; the listing has `Versions/A/QtCore`. Fix the target, or soften the docstring and ledger.
+   - **A-r6-2:** `tests/test_release_workflow.py:1496-1501`, where the `sw_vers` patch catches a cold `platform.machine()` when WMI is unavailable. Call `platform.uname()` before the patch, or pass other argv through.
+   - One test-isolation DR row (CHARC's) names both fixtures. `macos_bundle` is already fixed in `eb7b8949`.
+   - A-r5-3 (time to refuse a K-cubed loop fan) is a watched DR row, not folded.
+3. **WP6.5 lane history (for a fresh Codex session):** `codex\dispatch-1..8`, `return-1..8`, `prompt-5/7/8`. Session `01a1c657-acd9-7791-9716-c658e683a07a` ended at depth 155,030, with a 258,400 window that turn. The next group should run FRESH.
+4. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1`, `wp7.1-iA`, `wp7.1-instrument`, `wp7.1-rA`, `wp6.5-rB`, `wp6.5-rA`; plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`; and the state worktrees `orch-state-g65`, `orch-state-g66`, `orch-state-g67`.
+
+### GEN-67 RECORD
+
+- Online `419b5f88`; CHARC ack `7ec41241`, which ruled the `macos_bundle` xdist fixture a DR row.
+- **Run-4 fix, closed over four review rounds:**
+
+  | Round | Range | Result | Ruling / commits |
+  | --- | --- | --- | --- |
+  | A r3 | `eee896b6..6dc8c000` | F1-c MAJOR: a nested folder link was not re-rooted | CHARC `7a246dfd`; Codex turn 6 (resumed) -> `a0d62fec` + `29f9305f` |
+  | A r4 | | F1-d MAJOR: an aliased release root refused 20 legitimate links; plus a fan-out advisory | CHARC `37ba6ba9`; turn 7 (FRESH) -> `74d416d6` + `80d57f15` |
+  | A r5 | | `NO_NEW_CRITICAL_MAJOR`, 3 advisories | Ready `59300ea2`; pushed; run 5 |
+
+- **Run 5 (`42853872024`) FAILED outside the `.app`:**
+  - 42 links in PyInstaller's COLLECT sibling `Clearwater/_internal/`;
+  - `pyz:_sysconfigdata__darwin_darwin`.
+  - CHARC ruled `c6f26292`. Turn 8 (FRESH) -> `eb7b8949` + `200dffd8`.
+  - A r6 `NO_NEW_CRITICAL_MAJOR` (2 test-only advisories); seat QA green.
+  - Ready `a349cd41`; CHARC pushed; **run 6 green** (post `060c9bf0`).
+
+### Gen-67 lessons
+
+- **A reviewer's rebuild covers only what the evidence captured.** Four review rounds rebuilt the `.app` from `app-listing.txt` (`find <root>/Clearwater.app -ls`) and never saw PyInstaller's COLLECT sibling beside it. Run 4's 50-line print cap hid the sibling's lines and the `pyz:` line. Before a "content check passes" claim, ask what the check walks, compare it with what the evidence lists, and read any capped output to its end.
+- **Judge what ships:** `release_zip_folder(root)` is the shipped folder. A check over the whole distpath judges build by-products.
+- **A test-wide patch of the shared `subprocess` catches the stdlib's own cold `platform` query** (`win32_ver` -> `ver` when WMI is unavailable, as in the Codex sandbox). Two fixtures had it. A sandbox-only test failure in that family is not a product defect; confirm it at the seat.
+- **The bare-`cd` slip struck once** (`cd .worktrees/wp6.5-rB && ...` to read a skip reason). It was restored in the next call, and nothing was written while moved.
 
 ### GEN-66 RECORD
 
