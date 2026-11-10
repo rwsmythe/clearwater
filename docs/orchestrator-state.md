@@ -5,58 +5,50 @@
 
 ### Generation
 
-- **Generation 67** (session `clearwater-orchestrator-20261110-0444`). LIVE 2026-11-10 14:45Z from gen 66's rollover `97b2404f`; ROLLED ~18:55Z at the 400K cap with NOTHING it started still running (see the rollover post).
-  - **Seat folder `work/orch-g67/`:**
-    - drains 1-13 and the posts;
+- **Generation 68** (session `clearwater-orchestrator-20261110-0904`). LIVE 2026-11-10 19:05Z from gen 67's rollover `db53c8e3`.
+  - **Seat folder `work/orch-g68/`:**
+    - drains and posts;
     - `state-top.md` and `state_update.py`;
-    - `assemble_f7.py <N>` (the run-4/5 Codex lane's fresh prompt);
-    - `assemble_f02.py <N>` (the F0-2 lane's fresh prompt: agent + F0-2 brief from main + f02 dispatches/returns 1..N-1 + dispatch-N -> `f02\codex\prompt-N.md`);
-    - `fix_d3.py`.
+    - `make_d4.py` (dispatch-4 = `d4-head.md` + dispatch-3's locks/rules sections + `d4-tail.md`).
+  - The fresh Codex prompt is still built by gen 67's `work/orch-g67/assemble_f02.py <N>`. It needs `f02\return-<N-1>.md` at the f02 root: copy it from `f02\codex\`.
   - **Seat QA** is gen 65's `qa.sh`: `bash work/orch-g65/qa.sh <sha> <label>`, from the DETACHED `wp6.5-rB`; it writes `work/orch-g65/qa-<label>/summary.txt`.
-  - **State worktree** `.worktrees/orch-state-g67`. Bash gauge 37 ms.
-- **NO cell, Codex turn, review, gate or leg is running.**
-  - `wp65-cell19` (Claude) RETURNED and is RETIRED, static at 384,970 / 135 turns on two readings: never message it.
-  - The Codex F0-2a fold session `01a1c6c4-ab34-7461-8fc1-d7dbb2cc579c` ended at depth 203,728: resume it only below ~160K, so the next turn is FRESH.
-- **CHARC is gen 22, `clearwater-charc-20261110-0800`** (gen 21 rolled at ~18:00Z). Re-verify the name in `comms/.launch-sessions.json` before every cue.
+  - **State worktree** `.worktrees/orch-state-g68`. Bash gauge 46 ms.
+- **RUNNING (at this writing):** Codex turn 4 (FRESH session, dispatch-4). It started 19:20Z in `.worktrees/wp6.5` from `5729dd63`; the driver's stdout is `f02\codex\turn-4.driver.stdout`. Its return is `f02\codex\turn-4.*` / `return-4.md`.
+- **CHARC is gen 22, `clearwater-charc-20261110-0800`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **WP6.5 F0-2a: `wp6.5` at `5729dd63`** (ff chain from `200dffd8`).
-   - **Commits:**
-     - `4e838bc6` round 0 (the ledger; STOP D1 -> CHARC SPLIT `eb1fc893`);
-     - `ba0de255` A-r6-1, `2668f88d` A-r6-2;
-     - `b23794f5` `notices.py` reads the `.app`;
-     - `87225d7b` the validation-mode step "Record the Mach-O identities";
-     - `701475de` the ledger;
-     - **`db059efd` + `5729dd63`, the Codex fold of Codex A r1's 4 MAJOR + 2 MINOR under CHARC `698a6460`** (fresh Codex session, return `clearwater-review-evidence\wp6.5\f02\codex\return-3.md`).
-   - **The fold's cell report:**
-     - notices + build 1,243 / 1, both `-n 3` plain and loadfile;
-     - smoke / portability / workflow 223 / 227 skipped / **5 failed**: the sandbox's real-git `CreateFileMapping` limit on `test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`, five params; the seat re-runs them;
-     - RED on extracted `701475de`: 27 failed / 3 controls;
-     - the Windows root annex is byte-identical to `200dffd8` (854,656 bytes).
-   - **Checked at the seat:** 0 CR; `src/`, `build.py`, `release.yml`, the lock and `native-licences/` unchanged since `200dffd8`; `MACOS_FFMPEG_BUNDLED: "false"`.
+1. **WP6.5 F0-2a: `wp6.5` at `5729dd63`; the Codex A r1 fold is committed.**
+   - **Claude A r2** on `701475de..5729dd63` (`f02\A-claude\r2\review.txt`) gave FINDINGS:
+     - F1 MAJOR: a universal2 Qt origin skips the `macho:` identity check, because `_macho_identity` handles thin arm64 only;
+     - F2 MINOR: the census shape is not strict;
+     - advisories A1 (`in_app` is recomputed), A2 (fixture), A3 (efficiency).
+   - **Seat QA on `5729dd63` all green** (`work/orch-g65/qa-5729/summary.txt`; release_workflow 153 passed, so the sandbox's five real-git params pass at the seat).
+   - **CHARC ruled `7a363f94`:** fold F1 (fat-origin tests required), F2 (strict on every platform), A1 and A2; **A3 is NOT folded and becomes a DR row at the accept.**
+   - **Dispatch-4 is running** (above).
    - **NEXT, in order:**
-     1. **Claude Reviewer A r2 on `701475de..5729dd63`**, the other model from the Codex fold.
-        - Prompt form: `clearwater-review-evidence\wp6.5\A-codex\r6\review-prompt.md` (a Claude review of a Codex turn: CHARC's ruling verbatim, the severity rule, numbered CHECKs, run-once commands, the ISOLATION block, NO `run_in_background`).
-        - Hunt list: Codex A r1's six findings `f02\A\r1\review.txt` closed against its probes. Then:
-          - CHARC `698a6460` item 1's five census cases: empty, partial, complete-without-evidence, complete-with-zero-hosts, complete-and-consistent;
-          - item 4's one layout context: a planted `X.app` onedir on Windows gives the base behaviour; the Windows annex byte-equal;
-          - every following call after admission;
-          - no `build.py` change.
-        - Run: `git -C .worktrees/wp6.5-rA checkout -q --detach 5729dd63`, then `codex_cell.py review --worktree 'C:\Users\rwsmy\clearwater\.worktrees\wp6.5-rA' --base 701475de --prompt <p> --out 'C:\Users\rwsmy\clearwater-review-evidence\wp6.5\f02\A-claude\r2'`, in the background.
-        - Seat QA beside it: `bash work/orch-g65/qa.sh 5729dd63 5729`. Its `test_release_workflow` run is the seat's re-run of the five real-git params.
-     2. A finding: a fold in a FRESH Codex session (`assemble_f02.py <N>` after writing `f02\dispatch-<N>.md`), or ask CHARC if it touches the census form, admission or Windows.
-     3. **Reviewer B = Claude at the seat on the WHOLE group `200dffd8..<head>`** (CHARC: the other model from the implementer; the fold went Codex). A single pass; one remediation if needed.
-     4. **The two-leg gate on the laptop** from the detached `wp6.5-rB` at the head: copy the toml and `uv sync --frozen` first. Use gen 64's `bash work/orch-g64/gate.sh <worktree> <run-id> <legs...>` plus `watch2.sh` with a stall watch; read both scripts first. Also the harness.
-     5. **The ready post to CHARC.** CHARC's run-7 push bar: nothing under `src/`; the `.github` diff is the identity step (+ item 6's root check) only; a fast-forward from `200dffd8`. CHARC pushes run 7 with the switch OFF.
-     6. Watch run 7 and download read-only. Its `macho-identities.txt` should hold 155 lines; it is F0-2b's input. Post the table.
-   - **F0-2b (after run 7; brief on main `299a37d9`):**
-     - the seat census in the gen-51 / gen-55 form: a census subagent at the seat with spot checks, from run 7's identities plus python-build-standalone's macOS metadata for `libpython3.12.dylib` and each wheel's vendoring files;
-     - then a cell writes the darwin host rows AND `embedded_census.darwin = {"status": "complete", "evidence": "<run id + head>"}` in the same commit (CHARC `698a6460` item 1);
-     - switch ON; the `macos-release` upload gated on release mode (5a); `!cancelled()` on the bundled build (5b); the CUDA skip;
-     - open items in the ledger: the Mac Python licence path, the PBS BUILD marker, the libogg wording. Run 8 is the proof.
-   - **At the WP6.5 accept** (CHARC): the test-isolation DR row closes (A-r6-1 / A-r6-2 landed in `ba0de255` / `2668f88d`); A-r5-3 stays a watched DR row; the item-4 Windows-leak near miss goes into the A4 "Windows untouched" lesson line.
-2. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1`, `wp7.1-iA`, `wp7.1-instrument`, `wp7.1-rA`, `wp6.5-rB`, `wp6.5-rA`; plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`; and the state worktrees `orch-state-g65`, `orch-state-g66`, `orch-state-g67`.
+     1. Commit turn 4's return in `wp6.5` (`codex_cell.py commit`, or by pathspec in the worktree), LF, 0 CR. Check that nothing changed under `src/`, `build.py`, `.github/`, `release.yml`, the lock or `native-licences/`.
+     2. Seat QA on the fold head, and **Claude A r3** on `5729dd63..<fold>` (form: `f02\A-claude\r2\review-prompt.md`), from the detached `wp6.5-rA`.
+     3. **Claude B** on `200dffd8..<head>` (a single pass; form: `wp6.3a\B\r1\review-prompt-B.md`, HUNT lenses).
+     4. The two-leg gate from the detached `wp6.5-rB` (`work/orch-g64/gate.sh` + `watch2.sh`); the serial leg runs only with NO live cell (DR-162). Run the harness too.
+     5. The ready post to CHARC, giving the range. CHARC pushes run 7 with the switch OFF.
+     6. Watch run 7; its `macho-identities.txt` (155 lines) is F0-2b's input.
+   - **F0-2b (after run 7; brief on main `299a37d9`):** unchanged from gen 67's plan. The census subagent at the seat; then the darwin rows + `embedded_census.darwin = {status, evidence}` in ONE commit; switch ON; 5a / 5b; the CUDA skip; run 8 is the proof.
+   - **At the WP6.5 accept** (CHARC):
+     - the test-isolation DR row closes;
+     - A-r5-3 stays a watched DR row;
+     - the A3 efficiency DR row is added;
+     - the item-4 Windows-leak near miss goes into the A4 "Windows untouched" lesson line, and the universal2 lesson goes beside it.
+2. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1`, `wp7.1-iA`, `wp7.1-instrument`, `wp7.1-rA`, `wp6.5-rB`, `wp6.5-rA`; plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`; and the state worktrees `orch-state-g65` .. `orch-state-g68`.
+
+### GEN-68 RECORD
+
+- Online `34378524`; CHARC ack `8593ed36`.
+- **Claude A r2:** FINDINGS (above). Seat QA green. Query `b2a91c5d`; CHARC ruled `7a363f94`. Dispatch-4 started, a fresh Codex turn 4 (status `faa52db4`).
+
+### Gen-68 lessons
+
+- **A normaliser's input class must match the real inputs.** The fold's identity test used a THIN origin; the real PySide6 / shiboken6 wheels are universal2. Ask "what does the real wheel look like" for every synthetic origin in a test.
 
 ### GEN-67 RECORD
 
