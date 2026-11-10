@@ -4198,11 +4198,11 @@ No STOP or dispute; this is the fourth Codex-lane review fold, below the round-5
   chain, class, listing and view helpers are unchanged.
 - **A-r4-2 ADVISORY, confirmed / fixed as ruled:** measured the full captured graph
   BEFORE editing product code (`measure.log`), and again at the fold head
-  (`measure-final.log`). Of 86 top-level links the largest recursive view contains
-  **198 entries**, at `Contents/Frameworks/PySide6/Qt/translations` (next: 164 for
-  `Contents/Resources/scipy`). Thus 10x = 1,980 < 4,096; the named
+  (`measure-final.log`). Corrected at the run-5 fold (A-r5-1): the PRODUCT's
+  `judged` counter has a maximum of **99 entries**, at
+  `Contents/Frameworks/PySide6/Qt/translations`. Thus 10x = 990 < 4,096; the named
   `_MACOS_LINK_CONTENT_ENTRIES = 4096` sits beside `_MACOS_LINK_HOPS` (`:4442`),
-  with more than 20x measured headroom. One shared counter counts each re-rooted
+  with about 41x measured headroom. One shared counter counts each re-rooted
   entry judged, including nested folder links and their entries, across all levels
   of ONE top-level link. Before the next entry would pass N (`:656`), it stops that
   entire descent and emits exactly ONE `(link: folder fan-out)` line at the original
@@ -4292,3 +4292,178 @@ fold plus tests and ledger; no commit, shared admission/listing, src/interface/w
 dependency/notices/committed-fixture/debt/C14 change, frozen run, real bin/FFmpeg access,
 desktop input, network action, other-worktree read or footage/profile write.
 All evidence is inside this worktree. Dispatcher-read depth not supplied.
+
+## Run-5 fix
+
+Codex cell, dispatch 8, base `80d57f15`, 2026-11-10; CHARC `c6f26292`.
+No STOP or dispute. Claude A r5 read in full from
+`C:/Users/rwsmy/clearwater-review-evidence/wp6.5/A-codex/r5/review.txt`:
+`NO_NEW_CRITICAL_MAJOR`, with three advisories. This dispatch authorises the two
+new runner-failure classes, A-r5-1 / A-r5-2 cleanup, and the previously banked
+test-isolation fixture fix. The seat owns the next review and push for run 6;
+this is a return to that seat, not a claim of native build success.
+
+**Run 5 facts:** run `42853872024`, head `80d57f15`, failed at "Build app bundle
+without FFmpeg". Read the `FORBIDDEN in the bundle (43)` block and the captured
+app listing under
+`C:/Users/rwsmy/clearwater-review-evidence/wp6.5/runner/run-42853872024/macos-evidence/`.
+No `dist:Clearwater.app/...` violation appeared. The archived runner summaries
+(read here, not executed here) are:
+
+| Runner leg | Passed | Skipped | Other / wall |
+| --- | --- | --- | --- |
+| Parallel | 7,948 | 1,231 | 1 warning; 270.94s |
+| Serial | 526 | 797 | 9,413 deselected; 117.90s |
+| macOS bundle tests | 136 | 0 | 10,600 deselected; 52.20s |
+
+The 43 failures divide into 42 COLLECT-sibling links (18 internal framework
+structure links, six top-level Qt links, 18 top-level dylib links), and
+`pyz:_sysconfigdata__darwin_darwin (unexpected-module)`.
+
+| Round / item | Severity counts | Scope / disposition | NEW / REOPENED | Reverts | Fix kind | Reviewer / depth |
+| --- | --- | --- | --- | --- | --- | --- |
+| Codex lane A r5 | 0 CRITICAL, 0 MAJOR, 3 ADVISORY | A-r5-1 and A-r5-2 confirmed / fixed; A-r5-3 time-only, outside this dispatch, unchanged / disclosed | 3 / 0 | 0 | Tests + ledger | Claude at seat; dispatcher-read depth and CLI/transport version not supplied |
+| Run-5 failures | 2 MAJOR | Both in-envelope, confirmed / fixed under `c6f26292` | 2 / 0 | 0 | Product code + regressions | Native runner evidence; fresh Codex cell |
+| Banked fixture isolation | 1 MINOR | Now explicitly in-envelope, confirmed / fixed | Previously banked, not reopened | 0 | Test fixture + callers | Default-xdist proof below |
+
+**Changes and scope:**
+
+- **Class 1, MAJOR, confirmed / fixed:** `tools/package/build.py:5558` changes
+  ONLY the `.app` branch's first argument to
+  `forbidden_paths(release_zip_folder(root), app=app)`. The default/onedir call
+  stays `forbidden_paths(root)`. `find_executable` selects
+  `root / MACOS_APP / Contents / MacOS / APP_NAME` before either onedir fallback;
+  `_macos_content_app` therefore selects exactly `root / MACOS_APP`, the same
+  lexical folder as `release_zip_folder(root)` on darwin. Neither selection
+  changes. `release_dir`'s docstring (`:333`) now names the COLLECT sibling as
+  unshipped. Its original text did not contain the dispatch's quoted ONE-item
+  claim; `release_zip_name`'s ONE top-level ZIP item remains accurate and unchanged.
+  The total-size line and every other use of `root` are unchanged.
+- **Class 1 regressions:** `tests/test_tools_package_build.py:4846` builds six
+  literal run-5 link names spanning all three sibling classes: QtCore's three
+  framework links, the top-level QtCore link, and libXau / libx265 aliases. Targets
+  use the captured PyInstaller layout. These are real `os.symlink` entries under
+  the test root, not committed runner bytes. The build-path test (`:4900`) uses
+  real content checks and a real synthetic CArchive; PyInstaller execution,
+  origin and signing are stubbed. A planted `cupy.pyc` still fails at
+  `dist:Contents/Frameworks/cupy.pyc (gpu-module)` while the sibling is ignored.
+  The ZIP test (`:4921`) exercises `_macos_release_files` and `write_release_zip`:
+  exactly the three minimal `.app/Contents/...` files ship, no `Clearwater/`
+  member. No EXISTING `.app` label assertion was adjusted; direct callers keep
+  their release-root labels and the new build-path pin proves app-root labels.
+- **Class 2, MAJOR, confirmed / fixed:** `module_violations` (`build.py:495`,
+  exact-name comparison `:513`) computes
+  `_sysconfigdata_{abiflags}_{platform}_{multiarch}` from the build interpreter,
+  using `getattr` for abiflags and `_multiarch`. The exception is POSIX-only,
+  exact top-level PYZ-only, and never honours `_PYTHON_SYSCONFIGDATA_NAME`.
+  `allow_boot=True` (the CArchive-module path) never gets it. All other name
+  rules still run. `name_violations` and the stdlib/Windows allowlists are
+  source-identical. Tests (`:510-590`) model `darwin`, empty abiflags and
+  `_multiarch="darwin"` without changing pathlib's host selection. The exact
+  name passes even with an evil environment override; evil, wrong-platform and
+  nested names fail. Windows admits none. Real CArchive/PYZ, loose file, ZIP and
+  `.app` checks pin the storage boundary. The native CPython-agreement test is
+  collected but skipped on Windows; it runs on POSIX with the override unset.
+- **A-r5-1, ADVISORY, confirmed / fixed:** corrected the A r4 fold above to the
+  PRODUCT's **99** maximum at `Contents/Frameworks/PySide6/Qt/translations`, about
+  **41x** headroom at N=4,096. `work/wp6.5/f8/measure_counter.py` traces the
+  product frame's actual `judged` local on return (380 judged entries across 86
+  physical link entries; only folder links consume entries). It independently
+  reproduces **198** when counting ALL `macos_link_view` returns, including
+  the admission scans; that was the earlier instrument's double count. Boundary:
+  **N=99 -> 0**, **N=98 -> exactly one translations fan-out line**, from both the
+  release root and the app root. `measure-counter.log` contains the values.
+- **A-r5-2, ADVISORY, confirmed / fixed:** the 13-level diamond test (`:1078`)
+  patches N to **64**, retaining real recursive links and its single top-level
+  refusal assertion. The cheap separate assertion (`:1107`) pins the REAL
+  constant to at least `10 * 99`. Product budget and admission code are unchanged.
+- **Fixture isolation, MINOR, confirmed / fixed:** `macos_bundle` saves
+  `real_popen` beside `real_run` (`:5989`, `:6008`); all THREE existing callers
+  that restore `run` also restore `Popen` (`:6725`, `:6977`, `:7058`). The fixture
+  still blocks both by default during bundle-only checks. A cold archive-writer
+  import can now perform its platform query in callers that intentionally allow
+  normal subprocesses. The seat can close the debt row at accept; it was not edited.
+- **A-r5-3, ADVISORY:** the pre-existing self-alias admission-scan cost remains
+  outside this dispatch. No admission, recursion, loop or fan-out behaviour is
+  changed here. It remains a time-only refusal cost for the seat's disposition.
+
+**Validation evidence:** all local logs and probes under `work/wp6.5/f8/`.
+All pytest commands use `PYTHONPATH=scripts`, the sandbox mkdir shim,
+`-p no:cacheprovider`, the startup-test exclusion and basetemps under this folder.
+The scratch runner removes only the bootstrap `PYTHONPATH` environment value
+after Python has put `scripts` on sys.path, as in prior turns: product build
+checks continue to refuse ambient Python environment overrides.
+
+| Local check | Result | Evidence |
+| --- | --- | --- |
+| Build + notices, default `-n 3`, final state | **1,202 passed, 1 skipped**, 70.43s | `build-notices-plain-final.log` |
+| Build + notices, `-n 3 --dist loadfile`, final state | **1,202 passed, 1 skipped**, 133.27s | `build-notices-loadfile.log` |
+| Smoke | **74 passed, 1 skipped**, 83.22s | `smoke.log` |
+| Portability | **226 skipped**, 0.21s, Windows native-M skips | `portability.log` |
+| Release workflow, official file / cold process | **136 passed, 8 failed**, 2.76s; dispositions below | `release-workflow.log` |
+| Final run-5 + diamond selection | **12 passed, 1 skipped**, 0.67s | `green-final-current.log` |
+| Ruff check | **All checks passed** | `ruff-check.log` |
+| Ruff format check | **339 files already formatted** | `ruff-format.log` |
+| Mypy, default and darwin | **No issues in 166 source files each** | `mypy.log`, `mypy-darwin.log` |
+| Onedir nine-case census, parent vs fold | **372 = 372**, exact ordered calls, following flags, results and messages | `onedir-census.log`, `onedir-census.json` |
+
+The build-suite skip is the new POSIX-only native CPython-agreement case. Smoke's
+skip is the native POSIX process-group proof. The default-distribution build run
+proves the fixture restoration under the previously problematic scheduling;
+no `--dist loadfile` workaround is needed for that green result.
+
+**RED:** `git show 80d57f15:tools/package/build.py` saved as bytes to `build_r5.py`,
+selected through `WP61_BUILD_SCRIPT`. Final run-5 regressions: **4 failed,
+7 passed, 1 skipped**, 771 deselected in 1.02s (`red-final-current.log`). The exact
+PYZ name fails its empty-rules assertion; the archive-storage pin sees an extra
+`pyz:_sysconfigdata__darwin_darwin` violation; the clean build fails with SIX
+COLLECT-sibling link lines; the planted-app build still prints those sibling
+lines and fails the no-sibling assertion. The ZIP exclusion pin, Windows model,
+look-alikes and real-constant headroom pin pass on the parent as expected.
+The initial RED attempt needed the copied script's `REPO_ROOT` set to the real
+repo root; the final regression does that explicitly and fails on content,
+not a missing source file. `red-final.log` records the initial intended three
+failures before adding the companion planted-app parameter.
+
+The patched diamond's final head duration is **0.29s** (`green-final-current.log`),
+down from the prior turn's 17.95s. Its parent `29f9305f` RED is recorded separately
+in `diamond-red.log`: **1 expected failure**, 782 deselected in 88.12s (87.63s
+call), at `found.count(label) == 1`, actual 0. This is a synthetic-test
+wall, not a Mac performance measurement or an exclusive hardware figure.
+
+**Release-workflow failures (out of scope, not repaired):**
+
+- **Sandbox limit:** the five parameters of
+  `test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`
+  (`annotated`, `lightweight`, `wrong-commit`, `mismatched-name`, `deleted-origin`)
+  fail during the fixture's LOCAL `git push` into its disposable bare repository,
+  exit 128. Captured stderr names Git's `sh.exe` fatal `CreateFileMapping` error
+  and "Could not read from remote repository". No network remote is involved.
+  The seat must rerun these five outside this sandbox; no product defect is claimed.
+- **MINOR, confirmed existing cold-import test isolation, outside this dispatch:**
+  `test_macos_version_step_records_or_checks_the_release_version`'s three success
+  parameters (`[-1.2.0-false-validation]`, `[-1.2.0-true-validation]`,
+  `[1.2.0-1.2.0-true-release]`) patch the shared `subprocess.run` with `sw_vers`.
+  A cold `platform.machine()` in the workflow body calls `uname -> win32_ver ->
+  _syscmd_ver -> check_output('ver') -> run`, so the sw_vers-only kwargs assertion
+  fails (`tests/test_release_workflow.py:1498`). Independent cold selection:
+  **3 failed, 2 passed**, 139 deselected in 0.43s (`workflow-cold.log`). With ONLY
+  `platform.machine()` warmed before pytest in a scratch launcher, all five
+  parameters pass: **5 passed**, 139 deselected in 0.10s (`workflow-warm.log`).
+  No test or workflow file is changed. The official result remains 136/8, not
+  the warmed subset's green result; this finding is returned to the seat.
+
+**Verification loop / locks:** confirmed both runner failures with final parent
+REDs, applied the two minimal ruled product edits, and ran the full requested
+module suites plus statics. Independently traced the actual counter and checked
+its refusal boundary; confirmed the new workflow-test failure mechanism rather
+than editing outside scope. Final source/census audit finds no new in-envelope
+issue. Shared content/admission/listing/view/ZIP rules and the default onedir
+filesystem path remain source-identical (`scope-final.log`). `build()` differs ONLY in
+the `.app` call's first argument. No false positive was rejected; the two workflow
+failure classes above remain disclosed for the seat. Range is `80d57f15..working
+tree`; only build.py, its test file and this ledger change, all LF. No commit,
+push/tag/dispatch, src/interface/.github/dependency/notices/debt/C14/committed-fixture
+change, real bin/FFmpeg access, frozen run/build, product entry-point/GUI launch,
+desktop input, network action, other-worktree read or footage/profile write.
+All evidence stays inside this worktree; the seat handles review, commits and run 6.
