@@ -3876,3 +3876,109 @@ real bin/FFmpeg access, desktop input, push/tag/dispatch, footage/profile write 
 of another worktree. All probes, logs and basetemps remain under `work/wp6.5/f4/`.
 
 Dispatch 3 closes the preceding scope flag: the sole smoke `forbidden_paths` stub now accepts and records `app=`, asserted by `test_darwin_smoke_runs_every_row_on_the_app_and_preserves_its_bytes`; the OFFICIAL smoke module passes **74 passed, 1 skipped in 78.11s** (`work/wp6.5/f4/smoke-official-dispatch3.log`, sandbox shim and required exclusion); ruff check, format check (339 files) and mypy (166 source files) pass (`*-dispatch3.log`); no product change or commit in this turn.
+
+### A r1 fold
+
+Claude Reviewer A r1 on `ae128116..2f69ad1d`: FINDINGS, read in full from the seat's
+`C:/Users/rwsmy/clearwater-review-evidence/wp6.5/A-codex/r1/review.txt`. Folded under
+CHARC `0317f4cb`, amending `200f9645`; base of this turn `2f69ad1d`. F3 is MAJOR by
+CHARC's ruling (MINOR in the review). All five findings adjudicated; no dispute or STOP.
+
+| Round | Severity counts | Scope / disposition | NEW / REOPENED | Reverts | Fix kind | Reviewer / depth |
+| --- | --- | --- | --- | --- | --- | --- |
+| Codex lane A r1 | 3 MAJOR, 0 MINOR, 2 ADVISORY | F1/F2/F3/A2 in-envelope and fixed; A1 recorder-only, recorded without a fold | 5 / 0 | 0 | Product code + tests; A1 documentation only | Claude at seat; CLI/transport version and dispatcher-read depth not supplied |
+
+- **F1 MAJOR, confirmed / fixed:** `tools/package/build.py:635` checks admitted folder
+  links whose own name is an identifier as package names. At the top of Frameworks or
+  Resources this is `name_violations([name, "__init__.py"], module_root=True)`; nested
+  framework/mirror links retain their mapped top-level package. Outside the frozen
+  folders the rule is `unexpected-module`. Dotted metadata folder names are skipped.
+  `tests/test_tools_package_build.py:807` proves Frameworks/foo -> numpy is refused as
+  `unexpected-module`, Frameworks/io -> numpy as `shadow`, and MacOS/numpy ->
+  ../Frameworks/numpy as `unexpected-module`, matching a physical package's rule. All
+  three links still pass the SHARED admission rule, checked separately in the test.
+- **F2 MAJOR, confirmed / fixed:** `build.py:633` reads an admitted link's kind with
+  `stat.S_ISREG(os.stat(path).st_mode)` AFTER `macos_link_problem` returns None. The
+  path-text kinds dictionary and its root-realpath construction are gone. ZIP checks
+  still open physical files only. `tests:819` builds the real case-variant file link
+  `MacOS/evil.so -> ../Frameworks/NUMPY/random/_generator.cpython-312-darwin.so`. The
+  test models a case-insensitive volume by mapping NUMPY to numpy in stat/lstat and
+  stat-following the alias to the physical target. A realpath adapter preserves NUMPY
+  in the written result, while a native Path subclass uses case-sensitive equality
+  and hashing, reproducing the old POSIX-key lookup miss even on Windows. The shared
+  rule admits the link; the old content check returns no violations; the fixed one
+  refuses `evil.so` as `unexpected-module`. This is a bounded filesystem model, not
+  a claim of native macOS execution.
+- **F3 MAJOR, confirmed / fixed:** `build.py:586` strips Contents for every other
+  non-frozen container as well as the three existing folder mappings. `:642` also
+  refuses `tests` beneath non-frozen Contents containers: dropping Contents alone
+  would still miss PlugIns/tests and _CodeSignature/tests. `tests:873` covers all
+  three ruled payloads; `:880` confirms Info.plist/PkgInfo stay allowed, Info.plist
+  maps to `(["Info.plist"], False)`, and Info.plist.so is refused.
+- **A2 ADVISORY, confirmed / fixed:** `build.py:612` narrows the signature-metadata
+  exemption to names WITHOUT a module suffix. The revised `tests:788` first permits
+  CodeResources, then refuses private.so as `unexpected-module`, and still refuses
+  libnvrtc.so as `cuda-library`.
+- **A1 ADVISORY, recorded / no logic fold:** added to `_FsRecorder`'s uncovered list
+  (`tests:3482`). A chain admitted by the walk records admission for its FIRST link
+  only, omitting intermediate links. Reviewer A's full pre-fold run-4 app produced
+  **105 false alarms on 25 paths**, all shared-rule post-admission calls; examples
+  QtCore.framework/Versions/Current/QtCore and the pillow_heif .dylibs chain. Covered
+  shape 5 is UNCHANGED (the direct run-4 mirrors), and no recorder logic changed.
+  The full rebuilt app is checked for content without asserting a recorder proof
+  over those uncovered chains.
+
+**RED on `2f69ad1d`:** its build script copied with `git show` to
+`work/wp6.5/f4/build_r1.py`, loaded via `WP61_BUILD_SCRIPT`. The final selection
+(`ar1 or run4_content_metadata_exempts`) gives **9 failed, 740 deselected in 1.55s**,
+`work/wp6.5/f4/ar1-red-final.log`: all eight new cases and the revised A2 case fail
+by their intended assertions, including the case-variant link's old empty result.
+No unexpected-keyword or fixture errors count as RED.
+
+**Windows fixture adaptation:** `tests:700` `app_content_paths` models a following
+stat only when Windows rejects a POSIX-text symlink with WinError 123. The original
+following query is attempted FIRST, preserving recorder visibility and admission
+order; only that failure falls back to the link's text from its physical parent.
+Native POSIX uses the actual stat. The onedir census bypasses this helper entirely.
+This is needed because the mandated product `os.stat(path)` follows the native link,
+whereas the old dictionary lookup did not. No product Windows special case was added.
+
+**GREEN / required checks**, all logs and basetemps under `work/wp6.5/f4/`:
+
+- Targeted regressions, run-4 cases and existing recorder shapes: **36 passed**,
+  `ar1-green2.log`.
+- Build + notices (`-n 3`): **1169 passed in 66.39s** (749 build, 420 notices),
+  `ar1-build-notices.log`.
+- Official smoke: **74 passed, 1 skipped in 77.92s**, `ar1-smoke.log`; native POSIX
+  process-group proof is the skip. The smoke test file is unchanged in this turn.
+- Portability: **226 skipped in 0.17s**, `ar1-portability.log`, all native macOS skips
+  on Windows. No native Mac or frozen-bundle proof is claimed.
+- Ruff check clean; format check 339 files already formatted; mypy and mypy darwin
+  each clean in 166 source files. Logs `ar1-ruff-check.log`, `ar1-ruff-format.log`,
+  `ar1-mypy.log`, `ar1-mypy-darwin.log`.
+- Nine onedir LINK_CASES, `2f69ad1d` versus working tree, no app argument: **372 = 372**,
+  every call, order, following flag, result and message identical. Full events in
+  `ar1-onedir-census.json`, summary `ar1-onedir-census.log`.
+- `ar1-source-identity.log`: the shared link rule, its chain/class helpers, shared
+  listing, old `_bundle_parts`, default forbidden_paths loop and Windows smoke static
+  call site are byte-identical source to `2f69ad1d`. No admission changed.
+- `ar1_listing_probe.py` rebuilds all **293 physical files, 114 folders and 86 real
+  links** from app-listing.txt with inert bytes/empty valid ZIPs: **0 content violations**
+  from both release and app roots (`ar1-listing.log`). This includes the nested
+  framework identifier links and the dotted metadata folder link; run 4 stays allowed.
+  No recorder assertion is made for A1's uncovered chains.
+
+All pytest runs retain the required exclusion, sandbox shim, no cache provider and
+work-tree basetemps; the full module runs use the existing PYTHONPATH-bootstrap runner
+described above. No sandbox-limited failure remains for the seat to repeat.
+
+**Verification loop:** pass 1 confirmed the four actionable findings with independent
+physical equivalents / the modelled case-variant lookup and parent RED; fixed all four.
+The first GREEN attempt exposed Windows' native POSIX-link stat limitation (WinError
+123), confirmed and handled in the test helper only. Pass 2: targeted/full suites,
+the whole captured name graph, the onedir census and protected-source audit found no
+new product issue. A1 is an explicitly uncovered recorder shape, not a new admission
+defect. Reviewer A's next pass remains the seat's action; no convergence claim yet.
+One logical fold plus tests and ledger; no commit, frozen run, real FFmpeg access,
+desktop input, network write, workflow/src/dependency/debt/C14 change or profile/footage
+write. No deviation or open question for the seat beyond its next review round.
