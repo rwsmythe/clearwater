@@ -3012,6 +3012,33 @@ def test_a_chain_that_meets_a_junction_is_refused(tmp_path):
     )
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows junction regression")
+def test_a_chain_handed_over_as_its_real_path_is_labelled_from_the_real_app(tmp_path):
+    """Run 3 (b): a folder link's view hands a nested link over as its REAL path; under a
+    release root named through an alias (here a junction; ``/var`` -> ``/private/var`` on a
+    Mac) the chain is labelled from the real .app, never a ``relative_to`` error."""
+    import _winapi
+
+    real = tmp_path / "real"
+    folder, _ = link_release(
+        real,
+        "app",
+        [],
+        [
+            ("Contents/Resources/libx.dylib", "../Frameworks/libx.dylib", False),
+            ("Contents/Frameworks/libx.dylib", "missing.dylib", False),
+        ],
+    )
+    _winapi.CreateJunction(str(real / "wrapper"), str(tmp_path / "alias"))
+    alias = tmp_path / "alias" / folder.name
+    problem = build._macos_link_chain_problem(alias, folder / "Contents/Resources/libx.dylib")
+    assert problem == (
+        "link chain ends in a missing entry: "
+        "Contents/Resources/libx.dylib -> '../Frameworks/libx.dylib'; "
+        "Contents/Frameworks/libx.dylib -> 'missing.dylib'; Contents/Frameworks/missing.dylib"
+    )
+
+
 def test_folder_link_files_are_checked_at_the_links_location(tmp_path, monkeypatch):
     """A transformed native seen through a cross-link must fit the mirrored location."""
     base = tree(tmp_path / "python", ["lib/libbar.dylib"], original_native())

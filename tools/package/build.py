@@ -4288,8 +4288,17 @@ def _macos_link_chain_problem(root: Path, physical: Path) -> str | None:
     def refused(reason: str) -> str:
         return f"link chain {reason}: {'; '.join(hops)}"
 
-    current, label = physical, physical.relative_to(root).as_posix()
-    seen = {Path(os.path.realpath(physical.parent)) / physical.name}
+    def shown(real: Path) -> str:
+        """A hop's real path, relative to the real ``.app`` when it lies inside it."""
+        return (
+            real.relative_to(real_root).as_posix() if real.is_relative_to(real_root) else str(real)
+        )
+
+    start = Path(os.path.realpath(physical.parent)) / physical.name
+    # A link seen through a linked folder arrives as its real path (macos_link_view).
+    current = physical
+    label = physical.relative_to(root).as_posix() if physical.is_relative_to(root) else shown(start)
+    seen = {start}
     for _ in range(_MACOS_LINK_HOPS):
         if current.is_junction():
             hops.append(f"{label} (junction)")
@@ -4303,7 +4312,7 @@ def _macos_link_chain_problem(root: Path, physical: Path) -> str | None:
             hop = Path(os.path.realpath(named))
         else:
             hop = Path(os.path.realpath(named.parent)) / named.name
-        label = hop.relative_to(real_root).as_posix() if hop.is_relative_to(real_root) else str(hop)
+        label = shown(hop)
         if not hop.is_relative_to(bundle):
             hops.append(label)
             return refused("leaves the bundle")
