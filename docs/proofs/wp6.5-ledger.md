@@ -2750,9 +2750,8 @@ fixes (below).
 "On macOS the GUI offers the GPU pack menu and dialog, and `gpu_pack_install.plan()` raises
 `cupy-cuda12x: 0 compatible locked wheels` (`gpu_pack_install.py:165`); the pack is None by
 design on macOS (brief), but the product does not say so." Must be fixed before the 1.2.0
-macOS release. **PREMISE REFUTED by the code above:** the GUI does NOT offer the menu or the
-dialog on macOS, and `plan()` is not reached there. Raised to the dispatcher for CHARC's
-ruling (bank, reword or drop); `docs/debt-register.md` untouched.
+macOS release.
+S2 premise refuted at the seat and by CHARC; no DR row; no product package (CHARC c1c14926).
 
 ### Item 3: S3, settings cache-job errors (`4f236be1`, test-side)
 
@@ -3013,4 +3012,214 @@ Pass 2 over the eight items, the ledger's claims and the commits: nothing new. L
   checks).
 - (d) the listing and the census files are first produced by the next runner run.
 
-Depth at run-3-fix yield: DISPATCHER TO FILL
+Depth at run-3-fix yield: 316,018 (wp65-cell16, read by the dispatcher with cell_depth.py at its run-3-fix return)
+
+## A r11 fold (`wp65-cell17`, dispatch-18; base `0a40c058`)
+
+Codex Reviewer A r11 on `a93a0ab7..0a40c058`: `VERDICT: FINDINGS`, 1 MAJOR + 3 MINOR, all
+upheld by CHARC (`75e7d765`) and folded as ruled. The S2 entry above carries CHARC's
+`c1c14926` line. No `src/` change; `release.yml` byte-identical (`git diff 0a40c058` empty,
+its sha256 pin passes); `MACOS_FFMPEG_BUNDLED` stays "false"; `notices.py`, the debt
+register, the C14 rows, the committed fixtures and the Windows notices annex untouched.
+Scratch `work\wp6.5\ar11fold\`.
+
+### Commits
+
+| Finding | Commit | Files |
+|---|---|---|
+| F1 MAJOR, the `.app` walk | `2b7cbcc5` | `tools/package/build.py`, `tests/test_tools_package_build.py` |
+| F2 the tiny set's photo half | `bb644951` | `tests/test_reviewpack.py` |
+| F3 the GPU pack platform gap | `230d652d` | `tests/test_gui_gpu_pack_dialog.py` |
+| F4 the listing after both builds | `3a9bc562` | `.github/workflows/macos-build.yml`, `tests/test_release_workflow.py` |
+
+### F1 MAJOR: a `.app` link is walked component by component (`2b7cbcc5`)
+
+`tools/package/build.py`:
+
+- `:4268` `_macos_link_chain_problem(root, physical)` is rewritten as a component walk:
+  - the boundary `realpath(root / "Contents")` is canonicalised ONCE, at the start, so an
+    alias above the release root (macOS `/var` -> `/private/var`) is untouched;
+  - the walk starts at the link's canonical folder; each component of the stored text is
+    taken in turn: `..` steps to the canonical parent, a name steps into it;
+  - a component outside `Contents` is refused AT THAT POINT ("link chain leaves the
+    bundle"), before any later component is read, so an outside alias's return hop is never
+    followed;
+  - EVERY link met (a folder link in mid-path as much as a further hop at the final name)
+    counts against `_MACOS_LINK_HOPS` = 8 and is validated as the first: relative POSIX text,
+    never a junction, never met twice (a loop); its text is then walked in place;
+  - a CHAIN (a link met at the final name) must end in an existing regular file; a single
+    hop's end stays with the class rule (a folder target is legitimate there);
+  - the message lists every link met, the departing one included, and for a departure ends
+    with where the hop was heading, read lexically (A's shape:
+    `<release>/outside/back/data`, the external hop).
+- `:4383` `_macos_link_class_problem`: inside a `.app`, a SINGLE hop is now walked too,
+  after today's outside / dangling checks (so their messages hold). That closes the
+  second link of A's shape, which `named.is_symlink()` (the OS resolving the outside alias)
+  had read as a single hop and admitted as a (B) link.
+- `:4446` `macos_link_problem`'s docstring states the component reading. Still THE one rule,
+  shared by the origin check, the ZIP and the notices. Outside a `.app` (onedir, and every
+  Windows caller) the code path is unchanged: "link to a link (one hop only)" byte for byte.
+
+`tests/test_tools_package_build.py` (the out-of-root alias is built beside the `.app`, inside
+the test's tmp folder; `:3047` `outside_alias` writes its text with the host's separator,
+since a Windows host follows a folder link only through backslash text, and the rule never
+reads it):
+
+- `:3062` A's exact shape: both bundle links REFUSED, each message naming
+  `Contents/Frameworks/data -> '../../../outside/back/data'` and the external
+  `<tmp>/wrapper/outside/back/data`; the origin walk names both, the ZIP refuses with it.
+- `:3093` a folder link in mid-chain (`Contents/Frameworks/F -> ../../../outside/back`, the
+  alias leading back to `Contents/Frameworks/pkg`) REFUSED where it leaves.
+- `:3115` a single hop that steps above `Contents` and back with no link at all
+  (`../../Contents/Frameworks/y.dylib`) REFUSED at the `..` (the ruling's "any component").
+- `:3134` the bound counts folder links: five file hops through four folder links (9 links)
+  REFUSED with all nine named; four file hops through four folder links (8) ADMITTED.
+- `:3164` an alias (a folder link) above the release root: the PyInstaller chain and the
+  single-hop cross-link ADMITTED by the walk, the single hop by the whole rule and the
+  origin walk. (The chain is checked through the walk: on a Windows host `ntpath.realpath`
+  cannot follow a POSIX-text file link under an alias, a host artifact of today's
+  `realpath(named)` check, not of the rule.)
+- MIRRORS still ADMITTED, unchanged: `C-app-pyinstaller-chain` and `C-app-link-to-a-link`
+  (`LINK_CASES`, origin walk and ZIP), `test_the_pyinstaller_chain_is_admitted_in_the_origin_walk`,
+  the aliased-root label case from `85f2739d`. The five `CHAIN_REFUSALS`, the absolute hop,
+  the junction and the 8 / 9 direct-hop bound keep their exact messages.
+- Onedir two-hop: `test_the_onedir_two_hop_chain_keeps_todays_message` passes unchanged.
+
+**RED on `0a40c058`** (its `build.py` swapped in, restored, `cmp` equal): the four new
+refusal tests FAIL (A's shape; the mid-chain folder link: `None`; the lexical exit: `None`;
+the 9-link bound: `None`); the five mirrors / alias tests pass. A's shape on the parent, by
+a scratch probe (`ar11fold\probe_ashape.py`, a `release\` tree): `Contents/Frameworks/data`
+-> `None` (ADMITTED, the hole); `Contents/Resources/data` -> "link resolves outside the
+release folder" on this Windows host only, the same `ntpath.realpath` artifact (A executed it
+on POSIX semantics: admitted). Head: both refused with the chain.
+
+**GREEN:** `test_tools_package_build.py` + `test_tools_package_notices.py` (`-n 3`) **1112
+passed** (686 + 6 new = 692; notices 420). Symlinks available: 0 skipped.
+
+### F2 MINOR: the tiny set's photo half runs without FFmpeg (`bb644951`)
+
+A split test (the ruled preference):
+
+- `tests/test_reviewpack.py:953` `TINY_PHOTOS` / `TINY_VIDEO`; `:960` `_run_tiny_set` plants
+  the inputs, writes the config and manifest, runs `build.main all --force-cpu` (== 2,
+  R3-5) and checks the links.
+- `:1004` `test_all_tiny_set_photos` (`slow`, NO FFmpeg guard): the two photos; the corrected
+  / neutral PNG assertions (the former `:996-998`), the P-A / P-Z records, `pack.json` (128
+  items, 126 pending), two review-sheet rows, byte immutability.
+- `:1026` `test_all_tiny_set` (`slow`, `ffmpeg_tools`): the three-item run with every
+  assertion it had, unchanged.
+
+**RED on `0a40c058`** (its test file swapped in, restored, `cmp` equal; FFmpeg dropped from
+PATH by removing `WinGet\Links`; the file calls no `clearwater.__main__`, `app.main` or
+export worker: its runner is `tools/headless_export.py`, which loads no PySide6): `-k tiny_set` **1
+skipped** (the whole test, at `:953`, with the FFmpeg reason): no photo assertion ran.
+**GREEN, FFmpeg dropped:** `test_all_tiny_set_photos` PASSED, `test_all_tiny_set` SKIPPED
+"ffmpeg and ffprobe are not on the PATH (needed to generate or probe video)". **Normal
+PATH:** module 178 passed (177 + 1). **FFmpeg dropped:** module 151 passed, 27 skipped, every
+skip that one reason.
+
+### F3 MINOR: only a platform gap skips (`230d652d`)
+
+- `tests/test_gui_gpu_pack_dialog.py:53` `_fits_the_platform(tag, interpreter, platform)`:
+  a wheel tag's PLATFORM part read through `gpu_pack.tag_fits` itself, the python and ABI
+  parts replaced by `py3-none` (any CPython 3 interpreter accepts them).
+- `:63` `lock_gap`: a locked distribution none of whose wheels (expanded by
+  `gpu_pack_install._wheel_tags`, as `plan()` does) has a tag for the platform skips, with
+  the unchanged reason. An interpreter / ABI miss on a platform the lock carries is no
+  skip: the test runs and `plan()` fails it. Per distribution, as `plan()` fails per
+  distribution: `cuda-pathfinder` is a `py3-none-any` wheel, so a whole-lock "no wheel fits
+  the platform" would never skip darwin.
+- `:531` `test_the_lock_decides_the_skip_as_plan_does`: `win-cp312` and `linux-cp312` no skip,
+  `plan()` succeeds; `win-cp313` no skip, `require_locked_wheels()` does not skip, `plan()`
+  raises "cupy-cuda12x: 0 compatible locked wheels"; `mac-arm64` / `mac-x86_64` skip with the
+  reason, `plan()` raises.
+
+**RED on `0a40c058`:** the new unit case with the parent's fit (`gpu_pack.tag_fits` on the
+full tag, swapped in, restored): `[win-cp313]` FAILS ("GPU pack lock carries no wheels for
+win32/amd64 (cupy-cuda12x; tags cp313, win_amd64)" is not None), 4 passed. The parent file
+under a cp313 / win_amd64 scratch plugin (`ar11fold\sim\simcp313_tags.py`): 21 passed, **8
+skipped** with that win32/amd64 reason (A's finding).
+**GREEN:** real Windows 29 passed, none skipped; simulated darwin/arm64
+(`ar11fold\sim\simmac_tags.py`) 21 passed, **8 skipped** "GPU pack lock carries no wheels
+for darwin/arm64 (cupy-cuda12x; tags cp312, macosx_14_0_arm64)"; simulated cp313 / win_amd64:
+**8 failed** (no skip; the first at `gpu_pack_install.py:165`, "cupy-cuda12x: 0 compatible
+locked wheels"), 21 passed: the ruled "stays a FAILURE".
+
+### F4 MINOR: the listing after both builds (`3a9bc562`)
+
+- `.github/workflows/macos-build.yml:145` "List the app bundle" now follows "Build release
+  bundle and zip" (`:137`), with the same `if: ${{ !cancelled() && !inputs.release-version }}`
+  and the same script: it lists whichever `.app` the build that ran left. Release mode
+  unchanged; `release.yml` untouched.
+- `tests/test_release_workflow.py`:
+  - `:897` the step order pin: the listing after both builds;
+  - `:1645` the listing pin: right after "Build release bundle and zip", after "Build app
+    bundle without FFmpeg";
+  - `:1714` `test_the_app_listing_follows_whichever_build_ran` (4 cases): the real `if:`
+    expressions evaluated step by step in validation mode, switch off / on, green / a
+    failed leg. The listing is reached after the build that ran (with the switch on and
+    green, after the FFmpeg-ON build), never before a build; release mode never lists.
+  - `MODE_REACHED` and the condition-table tests unchanged and passing.
+
+**RED on `0a40c058`** (its workflow swapped in, restored, `cmp` equal): **3 failed, 141
+passed**: the order pin, the listing pin and `[ok-switch-on]` (the listing reached before
+the FFmpeg-ON build). **GREEN:** module 144 passed (140 + 4).
+
+### Static and tests at the head (`3a9bc562`; `-m "not gpu"`, every run `-k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`)
+
+Static:
+
+- `ruff check .` all passed;
+- `ruff format --check .` 339 files already formatted;
+- `mypy` and `mypy --platform darwin` no issues in 166 source files;
+- every committed blob of the delta 0 CR and 0 NUL (counted in Python); `git diff --check`
+  clean.
+
+| Module | Normal PATH | FFmpeg dropped |
+|---|---|---|
+| `tests/test_tools_package_build.py` + `tests/test_tools_package_notices.py` (`-n 3`) | 1112 passed | - |
+| `tests/test_reviewpack.py` (offscreen, no `-n`) | 178 passed | 151 passed, 27 skipped |
+| `tests/test_gui_gpu_pack_dialog.py` (offscreen, no `-n`) | 29 passed | - |
+| `tests/test_release_workflow.py` | 144 passed | - |
+| `tests/test_tools_package_smoke.py` | 74 passed, 1 skipped | - |
+| `tests/test_macos_portability.py` | 226 skipped (platform) | - |
+
+### Verification loop (self)
+
+Pass 1:
+
+- **Suspected:** after the walk, a one-hop `.app` link that also leaves the release would
+  change today's "link resolves outside the release folder" text
+  (`test_folder_link_checks_nested_links_as_if_at_its_location` pins it). **Avoided by
+  design:** the single-hop walk runs AFTER today's outside / dangling checks; the test
+  passes unchanged.
+- **Suspected:** A's second link (`Contents/Frameworks/data`) never reaches the chain walk
+  because `named.is_symlink()` resolves through the outside alias to a regular file.
+  **CONFIRMED** by the probe (parent: `None`); **FIXED** in the same commit: every `.app`
+  single hop is walked.
+- **Suspected:** the walk refuses a legitimate PyInstaller shape. **REJECTED:** BUNDLE's
+  cross-links are written relative within `Contents` (`../Frameworks/...`, depth-based
+  `../../Frameworks/...` from a Resources subfolder), and the dotted-folder and
+  framework-structure links stay inside; every admitted `LINK_CASES` row, the folder-link
+  depth test and the PyInstaller chain still pass.
+- **Noted, conservative:** a path that meets the same link twice (`F/../F/x`) is refused as
+  a loop; PyInstaller writes no such text, and a refusal is the safe side.
+- **Slips, fixed before commit:** a leftover `folder, executable = ..., None` line in the
+  first draft of the alias test; a first draft of the A-shape test asserted
+  `realpath(...).is_file()` on POSIX-text links, which a Windows host cannot follow (redone
+  on the outside alias itself).
+
+Pass 2 over the four findings, the S2 line, the ledger's claims and the commits: nothing
+new. Loop ended.
+
+**For the dispatcher:**
+
+- (a) The S2 entry's heading above still reads "(DR number: CHARC assigns at the accept)";
+  the dispatch replaced only the placeholder sentence, so the heading was left as written.
+- (b) F2: the photo half uses its own two-photo manifest inside the split (126 pending, two
+  sheet rows); the three-item test keeps every original assertion.
+- (c) F1's refusal for a departure names where the hop was heading (lexically), not the
+  outside alias's own text: reading the alias would be following a hop outside the bundle,
+  which the ruling forbids.
+
+Depth at A-r11-fold yield: DISPATCHER TO FILL
