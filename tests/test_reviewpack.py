@@ -950,15 +950,19 @@ def test_presets_export_product_starters_without_expanding_serialized_maps(
     assert list(roots.footage.iterdir()) == []
 
 
-@pytest.mark.slow(reason="runs the headless runner and FFmpeg")
-@pytest.mark.usefixtures("ffmpeg_tools")  # one runner call exports the photos and the clip
-def test_all_tiny_set(roots: OutputRoots) -> None:
-    """Exercise all stages end to end while recording source byte immutability."""
-    inputs = [
-        (FIXTURES / "stills" / "jpeg" / "jpeg-gradient-srgb.jpg", "IMG_6751.JPG", "P-A"),
-        (FIXTURES / "stills" / "jpeg" / "jpeg-lowred-srgb.jpg", "IMG_6791.JPG", "P-Z"),
-        (FIXTURES / "video" / "hevc8-bt709-full.mp4", "GX011604.mp4", "V-S"),
-    ]
+TINY_PHOTOS = [
+    (FIXTURES / "stills" / "jpeg" / "jpeg-gradient-srgb.jpg", "IMG_6751.JPG", "P-A"),
+    (FIXTURES / "stills" / "jpeg" / "jpeg-lowred-srgb.jpg", "IMG_6791.JPG", "P-Z"),
+]
+TINY_VIDEO = (FIXTURES / "video" / "hevc8-bt709-full.mp4", "GX011604.mp4", "V-S")
+
+
+def _run_tiny_set(roots: OutputRoots, inputs: list[tuple[Path, str, str]]) -> dict[str, bytes]:
+    """Plant ``inputs``, run ``build.main all`` over them on the CPU and check its links.
+
+    Returns:
+        Each planted source's bytes before the run, by name.
+    """
     before = {}
     for source, name, _ in inputs:
         shutil.copyfile(source, roots.footage / name)
@@ -990,9 +994,39 @@ def test_all_tiny_set(roots: OutputRoots) -> None:
                 "--force-cpu",
             ]
         )
-        == 2  # R3-5: the three-item fixture leaves 125 commissioned items pending.
+        == 2  # R3-5: a tiny fixture leaves the other commissioned items pending.
     )
     assert page.check_links(roots.allowed / "index.html", roots=roots) == []
+    return before
+
+
+@pytest.mark.slow(reason="runs the headless runner")
+def test_all_tiny_set_photos(roots: OutputRoots) -> None:
+    """The photo half needs no FFmpeg, so it runs on a runner without it (WP6.5 A r11 #2)."""
+    before = _run_tiny_set(roots, TINY_PHOTOS)
+    for stem in ("IMG_6751", "IMG_6791"):
+        assert (roots.allowed / "photos" / f"{stem}_corrected.png").is_file()
+        assert (roots.allowed / "photos" / f"{stem}_neutral.png").is_file()
+    for group in ("P-A", "P-Z"):
+        record = json.loads((roots.allowed / "records" / f"{group}.json").read_text())
+        assert record["settings"]["force_cpu"] is True
+        assert record["parameters_from"] == "defaults"
+        assert record["items"][0]["state"] in {"done", "done with warnings"}
+    state = json.loads((roots.allowed / "records" / "pack.json").read_text())
+    assert len(state["items"]) == 128
+    # R3-5: the two photos leave 126 commissioned items pending.
+    assert sum(item["status"] == "pending" for item in state["items"]) == 126
+    with (roots.allowed / "review-sheet.csv").open(encoding="utf-8", newline="") as handle:
+        assert len(list(csv.DictReader(handle))) == 2
+    assert before == {name: (roots.footage / name).read_bytes() for _, name, _ in TINY_PHOTOS}
+
+
+@pytest.mark.slow(reason="runs the headless runner and FFmpeg")
+@pytest.mark.usefixtures("ffmpeg_tools")  # the clip needs FFmpeg; the photos run above too
+def test_all_tiny_set(roots: OutputRoots) -> None:
+    """Exercise all stages end to end while recording source byte immutability."""
+    inputs = [*TINY_PHOTOS, TINY_VIDEO]
+    before = _run_tiny_set(roots, inputs)
     for stem in ("IMG_6751", "IMG_6791"):
         assert (roots.allowed / "photos" / f"{stem}_corrected.png").is_file()
         assert (roots.allowed / "photos" / f"{stem}_neutral.png").is_file()
@@ -1006,6 +1040,7 @@ def test_all_tiny_set(roots: OutputRoots) -> None:
         assert record["items"][0]["state"] in {"done", "done with warnings"}
     state = json.loads((roots.allowed / "records" / "pack.json").read_text())
     assert len(state["items"]) == 128
+    # R3-5: the three-item fixture leaves 125 commissioned items pending.
     assert sum(item["status"] == "pending" for item in state["items"]) == 125
     video = next(item for item in state["items"] if item["item"] == "GX011604")
     assert [still["fraction"] for still in video["stills"]] == [0.1, 0.5, 0.9]
