@@ -1086,6 +1086,50 @@ def test_verified_bundle_writes_parent_and_ffmpeg_ref(synthetic_bundle):
     assert f"FFmpeg ref: {data['ffmpeg_ref']}" in lines
 
 
+def test_windows_build_record_bytes_are_the_pre_dr165_form(synthetic_bundle):
+    """DR-165 byte-identity: the unpatched Windows build's record is these lines exactly (the
+    macOS ``Modified:`` line and patch text are the macOS path's; this guard is GREEN before and
+    after the change, written from the writer's format at ``c6a1b9bb``)."""
+    data, _source, destination, *_ = synthetic_bundle
+    bundle(synthetic_bundle)
+    parent = data["parent_provider"]
+    expected = "\n".join(
+        [
+            f"Provider: {data['provider']}",
+            f"Parent provider: {parent['repository']} @ {parent['commit']}",
+            f"Release tag: {data['release_tag']}",
+            f"Asset: {data['asset_name']}",
+            f"SHA256: {data['github_sha256']}",
+            f"FFmpeg version: {data['version']}",
+            f"FFmpeg commit: {data['ffmpeg_commit']}",
+            f"FFmpeg ref: {data['ffmpeg_ref']}",
+            f"Build repository commit: {data['build_repository_commit']}",
+            f"Per-component source recipes: {data['source_record_url']}",
+            "Per-component pins and licence readings: "
+            "tools/package/ffmpeg.lock.json in Clearwater source",
+            data["configure_line"],
+            "",
+        ]
+    )
+    # The writer opens the record in text mode: its line ends are the host's; compare as LF.
+    written = (destination / "ffmpeg-BUILD.txt").read_bytes().replace(b"\r\n", b"\n")
+    assert written == expected.encode("utf-8")
+    assert sorted(path.name for path in destination.iterdir() if path.suffix == ".txt") == [
+        "ffmpeg-BUILD.txt",
+        "ffmpeg-LICENSE.txt",
+    ]
+
+
+def test_windows_lock_has_no_patches_field_and_refuses_one():
+    """The Windows build is unpatched: its lock carries no ``patches`` and the strict key set
+    refuses one (the field belongs to the macOS lock only)."""
+    data = lock_data()
+    assert "patches" not in data
+    data["patches"] = []
+    with pytest.raises(ValueError, match="invalid"):
+        build.validate_ffmpeg_lock(data)
+
+
 @pytest.mark.parametrize("kind", ["argument", "lock", "download"])
 def test_hash_mismatch_fails_before_any_extraction_or_execution(synthetic_bundle, kind):
     data, source, destination, _out, _members, _write, pin = synthetic_bundle

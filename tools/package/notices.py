@@ -2091,7 +2091,11 @@ def _macos_ffmpeg_rows(app: Path, lock_path: Path, native_licences_path: Path) -
     The tools sit in ``Contents/MacOS`` and their texts in ``Contents/Resources``
     (``build.place_macos_tools``); the build record's lines are the ones the darwin
     bundling writes, and every component and toolchain text is read from
-    ``ffmpeg-macos-components`` under its lock identity.
+    ``ffmpeg-macos-components`` under its lock identity. DR-165: each patch the lock lists
+    must sit in ``Contents/Resources`` under ``build.macos_ffmpeg_patch_file_name`` with
+    the lock's sha256, the record must carry exactly the lock's ``Modified:`` lines
+    (``build.macos_ffmpeg_modified_lines``), and the patch files are entries of the FFmpeg
+    row (so the plan attributes them) with a note naming each.
     """
     tools = [app / name for name in _APP_FFMPEG_TOOLS]
     material = [app / name for name in _APP_FFMPEG_TEXTS]
@@ -2103,15 +2107,25 @@ def _macos_ffmpeg_rows(app: Path, lock_path: Path, native_licences_path: Path) -
     if missing:
         raise ValueError("notices: FFmpeg missing " + ", ".join(missing))
     texts_path = native_licences_path / "ffmpeg-macos-components"
+    build = _build_tool()
     lock = cast(
         dict[str, Any],
-        _build_tool().validate_ffmpeg_lock(
+        build.validate_ffmpeg_lock(
             json.loads(lock_path.read_text(encoding="utf-8")),
             component_texts_path=texts_path,
             platform="darwin",
         ),
     )
     _refuse_gpl3_incompatible(lock)
+    patch_files = [
+        app / "Contents/Resources" / build.macos_ffmpeg_patch_file_name(patch["name"])
+        for patch in lock["patches"]
+    ]
+    for patch, path in zip(lock["patches"], patch_files, strict=True):
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"notices: FFmpeg missing patch text {path.name}")
+        if hashlib.sha256(path.read_bytes()).hexdigest() != patch["sha256"]:
+            raise ValueError(f"notices: FFmpeg patch text differs from the lock: {path.name}")
     script = lock["build_script"]
     expected = {
         "Provider": lock["provider"],
@@ -2137,14 +2151,26 @@ def _macos_ffmpeg_rows(app: Path, lock_path: Path, native_licences_path: Path) -
             raise ValueError(f"notices: FFmpeg build provenance differs: {key}")
     if [line for line in lines if line.startswith("configuration:")] != [lock["configure_line"]]:
         raise ValueError("notices: FFmpeg build provenance differs: configuration")
+    if [line for line in lines if line.startswith("Modified: ")] != (
+        build.macos_ffmpeg_modified_lines(lock)
+    ):
+        raise ValueError("notices: FFmpeg build provenance differs: Modified")
     if not material[1].stat().st_size:
         raise ValueError("notices: FFmpeg missing licence material")
-    entries = tuple("file:" + path.relative_to(app).as_posix() for path in (*tools, *material))
+    entries = tuple(
+        "file:" + path.relative_to(app).as_posix() for path in (*tools, *material, *patch_files)
+    )
     notes = (
         f"Provider: {lock['provider']} @ {lock['build_repository_commit']}; "
         f"built with {script['repository']} at {script['commit'][:8]} "
         f"for macOS {lock['macos_deployment_target']} and later ({lock['platform']}); "
         f"FFmpeg {lock['ffmpeg_ref']} at {lock['ffmpeg_commit'][:8]}.",
+        *(
+            f"Modified: FFmpeg is built with the patch {patch['name']} "
+            f"(sha256 {patch['sha256']}); its text is the bundled "
+            f"Contents/Resources/{path.name}."
+            for patch, path in zip(lock["patches"], patch_files, strict=True)
+        ),
         *(
             f"{'Build stage' if row['status'] in {'BUILT', 'ENTRY'} else 'Excluded'} "
             f"{row['stage']} ({row['status']}): {row['reason']}"

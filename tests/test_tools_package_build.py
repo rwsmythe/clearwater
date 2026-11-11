@@ -864,6 +864,24 @@ def test_run4_content_checks_the_links_own_gpu_name(tmp_path, folder):
     assert hits(app_content_paths(root, app), f"Resources/{name} (gpu-module)")
 
 
+def test_content_check_admits_the_ffmpeg_texts_and_patch_text_in_resources(tmp_path):
+    """DR-165 (3): the ``.app`` content check (the sibling of notices' attribution) judges the
+    bundled patch text like ``ffmpeg-BUILD.txt``: a plain ``.patch`` file under
+    ``Contents/Resources`` breaks no name or module rule."""
+    root, app = run4_content_release(tmp_path, [])
+    patch = "ffmpeg-patch-0001-avcodec-videotoolboxenc-set-packet-duration.patch"
+    assert app_content_paths(root, app) == []
+    tree(
+        app,
+        [
+            "Contents/Resources/ffmpeg-BUILD.txt",
+            "Contents/Resources/ffmpeg-LICENSE.txt",
+            f"Contents/Resources/{patch}",
+        ],
+    )
+    assert app_content_paths(root, app) == []
+
+
 def test_run4_content_metadata_exempts_only_the_module_root_rule(tmp_path):
     """Only non-module signature metadata is exempt; all other name rules remain."""
     root, app = run4_content_release(tmp_path, [])
@@ -5044,6 +5062,31 @@ def macos_lock() -> dict[str, Any]:
     return json.loads(MACOS_LOCK_FIXTURE.read_text(encoding="utf-8"))
 
 
+FIXTURE_PATCH_FILE = "0001-synthetic-test.patch"
+"""The fixture lock's one patch, by file name: its text exists only in these tests."""
+
+FIXTURE_PATCH_BYTES = b"synthetic FFmpeg patch text (WP6.5 DR-165 test fixture)\n"
+"""The bytes the fixture lock's ``patches`` entry hashes (never read from the repository)."""
+
+
+def fixture_versions(lock: dict[str, Any], patches=None, extra=()) -> bytes:
+    """A synthetic ``build/versions.txt`` shaped like the fork's: line 1 the FFmpeg commit, then
+    one ``<sha256>  <recipe path>`` line per patch, then component lines and the recipe line."""
+    rows = lock["patches"] if patches is None else patches
+    lines = [f"ffmpeg {lock['ffmpeg_commit']} (release/9.0, git describe synthetic)"]
+    lines += [f"{row['sha256']}  {row['name']}" for row in rows]
+    lines += list(extra)
+    lines += ["x264 0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee (git)", "zlib 1.3.2", ""]
+    return "\n".join(lines).encode()
+
+
+def test_macos_lock_fixture_patch_entry_is_the_fixture_bytes():
+    """The fixture's ``patches`` entry hashes ``FIXTURE_PATCH_BYTES`` and names the fixture file."""
+    (patch,) = macos_lock()["patches"]
+    assert patch["name"].endswith("/" + FIXTURE_PATCH_FILE)
+    assert patch["sha256"] == hashlib.sha256(FIXTURE_PATCH_BYTES).hexdigest()
+
+
 def test_macos_lock_fixture_validates_with_the_platform_discriminator():
     data = macos_lock()
     assert build.validate_ffmpeg_lock(data, platform="darwin") is data
@@ -5062,6 +5105,102 @@ def test_macos_lock_excluded_rows_are_exactly_the_recipe_skips():
     assert switches == build.FFMPEG_MACOS_EXCLUDED_STAGES
     assert {row["stage"] for row in macos_lock()["excluded"]} == switches
     assert len(switches) == 21
+
+
+def test_macos_fork_series_is_the_two_commit_recipe_the_lock_names():
+    """DR-165 (4): the in-repo recipe record is the fork's series ``d77b8352..5314a43c``: the
+    nozvbi recipe, then the commit applying and packaging the lock's patch; only the first
+    commit carries recipe switches."""
+    series = MACOS_FORK_PATCH.read_bytes()
+    assert b"\r" not in series
+    text = series.decode("utf-8")
+    assert "Subject: [PATCH 1/2] " in text and "Subject: [PATCH 2/2] " in text
+    assert "base-commit: d77b8352f60bd180ebce585632846533aa60b183" in text
+    first, second = text.split("\nFrom 5314a43c6ea6145a826e34e30ac3a965cef1b996 ", 1)
+    assert first.startswith("From 9cb0fa81871f09ae3f750d6845874c26a871b985 ")
+    assert "-SKIP_" not in second
+    (patch,) = real_macos_lock()["patches"]
+    assert f"diff --git a/{patch['name']} b/{patch['name']}" in second
+    assert len(recipe_skips()) == 21
+
+
+def test_macos_lock_patches_field_is_present_and_names_the_vt_patch():
+    """DR-165 (1): the committed lock carries the patch the fork's versions.txt lists."""
+    data = real_macos_lock()
+    assert data["patches"] == [
+        {
+            "name": "macos/build-script/patches/ffmpeg/"
+            "0001-avcodec-videotoolboxenc-set-packet-duration.patch",
+            "sha256": "b598505e8d2859835312ca75ff92f50ec35b2166421a2e5c84c49d4691293c4f",
+        }
+    ]
+    assert build.load_macos_ffmpeg_lock() == data
+
+
+def test_macos_lock_refuses_a_missing_patches_field():
+    data = macos_lock()
+    del data["patches"]
+    with pytest.raises(ValueError, match="invalid macOS document fields"):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+def test_macos_lock_admits_an_empty_patches_list_and_several_patches():
+    """An unpatched build records ``[]`` (the bundling still checks it against versions.txt)."""
+    data = macos_lock()
+    data["patches"] = []
+    assert build.validate_ffmpeg_lock(data, platform="darwin") is data
+    data["patches"] = [
+        {"name": "macos/a/0001-x.patch", "sha256": "a" * 64},
+        {"name": "macos/a/0002-y.patch", "sha256": "b" * 64},
+    ]
+    assert build.validate_ffmpeg_lock(data, platform="darwin") is data
+
+
+GOOD_PATCH = {"name": "macos/a/0001-x.patch", "sha256": "a" * 64}
+
+
+@pytest.mark.parametrize(
+    ("patches", "refusal"),
+    [
+        ("0001-x.patch", "patches must be a list"),
+        (GOOD_PATCH, "patches must be a list"),
+        (["0001-x.patch"], "invalid patch fields"),
+        ([{"name": GOOD_PATCH["name"]}], "invalid patch fields"),
+        ([{"sha256": "a" * 64}], "invalid patch fields"),
+        ([{**GOOD_PATCH, "extra": "x"}], "invalid patch fields"),
+        ([{**GOOD_PATCH, "sha256": "A" * 64}], "invalid patch sha256"),
+        ([{**GOOD_PATCH, "sha256": "a" * 63}], "invalid patch sha256"),
+        ([{**GOOD_PATCH, "sha256": "g" * 64}], "invalid patch sha256"),
+        ([{**GOOD_PATCH, "sha256": 7}], "invalid patch sha256"),
+        ([{**GOOD_PATCH, "name": ""}], "invalid patch name"),
+        ([{**GOOD_PATCH, "name": 7}], "invalid patch name"),
+        ([{**GOOD_PATCH, "name": "macos/a/0001-x.diff"}], "invalid patch name"),
+        ([{**GOOD_PATCH, "name": "../0001-x.patch"}], "invalid patch name"),
+        ([{**GOOD_PATCH, "name": "macos/../0001-x.patch"}], "invalid patch name"),
+        ([{**GOOD_PATCH, "name": "/macos/0001-x.patch"}], "invalid patch name"),
+        ([{**GOOD_PATCH, "name": "macos//0001-x.patch"}], "invalid patch name"),
+        ([{**GOOD_PATCH, "name": "macos\\0001-x.patch"}], "invalid patch name"),
+        ([{**GOOD_PATCH, "name": "macos/ 0001-x.patch"}], "invalid patch name"),
+        ([{**GOOD_PATCH, "name": "macos/.hidden.patch"}], "invalid patch name"),
+        ([GOOD_PATCH, {**GOOD_PATCH, "sha256": "b" * 64}], "duplicate patch"),
+        ([GOOD_PATCH, {"name": "other/0001-x.patch", "sha256": "b" * 64}], "duplicate patch"),
+    ],
+)
+def test_macos_lock_refuses_a_malformed_patches_field(patches, refusal):
+    """DR-165 (1): strict like the rest of the validator: shape, hex, path form, uniqueness."""
+    data = macos_lock()
+    data["patches"] = patches
+    with pytest.raises(ValueError, match=refusal):
+        build.validate_ffmpeg_lock(data, platform="darwin")
+
+
+def test_macos_patch_file_name_is_the_patchs_own_name_behind_a_fixed_prefix():
+    name = (
+        "macos/build-script/patches/ffmpeg/0001-avcodec-videotoolboxenc-set-packet-duration.patch"
+    )
+    assert build.macos_ffmpeg_patch_file_name(name) == (
+        "ffmpeg-patch-0001-avcodec-videotoolboxenc-set-packet-duration.patch"
+    )
 
 
 @pytest.mark.parametrize("stage", sorted(row["stage"] for row in macos_lock()["excluded"]))
@@ -5961,6 +6100,8 @@ def macos_bundle(tmp_path, monkeypatch):
         f"{root}/LICENSE.txt": b"synthetic GPL-3.0 text\n",
         f"{root}/build/toolchain.txt": b"Apple clang (synthetic)\n",
         f"{root}/build/logs/build-ffmpeg.log": b"log\n",
+        f"{root}/build/versions.txt": fixture_versions(data),
+        f"{root}/build/{FIXTURE_PATCH_FILE}": FIXTURE_PATCH_BYTES,
     }
     source = tmp_path / data["asset_name"]
     pin = tmp_path / "ffmpeg-macos.lock.json"
@@ -6035,8 +6176,14 @@ def test_macos_bundle_places_the_verified_tools_and_texts_and_runs_nothing(macos
         assert (macos / tool).read_bytes() == case.members[f"{root}/bin/{tool}"]
     assert trusted == {hashlib.sha256(case.members[f"{root}/bin/ffmpeg"]).hexdigest()}
     assert sorted(p.name for p in macos.iterdir()) == ["Clearwater", "ffmpeg", "ffprobe"]
-    assert sorted(p.name for p in resources.iterdir()) == ["ffmpeg-BUILD.txt", "ffmpeg-LICENSE.txt"]
+    patch_file = f"ffmpeg-patch-{FIXTURE_PATCH_FILE}"
+    assert sorted(p.name for p in resources.iterdir()) == [
+        "ffmpeg-BUILD.txt",
+        "ffmpeg-LICENSE.txt",
+        patch_file,
+    ]
     assert (resources / "ffmpeg-LICENSE.txt").read_bytes() == b"synthetic GPL-3.0 text\n"
+    assert (resources / patch_file).read_bytes() == FIXTURE_PATCH_BYTES
     text = (resources / "ffmpeg-BUILD.txt").read_text(encoding="utf-8")
     for field in (
         "provider",
@@ -6062,6 +6209,143 @@ def test_macos_bundle_places_the_verified_tools_and_texts_and_runs_nothing(macos
         modes = {p.name: p.stat().st_mode & 0o777 for p in (*macos.iterdir(), *resources.iterdir())}
         assert modes["ffmpeg"] == modes["ffprobe"] == 0o755
         assert modes["ffmpeg-BUILD.txt"] == modes["ffmpeg-LICENSE.txt"] == 0o644
+        assert modes[patch_file] == 0o644
+
+
+def modified_line(data: dict[str, Any], patch: dict[str, str]) -> str:
+    """The ``Modified:`` line of ``ffmpeg-BUILD.txt``, written out in full (not via the build)."""
+    file = "ffmpeg-patch-" + patch["name"].rsplit("/", 1)[1]
+    return (
+        f"Modified: FFmpeg is built with the patch {patch['name']} (sha256 {patch['sha256']}), "
+        f"listed in the asset's build/versions.txt; patch text: Contents/Resources/{file} in "
+        f"this bundle; source: {patch['name']} in {data['source_record_url']}"
+    )
+
+
+def test_macos_build_record_carries_one_modified_line_per_patch(macos_bundle):
+    """DR-165 (2) and (3): the record says the FFmpeg is modified, names the patch, its hash and
+    where its text is; the text is the VERIFIED archive's bytes (synthetic ones exist nowhere in
+    the repository)."""
+    case = macos_bundle
+    bundle_macos(case)
+    resources = case.app / "Contents/Resources"
+    lines = (resources / "ffmpeg-BUILD.txt").read_text(encoding="utf-8").splitlines()
+    (patch,) = case.data["patches"]
+    assert [line for line in lines if line.startswith("Modified")] == [
+        modified_line(case.data, patch)
+    ]
+    index = lines.index(modified_line(case.data, patch))
+    assert lines[index - 1] == f"FFmpeg ref: {case.data['ffmpeg_ref']}"
+    assert lines[index + 1].startswith("Build repository commit: ")
+    carried = resources / f"ffmpeg-patch-{FIXTURE_PATCH_FILE}"
+    assert hashlib.sha256(carried.read_bytes()).hexdigest() == patch["sha256"]
+    member = f"{case.data['archive_root']}/build/{FIXTURE_PATCH_FILE}"
+    assert carried.read_bytes() == case.members[member]
+    staged = case.out / "ffmpeg" / (case.data["archive_root"] + ".verified")
+    assert (staged / f"ffmpeg-patch-{FIXTURE_PATCH_FILE}").read_bytes() == FIXTURE_PATCH_BYTES
+
+
+def test_macos_bundle_of_an_unpatched_lock_has_no_modified_line_and_no_patch_text(macos_bundle):
+    """An empty ``patches`` list with a versions.txt that lists no patch is the unpatched build."""
+    case = macos_bundle
+    root = case.data["archive_root"]
+    case.data["patches"] = []
+    del case.members[f"{root}/build/{FIXTURE_PATCH_FILE}"]
+    case.members[f"{root}/build/versions.txt"] = fixture_versions(case.data)
+    case.write()
+    bundle_macos(case)
+    resources = case.app / "Contents/Resources"
+    assert sorted(p.name for p in resources.iterdir()) == ["ffmpeg-BUILD.txt", "ffmpeg-LICENSE.txt"]
+    text = (resources / "ffmpeg-BUILD.txt").read_text(encoding="utf-8")
+    assert "Modified" not in text and "patch" not in text.lower()
+
+
+def _break_patches(case, kind):
+    """Plant one disagreement between the lock, the archive's versions.txt and its patch file."""
+    root = case.data["archive_root"]
+    versions, patch = f"{root}/build/versions.txt", f"{root}/build/{FIXTURE_PATCH_FILE}"
+    (entry,) = case.data["patches"]
+    other = {"name": "macos/x/0002-other.patch", "sha256": "c" * 64}
+    if kind == "lock-has-an-extra-patch":
+        case.data["patches"].append(other)
+    elif kind == "lock-is-empty":
+        case.data["patches"] = []
+    elif kind == "versions-has-an-extra-patch":
+        extra = f"{'c' * 64}  {other['name']}"
+        case.members[versions] = fixture_versions(case.data, extra=[extra])
+    elif kind == "versions-has-no-patch-line":
+        case.members[versions] = fixture_versions(case.data, patches=[])
+    elif kind == "versions-sha-differs":
+        case.members[versions] = fixture_versions(
+            case.data, patches=[{**entry, "sha256": "d" * 64}]
+        )
+    elif kind == "versions-name-differs":
+        case.members[versions] = fixture_versions(
+            case.data, patches=[{**entry, "name": "macos/x/0001-renamed.patch"}]
+        )
+    elif kind == "versions-repeats-the-patch":
+        again = f"{entry['sha256']}  {entry['name']}"
+        case.members[versions] = fixture_versions(case.data, extra=[again])
+    elif kind == "single-space-patch-line":
+        case.members[versions] = fixture_versions(case.data).replace(b"  macos/", b" macos/")
+    elif kind == "uppercase-patch-hash":
+        case.members[versions] = fixture_versions(case.data).replace(
+            entry["sha256"].encode(), entry["sha256"].upper().encode()
+        )
+    elif kind == "versions-not-utf8":
+        case.members[versions] += b"\xff\xfe\n"
+    elif kind == "versions-missing":
+        del case.members[versions]
+    elif kind == "patch-file-missing":
+        del case.members[patch]
+    elif kind == "patch-bytes-differ":
+        case.members[patch] = FIXTURE_PATCH_BYTES + b"tampered\n"
+    elif kind == "patch-file-too-big":
+        case.members[patch] = b"x" * (1024 * 1024 + 1)
+    else:
+        raise AssertionError(kind)
+    case.write()
+
+
+@pytest.mark.parametrize(
+    ("kind", "refusal"),
+    [
+        ("lock-has-an-extra-patch", "patch lines differ from the lock's patches"),
+        ("lock-is-empty", "patch lines differ from the lock's patches"),
+        ("versions-has-an-extra-patch", "patch lines differ from the lock's patches"),
+        ("versions-has-no-patch-line", "patch lines differ from the lock's patches"),
+        ("versions-sha-differs", "patch lines differ from the lock's patches"),
+        ("versions-name-differs", "patch lines differ from the lock's patches"),
+        ("versions-repeats-the-patch", "patch lines differ from the lock's patches"),
+        ("single-space-patch-line", "malformed patch line"),
+        ("uppercase-patch-hash", "malformed patch line"),
+        ("versions-not-utf8", "not strict UTF-8"),
+        ("versions-missing", "missing member"),
+        ("patch-file-missing", "missing member"),
+        ("patch-bytes-differ", "patch file differs from the lock"),
+        ("patch-file-too-big", "larger than the build limit"),
+    ],
+)
+def test_macos_bundle_refuses_a_lock_that_does_not_describe_the_archive_patches(
+    macos_bundle, kind, refusal
+):
+    """DR-165 (1): the build's patch lines (versions.txt) and the lock's ``patches`` agree
+    exactly, and each patch file hashes to its entry, or nothing is placed."""
+    case = macos_bundle
+    _break_patches(case, kind)
+    with pytest.raises(ValueError, match=refusal):
+        bundle_macos(case)
+    assert not (case.app / "Contents/MacOS/ffmpeg").exists()
+    assert not (case.app / "Contents/Resources").exists()
+
+
+def test_macos_bundle_refuses_an_existing_patch_text_in_the_app(macos_bundle):
+    case = macos_bundle
+    tree(case.app, [f"Contents/Resources/ffmpeg-patch-{FIXTURE_PATCH_FILE}"])
+    with pytest.raises(ValueError, match="already exists"):
+        bundle_macos(case)
+    assert not (case.app / "Contents/MacOS/ffmpeg").exists()
+    assert not (case.out / "ffmpeg").exists()
 
 
 def test_macos_bundle_sets_the_execute_bits_on_exactly_the_two_tools(macos_bundle, monkeypatch):
@@ -6966,6 +7250,8 @@ def real_lock_bundle(case) -> SimpleNamespace:
     real = real_macos_lock()
     case.data.clear()
     case.data.update(real)
+    # The real patch's bytes are the fork's; the synthetic archive carries the fixture's.
+    case.data["patches"] = macos_lock()["patches"]
     marker = b"\0" + real["toolchain"]["compiler"].encode() + b"\0"
     for tool in ("ffmpeg", "ffprobe"):
         case.members[f"{real['archive_root']}/bin/{tool}"] = fake_macho(real, extra=marker)

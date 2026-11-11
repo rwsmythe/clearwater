@@ -842,13 +842,16 @@ def test_f02b_darwin_tcl_limit_requires_rendered_pillow_section(run7_release, he
         )
 
 
-@pytest.mark.parametrize("line", ["Runner:", "Per-component pins and licence readings:"])
+@pytest.mark.parametrize(
+    "line", ["Runner:", "Per-component pins and licence readings:", "Modified:"]
+)
 def test_f02b_ffmpeg_provenance_checks_runner_and_pins(app_release, line):
-    """The writer's fifteen-line record binds the runner and component pin pointer."""
-    add_app_ffmpeg(app_release["app"], app_release["native_surface"])
+    """The writer's sixteen-line record binds the runner, the component pin pointer and the
+    patch notice (DR-165)."""
+    add_app_ffmpeg(app_release)
     record = app_release["app"] / "Contents/Resources/ffmpeg-BUILD.txt"
     text = record.read_text()
-    assert len(text.splitlines()) == 15
+    assert len(text.splitlines()) == 16
     assert line in text
     record.write_text(
         "\n".join(
@@ -4876,17 +4879,45 @@ APP_LINKS = {
 }
 
 
-def add_app_ffmpeg(app, native_surface):
-    """The darwin bundling's four files, from the real macOS lock (never executed)."""
+APP_PATCH_BYTES = b"synthetic FFmpeg patch text (notices fixture)\n"
+APP_PATCH_NAME = "macos/build-script/patches/ffmpeg/0001-synthetic-notices.patch"
+APP_PATCH_FILE = "ffmpeg-patch-0001-synthetic-notices.patch"
+
+
+def app_modified_line(pin):
+    """The record's ``Modified:`` line for the fixture patch, written out in full."""
+    sha = hashlib.sha256(APP_PATCH_BYTES).hexdigest()
+    return (
+        f"Modified: FFmpeg is built with the patch {APP_PATCH_NAME} (sha256 {sha}), "
+        f"listed in the asset's build/versions.txt; patch text: "
+        f"Contents/Resources/{APP_PATCH_FILE} in this bundle; "
+        f"source: {APP_PATCH_NAME} in {pin['source_record_url']}"
+    )
+
+
+def add_app_ffmpeg(app_release):
+    """The darwin bundling's files, from the real macOS lock (never executed).
+
+    The patch is the fixture's (the real one's bytes are the fork's), so the plan reads a copy of
+    the real lock whose ``patches`` entry names it; ``app_release["ffmpeg_lock"]`` is that copy.
+    """
+    app, native_surface = app_release["app"], app_release["native_surface"]
     shutil.copytree(
         ROOT / "tools/package/native-licences/ffmpeg-macos-components",
         native_surface / "ffmpeg-macos-components",
     )
     pin = json.loads((ROOT / "tools/package/ffmpeg-macos.lock.json").read_text())
+    pin["patches"] = [
+        {"name": APP_PATCH_NAME, "sha256": hashlib.sha256(APP_PATCH_BYTES).hexdigest()}
+    ]
+    lock_path = app_release["audit"].parent / "ffmpeg-macos.synthetic.lock.json"
+    lock_path.write_text(json.dumps(pin), encoding="utf-8")
+    app_release["ffmpeg_lock"] = lock_path
     for name in ("ffmpeg", "ffprobe"):
         (app / "Contents/MacOS" / name).write_bytes(b"synthetic tool; never executed")
     resources = app / "Contents/Resources"
     (resources / "ffmpeg-LICENSE.txt").write_text("synthetic GPL-3.0 licence")
+    (resources / APP_PATCH_FILE).write_bytes(APP_PATCH_BYTES)
     script = pin["build_script"]
     (resources / "ffmpeg-BUILD.txt").write_text(
         "\n".join(
@@ -4899,6 +4930,7 @@ def add_app_ffmpeg(app, native_surface):
                 f"FFmpeg version: {pin['version']}",
                 f"FFmpeg commit: {pin['ffmpeg_commit']}",
                 f"FFmpeg ref: {pin['ffmpeg_ref']}",
+                app_modified_line(pin),
                 f"Build repository commit: {pin['build_repository_commit']}",
                 f"Build run: {pin['build_run_url']}",
                 f"Per-component source recipes: {pin['source_record_url']}",
@@ -5055,6 +5087,8 @@ def app_release(tmp_path, monkeypatch):
 
 def app_plan(app_release, **kwargs):
     kwargs.setdefault("native_licences_path", app_release["native_surface"])
+    if "ffmpeg_lock" in app_release:
+        kwargs.setdefault("ffmpeg_lock_path", app_release["ffmpeg_lock"])
     return app_release["module"].plan_notices(
         app_release["root"],
         audit_path=app_release["audit"],
@@ -5210,7 +5244,7 @@ def test_app_plan_reads_the_macos_ffmpeg_lock_and_bundle_locations(app_release):
     the tools in Contents/MacOS and their texts in Contents/Resources, each text by identity."""
     module = app_release["module"]
     assert module.default_ffmpeg_lock() == ROOT / "tools/package/ffmpeg-macos.lock.json"
-    pin = add_app_ffmpeg(app_release["app"], app_release["native_surface"])
+    pin = add_app_ffmpeg(app_release)
     result = app_plan(app_release)
     rows = {row.name: row for row in result.rows}
     main = rows["FFmpeg / ffprobe"]
@@ -5220,18 +5254,67 @@ def test_app_plan_reads_the_macos_ffmpeg_lock_and_bundle_locations(app_release):
         "file:Contents/MacOS/ffprobe",
         "file:Contents/Resources/ffmpeg-BUILD.txt",
         "file:Contents/Resources/ffmpeg-LICENSE.txt",
+        f"file:Contents/Resources/{APP_PATCH_FILE}",
     }
     assert main.notes[0].startswith(f"Provider: {pin['provider']} @ ")
+    assert main.notes[1] == (
+        f"Modified: FFmpeg is built with the patch {APP_PATCH_NAME} "
+        f"(sha256 {hashlib.sha256(APP_PATCH_BYTES).hexdigest()}); its text is the bundled "
+        f"Contents/Resources/{APP_PATCH_FILE}."
+    )
     components = [name for name in rows if name.startswith("FFmpeg component: ")]
     assert len(components) == len(pin["components"]) == 12
     runtimes = [name for name in rows if name.startswith("FFmpeg toolchain runtime: ")]
     assert len(runtimes) == len(pin["toolchain_runtime"]) == 1
     assert rows[runtimes[0]].licence == "Apache-2.0 WITH LLVM-exception"
     assert not any("FFmpeg" in line for line in result.user_obtained)
-    module.render_notices(result)
+    rendered = module.render_notices(result).decode("utf-8")
+    assert f"Modified: FFmpeg is built with the patch {APP_PATCH_NAME}" in rendered
+    assert f"`file:Contents/Resources/{APP_PATCH_FILE}`" in rendered
     record = app_release["app"] / "Contents/Resources/ffmpeg-BUILD.txt"
     record.write_text(record.read_text().replace("Build run: ", "Build run: x"))
     with pytest.raises(ValueError, match="FFmpeg build provenance differs: Build run"):
+        app_plan(app_release)
+
+
+def test_app_plan_refuses_ffmpeg_patch_text_that_differs_from_the_lock(app_release):
+    """DR-165 (3): the patch text the bundle carries is checked against the lock's sha256, and
+    its absence or a stray extra patch file is each refused (the new file is attributed by the
+    lock, never by its name or by lying under Contents/Resources)."""
+    add_app_ffmpeg(app_release)
+    resources = app_release["app"] / "Contents/Resources"
+    patch = resources / APP_PATCH_FILE
+    app_plan(app_release)
+    patch.write_bytes(APP_PATCH_BYTES + b"tampered\n")
+    differs = f"FFmpeg patch text differs from the lock: {APP_PATCH_FILE}"
+    with pytest.raises(ValueError, match=re.escape(differs)):
+        app_plan(app_release)
+    patch.unlink()
+    with pytest.raises(ValueError, match=f"FFmpeg missing patch text {APP_PATCH_FILE}"):
+        app_plan(app_release)
+    patch.write_bytes(APP_PATCH_BYTES)
+    app_plan(app_release)
+    (resources / "ffmpeg-patch-0002-stray.patch").write_bytes(b"stray")
+    label = "file:Contents/Resources/ffmpeg-patch-0002-stray.patch"
+    with pytest.raises(ValueError, match=re.escape(f"unknown or ambiguous bundled entry {label}")):
+        app_plan(app_release)
+
+
+@pytest.mark.parametrize("damage", ["dropped", "extra", "reworded"])
+def test_app_plan_checks_the_modified_lines_of_the_ffmpeg_record(app_release, damage):
+    """DR-165 (2): the record carries exactly the lock's ``Modified:`` lines."""
+    pin = add_app_ffmpeg(app_release)
+    record = app_release["app"] / "Contents/Resources/ffmpeg-BUILD.txt"
+    lines = record.read_text().splitlines()
+    index = lines.index(app_modified_line(pin))
+    if damage == "dropped":
+        del lines[index]
+    elif damage == "extra":
+        lines.insert(index, "Modified: another patch")
+    else:
+        lines[index] = lines[index].replace(" in this bundle", "")
+    record.write_text("\n".join(lines) + "\n")
+    with pytest.raises(ValueError, match="FFmpeg build provenance differs: Modified"):
         app_plan(app_release)
 
 

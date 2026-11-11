@@ -1,7 +1,7 @@
-From 92613dce4a2fa1e1189d0a913033364a140be350 Mon Sep 17 00:00:00 2001
+From 9cb0fa81871f09ae3f750d6845874c26a871b985 Mon Sep 17 00:00:00 2001
 From: Reid Smythe <rwsmythe@gmail.com>
 Date: Mon, 9 Nov 2026 00:38:02 -1000
-Subject: [PATCH] feat(wp6.5): build macOS arm64 GPL FFmpeg release/9.0 at
+Subject: [PATCH 1/2] feat(wp6.5): build macOS arm64 GPL FFmpeg release/9.0 at
  b204e94e without zvbi
 
 Clearwater WP6.5 (docs/briefs/wp6.5-brief.md in rwsmythe/clearwater), group 2a.
@@ -3052,6 +3052,176 @@ index 0000000..367761e
 +40b1ea0453e0309f0eba934e0ddf533f8f6295966679e8894e8f1c1c8d5e1210  https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.2.tar.gz
 
 base-commit: d77b8352f60bd180ebce585632846533aa60b183
+-- 
+2.52.0.windows.1
+
+
+From 5314a43c6ea6145a826e34e30ac3a965cef1b996 Mon Sep 17 00:00:00 2001
+From: Reid Smythe <rwsmythe@gmail.com>
+Date: Tue, 10 Nov 2026 22:55:17 -1000
+Subject: [PATCH 2/2] fix(wp6.5): apply and package the VideoToolbox
+ packet-duration patch (DR-163)
+
+FFmpeg's VideoToolbox wrapper never sets AVPacket.duration, so the muxer
+substitutes the average frame period for the last sample and a VFR export's
+terminal sample duration is wrong (Clearwater DR-163, runs 8-9).
+
+- macos/build-script/patches/ffmpeg/0001-avcodec-videotoolboxenc-set-packet-duration.patch:
+  carries frame->duration through the per-frame sourceFrameCtx node to
+  pkt->duration, flush included, wrapper-wide (against FFmpeg b204e94e).
+- build-ffmpeg.sh: git apply --check + git apply after the pinned checkout;
+  logs the patch sha256. The version token and extra-version are unchanged.
+- build-macos.yml Package step: the patch file ships in build/ and its
+  sha256 is a line of versions.txt (source correspondence).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .github/workflows/build-macos.yml             |  2 +
+ ...-videotoolboxenc-set-packet-duration.patch | 95 +++++++++++++++++++
+ macos/build-script/script/build-ffmpeg.sh     |  8 ++
+ 3 files changed, 105 insertions(+)
+ create mode 100644 macos/build-script/patches/ffmpeg/0001-avcodec-videotoolboxenc-set-packet-duration.patch
+
+diff --git a/.github/workflows/build-macos.yml b/.github/workflows/build-macos.yml
+index 79e32e5..fd7c175 100644
+--- a/.github/workflows/build-macos.yml
++++ b/.github/workflows/build-macos.yml
+@@ -276,6 +276,7 @@ jobs:
+           cp work/ffmpeg-version.txt work/ffprobe-version.txt work/ffmpeg-encoders.txt work/ffmpeg-decoders.txt \
+             work/ffmpeg-dylibs.txt work/ffprobe-dylibs.txt "pkg/$root/build/"
+           cp macos/sha256-pins.txt macos/meson-requirements.txt "pkg/$root/build/"
++          cp macos/build-script/patches/ffmpeg/0001-avcodec-videotoolboxenc-set-packet-duration.patch "pkg/$root/build/"
+           # the records taken before the build: what /usr/local/{include,lib} held
+           # (moved aside for the build) and the toolchain's search paths
+           cp "$RUNNER_TEMP/usr-local-include.txt" "$RUNNER_TEMP/usr-local-lib.txt" \
+@@ -283,6 +284,7 @@ jobs:
+           cp work/log/*.log "pkg/$root/build/logs/"
+           {
+             echo "ffmpeg $(git -C work/source/ffmpeg/ffmpeg rev-parse HEAD) (release/9.0, git describe $base)"
++            shasum -a 256 macos/build-script/patches/ffmpeg/0001-avcodec-videotoolboxenc-set-packet-duration.patch
+             echo "x264 $(git -C work/source/x264/x264-master rev-parse HEAD) (git)"
+             for f in macos/build-script/version/*; do
+               echo "$(basename "$f") $(cat "$f")"
+diff --git a/macos/build-script/patches/ffmpeg/0001-avcodec-videotoolboxenc-set-packet-duration.patch b/macos/build-script/patches/ffmpeg/0001-avcodec-videotoolboxenc-set-packet-duration.patch
+new file mode 100644
+index 0000000..cf255de
+--- /dev/null
++++ b/macos/build-script/patches/ffmpeg/0001-avcodec-videotoolboxenc-set-packet-duration.patch
+@@ -0,0 +1,95 @@
++From 1f1fedd0c0b10459d125d42765e63ae896bacb8d Mon Sep 17 00:00:00 2001
++From: Reid Smythe <rwsmythe@gmail.com>
++Date: Tue, 10 Nov 2026 22:54:07 -1000
++Subject: [PATCH] avcodec/videotoolboxenc: preserve frame duration in output
++ packets
++
++The wrapper drops input frame durations, allowing the muxer to substitute
++an average duration and alter VFR timing. Carry positive durations through
++the existing sourceFrameCtx node to the corresponding packet, including
++delayed and flushed output. Preserve zero for unknown durations and leave
++CoreMedia timing unchanged.
++
++Clearwater WP6.5 DR-163.
++
++Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
++---
++ libavcodec/videotoolboxenc.c | 13 ++++++++++---
++ 1 file changed, 10 insertions(+), 3 deletions(-)
++
++diff --git a/libavcodec/videotoolboxenc.c b/libavcodec/videotoolboxenc.c
++index de52923..7345e0d 100644
++--- a/libavcodec/videotoolboxenc.c
+++++ b/libavcodec/videotoolboxenc.c
++@@ -239,6 +239,7 @@ typedef struct BufNode {
++     CMSampleBufferRef cm_buffer;
++     ExtraSEI sei;
++     AVBufferRef *frame_buf;
+++    int64_t duration;
++     struct BufNode* next;
++ } BufNode;
++ 
++@@ -411,7 +412,8 @@ static void vtenc_reset(VTEncContext *vtctx)
++     }
++ }
++ 
++-static int vtenc_q_pop(VTEncContext *vtctx, bool wait, CMSampleBufferRef *buf, ExtraSEI *sei)
+++static int vtenc_q_pop(VTEncContext *vtctx, bool wait, CMSampleBufferRef *buf,
+++                       ExtraSEI *sei, int64_t *duration)
++ {
++     BufNode *info;
++ 
++@@ -450,6 +452,8 @@ static int vtenc_q_pop(VTEncContext *vtctx, bool wait, CMSampleBufferRef *buf, E
++ 
++     *buf = info->cm_buffer;
++     info->cm_buffer = NULL;
+++    if (duration)
+++        *duration = info->duration;
++     if (sei && *buf) {
++         *sei = info->sei;
++         info->sei = (ExtraSEI) {0};
++@@ -2503,6 +2507,7 @@ static int vtenc_send_frame(AVCodecContext *avctx,
++     }
++ #endif
++ 
+++    node->duration = frame->duration > 0 ? frame->duration : 0;
++     time = CMTimeMake(frame->pts * avctx->time_base.num, avctx->time_base.den);
++     status = VTCompressionSessionEncodeFrame(
++         vtctx->session,
++@@ -2543,6 +2548,7 @@ static av_cold int vtenc_frame(
++     int status;
++     CMSampleBufferRef buf = NULL;
++     ExtraSEI sei = {0};
+++    int64_t duration = 0;
++ 
++     if (frame) {
++         status = vtenc_send_frame(avctx, vtctx, frame);
++@@ -2579,7 +2585,7 @@ static av_cold int vtenc_frame(
++         goto end_nopkt;
++     }
++ 
++-    status = vtenc_q_pop(vtctx, !frame, &buf, &sei);
+++    status = vtenc_q_pop(vtctx, !frame, &buf, &sei, &duration);
++     if (status) goto end_nopkt;
++     if (!buf)   goto end_nopkt;
++ 
++@@ -2588,6 +2594,7 @@ static av_cold int vtenc_frame(
++     CFRelease(buf);
++     if (status) goto end_nopkt;
++ 
+++    pkt->duration = duration;
++     *got_packet = 1;
++     return 0;
++ 
++@@ -2670,7 +2677,7 @@ static int vtenc_populate_extradata(AVCodecContext   *avctx,
++         goto pe_cleanup;
++     }
++ 
++-    status = vtenc_q_pop(vtctx, 0, &buf, NULL);
+++    status = vtenc_q_pop(vtctx, 0, &buf, NULL, NULL);
++     if (status) {
++         av_log(avctx, AV_LOG_ERROR, "popping: %d\n", status);
++         goto pe_cleanup;
++-- 
++2.52.0.windows.1
++
+diff --git a/macos/build-script/script/build-ffmpeg.sh b/macos/build-script/script/build-ffmpeg.sh
+index 32aeb08..73e2af8 100755
+--- a/macos/build-script/script/build-ffmpeg.sh
++++ b/macos/build-script/script/build-ffmpeg.sh
+@@ -54,6 +54,14 @@ checkStatus $? "change directory failed"
+ git checkout --detach "$FFMPEG_COMMIT"
+ checkStatus $? "checkout of the pinned ffmpeg commit failed"
+ 
++FFMPEG_PATCH="$SCRIPT_DIR/../patches/ffmpeg/0001-avcodec-videotoolboxenc-set-packet-duration.patch"
++git apply --check "$FFMPEG_PATCH"
++checkStatus $? "ffmpeg packet duration patch check failed"
++git apply "$FFMPEG_PATCH"
++checkStatus $? "ffmpeg packet duration patch application failed"
++shasum -a 256 "$FFMPEG_PATCH"
++checkStatus $? "ffmpeg packet duration patch checksum failed"
++
+ # prepare build (Clearwater WP6.5: the extra version is the UTC build date,
+ # the form of the Windows build)
+ EXTRA_VERSION="$(date -u +%Y%m%d)"
 -- 
 2.52.0.windows.1
 

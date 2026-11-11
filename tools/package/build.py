@@ -1148,6 +1148,17 @@ class FFmpegMacCensus(TypedDict):
     external_libraries: str
 
 
+class FFmpegPatch(TypedDict):
+    """One patch the macOS recipe applies to the FFmpeg source (WP6.5 DR-165).
+
+    ``name`` is the recipe-relative path exactly as the asset's ``build/versions.txt`` lists
+    it; ``sha256`` the hash of the patch file's bytes, the same line's first field.
+    """
+
+    name: str
+    sha256: str
+
+
 class FFmpegMacLock(TypedDict):
     """The macOS arm64 FFmpeg pin (WP6.5): the fork's release asset and its provenance.
 
@@ -1156,7 +1167,9 @@ class FFmpegMacLock(TypedDict):
     discriminator (the Windows document carries no such field). ``census`` is
     ``"pending"`` (``components``, ``toolchain`` and ``toolchain_runtime`` then stay
     empty) or a :class:`FFmpegMacCensus` naming the run-log step and lines the complete
-    census rows were read from (WP6.5 part 3).
+    census rows were read from (WP6.5 part 3). ``patches`` lists the patches the build
+    applies to FFmpeg's source (possibly none); the bundling checks it against the
+    verified archive's ``build/versions.txt`` and notices the modification (DR-165).
     """
 
     schema_version: int
@@ -1180,6 +1193,7 @@ class FFmpegMacLock(TypedDict):
     licence: str
     archive_root: str
     extract_members: list[str]
+    patches: list[FFmpegPatch]
     source_record_url: str
     retention_note: str
     macos_deployment_target: str
@@ -1243,9 +1257,12 @@ FFMPEG_MACOS_EXCLUDED_STAGES = frozenset(
 """The macOS lock's ``excluded`` stages, EXACTLY: the fork recipe's component skips.
 
 The ``-SKIP_<NAME>=YES`` switches ``tools/package/ffmpeg-fork-macos.patch`` passes to the
-build script, less ``SKIP_TEST`` and ``SKIP_BUNDLE`` (not components). Held here, not read
-from the patch, so the validator needs nothing but the lock; a test binds this set to the
-patch, so a recipe change that is not mirrored here fails the suite.
+build script, less ``SKIP_TEST`` and ``SKIP_BUNDLE`` (not components). That file is the
+fork's whole recipe series, ``git format-patch`` of ``d77b8352..5314a43c`` (the nozvbi
+macOS recipe, then the VideoToolbox packet-duration patch's application and packaging;
+only the first commit carries the switches). Held here, not read from the series, so the
+validator needs nothing but the lock; a test binds this set to the series, so a recipe
+change that is not mirrored here fails the suite.
 """
 
 FFMPEG_MACOS_REQUIRED_SWITCHES = ("gpl", "version3", "libx265")
@@ -2107,6 +2124,58 @@ def _macos_census_texts(
         )
 
 
+_MACOS_PATCH_NAME = re.compile(
+    r"[A-Za-z0-9_][A-Za-z0-9_.+-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.+-]*)*\.patch"
+)
+"""A patch's recipe-relative path as ``build/versions.txt`` lists it: plain components, no
+``..`` or ``.`` component, no leading or doubled slash, ending in ``.patch``."""
+
+
+def macos_ffmpeg_patch_file_name(patch_name: str) -> str:
+    """The file name a macOS patch's text has in the bundle's ``Contents/Resources``.
+
+    The patch's own file name (the last component of its recipe path, which is also its
+    name under the archive's ``build/``) behind a fixed ``ffmpeg-patch-`` prefix, so the
+    file is recognisable beside ``ffmpeg-BUILD.txt`` and cannot collide with another
+    bundled file. The lock validator refuses two patches with the same file name.
+
+    Args:
+        patch_name: A lock ``patches`` entry's ``name``.
+
+    Returns:
+        The plain file name (no folder).
+    """
+    return "ffmpeg-patch-" + PurePosixPath(patch_name).name
+
+
+def _macos_patch_entries(value: object) -> list[FFmpegPatch]:
+    """Validate the macOS lock's ``patches`` list strictly (WP6.5 DR-165).
+
+    An empty list is legal: it records an UNPATCHED build, and the bundling still checks it
+    against the archive's ``build/versions.txt`` (:func:`_macos_patch_texts`), so an empty
+    list cannot hide a patch the build applied. Every entry has exactly ``name`` and
+    ``sha256``; names are unique and so are their file names.
+    """
+    if not isinstance(value, list):
+        raise ValueError("FFmpeg lock: patches must be a list")
+    names: set[str] = set()
+    files: set[str] = set()
+    for item in value:
+        row = _ffmpeg_fields(item, set(FFmpegPatch.__annotations__), "patch")
+        name = _ffmpeg_text(row["name"], "patch name")
+        digest = _ffmpeg_text(row["sha256"], "patch sha256")
+        if _MACOS_PATCH_NAME.fullmatch(name) is None:
+            raise ValueError("FFmpeg lock: invalid patch name (a recipe-relative .patch path)")
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ValueError("FFmpeg lock: invalid patch sha256 (64 lowercase hex digits)")
+        file = macos_ffmpeg_patch_file_name(name)
+        if name in names or file in files:
+            raise ValueError("FFmpeg lock: duplicate patch")
+        names.add(name)
+        files.add(file)
+    return cast(list[FFmpegPatch], value)
+
+
 def _validate_macos_ffmpeg_lock(value: dict[str, object], texts: Path) -> FFmpegMacLock:
     """Validate the macOS lock (:class:`FFmpegMacLock`), its census rows against ``texts``."""
     data = _ffmpeg_fields(value, set(FFmpegMacLock.__annotations__), "macOS document")
@@ -2120,6 +2189,7 @@ def _validate_macos_ffmpeg_lock(value: dict[str, object], texts: Path) -> FFmpeg
         "census",
         "build_script",
         "extract_members",
+        "patches",
         "components",
         "excluded",
         "toolchain",
@@ -2159,6 +2229,7 @@ def _validate_macos_ffmpeg_lock(value: dict[str, object], texts: Path) -> FFmpeg
         raise ValueError("FFmpeg lock: combined build must be GPL-3.0-or-later")
     if data["extract_members"] != [*(f"bin/{tool}" for tool in FFMPEG_MACOS_TOOLS), "LICENSE.txt"]:
         raise ValueError("FFmpeg lock: extract_members must name only the two tools and licence")
+    _macos_patch_entries(data["patches"])
     # The fork names the archive from the build's describe token (the version without
     # its date): a Windows-shaped root, name or URL can never pass for the macOS asset.
     root = text["archive_root"]
@@ -3006,6 +3077,103 @@ def _check_macos_toolchain_marker(path: Path, lock: FFmpegMacLock) -> None:
     raise ValueError(f"{path.name}: missing the Apple toolchain marker {toolchain['compiler']!r}")
 
 
+_MACOS_VERSIONS_PATCH_LINE = re.compile(r"([0-9a-f]{64})  (\S+\.patch)")
+"""A patch line of the asset's ``build/versions.txt``: sha256, TWO spaces, the recipe path."""
+
+_MACOS_BUILD_MEMBER_LIMIT = 1024 * 1024
+"""The most bytes read from one ``build/`` member (``versions.txt`` is under 1 KiB)."""
+
+
+def macos_ffmpeg_modified_lines(lock: FFmpegMacLock) -> list[str]:
+    """The ``Modified:`` lines of the macOS ``ffmpeg-BUILD.txt``, one per lock patch (DR-165).
+
+    Each names the patch's recipe path and sha256, says the asset's ``build/versions.txt``
+    lists it (the bundling refuses unless that file and the lock agree and the patch file's
+    bytes hash to the lock), and says where its text is: the bundle's ``Contents/Resources``
+    beside the record, and the recipe path in the source record (``source_record_url``, the
+    fork commit the asset was built from). Empty when the lock lists no patch. The notices
+    check reads the record against this same function.
+
+    Args:
+        lock: The validated macOS lock.
+
+    Returns:
+        The lines, in the lock's order, without line ends.
+    """
+    return [
+        f"Modified: FFmpeg is built with the patch {patch['name']} (sha256 {patch['sha256']}), "
+        f"listed in the asset's build/versions.txt; patch text: "
+        f"Contents/Resources/{macos_ffmpeg_patch_file_name(patch['name'])} in this bundle; "
+        f"source: {patch['name']} in {lock['source_record_url']}"
+        for patch in lock["patches"]
+    ]
+
+
+def _macos_build_member(archive: zipfile.ZipFile, lock: FFmpegMacLock, name: str) -> bytes:
+    """Read ``<archive_root>/build/<name>`` from the verified archive, bounded.
+
+    The member inventory (:func:`_macos_archive_members`) has already refused unsafe and
+    duplicate names, so the lookup is unambiguous. A missing member, a folder or one past
+    :data:`_MACOS_BUILD_MEMBER_LIMIT` (by its header, then by the bytes read) is refused.
+    """
+    path = f"{lock['archive_root']}/build/{name}"
+    try:
+        info = archive.getinfo(path)
+    except KeyError:
+        raise ValueError(f"FFmpeg archive: missing member {path!r}") from None
+    if info.is_dir() or info.file_size > _MACOS_BUILD_MEMBER_LIMIT:
+        raise ValueError(f"FFmpeg archive: {path!r} is a folder or larger than the build limit")
+    with archive.open(info) as source:
+        data = source.read(_MACOS_BUILD_MEMBER_LIMIT + 1)
+    if len(data) > _MACOS_BUILD_MEMBER_LIMIT:
+        raise ValueError(f"FFmpeg archive: {path!r} is larger than the build limit")
+    return data
+
+
+def _macos_patch_texts(archive: zipfile.ZipFile, lock: FFmpegMacLock) -> dict[str, bytes]:
+    """The lock's patches, proven against the verified archive (DR-165); name -> patch bytes.
+
+    Reads ``<archive_root>/build/versions.txt`` (strict UTF-8) and collects every line whose
+    second field ends in ``.patch``: each must be exactly ``<sha256>  <path>`` (TWO spaces).
+    Those lines must equal the lock's ``patches`` (same entries, none extra, none missing,
+    none repeated), or the lock does not describe the asset. Then each patch's text is read
+    from ``<archive_root>/build/<its file name>`` and must hash to the lock's sha256, so the
+    bytes the bundle carries are the bytes the build recorded.
+
+    Raises:
+        ValueError: ``versions.txt`` or a patch file is missing, malformed or oversized, the
+            patch lines differ from the lock, or a patch file's hash differs from its entry.
+    """
+    raw = _macos_build_member(archive, lock, "versions.txt")
+    try:
+        versions = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise ValueError("FFmpeg archive: build/versions.txt is not strict UTF-8") from None
+    recorded: list[tuple[str, str]] = []
+    for line in versions.split("\n"):
+        fields = line.split()
+        if len(fields) >= 2 and fields[1].endswith(".patch"):
+            match = _MACOS_VERSIONS_PATCH_LINE.fullmatch(line)
+            if match is None:
+                raise ValueError("FFmpeg archive: malformed patch line in build/versions.txt")
+            recorded.append((match.group(2), match.group(1)))
+    locked = [(patch["name"], patch["sha256"]) for patch in lock["patches"]]
+    if sorted(recorded) != sorted(locked):
+        raise ValueError(
+            "FFmpeg archive: build/versions.txt patch lines differ from the lock's patches; "
+            f"not in the lock {sorted(set(recorded) - set(locked))}, "
+            f"not in the archive {sorted(set(locked) - set(recorded))}, "
+            f"recorded {len(recorded)} against locked {len(locked)}"
+        )
+    texts: dict[str, bytes] = {}
+    for patch in lock["patches"]:
+        data = _macos_build_member(archive, lock, PurePosixPath(patch["name"]).name)
+        if hashlib.sha256(data).hexdigest() != patch["sha256"]:
+            raise ValueError(f"FFmpeg archive: patch file differs from the lock: {patch['name']}")
+        texts[patch["name"]] = data
+    return texts
+
+
 def _bundle_macos_ffmpeg(
     destination: Path,
     *,
@@ -3030,6 +3198,13 @@ def _bundle_macos_ffmpeg(
     before :func:`seal_macos_bundle`. Each tool must also carry the census's Apple
     toolchain marker (:func:`_check_macos_toolchain_marker`, the Windows
     :func:`_check_ffmpeg_toolchain_markers` analogue) before anything is placed.
+
+    DR-165: the lock's ``patches`` are proven against the archive's ``build/versions.txt``
+    and each patch file's bytes (:func:`_macos_patch_texts`, read through the same verified
+    archive and its already-inspected inventory, NOT through ``extract_members``, which stays
+    the two tools and the licence); each patch's text is staged and placed in
+    ``Contents/Resources`` as ``ffmpeg-patch-<file name>`` beside the notices, and the
+    build record carries a ``Modified:`` line for it (:func:`macos_ffmpeg_modified_lines`).
     """
     lock = load_macos_ffmpeg_lock()
     destination = destination.resolve()
@@ -3040,7 +3215,10 @@ def _bundle_macos_ffmpeg(
         or bundle.suffix != ".app"
     ):
         raise ValueError(f"macOS FFmpeg goes into Contents/MacOS of a built .app: {destination}")
-    texts = ("ffmpeg-LICENSE.txt", "ffmpeg-BUILD.txt")
+    patch_files = {
+        patch["name"]: macos_ffmpeg_patch_file_name(patch["name"]) for patch in lock["patches"]
+    }
+    texts = ("ffmpeg-LICENSE.txt", "ffmpeg-BUILD.txt", *patch_files.values())
     for target in (
         *(destination / tool for tool in FFMPEG_MACOS_TOOLS),
         *(bundle / "Contents" / "Resources" / name for name in texts),
@@ -3070,6 +3248,10 @@ def _bundle_macos_ffmpeg(
             path.chmod(0o644 if name == "LICENSE.txt" else 0o755)
             if name != "LICENSE.txt":
                 tool_hashes.add(digest.hexdigest())
+        for patch_name, patch_bytes in _macos_patch_texts(archive, lock).items():
+            patch_path = staging / patch_files[patch_name]
+            patch_path.write_bytes(patch_bytes)
+            patch_path.chmod(0o644)
     result = []
     for tool in FFMPEG_MACOS_TOOLS:
         problem = _macos_tool_problem(
@@ -3092,6 +3274,7 @@ def _bundle_macos_ffmpeg(
                 f"FFmpeg version: {lock['version']}",
                 f"FFmpeg commit: {lock['ffmpeg_commit']}",
                 f"FFmpeg ref: {lock['ffmpeg_ref']}",
+                *macos_ffmpeg_modified_lines(lock),
                 f"Build repository commit: {lock['build_repository_commit']}",
                 f"Build run: {lock['build_run_url']}",
                 f"Per-component source recipes: {lock['source_record_url']}",

@@ -27,6 +27,12 @@
     "bin/ffprobe",
     "LICENSE.txt"
   ],
+  "patches": [
+    {
+      "name": "macos/build-script/patches/ffmpeg/0001-synthetic-test.patch",
+      "sha256": "9c483104332e9a3a2cef7096753a51b138d6a18895ce5e9b9ff25cf334c558cd"
+    }
+  ],
   "source_record_url": "https://github.com/rwsmythe/FFmpeg-Builds/tree/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
   "retention_note": "SYNTHETIC FIXTURE (WP6.5 group 2a part 2): not a release pin; the real tools/package/ffmpeg-macos.lock.json is written from the fork run in part 3",
   "macos_deployment_target": "14.0",

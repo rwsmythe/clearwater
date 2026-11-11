@@ -37,6 +37,12 @@
     "bin/ffprobe",
     "LICENSE.txt"
   ],
+  "patches": [
+    {
+      "name": "macos/build-script/patches/ffmpeg/0001-avcodec-videotoolboxenc-set-packet-duration.patch",
+      "sha256": "b598505e8d2859835312ca75ff92f50ec35b2166421a2e5c84c49d4691293c4f"
+    }
+  ],
   "source_record_url": "https://github.com/rwsmythe/FFmpeg-Builds/tree/5314a43c6ea6145a826e34e30ac3a965cef1b996",
   "retention_note": "the asset is a release of the owner's fork (tag ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-5314a43, not Latest); no retention policy applies; rebuild in the fork for an FFmpeg bump (checklist step)",
   "macos_deployment_target": "14.0",
