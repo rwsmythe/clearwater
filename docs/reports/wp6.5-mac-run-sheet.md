@@ -21,6 +21,7 @@ Nothing in this sheet names the Mac's account or host. Refer to the machine as "
 | step 10a | the zip's sha256 as printed in the downloaded `macos-validation-bundle` (the `.sha256` sidecar) |
 | step 34 and step 37 | `[SEAT CHECKS: option present in the bundle/source under test]`: `--vt-rate-control` is in the checked-out commit |
 | step 30, the runner's wall | the wall of the same leg in run 10's `macos.log` |
+| step 30, the expected `deselected` total | the seat's own collection with step 30's `-m` and `-k` at the run-10 commit (every non-`macos` test plus the 15 GUI sites); step 29a confirms the 15 on the Mac |
 | section 1 item L1 | the run id of the downloaded `macos-validation-bundle` |
 | section 1 items L2, L4 | the paths the seat used on the laptop (and the frame count of the trim) |
 | steps 1, 19, 9, 39 (only if the seat switches the full clip to `GX011592`) | the gates become 13 and 11 GiB and the clip name changes (section 0.4) |
@@ -566,7 +567,7 @@ LANDS: `wp6.5-mac/python.txt`.
 ### Step 28 -- the headless smoke of THIS bundle
 
 ```
-needw && iso /usr/bin/time -p uv run python tools/package/build.py --smoke "$APP/Contents/MacOS" --out "$W/smoke-out" > "$W/smoke.log" 2>&1; echo "exit $?"; tail -n 14 "$W/smoke.log"
+needw && { iso /usr/bin/time -p uv run python tools/package/build.py --smoke "$APP/Contents/MacOS" --out "$W/smoke-out" > "$W/smoke.log" 2>&1; echo "exit $?"; tail -n 14 "$W/smoke.log"; }
 ```
 
 EXPECT: `exit 0`; the log ends with `smoke: PASS (headless process checks in contained process groups)`
@@ -590,12 +591,26 @@ IF NOT: STOP; the log is the evidence.
 EXPECT: well under 100 Mi left (the planted copy was about 1 Gi; it is only a copy of the bundle).
 LANDS: `wp6.5-mac/smoke-out/`.
 
+### Step 29a -- confirm the 15 GUI sites are the ones left out of step 30
+
+```
+needw && { iso env CLEARWATER_MAC_BUNDLE="$APP" uv run pytest --collect-only -q -m macos -k "not test_python_m_clearwater_starts_the_shell_and_exits_0 and not test_macos_native_gui_contract" tests/test_macos_portability.py > "$W/macos-collect.txt" 2>&1; echo "exit $?" >> "$W/macos-collect.txt"; tail -n 3 "$W/macos-collect.txt"; }
+```
+
+The same `-m` and `-k` as step 30, restricted to the macOS test module (`pytestmark` marks every test
+in it `macos`, `tests/test_macos_portability.py:51`), so here the only deselected tests are the GUI
+cases. It collects only; no test runs and no window starts.
+
+EXPECT: a summary line `X/Y tests collected (15 deselected) in <s>s`, then `exit 0`.
+LANDS: `wp6.5-mac/macos-collect.txt`.
+IF NOT: a number other than 15 is a finding, not a STOP: copy the line into `notes.txt` and go on.
+
 ### Step 30 -- the macOS test leg on the built bundle (the VideoToolbox halves)
 
 DR-163 (VideoToolbox last-sample duration on VFR sources): [SEAT FILLS AFTER RUN 10: closed by run 10 / open -- avoid VT on VFR sources]
 
 ```
-needw && iso /usr/bin/time -p env CLEARWATER_MAC_BUNDLE="$APP" uv run pytest -q -rs --timeout 1200 -m macos -k "not test_python_m_clearwater_starts_the_shell_and_exits_0 and not test_macos_native_gui_contract" --basetemp="$W/pytest-macos" --junitxml="$W/macos-junit.xml" > "$W/macos.log" 2>&1; echo "exit $?"; tail -n 6 "$W/macos.log"
+needw && { iso /usr/bin/time -p env CLEARWATER_MAC_BUNDLE="$APP" uv run pytest -q -rs --timeout 1200 -m macos -k "not test_python_m_clearwater_starts_the_shell_and_exits_0 and not test_macos_native_gui_contract" --basetemp="$W/pytest-macos" --junitxml="$W/macos-junit.xml" > "$W/macos.log" 2>&1; echo "exit $?"; tail -n 6 "$W/macos.log"; }
 ```
 
 No test in this leg starts a window. EXCLUDED, because each would start a real GUI (a scripted
@@ -610,8 +625,14 @@ owner's own hand checks (steps 16, 47 to 49).
 
 It is long; the runner's wall for the same leg is in run 10's `macos.log`
 [SEAT FILLS: the runner's wall].
-EXPECT: `exit 0`, a last line `N passed, M skipped, 15 deselected ... in <s>s` (the 15 are the GUI
-sites above) with no `failed` or `error`. The
+EXPECT: `exit 0`, a last line `N passed, M skipped, D deselected ... in <s>s` with no `failed` or
+`error`. This sheet does not fix `D`: the leg names no test file, so pytest collects the whole
+`tests` tree (`testpaths`, `pyproject.toml:72`) and `D` is every test WITHOUT the `macos` marker
+plus the 15 GUI sites above. The 15 are confirmed on their own by step 29a. The seat's expected
+total: [SEAT FILLS: expected `D` for this commit, from the seat's own collection with this same
+`-m` and `-k`]. If your `D` differs from it, copy the summary line into `notes.txt` and go on (not
+a STOP; read it with step 29a's line: 15 there and a different total here means only the
+non-`macos` tests differ). The
 VideoToolbox rows (M-CODEC, M-RATE, M-V4 VT halves, M-SPACE) RUN here (the runner may not have had
 hardware encode), so VideoToolbox skips should be absent; every `SKIPPED` line in `macos.log` carries its reason. If
 the DR-163 line above says open, the four DR-163 VT/VFR cases are strict xfails and show as
@@ -633,7 +654,7 @@ sources through `hevc_videotoolbox` at 10-bit (the cases of `test_macos_videotoo
 `clip:vfr-gap-hevc_videotoolbox-10`):
 
 ```
-needw && iso /usr/bin/time -p env CLEARWATER_MAC_BUNDLE="$APP" uv run pytest -q -rs --timeout 1200 -m macos -k "test_macos_videotoolbox_v4_corpus and (vid-vfr or vfr-gap) and hevc_videotoolbox-10" --basetemp="$W/pytest-dr163" > "$W/dr163.log" 2>&1; echo "exit $?"; tail -n 6 "$W/dr163.log"
+needw && { iso /usr/bin/time -p env CLEARWATER_MAC_BUNDLE="$APP" uv run pytest -q -rs --timeout 1200 -m macos -k "test_macos_videotoolbox_v4_corpus and (vid-vfr or vfr-gap) and hevc_videotoolbox-10" --basetemp="$W/pytest-dr163" > "$W/dr163.log" 2>&1; echo "exit $?"; tail -n 6 "$W/dr163.log"; }
 ```
 
 EXPECT: two cases ran (the `-k` keeps the VideoToolbox cases at 10-bit only; no libx265 case and no
@@ -722,7 +743,7 @@ Each export is the full pipeline on the CPU; the first one also analyses and fil
 that the other three reuse (V17).
 
 ```
-needw && mkdir -p "$W/q1" "$W/cache-q1" && for q in high standard; do for d in 8 10; do tag="B-$q-$d"; mkdir -p "$W/q1/$tag"; if [ "$d" = 10 ]; then t="--ten-bit"; else t=""; fi; iso /usr/bin/time -l uv run python tools/headless_export.py "$IN/GX011627-trim.mp4" --out "$W/q1/$tag" --quality "$q" --encoder hevc_videotoolbox --vt-rate-control B $t --cache-dir "$W/cache-q1" --record "$W/q1/$tag.json" > "$W/q1/$tag.log" 2>&1; echo "exit $?" >> "$W/q1/$tag.log"; done; done; for tag in B-high-8 B-high-10 B-standard-8 B-standard-10; do echo "== $tag"; tail -n 4 "$W/q1/$tag.log"; [ -f "$W/q1/$tag/GX011627-trim_corrected.mp4" ] && echo "output present" || echo "OUTPUT MISSING $tag: STOP"; done
+needw && { mkdir -p "$W/q1" "$W/cache-q1" && for q in high standard; do for d in 8 10; do tag="B-$q-$d"; mkdir -p "$W/q1/$tag"; if [ "$d" = 10 ]; then t="--ten-bit"; else t=""; fi; iso /usr/bin/time -l uv run python tools/headless_export.py "$IN/GX011627-trim.mp4" --out "$W/q1/$tag" --quality "$q" --encoder hevc_videotoolbox --vt-rate-control B $t --cache-dir "$W/cache-q1" --record "$W/q1/$tag.json" > "$W/q1/$tag.log" 2>&1; echo "exit $?" >> "$W/q1/$tag.log"; done; done; for tag in B-high-8 B-high-10 B-standard-8 B-standard-10; do echo "== $tag"; tail -n 4 "$W/q1/$tag.log"; [ -f "$W/q1/$tag/GX011627-trim_corrected.mp4" ] && echo "output present" || echo "OUTPUT MISSING $tag: STOP"; done; }
 ```
 
 `tools/headless_export.py` REFUSES a `--cache-dir` folder that does not exist
@@ -750,7 +771,7 @@ the later measurements do not depend on it.)
 ### Step 35 -- Q1, the sizes and the stream facts
 
 ```
-needw && for tag in B-high-8 B-high-10 B-standard-8 B-standard-10; do f="$W/q1/$tag/GX011627-trim_corrected.mp4"; echo "== $tag"; if [ -f "$f" ]; then ls -l "$f" | awk '{print $5, "bytes"}'; ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,profile,level,pix_fmt,bit_rate,nb_frames -show_entries format=size,bit_rate -of default=nw=1 "$f"; else echo "MISSING $f: STOP (no output to measure)"; fi; done > "$W/q1/streams.txt"; cat "$W/q1/streams.txt"
+needw && { for tag in B-high-8 B-high-10 B-standard-8 B-standard-10; do f="$W/q1/$tag/GX011627-trim_corrected.mp4"; echo "== $tag"; if [ -f "$f" ]; then ls -l "$f" | awk '{print $5, "bytes"}'; ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,profile,level,pix_fmt,bit_rate,nb_frames -show_entries format=size,bit_rate -of default=nw=1 "$f"; else echo "MISSING $f: STOP (no output to measure)"; fi; done > "$W/q1/streams.txt"; cat "$W/q1/streams.txt"; }
 ```
 
 EXPECT: for each of the four outputs: `hevc`; profile `Main` for 8-bit and `Main 10` for 10-bit
@@ -784,7 +805,7 @@ mirrors step 34: the same trim, qualities and depths, the same shared cache, out
 `wp6.5-mac/q1/A-<quality>-<depth>/`.
 
 ```
-needw && mkdir -p "$W/q1" "$W/cache-q1" && for q in high standard; do for d in 8 10; do tag="A-$q-$d"; mkdir -p "$W/q1/$tag"; if [ "$d" = 10 ]; then t="--ten-bit"; else t=""; fi; iso /usr/bin/time -l uv run python tools/headless_export.py "$IN/GX011627-trim.mp4" --out "$W/q1/$tag" --quality "$q" --encoder hevc_videotoolbox --vt-rate-control A $t --cache-dir "$W/cache-q1" --record "$W/q1/$tag.json" > "$W/q1/$tag.log" 2>&1; echo "exit $?" >> "$W/q1/$tag.log"; done; done; for tag in A-high-8 A-high-10 A-standard-8 A-standard-10; do echo "== $tag"; tail -n 4 "$W/q1/$tag.log"; [ -f "$W/q1/$tag/GX011627-trim_corrected.mp4" ] && echo "output present" || echo "OUTPUT MISSING $tag: STOP"; done
+needw && { mkdir -p "$W/q1" "$W/cache-q1" && for q in high standard; do for d in 8 10; do tag="A-$q-$d"; mkdir -p "$W/q1/$tag"; if [ "$d" = 10 ]; then t="--ten-bit"; else t=""; fi; iso /usr/bin/time -l uv run python tools/headless_export.py "$IN/GX011627-trim.mp4" --out "$W/q1/$tag" --quality "$q" --encoder hevc_videotoolbox --vt-rate-control A $t --cache-dir "$W/cache-q1" --record "$W/q1/$tag.json" > "$W/q1/$tag.log" 2>&1; echo "exit $?" >> "$W/q1/$tag.log"; done; done; for tag in A-high-8 A-high-10 A-standard-8 A-standard-10; do echo "== $tag"; tail -n 4 "$W/q1/$tag.log"; [ -f "$W/q1/$tag/GX011627-trim_corrected.mp4" ] && echo "output present" || echo "OUTPUT MISSING $tag: STOP"; done; }
 ```
 
 EXPECT: as step 34: four logs each ending `exit 0` and followed by `output present`, an
@@ -798,7 +819,7 @@ and the sheet goes on at step 38).
 ### Step 37a -- Q1 candidate A, the sizes and the stream facts
 
 ```
-needw && for tag in A-high-8 A-high-10 A-standard-8 A-standard-10; do f="$W/q1/$tag/GX011627-trim_corrected.mp4"; echo "== $tag"; if [ -f "$f" ]; then ls -l "$f" | awk '{print $5, "bytes"}'; ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,profile,level,pix_fmt,bit_rate,nb_frames -show_entries format=size,bit_rate -of default=nw=1 "$f"; else echo "MISSING $f: STOP (no output to measure)"; fi; done > "$W/q1/streams-A.txt"; cat "$W/q1/streams-A.txt"
+needw && { for tag in A-high-8 A-high-10 A-standard-8 A-standard-10; do f="$W/q1/$tag/GX011627-trim_corrected.mp4"; echo "== $tag"; if [ -f "$f" ]; then ls -l "$f" | awk '{print $5, "bytes"}'; ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,profile,level,pix_fmt,bit_rate,nb_frames -show_entries format=size,bit_rate -of default=nw=1 "$f"; else echo "MISSING $f: STOP (no output to measure)"; fi; done > "$W/q1/streams-A.txt"; cat "$W/q1/streams-A.txt"; }
 ```
 
 EXPECT: as step 35 for the four A outputs (profile `Main` / `Main 10`, `pix_fmt`, the frame count,
@@ -825,7 +846,7 @@ graphics-card readings will say `nvidia-smi did not run`: expected on a Mac
 (`tools/video_io_bench.py:163-185`).
 
 ```
-needw && mkdir -p "$W/n6" && iso /usr/bin/time -l uv run python tools/export_bench.py run GX011627-trim --runs 1 --cache cold --force-cpu --encoder auto --quality standard > "$W/n6/trim.log" 2>&1; echo "exit $?" >> "$W/n6/trim.log"; tail -n 22 "$W/n6/trim.log"
+needw && { mkdir -p "$W/n6" && iso /usr/bin/time -l uv run python tools/export_bench.py run GX011627-trim --runs 1 --cache cold --force-cpu --encoder auto --quality standard > "$W/n6/trim.log" 2>&1; echo "exit $?" >> "$W/n6/trim.log"; tail -n 22 "$W/n6/trim.log"; }
 ```
 
 EXPECT: `exit 0`; a `RUN ...` line, a result row with `min/min`, a `RECORD <path>` line; the `time -l`
@@ -840,7 +861,7 @@ write `cpu_freq unavailable` in `notes.txt` and continue; the sheet carries no t
 ### Step 39 -- the N6 figure, ONE full clip, end to end
 
 ```
-needw && iso /usr/bin/time -l uv run python tools/export_bench.py run GX011589 --runs 1 --cache cold --force-cpu --encoder auto --quality standard > "$W/n6/full.log" 2>&1; echo "exit $?" >> "$W/n6/full.log"; tail -n 22 "$W/n6/full.log"
+needw && { iso /usr/bin/time -l uv run python tools/export_bench.py run GX011589 --runs 1 --cache cold --force-cpu --encoder auto --quality standard > "$W/n6/full.log" 2>&1; echo "exit $?" >> "$W/n6/full.log"; tail -n 22 "$W/n6/full.log"; }
 ```
 
 EXPECT: as step 38, on the whole 6.4 s clip (about 192 frames). `GX011589` is the smallest full SCUBA
@@ -875,7 +896,7 @@ export through the product engine on the CPU and keeps the pre-encode frame dige
 frame per second, the full float32 frame; `compare` sets it against the Windows reference from L4.
 
 ```
-needw && iso /usr/bin/time -l uv run python tools/export_oracle.py record --clip GX011627-trim --force-cpu --name mac-cpu > "$W/ad11-record.log" 2>&1; echo "exit $?" >> "$W/ad11-record.log"; tail -n 14 "$W/ad11-record.log"
+needw && { iso /usr/bin/time -l uv run python tools/export_oracle.py record --clip GX011627-trim --force-cpu --name mac-cpu > "$W/ad11-record.log" 2>&1; echo "exit $?" >> "$W/ad11-record.log"; tail -n 14 "$W/ad11-record.log"; }
 ```
 
 EXPECT: `exit 0`; `ORACLE GX011627-trim.mp4 c3 <device>: <the trim's frame count> frames, about 3 kept, ...`; `RECORD <path>`
@@ -887,7 +908,7 @@ LANDS: `wp6.5-mac/ad11-record.log`; `wp6.5-mac/work/wp3.21/oracle/mac-cpu/` (`or
 ### Step 43 -- AD-11: the verdict
 
 ```
-needw && iso uv run python tools/export_oracle.py compare "$IN/win-ref" "$W/work/wp3.21/oracle/mac-cpu" > "$W/ad11-compare.txt" 2>&1; echo "exit $?" >> "$W/ad11-compare.txt"; cat "$W/ad11-compare.txt"
+needw && { iso uv run python tools/export_oracle.py compare "$IN/win-ref" "$W/work/wp3.21/oracle/mac-cpu" > "$W/ad11-compare.txt" 2>&1; echo "exit $?" >> "$W/ad11-compare.txt"; cat "$W/ad11-compare.txt"; }
 ```
 
 EXPECT: `VERDICT TIER1` or `VERDICT TIER2` with the frame counts and `max abs` / `mean abs`, then
@@ -904,7 +925,7 @@ The command line prints only the largest figures. This step calls the same `comp
 mean of each measured frame.
 
 ```
-needw && iso uv run python -c "import json, sys; sys.path.insert(0, 'tools'); import export_oracle as e; from pathlib import Path; print(json.dumps(e.compare(Path(sys.argv[1]), Path(sys.argv[2])), indent=1))" "$IN/win-ref" "$W/work/wp3.21/oracle/mac-cpu" > "$W/ad11-compare.json" 2>&1; head -n 40 "$W/ad11-compare.json"
+needw && { iso uv run python -c "import json, sys; sys.path.insert(0, 'tools'); import export_oracle as e; from pathlib import Path; print(json.dumps(e.compare(Path(sys.argv[1]), Path(sys.argv[2])), indent=1))" "$IN/win-ref" "$W/work/wp3.21/oracle/mac-cpu" > "$W/ad11-compare.json" 2>&1; head -n 40 "$W/ad11-compare.json"; }
 ```
 
 EXPECT: a JSON object with `verdict`, `frames`, `frames_differing`, `frames_measured`, `max_abs`,
@@ -1128,9 +1149,21 @@ needw && { for p in "$USER" "$(hostname -s)" "$(hostname)" "$(scutil --get Compu
 EXPECT: no output (the paths are all under `/Users/Shared`; `grep -I` skips the video files; only
 file NAMES are printed, never their lines).
 LANDS: the terminal.
-IF NOT: for each file listed that held a NAME, replace the names in place, one file at a time,
-`[ "$W" = /Users/Shared/clearwater-wp65/wp6.5-mac ] || { echo "W not set: STOP"; false; } && for p in "$USER" "$(hostname -s)" "$(hostname)" "$(scutil --get ComputerName 2>/dev/null)" "$(scutil --get LocalHostName 2>/dev/null)"; do [ -n "$p" ] && sed -i '' "s/$p/REDACTED/g" "<the file>"; done`
-and run this step again until it prints nothing. (Never replace it in a `.mp4`.) A file that held
+IF NOT: for each file listed that held a NAME, replace the names in place, one file at a time
+(put the file's path, which this step printed, where `<the file>` is):
+
+```
+[ "$W" = /Users/Shared/clearwater-wp65/wp6.5-mac ] || { echo "W not set: STOP"; false; } && for p in "$USER" "$(hostname -s)" "$(hostname)" "$(scutil --get ComputerName 2>/dev/null)" "$(scutil --get LocalHostName 2>/dev/null)"; do [ -n "$p" ] && { N="$p" perl -pi -e 'BEGIN { $n = $ENV{N} } s/\Q$n\E/REDACTED/g' "<the file>" 2>/dev/null || { echo "redaction failed: STOP"; break; }; }; done
+```
+
+The replacement is LITERAL: the name travels in the environment variable `N`, never inside the
+command text, and perl's `\Q...\E` quotes every character of it, so a `[`, `/`, `\`, `&`, `.` or `*`
+in a name is matched as itself and a newline cannot end the pattern. (`perl` and its `-pi` in-place
+edit ship with macOS; `sed` is not used because its `s` command reads the name as syntax and its
+error message can print it.) perl's errors go to `/dev/null`; a non-zero status prints only the fixed
+line `redaction failed: STOP`, never a name: then STOP, leave the file as it is and tell the seat
+the file's name.
+Run the scan again until it prints nothing. (Never replace it in a `.mp4`.) A file that held
 a `/Users/` path of another account is NOT edited: do not copy the folder in step 59, tell the seat
 the file name and wait for the seat's word.
 
@@ -1166,7 +1199,7 @@ real-profile folders of steps 15 to 17 are the account's; only step 56a removes 
 | Gatekeeper first launch (F0-4) | 14-17 | `quarantine.txt`, `real-profile-*.txt`, `notes.txt` |
 | the zip's identity after the Drive transfer | 10, 10a, 11 | `notes.txt` |
 | the bundle's smoke on 26.3.1 | 28, 29 | `smoke.log` |
-| the M leg, VideoToolbox halves (DR-134 / DR-135) | 30-32 | `macos.log`, `macos-junit.xml`, `macos-skips.txt`, `m-rate/` |
+| the M leg, VideoToolbox halves (DR-134 / DR-135) | 29a-32 | `macos-collect.txt`, `macos.log`, `macos-junit.xml`, `macos-skips.txt`, `m-rate/` |
 | the 10-bit VideoToolbox VFR evidence (DR-163), if the marker says run | 30a, 30b | `dr163.log`, `dr163/` |
 | Q1 candidate B on the trim, V4 on each output | 34-36 | `q1/` |
 | Q1 candidate A on the trim, V4 on each output | 37, 37a, 37b | `q1/` |
