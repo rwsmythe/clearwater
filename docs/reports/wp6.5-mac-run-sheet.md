@@ -19,7 +19,7 @@ Nothing in this sheet names the Mac's account or host. Refer to the machine as "
 | the DR-163 line (step 30 and section 6) | see the line there; the seat replaces the bracket |
 | the 10-bit VideoToolbox VFR line (step 30a and section 6) | `proven in run 10` or `RUN THIS STEP` (CHARC 792af2fd) |
 | step 10a | the zip's sha256 as printed in the downloaded `macos-validation-bundle` (the `.sha256` sidecar) |
-| step 34 and step 37 | `[SEAT CHECKS: option present in the bundle/source under test]`: `--vt-rate-control` is in the checked-out commit |
+| step 34 and step 37 | FILLED 2026-11-11: `--vt-rate-control {A,B}` is in the checked-out commit from `e4fb0d4d` (package WP6.5 Q1-tool) |
 | step 30, the runner's wall | the wall of the same leg in run 10's `macos.log` |
 | step 30, the expected `deselected` total | the seat's own collection with step 30's `-m` and `-k` at the run-10 commit (every non-`macos` test plus the 15 GUI sites); step 29a confirms the 15 on the Mac |
 | section 1 item L1 | the run id of the downloaded `macos-validation-bundle` |
@@ -738,7 +738,7 @@ AD-35's rate candidates (`src/clearwater/io/video/encode.py:122-129`): B (the de
 trim, High and Standard, 8-bit and 10-bit (`--ten-bit` is D76's 10-bit from an 8-bit source).
 The command passes `--vt-rate-control B` explicitly. That option arrives with the package
 "WP6.5 Q1-tool" (`tools/headless_export.py --vt-rate-control {A,B}`, which sets the VideoToolbox rate
-control for that process only). [SEAT CHECKS: option present in the bundle/source under test]
+control for that process only). (seat-checked 2026-11-11: present from commit `e4fb0d4d`, choices `A` / `B`)
 Each export is the full pipeline on the CPU; the first one also analyses and fills the cache
 that the other three reuse (V17).
 
@@ -800,7 +800,7 @@ LANDS: `wp6.5-mac/q1/<tag>.v4.txt`; the records `wp6.5-mac/work/wp3.10/q1-<tag>/
 Candidate A is `-q:v` per quality level plus `-maxrate R` (`src/clearwater/io/video/encode.py:122-129`;
 the `VT_Q_LEVEL` figures 65 / 55 / 45 are placeholders this measurement exists to replace). The option
 `--vt-rate-control` arrives with the package "WP6.5 Q1-tool" (`tools/headless_export.py --vt-rate-control
-{A,B}`, per process only). [SEAT CHECKS: option present in the bundle/source under test] The layout
+{A,B}`, per process only). (seat-checked 2026-11-11: present from commit `e4fb0d4d`, choices `A` / `B`) The layout
 mirrors step 34: the same trim, qualities and depths, the same shared cache, outputs under
 `wp6.5-mac/q1/A-<quality>-<depth>/`.
 
