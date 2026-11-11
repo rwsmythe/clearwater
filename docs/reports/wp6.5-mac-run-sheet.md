@@ -17,8 +17,12 @@ Nothing in this sheet names the Mac's account or host. Refer to the machine as "
 | `SEAT_FILLS_VERSION` (in step 4) | the `clearwater.__version__` of the run-10 build, as in the zip name `Clearwater-<version>-macos.zip` |
 | `SEAT_FILLS_COMMIT` (in step 4) | the full 40-character commit run 10 built (the zip sidecar's `# source-commit:` line) |
 | the DR-163 line (step 30 and section 6) | see the line there; the seat replaces the bracket |
-| section 1 item L1 | how the run-10 `.app` zip leaves the runner (see the open point there) |
-| section 1 items L2, L4 | the paths the seat used on the laptop |
+| the 10-bit VideoToolbox VFR line (step 30a and section 6) | `proven in run 10` or `RUN THIS STEP` (CHARC 792af2fd) |
+| step 10a | the zip's sha256 as printed in the downloaded `macos-validation-bundle` (the `.sha256` sidecar) |
+| step 34 and step 37 | `[SEAT CHECKS: option present in the bundle/source under test]`: `--vt-rate-control` is in the checked-out commit |
+| step 30, the runner's wall | the wall of the same leg in run 10's `macos.log` |
+| section 1 item L1 | the run id of the downloaded `macos-validation-bundle` |
+| section 1 items L2, L4 | the paths the seat used on the laptop (and the frame count of the trim) |
 
 If a step below still shows a literal `SEAT_FILLS_` token when you reach it, STOP: the sheet was
 handed over unfilled.
@@ -45,6 +49,11 @@ handed over unfilled.
   clean up and copy the folder back) and tell the seat. Do not retry with changes, do not edit
   any file under `Clearwater.app`, do not run `xattr -d` or `xattr -c` on the bundle (that would
   change what this run proves).
+- No account name, user name or host name in any path, any output or any screenshot. The program
+  folder is under `/Users/Shared` for that reason. If you take a screenshot (optional; for the
+  Gatekeeper dialogs of step 16 or the dialogs of step 48), crop out or hide the menu-bar user
+  name, the Finder sidebar and any title that shows a home folder; step 57 scans the text outputs
+  but cannot read a picture.
 - No step sends keystrokes or mouse input for you; none may be run with any automation tool.
 - Keep command output exactly as printed; where a step redirects to a file, nothing needs
   copying by hand.
@@ -91,7 +100,7 @@ The Mac has no footage folder and the harness never reaches it. The seat builds 
 
 | Item | Content | How | Size |
 | --- | --- | --- | ---: |
-| L1 | `Clearwater-<version>-macos.zip` and `Clearwater-<version>-macos.zip.sha256` | the run-10 build, downloaded at the seat (`gh run download`, read-only) and put in the folder. OPEN POINT: in validation mode the `macos` job uploads only `macos-evidence` (`.github/workflows/macos-build.yml:322-328`); `macos-release` (the zip) is uploaded only when `inputs.release-version` is set (`:314-320`), so run 10 as the workflow stands does not keep the zip off the runner. [SEAT FILLS: how run 10 delivers the zip.] | 0.5 GiB |
+| L1 | `Clearwater-<version>-macos.zip`, its `.zip.sha256` sidecar and `THIRD_PARTY_NOTICES-macos.md` | run 10 uploads a validation artifact named `macos-validation-bundle` holding exactly those three files, kept for ONE day (CHARC fac58dc7; the workflow edit is made in another package, not in this sheet). The seat downloads it within that day (`gh run download`, read-only), verifies the zip against the sidecar, writes the zip's sha256 into step 10a's marker, and puts the three files in the Drive folder. [SEAT FILLS: the run id, and that the artifact was downloaded and verified.] | 0.5 GiB |
 | L2 | `GX011627-trim.mp4`: the 90-frame stream-copy trim of `Snorkel/GX011627.mp4` | the command and the checks are the `gx011627_trim` fixture's (`tests/conftest.py:837` `_gx011627_trim_plan`, `:579` `gx011627_trim_checks`); the fixture deletes its trim at teardown, so the seat makes a persistent copy by that same plan [SEAT FILLS: the path used and the frame count] | 0.02 GiB |
 | L3 | `GX011589.mp4`: the full clip | a plain copy of `SCUBA/GX011589.mp4` (read from the footage folder, never written to it) | 0.05 GiB |
 | L4 | `win-ref/`: the Windows reference for the AD-11 comparison | on the laptop, with the trim from L2 copied OUTSIDE the footage folder under the SAME file name: `uv run python tools/export_oracle.py record --file <path>\GX011627-trim.mp4 --force-cpu --name win-ref` (`tools/export_oracle.py:700-717`; the record folder is `<working>\wp3.21\oracle\win-ref`, holding `oracle.json` and `frames\`). It must be a CPU record: `compare` fails when `force_cpu`, `method`, the clip name or the source size differ (`tools/export_oracle.py:531-545`) | 0.31 GiB |
@@ -182,6 +191,7 @@ cat > /Users/Shared/clearwater-wp65/wp6.5-mac/notes.txt <<'EOF'
 WP6.5 stage 2 notes (the owner writes under each heading; plain words, what you saw)
 Date and time started:
 STOP, if any (step number and what you saw):
+Step 10a zip digest as printed:
 Step 16 Finder first launch (every dialog text word for word; the path you took; window? Dock icon? menus?):
 Step 47 Terminal launch (window? exit status printed? anything on the terminal?):
 Step 48 native dialogs P33 (File > Open), P34 (Batch > Add files), P35 (Presets Save/Export/Import), P36 (Settings output folder), P27 (upper-case names listed?):
@@ -235,7 +245,7 @@ LANDS: `in/`.
 ls -1sh "$IN" && du -sh "$IN"
 ```
 
-EXPECT: the zip, the `.zip.sha256`, `GX011627-trim.mp4`, `GX011589.mp4`, `SHA256SUMS.txt`,
+EXPECT: the zip, the `.zip.sha256`, `THIRD_PARTY_NOTICES-macos.md`, `GX011627-trim.mp4`, `GX011589.mp4`, `SHA256SUMS.txt`,
 `win-ref` (a folder); about 0.9 Gi.
 LANDS: the terminal.
 
@@ -249,6 +259,18 @@ EXPECT: every line ends `OK`; no `FAILED`.
 LANDS: the terminal.
 IF NOT: STOP. A damaged copy is not evidence; copy again from Drive once, repeat this step; a
 second failure is a STOP.
+
+### Step 10a -- the zip's sha256 against the artifact's (after the Drive transfer)
+
+```
+shasum -a 256 "$ZIP"
+```
+
+EXPECT: the printed digest is exactly `[SEAT FILLS: sha256 from macos-validation-bundle]` (the digest
+the seat read from the downloaded `macos-validation-bundle`, so this checks the file AFTER its trip
+through Google Drive, not only against a list made on the laptop).
+LANDS: the terminal; copy the line into `notes.txt` under "Step 10a".
+IF NOT: STOP. A different digest is not this build; do not unzip it.
 
 ### Step 11 -- check the zip against its sidecar
 
@@ -308,8 +330,11 @@ LANDS: `wp6.5-mac/real-profile-before.txt`.
 NOTE: a Finder launch cannot be redirected: it will create `~/Library/Application Support/Clearwater`
 (log, settings) and `~/Library/Caches/Clearwater` in the account if they were `absent` in step 15.
 This is the one place the sheet touches the real profile, on purpose, because the Finder launch IS
-the check. If you would rather not, write `skipped: shared account` in `notes.txt` and go to step 18.
-Nothing here is edited or deleted by the sheet; what you do with those folders afterwards is yours.
+the check. THIS STEP IS SKIPPABLE and the owner decides at run time: if you would rather not, write
+`skipped: owner decided at run time` in `notes.txt` and go to step 18 (steps 15 and 17 still record
+the profile's existence). Nothing in steps 15 to 17 edits or deletes anything; step 56a is the only
+step that removes a real-profile folder, and only one that was absent in step 15 and exists now.
+No account name in any screenshot (section 0.2).
 
 1. In Finder open `/Users/Shared/clearwater-wp65` and double-click `Clearwater.app`.
 2. If macOS blocks it (the build is unsigned, F0-4 of the ledger): write the dialog's text and
@@ -336,7 +361,8 @@ for d in "Application Support" "Caches"; do [ -d "$HOME/Library/$d/Clearwater" ]
 ```
 
 EXPECT: `present` for both after a Finder launch (`absent` before and `present` after means the
-launch created them; paths: `src/clearwater/config/paths.py:136-140`).
+launch created them; paths: `src/clearwater/config/paths.py:136-140`). After a skipped step 16 the
+lines equal step 15's.
 LANDS: `wp6.5-mac/real-profile-after.txt`.
 
 ### Step 18 -- the bundle's own FFmpeg, from Terminal
@@ -504,7 +530,40 @@ fold). This is the command the workflow runs (`.github/workflows/macos-build.yml
 FFmpeg bundled), with the bundle's folder first on PATH from step 4.
 LANDS: `wp6.5-mac/macos.log`, `wp6.5-mac/macos-junit.xml`, `wp6.5-mac/pytest-macos/` (cleaned in step 32).
 IF NOT: a failure is a finding, not a STOP for the rest of the sheet: copy the summary and the
-`FAILED` lines into `notes.txt` and go on to step 31.
+`FAILED` lines into `notes.txt` and go on to step 30a.
+
+### Step 30a -- the 10-bit VideoToolbox VFR cases (CHARC 792af2fd): RUN ONLY IF THE MARKER SAYS SO
+
+10-bit VideoToolbox on the variable-rate sources, beside DR-163: [SEAT FILLS AFTER RUN 10: proven in run 10 / RUN THIS STEP]
+
+If the marker says `proven in run 10`, write that in `notes.txt` and go to step 31 (steps 30a and
+30b are not run). If it says `RUN THIS STEP`, run the `-m macos` leg filtered to the two variable-rate
+sources through `hevc_videotoolbox` at 10-bit (the cases of `test_macos_videotoolbox_v4_corpus`,
+`tests/test_macos_portability.py:851-867,1181`: ids `sample:vid-vfr-hevc_videotoolbox-10` and
+`clip:vfr-gap-hevc_videotoolbox-10`):
+
+```
+iso /usr/bin/time -p env CLEARWATER_MAC_BUNDLE="$APP" uv run pytest -q -rs --timeout 1200 -m macos -k "test_macos_videotoolbox_v4_corpus and (vid-vfr or vfr-gap) and hevc_videotoolbox-10" --basetemp="$W/pytest-dr163" > "$W/dr163.log" 2>&1; echo "exit $?"; tail -n 6 "$W/dr163.log"
+```
+
+EXPECT: two cases ran; each is `passed`, or `xfailed` while DR-163 is marked open; an `XPASS` or a
+`failed` is a finding to write down. The test hook writes an evidence file per case under
+`src/work/evidence/` (`f8-3-<case>.txt`, `tests/test_macos_portability.py:1218`).
+LANDS: `wp6.5-mac/dr163.log`; the evidence files are copied in step 30b; `wp6.5-mac/pytest-dr163/` is
+removed in step 56.
+
+### Step 30b -- copy the evidence and read the raw timing values
+
+```
+mkdir -p "$W/dr163" && cp "$SRC"/work/evidence/f8-3-*.txt "$W/dr163/" && ls -1 "$W/dr163" && grep -H -E "^last stts" "$W"/dr163/*vfr*10*.txt | cut -c1-300; grep -H "^output boxes" "$W"/dr163/*vfr*10*.txt | cut -c1-900
+```
+
+EXPECT (CHARC 792af2fd; each file's first `last stts` line is the OUTPUT, the second the source):
+for `vid-vfr` the output's last raw `stts` delta is 2002, `mdhd` duration 40040, `elst` 320320 at
+media time 240000; for `vfr-gap` the last delta is 512, `mdhd` 30720, edits 192000 empty followed by
+768000 at media time 384000. A different value (the predictions that failed were 1335 and 559) is
+the finding: write it in `notes.txt`. If a case passed and left no evidence file, write that too.
+LANDS: `wp6.5-mac/dr163/`.
 
 ### Step 31 -- the skips, listed
 
@@ -539,6 +598,8 @@ elapsed time in `notes.txt`, and go on.
 
 DR-163 (VideoToolbox last-sample duration on VFR sources): [SEAT FILLS AFTER RUN 10: closed by run 10 / open -- avoid VT on VFR sources]
 
+10-bit VideoToolbox on the variable-rate sources (steps 30a and 30b): [SEAT FILLS AFTER RUN 10: proven in run 10 / RUN THIS STEP]. The GX011627 trim is constant-rate; this line is about the two test sources.
+
 ### Step 33 -- note the load before
 
 ```
@@ -554,11 +615,14 @@ LANDS: `wp6.5-mac/load-before.txt`.
 AD-35's rate candidates (`src/clearwater/io/video/encode.py:122-129`): B (the default) is
 `-b:v R -maxrate R`; A is `-q:v` per level plus `-maxrate R`. This step is B on the GX011627
 trim, High and Standard, 8-bit and 10-bit (`--ten-bit` is D76's 10-bit from an 8-bit source).
+The command passes `--vt-rate-control B` explicitly. That option arrives with the package
+"WP6.5 Q1-tool" (`tools/headless_export.py --vt-rate-control {A,B}`, which sets the VideoToolbox rate
+control for that process only). [SEAT CHECKS: option present in the bundle/source under test]
 Each export is the full pipeline on the CPU; the first one also analyses and fills the cache
 that the other three reuse (V17).
 
 ```
-mkdir -p "$W/q1" && for q in high standard; do for d in 8 10; do tag="B-$q-$d"; mkdir -p "$W/q1/$tag"; if [ "$d" = 10 ]; then t="--ten-bit"; else t=""; fi; iso /usr/bin/time -l uv run python tools/headless_export.py "$IN/GX011627-trim.mp4" --out "$W/q1/$tag" --quality "$q" --encoder hevc_videotoolbox $t --cache-dir "$W/cache-q1" --record "$W/q1/$tag.json" > "$W/q1/$tag.log" 2>&1; echo "exit $?" >> "$W/q1/$tag.log"; done; done; tail -n 4 "$W"/q1/B-*.log
+mkdir -p "$W/q1" && for q in high standard; do for d in 8 10; do tag="B-$q-$d"; mkdir -p "$W/q1/$tag"; if [ "$d" = 10 ]; then t="--ten-bit"; else t=""; fi; iso /usr/bin/time -l uv run python tools/headless_export.py "$IN/GX011627-trim.mp4" --out "$W/q1/$tag" --quality "$q" --encoder hevc_videotoolbox --vt-rate-control B $t --cache-dir "$W/cache-q1" --record "$W/q1/$tag.json" > "$W/q1/$tag.log" 2>&1; echo "exit $?" >> "$W/q1/$tag.log"; done; done; tail -n 4 "$W"/q1/B-*.log
 ```
 
 EXPECT: four logs each ending `exit 0`; the `time -l` block gives the wall (`real`) and
@@ -599,19 +663,45 @@ used (`tools/video_fidelity.py:1-70`, "Windows / NVIDIA evidence; not a Mac inst
 `encode` leg is). `False` is a V4 finding: keep the record, do not retry.
 LANDS: `wp6.5-mac/q1/<tag>.v4.txt`; the records `wp6.5-mac/work/wp3.10/q1-<tag>/*.compare.json` and `.md`.
 
-### Step 37 -- Q1, candidate A: NOT RUNNABLE FROM THE SHIPPED TOOLS (gap for CHARC)
+### Step 37 -- Q1, candidate A: the same runs with `--vt-rate-control A`
 
-[CHARC FILLS: no existing command selects candidate A. `VT_RATE_CONTROL` is a module constant
-(`src/clearwater/io/video/encode.py:122`, default `"B"`); only the tests flip it, by monkeypatch
-(`tests/test_macos_portability.py:801,1350`); `tools/headless_export.py` has no option for it
-(`:1190-1262`); `tools/video_fidelity.py encode` refuses `hevc_videotoolbox` (`:1409`, choices
-`hevc_nvenc` / `libx265`); the `VT_Q_LEVEL` figures 65 / 55 / 45 are placeholders
-(`encode.py:129`). Candidate A on the GX011627 trim at both quality levels and both depths, with
-V4 on each output, needs either a tool option or a wrapper that CHARC grants. Until it is filled
-this step stays EMPTY and nothing is run in its place. The test leg of step 30 already gave A and
-B on the synthetic busy and calm clips (M-RATE `m-rate/`, M-SPACE).]
+Candidate A is `-q:v` per quality level plus `-maxrate R` (`src/clearwater/io/video/encode.py:122-129`;
+the `VT_Q_LEVEL` figures 65 / 55 / 45 are placeholders this measurement exists to replace). The option
+`--vt-rate-control` arrives with the package "WP6.5 Q1-tool" (`tools/headless_export.py --vt-rate-control
+{A,B}`, per process only). [SEAT CHECKS: option present in the bundle/source under test] The layout
+mirrors step 34: the same trim, qualities and depths, the same shared cache, outputs under
+`wp6.5-mac/q1/A-<quality>-<depth>/`.
 
-LANDS: nothing yet.
+```
+mkdir -p "$W/q1" && for q in high standard; do for d in 8 10; do tag="A-$q-$d"; mkdir -p "$W/q1/$tag"; if [ "$d" = 10 ]; then t="--ten-bit"; else t=""; fi; iso /usr/bin/time -l uv run python tools/headless_export.py "$IN/GX011627-trim.mp4" --out "$W/q1/$tag" --quality "$q" --encoder hevc_videotoolbox --vt-rate-control A $t --cache-dir "$W/cache-q1" --record "$W/q1/$tag.json" > "$W/q1/$tag.log" 2>&1; echo "exit $?" >> "$W/q1/$tag.log"; done; done; tail -n 4 "$W"/q1/A-*.log
+```
+
+EXPECT: as step 34: four logs each ending `exit 0`, an `A-<quality>-<depth>/GX011627-trim_corrected.mp4`
+in each folder. An `exit 2` whose text refuses `--vt-rate-control` means the option is not in this
+checkout (a seat error: STOP).
+Longer than 90 minutes in total: Ctrl-C as above.
+LANDS: `wp6.5-mac/q1/A-<quality>-<depth>/`, `.log` and `.json` beside them.
+IF NOT: as step 34.
+
+### Step 37a -- Q1 candidate A, the sizes and the stream facts
+
+```
+for f in "$W"/q1/A-*/GX011627-trim_corrected.mp4; do echo "== $f"; ls -l "$f" | awk '{print $5, "bytes"}'; ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,profile,level,pix_fmt,bit_rate,nb_frames -show_entries format=size,bit_rate -of default=nw=1 "$f"; done > "$W/q1/streams-A.txt"; cat "$W/q1/streams-A.txt"
+```
+
+EXPECT: as step 35 for the four A outputs (profile `Main` / `Main 10`, `pix_fmt`, the frame count,
+bit rates below R). The seat tabulates A against B and against NVENC's.
+LANDS: `wp6.5-mac/q1/streams-A.txt`.
+
+### Step 37b -- V4 on each candidate A output
+
+```
+for tag in A-high-8 A-high-10 A-standard-8 A-standard-10; do iso uv run python tools/video_fidelity.py compare "$IN/GX011627-trim.mp4" "$W/q1/$tag/GX011627-trim_corrected.mp4" --bit-depth "${tag##*-}" --out "$W/work/wp3.10/q1-$tag" > "$W/q1/$tag.v4.txt" 2>&1; echo "exit $?" >> "$W/q1/$tag.v4.txt"; done; tail -n 3 "$W"/q1/A-*.v4.txt
+```
+
+EXPECT: as step 36: a verdict line per output with `MANDATORY+REQUIRED all SAME: True`, then `exit 0`.
+`False` is a V4 finding: keep the record, do not retry.
+LANDS: `wp6.5-mac/q1/<tag>.v4.txt`; `wp6.5-mac/work/wp3.10/q1-<tag>/*.compare.json` and `.md`.
 
 ### Step 38 -- the N6 figure, the 90-frame trim, end to end
 
@@ -632,7 +722,8 @@ output and cache are deleted by the tool after the run (no `--keep`), so no clip
 Longer than 60 minutes: Ctrl-C as in section 6.
 LANDS: `wp6.5-mac/n6/trim.log`; the record `wp6.5-mac/work/wp3.14/bench/export-bench-GX011627-trim-<stamp>.json`.
 IF NOT: `ERROR ...` on the first line is the tool's refusal (a finding, with the line copied into
-`notes.txt`); if it names `cpu_freq` or psutil, that is a finding about the tool on Apple Silicon.
+`notes.txt`). If `psutil.cpu_freq()` raises on Apple Silicon (the log names `cpu_freq` or psutil),
+write `cpu_freq unavailable` in `notes.txt` and continue; the sheet carries no tool fix.
 
 ### Step 39 -- the N6 figure, ONE full clip, end to end
 
@@ -640,7 +731,8 @@ IF NOT: `ERROR ...` on the first line is the tool's refusal (a finding, with the
 iso /usr/bin/time -l uv run python tools/export_bench.py run GX011589 --runs 1 --cache cold --force-cpu --encoder auto --quality standard > "$W/n6/full.log" 2>&1; echo "exit $?" >> "$W/n6/full.log"; tail -n 22 "$W/n6/full.log"
 ```
 
-EXPECT: as step 38, on the whole 6.4 s clip (about 192 frames). A short clip's per-minute figure is
+EXPECT: as step 38, on the whole 6.4 s clip (about 192 frames). `GX011589` is the smallest full SCUBA
+clip; the alternative is `GX011592` (378 MiB, 42.3 s), named for the seat's call before hand-over. A short clip's per-minute figure is
 dominated by start-up: the seat says so in the report.
 Longer than 60 minutes: Ctrl-C as in section 6.
 LANDS: `wp6.5-mac/n6/full.log`; `wp6.5-mac/work/wp3.14/bench/export-bench-GX011589-<stamp>.json`.
@@ -874,12 +966,12 @@ possibly an unfinished temporary file from the killed export (a hard end of the 
 D44's cancel path: write down what is there); the log tail shows how far it got.
 LANDS: `wp6.5-mac/after-logout.txt`.
 
-## 8. Close (steps 56 to 59)
+## 8. Close (steps 56 to 59, with 56a)
 
 ### Step 56 -- clean up what is not evidence
 
 ```
-rm -rf "$W/cache-q1" "$W/tmp" "$W/home/Library/Caches" "$W/pytest-macos"; du -sh "$W"
+rm -rf "$W/cache-q1" "$W/tmp" "$W/home/Library/Caches" "$W/pytest-macos" "$W/pytest-dr163"; du -sh "$W"
 ```
 
 EXPECT: the last line is the size of `wp6.5-mac/`: about 0.7 Gi, and it must be **under 2 Gi**.
@@ -887,6 +979,21 @@ EXPECT: the last line is the size of `wp6.5-mac/`: about 0.7 Gi, and it must be 
 Drive copy must stay small.
 LANDS: `wp6.5-mac/`.
 IF NOT: above 2 Gi: STOP and list `du -sh "$W"/* | sort -h` to the seat; do not copy.
+
+### Step 56a -- remove the real-profile folders this run created (only those)
+
+Reads step 15's record and removes a real Clearwater profile folder ONLY if it was `absent` then and
+exists now (the Finder launch of step 16 created it); a folder that existed before is never touched.
+It records what it did. If you skipped step 16 and a folder nonetheless appeared, do not run this
+step: write it in `notes.txt` instead.
+
+```
+for d in "Application Support" "Caches"; do if grep -qx "$d/Clearwater: absent" "$W/real-profile-before.txt" && [ -d "$HOME/Library/$d/Clearwater" ]; then rm -rf "$HOME/Library/$d/Clearwater" && echo "$d/Clearwater: absent before, created by this run, removed"; else echo "$d/Clearwater: not removed (existed before, or was not created)"; fi; done | tee "$W/real-profile-removed.txt"
+```
+
+EXPECT: two lines. After a Finder launch on an account that had no Clearwater profile: both
+`removed`. Otherwise `not removed`.
+LANDS: `wp6.5-mac/real-profile-removed.txt`.
 
 ### Step 57 -- make sure no account or host name travels back
 
@@ -922,7 +1029,7 @@ LANDS: your Drive.
 
 Optional, on the owner's word and not part of the sheet: the program folder
 `/Users/Shared/clearwater-wp65` can be deleted once the seat confirms it has what it needs. The
-real-profile folders steps 15 and 17 reported on are the account's; the sheet never deletes them.
+real-profile folders of steps 15 to 17 are the account's; only step 56a removes one, and only one this run created.
 
 ## 9. Index of what each step gives the report
 
@@ -930,12 +1037,15 @@ real-profile folders steps 15 and 17 reported on are the account's; the sheet ne
 | --- | --- | --- |
 | machine facts, build identity | 6, 7, 11, 13, 14, 27 | `machine.txt`, `bundle-listing.txt`, `quarantine.txt`, `python.txt` |
 | Gatekeeper first launch (F0-4) | 14-17 | `quarantine.txt`, `real-profile-*.txt`, `notes.txt` |
+| the zip's identity after the Drive transfer | 10, 10a, 11 | `notes.txt` |
 | the bundle's smoke on 26.3.1 | 28, 29 | `smoke.log` |
 | the M leg, VideoToolbox halves (DR-134 / DR-135) | 30-32 | `macos.log`, `macos-junit.xml`, `macos-skips.txt`, `m-rate/` |
+| the 10-bit VideoToolbox VFR evidence (DR-163), if the marker says run | 30a, 30b | `dr163.log`, `dr163/` |
 | Q1 candidate B on the trim, V4 on each output | 34-36 | `q1/` |
-| Q1 candidate A on the trim | 37 | GAP |
+| Q1 candidate A on the trim, V4 on each output | 37, 37a, 37b | `q1/` |
 | N6 CPU figure (trim, one full clip) | 38-41 | `n6/`, `work/wp3.14/bench/` |
 | M-DEVICE / AD-11 | 42-44 | `ad11-*`, `work/wp3.21/oracle/mac-cpu/` |
+| real-profile before / after / removed | 15, 17, 56a | `real-profile-*.txt` |
 | hand checks: Finder, Terminal, Dock Quit, Cmd-Q, logout | 16, 47, 50-55 | `notes.txt`, `gui-*.out`, `gui-*.err`, `after-*.txt` |
 | native dialogs P33-P36, P27 | 48 | `notes.txt` |
 | trackpad wheel P71 | 49 | `notes.txt` |
