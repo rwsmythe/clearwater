@@ -5,66 +5,71 @@
 
 ### Generation
 
-- **Generation 68** (session `clearwater-orchestrator-20261110-0904`). LIVE 2026-11-10 19:05Z from gen 67's rollover `db53c8e3`; ROLLED ~23:00Z at the ~400K cap with NOTHING it started still running.
-  - **Seat folder `work/orch-g68/`:** drains 1-7; the posts; `state-top.md`, `state_update.py` and the `state_patch*.py` / `fix_state.py` scripts.
-  - **Scripts:**
-    - `make_f02b.py`: builds F0-2b dispatch-1 + the fresh prompt-1 from `f02b-d1-head.md` / `-tail.md`;
-    - `stage_census.py`: stages the census into the worktree's ignored `work/wp6.5/f02b-census/` with `SHA256SUMS`;
-    - `census_qa.py`, `qa_f02b_texts.py`: seat QA;
-    - `last_text.py <jsonl> <out>`: a subagent's last text.
-  - **Seat QA** is gen 65's `bash work/orch-g65/qa.sh <sha> <label>`, from the DETACHED `wp6.5-rB` (currently at `aef6bb61`).
-  - **Gate:** gen 64's `work/orch-g64/gate.sh` + `watch2.sh`.
-  - **State worktree** `.worktrees/orch-state-g68`. Bash gauge 46 ms.
-- **NO cell, Codex turn, subagent, review, gate or leg is running.**
-  - The Codex F0-2b session `01a1c770-accb-7471-a672-9d8f9eab9e1e` ended at depth 292,827: NEVER resume it. The next turn is FRESH.
-  - The `darwin-census` subagent returned (static at 411,940): never message it.
+- **Generation 69** (session `clearwater-orchestrator-20261110-1259`). LIVE 2026-11-10 22:59Z from gen 68's rollover `429042c2`. **PAUSED ~01:40Z 2026-11-11 on the OWNER'S WORD** (verbatim, relayed by CHARC `42743fc3`: "Pause once the work in flight is complete"; CHARC `6f8a8779` amended: Codex turn 5 was in flight, so it finished first).
+  - **Seat folder `work/orch-g69/`:**
+    - drains 1-8; the posts (`post-*.md`, `q-*.md`);
+    - `make_d3.py` / `make_d4.py` / `make_d5.py` (dispatch + FRESH prompt assembly), `read_run8.py` (the run reader; re-point it at run 9);
+    - the P17 seat repro `p17/`; the pinned FFmpeg sources `f83-src/` (`movenc.c`, `videotoolboxenc.c`, `mux.c` at `b204e94e`).
+  - **Seat QA:** gen 65's `bash work/orch-g65/qa.sh <sha> <label>` from the DETACHED `wp6.5-rB`. `tests/test_macos_timing_evidence.py` (new) is NOT in its module list: run it separately.
+  - **Gate:** gen 64's `work/orch-g64/gate.sh` + `watch2.sh`. Bash gauge 37 ms.
+- **NOTHING IS RUNNING.** No cell, Codex turn, review, gate or leg.
+  - The F0-2b Codex sessions are all ENDED: turn 3 `01a1c7b3...`; turn 4 `01a1c810...` (164,646); turn 5 `01a1c826-90bf-7e63-9e7f-22dc1a221340` (156,795). The next F0-2b turn is FRESH.
+  - The F8-3 diagnosis session `01a1c814-a8c8-7330-9a84-a3dc6c525043` (read-only, half 1 done, depth about 125K) is to be RESUMED for half 2 after run 9.
 - **CHARC is gen 22, `clearwater-charc-20261110-0800`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
-### PICKUP, in order
+### PAUSED -- what is queued for the resume (dispatch NOTHING until the owner's resume word arrives through CHARC)
 
-1. **WP6.5 F0-2b: `wp6.5` at `aef6bb61`** (`3783b93a` fix with the rows + declaration in ONE commit; `aef6bb61` ledger). It fast-forwards from `8955f790`, which run 7 pushed.
-   - **What is in it:**
-     - 56 darwin hosts bound by `macho` (no sha256 / size);
-     - 15 new components, 94 `embedded_in` appends, 11 new texts + 2 reused;
-     - the declaration `run 42897107215 @ 8955f790`;
-     - 14 darwin limits;
-     - darwin identity matching, the F2 framework-seal rule, the F6c limits schema (b);
-     - the nested-`.app` refusal; the FFmpeg record's pins / `Runner:` checks; the `_inventory` annotation;
-     - **the switch ON**, the release-only upload, `!cancelled()` on the bundled build, the `pbs BUILD:` line, the `# bootloader` line, `file -E -b`;
-     - the CUDA skip + its allowlist line (inside the bar: CHARC `aa1feb78`).
-   - **Seat QA on `aef6bb61` is ALL GREEN** (`work/orch-g65/qa-aef6/summary.txt`; harness 423, release_workflow 162).
-   - **Claude A r1** (`clearwater-review-evidence\wp6.5\f02b\A-claude\r1\review.txt`) = FINDINGS:
-     - **F1 MAJOR:** Windows refusal text names darwin paths (`notices.py:1206-1210`, the joined `embedded_in`). Fix: filter by host platform; pin the message.
-     - **F2 MAJOR:** the darwin U-T1 limit statement "rendered through the Python row" is false on macOS (Pillow's row carries Tcl/Tk).
-     - ADV A3: correct the CUDA ledger rationale. A4: the ledger citation should be `ff2ed010`, not `5729dd63`. A5: a run-8 checklist line.
-   - **QUERY posted `2273c4d3`** (22:58Z), recommending: F1 fold; F2 (a) a darwin U-T1 statement naming the Pillow row, the 13 others verbatim; A3-A5 fold. **AWAIT CHARC's ruling** (drain the inbox first).
-   - **NEXT, in order:**
-     1. Write `clearwater-review-evidence\wp6.5\f02b\dispatch-3.md`, a FRESH session. Its prompt = agent + brief + f02b dispatch-1 + return-1 + dispatch-2 + return-2 + dispatch-3. Adapt `make_f02b.py`, or gen 67's `assemble_f02.py` pattern pointed at `f02b`. The ruling goes in verbatim. RED on `aef6bb61`.
-     2. Launch with `codex_cell.py turn --worktree 'C:\Users\rwsmy\clearwater\.worktrees\wp6.5' --prompt <prompt-3> --evidence <f02b\codex> --turn 3`, in the background. Never write a dispatch and launch the turn that reads it in ONE batch.
-     3. Commit by pathspec IN the worktree, 0 CR.
-     4. Seat QA, then **Claude A r2** on `aef6bb61..<head>` (form `f02b\A-claude\r1\review-prompt.md`; review copy `wp6.5-rA`; copy `work/wp6.5/f02b-census/` into the copy if it was cleaned).
-     5. **Claude B** on `8955f790..<head>`. Form `clearwater-review-evidence\wp6.5\f02\B-claude\r1\review-prompt.md`, HUNT lenses; the verdict line unnumbered. Include run 8's real-plan risk lens: the parallel-leg darwin tests on a real Mac, the BUILD marker, the seals.
-     6. **The two-leg gate** from the detached `wp6.5-rB`. Run the parallel half beside a review if needed; the serial leg only with nothing else running. If serial is again over 2,000 s, name the slowest ten (CHARC).
-     7. **The ready post for run 8.** CHARC's bar:
-        - fast-forward from `8955f790`; nothing under `src/`;
-        - the `.github` diff = the switch, the release-only upload, `!cancelled()`, the BUILD line, the bootloader line, `file -E -b`, the CUDA allowlist line; comments free;
-        - `native-licences/` = the 110 Windows host rows byte-unchanged; component rows changed ONLY by `embedded_in` appends + the new components; texts additive; the declaration; the limits form;
-        - the PROOF is Windows output + `--check` byte-identical to `200dffd8`.
-     8. **Run 8, read by `da5a86b7` + `3fdf1fd3`:**
-        - any `macho:` identity different from run 7's = STOP to CHARC;
-        - sha256-only differences = one sentence;
-        - BUILD absent or different = a finding;
-        - a plan refusal = a finding unless it names a product file;
-        - A5's parallel-leg darwin tests = findings.
+1. **WP6.5 F0-2b on `wp6.5` at `6bf69487`:**
+   - `eb095682` + `04dfd101`: turn 4, the run-8 fold;
+   - `8417c0b8` + `6bf69487`: turn 5, the F8-3 hook widened, test-only.
 
-        Download the evidence read-only to `clearwater-review-evidence\wp6.5\runner\run-<id>`.
-   - **At the WP6.5 accept** (CHARC):
-     - the test-isolation DR row closes;
-     - A-r5-3 stays watched;
-     - the A3 efficiency DR row is added;
-     - the A4 line gets the Windows-leak + universal2 lessons;
-     - census U3 / U4 / U10 become accept-note sentences.
-2. **Worktrees to tidy at the accepts** (owner's word for any prune): `wp7.1`, `wp7.1-iA`, `wp7.1-instrument`, `wp7.1-rA`, `wp6.5-rB`, `wp6.5-rA`; plus the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`; and the state worktrees `orch-state-g65` .. `orch-state-g68`.
+   Seat QA: `04dfd101` ALL GREEN; `6bf69487` see `work/orch-g65/qa-6bf6/summary.txt` (ALL GREEN: harness 423 OK, actionlint 0, build 790 / 1, smoke 76 / 1, release_workflow 162, notices 555, portability 226 skipped, timing-evidence 12 passed, the GUI / startup modules green).
+   - **Pushed and run:** run 8 `42930761176` on `9a086f49` FAILED, no STOP. All identities equal run 7's; 157 = 155 + ffmpeg/ffprobe; the bootloader is sha256-only; `pbs BUILD: 20260303`. Table: `work/orch-g69/post-run8.md`; evidence `clearwater-review-evidence\wp6.5\runner\run-42930761176\`.
+   - **The four findings were folded under CHARC `ef405237`:**
+     - F8-1: `pyz:_sysconfigdata__darwin_darwin` -> the Python row via `build.py:_sysconfigdata_name()`;
+     - F8-2: the `.dylibs` link fixture;
+     - F8-4: P17 HLG through `-x265-params`;
+     - F8-3: four VT+VFR xfails `strict=True` DR-163, plus the in-verify evidence hook writing `work/evidence/f8-3-<case>.txt`.
+   - **Also folded:** B F1 / A1 / A2 / A3 and A r2's ADV (`d0d9b6dd`).
+   - **NEXT at the resume, in order:**
+     1. **Claude A r3** on `9a086f49..6bf69487`, from the review copy `wp6.5-rA` (detach it at `6bf69487`). Form: `f02b\A-claude\r2\review-prompt.md`, adapted: dispatches 4 + 5, returns 4 + 5, the run-8 table, and `-m "not gpu"` in every pytest line (CHARC method note).
+     2. **A short Claude B** on the same delta. Form: `f02b\B-claude\r1\review-prompt.md`, adapted. Lenses: the real-Mac run-9 plan past `:2627` (rows, carried texts, limits, `TCL_TK`, the write, the seal with FFmpeg inside, smoke), the xfail strictness and the hook's exception preservation, and `build.py`'s helper byte-identity.
+     3. **The two-leg gate** from the detached `wp6.5-rB`; the serial leg only with nothing else running.
+     4. **The ready post for run 9.** CHARC's bar (3fdf1fd3 / aa1feb78): fast-forward from `9a086f49` (which origin's `macos-validation/wp6.5` holds); `src/` 0; NO `.github` change; `native-licences/` unchanged since `9a086f49`. The `build.py` diff is ONLY the helper.
+     5. **Run 9 reading:** the run-8 rules (`da5a86b7` item 1 verbatim, + `3fdf1fd3` + `ffe906d6` A5 + `c1339c28`), plus:
+        - the PASS marks: notices at `Contents/Resources/THIRD_PARTY_NOTICES.md`, `TCL_TK` (via the plan not refusing), the seal with FFmpeg, smoke;
+        - the 4 VT+VFR = `4 xfailed`;
+        - download `f8-3-*.txt`.
+     6. **F8-3 half 2:** RESUME `01a1c814...` (`codex exec resume <id> -s read-only`, from `.worktrees/wp6.5-f83`) with run 9's `f8-3-*.txt`. Half 1's prediction: `vid-vfr` last packet (38038, 38038, 1335), last `stts` (1, 1335); `vfr-gap` (37888, 37888, 559), (1, 559). Refuter: a `vid-vfr` final `stts` delta of 2002. Deliverable: the note with the fix options (cost, blast radius, frozen-interface yes/no). DR-163 is reserved (CHARC writes it at the accept).
+   - **At the WP6.5 accept** (CHARC): the test-isolation DR row closes; A-r5-3 stays watched; the A3 efficiency DR row; the A4 line (Windows-leak + universal2 lessons); census U3 / U4 / U10 as accept notes; DR-163 opened (product, watched); the serial-leg sizing note (2,125 s against WP-T6's 1,389 s; a Phase 7 proposal).
+2. **Worktrees to tidy at the accepts** (owner's word for any prune):
+   - `wp6.5-f83` (detached, read-only diagnosis copy; keep it until half 2), `wp7.1`, `wp7.1-iA`, `wp7.1-instrument`, `wp7.1-rA`, `wp6.5-rB`, `wp6.5-rA`;
+   - the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`;
+   - the state worktrees `orch-state-g65` .. `orch-state-g69`.
+
+### GEN-69 RECORD
+
+- Online `7aa0502e`; CHARC ack `83b4fa81`.
+- **F0-2b A r1 fold:**
+  - The ruling `ffe906d6` met the seat fact that the run-7 fixture's Pillow text is synthetic. Query -> CHARC `c1339c28`: the PLANNER enforces an exact `TCL_TK` line on darwin U-T1.
+  - Codex turn 3 (FRESH, depth 132,868) -> `6a02f358` + `9a086f49`. Seat QA green.
+  - **A r2:** NO_NEW_CRITICAL_MAJOR (1 ADV). **B:** NO_NEW_CRITICAL_MAJOR (1 MINOR + 3 ADV).
+  - **Gate green:** parallel 9,337 / 213 / 0 in 694 s; serial 1,324 / 19 / 0 in 2,125 s (slowest ten named); harness 423.
+  - Ready post `9d67c944`. CHARC pushed **run 8** (`d0d9b6dd`).
+- **Run 8 FAILED, no STOP** (query; ruled `ef405237`).
+- **F8-3 lane:** Claude pace 2.515 vs Codex 0.583 -> CHARC `5f15d162`: read-only Codex in two halves. Half 1 explained `-667` and `+47` exactly (`mux.c` `guess_pkt_duration`, the VT wrapper never setting `pkt->duration`).
+- **Turn 4** (FRESH, 164,646) -> `eb095682` + `04dfd101`; seat QA green. **Turn 5** (FRESH, 156,795) -> `8417c0b8` + `6bf69487`.
+- **Owner's PAUSE word** `42743fc3`; turn-5 amendment `6f8a8779`.
+
+### Gen-69 lessons
+
+- **A fixture that stubs the very bytes a ruling's condition is about makes a test-only assertion circular.** Read the fixture's stubs before relaying a "the test also asserts X" condition; the fix may belong in the planner, where the real run checks real bytes (`c1339c28`).
+- **A real-bytes run reaches only as far as the first refusal.** Run 8 proved admission and nothing after `notices.py:2627`. Say which stages a failed run did NOT reach, so the next run's reading names them as first proofs.
+- **A run-5 fix in ONE checker (`build.py`'s content check) did not reach its sibling checker (`notices.py`)** over the same PYZ. When a fix admits a name in one checker, grep every checker that classifies the same entries.
+- **Test helpers can tag at the wrong layer:** `-color_trc` as an output option is not written into the stream by libx265 (`-x265-params` is). A seat repro with the laptop FFmpeg settled it in two runs.
+- **A reviewer's `-k` can match a `gpu` test.** Every review prompt carries `-m "not gpu"`.
+- **A dispatch can cross an owner's pause word in flight:** dispatch-5 launched a minute before the word arrived. Report it at once with the stop option; CHARC ruled it work in flight.
+- **The bare-`cd` slip struck once** (`cd .worktrees/wp6.5 && ...`; restored the next call; nothing written while moved; no cell live).
 
 ### GEN-68 RECORD
 
