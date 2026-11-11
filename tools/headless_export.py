@@ -18,6 +18,11 @@ Library API: :func:`route`, :func:`requests_for`, :func:`parameters_for`,
         [--suffix S] [--bit-depth {8,16}] [--no-provenance] [--force-cpu] [--encoder NAME]
         [--quality {high,standard,draft}] [--ten-bit] [--cache-limit-bytes N] [--method ID]
         [--parameters FILE | --neutral] [--settings-dir DIR] [--record FILE] [--cache-dir DIR]
+        [--vt-rate-control {A,B}]
+
+``--vt-rate-control`` selects an AD-35 / Q1 VideoToolbox rate candidate for this run only;
+the product default is B. When given, the record includes ``"vt_rate_control"``; when absent,
+the encoder setting and record fields are unchanged.
 
 Kinds are decided by extension exactly as ``clearwater.gui.sources.route`` decides them; a
 sidecar (D83) or an unknown extension is a failed item with the interface's text and the batch
@@ -119,6 +124,7 @@ from clearwater.interfaces import (
     validate_parameter_set,
 )
 from clearwater.interfaces.parameters import loads_object
+from clearwater.io.video import encode
 from clearwater.io.video.inputs import ascii_text, is_sidecar, sidecar_fault
 from clearwater.jobs import (
     BatchReport,
@@ -367,6 +373,7 @@ class RunRecord:
             item's last check (a Ctrl-C in its commit), so the run counts as cancelled.
         video: Each item's video facts (the record's ``"video"``), or None; empty when not
             collected.
+        vt_rate_control: The explicit AD-35 / Q1 candidate, omitted from JSON when None.
     """
 
     report: BatchReport
@@ -376,6 +383,7 @@ class RunRecord:
     folders: tuple[Path, ...] = ()
     cancel_requested: bool = False
     video: tuple[dict[str, Any] | None, ...] = ()
+    vt_rate_control: Literal["A", "B"] | None = None
 
 
 class Redactor:
@@ -1072,6 +1080,8 @@ def record_object(record: RunRecord) -> dict[str, Any]:
         "elapsed_s": record.elapsed_s,
         "items": items,
     }
+    if record.vt_rate_control is not None:
+        data["vt_rate_control"] = record.vt_rate_control
     return cast(dict[str, Any], _redacted(data, redact))
 
 
@@ -1200,6 +1210,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-provenance", action="store_true", help="embed no provenance (D91)")
     parser.add_argument("--force-cpu", action="store_true", help="process on the CPU (AD-9)")
     parser.add_argument("--encoder", metavar="NAME", help="the video encoder (D26)")
+    parser.add_argument(
+        "--vt-rate-control",
+        choices=("A", "B"),
+        help="AD-35 / Q1 VideoToolbox rate candidate, this run only; the product default is B",
+    )
     parser.add_argument(
         "--quality", choices=("high", "standard", "draft"), help="the video quality (D75)"
     )
@@ -1359,6 +1374,20 @@ def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None
             return 2
 
 
+@contextlib.contextmanager
+def _vt_rate_control(candidate: Literal["A", "B"] | None) -> Iterator[None]:
+    """Temporarily select a Q1 candidate; leave the setting untouched when absent."""
+    if candidate is None:
+        yield
+        return
+    previous = encode.VT_RATE_CONTROL
+    try:
+        encode.VT_RATE_CONTROL = candidate
+        yield
+    finally:
+        encode.VT_RATE_CONTROL = previous
+
+
 def _main(
     args: argparse.Namespace, exports: ExportJobs | None, redact: Redactor, known: list[Path]
 ) -> int:
@@ -1390,15 +1419,25 @@ def _main(
         on_main = threading.current_thread() is threading.main_thread()
         previous = signal.signal(signal.SIGINT, lambda *_: progress.cancel()) if on_main else None
         try:  # the handler stays until the record is written: a Ctrl-C then only sets the flag
-            record = run(
-                requests,
-                exports=exports,
-                progress=progress,
-                footage_folder=footage,
-                parameters_from=source,
-                known_folders=known,
-                cache_folder=args.cache_dir,
-            )
+            with _vt_rate_control(args.vt_rate_control):
+                if args.vt_rate_control is not None:
+                    print(
+                        redact(
+                            f"VideoToolbox rate control: {args.vt_rate_control} (this run only)"
+                        ),
+                        file=sys.stderr,
+                    )
+                record = run(
+                    requests,
+                    exports=exports,
+                    progress=progress,
+                    footage_folder=footage,
+                    parameters_from=source,
+                    known_folders=known,
+                    cache_folder=args.cache_dir,
+                )
+            if args.vt_rate_control is not None:
+                record = dataclasses.replace(record, vt_rate_control=args.vt_rate_control)
             for line in summary_lines(record):
                 print(line)
             written = args.record is None or _write_record(args.record, record, redact)

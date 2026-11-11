@@ -19,6 +19,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -27,6 +28,7 @@ from clearwater.app import composition
 from clearwater.config import new_parameter_set, save_settings
 from clearwater.config.presets import MAX_PRESET_BYTES
 from clearwater.interfaces import JobResult, Settings
+from clearwater.io.video import encode
 from clearwater.jobs.export_seam import CANCELLED
 
 TOOLS = Path(he.__file__).parent
@@ -220,6 +222,219 @@ def test_argument_errors_exit_2(sample, args: list[str], no_footage: None, capsy
 def test_help_exits_0(capsys) -> None:
     assert he.main(["--help"]) == 0
     assert "--cache-limit-bytes" in capsys.readouterr().out
+
+
+@pytest.fixture
+def isolated_vt_main(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate entry-point roots and block the GUI entry for the Q1 tool tests."""
+    for name in (
+        "APPDATA",
+        "LOCALAPPDATA",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_STATE_HOME",
+        "HOME",
+        "USERPROFILE",
+    ):
+        monkeypatch.setenv(name, str(tmp_path / "profile" / name))
+
+    def no_gui(*args, **kwargs):
+        pytest.fail("the headless Q1 test must never enter the GUI")
+
+    gui = ModuleType("clearwater.app.main")
+    gui.main = no_gui
+    monkeypatch.setitem(sys.modules, "clearwater.app.main", gui)
+    monkeypatch.setattr(sys.modules["clearwater.app"], "main", gui, raising=False)
+
+
+class _VtEngine:
+    """Observe the live encoder setting without reading or exporting media."""
+
+    def __init__(self, outcome="success") -> None:
+        self.outcome = outcome
+        self.seen = []
+
+    def job(self, request):
+        def run(progress):
+            self.seen.append(encode.VT_RATE_CONTROL)
+            if self.outcome == "exception":
+                raise RuntimeError("planted engine failure")
+            if self.outcome == "interrupt":
+                raise KeyboardInterrupt
+            if self.outcome == "cancel":
+                signal.raise_signal(signal.SIGINT)
+            return JobResult(True, (), (), None, "CPU: forced", 0.0)
+
+        return run
+
+
+@pytest.mark.timeout(30)
+@pytest.mark.usefixtures("isolated_vt_main", "no_footage")
+class TestVtRateControl:
+    """AD-35 / Q1 overrides last for exactly one headless export run."""
+
+    @pytest.mark.parametrize("candidate", ["A", "B", None])
+    def test_parser(self, candidate) -> None:
+        argv = ["clip.mp4", "--out", "."]
+        if candidate is not None:
+            argv += ["--vt-rate-control", candidate]
+        assert he._parser().parse_args(argv).vt_rate_control == candidate
+
+    def test_invalid_candidate_uses_redacted_usage(self, tmp_path, out, capsys) -> None:
+        private = tmp_path / "private" / "bad"
+        assert _main("clip.mp4", "--out", out, "--vt-rate-control", private) == 2
+        err = capsys.readouterr().err
+        assert "usage:" in err and "invalid choice" in err and "--vt-rate-control" in err
+        assert str(tmp_path) not in err and str(private) not in err
+
+    def test_help_names_the_measurement_and_default(self, capsys) -> None:
+        assert he.main(["--help"]) == 0
+        text = " ".join(capsys.readouterr().out.split())
+        assert "--vt-rate-control {A,B}" in text
+        assert "AD-35" in text and "Q1" in text
+        assert "this run only" in text and "the product default is B" in text
+
+    @pytest.mark.parametrize("candidate,prior", [("A", "B"), ("B", "A")])
+    @pytest.mark.parametrize("outcome", ["success", "exception", "interrupt", "cancel"])
+    def test_engine_observes_candidate_and_prior_is_restored(
+        self, candidate, prior, outcome, tmp_path, out, monkeypatch, capsys
+    ) -> None:
+        monkeypatch.setattr(encode, "VT_RATE_CONTROL", prior)
+        engine = _VtEngine(outcome)
+        # Exercise main's actual composition path, with only the media engine replaced.
+        monkeypatch.setattr(composition, "export_jobs", lambda **kwargs: engine)
+        record_path = tmp_path / "q1.json"
+        argv = [
+            "clip.mp4",
+            "--out",
+            out,
+            "--cache-dir",
+            out,
+            "--record",
+            record_path,
+            "--force-cpu",
+            "--vt-rate-control",
+            candidate,
+        ]
+        if outcome == "interrupt":
+            with pytest.raises(KeyboardInterrupt):
+                _main(*argv)
+        else:
+            assert _main(*argv) == (0 if outcome == "success" else 1)
+            data = json.loads(record_path.read_text(encoding="ascii"))
+            assert data["vt_rate_control"] == candidate
+            if outcome == "cancel":
+                assert data["cancelled"] is True
+        assert engine.seen == [candidate]
+        assert prior == encode.VT_RATE_CONTROL
+        err = capsys.readouterr().err
+        assert err.splitlines()[0] == f"VideoToolbox rate control: {candidate} (this run only)"
+
+    def test_uncaught_exception_restores_prior(self, out, monkeypatch) -> None:
+        monkeypatch.setattr(encode, "VT_RATE_CONTROL", "A")
+        seen = []
+
+        def fail(**kwargs):
+            seen.append(encode.VT_RATE_CONTROL)
+            raise RuntimeError("planted composition failure")
+
+        monkeypatch.setattr(composition, "export_jobs", fail)
+        with pytest.raises(RuntimeError, match="planted composition failure"):
+            _main("clip.mp4", "--out", out, "--cache-dir", out, "--vt-rate-control", "B")
+        assert seen == ["B"]
+        assert encode.VT_RATE_CONTROL == "A"
+
+    @pytest.mark.parametrize("during_run", [False, True])
+    def test_refusal_restores_prior(self, during_run, out, monkeypatch, capsys) -> None:
+        monkeypatch.setattr(encode, "VT_RATE_CONTROL", "A")
+        seen = []
+
+        def refuse(requests, footage):
+            seen.append(encode.VT_RATE_CONTROL)
+            if not during_run or len(seen) == 2:
+                raise he.RunnerRefusalError("planted refusal")
+
+        monkeypatch.setattr(he, "check_outputs", refuse)
+        assert _main("clip.mp4", "--out", out, "--cache-dir", out, "--vt-rate-control", "B") == 2
+        assert seen == (["A", "B"] if during_run else ["A"])
+        assert encode.VT_RATE_CONTROL == "A"
+        assert "planted refusal" in capsys.readouterr().err
+
+    def test_absent_preserves_sentinel_and_original_record_keys(
+        self, tmp_path, out, monkeypatch, capsys
+    ) -> None:
+        sentinel = object()
+        monkeypatch.setattr(encode, "VT_RATE_CONTROL", sentinel)
+        engine = _VtEngine()
+        record_path = tmp_path / "unchanged.json"
+        assert (
+            _main(
+                "clip.mp4",
+                "--out",
+                out,
+                "--cache-dir",
+                out,
+                "--record",
+                record_path,
+                exports=engine,
+            )
+            == 0
+        )
+        assert engine.seen == [sentinel] and encode.VT_RATE_CONTROL is sentinel
+        # Baseline bfff36cc's exact top-level keys: no optional key, including null.
+        assert set(json.loads(record_path.read_text(encoding="ascii"))) == {
+            "schema",
+            "tool",
+            "app_version",
+            "method",
+            "parameters_from",
+            "settings",
+            "counts",
+            "cancelled",
+            "elapsed_s",
+            "items",
+        }
+        assert "VideoToolbox rate control:" not in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("encoder", ["libx265", "hevc_nvenc"])
+@pytest.mark.parametrize("quality", ["high", "standard", "draft"])
+@pytest.mark.parametrize("depth", [8, 10])
+def test_vt_rate_control_does_not_change_other_encoder_argv(
+    encoder, quality, depth, monkeypatch
+) -> None:
+    rate = encode.NvencRate(maxrate=12_000_000, bufsize=12_000_000, level="5.1")
+    monkeypatch.setattr(encode, "VT_RATE_CONTROL", "A")
+    a = encode._encoder_options(encoder, quality, depth, rate)
+    monkeypatch.setattr(encode, "VT_RATE_CONTROL", "B")
+    assert encode._encoder_options(encoder, quality, depth, rate) == a
+
+
+@pytest.mark.parametrize("quality,q", [("high", "65"), ("standard", "55"), ("draft", "45")])
+def test_vt_rate_control_candidates_produce_the_two_rate_forms(quality, q, monkeypatch) -> None:
+    monkeypatch.setattr(encode, "VT_RATE_CONTROL", "A")
+    assert encode._videotoolbox_options(quality, 12_000_000) == [
+        "-c:v",
+        "hevc_videotoolbox",
+        "-allow_sw",
+        "0",
+        "-q:v",
+        q,
+        "-maxrate",
+        "12000000",
+    ]
+    monkeypatch.setattr(encode, "VT_RATE_CONTROL", "B")
+    assert encode._videotoolbox_options(quality, 12_000_000) == [
+        "-c:v",
+        "hevc_videotoolbox",
+        "-allow_sw",
+        "0",
+        "-b:v",
+        "12000000",
+        "-maxrate",
+        "12000000",
+    ]
 
 
 def test_exit_0_when_all_done_and_1_when_any_failed(
