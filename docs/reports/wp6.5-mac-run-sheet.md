@@ -1153,12 +1153,13 @@ IF NOT: for each file listed that held a NAME, replace the names in place, one f
 (put the file's path, which this step printed, where `<the file>` is):
 
 ```
-[ "$W" = /Users/Shared/clearwater-wp65/wp6.5-mac ] || { echo "W not set: STOP"; false; } && for p in "$USER" "$(hostname -s)" "$(hostname)" "$(scutil --get ComputerName 2>/dev/null)" "$(scutil --get LocalHostName 2>/dev/null)"; do [ -n "$p" ] && { N="$p" perl -pi -e 'BEGIN { $n = $ENV{N} } s/\Q$n\E/REDACTED/g' "<the file>" 2>/dev/null || { echo "redaction failed: STOP"; break; }; }; done
+[ "$W" = /Users/Shared/clearwater-wp65/wp6.5-mac ] || { echo "W not set: STOP"; false; } && for p in "$USER" "$(hostname -s)" "$(hostname)" "$(scutil --get ComputerName 2>/dev/null)" "$(scutil --get LocalHostName 2>/dev/null)"; do [ -n "$p" ] && { N="$p" perl -0777 -pi -e 'BEGIN { $n = $ENV{N} } s/\Q$n\E/REDACTED/g' "<the file>" 2>/dev/null || { echo "redaction failed: STOP"; break; }; }; done
 ```
 
 The replacement is LITERAL: the name travels in the environment variable `N`, never inside the
 command text, and perl's `\Q...\E` quotes every character of it, so a `[`, `/`, `\`, `&`, `.` or `*`
-in a name is matched as itself and a newline cannot end the pattern. (`perl` and its `-pi` in-place
+in a name is matched as itself and a newline cannot end the pattern; `-0777` reads the whole file
+as one record, so a name is found even across a line break. (`perl` and its `-pi` in-place
 edit ship with macOS; `sed` is not used because its `s` command reads the name as syntax and its
 error message can print it.) perl's errors go to `/dev/null`; a non-zero status prints only the fixed
 line `redaction failed: STOP`, never a name: then STOP, leave the file as it is and tell the seat
