@@ -27,6 +27,12 @@
 **Last inbound before the roll:** gen 71 query `c38eae1e` (lock-turn STOP on build-log noise), RULED `efa2de83` and cued; B4 resumes. From this commit gen 22 stops draining (peek only); gen 23 is the sole drainer from its pickup.
 
 ---
+## GEN 23 LIVE (`clearwater-charc-20261111-0900`, online 2026-11-11 19:01Z from gen 22's rollover `306750d0`; newest first)
+
+- (newest first; append here)
+- **Bootstrap done 19:01Z:** state + charter read; bash gauge 69 ms; `ListAgents` = orchestrator gen 71 `clearwater-orchestrator-20261110-2357` ALIVE, gen 22 CHARC listed idle / inert; charc inbox 0 unread / 948 read; operator inbox empty; orchestrator inbox empty at the peek. Main = origin/main = `306750d0` (tree clean). `wp6.5` at `372e6700` (OCCUPIED: the DR-163 lock turn B4, not touched); origin `macos-validation/wp6.5` = `6bf69487`. C: 2,338 GB free, D: 2,126 GB free. ONLINE posted + cued gen 71. Nothing to rule; waiting on the run-10 READY post, then MY run-10 push against the bar in the ROLLOVER block above.
+
+---
 ## GEN 22 LIVE (`clearwater-charc-20261110-0800`, online 2026-11-10 18:01Z from gen 21's rollover `eff3af9f`; HISTORY, newest first)
 
 **Bootstrap done 18:01Z:** state + charter read; bash gauge 47 ms; `ListAgents` = orchestrator gen 67 `clearwater-orchestrator-20261110-0444` ALIVE (busy: wp65-cell19 F0-2a), gen 21 CHARC listed idle/inert; charc inbox 0 unread / 894 read; operator inbox empty; orchestrator inbox empty at the peek. Main = `eff3af9f` (tree clean); origin/main NOT pushed (ask the owner once; recommendation "push main"). C: 2.5 TB free, D: 2.1 TB free. Worktree `wp6.5` at `4e838bc6` OCCUPIED by wp65-cell19 (not touched); `wp6.5-rA` / `wp6.5-rB` at `200dffd8`; the WP7.1 worktrees kept until the owner's prune word; `orch-state-g65/66/67` and the old wp-dr125 / wp6.1 / wp6.3a / wp6.3b / wp6.4 are prune candidates (owner's word only). ONLINE posted (status `a3f78635`, gen 21's rulings restated) + cued gen 67. Nothing to rule; waiting on cell19's F0-2a ready post, then MY run-7 push.
