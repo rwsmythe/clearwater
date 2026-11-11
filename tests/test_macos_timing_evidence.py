@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import importlib.util
 import json
@@ -282,8 +283,9 @@ def test_timing_writer_on_real_vfr_x265_mp4(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("source_id", ["sample:vid-vfr", "clip:vfr-gap"])
 @pytest.mark.parametrize("depth", [8, 10])
-def test_corpus_x265_controls_write_evidence_on_success(tmp_path, monkeypatch, source_id, depth):
-    """The actual corpus body must install capture for all four passing software controls."""
+@pytest.mark.parametrize("encoder", ["libx265", "hevc_videotoolbox"])
+def test_corpus_writes_evidence_on_success(tmp_path, monkeypatch, source_id, depth, encoder):
+    """The corpus body must capture all EIGHT successful controls and watched VT encodes."""
     import clearwater.io.video as video
     import video_fidelity as vf
     from clearwater.io.video import FFmpegVideoSink, verify
@@ -313,6 +315,8 @@ def test_corpus_x265_controls_write_evidence_on_success(tmp_path, monkeypatch, s
     monkeypatch.setattr(vf, "encode_file", encode)
     monkeypatch.setattr(vf, "fidelity_record", lambda *a, **kw: {"bit_depth": depth})
     monkeypatch.setattr(module, "v4_failures", lambda *a, **kw: [])
+    # This control tests capture wiring; the full raw contract is exercised below.
+    monkeypatch.setattr(module, "_assert_vt_vfr_timing", lambda *a: None)
     monkeypatch.setattr(module, "_v4_source", lambda *a: source)
     monkeypatch.setattr(
         module, "_capability", lambda *a: SimpleNamespace(available=True, bit_depths=(8, 10))
@@ -327,17 +331,19 @@ def test_corpus_x265_controls_write_evidence_on_success(tmp_path, monkeypatch, s
     monkeypatch.setattr(
         video,
         "probe",
-        lambda path: SimpleNamespace(video=SimpleNamespace(vfr=True, bit_depth=depth)),
+        lambda path: SimpleNamespace(
+            video=SimpleNamespace(vfr=True, bit_depth=depth, time_base=Fraction(1, 30000))
+        ),
     )
     monkeypatch.setattr(
         verify, "read_packet_table", lambda path: SimpleNamespace(video_pts=[0, 1001, 2002])
     )
     module.test_macos_videotoolbox_v4_corpus(
-        source_id, "libx265", depth, None, tmp_path, None, monkeypatch
+        source_id, encoder, depth, None, tmp_path, None, monkeypatch
     )
-    filename = f"f8-3-{source_id.replace(':', '_')}-libx265-{depth}.txt"
+    filename = f"f8-3-{source_id.replace(':', '_')}-{encoder}-{depth}.txt"
     evidence = tmp_path / "work/evidence" / filename
-    assert evidence.is_file(), "Passing x265 corpus control did not capture evidence"
+    assert evidence.is_file(), "Passing corpus case did not capture evidence"
     text = evidence.read_text()
     assert "verification passed" in text
     assert _record(text, "source identity: ")["recipe"].startswith(source_id)
@@ -426,3 +432,363 @@ def test_timing_writer_bounds_diagnostic_size_and_names_truncation(tmp_path, mon
     )
     assert dest.stat().st_size <= 192 * 1024
     assert "EVIDENCE TRUNCATED" in dest.read_text()
+
+
+def _vfr_boxes(tmp_path, source_id):
+    """Build independently specified video boxes for the two corrected VT outputs."""
+    import test_io_video_probe_boxes as b
+
+    if source_id == "sample:vid-vfr":
+        runs, media, movie, span, end = [(2, 1001), (1, 2002)] * 10, 30000, 240000, 40040, 320320
+        edits = [(320320, 0, 1, 0)]
+        pts = [1001 * (4 * (n // 3) + n % 3) for n in range(30)]
+        sentinel = 40040
+    else:
+        runs, media, movie, span, end = (
+            [(9, 512), (1, 3072), (45, 512)],
+            15360,
+            384000,
+            30720,
+            960000,
+        )
+        edits = [(192000, -1, 1, 0), (768000, 0, 1, 0)]
+        pts = [7680 + 512 * n for n in range(60) if n not in range(10, 15)]
+        sentinel = 38400
+    stts = struct.pack(">II", 0, len(runs)) + b"".join(struct.pack(">II", *r) for r in runs)
+    stbl = b.box("stts", stts) + b.box("stsz", struct.pack(">III", 0, 16, len(pts)))
+    tkhd = b.box("tkhd", b"\0" * 20 + struct.pack(">I", end))
+    mdhd = b.box("mdhd", b"\0" * 12 + struct.pack(">II", media, span))
+    mvhd = b.box("mvhd", b"\0" * 12 + struct.pack(">II", movie, end))
+    video = b.box(
+        "trak",
+        tkhd
+        + b.box("edts", b.elst(edits))
+        + b.box(
+            "mdia",
+            mdhd + b.hdlr("vide") + b.box("minf", b.box("stbl", stbl)),
+        ),
+    )
+    path = tmp_path / "correct.mp4"
+    path.write_bytes(b.FTYP + b.moov(mvhd, b.trak("soun", 48000), video))
+    evidence = (
+        "error: verification passed\nwritten pts: "
+        + json.dumps(pts)
+        + f"\nsentinel pts: {sentinel}\n"
+    )
+    return _helpers()._timing_boxes(path), pts, Fraction(1, media), evidence
+
+
+@pytest.mark.parametrize("source_id", ["sample:vid-vfr", "clip:vfr-gap"])
+def test_corrected_vt_raw_contract_reads_video_boxes(tmp_path, source_id):
+    """The complete corrected raw contract accepts known boxes with audio preceding video."""
+    _helpers()._assert_vt_vfr_timing(source_id, *_vfr_boxes(tmp_path, source_id))
+
+
+@pytest.mark.parametrize("source_id", ["sample:vid-vfr", "clip:vfr-gap"])
+@pytest.mark.parametrize(
+    "damage",
+    ["run9", "ctts", "clock", "mdhd", "edit", "tkhd", "mvhd", "pts", "sentinel", "written"],
+)
+def test_corrected_vt_contract_rejects_duration_or_written_timing_damage(
+    tmp_path, source_id, damage
+):
+    """A green verifier alone cannot conceal a bad last sample, header, edit or written span."""
+    raw, pts, tb, evidence = _vfr_boxes(tmp_path, source_id)
+    if damage == "run9":
+        count, _ = raw["stts"][-1]
+        if count > 1:
+            raw["stts"][-1] = (count - 1, 512)
+            raw["stts"].append((1, 559))
+        else:
+            raw["stts"][-1] = (1, 1335)
+    elif damage == "ctts":
+        raw["ctts"] = {"version": 1, "entries": [(len(pts), 1)]}
+    elif damage == "clock":
+        raw["movie_timescale"] *= 2
+    elif damage in {"mdhd", "tkhd", "mvhd"}:
+        raw["durations"][damage]["ticks"] += 1
+    elif damage == "edit":
+        raw["elst"][-1]["segment_duration"] += 1
+    elif damage == "pts":
+        pts[-1] += 1
+    elif damage == "sentinel":
+        evidence = evidence.replace("sentinel pts: ", "sentinel pts: 1")
+    else:
+        evidence = evidence.replace("written pts: [", "written pts: [1,")
+    with pytest.raises(AssertionError):
+        _helpers()._assert_vt_vfr_timing(source_id, raw, pts, tb, evidence)
+
+
+def test_expected_timing_uses_presentation_end_not_last_decode_packet():
+    """A reordered greatest-PTS packet can precede the final packet in decode order."""
+    expected = _helpers()._expected_timing([(110, 80, 30), (100, 90, 10)], Fraction(1, 100))
+    assert expected == {
+        "pts": [Fraction(1), Fraction(11, 10)],
+        "first": Fraction(1),
+        "end": Fraction(7, 5),
+        "span": Fraction(2, 5),
+    }
+
+
+@pytest.mark.parametrize("packets", [[], [(0, 0, 0)], [(0, 0, -1)], [(0, 0, 1), (0, 1, 1)]])
+def test_expected_timing_rejects_unusable_source_packets(packets):
+    """Missing, nonpositive and duplicated source timing cannot supply an expected span."""
+    with pytest.raises(AssertionError):
+        _helpers()._expected_timing(packets, Fraction(1, 30))
+
+
+def test_packet_timing_selects_video_and_retains_clock(tmp_path, monkeypatch):
+    """An interleaved audio packet must never become the terminal-video assertion."""
+    import clearwater.io.video as video
+
+    module = _helpers()
+    commands = []
+    monkeypatch.setattr(video, "find_tool", lambda name: Path("ffprobe-not-executed"))
+
+    def run(argv):
+        commands.append(argv)
+        return SimpleNamespace(
+            returncode=0,
+            stderr="",
+            stdout=json.dumps(
+                {
+                    "streams": [{"time_base": "1/30000"}],
+                    "packets": [{"pts": 38038, "dts": 36036, "duration": 2002}],
+                }
+            ),
+        )
+
+    monkeypatch.setattr(module, "_run", run)
+    assert module._packet_timing(tmp_path / "in.mp4") == (
+        [(38038, 36036, 2002)],
+        Fraction(1, 30000),
+    )
+    assert commands[0][3:5] == ["-select_streams", "v:0"]
+
+
+def _encoder_log(rows):
+    """Representative single-video-stream debug_ts/benchmark log, with unrelated noise."""
+    return "\n".join(
+        f"bench: 1 user 2 sys 3 real {'flush' if flush else 'encode'}_video 0.0\n"
+        "[aost] encoder -> type:audio pkt_pts:999 duration:1024\n"
+        f"[vost] encoder -> type:video pkt_pts:{pts} pkt_pts_time:0 pkt_dts:0 "
+        f"pkt_dts_time:0 duration:{duration} duration_time:0\n"
+        "muxer <- type:video pkt_pts:999 duration:999"
+        for pts, duration, flush in rows
+    )
+
+
+def test_encoder_boundary_parser_retains_zero_and_flush_association():
+    """Only the encoder's pre-mux video durations count, with flush attached to each packet."""
+    rows = [(0, 0, False), (2, 5, True), (7, 1, True), (8, 4, True)]
+    assert _helpers()._encoder_packets(_encoder_log(rows)) == rows
+
+
+def test_encoder_boundary_zero_duration_red_message():
+    """Name the exact RED from the unpatched VT wrapper, without running it at this seat."""
+    expected = [(0, 2), (2, 5), (7, 1), (8, 4)]
+    log = _encoder_log([(pts, 0, True) for pts, _ in expected])
+    with pytest.raises(AssertionError) as failure:
+        _helpers()._assert_encoder_durations(log, expected)
+    assert str(failure.value) == (
+        "DR-163 encoder boundary: expected [(0, 2), (2, 5), (7, 1), (8, 4)]; "
+        "got [(0, 0), (2, 0), (7, 0), (8, 0)]"
+    )
+
+
+@pytest.fixture(
+    params=[(name, depth) for name in ("sample:vid-vfr", "clip:vfr-gap") for depth in (8, 10)]
+)
+def run9_duration_replay(request, tmp_path):
+    """Replay the ruled DR-163 RED, distinguishing inferred pre-mux zeros from measured tails.
+
+    CHARC 6688c6fd names run 9 as the RED of record. Zero-duration encoder lines
+    model the unpatched wrapper; they were NOT captured at that boundary in run 9.
+    The measured post-mux tails are f8-3-sample_vid-vfr-hevc_videotoolbox-{8,10}.txt:101
+    and f8-3-clip_vfr-gap-hevc_videotoolbox-{8,10}.txt:159. Raw tables are :108/:167;
+    written PTS and sentinel are :4-5. Fixture bytes are test-side, with no work/ dependency.
+    """
+    source_id, depth = request.param
+    corrected, pts, tb, evidence = _vfr_boxes(tmp_path, source_id)
+    runs = corrected["stts"]
+    deltas = [d for n, d in runs for _ in range(n)]
+    expected = list(zip(pts, deltas, strict=True))
+    old = copy.deepcopy(corrected)
+    if source_id == "sample:vid-vfr":
+        measured_last = (38038, 38038, 1335)
+        old["stts"][-1] = (1, 1335)
+        media_ticks, movie_ticks = 39373, 314984
+    else:
+        measured_last = (37888, 37888, 559)
+        old["stts"][-1] = (44, 512)
+        old["stts"].append((1, 559))
+        media_ticks, movie_ticks = 30767, 961175
+    old["durations"]["mdhd"]["ticks"] = media_ticks
+    old["durations"]["tkhd"]["ticks"] = movie_ticks
+    old["durations"]["mvhd"]["ticks"] = movie_ticks
+    old["elst"][-1]["segment_duration"] = movie_ticks - (
+        192000 if source_id == "clip:vfr-gap" else 0
+    )
+    zero_packets = [(p, 0, n == len(pts) - 1) for n, p in enumerate(pts)]
+    log = _encoder_log(zero_packets) + (
+        f"\nmuxer <- type:video pkt_pts:{measured_last[0]} "
+        f"pkt_dts:{measured_last[1]} duration:{measured_last[2]}"
+    )
+    return source_id, depth, old, corrected, pts, tb, evidence, expected, zero_packets, log
+
+
+def test_run9_replay_is_red_before_mux_guess_and_green_with_restored_durations(
+    run9_duration_replay,
+):
+    """The four recorded terminal defects and ruled zero-duration replay fail exact assertions."""
+    source_id, depth, old, corrected, pts, tb, evidence, expected, zeros, log = run9_duration_replay
+    assert depth in (8, 10)
+    module = _helpers()
+    assert module._encoder_packets(log) == zeros  # post-mux 1335/559 must not be used
+    with pytest.raises(AssertionError) as failure:
+        module._assert_encoder_durations(log, expected)
+    assert str(failure.value) == (
+        f"DR-163 encoder boundary: expected {expected}; got {[(p, 0) for p, _ in expected]}"
+    )
+    with pytest.raises(
+        AssertionError, match="DR-163: raw video stts differs from source durations"
+    ):
+        module._assert_vt_vfr_timing(source_id, old, pts, tb, evidence)
+    module._assert_vt_vfr_timing(source_id, corrected, pts, tb, evidence)
+    module._assert_encoder_durations(
+        _encoder_log([(p, d, n == len(expected) - 1) for n, (p, d) in enumerate(expected)]),
+        expected,
+    )
+
+
+def test_encoder_boundary_requires_positive_associated_durations_and_flush():
+    """Zero, swapped and missing flush output are distinct failures of the boundary proof."""
+    module = _helpers()
+    expected = [(0, 2), (2, 5), (7, 1), (8, 4)]
+    module._assert_encoder_durations(_encoder_log([(p, d, True) for p, d in expected]), expected)
+    for rows in (
+        [(0, 5, True), (2, 2, True), (7, 1, True), (8, 4, True)],
+        [(p, d, False) for p, d in expected],
+        [(p, d, True) for p, d in expected[:-1]],
+    ):
+        with pytest.raises(AssertionError):
+            module._assert_encoder_durations(_encoder_log(rows), expected)
+
+
+@pytest.mark.parametrize(
+    "log",
+    [
+        "",
+        "encoder -> type:video pkt_pts:0 duration:1",
+        "bench: 1 real flush_video 0.0\nencoder -> type:video pkt_pts:NOPTS duration:1",
+    ],
+)
+def test_encoder_boundary_parser_fails_closed_on_absent_or_malformed_lines(log):
+    """No duration can be inferred from a mux line, a missing action or absent PTS."""
+    with pytest.raises(AssertionError):
+        _helpers()._encoder_packets(log)
+
+
+def test_long_early_interval_rejects_last_only_endpoint_repair():
+    """An earlier guessed packet end can exceed the real end after the last is fixed."""
+    module = _helpers()
+    packets = [(p, p, d) for p, d in [(0, 100), (100, 1), (101, 1), (102, 1), (103, 1), (104, 1)]]
+    expected = module._expected_timing(packets, Fraction(1, 30))
+    assert expected["end"] == Fraction(7, 2)
+    guessed = expected["span"] / 6
+    endpoint = max(
+        p * Fraction(1, 30) + (Fraction(d, 30) if p == 104 else guessed) for p, _, d in packets
+    )
+    assert endpoint == Fraction(241, 60) > expected["end"]
+    raw = {
+        "media_timescale": 60,
+        "movie_timescale": 60,
+        "stts": [(1, 200), (5, 2)],
+        "sample_count": 6,
+        "stsz_sample_count": 6,
+        "durations": {h: {"ticks": 210} for h in ("mdhd", "tkhd", "mvhd")},
+        "elst": [{"segment_duration": 210, "media_time": 0, "rate": "1"}],
+    }
+    module._assert_timing_span(raw, expected)
+    broken = copy.deepcopy(raw)
+    broken["elst"][0]["segment_duration"] = 241
+    broken["durations"]["tkhd"]["ticks"] = broken["durations"]["mvhd"]["ticks"] = 241
+    with pytest.raises(AssertionError):
+        module._assert_timing_span(broken, expected)
+
+
+@pytest.mark.parametrize("name", ["regular-final", "early-long"])
+@pytest.mark.parametrize("depth", [8, 10])
+def test_new_duration_fixtures_with_real_x265_control(
+    tmp_path, tmp_path_factory, monkeypatch, name, depth, ffmpeg_tools
+):
+    """Run new test-side designs and their presentation checks with external x265 on Windows."""
+    module = _helpers()
+    monkeypatch.setattr(
+        module, "_capability", lambda encoder: SimpleNamespace(available=True, bit_depths=(8, 10))
+    )
+    monkeypatch.setattr(module, "REPO", tmp_path)
+    if name == "regular-final":
+        with pytest.raises(
+            module._DR164DurationMismatchError, match="V4 video stream duration differs"
+        ):
+            module.test_macos_duration_regression(
+                name, "libx265", depth, tmp_path, tmp_path_factory, monkeypatch
+            )
+    else:
+        module.test_macos_duration_regression(
+            name, "libx265", depth, tmp_path, tmp_path_factory, monkeypatch
+        )
+    evidence = tmp_path / "work/evidence" / f"f8-3-clip_{name}-libx265-{depth}.txt"
+    text = evidence.read_text(encoding="utf-8")
+    assert text.startswith("error: verification passed\n")
+    record = _record(text, "V4 record: ")
+    failures = _record(text, "V4 failures: ")
+    if name == "regular-final":
+        assert len(failures) == 1
+        assert [
+            i["name"]
+            for i in record["items"]
+            if i["class"] == "MANDATORY" and i["status"] == "DIFFERENT"
+        ] == ["video stream duration"]
+        assert _record(text, "source boxes: ")["stts"] == [[29, 512], [1, 2048]]
+        assert _record(text, "output boxes: ")["stts"] == [[30, 512]]
+        assert _record(text, "output boxes: ")["durations"]["mdhd"]["ticks"] == 15360
+    else:
+        assert failures == []
+
+
+@pytest.mark.parametrize("damage", ["none", "extra-item", "extra-failure", "unwatched", "green"])
+def test_dr164_exception_only_covers_the_watched_duration_mismatch(damage):
+    """An unrelated failure must fail normally; only the named V4 duration error may xfail."""
+    module = _helpers()
+    record = {
+        "items": [
+            {
+                "name": "video stream duration",
+                "class": "MANDATORY",
+                "status": "DIFFERENT",
+                "source": "1.100000 (11/10)",
+                "output": "1.000000 (1/1)",
+            }
+        ]
+    }
+    failures = ["V4: video stream duration"]
+    if damage == "extra-item":
+        record["items"].append({"name": "video pts", "class": "MANDATORY", "status": "DIFFERENT"})
+    elif damage == "extra-failure":
+        failures.append("V4: the frame count differs from the frames written")
+    elif damage == "green":
+        module._assert_duration_v4(record, [], watched=True)
+        return
+    if damage == "none":
+        with pytest.raises(module._DR164DurationMismatchError) as caught:
+            module._assert_duration_v4(record, failures, watched=True)
+        assert str(caught.value) == (
+            "DR-164: V4 video stream duration differs: "
+            "source=1.100000 (11/10); output=1.000000 (1/1)"
+        )
+    else:
+        with pytest.raises(AssertionError) as caught:
+            module._assert_duration_v4(record, failures, watched=damage != "unwatched")
+        assert not isinstance(caught.value, module._DR164DurationMismatchError)

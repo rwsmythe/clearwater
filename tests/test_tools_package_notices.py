@@ -40,24 +40,20 @@ def load_macos_tests():
     return module
 
 
-def test_f02b_vt_vfr_xfails_are_exact_and_strict():
-    """Only the four watched VT/VFR parameter sets may xfail, and XPASS must fail."""
+def test_f02b_timing_xfails_are_exactly_the_two_dr164_controls():
+    """The original DR-163 corpus passes ordinarily; only two DR-164 rows may xfail."""
     module = load_macos_tests()
     watched = []
-    for case in module._v4_cases():
+    for case in [*module._v4_cases(), *module._duration_cases()]:
         for mark in case.marks:
             if mark.name == "xfail":
                 assert mark.kwargs == {
                     "strict": True,
-                    "reason": "DR-163: hevc_videotoolbox last-packet duration (F8-3)",
+                    "reason": "DR-164: libx265 reordered output loses a long final frame duration",
+                    "raises": module._DR164DurationMismatchError,
                 }
-                watched.append(tuple(case.values))
-    assert set(watched) == {
-        (source, "hevc_videotoolbox", depth)
-        for source in ("sample:vid-vfr", "clip:vfr-gap")
-        for depth in (8, 10)
-    }
-    assert len(watched) == 4
+                watched.append(case.id)
+    assert sorted(watched) == ["10-libx265-regular-final", "8-libx265-regular-final"]
 
 
 def test_f02b_p17_tags_the_x265_stream(tmp_path, monkeypatch):

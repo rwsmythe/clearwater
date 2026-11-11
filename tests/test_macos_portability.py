@@ -43,6 +43,7 @@ import unicodedata
 import warnings
 from collections.abc import Iterator, Sequence
 from fractions import Fraction
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -858,22 +859,11 @@ def _v4_cases() -> list[Any]:
             encoder,
             out,
             id=f"{source}-{encoder}-{out}",
-            marks=pytest.mark.xfail(strict=True, reason=VT_VFR_REASON)
-            if _vt_vfr_case(source, encoder)
-            else (),
         )
         for source, depth in sources
         for encoder in (VT, X265)
         for out in sorted({depth, 10})
     ]
-
-
-VT_VFR_REASON = "DR-163: hevc_videotoolbox last-packet duration (F8-3)"
-
-
-def _vt_vfr_case(source: str, encoder: str) -> bool:
-    """The four watched VT/VFR cases, at their two parametrised depths."""
-    return encoder == VT and source in {"sample:vid-vfr", "clip:vfr-gap"}
 
 
 def _timing_boxes(path: Path) -> dict[str, Any]:
@@ -960,6 +950,132 @@ def _timing_boxes(path: Path) -> dict[str, Any]:
     }
 
 
+def _packet_timing(path: Path) -> tuple[list[tuple[int, int, int]], Fraction]:
+    """Read VIDEO packets only, retaining their source clock and positive durations."""
+    from clearwater.io.video import find_tool
+
+    done = _run([
+        str(find_tool("ffprobe")), "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "packet=pts,dts,duration:stream=time_base", "-of", "json", str(path),
+    ])  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    data = json.loads(done.stdout)
+    return (
+        [(int(p["pts"]), int(p["dts"]), int(p["duration"])) for p in data["packets"]],
+        Fraction(data["streams"][0]["time_base"]),
+    )
+
+
+def _expected_timing(packets: Sequence[tuple[int, int, int]], tb: Fraction) -> dict[str, Any]:
+    """Derive the presentation span from a source packet table, never its average rate."""
+    ordered = sorted(packets)
+    assert ordered and tb > 0
+    assert all(duration > 0 for _, _, duration in ordered), "nonpositive source duration"
+    pts = [p for p, _, _ in ordered]
+    assert len(set(pts)) == len(pts), "duplicate source PTS"
+    first = pts[0] * tb
+    end = max((p + duration) * tb for p, _, duration in ordered)
+    return {"pts": [p * tb for p in pts], "first": first, "end": end, "span": end - first}
+
+
+def _assert_timing_span(
+    raw: dict[str, Any], expected: dict[str, Any], *, reordered: bool = False
+) -> None:
+    """Check totals and edit effects, allowing x265's reordered stts/ctts run shapes."""
+    media, movie = raw["media_timescale"], raw["movie_timescale"]
+    decode_ticks = sum(n * delta for n, delta in raw["stts"])
+    if not reordered:
+        assert decode_ticks == expected["span"] * media
+    assert raw["sample_count"] == raw["stsz_sample_count"] == len(expected["pts"])
+    for header, ticks in (
+        ("mdhd", decode_ticks),
+        ("tkhd", expected["end"] * movie),
+        ("mvhd", expected["end"] * movie),
+    ):
+        assert raw["durations"][header]["ticks"] == ticks, header
+    edits = []
+    if expected["first"]:
+        edits.append({"segment_duration": expected["first"] * movie, "media_time": -1, "rate": "1"})
+    edits.append({"segment_duration": expected["span"] * movie, "media_time": 0, "rate": "1"})
+    assert raw["elst"] == edits
+
+
+def _assert_vt_vfr_timing(
+    source_id: str,
+    raw: dict[str, Any],
+    pts: Sequence[int],
+    tb: Fraction,
+    evidence: str,
+) -> None:
+    """Pin the four DR-163 outputs, including the last VIDEO sample from raw stts."""
+    if source_id == "sample:vid-vfr":
+        entries = [(2, 1001), (1, 2002)] * 10
+        wanted_pts = [1001 * (4 * (n // 3) + n % 3) for n in range(30)]
+        first, end, media, movie = 0, 40040, 30000, 240000
+        last = (38038, 38038, 2002)
+    else:
+        assert source_id == "clip:vfr-gap"
+        entries = [(9, 512), (1, 3072), (45, 512)]
+        wanted_pts = [7680 + n * 512 for n in range(60) if n not in range(10, 15)]
+        first, end, media, movie = 7680, 38400, 15360, 384000
+        last = (37888, 37888, 512)
+    assert (raw["media_timescale"], raw["movie_timescale"]) == (media, movie)
+    assert tb == Fraction(1, media)
+    assert raw["stts"] == entries, "DR-163: raw video stts differs from source durations"
+    assert raw["ctts"] == {"version": None, "entries": []}
+    assert sorted(pts) == wanted_pts
+    written = re.findall(r"^written pts: (.*)$", evidence, re.MULTILINE)
+    assert len(written) == 1 and json.loads(written[0]) == wanted_pts
+    assert re.findall(r"^sentinel pts: (.*)$", evidence, re.MULTILINE) == [str(end)]
+    assert evidence.splitlines()[0] == "error: verification passed"
+    deltas = [delta for count, delta in raw["stts"] for _ in range(count)]
+    # No ctts: raw decode and presentation times coincide; do not read an audio tail line.
+    last_dts = first + sum(deltas[:-1])
+    assert (last_dts, last_dts, deltas[-1]) == last
+    _assert_timing_span(
+        raw,
+        {
+            "pts": wanted_pts,
+            "first": Fraction(first, media),
+            "end": Fraction(end, media),
+            "span": Fraction(end - first, media),
+        },
+    )
+
+
+def _encoder_packets(log: str) -> list[tuple[int, int, bool]]:
+    """Parse debug_ts at the encoder boundary; benchmark action identifies flush receives.
+
+    FFmpeg b204e94e fftools/ffmpeg_enc.c:612,654-658,704-710 logs pkt->duration
+    after receive_packet and BEFORE sch_enc_send (:717). The benchmark's encode/flush
+    action is printed at :657 (ffmpeg.c:551-565). libavformat/mux.c:1102 calls
+    guess_pkt_duration later. stats_enc_post has no duration field in this revision.
+    """
+    packets = []
+    flushing = None
+    for line in log.splitlines():
+        action = re.search(r"bench:.*\b(encode|flush)_video 0\.0\b", line)
+        if action:
+            flushing = action[1] == "flush"
+        if "encoder -> type:video " in line:
+            packet = re.search(r"pkt_pts:(-?\d+)\b.*?\bduration:(\d+)\b", line)
+            assert packet is not None, f"malformed encoder packet: {line}"
+            assert flushing is not None, "encoder packet without receive action"
+            packets.append((int(packet[1]), int(packet[2]), flushing))
+    assert packets, "no encoder-boundary video packets"
+    return packets
+
+
+def _assert_encoder_durations(log: str, expected: Sequence[tuple[int, int]]) -> None:
+    """Require exact positive durations associated by PTS, including delayed flush output."""
+    packets = _encoder_packets(log)
+    actual = sorted((pts, duration) for pts, duration, _ in packets)
+    assert actual == sorted(expected), (
+        f"DR-163 encoder boundary: expected {sorted(expected)}; got {actual}"
+    )
+    assert any(flushed for _, _, flushed in packets), "DR-163: no packet observed during flush"
+
+
 def _write_vt_failure(
     output: Path,
     destination: Path,
@@ -974,9 +1090,9 @@ def _write_vt_failure(
     frame_rate: Fraction | None = None,
     encode_argv: Sequence[str] = (),
 ) -> None:
-    """Record finished output (VT refusal or x265 control) before any sink cleanup.
+    """Record finished output (VT success/refusal or x265 control) before any sink cleanup.
 
-    The corpus is at most two seconds. Keep a named truncation diagnostic if unexpected
+    The watched synthetic clips are small. Keep a named truncation diagnostic if unexpected
     metadata exceeds the 192 KiB evidence budget; neither a huge tag nor an external reader
     error should hide the original encode refusal. ``end`` is the sentinel actually sent by
     ``_end_stream``; ``written_pts`` excludes that sentinel, as the sink's own list does.
@@ -1064,7 +1180,7 @@ def _capture_vt_failure(
     source: Path | None = None,
     recipe: str | None = None,
 ) -> None:
-    """Capture verification failures AND VFR controls before ``close`` can delete bytes.
+    """Capture verification failures AND successful VT/x265 VFR cases before cleanup.
 
     Observe ``_start``'s final argv without altering it. The original verification result or
     exception is preserved; diagnostic failures add a note to the original encode exception
@@ -1237,10 +1353,228 @@ def test_macos_videotoolbox_v4_corpus(
         assert sorted(read_packet_table(out).video_pts) == sorted(
             read_packet_table(source).video_pts
         )
+        if encoder == VT:
+            evidence = (
+                REPO
+                / "work/evidence"
+                / (f"f8-3-{source_id.replace(':', '_')}-{encoder}-{depth}.txt")
+            )
+            _assert_vt_vfr_timing(
+                source_id,
+                _timing_boxes(out),
+                read_packet_table(out).video_pts,
+                probe(out).video.time_base,
+                evidence.read_text(encoding="utf-8"),
+            )
     if source_id == "sample:vid-rotated":
         assert probe(out).video.rotation == 90
     if source_id == "clip:offset":
         assert probe(out).edit_list == probe(source).edit_list
+
+
+def _duration_source(name: str, tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Build regressions test-side with Clips.make's output BSF escape hatch."""
+    options: dict[str, Any] = {"offset": "0", "duration": "0.2", "size": "64x48"}
+    if name == "regular-final":
+        # Regular PTS (0..29)/30, but the final packet lasts FOUR periods.
+        options["duration"] = "1"
+        options["out_options"] = ("-bsf:v", r"setts=duration=if(eq(N\,29)\,4\,DURATION)")
+    else:
+        assert name == "early-long"
+        # (0,100,101,102,103,104)/30. An average substituted at the penultimate
+        # packet exceeds the true end 105/30 even if the last duration is repaired.
+        options["vf_chain"] = r"setpts=if(eq(N\,0)\,0\,N+99)"
+    return _v4_clips(tmp_path_factory).make(f"dr163-{name}", **options)
+
+
+DR164_REASON = "DR-164: libx265 reordered output loses a long final frame duration"
+
+
+class _DR164DurationMismatchError(AssertionError):
+    """The watched V4 duration mismatch, after all other timing checks have passed."""
+
+
+def _duration_cases() -> list[Any]:
+    """Keep only the two DR-164 controls xfailed; all VT and early-long rows are ordinary."""
+    return [
+        pytest.param(
+            name, encoder, depth, id=f"{depth}-{encoder}-{name}",
+            marks=pytest.mark.xfail(
+                strict=True, reason=DR164_REASON, raises=_DR164DurationMismatchError
+            ) if name == "regular-final" and encoder == X265 else (),
+        )
+        for depth in (8, 10)
+        for encoder in (VT, X265)
+        for name in ("regular-final", "early-long")
+    ]  # fmt: skip
+
+
+def _assert_duration_v4(record: dict[str, Any], failures: Sequence[str], *, watched: bool) -> None:
+    """Permit the DR-164 exception only for the sole mandatory/required duration failure."""
+    if not failures:
+        return
+    blocking = [
+        item["name"]
+        for item in record["items"]
+        if item["status"] == "DIFFERENT"
+        and (item["class"] == "MANDATORY" or item["class"].startswith("REQUIRED"))
+    ]
+    if watched and blocking == ["video stream duration"] and len(failures) == 1:
+        assert failures[0].startswith("V4: "), failures
+        item = next(i for i in record["items"] if i["name"] == "video stream duration")
+        raise _DR164DurationMismatchError(
+            f"DR-164: V4 video stream duration differs: source={item['source']}; "
+            f"output={item['output']}"
+        )
+    assert not failures, failures
+
+
+@pytest.mark.parametrize(("name", "encoder", "depth"), _duration_cases())
+def test_macos_duration_regression(
+    name: str,
+    encoder: str,
+    depth: int,
+    tmp_path: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Preserve source-derived timing for unusual final and long-early/short-tail spans."""
+    vf = importlib.import_module("video_fidelity")
+    row = _capability(encoder)
+    if encoder == X265:
+        assert row.available and row.bit_depths == (8, 10)
+    elif not row.available:
+        assert_proved_unavailable(row)
+        pytest.skip(f"VideoToolbox unavailable on this Mac: {row.reason}")
+    assert_advertised(row)
+    if depth not in row.bit_depths:
+        assert_unadvertised_refused(row)
+        return
+    source = _duration_source(name, tmp_path_factory)
+    packets, tb = _packet_timing(source)
+    expected = _expected_timing(packets, tb)
+    ordered = sorted(packets)
+    steps = [b[0] - a[0] for a, b in pairwise(ordered)]
+    if name == "regular-final":
+        assert len(ordered) == 30
+        assert len(set(steps)) == 1 and ordered[-1][2] != steps[-1]
+    else:
+        assert len(ordered) == 6
+        assert steps[0] > sum(steps[1:]) and len(set(steps[1:])) == 1
+        average = expected["span"] / len(ordered)
+        assert ordered[-2][0] * tb + average > expected["end"]
+    out = tmp_path / "duration.mp4"
+    case_id = f"clip:{name}-{encoder}-{depth}"
+    _capture_vt_failure(
+        monkeypatch,
+        case_id,
+        REPO / "work/evidence",
+        source=source,
+        recipe=f"test-side _duration_source({name!r}); Clips.make output BSF / setpts",
+    )
+    run = vf.encode_file(source, out, encoder=encoder, bit_depth=depth)
+    record = vf.fidelity_record(source, out, bit_depth=depth, run=run)
+    failures = v4_failures("clip:" + name, record, run.report.frames_written, run.report.warnings)
+    evidence = REPO / "work/evidence" / f"f8-3-clip_{name}-{encoder}-{depth}.txt"
+    # Require the verify hook's file; opening in append mode must not create a missing one.
+    captured = evidence.read_bytes()
+    evidence.write_bytes(
+        captured
+        + (
+            "V4 failures: " + json.dumps(failures) + "\nV4 record: " + json.dumps(record) + "\n"
+        ).encode("utf-8")
+    )
+    assert record["bit_depth"] == depth
+    output_packets, output_tb = _packet_timing(out)
+    assert _expected_timing(output_packets, output_tb)["pts"] == expected["pts"]
+    raw = _timing_boxes(out)
+    _assert_timing_span(raw, expected, reordered=encoder == X265)
+    if encoder == VT:
+        assert raw["ctts"] == {"version": None, "entries": []}
+        deltas = [d for n, d in raw["stts"] for _ in range(n)]
+        assert [d * Fraction(1, raw["media_timescale"]) for d in deltas] == [
+            d * tb for _, _, d in ordered
+        ]
+    _assert_duration_v4(record, failures, watched=name == "regular-final" and encoder == X265)
+
+
+@pytest.mark.parametrize("depth", [8, 10])
+def test_macos_vt_encoder_boundary_durations(depth: int, tmp_path: Path) -> None:
+    """Unequal frame durations must reach the VT packets before mux guessing, flush included."""
+    from clearwater.io.video import nut
+
+    row = _capability(VT)
+    if not row.available:
+        assert_proved_unavailable(row)
+        pytest.skip(f"VideoToolbox unavailable on this Mac: {row.reason}")
+    assert_advertised(row)
+    if depth not in row.bit_depths:
+        assert_unadvertised_refused(row)
+        return
+    source = tmp_path / "unequal.nut"
+    # A timestamped input and terminal sentinel, using the same input BSF as the sink.
+    # This is a DIRECT test invocation, never an intercepted/modified product command.
+    expected = [(0, 2), (2, 5), (7, 1), (8, 4)]
+    payload = bytes(64 * 48 * 3 * (2 if depth == 10 else 1))
+    with source.open("wb") as handle:
+        handle.write(
+            nut.stream_header(
+                width=64,
+                height=48,
+                bit_depth=depth,
+                time_base=Fraction(1, 30),
+                frame_rate=Fraction(10),
+            )
+        )
+        for pts, _ in expected:
+            handle.write(nut.frame_header(pts, len(payload)))
+            handle.write(payload)
+        handle.write(nut.sentinel(12))
+    command = [
+        str(_ffmpeg()),
+        "-nostdin",
+        "-hide_banner",
+        "-nostats",
+        "-loglevel",
+        "verbose",
+        "-debug_ts",
+        "-benchmark_all",
+        "-y",
+        "-bsf:v",
+        nut.INPUT_BITSTREAM_FILTER,
+        "-f",
+        "nut",
+        "-i",
+        str(source),
+        "-map",
+        "0:v:0",
+        "-an",
+        "-vf",
+        "format=" + ("p010le" if depth == 10 else "nv12"),
+        "-c:v",
+        VT,
+        "-allow_sw",
+        "1",
+        "-realtime",
+        "0",
+        "-bf",
+        "2",
+        "-b:v",
+        "1M",
+        "-fps_mode",
+        "passthrough",
+        "-enc_time_base:v",
+        "demux",
+        "-f",
+        "null",
+        "-",
+    ]
+    done = _run(command)
+    evidence = REPO / "work/evidence" / f"dr163-encoder-boundary-{depth}.txt"
+    evidence.parent.mkdir(parents=True, exist_ok=True)
+    evidence.write_text(json.dumps(command) + "\n" + done.stderr, encoding="utf-8")
+    assert done.returncode == 0, done.stderr[-4000:]
+    _assert_encoder_durations(done.stderr, expected)
 
 
 def _negative_timestamps_refused(
