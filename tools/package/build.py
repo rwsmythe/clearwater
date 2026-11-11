@@ -492,6 +492,14 @@ def name_violations(parts: Sequence[str], *, module_root: bool) -> list[str]:
     return sorted(rules)
 
 
+def _sysconfigdata_name() -> str:
+    """Return CPython's generated POSIX module name without environment overrides."""
+    return (
+        f"_sysconfigdata_{getattr(sys, 'abiflags', '')}_{sys.platform}_"
+        f"{getattr(sys.implementation, '_multiarch', '')}"
+    )
+
+
 def module_violations(module: str, *, allow_boot: bool = False) -> list[str]:
     """Return the rules a frozen module name (``a.b.c``) breaks: :func:`name_violations`.
 
@@ -510,13 +518,7 @@ def module_violations(module: str, *, allow_boot: bool = False) -> list[str]:
     """
     parts = module.split(".")
     boot = allow_boot and module.startswith(BOOT_MODULE_PREFIXES)
-    sysconfig_data = (
-        not allow_boot
-        and os.name == "posix"
-        and module
-        == f"_sysconfigdata_{getattr(sys, 'abiflags', '')}_{sys.platform}_"
-        f"{getattr(sys.implementation, '_multiarch', '')}"
-    )
+    sysconfig_data = not allow_boot and os.name == "posix" and module == _sysconfigdata_name()
     return name_violations(
         [*parts[:-1], parts[-1] + ".pyc"], module_root=not (boot or sysconfig_data)
     )

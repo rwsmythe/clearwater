@@ -2569,8 +2569,15 @@ def plan_notices(
         if entry.kind == "container":
             selected["pyinstaller"].append(entry.label)
             continue
-        if name == "_internal/base_library.zip" or (
-            entry.kind == "module" and name.split(".")[0] in sys.stdlib_module_names
+        if (
+            name == "_internal/base_library.zip"
+            or (entry.kind == "module" and name.split(".")[0] in sys.stdlib_module_names)
+            or (
+                entry.kind == "module"
+                and entry.label.startswith("pyz:")
+                and (os.name == "posix" or _host_platform() == "darwin")
+                and name == _build_tool()._sysconfigdata_name()
+            )
         ):
             selected["python"].append(entry.label)
             continue
@@ -2806,15 +2813,22 @@ def _carried_notice_rows(
     rows: list[NoticeRow],
 ) -> list[NoticeRow]:
     result = []
+    context_hosts = {
+        host["relpath"]
+        for host in document.get("embedded_hosts", [])
+        if host.get("platform", "win32") == _host_platform()
+    }
     # Resolve only against original, actually carried rows; references cannot
     # chain or use an absent distribution as a source of redistribution terms.
     for record in document["components"]:
         if "carried_notice" not in record or not claims.get(record["component"]):
             continue
         reference = _carried_notice(record)
+        context_paths = tuple(path for path in record["embedded_in"] if path in context_hosts)
         context = (
-            f"embedded {', '.join(record['embedded_in'])} "
-            f"component {record['component']} carried notice: "
+            f"embedded {', '.join(context_paths)} component {record['component']} carried notice: "
+            if context_paths
+            else ""
         )
         candidates = [row for row in rows if row.name == reference["row"]]
         if len(candidates) != 1:

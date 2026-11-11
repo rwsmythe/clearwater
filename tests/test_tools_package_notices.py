@@ -12,10 +12,12 @@ import marshal
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import sysconfig
 import zipfile
+from fractions import Fraction
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -27,6 +29,130 @@ WINDOWS_RELEASE_SKIP = (
     "and writes Clearwater.exe (no macOS release fixture yet)"
 )
 VENV_SITE_PACKAGES = Path(sysconfig.get_path("purelib"))
+
+
+def load_macos_tests():
+    """Load the native test helpers without executing their platform-skipped tests."""
+    path = Path(os.environ.get("WP65_MACOS_TEST_SCRIPT", ROOT / "tests/test_macos_portability.py"))
+    spec = importlib.util.spec_from_file_location("wp65_macos_helpers", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_f02b_vt_vfr_xfails_are_exact_and_strict():
+    """Only the four watched VT/VFR parameter sets may xfail, and XPASS must fail."""
+    module = load_macos_tests()
+    watched = []
+    for case in module._v4_cases():
+        for mark in case.marks:
+            if mark.name == "xfail":
+                assert mark.kwargs == {
+                    "strict": True,
+                    "reason": "DR-163: hevc_videotoolbox last-packet duration (F8-3)",
+                }
+                watched.append(tuple(case.values))
+    assert set(watched) == {
+        (source, "hevc_videotoolbox", depth)
+        for source in ("sample:vid-vfr", "clip:vfr-gap")
+        for depth in (8, 10)
+    }
+    assert len(watched) == 4
+
+
+def test_f02b_p17_tags_the_x265_stream(tmp_path, monkeypatch):
+    """The HLG negative probe needs stream-level x265 tags, retaining log-level=error."""
+    import clearwater.io.video as video
+
+    module = load_macos_tests()
+    calls = []
+    monkeypatch.setattr(module, "_clip", lambda path, **kwargs: calls.append(kwargs) or path)
+    monkeypatch.setattr(
+        video, "probe", lambda path: SimpleNamespace(faults=[SimpleNamespace(severity="refuse")])
+    )
+    module.test_macos_videotoolbox_v4("P17", monkeypatch, tmp_path, None)
+    assert calls[0]["extra"] == [
+        "-x265-params",
+        "log-level=error:colorprim=bt2020:transfer=arib-std-b67:colormatrix=bt2020nc",
+    ]
+
+
+def test_f02b_vt_evidence_records_packets_boxes_and_written_end(tmp_path, monkeypatch):
+    """The recorder reads real movie boxes and retains ffprobe output and written timing."""
+    import clearwater.io.video as video
+    import test_io_video_probe_boxes as boxes
+
+    module = load_macos_tests()
+    stts = boxes.box("stts", struct.pack(">II4I", 0, 2, 29, 1001, 1, 1335))
+    mdia = boxes.box(
+        "mdia",
+        boxes.header_box("mdhd", 30000)
+        + boxes.hdlr("vide")
+        + boxes.box("minf", boxes.box("stbl", stts)),
+    )
+    trak = boxes.box("trak", boxes.box("edts", boxes.elst([(39373, 0, 1, 0)])) + mdia)
+    output = boxes.write(tmp_path, boxes.FTYP, boxes.moov(boxes.header_box("mvhd", 30000), trak))
+    monkeypatch.setattr(video, "find_tool", lambda name: Path("ffprobe-not-executed"))
+    commands = []
+
+    def run(argv):
+        commands.append(argv)
+        return SimpleNamespace(returncode=0, stdout="packet|pts=38038|duration=1335", stderr="")
+
+    monkeypatch.setattr(module, "_run", run)
+    destination = tmp_path / "evidence/case.txt"
+    module._write_vt_failure(
+        output, destination, first=0, end=40040, time_base=Fraction(1, 30000), error="verify failed"
+    )
+    text = destination.read_text()
+    assert "packet|pts=38038|duration=1335" in text
+    assert "duration=39373" in text and "last stts (count, delta): (1, 1335)" in text
+    assert "written first: 0; end: 40040; time_base: 1/30000" in text
+    assert commands[0][1:-1] == [
+        "-v",
+        "error",
+        "-show_entries",
+        "format:stream:packet=pts,dts,duration,flags",
+        "-of",
+        "compact",
+    ]
+
+
+def test_f02b_vt_capture_precedes_failed_output_cleanup(tmp_path, monkeypatch):
+    """A verify refusal is re-raised after capture, while the failed output still exists."""
+    from clearwater.io.video import FFmpegVideoSink, VideoEncodeError
+
+    module = load_macos_tests()
+    output = tmp_path / "failed.mp4"
+    output.write_bytes(b"finished bytes")
+    failure = VideoEncodeError("verify_failed", "written end differs")
+
+    def refuse(sink, end):
+        raise failure
+
+    monkeypatch.setattr(FFmpegVideoSink, "_verify", refuse)
+    captures = []
+    monkeypatch.setattr(
+        module,
+        "_write_vt_failure",
+        lambda path, dest, **kw: captures.append((path.read_bytes(), dest.name, kw)),
+    )
+    module._capture_vt_failure(monkeypatch, "sample:vid-vfr-hevc_videotoolbox-8", tmp_path)
+    sink = SimpleNamespace(
+        _out_path=output,
+        _written=[1001, 2002],
+        _probe=SimpleNamespace(video=SimpleNamespace(time_base=Fraction(1, 30000))),
+    )
+    with pytest.raises(VideoEncodeError) as refusal:
+        FFmpegVideoSink._verify(sink, 40040)
+    assert refusal.value is failure
+    assert captures == [
+        (
+            b"finished bytes",
+            "f8-3-sample_vid-vfr-hevc_videotoolbox-8.txt",
+            {"first": 1001, "end": 40040, "time_base": Fraction(1, 30000), "error": str(failure)},
+        )
+    ]
 
 
 @pytest.mark.parametrize("variable", ["PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE"])
@@ -364,7 +490,14 @@ def test_f02b_framework_seals_are_generated_metadata(app_release, framework):
 
 @pytest.mark.parametrize(
     "damage",
-    ["non-framework", "unowned-executable", "non-plist", "linked", "record-owned-non-plist"],
+    [
+        "non-framework",
+        "unowned-executable",
+        "absent-executable",
+        "non-plist",
+        "linked",
+        "record-owned-non-plist",
+    ],
 )
 def test_f02b_framework_seal_rule_refuses_other_files(app_release, damage):
     """A path, bytes or ownership lookalike cannot claim the framework metadata rule."""
@@ -375,8 +508,9 @@ def test_f02b_framework_seal_rule_refuses_other_files(app_release, damage):
     seal = app / base / "_CodeSignature/CodeResources"
     seal.parent.mkdir(parents=True)
     executable = seal.parent.parent / "QtCore"
-    executable.write_bytes(b"owned framework stand-in")
-    if damage != "unowned-executable":
+    if damage != "absent-executable":
+        executable.write_bytes(b"owned framework stand-in")
+    if damage not in {"unowned-executable", "absent-executable"}:
         dist = app_release["distributions"]["numpy"]
         relative = executable.relative_to(app / "Contents/Frameworks").as_posix()
         origin = Path(str(dist.locate_file(relative)))
@@ -398,8 +532,12 @@ def test_f02b_framework_seal_rule_refuses_other_files(app_release, damage):
             origin.parent.mkdir(parents=True, exist_ok=True)
             origin.write_bytes(seal.read_bytes())
             record.write_text(record.read_text() + relative + ",,\n")
-    with pytest.raises(ValueError, match=r"unknown or ambiguous bundled entry|unsafe linked"):
+    with pytest.raises(
+        ValueError, match=r"unknown or ambiguous bundled entry|unsafe linked"
+    ) as refusal:
         app_plan(app_release)
+    if damage in {"unowned-executable", "absent-executable"}:
+        assert "file:" + seal.relative_to(app).as_posix() in str(refusal.value)
 
 
 def test_f02b_framework_seal_rule_is_not_an_onedir_exemption(release):
@@ -499,7 +637,10 @@ def run7_release(app_release, tmp_path, monkeypatch):
             identities[data] = hosts[relative]["macho"]
     assert len(files) == 293 and len(links) == 86
     # Build archives, never execute their stand-in bootloader or product entry points.
-    make_app_executable(app / "Contents/MacOS/Clearwater", ["clearwater", "json"])
+    # Build the runner's POSIX name even when this darwin model runs on Windows.
+    monkeypatch.setattr(sys.implementation, "_multiarch", "darwin", raising=False)
+    generated = module._build_tool()._sysconfigdata_name()
+    make_app_executable(app / "Contents/MacOS/Clearwater", ["clearwater", "json", generated])
     with zipfile.ZipFile(app / "Contents/Resources/base_library.zip", "w") as archive:
         archive.writestr("json/__init__.pyc", b"")
     for name, target in links:
@@ -624,6 +765,8 @@ def run7_release(app_release, tmp_path, monkeypatch):
         "surface": surface,
         "distributions": distributions,
         "pillow_licence": site / "pillow-12.3.0.dist-info/licenses/LICENSE.txt",
+        "numpy_licence": site / "numpy-2.5.4.dist-info/licenses/LICENSE.txt",
+        "generated": generated,
     }
 
 
@@ -636,12 +779,41 @@ def run7_plan(run7_release):
     )
 
 
+@pytest.mark.parametrize("kind", ["near-miss", "base", "archive", "file"])
+def test_f02b_sysconfig_exception_is_exact_and_pyz_only(run7_release, monkeypatch, kind):
+    """Generated sysconfig data has no name-only exemption outside the exact PYZ module."""
+    module = run7_release["module"]
+    original = module._inventory
+    name = run7_release["generated"]
+    label = ("pyz:" + name + "X") if kind == "near-miss" else kind + ":" + name
+    if kind == "file":
+        (run7_release["root"] / "Clearwater.app" / name).write_bytes(b"not a module")
+
+    def inventory(folder):
+        entries, home = original(folder)
+        exemplar = next(entry for entry in entries if entry.label == "pyz:" + name)
+        entries.append(
+            exemplar._replace(
+                label=label,
+                name=name + "X" if kind == "near-miss" else name,
+                kind="file" if kind == "file" else "module",
+            )
+        )
+        return entries, home
+
+    monkeypatch.setattr(module, "_inventory", inventory)
+    with pytest.raises(ValueError, match=re.escape("unknown or ambiguous bundled entry " + label)):
+        run7_plan(run7_release)
+
+
 def test_f02b_run7_all_file_classes_plan_with_real_manifest(run7_release):
     """All 293 files and 86 links, including six seals and RECORD plists, get owners."""
     result = run7_plan(run7_release)
     assert len([entry for entry in result.entries if entry.startswith("file:")]) == 293
     assert len([entry for entry in result.entries if entry.startswith("link:")]) == 86
     assert len(result.limits) == 14
+    python = next(row for row in result.rows if row.name.lower() == "python")
+    assert "pyz:" + run7_release["generated"] in python.entries
     for framework in ("QtCore", "QtDBus", "QtGui", "QtNetwork", "QtSvg", "QtWidgets"):
         prefix = f"file:Contents/Frameworks/PySide6/Qt/lib/{framework}.framework/Versions/A/"
         qt = next(row for row in result.rows if row.name == "pyside6-essentials")
@@ -650,12 +822,14 @@ def test_f02b_run7_all_file_classes_plan_with_real_manifest(run7_release):
         assert prefix + "_CodeSignature/CodeResources" in clearwater.entries
 
 
-@pytest.mark.parametrize("heading", ["TCL_TK", "", " TCL_TK", "TCL_TK_EXTRA"])
+@pytest.mark.parametrize("heading", ["TCL_TK", "", " TCL_TK", "TCL_TK_EXTRA", "other-row"])
 def test_f02b_darwin_tcl_limit_requires_rendered_pillow_section(run7_release, heading):
     """A Pillow-backed U-T1 statement needs an exact heading in its rendered text."""
     run7_release["pillow_licence"].write_bytes(
         f"Synthetic Pillow licence\n{heading}\nSynthetic terms\n".encode()
     )
+    if heading == "other-row":
+        run7_release["numpy_licence"].write_bytes(b"Other row\nTCL_TK\n")
     if heading == "TCL_TK":
         result = run7_plan(run7_release)
         pillow = next(row for row in result.rows if row.name == "pillow")
@@ -3643,7 +3817,12 @@ def test_shared_reference_preserves_original_heading(
         },
     }
     reused = module._carried_notice_rows(
-        {"components": [record]}, {reference_name: [("file:host.pyd", "a" * 64)]}, [original]
+        {
+            "components": [record],
+            "embedded_hosts": [{"relpath": "host.pyd", "platform": module._host_platform()}],
+        },
+        {reference_name: [("file:host.pyd", "a" * 64)]},
+        [original],
     )
     rendered = module.render_notices(module.NoticePlan(original.entries, (*reused, original), ()))
     assert rendered.count(terms) == 1
@@ -4301,6 +4480,22 @@ def test_embedded_carried_notice_reuses_existing_text_without_copy(release):
         b"### Installed wheel: numpy 2.5.4; numpy-2.5.4.dist-info/licenses/LICENSE.txt\n" in output
     )
     assert b"### Reused carried notice:" not in output
+
+
+def test_f02b_carried_notice_context_is_same_platform(release, monkeypatch):
+    """Appending a darwin host cannot alter a Windows carried-notice refusal."""
+    module, document, _terms = carried_notice_fixture(release)
+    monkeypatch.setattr(sys, "platform", "win32")
+    row = document["components"][-1]
+    other = "Contents/Frameworks/numpy/test.so"
+    row["embedded_in"].append(other)
+    document["embedded_hosts"].append({"relpath": other, "platform": "darwin"})
+    with pytest.raises(ValueError) as refusal:
+        module._carried_notice_rows(document, {"Carried runtime": [("file:host", "a" * 64)]}, [])
+    assert str(refusal.value) == (
+        "notices: embedded _internal/numpy/_core/test.pyd component Carried runtime "
+        "carried notice: missing/ambiguous source row numpy"
+    )
 
 
 @pytest.mark.parametrize("damage", ["hash", "size", "missing-row", "extra-field", "source-pin"])
@@ -4966,7 +5161,14 @@ def test_app_plan_applies_the_darwin_name_tables(app_release):
 
 @pytest.mark.parametrize(
     "damage",
-    ["dot-link-absent", "icon-bytes", "libpython-bytes", "macos-stray", "contents-stray"],
+    [
+        "dot-link-absent",
+        "dot-link-absent-link",
+        "icon-bytes",
+        "libpython-bytes",
+        "macos-stray",
+        "contents-stray",
+    ],
 )
 def test_app_plan_admits_nothing_by_name_alone(app_release, damage):
     """A ``__dot__`` folder without its link, an icon or libpython whose bytes are not the
@@ -4974,14 +5176,31 @@ def test_app_plan_admits_nothing_by_name_alone(app_release, damage):
     app = app_release["app"]
     label = {
         "dot-link-absent": "file:Contents/Frameworks/numpy/__dot__dylibs/libgfortran.5.dylib",
+        "dot-link-absent-link": "file:Contents/Frameworks/numpy/__dot__dylibs/libgfortran.5.dylib",
         "icon-bytes": "file:Contents/Resources/icon-windowed.icns",
         "libpython-bytes": "file:Contents/Frameworks/libpython3.12.dylib",
         "macos-stray": "file:Contents/MacOS/helper",
         "contents-stray": "file:Contents/PkgInfo",
     }[damage]
-    if damage == "dot-link-absent":
+    if damage.startswith("dot-link-absent"):
         (app / "Contents/Frameworks/libgfortran.5.dylib").unlink()
-        os.rmdir(app / "Contents/Frameworks/numpy/.dylibs")
+        dot = app / "Contents/Frameworks/numpy/.dylibs"
+        # Exercise both real APFS's link and the Windows fixture's empty directory.
+        if dot.is_symlink():
+            dot.unlink()
+        else:
+            dot.rmdir()
+        if damage == "dot-link-absent-link":
+            try:
+                dot.symlink_to("__dot__dylibs", target_is_directory=True)
+            except OSError as error:
+                pytest.skip(f"dot-link fixture cannot create a symlink: {error}")
+        else:
+            dot.mkdir()
+        if dot.is_symlink():
+            dot.unlink()
+        else:
+            dot.rmdir()
     elif damage in {"icon-bytes", "libpython-bytes"}:
         (app / label.removeprefix("file:")).write_bytes(b"other bytes")
     else:
@@ -5361,8 +5580,8 @@ def test_pending_app_census_with_evidence_keeps_named_refusal(app_release):
         app_plan(app_release)
 
 
-def test_windows_production_manifest_without_census_is_unchanged(monkeypatch):
-    """A r2 F2: the absent additive declaration preserves the committed Windows manifest."""
+def test_windows_production_manifest_preserves_hosts_components_and_limits(monkeypatch):
+    """The complete darwin census preserves the committed Windows declarations."""
     monkeypatch.setattr(sys, "platform", "win32")
     path = ROOT / "tools/package/native-licences/manifest.json"
     data = path.read_bytes()
@@ -5379,6 +5598,9 @@ def test_windows_production_manifest_without_census_is_unchanged(monkeypatch):
     ).stdout
     current = json.loads(data)
     previous = json.loads(committed)
+    assert [r for r in current["limits"] if r.get("platform", "win32") == "win32"] == previous[
+        "limits"
+    ]
     assert [
         r for r in current["embedded_hosts"] if r.get("platform", "win32") == "win32"
     ] == previous["embedded_hosts"]

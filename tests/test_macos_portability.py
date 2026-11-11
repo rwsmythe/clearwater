@@ -30,6 +30,7 @@ import functools
 import importlib
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -849,11 +850,99 @@ def _v4_cases() -> list[Any]:
     sources = [(f"sample:{k}", d) for k, d in V4_SAMPLES.items()]
     sources += [(f"clip:{k}", 8) for k in V4_CLIPS]
     return [
-        pytest.param(source, encoder, out, id=f"{source}-{encoder}-{out}")
+        pytest.param(
+            source,
+            encoder,
+            out,
+            id=f"{source}-{encoder}-{out}",
+            marks=pytest.mark.xfail(strict=True, reason=VT_VFR_REASON)
+            if _vt_vfr_case(source, encoder)
+            else (),
+        )
         for source, depth in sources
         for encoder in (VT, X265)
         for out in sorted({depth, 10})
     ]
+
+
+VT_VFR_REASON = "DR-163: hevc_videotoolbox last-packet duration (F8-3)"
+
+
+def _vt_vfr_case(source: str, encoder: str) -> bool:
+    """The four watched VT/VFR cases, at their two parametrised depths."""
+    return encoder == VT and source in {"sample:vid-vfr", "clip:vfr-gap"}
+
+
+def _write_vt_failure(
+    output: Path,
+    destination: Path,
+    *,
+    first: int,
+    end: int,
+    time_base: Fraction,
+    error: str,
+) -> None:
+    """Record failed output before sink cleanup, using the product's own box readers."""
+    from clearwater.io.video import find_tool, verify
+    from clearwater.io.video.boxes import read_movie_boxes
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        f"error: {error}",
+        f"written first: {first}; end: {end}; time_base: {time_base}",
+        f"written first seconds: {first * time_base}; end seconds: {end * time_base}",
+    ]
+    # Leave a named diagnostic even if a reader fails; never hide the encode refusal.
+    try:
+        done = _run(
+            [
+                str(find_tool("ffprobe")),
+                "-v",
+                "error",
+                "-show_entries",
+                "format:stream:packet=pts,dts,duration,flags",
+                "-of",
+                "compact",
+                str(output),
+            ]
+        )
+        lines.extend([f"ffprobe returncode: {done.returncode}", done.stdout, done.stderr])
+        boxes = read_movie_boxes(output)
+        lines.append(f"read_movie_boxes: {boxes!r}")
+        moov = verify._moov(output)
+        media = verify._video_media(moov) if moov is not None else None
+        minf = verify._child(moov, media, b"minf") if media else None
+        stbl = verify._child(moov, minf, b"stbl") if minf else None
+        stts = verify._child(moov, stbl, b"stts") if stbl else None
+        entries = list(verify._table_entries(moov, stts, ">II")) if stts else []
+        lines.append(f"last stts (count, delta): {entries[-1] if entries else None}")
+    except Exception as diagnostic_error:
+        lines.append(f"evidence read failed: {type(diagnostic_error).__name__}: {diagnostic_error}")
+    destination.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _capture_vt_failure(monkeypatch: pytest.MonkeyPatch, case_id: str, root: Path) -> None:
+    """Wrap verification so failed bytes are read before ``close`` deletes the output."""
+    from clearwater.io.video import FFmpegVideoSink, VideoEncodeError
+
+    original = FFmpegVideoSink._verify
+    safe_id = re.sub(r"[^A-Za-z0-9_.-]", "_", case_id)
+
+    def verify(sink: Any, end: int) -> Any:
+        try:
+            return original(sink, end)
+        except VideoEncodeError as error:
+            _write_vt_failure(
+                sink._out_path,
+                root / f"f8-3-{safe_id}.txt",
+                first=min(sink._written),
+                end=end,
+                time_base=sink._probe.video.time_base,
+                error=str(error),
+            )
+            raise
+
+    monkeypatch.setattr(FFmpegVideoSink, "_verify", verify)
 
 
 def _v4_clips(tmp_path_factory: pytest.TempPathFactory) -> Any:
@@ -920,6 +1009,7 @@ def test_macos_videotoolbox_v4_corpus(
     sample: Any,
     tmp_path: Path,
     tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """M-V4 (P15) over the Windows V4 corpus: each source through the product sink with each
     encoder at each depth it ADVERTISES, judged by the full instrument
@@ -940,6 +1030,8 @@ def test_macos_videotoolbox_v4_corpus(
         return
     source = _v4_source(source_id, sample, tmp_path_factory)
     out = tmp_path / "out.mp4"
+    if _vt_vfr_case(source_id, encoder):
+        _capture_vt_failure(monkeypatch, f"{source_id}-{encoder}-{depth}", REPO / "work/evidence")
     run = vf.encode_file(source, out, encoder=encoder, bit_depth=depth)
     record = vf.fidelity_record(source, out, bit_depth=depth, run=run)
     assert record["bit_depth"] == depth
@@ -1009,7 +1101,14 @@ def test_macos_videotoolbox_v4(
     from clearwater.io.video import probe as probe_file
 
     if site == "P17":  # HLG is refused before decode or encode, VT available or not
-        hlg = _clip(tmp_path / "hlg.mp4", seconds=0.2, extra=["-color_trc", "arib-std-b67"])
+        hlg = _clip(
+            tmp_path / "hlg.mp4",
+            seconds=0.2,
+            extra=[
+                "-x265-params",
+                "log-level=error:colorprim=bt2020:transfer=arib-std-b67:colormatrix=bt2020nc",
+            ],
+        )
         result = probe_file(hlg)
         assert any(f.severity == "refuse" for f in result.faults)
         return
