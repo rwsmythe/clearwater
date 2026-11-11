@@ -5925,3 +5925,275 @@ byte-check results are not presented as fresh local runs in this fold.
 | Phase | Critical | Major | Minor | Advisory | In/out | New/reopened | Reverts | Fix surface | Review / next | Dispatcher depth |
 | --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- | --- |
 | F0-2b post-run fold | 0 | 0 | 3 (A r3 M1 + B F1/F2) | 3 (A r3 A2/A3 + B F3) | 6/0 | 6/0 | 0 | One test guard + ledger | Supplied A r3/B items folded; seat acceptance / separate DR-163 package and run 10 | Not supplied |
+
+
+### DR-163 half B (tests)
+
+Status: half B implemented under CHARC `b80a8d7a` (2026-11-11), ready for seat
+commit/review and run 10. The first-turn STOP was ruled option 1: DR-164 is watched
+by exactly two strict xfails. Base `6879e2a2`; this section replaces only the
+uncommitted section, preserving that HEAD's entire ledger as an exact byte prefix.
+No actual macOS execution is claimed at this Windows seat. No run 10a is required.
+
+#### Changes and proof surface
+
+- `tests/test_macos_portability.py:852`: the four original DR-163 VFR corpus
+  cases are ordinary passing expectations, with their existing IDs unchanged.
+  `VT_VFR_REASON` / `_vt_vfr_case` were removed.
+- `:953,969,981,1003`: VIDEO-only packet timing, source-packet expectation
+  computation, presentation/edit/header totals and exact VT raw-table contracts.
+  The full stts runs, absent ctts, clocks, mdhd/tkhd/mvhd, edits, actual written
+  PTS and terminal sentinel are checked. Last VIDEO timing comes from raw stts
+  and its video clock, never an interleaved audio tail line. x265 may reorder
+  decode timing; its presentation PTS, totals and edits are compared without
+  requiring source-identical ctts/stts run shapes.
+- `:1046,1069`: encoder-boundary parser/assertion. `:1502`: two native boundary
+  rows, depths 8/10, in a direct test-only FFmpeg invocation. No product argv
+  interception/mutation. Positive unequal durations must remain associated by
+  PTS, and at least one emitted packet must be observed during encoder flush.
+- `:1375,1397,1433`: test-side `Clips.make` fixtures: 30 regular PTS with a
+  four-period final duration, and six PTS with a long early interval and short
+  tail. The early-long test proves that a penultimate guessed average duration
+  would extend the endpoint even after a last-packet-only repair. Both fixtures
+  cover both encoders and both depths. Expected values come from the generated
+  source's packet table. No fixture-tool change was needed: `out_options` carries
+  the unusual-final-duration BSF; `vf_chain` carries the early-gap setpts.
+- `:1397,1412`: ONLY `8-libx265-regular-final` and
+  `10-libx265-regular-final` carry strict xfail, exact DR-164 reason. The extra
+  `raises=_DR164DurationMismatchError` guard permits xfail only for the sole V4
+  mandatory/required video-stream-duration mismatch, after other timing checks
+  have passed. Missing evidence / other exceptions fail normally; a repaired
+  control is XPASS(strict). Both VT regular-final and every early-long row stay
+  ordinary.
+- `tests/test_tools_package_notices.py:43`: roster pins those two exact IDs,
+  strictness, reason and narrowed exception type over both old/new case lists.
+- `tests/test_macos_timing_evidence.py:287`: all eight watched/control corpus
+  success captures exercised. HEAD already passed source metadata to the hook
+  for VT success as well as x265 success; these tests retain/prove that wiring.
+  `:602,640`: four run-9 replay fixtures and RED/GREEN checks. `:722`: real x265
+  controls at both depths, verifying their evidence and known DR-164 signal.
+  `:762`: unrelated/multiple failures cannot become the special xfail exception.
+
+The original CFR corpus, B-frame presentation-effect, truncation/readable-end,
+incomplete-write, capability, quality, depth and provenance checks remain.
+Windows locks, NVENC/x265 product argv and snapshots, src, tools, workflows,
+locks, manifests, licence texts, hosts, components and limits are untouched.
+No dependencies, network, downloaded binary, GUI, entry point, GPU test, frozen
+run or background launch was used. Only the tests above and this ledger changed.
+
+#### Encoder-boundary route and RED/GREEN
+
+Read-only FFmpeg source: local `../wp6.5-dr163a/work/ffmpeg/`, commit `1f1fedd0`
+over `b204e94e`. `fftools/ffmpeg_enc.c:612` chooses encode/flush action;
+:654-658 receives a packet and prints the benchmark action; :704-710 logs
+`pkt->duration` for `-debug_ts`; :717 submits it to the scheduler. The action
+line is emitted by `fftools/ffmpeg.c:551-565`. `libavformat/mux.c:605-620,1102`
+guesses missing packet durations later. These fftools files are unchanged by
+half A's VT patch. `stats_enc_post` has no duration field in this revision.
+`-debug_ts -benchmark_all` on a direct test invocation is therefore the test-only
+route before mux guessing. The log and command land in
+`work/evidence/dr163-encoder-boundary-{8,10}.txt` on the runner. The actual VT
+boundary/flush proof is pending run 10; portable replay is not described as an
+observed boundary capture.
+
+CHARC `6688c6fd` / the B2 dispatch name run 9 as the RED of record. All four
+`work/dr163-inputs/run9/f8-3-sample_vid-vfr-hevc_videotoolbox-{8,10}.txt` and
+`f8-3-clip_vfr-gap-hevc_videotoolbox-{8,10}.txt` are cited by the fixture:
+
+| Run-9 reading | vid-vfr, both depths | vfr-gap, both depths |
+| --- | --- | --- |
+| Literal verify error | :1, edit-list mismatch only | :1, edit-list mismatch only |
+| Written PTS / sentinel | :4-5 | :4-5 |
+| Last VIDEO (PTS,DTS,duration) | :101 (38038,38038,1335) | :159 (37888,37888,559) |
+| Raw clocks/tables/headers | :108 | :167 |
+| Corresponding x265 control clocks/headers/edits | libx265 files :108 | libx265 files :167 |
+
+The previous crosscheck (`work/dr163-half-b/crosscheck.log`) confirms the required
+corrected expectations against all four run-9 controls and source raw stts:
+vid-vfr last delta 2002, mdhd 40040, edit 320320 @ 240000; vfr-gap last delta 512,
+mdhd 30720, edits 192000 + 768000 @ 384000. No expected-number dispute.
+The portable fixture explicitly distinguishes the observed post-mux terminal
+samples from the ruled replay of pre-mux zero durations (not directly captured
+in run 9). It feeds those zero lines, with the measured mux-tail line as ignored
+noise, through the parser; asserts the exact RED message; then checks corrected
+positive durations and raw boxes GREEN. The short independent parser control's
+exact RED is:
+
+```text
+DR-163 encoder boundary: expected [(0, 2), (2, 5), (7, 1), (8, 4)]; got [(0, 0), (2, 0), (7, 0), (8, 0)]
+```
+
+#### DR-164 origin: first-turn MAJOR finding retained
+
+**MAJOR, EXECUTED: regular-PTS / unusual-final-duration x265 control.**
+`work/dr163-half-b/reproduce_regular.py` is a standalone reproduction against the
+unchanged HEAD product, using the existing `Clips.make` test API (no fixture-tool
+change). Run from the repository root with PowerShell:
+
+```powershell
+$env:PYTHONPATH='src;tools;tests'
+uv run python work/dr163-half-b/reproduce_regular.py *> work/dr163-half-b/reproduction.log
+```
+
+This calls the video sink, not a product entry point, GUI or worker. It generates
+30 frames, regular PTS at 30 fps, with a final duration of four frame periods,
+using test-side output `setts` through `Clips.make(out_options=...)`. Outputs are
+confined to `work/dr163-half-b/reproduction/`. The installed PATH FFmpeg is
+9.0.2-full_build-www.gyan.dev; this is Windows evidence, not a macOS binary run.
+
+Independent reproduction after restoring the tests CONFIRMED:
+
+| Reading | Source | x265 output |
+| --- | --- | --- |
+| Video time base | 1/15360 | 1/15360 |
+| Raw stts | [(29,512),(1,2048)] | [(30,512)] |
+| mdhd | 16896 | 15360 |
+| Media edit duration, seconds | 11/10 | 11/10 |
+| tkhd / mvhd, seconds | 11/10 | 11/10 |
+| V4 mandatory video stream duration | 1.100000 (11/10) | 1.000000 (1/1), DIFFERENT |
+| Sink verification | n/a | returned SinkReport, 30 frames |
+
+The final presentation PTS is 14848 in both. The source greatest-PTS packet has
+duration 2048; the output greatest-PTS packet has duration 512 (it is not the last
+packet in decode order). A six-frame version independently reproduced the same
+loss (0.3 s source versus 0.2 s output), in `helpers.log` and
+`fixture-diagnosis.log`. Neither fixture requires `tools/` changes.
+
+
+
+The seat independently reproduced this STOP at detached `6879e2a2`; CHARC
+`b80a8d7a` ruled option 1. Attribution remains open. The finding is watched,
+not fixed, and its two xfails are signals rather than acceptance of the output.
+
+DR-164 (CHARC `b80a8d7a`; the row is written at the accept):
+
+> product, watched, OPEN. Signal: the two x265 `regular-final` xfails. Observed: a source whose final frame is longer than the period (fixture: 29 x 512 + 1 x 2048 at 1/15360) encodes through libx265 (B-frames, reordered) to an output whose every packet carries duration 512, `stts [(30,512)]`, `mdhd` 1.0 s, while the edit list / `tkhd` / `mvhd` say 1.1 s; the sink's D94 verify PASSES (it compares the edit list against the written end) and V4 MANDATORY `video stream duration` refuses (1.1 vs 1.0). TWO defects in one row: (i) the lost duration (attribution open: the product's input path, the libx265 wrapper's frame-to-packet association under reordering, or movenc; run 9's VFR controls show the SAME association assigning durations in decode order, `(2,2002)` last, with the total preserved, so the association is the first suspect); (ii) the sink verify's gap: media duration (`mdhd` / the `stts` sum) is not checked against the written end, so the sink accepts what V4 refuses. Reach: x265 on both platforms; NVENC and VT-with-reordering untested. Evidence: `work/dr163-half-b/`, `wp6.5-rB/work/dr163-half-b/seat-repro.log`, the ledger section.
+
+#### RUN-10 READING LINE: DR-164
+
+Both `test_macos_duration_regression[8-libx265-regular-final]` and
+`[10-libx265-regular-final]` MUST xfail, with the sole failure message
+`DR-164: V4 video stream duration differs: source=1.100000 (11/10); output=1.000000 (1/1)`.
+These cases DO write evidence: `work/evidence/f8-3-clip_regular-final-libx265-8.txt`
+and `...-10.txt`. Both files must exist, start `error: verification passed`, and
+carry source/output boxes, written PTS/sentinel, and appended `V4 failures:` /
+`V4 record:` JSON. The only MANDATORY/REQUIRED difference must be `video stream
+duration`; V4 frame count/roster checks must pass. Read raw stts/source mdhd as
+29 x 512 + 1 x 2048 / 16896 and output 30 x 512 / 15360, edits/tkhd/mvhd as
+1.1 s, and the item source/output as 1.1/1.0 s. An XPASS, missing file, unexpected
+raw signal or any other failure reason is a FINDING. The narrowed raises guard
+also makes unrelated failures fail the test rather than count as xfailed.
+All eight new duration rows capture evidence; they add files beside, without
+replacing, the original eight DR-163 files.
+
+#### Binding RUN-10 READING LINES: Reviewer A r4 verbatim
+
+**1. MAJOR. EXECUTED (probe) + REASONED (reading).** `docs/proofs/wp6.5-ledger.md`, section (b): the scope sentence, line 3 (B F1) and line 5 (B F3).
+
+- **The gap.** On run 10, DR-163 half B removes the four xfails. If VT's 10-bit trial fails on that VM (AD-35 permits it; B F1's scenario), the two watched 10-bit VT cases still PASS. They reach `assert_unadvertised_refused(row); return` at `:1212-1214`, before `_capture_vt_failure` is installed at `:1223`, so no `f8-3-*-hevc_videotoolbox-10.txt` file is written.
+- **Probe**, with no xfail mark, as on run 10:
+  - Called `test_macos_videotoolbox_v4_corpus('sample:vid-vfr', VT, 10, …)` directly.
+  - `_capability` was stubbed to `available=True, bit_depths=(8,)`, `assert_unadvertised_refused` was recorded, and `REPO` pointed at `work/rvA4-probe`.
+  - Output: `returned None refusal-check calls [(8,)] evidence files []`.
+- **What the run would show.** `226 passed`, 0 xfailed, the skip step PASS, and six F8-3 files instead of eight.
+- **What the checklist says about it:**
+  - The ledger's scope sentence retires line 1, the one line that calls a missing VT file a FINDING.
+  - Line 3 fires only on `XPASS(strict)`, and run 10 has no xfails.
+  - Line 5 calls only a missing *control* file a FINDING. It also expects VT files with the edit-list error, which is wrong once the fix lands, so a reader has to discard its VT half.
+- **Result.** "DR-163 fixed at both depths" is accepted on a run that never encoded VT 10-bit. That is the severity rule's own example: a missing evidence file read as a pass.
+- **Origin.** The implementer followed dispatch-6's text faithfully; the gap is in that text. The fix is ledger-only.
+- **Correction.** Append a run-10 form for the case where the xfails are gone:
+  - All four VT `f8-3-*.txt` files must exist, each `error: verification passed`, with raw values equal to the x265 controls of the same case:
+    - vid-vfr: last `stts` `(·, 2002)`, `mdhd` 40040, `elst` 320320 @ 240000;
+    - vfr-gap: last delta 512, `mdhd` 30720, `elst` 192000 + 768000 @ 384000.
+  - A watched VT case that PASSES with no `f8-3` file is an unadvertised depth: a capability FINDING, not a fix (line 3 restated for PASS instead of XPASS).
+  - Line 5's EIGHT-file rule covers VT files too: a missing VT file is a FINDING.
+
+**2. ADVISORY. EXECUTED.** Lines 1 and 5 and the run-9 table, ledger section (b).
+
+- The lines require the `error:` line to be "the `verify_failed` … mismatch". The file records only `str(error)`, without the error code: `verify_failed` occurs 0 times in all eight run-9 files.
+- The literal line is `error: The finished video does not match what was written: video edit list [...] where [...] was written`. That prefix is raised only as `verify_failed` (`encode.py:1366-1370`).
+- The message joins problems with `"; "`, so a second problem could ride alongside the edit-list one.
+- **Correction:** state the literal prefix to match, and that `video edit list` must be the only problem.
+
+**3. ADVISORY. REASONED.** Line 5, ledger section (b).
+
+- "A missing control file means the hook was not installed" is now incomplete. Since this guard, a control file can also be missing because the capture failed with a warning.
+- **Correction:** add "…or the capture failed: look for `DR-163 evidence capture failed for <case>` in `macos.log`'s warnings summary". Either way it stays a FINDING, so no wrong result is accepted.
+
+#### CHARC restatement, ruling `792af2fd` (verbatim)
+
+> all FOUR VT f8-3 files must exist, each 'verification passed', raw values equal to the x265 controls (vid-vfr last delta 2002, mdhd 40040, elst 320320 @ 240000; vfr-gap last delta 512, mdhd 30720, elst 192000 + 768000 @ 384000); a watched VT case that passes with NO file = a capability FINDING (AD-35 10-bit trial refused on the VM), not a DR-163 proof; a missing VT file = a FINDING; the error line matched by its literal prefix and required to be the only problem; a missing control file read against 'DR-163 evidence capture failed for <case>' in macos.log. One consequence I record now: if the runner's VM refuses VT 10-bit, run 10 proves DR-163 at 8-bit only, and the 10-bit proof is the owner's stage-2 run sheet on the real Mac (the sheet gets a 10-bit VT VFR line with the expected evidence values).
+
+
+#### Counts, validation and verification-loop record
+
+Native collection is **236 = 226 + 10**: eight new duration rows plus two
+encoder-boundary rows. Four original DR-163 xfails are gone. Exactly two DR-164
+rows xfail. Prospective run 10: **234 passed + 2 xfailed**, assuming all depths
+are available; absent VT files remain findings under the binding lines above.
+Windows native skips are not runner proof. The full proposed native additions:
+
+- `test_macos_duration_regression[{8,10}-{hevc_videotoolbox,libx265}-{regular-final,early-long}]` (8)
+- `test_macos_vt_encoder_boundary_durations[{8,10}]` (2)
+
+Validation evidence lives under `work/dr163-half-b/turn2/`:
+
+| Check | Observed result |
+| --- | --- |
+| `red.log`, reapplied B1 real fixture control | 1 failed (regular-final V4 duration), 1 passed (early-long), 29.17 s |
+| `portable.log`, portability + evidence modules | 65 passed, 236 skipped, 49.27 s |
+| `tests.log`, full touched modules before runner-env adjustment | 283 failed, 337 passed, 236 skipped, 696.48 s; ALL failures in notices; common ambient PYTHONPATH trigger |
+| `baseline-red.log`, original 6879e2a2 notices probes | 2 failed / 1 passed with inherited shim PYTHONPATH |
+| `baseline-green.log`, same original probes with launch variable removed | 3 passed, 1.38 s |
+| `notices-clean.log`, entire edited notices module | 555 passed, 292.23 s |
+| Final passing validation across the requested modules | 65 portable + 555 notices = 620 passed; 236 native cases skipped on Windows |
+| `mark-known.log` | Exactly 2 xfailed; exit 0 |
+| `mark-green.log` | 2 failed, XPASS(strict); exit 1, as required |
+| `mark-unrelated.log` | 2 failed, no xfails; exit 1, as required |
+| `collection-and-parser.log` | 226 -> 236; all original IDs retained; unedited workflow parser accepts 234 passed, 2 xfailed |
+| `ruff.log` / `format.log` | All checks passed / 340 files already formatted |
+| `mypy-windows.log` / `mypy-darwin.log` | Both success, 166 source files |
+
+The initial full-run failures were runner-environment interference, independently
+reproduced on the original notices tests. Packaging intentionally rejects inherited
+PYTHONPATH; the required sandbox-shim launch variable triggered that guard. The
+work-only `run_pytest.py` launcher starts with `PYTHONPATH=scripts`, preserves the
+initialized Python import path so `-p sandbox_mkdir_shim` still loads, then removes
+only that launch variable before `pytest.main`. The explicit environment-guard tests
+still set and reject their own variables. No product/test-fixture guard was changed.
+Every invocation retained `-m "not gpu"`, the startup-test exclusion, a work-tree
+basetemp, the sandbox shim and disabled cacheprovider. This launcher adjustment is
+disclosed rather than presenting the original red run as green. The full notices
+rerun passed, so no packaging-code change or additional product finding was needed.
+
+Patch application introduced CRLF in edited test files; final byte QA normalizes all
+three edited test files to LF before the final lint/format/diff checks. Final status
+and prefix/verbatim/scope checks are recorded below after those commands.
+
+
+Verification loop: first-turn regular-final failure independently confirmed at
+restored HEAD; seat confirmation and ruling recorded as DR-164; reapplied B1
+patch reproduces RED (1 failed / 1 passed, `red.log`); narrowed xfail and evidence
+writing implemented; portable replay rejects run-9 raw durations and ruled zero
+boundary packets and accepts corrected forms; both real x265 depths expose the
+same watched signal; the early-long last-only-repair control passes. Incomplete
+stub clocks and reordered decode-span assumptions from B1 were corrected in the
+preserved patch. B2 lint's exception-name finding was fixed with an Error suffix.
+No false pass is claimed from replay or a capability refusal. Final review of
+scope/raw values/markers/capture/line references found no additional test-code
+finding. Reviewer A (Claude) and runner execution remain the dispatcher's next
+steps; dispatcher depth was not supplied.
+
+| Phase | Critical | Major | Minor | Advisory | In/out | New/reopened | Reverts | Fix surface | Review / next | Dispatcher depth |
+| --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- | --- |
+| Supplied A r4 reading rules | 0 | 1 | 0 | 2 | 3/0 | supplied/0 | 0 | Verbatim ledger rules carried | Seat review | Not supplied |
+| B1 STOP / B2 ruling | 0 | 1 (DR-164) | 0 | 0 | 0/1 (product fix outside envelope) | 1/0 | B1 rollback reapplied under ruling | Tests only, two strict watched controls | DR-164 row written at accept | Not supplied |
+| B2 implementation | 0 | 0 | 0 | 0 | 0/0 | 0/0 | 0 | Tests + uncommitted ledger section | Claude A, then runner run 10 | Not supplied |
+
+Final gates: `final-ruff.log` = All checks passed; `final-format.log` = 340 files
+already formatted; `diff-check.log` = empty with exit 0. `ledger-write.log` /
+`final-scope.log` prove LF-only files, exact base-ledger prefix, exact carried
+A r4 / CHARC reading blocks and DR-164 row, and exactly the four owned modified
+paths. No remaining STOP or implementation dispute. Mac run 10 and external
+review remain pending, not implied by the portable evidence.
