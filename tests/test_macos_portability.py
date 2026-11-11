@@ -40,6 +40,7 @@ import sys
 import textwrap
 import time
 import unicodedata
+import warnings
 from collections.abc import Iterator, Sequence
 from fractions import Fraction
 from pathlib import Path
@@ -1066,7 +1067,8 @@ def _capture_vt_failure(
     """Capture verification failures AND VFR controls before ``close`` can delete bytes.
 
     Observe ``_start``'s final argv without altering it. The original verification result or
-    exception is preserved; diagnostic failures add a note to the original encode exception.
+    exception is preserved; diagnostic failures add a note to the original encode exception
+    or warn after successful verification.
     No encoder argv/logging option changes, packet tracing or product edits are involved.
     """
     from clearwater.io.video import FFmpegVideoSink, VideoEncodeError
@@ -1115,7 +1117,13 @@ def _capture_vt_failure(
                 error.add_note(f"DR-163 evidence capture failed: {diagnostic_error!r}")
             raise
         if source is not None:
-            capture(sink, end, "verification passed")
+            try:
+                capture(sink, end, "verification passed")
+            except Exception as diagnostic_error:
+                warnings.warn(
+                    f"DR-163 evidence capture failed for {case_id}: {diagnostic_error!r}",
+                    stacklevel=2,
+                )
         return result
 
     monkeypatch.setattr(FFmpegVideoSink, "_verify", verify)

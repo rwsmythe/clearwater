@@ -344,6 +344,34 @@ def test_corpus_x265_controls_write_evidence_on_success(tmp_path, monkeypatch, s
     assert _record(text, "written pts: ") == [0, 1001, 2002]
 
 
+def test_interception_success_capture_failure_warns_and_preserves_report(tmp_path, monkeypatch):
+    """Evidence I/O must warn once without failing a verified x265 control."""
+    from clearwater.io.video import FFmpegVideoSink
+
+    module = _helpers()
+    report = object()
+    case_id = "clip:vfr-gap-libx265-10"
+    monkeypatch.setattr(FFmpegVideoSink, "_verify", lambda sink, end: report)
+
+    def unwritable(*args, **kwargs):
+        raise OSError("evidence disk full")
+
+    monkeypatch.setattr(module, "_write_vt_failure", unwritable)
+    module._capture_vt_failure(monkeypatch, case_id, tmp_path, source=tmp_path / "source.mp4")
+    sink = SimpleNamespace(
+        _out_path=tmp_path / "finished.mp4",
+        _written=[0],
+        _probe=SimpleNamespace(
+            video=SimpleNamespace(time_base=Fraction(1, 30000), frame_rate=Fraction(30))
+        ),
+    )
+    with pytest.warns(UserWarning) as caught:
+        assert FFmpegVideoSink._verify(sink, 2002) is report
+    assert len(caught) == 1
+    assert case_id in str(caught[0].message)
+    assert "evidence disk full" in str(caught[0].message)
+
+
 def test_interception_diagnostic_failure_preserves_original_encode_error(tmp_path, monkeypatch):
     """An evidence I/O error must never turn a watched encode refusal into a different error."""
     from clearwater.io.video import FFmpegVideoSink, VideoEncodeError
