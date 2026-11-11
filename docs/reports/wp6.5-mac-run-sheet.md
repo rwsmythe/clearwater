@@ -139,7 +139,7 @@ The Mac has no footage folder and the harness never reaches it. The seat builds 
 
 | Item | Content | How | Size |
 | --- | --- | --- | ---: |
-| L1 | `Clearwater-<version>-macos.zip`, its `.zip.sha256` sidecar and `THIRD_PARTY_NOTICES-macos.md` | run 10 uploads a validation artifact named `macos-validation-bundle` holding exactly those three files, kept for ONE day (CHARC fac58dc7; the workflow edit is made in another package, not in this sheet). The seat downloads it within that day (`gh run download`, read-only), verifies the zip against the sidecar, writes the zip's sha256 into step 10a's marker, and puts the three files in the Drive folder. [SEAT FILLS: the run id, and that the artifact was downloaded and verified.] | 0.5 GiB |
+| L1 | `Clearwater-<version>-macos.zip`, its `.zip.sha256` sidecar and `THIRD_PARTY_NOTICES-macos.md` | run 10 uploads a validation artifact named `macos-validation-bundle` holding exactly those three files, kept for ONE day (CHARC fac58dc7; the workflow edit is made in another package, not in this sheet). The seat downloads it within that day (`gh run download`, read-only), verifies the zip against the sidecar, writes the zip's sha256 into step 10a's marker, and puts the three files in the Drive folder. FILLED 2026-11-11 (seat): run `43115320682` (run 10, commit `d4a1b507`); the artifact was downloaded read-only at 23:15Z (it expires 2026-11-12 23:07Z) to `clearwater-review-evidence/wp6.5/runner/run-43115320682/macos-validation-bundle/`, three files: `Clearwater-1.1.1-macos.zip` (95,858,483 bytes), its `.zip.sha256` and `THIRD_PARTY_NOTICES-macos.md` (1,241,091 bytes). The zip's sha256 `903cf47410e2e38fad1d7f5a61558594f0e3d3631668900d7bdf2b140f3a4fc0` equals the sidecar's digest line, and the sidecar's `# source-commit:` line is `d4a1b507731dd5666df0f811e60eccfe04fcb5fb`. | 0.5 GiB |
 | L2 | `GX011627-trim.mp4`: the 90-frame stream-copy trim of `Snorkel/GX011627.mp4` | the command and the checks are the `gx011627_trim` fixture's (`tests/conftest.py:837` `_gx011627_trim_plan`, `:579` `gx011627_trim_checks`); the fixture deletes its trim at teardown, so the seat makes a persistent copy by that same plan. FILLED 2026-11-11 (seat): made at `work/orch-g71/l2/GX011627-trim.mp4` on the laptop by `work/orch-g71/l2_trim.py` (the fixture's `_gx011627_trim_plan` + `gx011627_trim_checks`, checks 4a-4e PASS, data packets equal), from the `wp6.5` head `42901645`; **90 frames**, cut 3.003000 s, 28,489,190 bytes, sha256 `ffb57fb1860324540e9c5d0fd0a7673cf66812d398aaed676550a7e7081617d8` | 0.02 GiB |
 | L3 | `GX011589.mp4`: the full clip | a plain copy of `SCUBA/GX011589.mp4` (read from the footage folder, never written to it) | 0.05 GiB |
 | L4 | `win-ref/`: the Windows reference for the AD-11 comparison | on the laptop, with the trim from L2 copied OUTSIDE the footage folder under the SAME file name: `uv run python tools/export_oracle.py record --file <path>\GX011627-trim.mp4 --force-cpu --name win-ref` (`tools/export_oracle.py:700-717`; the record folder is `<working>\wp3.21\oracle\win-ref`, holding `oracle.json` and `frames\`). It must be a CPU record: `compare` fails when `force_cpu`, `method`, the clip name or the source size differ (`tools/export_oracle.py:531-545`). FILLED 2026-11-11 (seat): recorded from the L2 trim at `42901645` (`git_head` in `oracle.json`), `--force-cpu` (device `CPU: forced`), method `c3`, 90 frames, 3 kept (`frames/0.npy`, `30030.npy`, `60060.npy`), `ok` true; `oracle.json` md5 `15f82ba8ff7f384739895db6432ae22f` | 0.31 GiB |
@@ -191,8 +191,8 @@ W=$PROG/wp6.5-mac
 IN=$PROG/in
 APP=$PROG/Clearwater.app
 SRC=$PROG/src
-VERSION=SEAT_FILLS_VERSION
-COMMIT=SEAT_FILLS_COMMIT
+VERSION=1.1.1
+COMMIT=d4a1b507731dd5666df0f811e60eccfe04fcb5fb
 ZIP=$IN/Clearwater-$VERSION-macos.zip
 export UV_CACHE_DIR="$PROG/.uv/cache" UV_PYTHON_INSTALL_DIR="$PROG/.uv/python" UV_TOOL_DIR="$PROG/.uv/tools"
 # uv must link no executable outside the program folder (step 22 also passes --no-bin)
@@ -327,7 +327,7 @@ second failure is a STOP.
 needw && shasum -a 256 "$ZIP"
 ```
 
-EXPECT: the printed digest is exactly `[SEAT FILLS: sha256 from macos-validation-bundle]` (the digest
+EXPECT: the printed digest is exactly `903cf47410e2e38fad1d7f5a61558594f0e3d3631668900d7bdf2b140f3a4fc0` (the digest
 the seat read from the downloaded `macos-validation-bundle`, so this checks the file AFTER its trip
 through Google Drive, not only against a list made on the laptop).
 LANDS: the terminal; copy the line into `notes.txt` under "Step 10a".
@@ -607,7 +607,7 @@ IF NOT: a number other than 15 is a finding, not a STOP: copy the line into `not
 
 ### Step 30 -- the macOS test leg on the built bundle (the VideoToolbox halves)
 
-DR-163 (VideoToolbox last-sample duration on VFR sources): [SEAT FILLS AFTER RUN 10: closed by run 10 / open -- avoid VT on VFR sources]
+DR-163 (VideoToolbox last-sample duration on VFR sources): closed by run 10 (run `43115320682`: all four VT VFR cases `verification passed` at 8 and 10 bit, raw values equal to the libx265 controls)
 
 ```
 needw && { iso /usr/bin/time -p env CLEARWATER_MAC_BUNDLE="$APP" uv run pytest -q -rs --timeout 1200 -m macos -k "not test_python_m_clearwater_starts_the_shell_and_exits_0 and not test_macos_native_gui_contract" --basetemp="$W/pytest-macos" --junitxml="$W/macos-junit.xml" > "$W/macos.log" 2>&1; echo "exit $?"; tail -n 6 "$W/macos.log"; }
@@ -624,13 +624,12 @@ window (a search of `tests/test_macos_portability.py` for `cocoa`, `QT_QPA_PLATF
 owner's own hand checks (steps 16, 47 to 49).
 
 It is long; the runner's wall for the same leg is in run 10's `macos.log`
-[SEAT FILLS: the runner's wall].
+233.49 s (0:03:53), run 10's `macos.log` summary `234 passed, 10793 deselected, 2 xfailed`. The two `xfailed` there are the DR-164 libx265 cases `test_macos_duration_regression[8-libx265-regular-final]` and `[10-libx265-regular-final]` (strict xfails, ledger run-10 reading line DR-164); they are expected here too, and an `XPASS` of either is a failure to report.
 EXPECT: `exit 0`, a last line `N passed, M skipped, D deselected ... in <s>s` with no `failed` or
 `error`. This sheet does not fix `D`: the leg names no test file, so pytest collects the whole
 `tests` tree (`testpaths`, `pyproject.toml:72`) and `D` is every test WITHOUT the `macos` marker
 plus the 15 GUI sites above. The 15 are confirmed on their own by step 29a. The seat's expected
-total: [SEAT FILLS: expected `D` for this commit, from the seat's own collection with this same
-`-m` and `-k`]. If your `D` differs from it, copy the summary line into `notes.txt` and go on (not
+total: **10808** (the seat's collection at `d4a1b507` with this same `-m` and `-k`: `221/11029 tests collected (10808 deselected)`; the module-only collection of step 29a gives `221/236 tests collected (15 deselected)`). If your `D` differs from it, copy the summary line into `notes.txt` and go on (not
 a STOP; read it with step 29a's line: 15 there and a different total here means only the
 non-`macos` tests differ). The
 VideoToolbox rows (M-CODEC, M-RATE, M-V4 VT halves, M-SPACE) RUN here (the runner may not have had
@@ -645,7 +644,7 @@ IF NOT: a failure is a finding, not a STOP for the rest of the sheet: copy the s
 
 ### Step 30a -- the 10-bit VideoToolbox VFR cases (CHARC 792af2fd): RUN ONLY IF THE MARKER SAYS SO
 
-10-bit VideoToolbox on the variable-rate sources, beside DR-163: [SEAT FILLS AFTER RUN 10: proven in run 10 / RUN THIS STEP]
+10-bit VideoToolbox on the variable-rate sources, beside DR-163: proven in run 10
 
 If the marker says `proven in run 10`, write that in `notes.txt` and go to step 31 (steps 30a and
 30b are not run). If it says `RUN THIS STEP`, run the `-m macos` leg filtered to the two variable-rate
@@ -714,9 +713,9 @@ a step says otherwise. Bounds in a step ("longer than N minutes") are this sheet
 not a requirement: press Ctrl-C (the job stops and removes its partial output, D44), write the
 elapsed time in `notes.txt`, and go on.
 
-DR-163 (VideoToolbox last-sample duration on VFR sources): [SEAT FILLS AFTER RUN 10: closed by run 10 / open -- avoid VT on VFR sources]
+DR-163 (VideoToolbox last-sample duration on VFR sources): closed by run 10 (run `43115320682`: all four VT VFR cases `verification passed` at 8 and 10 bit, raw values equal to the libx265 controls)
 
-10-bit VideoToolbox on the variable-rate sources (steps 30a and 30b): [SEAT FILLS AFTER RUN 10: proven in run 10 / RUN THIS STEP]. The GX011627 trim is constant-rate; this line is about the two test sources.
+10-bit VideoToolbox on the variable-rate sources (steps 30a and 30b): proven in run 10. The GX011627 trim is constant-rate; this line is about the two test sources.
 
 ### Step 33 -- note the load before
 

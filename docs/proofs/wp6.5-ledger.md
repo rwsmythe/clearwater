@@ -6507,3 +6507,55 @@ it cites) are `str.splitlines()` line numbers. Line 4 of `build-ffmpeg.log`
 differently, and `145-154` then points into the "Enabled decoders" table. The
 previous pin's range (`144-153`) used the same `str.splitlines()` convention.
 A reader re-verifying a range counts with `str.splitlines()`.
+
+### Run 10 reading (orchestrator seat, gen 72)
+
+Run `43115320682` on `d4a1b507` (`macos-validation/wp6.5`, pushed by CHARC 22:52Z,
+ruling `f67fa7f1`), 22:52Z-23:07Z, conclusion **success**. Evidence downloaded
+read-only to
+`C:/Users/rwsmy/clearwater-review-evidence/wp6.5/runner/run-43115320682/`; the
+seat's reading script and output are `work/orch-g72/read_run10.py` and
+`work/orch-g72/run10-reading.txt`. Every run-10 reading line holds; no STOP, no
+FINDING.
+
+- macOS leg: junit 234 passed, 2 xfailed, 0 failed (`macos.log`:
+  `234 passed, 10793 deselected, 2 xfailed in 233.49s`). Parallel 8,220 / 1,242
+  skipped / 0 failed; serial 526 / 797 / 0; skip-reason step success.
+- DR-164: the two xfails are exactly `[8-libx265-regular-final]` and
+  `[10-libx265-regular-final]`. Both evidence files begin
+  `error: verification passed`. Their MANDATORY list is `['video stream duration']`
+  only, and REQUIRED is empty. The item reads source `1.100000 (11/10)`, output
+  `1.000000 (1/1)`. Raw values: source stts `[[29,512],[1,2048]]`, mdhd 16896;
+  output `[[30,512]]`, mdhd 15360; mvhd = tkhd = elst = 422400 @ 384000.
+- Files: the ten new files are all present, and the original eight are all present.
+- DR-163: all four VT files read `error: verification passed`, and their raw
+  values equal the libx265 controls:
+  - vid-vfr: last delta 2002, mdhd 40040, elst 320320 @ 240000;
+  - vfr-gap: last delta 512, mdhd 30720, elst 192000 (media -1) + 768000 @ 384000.
+
+  The run-length count of the last stts entry differs (VT 1 / 45, x265 2 / 43,
+  from encoder reorder). The rule's form is `(·, delta)`, so the count is free.
+  **10-bit VT encoded on the runner VM**, so DR-163 is proven at both depths. The
+  sheet's 10-bit line is `proven in run 10`.
+- Smoke: `ffmpeg-version` PASS reports `n9.0.2-47-gb204e94e90-20261111`, and
+  ffprobe reports the same version. The seal PASS line reads `codesign --verify
+  --deep --strict`. Notices are at `Contents/Resources/THIRD_PARTY_NOTICES.md`,
+  PBS BUILD is `20260303`, TCL_TK is rendered, and there is no validation-mode
+  `macos-release` upload.
+- Identities: against run 7 (`42897107215`), the 155 common entries have 0
+  `macho:` changes, and run 10 adds only `MacOS/ffmpeg` / `MacOS/ffprobe`. The one
+  sha256-only difference with an equal identity is `Contents/MacOS/Clearwater`.
+  Against run 9, ffmpeg goes `macho:3256b4c0...` -> `macho:f323f0da...` and
+  ffprobe `macho:3aa40639...` -> `macho:2378e0ff...`. These are the re-pin,
+  recorded, not a STOP.
+- Line 5: the bundle holds three files. The zip's sha256 `903cf474...4fc0` equals
+  the sidecar's digest line, and `# source-commit:` is `d4a1b507...`. The
+  artifact expires 2026-11-12 23:07Z; the local copy is in the evidence folder.
+
+Sheet markers filled in the same commit: version `1.1.1`, commit
+`d4a1b507731dd5666df0f811e60eccfe04fcb5fb`, step 10a sha256, L1 run id, step 30
+wall (233.49 s) with the expected DR-164 xfails, step 30 `D` = 10808 (seat
+collection at `d4a1b507`), DR-163 `closed by run 10`, 10-bit `proven in run 10`.
+Still owed before the stage-1 close (CHARC `f67fa7f1`): the whole serial leg on a
+quiet machine at `d4a1b507`. The first guarded attempt was stopped at 23:07Z by
+sibling-harness load and is not of record.
