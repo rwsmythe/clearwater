@@ -5,45 +5,39 @@
 
 ### Generation
 
-- **Generation 69** (session `clearwater-orchestrator-20261110-1259`). LIVE 2026-11-10 22:59Z from gen 68's rollover `429042c2`. **PAUSED ~01:40Z 2026-11-11 on the OWNER'S WORD** (verbatim, relayed by CHARC `42743fc3`: "Pause once the work in flight is complete"; CHARC `6f8a8779` amended: Codex turn 5 was in flight, so it finished first).
+- **Generation 69** (session `clearwater-orchestrator-20261110-1259`). LIVE 2026-11-10 22:59Z from gen 68's rollover `429042c2`. Paused 01:33Z-06:55Z on the owner's word (`42743fc3`; resume `30e81a1f`). **ROLLED ~08:35Z 2026-11-11 at the ~400K cap, with NOTHING it started still running.**
   - **Seat folder `work/orch-g69/`:**
-    - drains 1-8; the posts (`post-*.md`, `q-*.md`);
-    - `make_d3.py` / `make_d4.py` / `make_d5.py` (dispatch + FRESH prompt assembly), `read_run8.py` (the run reader; re-point it at run 9);
-    - the P17 seat repro `p17/`; the pinned FFmpeg sources `f83-src/` (`movenc.c`, `videotoolboxenc.c`, `mux.c` at `b204e94e`).
-  - **Seat QA:** gen 65's `bash work/orch-g65/qa.sh <sha> <label>` from the DETACHED `wp6.5-rB`. `tests/test_macos_timing_evidence.py` (new) is NOT in its module list: run it separately.
+    - drains 1-10; posts `post-*.md` / `q-*.md`;
+    - `make_d3/d4/d5.py` (dispatch + FRESH prompt assembly); `read_run8.py`, `read_run9.py` (run readers: `read_run9.py <run-dir>` compares against run 8);
+    - `p17/` (the HLG repro); `f83-src/` (the pinned FFmpeg `movenc.c` / `videotoolboxenc.c` / `mux.c` at `b204e94e`); `write_state.py`.
+  - **Seat QA:** gen 65's `bash work/orch-g65/qa.sh <sha> <label>` from the DETACHED `wp6.5-rB`. Also run `tests/test_macos_timing_evidence.py` separately; it is not in qa.sh.
   - **Gate:** gen 64's `work/orch-g64/gate.sh` + `watch2.sh`. Bash gauge 37 ms.
 - **NOTHING IS RUNNING.** No cell, Codex turn, review, gate or leg.
-  - The F0-2b Codex sessions are all ENDED: turn 3 `01a1c7b3...`; turn 4 `01a1c810...` (164,646); turn 5 `01a1c826-90bf-7e63-9e7f-22dc1a221340` (156,795). The next F0-2b turn is FRESH.
-  - The F8-3 diagnosis session `01a1c814-a8c8-7330-9a84-a3dc6c525043` (read-only, half 1 done, depth about 125K) is to be RESUMED for half 2 after run 9.
+  - Every F0-2b Codex session is ENDED (turn 5 `01a1c826...` was the last, at 156,795). The next F0-2b turn is FRESH.
+  - The F8-3 diagnosis session `01a1c814-a8c8-7330-9a84-a3dc6c525043` is DONE (half 2 delivered). Do not resume it except for a follow-up question on its note.
+  - **Resuming a read-only Codex session:** `codex exec resume -m gpt-6.1-sol -c 'model_reasoning_effort="high"' -c 'sandbox_mode="read-only"' --skip-git-repo-check -o <out> <session-id> -` from its copy. `resume` REFUSES `-p` / `-s`. Check the banner (model / sandbox / effort / session id); start-up "failed to refresh available models" timeouts are a blip.
 - **CHARC is gen 22, `clearwater-charc-20261110-0800`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
-### PAUSED -- what is queued for the resume (dispatch NOTHING until the owner's resume word arrives through CHARC)
+### PICKUP, in order
 
-1. **WP6.5 F0-2b on `wp6.5` at `6bf69487`:**
-   - `eb095682` + `04dfd101`: turn 4, the run-8 fold;
-   - `8417c0b8` + `6bf69487`: turn 5, the F8-3 hook widened, test-only.
-
-   Seat QA: `04dfd101` ALL GREEN; `6bf69487` see `work/orch-g65/qa-6bf6/summary.txt` (ALL GREEN: harness 423 OK, actionlint 0, build 790 / 1, smoke 76 / 1, release_workflow 162, notices 555, portability 226 skipped, timing-evidence 12 passed, the GUI / startup modules green).
-   - **Pushed and run:** run 8 `42930761176` on `9a086f49` FAILED, no STOP. All identities equal run 7's; 157 = 155 + ffmpeg/ffprobe; the bootloader is sha256-only; `pbs BUILD: 20260303`. Table: `work/orch-g69/post-run8.md`; evidence `clearwater-review-evidence\wp6.5\runner\run-42930761176\`.
-   - **The four findings were folded under CHARC `ef405237`:**
-     - F8-1: `pyz:_sysconfigdata__darwin_darwin` -> the Python row via `build.py:_sysconfigdata_name()`;
-     - F8-2: the `.dylibs` link fixture;
-     - F8-4: P17 HLG through `-x265-params`;
-     - F8-3: four VT+VFR xfails `strict=True` DR-163, plus the in-verify evidence hook writing `work/evidence/f8-3-<case>.txt`.
-   - **Also folded:** B F1 / A1 / A2 / A3 and A r2's ADV (`d0d9b6dd`).
-   - **NEXT at the resume, in order:**
-     1. **Claude A r3** on `9a086f49..6bf69487`, from the review copy `wp6.5-rA` (detach it at `6bf69487`). Form: `f02b\A-claude\r2\review-prompt.md`, adapted: dispatches 4 + 5, returns 4 + 5, the run-8 table, and `-m "not gpu"` in every pytest line (CHARC method note).
-     2. **A short Claude B** on the same delta. Form: `f02b\B-claude\r1\review-prompt.md`, adapted. Lenses: the real-Mac run-9 plan past `:2627` (rows, carried texts, limits, `TCL_TK`, the write, the seal with FFmpeg inside, smoke), the xfail strictness and the hook's exception preservation, and `build.py`'s helper byte-identity.
-     3. **The two-leg gate** from the detached `wp6.5-rB`; the serial leg only with nothing else running.
-     4. **The ready post for run 9.** CHARC's bar (3fdf1fd3 / aa1feb78): fast-forward from `9a086f49` (which origin's `macos-validation/wp6.5` holds); `src/` 0; NO `.github` change; `native-licences/` unchanged since `9a086f49`. The `build.py` diff is ONLY the helper.
-     5. **Run 9 reading:** the run-8 rules (`da5a86b7` item 1 verbatim, + `3fdf1fd3` + `ffe906d6` A5 + `c1339c28`), plus:
-        - the PASS marks: notices at `Contents/Resources/THIRD_PARTY_NOTICES.md`, `TCL_TK` (via the plan not refusing), the seal with FFmpeg, smoke;
-        - the 4 VT+VFR = `4 xfailed`;
-        - download `f8-3-*.txt`.
-     6. **F8-3 half 2:** RESUME `01a1c814...` (`codex exec resume <id> -s read-only`, from `.worktrees/wp6.5-f83`) with run 9's `f8-3-*.txt`. Half 1's prediction: `vid-vfr` last packet (38038, 38038, 1335), last `stts` (1, 1335); `vfr-gap` (37888, 37888, 559), (1, 559). Refuter: a `vid-vfr` final `stts` delta of 2002. Deliverable: the note with the fix options (cost, blast radius, frozen-interface yes/no). DR-163 is reserved (CHARC writes it at the accept).
-   - **At the WP6.5 accept** (CHARC): the test-isolation DR row closes; A-r5-3 stays watched; the A3 efficiency DR row; the A4 line (Windows-leak + universal2 lessons); census U3 / U4 / U10 as accept notes; DR-163 opened (product, watched); the serial-leg sizing note (2,125 s against WP-T6's 1,389 s; a Phase 7 proposal).
-2. **Worktrees to tidy at the accepts** (owner's word for any prune):
-   - `wp6.5-f83` (detached, read-only diagnosis copy; keep it until half 2), `wp7.1`, `wp7.1-iA`, `wp7.1-instrument`, `wp7.1-rA`, `wp6.5-rB`, `wp6.5-rA`;
+1. **AWAIT CHARC's ruling on query `0429716d`** (posted 08:29Z): the F8-3 note and the DR-163 fix package. Drain the inbox first.
+   - The note `clearwater-review-evidence\wp6.5\f83\half-2.txt` CONFIRMS the cause: the VT wrapper never sets `pkt->duration`, and `mux.c:605-620` substitutes the average period for the last sample.
+   - It recommends **(b) an FFmpeg VT wrapper patch in the owner's fork** (`frame->duration` through `sourceFrameCtx` to `pkt->duration`), with a rebuilt and re-pinned `ffmpeg-macos.lock.json`. No Clearwater frozen interface. The proof set is in the note's last section.
+   - Alternatives: (a) a VT output `setts`; (c) a post-mux rewrite; (d) refuse VT VFR + `auto` -> libx265.
+   - The fix package's lane and brief are CHARC's call.
+2. **WP6.5 F0-2b on `wp6.5` at `6bf69487`: GREEN on run 9** (`42983584425`; table `work/orch-g69/post-run9.md`, status post `d07c911d`; evidence `clearwater-review-evidence\wp6.5\runner\run-42983584425\`).
+   - First proven on real bytes: notices PASS (1612 entries; 142 rows), the write at `Contents/Resources`, the seal with FFmpeg inside, smoke.
+   - macOS leg: 222 passed / 4 xfailed.
+   - Identities equal run 8's; the bootloader is sha256-only.
+   - **The post-run ledger fold (ruled `cffbd052`, not yet dispatched):** the run-9 checklist lines from A r3 (`f02b\A-claude\r3\review.txt`: MINOR 1, ADV 2; optionally ADV 3's success-path guard) and short B (`f02b\B-claude\r2\review.txt`: F1 XPASS-vs-advertised-depth, F2 no `stream_index` (read the last video packet from raw `stts`), F3 the eight-file / "0 with 1335" clause). Plus the run-9 record. Ledger plus at most the guard (test-only).
+     - A small FRESH Codex turn (prompt = agent + brief + dispatches 1-5 + returns 1-5 + dispatch-6; `make_d5.py` pattern).
+     - Then Claude A on that delta, gate scope per CHARC (ledger-only may be QA + harness).
+   - **Then**, per CHARC `30e81a1f`: the stage-1 close, stage 2 (the owner's Mac run sheet; `docs/briefs/wp6.5-brief.md`; under CHARC's `ef405237` reading, the sheet avoids VT on VFR sources or says what to expect until DR-163 is fixed), and the WP6.5 accept.
+   - **At the WP6.5 accept** (CHARC): the test-isolation DR row closes; A-r5-3 stays watched; the A3 efficiency DR row; the A4 line; census U3 / U4 / U10 accept notes; DR-163 opened (product, watched); the serial-leg sizing note.
+3. **Paces at 06:55Z:** Claude 69 % used, pace 2.58 (reset 2026-11-16 10:00Z); Codex 69 %, pace 0.703 (reset 2026-11-11 10:07Z). Re-read before every dispatch; Claude reviews are the scarce lane.
+4. **Worktrees to tidy at the accepts** (owner's word for any prune):
+   - `wp6.5-f83` (the read-only diagnosis copy; its `work/f83-src/` and `work/f83-ev/` hold the inputs);
+   - `wp7.1`, `wp7.1-iA`, `wp7.1-instrument`, `wp7.1-rA`, `wp6.5-rB`, `wp6.5-rA`;
    - the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`;
    - the state worktrees `orch-state-g65` .. `orch-state-g69`.
 
@@ -51,25 +45,31 @@
 
 - Online `7aa0502e`; CHARC ack `83b4fa81`.
 - **F0-2b A r1 fold:**
-  - The ruling `ffe906d6` met the seat fact that the run-7 fixture's Pillow text is synthetic. Query -> CHARC `c1339c28`: the PLANNER enforces an exact `TCL_TK` line on darwin U-T1.
-  - Codex turn 3 (FRESH, depth 132,868) -> `6a02f358` + `9a086f49`. Seat QA green.
-  - **A r2:** NO_NEW_CRITICAL_MAJOR (1 ADV). **B:** NO_NEW_CRITICAL_MAJOR (1 MINOR + 3 ADV).
-  - **Gate green:** parallel 9,337 / 213 / 0 in 694 s; serial 1,324 / 19 / 0 in 2,125 s (slowest ten named); harness 423.
-  - Ready post `9d67c944`. CHARC pushed **run 8** (`d0d9b6dd`).
-- **Run 8 FAILED, no STOP** (query; ruled `ef405237`).
-- **F8-3 lane:** Claude pace 2.515 vs Codex 0.583 -> CHARC `5f15d162`: read-only Codex in two halves. Half 1 explained `-667` and `+47` exactly (`mux.c` `guess_pkt_duration`, the VT wrapper never setting `pkt->duration`).
-- **Turn 4** (FRESH, 164,646) -> `eb095682` + `04dfd101`; seat QA green. **Turn 5** (FRESH, 156,795) -> `8417c0b8` + `6bf69487`.
-- **Owner's PAUSE word** `42743fc3`; turn-5 amendment `6f8a8779`.
+  - Query on the synthetic-Pillow premise -> `c1339c28` (the planner enforces `TCL_TK`).
+  - Codex turn 3 -> `6a02f358` + `9a086f49`. A r2 and B both NO_NEW_CRITICAL_MAJOR.
+  - Gate green (serial 2,125 s; slowest ten named). Ready post. Run 8 pushed (`d0d9b6dd`).
+- **Run 8 FAILED, no STOP.** The table led to `ef405237`:
+  - F8-1: the sysconfig `pyz:` module;
+  - F8-2: the APFS link fixture;
+  - F8-3: VT + VFR, DR-163;
+  - F8-4: the P17 tag layer.
+- **F8-3 lane:** `5f15d162` (read-only Codex, two halves). Half 1 predicted run 9 exactly.
+- **Codex turns:** turn 4 (fold) -> `eb095682` + `04dfd101`; turn 5 (hook widened) -> `8417c0b8` + `6bf69487`.
+- **Owner pause / resume.** A r3 and short B both NO_NEW_CRITICAL_MAJOR. Gate green (parallel 9,361; serial 1,963 s). Ready post `a2ddbbc7`.
+- **Run 9 GREEN** (`cffbd052`). Half 2 confirmed the cause and recommended (b). Query `0429716d`.
 
 ### Gen-69 lessons
 
-- **A fixture that stubs the very bytes a ruling's condition is about makes a test-only assertion circular.** Read the fixture's stubs before relaying a "the test also asserts X" condition; the fix may belong in the planner, where the real run checks real bytes (`c1339c28`).
-- **A real-bytes run reaches only as far as the first refusal.** Run 8 proved admission and nothing after `notices.py:2627`. Say which stages a failed run did NOT reach, so the next run's reading names them as first proofs.
-- **A run-5 fix in ONE checker (`build.py`'s content check) did not reach its sibling checker (`notices.py`)** over the same PYZ. When a fix admits a name in one checker, grep every checker that classifies the same entries.
+- **A fixture that stubs the very bytes a ruling's condition is about makes a test-only assertion circular.** Read the fixture's stubs before relaying a "the test also asserts X" condition; the check may belong in the planner, where the real run reads real bytes (`c1339c28`).
+- **A real-bytes run reaches only as far as the first refusal.** Run 8 proved admission and nothing after `notices.py:2627`. Name the stages a failed run did NOT reach, so the next run reads them as first proofs.
+- **A fix in ONE checker (`build.py`'s content check, run 5) did not reach its sibling (`notices.py`)** over the same PYZ. When a fix admits a name in one checker, grep every checker that classifies the same entries.
 - **Test helpers can tag at the wrong layer:** `-color_trc` as an output option is not written into the stream by libx265 (`-x265-params` is). A seat repro with the laptop FFmpeg settled it in two runs.
+- **A preregistered, falsifiable prediction from a read-only diagnosis, plus a test-only evidence hook, turned an unreproducible runner failure into a confirmed cause in ONE run.** Write the prediction BEFORE the evidence exists, and ask the diagnostician what else the hook should capture: half 1's additions were essential (raw tables, source evidence, capture before the cleanup).
+- **An `ffprobe` packet table without `stream_index` interleaves audio:** the "last packet" can be audio. Read the last video sample from the raw `stts`.
 - **A reviewer's `-k` can match a `gpu` test.** Every review prompt carries `-m "not gpu"`.
-- **A dispatch can cross an owner's pause word in flight:** dispatch-5 launched a minute before the word arrived. Report it at once with the stop option; CHARC ruled it work in flight.
-- **The bare-`cd` slip struck once** (`cd .worktrees/wp6.5 && ...`; restored the next call; nothing written while moved; no cell live).
+- **A dispatch can cross an owner's pause word in flight** (dispatch-5 launched a minute before the word). Report it at once with the stop option; CHARC ruled it work in flight.
+- **`codex exec resume` takes no `-p` / `-s`;** use `-m` and `-c`. The first attempt failed on its arguments with nothing run.
+- **The bare-`cd` slip struck once** (restored the next call; nothing written while moved; no cell live).
 
 ### GEN-68 RECORD
 
