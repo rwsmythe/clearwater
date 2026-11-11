@@ -758,7 +758,9 @@ def test_new_duration_fixtures_with_real_x265_control(
         assert failures == []
 
 
-@pytest.mark.parametrize("damage", ["none", "extra-item", "extra-failure", "unwatched", "green"])
+@pytest.mark.parametrize(
+    "damage", ["none", "extra-item", "extra-failure", "wrong-message", "unwatched", "green"]
+)
 def test_dr164_exception_only_covers_the_watched_duration_mismatch(damage):
     """An unrelated failure must fail normally; only the named V4 duration error may xfail."""
     module = _helpers()
@@ -778,6 +780,8 @@ def test_dr164_exception_only_covers_the_watched_duration_mismatch(damage):
         record["items"].append({"name": "video pts", "class": "MANDATORY", "status": "DIFFERENT"})
     elif damage == "extra-failure":
         failures.append("V4: the frame count differs from the frames written")
+    elif damage == "wrong-message":
+        failures = ["V4: the frame count differs from the frames written"]
     elif damage == "green":
         module._assert_duration_v4(record, [], watched=True)
         return

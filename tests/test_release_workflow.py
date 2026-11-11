@@ -913,6 +913,7 @@ def test_macos_job_steps_mirror_the_windows_order(macos):
         "Check macOS skip reasons",
         "Capture runner and encoder facts",
         "Stage release assets",
+        "Upload validation bundle",
         "Upload release assets",
         "Upload evidence",
     ]
@@ -977,6 +978,7 @@ def test_macos_test_legs_follow_the_windows_gate_with_the_ruled_differences(maco
 VALIDATION_CONTINUES = "${{ success() || (!cancelled() && !inputs.release-version) }}"
 VALIDATION_CONTINUES_ON = "${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED == 'true' }}"
 RELEASE_UPLOAD = "inputs.release-version && env.MACOS_FFMPEG_BUNDLED == 'true'"
+VALIDATION_UPLOAD = "${{ !inputs.release-version && env.MACOS_FFMPEG_BUNDLED == 'true' }}"
 VALIDATION_CONTINUES_OFF = "${{ !cancelled() && env.MACOS_FFMPEG_BUNDLED != 'true' }}"
 VALIDATION_ONLY = "${{ !cancelled() && !inputs.release-version }}"
 """Run 3 (CHARC's exact form): the app listing runs in validation mode only, after any failure."""
@@ -996,6 +998,7 @@ MACOS_STEP_CONDITIONS = {
     "Check macOS skip reasons": VALIDATION_CONTINUES,
     "Capture runner and encoder facts": VALIDATION_CONTINUES,
     "Stage release assets": "env.MACOS_FFMPEG_BUNDLED == 'true'",
+    "Upload validation bundle": VALIDATION_UPLOAD,
     "Upload release assets": RELEASE_UPLOAD,
     "Upload evidence": "always()",
 }
@@ -1257,6 +1260,39 @@ def _walk(macos, inputs, switch, failing):
             reached.append(name)
             failed = failed or name == failing
     return reached
+
+
+def test_macos_validation_bundle_upload_contract(macos):
+    """A validation build exposes the three staged assets for one day at the pinned action."""
+    upload = step(macos, "Upload validation bundle")
+    assert upload == (
+        f"        if: {VALIDATION_UPLOAD}\n"
+        f"        uses: actions/upload-artifact@{PINS['actions/upload-artifact']} # v4.6.2\n"
+        "        with:\n"
+        "          name: macos-validation-bundle\n"
+        "          path: work/release-assets/*\n"
+        "          if-no-files-found: error\n"
+        "          retention-days: 1\n\n"
+    )
+    names = list(_conditions(macos))
+    assert names.index("Upload validation bundle") == names.index("Stage release assets") + 1
+
+
+@pytest.mark.parametrize("release", [False, True])
+@pytest.mark.parametrize("bundled", [False, True])
+@pytest.mark.parametrize("failed", [False, True])
+def test_macos_validation_bundle_upload_reaches_only_successful_bundled_validation(
+    macos, release, bundled, failed
+):
+    """Evaluate the real condition: release mode, unbundled builds and failed staging exclude it."""
+    reached = _walk(
+        macos,
+        {"release-version": "1.2.0"} if release else {},
+        "true" if bundled else "false",
+        "Stage release assets" if failed else None,
+    )
+    assert ("Upload validation bundle" in reached) is (not release and bundled and not failed)
+    assert ("Upload release assets" in reached) is (release and bundled and not failed)
 
 
 def _mode_violations(macos, case):
@@ -1807,6 +1843,7 @@ SWITCH_GATES = {
     "${{ !cancelled() && !inputs.release-version }}": True,
     "env.MACOS_FFMPEG_BUNDLED == 'true'": False,
     VALIDATION_CONTINUES_ON: False,
+    VALIDATION_UPLOAD: False,
     RELEASE_UPLOAD: False,
 }
 """Each step condition the macOS job uses -> whether the step runs with the switch "false"."""
@@ -1899,6 +1936,7 @@ def test_the_lock_with_the_switch_off_is_inert(macos):
     assert not {
         "Build release bundle and zip",
         "Stage release assets",
+        "Upload validation bundle",
         "Upload release assets",
     } & set(ran)
     command = script(macos, "Build app bundle without FFmpeg").splitlines()[0]

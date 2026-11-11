@@ -3,33 +3,33 @@
   "platform": "macos-arm64",
   "census": {
     "state": "complete",
-    "job_url": "https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/42661533922/job/129375108552",
-    "log": "the job's log, attempt 3, as the seat saved it (874 lines; gh run view --log form); line numbers are that file's",
+    "job_url": "https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/43061417269/job/130719735477",
+    "log": "the job's log, attempt 3, as the seat saved it (878 lines; gh run view --log form); line numbers are that file's",
     "linkage_step": "Check the binaries",
     "linkage_lines": "618-659",
     "version_lines": "660-662",
     "toolchain_step": "Record and check the runner",
     "toolchain_lines": "157-163",
-    "external_libraries": "build/logs/build-ffmpeg.log:144-153"
+    "external_libraries": "build/logs/build-ffmpeg.log:145-154"
   },
   "provider": "rwsmythe/FFmpeg-Builds",
   "build_script": {
     "repository": "https://git.martin-riedl.de/ffmpeg/build-script.git",
     "commit": "f63b8aab8f5ce1a067da86ba69e34a36a7e217e5"
   },
-  "release_tag": "ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-9cb0fa8",
-  "build_repository_commit": "9cb0fa81871f09ae3f750d6845874c26a871b985",
-  "build_run_url": "https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/42661533922",
+  "release_tag": "ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-5314a43",
+  "build_repository_commit": "5314a43c6ea6145a826e34e30ac3a965cef1b996",
+  "build_run_url": "https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/43061417269",
   "asset_name": "ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0.zip",
-  "asset_url": "https://github.com/rwsmythe/FFmpeg-Builds/releases/download/ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-9cb0fa8/ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0.zip",
-  "size_bytes": 37978871,
-  "github_sha256": "e3f251dc281a71e46e1464436c8cb281994af7fe4ed4978d95922ad82bb176e4",
-  "seat_sha256": "e3f251dc281a71e46e1464436c8cb281994af7fe4ed4978d95922ad82bb176e4",
+  "asset_url": "https://github.com/rwsmythe/FFmpeg-Builds/releases/download/ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-5314a43/ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0.zip",
+  "size_bytes": 37980024,
+  "github_sha256": "4f2fd870a8c2fc023df3fb2a2bc607f37ff13d5e2004f7789985a77eaeaed810",
+  "seat_sha256": "4f2fd870a8c2fc023df3fb2a2bc607f37ff13d5e2004f7789985a77eaeaed810",
   "ffmpeg_ref": "release/9.0",
   "ffmpeg_commit": "b204e94e90fca64045e9ca7dd44c65678c7eb29e",
   "ffmpeg_repository": "https://github.com/FFmpeg/FFmpeg.git",
-  "version": "n9.0.2-47-gb204e94e90-20261109",
-  "configure_line": "configuration: --prefix=/Users/runner/work/FFmpeg-Builds/FFmpeg-Builds/work/out --pkg-config-flags=--static --extra-version=20261109 --enable-gray --enable-libxml2 --enable-version3 --enable-gpl --enable-openssl --enable-libfreetype --enable-fontconfig --enable-libharfbuzz --enable-libass --enable-libx264 --enable-libx265",
+  "version": "n9.0.2-47-gb204e94e90-20261111",
+  "configure_line": "configuration: --prefix=/Users/runner/work/FFmpeg-Builds/FFmpeg-Builds/work/out --pkg-config-flags=--static --extra-version=20261111 --enable-gray --enable-libxml2 --enable-version3 --enable-gpl --enable-openssl --enable-libfreetype --enable-fontconfig --enable-libharfbuzz --enable-libass --enable-libx264 --enable-libx265",
   "licence": "GPL-3.0-or-later",
   "archive_root": "ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0",
   "extract_members": [
@@ -37,8 +37,8 @@
     "bin/ffprobe",
     "LICENSE.txt"
   ],
-  "source_record_url": "https://github.com/rwsmythe/FFmpeg-Builds/tree/9cb0fa81871f09ae3f750d6845874c26a871b985",
-  "retention_note": "the asset is a release of the owner's fork (tag ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-9cb0fa8, not Latest); no retention policy applies; rebuild in the fork for an FFmpeg bump (checklist step)",
+  "source_record_url": "https://github.com/rwsmythe/FFmpeg-Builds/tree/5314a43c6ea6145a826e34e30ac3a965cef1b996",
+  "retention_note": "the asset is a release of the owner's fork (tag ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-5314a43, not Latest); no retention policy applies; rebuild in the fork for an FFmpeg bump (checklist step)",
   "macos_deployment_target": "14.0",
   "runner_label": "macos-26",
   "runner_image_version": "20261102.0473.1",
@@ -541,8 +541,8 @@
     "sdk": "26.5",
     "target": "arm64-apple-darwin25.6.0",
     "deployment_target": "14.0",
-    "census_build_commit": "9cb0fa81871f09ae3f750d6845874c26a871b985",
-    "census_asset_sha256": "e3f251dc281a71e46e1464436c8cb281994af7fe4ed4978d95922ad82bb176e4"
+    "census_build_commit": "5314a43c6ea6145a826e34e30ac3a965cef1b996",
+    "census_asset_sha256": "4f2fd870a8c2fc023df3fb2a2bc607f37ff13d5e2004f7789985a77eaeaed810"
   },
   "toolchain_runtime": [
     {

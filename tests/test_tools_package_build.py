@@ -6773,9 +6773,9 @@ def test_darwin_build_bundles_from_the_macos_lock_and_refuses_release_while_cens
 # F0-2 group's (CHARC, 2026-11-09).
 
 REAL_MACOS_LOCK = REPO_ROOT / "tools" / "package" / "ffmpeg-macos.lock.json"
-"""The committed macOS lock: fork run 42661533922 attempt 3, its asset and its census."""
+"""The committed macOS lock: patched fork run 43061417269 attempt 3 and its census."""
 
-REAL_MACOS_ASSET_SHA256 = "e3f251dc281a71e46e1464436c8cb281994af7fe4ed4978d95922ad82bb176e4"
+REAL_MACOS_ASSET_SHA256 = "4f2fd870a8c2fc023df3fb2a2bc607f37ff13d5e2004f7789985a77eaeaed810"
 
 
 def real_macos_lock() -> dict[str, Any]:
@@ -6792,21 +6792,29 @@ def test_the_real_macos_lock_pins_the_artifact_and_validates():
     """Condition 1: the lock pins the ARTIFACT (tag, fork commit, asset, size, both digests)."""
     data = real_macos_lock()
     assert build.load_macos_ffmpeg_lock() == data
-    tag = "ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-9cb0fa8"
+    tag = "ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-5314a43"
     asset = "ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0.zip"
     assert data["release_tag"] == tag
-    assert data["build_repository_commit"] == "9cb0fa81871f09ae3f750d6845874c26a871b985"
+    assert data["build_repository_commit"] == "5314a43c6ea6145a826e34e30ac3a965cef1b996"
     assert data["asset_name"] == asset
     assert data["asset_url"] == (
         f"https://github.com/rwsmythe/FFmpeg-Builds/releases/download/{tag}/{asset}"
     )
-    assert data["size_bytes"] == 37_978_871
+    assert data["size_bytes"] == 37_980_024
     assert data["github_sha256"] == data["seat_sha256"] == REAL_MACOS_ASSET_SHA256
     assert data["toolchain"]["census_asset_sha256"] == REAL_MACOS_ASSET_SHA256
     assert data["census"]["state"] == "complete"
     assert data["build_run_url"] == (
-        "https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/42661533922"
+        "https://github.com/rwsmythe/FFmpeg-Builds/actions/runs/43061417269"
     )
+    assert data["version"] == "n9.0.2-47-gb204e94e90-20261111"
+    assert data["ffmpeg_commit"] == "b204e94e90fca64045e9ca7dd44c65678c7eb29e"
+    assert data["source_record_url"] == (
+        "https://github.com/rwsmythe/FFmpeg-Builds/tree/5314a43c6ea6145a826e34e30ac3a965cef1b996"
+    )
+    assert data["census"]["job_url"] == data["build_run_url"] + "/job/130719735477"
+    assert data["census"]["external_libraries"] == "build/logs/build-ffmpeg.log:145-154"
+    assert "--extra-version=20261111" in data["configure_line"]
 
 
 def test_the_macos_component_texts_are_exactly_the_locks_and_rehash_to_it():

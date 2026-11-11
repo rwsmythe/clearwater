@@ -1047,7 +1047,7 @@ def _encoder_packets(log: str) -> list[tuple[int, int, bool]]:
     """Parse debug_ts at the encoder boundary; benchmark action identifies flush receives.
 
     FFmpeg b204e94e fftools/ffmpeg_enc.c:612,654-658,704-710 logs pkt->duration
-    after receive_packet and BEFORE sch_enc_send (:717). The benchmark's encode/flush
+    after receive_packet and BEFORE sch_enc_send (:718). The benchmark's encode/flush
     action is printed at :657 (ffmpeg.c:551-565). libavformat/mux.c:1102 calls
     guess_pkt_duration later. stats_enc_post has no duration field in this revision.
     """
@@ -1421,6 +1421,7 @@ def _assert_duration_v4(record: dict[str, Any], failures: Sequence[str], *, watc
     ]
     if watched and blocking == ["video stream duration"] and len(failures) == 1:
         assert failures[0].startswith("V4: "), failures
+        assert "video stream duration" in failures[0], failures
         item = next(i for i in record["items"] if i["name"] == "video stream duration")
         raise _DR164DurationMismatchError(
             f"DR-164: V4 video stream duration differs: source={item['source']}; "

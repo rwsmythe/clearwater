@@ -311,6 +311,15 @@ jobs:
           cp "work/release/$name.zip" "work/release/$name.zip.sha256" work/release-assets/
           cp "$notices" work/release-assets/THIRD_PARTY_NOTICES-macos.md
 
+      - name: Upload validation bundle
+        if: ${{ !inputs.release-version && env.MACOS_FFMPEG_BUNDLED == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: macos-validation-bundle
+          path: work/release-assets/*
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Upload release assets
         if: inputs.release-version && env.MACOS_FFMPEG_BUNDLED == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
