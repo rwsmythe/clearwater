@@ -5,41 +5,108 @@
 
 ### Generation
 
-- **Generation 69** (session `clearwater-orchestrator-20261110-1259`). LIVE 2026-11-10 22:59Z from gen 68's rollover `429042c2`. Paused 01:33Z-06:55Z on the owner's word (`42743fc3`; resume `30e81a1f`). **ROLLED ~08:35Z 2026-11-11 at the ~400K cap, with NOTHING it started still running.**
-  - **Seat folder `work/orch-g69/`:**
-    - drains 1-10; posts `post-*.md` / `q-*.md`;
-    - `make_d3/d4/d5.py` (dispatch + FRESH prompt assembly); `read_run8.py`, `read_run9.py` (run readers: `read_run9.py <run-dir>` compares against run 8);
-    - `p17/` (the HLG repro); `f83-src/` (the pinned FFmpeg `movenc.c` / `videotoolboxenc.c` / `mux.c` at `b204e94e`); `write_state.py`.
-  - **Seat QA:** gen 65's `bash work/orch-g65/qa.sh <sha> <label>` from the DETACHED `wp6.5-rB`. Also run `tests/test_macos_timing_evidence.py` separately; it is not in qa.sh.
-  - **Gate:** gen 64's `work/orch-g64/gate.sh` + `watch2.sh`. Bash gauge 37 ms.
+- **Generation 70** (session `clearwater-orchestrator-20261110-2231`). LIVE 2026-11-11 08:31Z from gen 69's rollover `b696bb2d`. **ROLLED ~09:50Z 2026-11-11 at the ~400K cap, with NOTHING it started still running.**
+  - **Seat folder `work/orch-g70/`:**
+    - drains 1-8;
+    - posts and queries (`online.md`, `q-*.md`, `post-*.md`);
+    - `make_d6.py` / `make_dA1.py` / `make_dB1.py` (FRESH-prompt assembly);
+    - `last_text.py <jsonl> <out>` (a subagent's last text, used when a chat return is truncated);
+    - `pending.md` (the carried items).
+  - **Seat QA:** gen 65's `bash work/orch-g65/qa.sh <sha> <label>` from the DETACHED `wp6.5-rB`, plus `tests/test_macos_timing_evidence.py` separately.
+  - **Gate:** gen 64's `work/orch-g64/gate.sh` + `watch2.sh`.
+  - **Bash gauge:** 327 ms (PowerShell-measured).
 - **NOTHING IS RUNNING.** No cell, Codex turn, review, gate or leg.
-  - Every F0-2b Codex session is ENDED (turn 5 `01a1c826...` was the last, at 156,795). The next F0-2b turn is FRESH.
-  - The F8-3 diagnosis session `01a1c814-a8c8-7330-9a84-a3dc6c525043` is DONE (half 2 delivered). Do not resume it except for a follow-up question on its note.
-  - **Resuming a read-only Codex session:** `codex exec resume -m gpt-6.1-sol -c 'model_reasoning_effort="high"' -c 'sandbox_mode="read-only"' --skip-git-repo-check -o <out> <session-id> -` from its copy. `resume` REFUSES `-p` / `-s`. Check the banner (model / sandbox / effort / session id); start-up "failed to refresh available models" timeouts are a blip.
+  - Retired cells: `wp65-sheet1` (309,166 at its last yield) and `wp65-sheet2` (164,939 at yield). Do not message either.
+  - Codex sessions:
+    - half A `01a1c9c5` is DONE (depth 94,268).
+    - half B `01a1c9d8` is DONE (turn 2 returned at depth 220,939; any further half-B turn is FRESH).
+    - the DR-164 diagnosis and the sheet reads are DONE.
 - **CHARC is gen 22, `clearwater-charc-20261110-0800`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **AWAIT CHARC's ruling on query `0429716d`** (posted 08:29Z): the F8-3 note and the DR-163 fix package. Drain the inbox first.
-   - The note `clearwater-review-evidence\wp6.5\f83\half-2.txt` CONFIRMS the cause: the VT wrapper never sets `pkt->duration`, and `mux.c:605-620` substitutes the average period for the last sample.
-   - It recommends **(b) an FFmpeg VT wrapper patch in the owner's fork** (`frame->duration` through `sourceFrameCtx` to `pkt->duration`), with a rebuilt and re-pinned `ffmpeg-macos.lock.json`. No Clearwater frozen interface. The proof set is in the note's last section.
-   - Alternatives: (a) a VT output `setts`; (c) a post-mux rewrite; (d) refuse VT VFR + `auto` -> libx265.
-   - The fix package's lane and brief are CHARC's call.
-2. **WP6.5 F0-2b on `wp6.5` at `6bf69487`: GREEN on run 9** (`42983584425`; table `work/orch-g69/post-run9.md`, status post `d07c911d`; evidence `clearwater-review-evidence\wp6.5\runner\run-42983584425\`).
-   - First proven on real bytes: notices PASS (1612 entries; 142 rows), the write at `Contents/Resources`, the seal with FFmpeg inside, smoke.
-   - macOS leg: 222 passed / 4 xfailed.
-   - Identities equal run 8's; the bootloader is sha256-only.
-   - **The post-run ledger fold (ruled `cffbd052`, not yet dispatched):** the run-9 checklist lines from A r3 (`f02b\A-claude\r3\review.txt`: MINOR 1, ADV 2; optionally ADV 3's success-path guard) and short B (`f02b\B-claude\r2\review.txt`: F1 XPASS-vs-advertised-depth, F2 no `stream_index` (read the last video packet from raw `stts`), F3 the eight-file / "0 with 1335" clause). Plus the run-9 record. Ledger plus at most the guard (test-only).
-     - A small FRESH Codex turn (prompt = agent + brief + dispatches 1-5 + returns 1-5 + dispatch-6; `make_d5.py` pattern).
-     - Then Claude A on that delta, gate scope per CHARC (ledger-only may be QA + harness).
-   - **Then**, per CHARC `30e81a1f`: the stage-1 close, stage 2 (the owner's Mac run sheet; `docs/briefs/wp6.5-brief.md`; under CHARC's `ef405237` reading, the sheet avoids VT on VFR sources or says what to expect until DR-163 is fixed), and the WP6.5 accept.
-   - **At the WP6.5 accept** (CHARC): the test-isolation DR row closes; A-r5-3 stays watched; the A3 efficiency DR row; the A4 line; census U3 / U4 / U10 accept notes; DR-163 opened (product, watched); the serial-leg sizing note.
-3. **Paces at 06:55Z:** Claude 69 % used, pace 2.58 (reset 2026-11-16 10:00Z); Codex 69 %, pace 0.703 (reset 2026-11-11 10:07Z). Re-read before every dispatch; Claude reviews are the scarce lane.
-4. **Worktrees to tidy at the accepts** (owner's word for any prune):
-   - `wp6.5-f83` (the read-only diagnosis copy; its `work/f83-src/` and `work/f83-ev/` hold the inputs);
-   - `wp7.1`, `wp7.1-iA`, `wp7.1-instrument`, `wp7.1-rA`, `wp6.5-rB`, `wp6.5-rA`;
-   - the old `wp-dr125`, `wp6.1`, `wp6.3a`, `wp6.3b`, `wp6.4`, `wp7.2`, `wp7.2-rB`;
-   - the state worktrees `orch-state-g65` .. `orch-state-g69`.
+1. **DR-164 CENSUS: your FIRST act after ONLINE.** Ruling `cf8f3060` item 1 binds verbatim.
+   - The command: `ffprobe -v error -select_streams v:0 -show_packets -show_streams -show_format -show_entries 'packet=pts,dts,duration:stream=time_base,r_frame_rate,start_pts,duration_ts,nb_frames:format=duration' -of json <SOURCE>`.
+   - The sources:
+     - the 19 iPhone MOVs in scope (`docs/reports/inventory-2026-10-29.md:278-329`);
+     - the 4 Insta360 HEVC exports (`inventory-2026-11-09.md:138`; list the 3 ProRes as out of admission, NOT probed);
+     - the 34 GoPro originals.
+   - Footage is READ-ONLY: ffprobe reads only; the outputs go to `work/`. Check free disk first.
+   - Per source, record:
+     - the median packet duration;
+     - the decode-order last packet (pts, dts, duration);
+     - the greatest-PTS packet (pts, duration);
+     - the container duration.
+     Report container-rounding positives apart (`docs/reports/wp7.2-last-sample-end.md:15`: two Insta360 exports end exactly one period after the last PTS).
+   - Record: `clearwater-review-evidence\wp6.5\dr164\seat\census.md` plus the raw json.
+   - **READING RULE:** a source whose greatest-PTS packet duration exceeds its median by more than one period is a real long terminal frame, and DR-164 becomes a 1.2.0 BLOCKER. Zero such sources means Phase 7.
+   - Post the result to CHARC; defect (i)'s fix is ruled on it.
+2. **DR-163 half B (tests) on `wp6.5`:** LANDED by the seat as `9e523602` (tests) + `86d4c9df` (ledger); return `wp6.5\dr163\codex-b\return-2.md`. Collection 226 -> 236; four DR-163 xfails removed with exact raw timing assertions; two strict DR-164 xfails (libx265 `regular-final` 8/10); eight timing regressions; two encoder-boundary tests (`-debug_ts -benchmark_all`, `ffmpeg_enc.c:654-717`) with the run-9 RED replayed locally; roster = the two DR-164 ids; 65 portable + 555 notices passed at the cell. NOT yet reviewed: NEXT = Claude A r1 on `6879e2a2..86d4c9df` (form `wp6.5\f02b\A-claude\r4\review-prompt.md`, `codex_cell.py review --worktree <wp6.5-rA moved to 86d4c9df> --base 6879e2a2`).
+   - Then: Claude A (the other model) on the delta from `6879e2a2`, seat QA, the two-leg gate (from the detached `wp6.5-rB`).
+   - Prospective run-10 count: 234 passed + 2 xfailed (DR-164).
+3. **DR-163 half A: fork `wp6.5-macos` = `5314a43c6ea6145a826e34e30ac3a965cef1b996`**, PUSHED, Claude A r1 clean. **HOLD: the fork DISPATCH needs the OWNER'S WORD, relayed by CHARC (still open).**
+   - On the word:
+     - `gh workflow run build-macos.yml -R rwsmythe/FFmpeg-Builds --ref wp6.5-macos`;
+     - verify the asset three ways (GitHub digest, `checksums.sha256`, the seat);
+     - read the archive's `build/versions.txt` patch line (the patch sha256 must be `b598505e8d2859835312ca75ff92f50ec35b2166421a2e5c84c49d4691293c4f`).
+   - Then **half B's LOCK turn**:
+     - re-pin `tools/package/ffmpeg-macos.lock.json` (tag, commit, asset, size, sha256, `version` with the new build date, `configure_line`);
+     - **PLUS the granted workflow edit (CHARC `fac58dc7` item 1):** a `macos-validation-bundle` artifact (zip + `.sha256` + notices), `retention-days: 1`, `if: ${{ !inputs.release-version && env.MACOS_FFMPEG_BUNDLED == 'true' }}`, `macos-release` untouched.
+   - Then run 10 (CHARC pushes it). The run-10 reading lines are in the ledger: A r4 F1 / ADV 2 / ADV 3, CHARC `792af2fd`, and the DR-164 xfail line.
+4. **The stage-2 run sheet: branch `wp6.5-sheet` at `1dea2984`.**
+   - Codex r2 (`wp6.5\sheet\codex-read\r2\review.txt`) found 3 MAJOR:
+     - the log appends at steps 38 / 39 / 42 / 43 escape `needw` (put each inside `needw && { ...; }`);
+     - step 57's `sed` redaction treats names as syntax;
+     - step 30's "15 deselected" count is wrong (`pyproject.toml:72`).
+   - Next: a FRESH Sonnet cell (`wp65-sheet3`, dispatch form `wp6.5\sheet\dispatch-S3.md`), then Codex r3, then merge into `wp6.5` by the seat.
+   - The sheet runs ONLY after run 10 is green and the seat has filled every `SEAT FILLS` / `SEAT CHECKS` marker. Also before the Mac run: the persistent GX011627 trim (L2) and the Windows CPU `export_oracle record` reference (L4).
+5. **After half B's lock turn: package "WP6.5 Q1-tool"** (CHARC `fac58dc7` item 2; Codex lane, Claude A).
+   - It adds `tools/headless_export.py --vt-rate-control {A,B}`, process-scoped.
+   - A test proves the constant is restored, and that Windows is byte-unchanged.
+6. **"DR-164 verify" package**, commissioned REGARDLESS of the census (`cf8f3060` item 3), after the WP6.5 accept unless the census says BLOCKER.
+   - Raw `mdhd` AND the `stts` sum checked against `end_pts - written[0]`, exact rationals.
+   - IF-5 internals only.
+   - RED = the DR-164 fixture refused by the SINK.
+7. **Paces at 09:02Z:** Codex 72 %, pace 0.725 (reset 2026-11-11 10:07Z, so a NEW window after that). Claude 73 %, pace 2.635 (reset 2026-11-16 10:00Z). Claude is the scarce lane: Sonnet for docs cells; re-read before every dispatch.
+8. **Worktrees** (any prune needs the owner's word):
+   - `wp6.5-dr163a` (holds `work/fork`, `work/ffmpeg` at `1f1fedd`, `work/ffmpeg-pristine`; keep until run 10);
+   - `wp6.5-sheet` and `wp6.5-sheet-r` (detached);
+   - `wp6.5-rA` and `wp6.5-rB` (detached at `6879e2a2`; `rB/work/dr164/` and `rB/work/dr163-half-b/` hold the seat probes);
+   - plus gen 69's list (`wp6.5-f83`, `wp7.1*`, `wp7.2*`, `wp-dr125`, `wp6.1`, `wp6.3a/b`, `wp6.4`, `orch-state-g65..g70`).
+
+### GEN-70 RECORD
+
+- Online `f6fd3f34`; CHARC ack `3f09fd9e`.
+- **Rulings drained (all in `comms/orchestrator/read/`):**
+  - `d94f38dd`: DR-163 = fork VT patch (b), two halves, Codex lane.
+  - `c1b49908`: no version marker.
+  - `792af2fd`: A r4 carried into half B.
+  - `6688c6fd`: no run 10a; run 9 is the RED of record.
+  - `fac58dc7`: sheet rulings.
+  - `b80a8d7a`: DR-164 opened, strict xfails.
+  - `cf8f3060`: DR-164 = movenc; census; verify package.
+- **Post-run fold:** Codex turn 6 (fresh) -> `aca1ba7d` + `6879e2a2`. Claude A r4 FINDINGS: F1 MAJOR (run-10 reading) + ADV 2 / 3, carried into half B (CHARC). Seat QA on `6879e2a2` fully green.
+- **DR-163 half A:**
+  - Codex turn 1 STOPPED correctly: the fork's `build-macos.yml:236` version regex and Clearwater's macOS lock validator both pin an 8-digit suffix. The marker was withdrawn.
+  - Turn 2: the patch (+10/-3, wrapper-wide).
+  - The seat: FFmpeg commit `1f1fedd`; format-patch sha256 `b598505e...93c4f`, byte-equal applied to pristine; fork commit `5314a43`.
+  - Claude A r1 NO_NEW_CRITICAL_MAJOR (3 ADV accepted). Pushed.
+- **DR-163 half B:** turn 1 STOPPED on a NEW product defect.
+  - The defect: libx265 output of a long-final-frame source, `mdhd` 1.0 s vs edit 1.1 s; V4 MANDATORY refuses, the sink accepts.
+  - The seat reproduced it.
+  - The NVENC probe keeps the duration on that fixture.
+  - The read-only diagnosis attributes it to movenc's terminal decode delta (`movenc.c:7323`). Its `-debug_ts` prediction was CONFIRMED at the seat: the encoder emits 2048 on PTS 14848, sum 16896.
+  - DR-164 was opened. Turn 2 resumed on the ruling.
+- **The sheet:** `wp65-sheet1` S1 (`2dbd7453`; delivery gap, Q1-A gap, Gatekeeper all verified), then S2 fold (`275d1c61`). Codex r1: 1 CRITICAL + 6 MAJOR; `wp65-sheet2` fold (`1dea2984`). Codex r2: 3 MAJOR.
+
+### Gen-70 lessons
+
+- **A dispatch can carry a SUPERSEDED brief line** (the Gatekeeper "right-click-Open" came from a corrected note). Quote a brief by its CURRENT text, and grep for "CORRECTED" / "Superseded" around any line you lift.
+- **"A marker in the version string" ran into two version validators, one per repository** (the fork's workflow regex and Clearwater's macOS lock validator). Before ruling or briefing an identity change, grep BOTH sides for the field's validators.
+- **A probe that passes on one encoder can be a fixture coincidence:** NVENC kept the duration only because its long frame was also last in decode order. Ask the diagnostician "is the passing case structurally immune, or did the fixture miss the trigger?" before reporting reach.
+- **A posted lead can be wrong in its attribution** (my "libx265-specific" was movenc). Report a probe's FACT ("NVENC keeps it on this fixture") apart from its INFERENCE.
+- **Every run-sheet `rm` / redirect needs a variable guard,** and appends after a guarded command escape the guard (r1 CRITICAL, r2 MAJOR). Brief run-sheet authors with "every write sits INSIDE the guard's `&& { }`".
+- **The bare-`cd` slip struck once** (`cd .worktrees/wp6.5 && ...` moved the session; restored in the next call; nothing written while moved; no cell live).
 
 ### GEN-69 RECORD
 
