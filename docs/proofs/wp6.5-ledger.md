@@ -5624,3 +5624,135 @@ texts, 14 darwin limits; Windows 110 hosts and 17 limits unchanged.
 | Phase | Critical | Major | Minor | Advisory | In/out | New/reopened | Reverts | Fix surface | Review / next | Dispatcher depth |
 | --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- | --- |
 | F0-2b run-8 fold | 0 | 2 | 3 | 4 | 8/1 | 9/0 | 0 | Notices + shared build helper + tests + ledger; F8-3 product repair out of scope | A r3 / short B / gate / run 9 at seat | Not supplied |
+
+#### F8-3 hook widened
+
+2026-11-11, fresh Codex implementer, dispatch F0-2b / 5, base `04dfd101`.
+TEST-ONLY extension of the existing hook; no product timing repair. The four
+`strict=True` DR-163 xfail parameter sets and their reason remain unchanged.
+Read-only diagnosis input (seat record supplied in dispatch):
+`clearwater-review-evidence/wp6.5/f83/half-1.txt`, half 1 at `9a086f49`.
+Its mechanism is a hypothesis awaiting run 9: VideoToolbox leaves the last
+packet duration zero (`videotoolboxenc.c:2313-2328`), then FFmpeg's
+`guess_pkt_duration` (`mux.c:617-620`) substitutes one average-frame-rate period.
+No network/source fetch was made by this cell.
+
+**Captured fields and mechanics:**
+
+| Dispatch item | Test mechanic / surface |
+| --- | --- |
+| 1, source | `tests/test_macos_portability.py:962` `_write_vt_failure` records the source path, SHA-256, byte size and recipe ID (WP2.3 `tools/fixtures/video.py` or `test_io_video_encode.Clips.make`, including the vfr-gap override). Source ffprobe lists every packet's PTS/DTS/duration/flags and full stream fields, including time_base, avg_frame_rate and r_frame_rate. Source raw stts and edit list are recorded too. |
+| 2-3, raw output | `:878` `_timing_boxes` reads the complete stts; complete ctts plus version (v0 unsigned, v1 signed); sample counts from stts and stsz; movie/media timescales; raw elst segment_duration in movie ticks, media_time in media ticks and exact rate; elst version; mvhd/mdhd/tkhd versions and durations in their own ticks. It selects the video track even when audio precedes it. |
+| 4, what the product wrote | `:1058` `_capture_vt_failure` records the sink's actual `_written` PTS sequence, `min(_written)` first, verification's end argument (the actual `_end_stream` sentinel), source time_base and `_probe.video.frame_rate`. A test-only `_start` wrapper observes the final argv without changing it or starting another process. |
+| 5, x265 controls | Corpus body `:1209` installs the same recorder for both VFR source IDs and both encoders. All four libx265 controls remain ordinary passing cases and capture on verification SUCCESS. Parameter marks are unchanged. The portable corpus-boundary tests execute all four control branches and require each evidence file. |
+| 6, before cleanup | The turn-4 route is retained: `_verify` is wrapped, its original result/exception is observed, then the finished file is read while still inside that call, before `close` / `_fail` / `abort` can remove it. No failed binary needs to survive cleanup. Original `VideoEncodeError` object identity is pinned; even an evidence I/O failure only adds a diagnostic note and re-raises that same exception. |
+| 7, tracing | A test-only override of the existing `_command` / `_start` seam could request FFmpeg tracing without a src edit; none is enabled. This hook observes argv only. No encoder-side pre-guess packet duration is claimed: that tracing and its exact exposed fields remain diagnosis work. |
+
+Readers reused: `boxes.read_movie_boxes` for timescales/raw edits;
+`verify._moov`, `_video_media`, `_boxes`, `_child` for the bounded moov/video
+walk; `verify._table_entries` for stts/ctts. The small read-only test parser
+handles mvhd/mdhd/tkhd durations (versions 0/1) and stsz's stored sample count,
+which these product readers do not expose. Neither mdat nor product state is
+modified. Packet/stream/format evidence uses the existing ffprobe argv.
+Each file is capped at 192 KiB (196,608 B); an unexpected overrun has a named
+truncation marker. The two-second corpus is far below that bound.
+
+**Half-1 predictions: run 9's F8-3 reading line (both 8 and 10 bit):**
+
+| Case | Time base | Media timescale | Last output packet (PTS, DTS, duration) | Last raw stts (count, delta) | Media edit |
+| --- | --- | ---: | --- | --- | --- |
+| sample:vid-vfr | 1/30000 | 30000 | (38038, 38038, 1335) | (1, 1335) | 39373/30000 |
+| clip:vfr-gap | 1/15360 | 15360 | (37888, 37888, 559) | (1, 559) | 30767/15360, after a 1/2 empty edit |
+
+For vid-vfr the predicted substitution is `40040/30 -> 1335`, instead of
+2002, explaining the 667-tick shortfall. For vfr-gap it predicts 559 instead
+of 512, explaining the 47-tick surplus. Compare source, written sequence and
+x265 controls in the same capture. **Decisive refuter:** a final raw stts
+delta of 2002 on the failing VT vid-vfr output refutes the predicted muxer
+substitution. Do not infer confirmation solely from the verification error.
+The original run-9 identity/plan/post-plan-stage checklist above still binds.
+
+The workflow is unchanged. Its existing summary parser counts `xfailed` but
+rejects only failures/errors and unapproved SKIPPED reasons; `4 xfailed` with
+passing tests remains acceptable as written. Actual VideoToolbox output,
+four strict xfails and the half-1 predictions cannot be tested off macOS;
+run 9 supplies that evidence. No src, workflow, manifest, lock, text or Windows
+row changes; no dependency added; no frozen build/run or GUI launch.
+
+**Validation / verification loop:** evidence under `work/wp6.5/f02b-hook/`.
+The copied sandbox runner loads `sandbox_mkdir_shim`, clears PYTHONPATH before
+the tool environment guard, disables cacheprovider, uses disposable basetemps,
+excludes the shell-start integration test and GPU tests. Initial fixture
+packing had an incorrect ctts struct format; corrected before the valid
+parent comparison. `red-parent-final.log` is the RED of record, against the
+byte-exact `git show 04dfd101:tests/test_macos_portability.py` copy through
+`WP65_MACOS_TEST_SCRIPT`:
+
+- Twelve expected failures: two missing `output boxes:` field assertions;
+  source-aware writer/hook unsupported (four cases); all four passing x265
+  corpus captures absent; diagnostic I/O masks the original exception; oversized
+  evidence exceeds the bound. These are test-recorder gaps, not product defects.
+- `green-final.log`: 15 passed (the 12 portable controls plus the existing
+  three packet/written-end, original-error and exact-xfail-roster controls).
+- Real external Winget FFmpeg/ffprobe wrote a tiny libx265 MP4 with the vid-vfr
+  PTS pattern and the recipe's last-duration bitstream filter. The recorder
+  reads 30 samples, 30000 media ticks/s, varying 1001/2002 deltas and last
+  `(1, 2002)` from actual bytes. Synthetic moov tests independently pin all raw
+  fields for versions 0/1 and ctts signedness, with audio before video. No
+  repository `bin/ffmpeg` or `bin/ffprobe` was read or run.
+
+**Final foreground validation:**
+
+| Check | Observed result | Log under `work/wp6.5/f02b-hook/` |
+| --- | --- | --- |
+| ruff check . | All checks passed | `ruff-final.log` |
+| ruff format --check . | 340 files already formatted | `format-final.log` |
+| mypy | Success, 166 source files | `mypy.log` |
+| mypy --platform darwin | Success, 166 source files | `mypy-darwin.log` |
+| notices/build, plain -n 3 | 1,345 passed, 1 skipped | `plain.log` |
+| notices/build, -n 3 --dist loadfile | 1,345 passed, 1 skipped | `loadfile.log` |
+| smoke/macOS/workflow/bench + portable recorder, serial, not gpu | 257 passed, 227 skipped, 1 deselected, 5 sandbox Git failures | `serial.log` |
+| Windows ordinary/X.app success bytes, platform-local refusal bytes, manifest hosts/components/limits | 5 passed | `windows-locks.log` |
+| Root annex CLI | root annex matches | `integrity-2.log` |
+| Scope, locked files, LF, diff | Exactly three owned files; zero CR bytes in all three; diff check exit 0; no product/workflow/manifest/lock changes | `integrity-final.log`, `integrity-0.log` |
+
+The portable module `tests/test_macos_timing_evidence.py` is needed because the
+native module's marks skip every collected test off macOS. Its seven functions
+expand to 12 cases: raw tables/headers at both box versions (`:64`), complete
+source/written/command evidence (`:105`), original failure and passing report
+preserved before cleanup (`:154`), real VFR x265 MP4 (`:216`), all four passing
+corpus control branches (`:285`), original-error preservation when diagnostics
+fail (`:347`), bounded evidence (`:374`). These tests do not activate a GPU or
+call an application entry point. The saved real-MP4 diagnostic is
+`real-vfr-evidence.txt`: 9,555 B, 30 samples by both stts and stsz, media
+timescale 30000, last stts `(1, 2002)`, no ctts box. Synthetic ctts tests cover
+both unsigned v0 and signed v1 independently of that real file.
+
+**Seat rerun:** the five
+`test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`
+cases (annotated, lightweight, wrong-commit, mismatched-name, deleted-origin)
+again fail in Git's sh.exe with `fatal error - CreateFileMapping`, before their
+gate assertions. Re-run outside the sandbox; no test was relaxed or changed.
+The serial roster is not claimed green. The one notices/build skip is the
+existing POSIX-only CPython sysconfig comparison on Windows. Native Mac cases
+skip off darwin as before; the new portable recorder controls all pass.
+
+Verification loop closed on the test-only envelope: parent RED independently
+confirms the lost evidence, named-field tests check literal raw box values,
+real ffprobe/MP4 checks confirm the writer on muxed bytes, and synthetic
+interception verifies original-error identity and control reports. A scratch
+integrity probe initially used pytest's untruncated test-name pattern and found
+no file; corrected to the actual basetemp name, then passed in full. No product
+defect was inferred from that probe. Final scope and return claims were checked
+against the saved tool results. No remaining implementation work in this fold;
+Claude A/B, the seat gate and run 9 are the commissioned next actions.
+F8-3 product diagnosis/repair remains the separate watched DR-163 work.
+
+No hosts, components, texts or limits changed (zero additions). Windows
+110 hosts and 17 limits remain unchanged with the complete manifest/text tree.
+Dispatcher depth was not supplied. This is an evidence extension ordered after
+the run-8 fold, not a new review round; its prior cumulative counts remain above.
+
+| Phase | Critical | Major | Minor | Advisory | In/out | New/reopened | Reverts | Fix surface | Review / next | Dispatcher depth |
+| --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- | --- |
+| F8-3 hook widened | 0 | 0 | 0 | 0 | No new findings | 0/0 | 0 | Tests and ledger only | A/B / seat gate / run 9 | Not supplied |
