@@ -6197,3 +6197,264 @@ already formatted; `diff-check.log` = empty with exit 0. `ledger-write.log` /
 A r4 / CHARC reading blocks and DR-164 row, and exactly the four owned modified
 paths. No remaining STOP or implementation dispute. Mac run 10 and external
 review remain pending, not implied by the portable evidence.
+
+
+### DR-163 half B lock turn
+
+Status: B3 STOP ruled; B4 implemented and checked locally. Five baseline Git
+sandbox failures remain for the seat; Claude review and run 10 are pending.
+Base: `372e67001ebbce302603ad173af27c0183b97495`. The B4 dispatch supplies
+resume depth **103K** at the 2026-11-11 18:57Z ruling. This section replaces only
+the uncommitted B3 append; the complete committed base ledger is a byte prefix.
+The B3 STOP was recorded before implementation, with a complete raw diff and
+cheap examples at `work/dr163-lock/validation/metadata.diff` and
+`stop-evidence.log`. CHARC `efa2de83` rules the examples permitted rebuild noise.
+
+#### CHARC `efa2de83`, 2026-11-11 18:57Z (verbatim)
+
+> The STOP was correct under 050cc370. Ruled: classes 1-4 in dr163/lock-stop/classify.txt (curl progress meters; parallel-make line order and percentage width; interleaved diagnostic text whose characters are equal as a multiset; date padding) are PERMITTED rebuild noise; class 5 (the versions.txt patch sha line and the patch-apply line in build-ffmpeg.log) is the EXPECTED difference. The 050cc370 rule is amended on the record to: component pins, linkage inventories, configure lines, enabled-component lists, library lists, FFmpeg commit, clang / Xcode / SDK / target / image markers must be EQUAL; log text is compared as a multiset of lines with digit runs and hex masked, and only the five classes above may remain; any other residual = STOP. The cell's ledger record names the classes and cites classify.txt; the census rows stay byte-for-byte. RESUME the session as B4 (103K, below the resume line) with this ruling verbatim; continue B3's scope from item 1.
+
+#### Rebuild-noise comparison and unchanged census rows
+
+Seat classification: `C:/Users/rwsmy/clearwater-review-evidence/wp6.5/dr163/lock-stop/classify.txt`
+(by `classify_logs.py` beside it). Sandbox copies:
+`work/dr163-lock/seat-classify/classify.txt` and `classify_logs.py`.
+The cell used its own equivalent, `work/dr163-lock/validation/b4_classify.py`:
+compare complete Counters of lines after masking hex strings and digit runs,
+then remove curl-progress records (class 1), normalize CMake percentage padding
+(class 2) and the NASM date padding (class 4), and remove the exact expected
+patch-hash record (class 5). The sole remaining residual is SDL's interleaved
+diagnostic and `CC build/SDL_syscond.lo`; its complete non-whitespace character
+multisets compare equal (class 3). No residual was truncated for this check.
+Results: `b4-classification.log` and `b4-classification.json` in that folder.
+
+All **32** paths compared: **10 identical, 21 changed, one added patch**:
+
+- Identical: `sha256-pins.txt`, `ffmpeg-dylibs.txt`, `ffprobe-dylibs.txt`,
+  `ffmpeg-encoders.txt`, `ffmpeg-decoders.txt`, `FFmpeg-LICENSE.md`,
+  `meson-requirements.txt`, `toolchain-search.txt`, `usr-local-include.txt`,
+  `usr-local-lib.txt`.
+- Digit/order-only: `ffmpeg-version.txt`, `ffprobe-version.txt`,
+  `logs/build-fribidi.log`, `logs/build-libass.log`; order-only:
+  `logs/build-x264.log`.
+- Class 1 residuals: `logs/build-{cmake,fontconfig,freetype,harfbuzz,libogg,libxml2,nasm,ninja,openssl,pkg-config,sdl,x265,zlib}.log`.
+  Class 2 additionally covers percentage padding in ninja/x265, plus the
+  parallel-build output order. Class 3 additionally covers SDL's interleaving.
+- Class 4 residual: `toolchain.txt` (NASM compile-date padding).
+- Class 5 residuals: `versions.txt` and `logs/build-ffmpeg.log` (patch record);
+  added file `0001-avcodec-videotoolboxenc-set-packet-duration.patch`.
+
+The unmasked component pins and both dylib inventories compare byte-for-byte.
+Configure lines compare exactly after only the permitted date replacement.
+The complete FFmpeg configure summary, including every enabled-component and
+library list from `install prefix` through `License`, compares exactly after
+that date replacement. FFmpeg commit is unchanged. Toolchain metadata compares
+exactly after the NASM compile date and run URL substitutions; compiler, Xcode,
+SDK, target, deployment target and image are unchanged. Checks are in
+`b4-classification.log` / `b4-validator.log`.
+
+Date-only differences: both version text files' suffix and `--extra-version`
+change `20261109` -> `20261111`; build-ffmpeg.log's `version string suffix`
+changes the same way; NASM compile date changes `Nov  9 2026` -> `Nov 11 2026`;
+job-log timestamps are the new run's. Recipe commit and run URL are the new
+build identities, explicitly required by B3, not date-only claims.
+
+#### Re-pin and re-census
+
+`tools/package/ffmpeg-macos.lock.json:6` and `:22` now name fork commit
+`5314a43c6ea6145a826e34e30ac3a965cef1b996`, run `43061417269` attempt 3, job
+`130719735477`, tag `ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-5314a43`.
+Asset `ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0.zip`, **37,980,024 B**,
+retains archive root `ffmpeg-n9.0.2-47-gb204e94e90-macos-arm64-gpl-9.0`.
+The GitHub digest, release `checksums.sha256` and seat's own hash are supplied
+by the seat as the same value:
+`4f2fd870a8c2fc023df3fb2a2bc607f37ff13d5e2004f7789985a77eaeaed810`.
+This cell did not download or independently hash/run the binary; the staged
+metadata was the input. `github_sha256`, `seat_sha256` and the toolchain's
+`census_asset_sha256` all use that value; `census_build_commit` follows the
+new fork commit. `source_record_url` and `retention_note` follow the new tag/commit.
+Asset name and archive root were re-read and remain unchanged.
+
+New `versions.txt:1` retains FFmpeg
+`b204e94e90fca64045e9ca7dd44c65678c7eb29e`. New `versions.txt:2` is:
+
+```text
+b598505e8d2859835312ca75ff92f50ec35b2166421a2e5c84c49d4691293c4f  macos/build-script/patches/ffmpeg/0001-avcodec-videotoolboxenc-set-packet-duration.patch
+```
+
+Independently hashing the staged patch returns that digest. Vendored build
+script remains `f63b8aab8f5ce1a067da86ba69e34a36a7e217e5`.
+
+Re-read `new-job.log` (878 lines), not inferred from the old lock:
+
+| Census surface | Re-read range / values |
+| --- | --- |
+| Linkage, Check the binaries | 618-659; identical old/new payloads after removing timestamps |
+| Version | 660-662; `n9.0.2-47-gb204e94e90-20261111`; configure line copied verbatim from 662 |
+| Toolchain, Record and check the runner | 157-163; Xcode 26.6 (17F113), SDK 26.5, Apple clang 21.0.0 (clang-2100.1.1.101), arm64-apple-darwin25.6.0 |
+| Deployment target | staged toolchain.txt:12, `14.0`; unchanged |
+| Runner image | new log 18/155, `20261102.0473.1`; unchanged |
+| External libraries | new build/logs/build-ffmpeg.log:145-154; same text as old 144-153, shifted one line by the patch record |
+
+The linkage/version/toolchain range fields retain their old values because the
+new ranges are identical. Census job URL/log length and the external-library
+source pointer are updated. **Component, excluded and toolchain-runtime census
+rows remain byte-for-byte**, with no reserialization or licence-text change.
+The build's `load_macos_ffmpeg_lock()` accepts the new lock: platform
+`macos-arm64`, census `complete`, 12 components; output `b4-validator.log`.
+`tests/test_tools_package_build.py:6777` pins the new identity and loader result.
+
+#### Workflow step and review folds
+
+- `.github/workflows/macos-build.yml:314`: only added step `Upload validation
+  bundle`, immediately after staging. Pinned upload-artifact SHA
+  `ea165f8d65b6e75b540449e92b4886f43607fa02`, name `macos-validation-bundle`,
+  path `work/release-assets/*`, missing files error, retention 1 day, exact
+  condition `${{ !inputs.release-version && env.MACOS_FFMPEG_BUNDLED == 'true' }}`.
+  `tests/test_release_workflow.py:1265` pins the complete step and placement;
+  the following eight mode rows evaluate the real condition for release vs
+  validation, bundled vs unbundled, successful vs failed staging. Removing only
+  the new step restores the entire workflow byte-for-byte. `release.yml`,
+  `macos-release`, `macos-evidence` and release-mode semantics are unchanged.
+- Reviewer A half-B r1, `e2b7e458`, F1 MINOR: CONFIRMED / folded by the reading
+  line below. `-q -rs` does not print the xfail exception; read `V4 failures:` /
+  `V4 record:` in the evidence instead. No `-rx` or other workflow flag change.
+- F2 MINOR: CONFIRMED / all ten new evidence files required below.
+- A1 ADVISORY: CONFIRMED / `tests/test_macos_portability.py:1050` now cites
+  scheduler submission at `ffmpeg_enc.c:718`. This corrects committed ledger
+  line 5989's `:717` pointer by append, preserving the committed prefix.
+- A2 ADVISORY: CONFIRMED / exact passed-xfailed split required below.
+- A3 ADVISORY: CONFIRMED / 64x48 fail-closed size and wrapper-only boundary
+  scope recorded below; no fixture-size or hardware policy change.
+- A4 ADVISORY: CONFIRMED / `_assert_duration_v4` at
+  `tests/test_macos_portability.py:1412` additionally requires
+  `"video stream duration" in failures[0]`. Portable `wrong-message` damage
+  case at `tests/test_macos_timing_evidence.py:764` proves an unrelated sole
+  failure cannot become the watched exception.
+- Q1-tool A1 ADVISORY (`4ff3ad5b`): the RED at `bfff36cc` is **16 failed,
+  16 passed**, not the earlier return's nine-failure claim. Read source:
+  `C:/Users/rwsmy/clearwater-review-evidence/wp6.5/q1tool/A-claude/r1/review.txt`,
+  section 6 / advisory A1. This turn did not re-run the headless tool or its
+  product entry points.
+
+Reviewer sources: `C:/Users/rwsmy/clearwater-review-evidence/wp6.5/dr163/A-claude-halfB/r1/review.txt`
+and the Q1-tool review above. Both MINOR findings and all five advisories are
+in-envelope, supplied, confirmed and folded; no reverts, no product-code fix.
+The B3 comparison MINOR is ruled permitted noise, not a product finding.
+Claude's next review remains at the seat; no reviewer was spawned by this cell.
+
+#### RUN-10 READING LINES (appended; earlier lines left unchanged)
+
+1. DR-164: both `test_macos_duration_regression[8-libx265-regular-final]` and
+   `[10-libx265-regular-final]` MUST xfail. Read their evidence files
+   `f8-3-clip_regular-final-libx265-{8,10}.txt`, appended `V4 failures:` /
+   `V4 record:` JSON: exactly one failure, its message identifies `video stream
+   duration`, the only MANDATORY/REQUIRED DIFFERENT item is `video stream
+   duration`, with source **`1.100000 (11/10)`** and output
+   **`1.000000 (1/1)`**. The raw table checks from the earlier reading line
+   still bind. The xfail exception text is not printed by `-q -rs` and is NOT
+   required in macos.log. An XPASS, a missing file or any other reason is a
+   FINDING.
+2. ALL TEN new files must exist under the runner's evidence folder:
+   `f8-3-clip_{regular-final,early-long}-{hevc_videotoolbox,libx265}-{8,10}.txt`
+   (8), and `dr163-encoder-boundary-{8,10}.txt` (2). A VT row that passes
+   without its file is a capability FINDING, not a proof. These are additional
+   to the original EIGHT corpus files; all FOUR VT corpus files and the four
+   x265 controls remain required under A r4 / CHARC `792af2fd` above.
+3. ANY passed / xfailed split other than **234 passed, 2 xfailed** is a
+   FINDING. Native collection stays **236**. Portable helper/mode tests added
+   in this turn are not native M cases and do not change that expectation.
+   The workflow parser accepts other splits, so this is an explicit reading
+   gate, not a claim that the workflow enforces the count.
+4. The new VT duration/boundary rows encode **64x48**. A VT rejection of that
+   size fails CLOSED: a false RED costing a round trip, never a false pass.
+   Boundary `-allow_sw 1` proves the FFmpeg wrapper, NOT AD-35's hardware-only
+   route. The product-duration rows retain `-allow_sw 0`. Missing depth files
+   stay capability FINDINGS even if a refusal check returns as a passing row.
+
+#### Validation and verification loop
+
+Evidence folder: `work/dr163-lock/validation/`. Every pytest invocation uses
+`-m "not gpu"`, startup exclusion
+`-k "not test_python_m_clearwater_starts_the_shell_and_exits_0"`, work-tree
+basetemp, `-p sandbox_mkdir_shim -p no:cacheprovider`. Reused the predecessor's
+work-only `work/dr163-half-b/turn2/run_pytest.py` launcher: initialize imports
+with `PYTHONPATH=scripts`, then remove that launch variable before pytest so
+packaging's environment guard does not reject the shim. No guard is weakened.
+The fixture's explicit environment-guard tests still set their own variables.
+
+Focused RED before implementation: **3 failed, 5 passed** (`b4-red.log`):
+missing validation upload step, old lock tag, unrelated V4 message wrongly
+raised the DR-164 watched exception. The rest of the guard's cases passed.
+Full five-module results and the final affected-module rerun are recorded below.
+
+No src change, new dependency, component-row edit, licence-text change,
+external binary download/network access, GPU test, application entry point,
+GUI or frozen build was used. No Clearwater repository push, tag, commit or
+background launch occurred. Existing tests create temporary local Git
+repositories and transfer synthetic archive fixtures within work/ only.
+
+
+#### Final observed checks and verification-loop record
+
+| Check | Result | Evidence in work/dr163-lock/validation/ |
+| --- | --- | --- |
+| Requested five-module run | 1576 passed, 237 skipped, 6 failed in 549.13 s; exit 1 | b4-tests.log |
+| Final whole workflow-module rerun | 166 passed, 5 failed in 7.05 s; exit 1; only baseline Git sandbox failures | b4-workflow-final.log |
+| Final focused regression/contract/lock suite | 17 passed; exit 0 | b4-focused-green.log |
+| Native portability collection | 236; unchanged from dispatch base | b4-collect.log |
+| Lock loader | PASS; macos-arm64 / complete / 12 components | b4-validator.log |
+| Workflow skip parser | accepts 234 passed, 2 xfailed; also accepts 236 passed and 233 passed, 3 xfailed; rejects 2 failed, 234 passed | b4-parser.log |
+| Final ruff check / format check | All checks passed / 340 files already formatted; exits 0 | b4-final-ruff.log / b4-final-format.log |
+| mypy, Windows / darwin | Success, no issues in 166 source files each; exits 0 | b4-mypy-windows.log / b4-mypy-darwin.log |
+| Scope, baseline prefix, CR and diff checks | See final QA below | b4-final-qa.log |
+
+One new test-helper omission was suspected from the full run and independently
+reproduced by rerunning the workflow module: `_switch_off_violations`'s
+`SWITCH_GATES` did not recognize the new validation condition. Confirmed and
+fixed in `tests/test_release_workflow.py:1846` by mapping `VALIDATION_UPLOAD`
+to False for the OFF reading, and explicitly excluding that upload from the
+OFF reached set. The final whole workflow rerun passes that guard. This is a
+test-only fix; the condition itself was already correct. No false-positive
+product finding or product-code repair was needed.
+
+The other five failures are all existing
+`test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`
+rows: `annotated`, `lightweight`, `wrong-commit`, `mismatched-name`,
+`deleted-origin`. They fail during temporary Git repository setup at local
+`git push`, before the workflow gate runs. Git's MSYS sh.exe refuses
+`CreateFileMapping ... Win32 error 5` under this sandbox. Baseline proof:
+`b4-baseline-git.log` loads `372e6700`'s original test function, confirms its
+AST is identical to the current function, and reproduces the same failure
+on the annotated row. This selected baseline function never calls
+clearwater.__main__, app.main or the export worker; the version gate uses
+its existing clearwater version stub. No application entry point ran.
+No test was skipped, weakened or changed to hide these failures. The seat
+must rerun the five Git cases outside this sandbox; local validation is not
+reported as wholly green.
+
+The four unchanged-after-run modules contributed **1411 passed, 237 skipped**;
+combining those with the final affected workflow-module rerun gives
+**1577 passed, 237 skipped, 5 baseline sandbox failures**, across final file
+states (not a claim that one final five-module command returned that total).
+The 237 skips include all 236 native M cases on Windows, plus one existing
+packaging case. Final focused 17 includes the upload contract, all eight
+mode evaluations, the OFF guard, all six DR-164 guard cases and the lock
+identity/loader assertion.
+
+Verification loop: rechecked all staged residuals against the amended rule;
+unmasked pins/configure/enabled lists/libraries/toolchain equal; lock loaded;
+focused RED distinguished all three pre-change cases; full validation exposed
+the omitted OFF test-helper condition and baseline Git sandbox errors; the
+condition was fixed and its affected module and focused suite rerun; baseline
+error independently reproduced; final scope/reading-line/digest/census review
+found no new in-envelope implementation issue. Ruff/format pass after the
+helper fix; mypy inputs (src/tools, including the lock consumer) unchanged
+since both clean platform runs. macOS behavior, the real validation upload,
+and run-10 evidence remain runner/owner proofs, not inferred from Windows.
+
+| Phase | Critical | Major | Minor | Advisory | In/out | New/reopened | Reverts | Fix surface | Review / next | Dispatcher depth |
+| --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- | --- |
+| B3 STOP / B4 ruling | 0 | 0 | 1 comparison finding, ruled permitted | 0 | 1/0 | supplied/0 | 0 | Uncommitted ledger amend only | efa2de83 applied | 103K at resume |
+| A half-B r1 + Q1-tool A1 folds | 0 | 0 | 2 | 5 | 7/0 | supplied/0 | 0 | Test guard/citation + appended reading rules | Claude seat review | 103K at resume |
+| B4 validation | 0 | 0 | 1 helper omission fixed; 1 baseline sandbox limitation | 0 | 1/1 | 2/0 | 0 | Test-only helper; no environment workaround | Seat reruns five Git cases; run 10 | No later figure supplied |
