@@ -6458,3 +6458,52 @@ and run-10 evidence remain runner/owner proofs, not inferred from Windows.
 | B3 STOP / B4 ruling | 0 | 0 | 1 comparison finding, ruled permitted | 0 | 1/0 | supplied/0 | 0 | Uncommitted ledger amend only | efa2de83 applied | 103K at resume |
 | A half-B r1 + Q1-tool A1 folds | 0 | 0 | 2 | 5 | 7/0 | supplied/0 | 0 | Test guard/citation + appended reading rules | Claude seat review | 103K at resume |
 | B4 validation | 0 | 0 | 1 helper omission fixed; 1 baseline sandbox limitation | 0 | 1/1 | 2/0 | 0 | Test-only helper; no environment workaround | Seat reruns five Git cases; run 10 | No later figure supplied |
+
+### Seat ledger append: lock-turn Claude A r1 M1 / A2 / A3 (CHARC `b08a354a`)
+
+Appended by the orchestrator seat (gen 72) after the gate on `53095351` and
+before the READY post. Review of record:
+`C:/Users/rwsmy/clearwater-review-evidence/wp6.5/dr163/A-claude-lock/r1/review.txt`
+(`VERDICT: NO_NEW_CRITICAL_MAJOR`; 1 MINOR + 3 ADVISORY). A1 is DR-165
+(reserved by CHARC, a 1.2.0 release blocker, its own package after run 10)
+and is not folded here. Earlier lines are left unchanged.
+
+#### M1 (MINOR): corrected lock pointers
+
+The line under "Re-pin and re-census" above that cites
+`tools/package/ffmpeg-macos.lock.json:6` and `:22` for the fork commit, run,
+job and tag has the wrong pointers; no value it states is wrong. At
+`53095351` the lock carries them at:
+
+- `:6` `census.job_url` = run `43061417269`, job `130719735477`;
+- `:20` `release_tag` = `ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-5314a43`;
+- `:21` `build_repository_commit` = `5314a43c6ea6145a826e34e30ac3a965cef1b996`;
+- `:22` `build_run_url` = run `43061417269`.
+
+Re-read at the seat with `sed -n '6p;20p;21p;22p'` on the lock at `53095351`.
+
+#### A2 (ADVISORY): RUN-10 READING LINE 5, the validation bundle
+
+5. The `macos-validation-bundle` artifact MUST exist on run 10 and hold three
+   files: the zip, its `.zip.sha256`, and `THIRD_PARTY_NOTICES-macos.md`. The
+   zip MUST match the digest line of its `.zip.sha256` (the "Stage release
+   assets" step appends a `# source-commit: <sha>` comment line to that file,
+   `macos-build.yml:309`; that sha MUST be run 10's head). The seat downloads it within the day
+   (artifact retention 1 day), read-only
+   (`gh run download <id> -n macos-validation-bundle`), and checks the digest
+   before any sheet fill. A missing artifact or file, or a digest mismatch, is
+   a FINDING. A red step in validation mode leaves no bundle ("Stage release
+   assets" runs only after every earlier step succeeded); that is accepted,
+   because a red run 10 needs a fix round before the Mac anyway. No workflow
+   change.
+
+#### A3 (ADVISORY): the census line-counting rule
+
+The lock's census line ranges (`census.external_libraries`
+`build-ffmpeg.log:145-154`, and every other `build-ffmpeg.log` / job-log range
+it cites) are `str.splitlines()` line numbers. Line 4 of `build-ffmpeg.log`
+(git checkout progress) carries bare CRs (103 per the review), so a
+`\n`-only count (`grep -n`, `sed -n`, most editors) numbers later lines
+differently, and `145-154` then points into the "Enabled decoders" table. The
+previous pin's range (`144-153`) used the same `str.splitlines()` convention.
+A reader re-verifying a range counts with `str.splitlines()`.
