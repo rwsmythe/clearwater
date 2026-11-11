@@ -5,74 +5,98 @@
 
 ### Generation
 
-- **Generation 70** (session `clearwater-orchestrator-20261110-2231`). LIVE 2026-11-11 08:31Z from gen 69's rollover `b696bb2d`. **ROLLED ~09:50Z 2026-11-11 at the ~400K cap, with NOTHING it started still running.**
-  - **Seat folder `work/orch-g70/`:**
-    - drains 1-8;
-    - posts and queries (`online.md`, `q-*.md`, `post-*.md`);
-    - `make_d6.py` / `make_dA1.py` / `make_dB1.py` (FRESH-prompt assembly);
-    - `last_text.py <jsonl> <out>` (a subagent's last text, used when a chat return is truncated);
-    - `pending.md` (the carried items).
-  - **Seat QA:** gen 65's `bash work/orch-g65/qa.sh <sha> <label>` from the DETACHED `wp6.5-rB`, plus `tests/test_macos_timing_evidence.py` separately.
-  - **Gate:** gen 64's `work/orch-g64/gate.sh` + `watch2.sh`.
-  - **Bash gauge:** 327 ms (PowerShell-measured).
+- **Generation 71** (session `clearwater-orchestrator-20261110-2357`). LIVE 2026-11-11 09:57Z from gen 70's rollover `491211bf`. **ROLLED ~20:26Z 2026-11-11 at the ~400K cap, with NOTHING it started still running.**
+  - **Seat folder `work/orch-g71/`:**
+    - drains 1-11;
+    - posts (`online.md`, `q-*.md`, `post-*.md`, `status-*.md`);
+    - `census.py` (DR-164 census), `classify_logs.py` (build-metadata multiset classifier);
+    - `l2_trim.py` (the persistent trim), `l4.sh` (the win-ref record), `qa-gate.sh <sha>` (seat QA then the full gate);
+    - `make_dQ1.py` / `make_dB3.py` / `make_dB4.py` (dispatch + FRESH-prompt assembly);
+    - `pending.md` (the running seat notes).
+  - **Seat QA + gate:** `bash work/orch-g71/qa-gate.sh <sha>` (from the detached `wp6.5-rB`), which chains gen 65's `qa.sh` and gen 64's `gate.sh` (legs static collect harness parallel serial). Watch: gen 64's `watch2.sh g71-<sha> <lines>`.
+  - **Bash gauge:** 34 ms (PowerShell-measured).
 - **NOTHING IS RUNNING.** No cell, Codex turn, review, gate or leg.
-  - Retired cells: `wp65-sheet1` (309,166 at its last yield) and `wp65-sheet2` (164,939 at yield). Do not message either.
-  - Codex sessions:
-    - half A `01a1c9c5` is DONE (depth 94,268).
-    - half B `01a1c9d8` is DONE (turn 2 returned at depth 220,939; any further half-B turn is FRESH).
-    - the DR-164 diagnosis and the sheet reads are DONE.
-- **CHARC is gen 22, `clearwater-charc-20261110-0800`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
+  - Retired cells: `wp65-sheet3` (102,716 at yield). Do not message it.
+  - Codex sessions: Q1-tool `01a1ca4d` DONE (126,470); lock turn `01a1cbf4` DONE (turn 4 returned at 178,918; any further lock-turn fold is FRESH).
+- **CHARC is gen 23, `clearwater-charc-20261111-0900`** (online 19:01Z). Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **DR-164 CENSUS: your FIRST act after ONLINE.** Ruling `cf8f3060` item 1 binds verbatim.
-   - The command: `ffprobe -v error -select_streams v:0 -show_packets -show_streams -show_format -show_entries 'packet=pts,dts,duration:stream=time_base,r_frame_rate,start_pts,duration_ts,nb_frames:format=duration' -of json <SOURCE>`.
-   - The sources:
-     - the 19 iPhone MOVs in scope (`docs/reports/inventory-2026-10-29.md:278-329`);
-     - the 4 Insta360 HEVC exports (`inventory-2026-11-09.md:138`; list the 3 ProRes as out of admission, NOT probed);
-     - the 34 GoPro originals.
-   - Footage is READ-ONLY: ffprobe reads only; the outputs go to `work/`. Check free disk first.
-   - Per source, record:
-     - the median packet duration;
-     - the decode-order last packet (pts, dts, duration);
-     - the greatest-PTS packet (pts, duration);
-     - the container duration.
-     Report container-rounding positives apart (`docs/reports/wp7.2-last-sample-end.md:15`: two Insta360 exports end exactly one period after the last PTS).
-   - Record: `clearwater-review-evidence\wp6.5\dr164\seat\census.md` plus the raw json.
-   - **READING RULE:** a source whose greatest-PTS packet duration exceeds its median by more than one period is a real long terminal frame, and DR-164 becomes a 1.2.0 BLOCKER. Zero such sources means Phase 7.
-   - Post the result to CHARC; defect (i)'s fix is ruled on it.
-2. **DR-163 half B (tests) on `wp6.5`:** LANDED by the seat as `9e523602` (tests) + `86d4c9df` (ledger); return `wp6.5\dr163\codex-b\return-2.md`. Collection 226 -> 236; four DR-163 xfails removed with exact raw timing assertions; two strict DR-164 xfails (libx265 `regular-final` 8/10); eight timing regressions; two encoder-boundary tests (`-debug_ts -benchmark_all`, `ffmpeg_enc.c:654-717`) with the run-9 RED replayed locally; roster = the two DR-164 ids; 65 portable + 555 notices passed at the cell. NOT yet reviewed: NEXT = Claude A r1 on `6879e2a2..86d4c9df` (form `wp6.5\f02b\A-claude\r4\review-prompt.md`, `codex_cell.py review --worktree <wp6.5-rA moved to 86d4c9df> --base 6879e2a2`).
-   - Then: Claude A (the other model) on the delta from `6879e2a2`, seat QA, the two-leg gate (from the detached `wp6.5-rB`).
-   - Prospective run-10 count: 234 passed + 2 xfailed (DR-164).
-3. **DR-163 half A: fork `wp6.5-macos` = `5314a43c6ea6145a826e34e30ac3a965cef1b996`**, PUSHED, Claude A r1 clean. **HOLD: the fork DISPATCH needs the OWNER'S WORD, relayed by CHARC (still open).**
-   - On the word:
-     - `gh workflow run build-macos.yml -R rwsmythe/FFmpeg-Builds --ref wp6.5-macos`;
-     - verify the asset three ways (GitHub digest, `checksums.sha256`, the seat);
-     - read the archive's `build/versions.txt` patch line (the patch sha256 must be `b598505e8d2859835312ca75ff92f50ec35b2166421a2e5c84c49d4691293c4f`).
-   - Then **half B's LOCK turn**:
-     - re-pin `tools/package/ffmpeg-macos.lock.json` (tag, commit, asset, size, sha256, `version` with the new build date, `configure_line`);
-     - **PLUS the granted workflow edit (CHARC `fac58dc7` item 1):** a `macos-validation-bundle` artifact (zip + `.sha256` + notices), `retention-days: 1`, `if: ${{ !inputs.release-version && env.MACOS_FFMPEG_BUNDLED == 'true' }}`, `macos-release` untouched.
-   - Then run 10 (CHARC pushes it). The run-10 reading lines are in the ledger: A r4 F1 / ADV 2 / ADV 3, CHARC `792af2fd`, and the DR-164 xfail line.
-4. **The stage-2 run sheet: branch `wp6.5-sheet` at `1dea2984`.**
-   - Codex r2 (`wp6.5\sheet\codex-read\r2\review.txt`) found 3 MAJOR:
-     - the log appends at steps 38 / 39 / 42 / 43 escape `needw` (put each inside `needw && { ...; }`);
-     - step 57's `sed` redaction treats names as syntax;
-     - step 30's "15 deselected" count is wrong (`pyproject.toml:72`).
-   - Next: a FRESH Sonnet cell (`wp65-sheet3`, dispatch form `wp6.5\sheet\dispatch-S3.md`), then Codex r3, then merge into `wp6.5` by the seat.
-   - The sheet runs ONLY after run 10 is green and the seat has filled every `SEAT FILLS` / `SEAT CHECKS` marker. Also before the Mac run: the persistent GX011627 trim (L2) and the Windows CPU `export_oracle record` reference (L4).
-5. **After half B's lock turn: package "WP6.5 Q1-tool"** (CHARC `fac58dc7` item 2; Codex lane, Claude A).
-   - It adds `tools/headless_export.py --vt-rate-control {A,B}`, process-scoped.
-   - A test proves the constant is restored, and that Windows is byte-unchanged.
-6. **"DR-164 verify" package**, commissioned REGARDLESS of the census (`cf8f3060` item 3), after the WP6.5 accept unless the census says BLOCKER.
-   - Raw `mdhd` AND the `stts` sum checked against `end_pts - written[0]`, exact rationals.
-   - IF-5 internals only.
-   - RED = the DR-164 fixture refused by the SINK.
-7. **Paces at 09:02Z:** Codex 72 %, pace 0.725 (reset 2026-11-11 10:07Z, so a NEW window after that). Claude 73 %, pace 2.635 (reset 2026-11-16 10:00Z). Claude is the scarce lane: Sonnet for docs cells; re-read before every dispatch.
-8. **Worktrees** (any prune needs the owner's word):
-   - `wp6.5-dr163a` (holds `work/fork`, `work/ffmpeg` at `1f1fedd`, `work/ffmpeg-pristine`; keep until run 10);
-   - `wp6.5-sheet` and `wp6.5-sheet-r` (detached);
-   - `wp6.5-rA` and `wp6.5-rB` (detached at `6879e2a2`; `rB/work/dr164/` and `rB/work/dr163-half-b/` hold the seat probes);
-   - plus gen 69's list (`wp6.5-f83`, `wp7.1*`, `wp7.2*`, `wp-dr125`, `wp6.1`, `wp6.3a/b`, `wp6.4`, `orch-state-g65..g70`).
+1. **Read the gate on `53095351` FIRST:** `work/orch-g64/gate-g71-53095351/summary.txt` and the QA `work/orch-g65/qa-g71-53095351/summary.txt`. **The gate on `53095351` is INCOMPLETE: the serial leg was STOPPED by gen 71 under external CPU load. RE-RUN THE SERIAL LEG.**
+   - Seat QA: fully green (`work/orch-g65/qa-g71-53095351/summary.txt`).
+   - Gate legs (`work/orch-g64/gate-g71-53095351/summary.txt`): static clean; collect identity 9,679 + 1,343 + 7 = 11,029, 0 dup, 0 diff; harness 423 OK; parallel 9,456 passed / 223 skipped / 0 failed (1,056 s, slow under load).
+   - Serial: at ~48 % it showed ONE `F` and then a 300 s timeout in `tests/test_jobs_export_video.py::test_v4_synthetic_5k3_8_7_clip` (stack dump in `serial.log`). The cause: a SIBLING harness (`swing-trading`) was running three `pytest -n 8` suites (about 24 workers) plus msmpeng at 175 %, with CPU at 100 % (seen ~20:23Z). Gen 71 killed its own gate tree (`taskkill /T` on the `gate.sh` bash, PID 42760) at ~20:24Z and confirmed that no `wp6.5-rB` pytest was left. `serial.xml` was not written.
+   - **First act:** check that the machine is quiet: `Get-CimInstance Win32_Processor | Select LoadPercentage`, and no sibling `pytest -n 8` in `Get-CimInstance Win32_Process`. Then re-run the serial leg ALONE from the detached `wp6.5-rB` (already at `53095351`): `bash work/orch-g64/gate.sh wp6.5-rB g72-53095351 serial` in the background, plus a Monitor on `watch2.sh g72-53095351 0`.
+   - If the `F` or the timeout recurs on a quiet machine: identify it from the junit, re-run it alone 3x, and run it at the previous head (`bfff36cc`, where the serial leg was green, 1,324 / 19 / 0) before calling it a defect. Then go to CHARC.
+   - The parallel leg's 1,056 s was under the same load; it was green, so no re-run is needed.
+2. **The seat LEDGER APPEND (CHARC `b08a354a`, binding), before the READY post.** Make one ledger-only commit on `wp6.5` (in the `wp6.5` worktree, by pathspec, LF bytes, CR 0, append-only) carrying:
+   - **M1:** the corrected pointers. Lock `:6` = `census.job_url` (run + job), `:20` = tag, `:21` = commit, `:22` = `build_run_url`. This corrects the line at ledger `:6264`.
+   - **A2:** a run-10 reading line. The `macos-validation-bundle` artifact must exist with its three files (zip, `.zip.sha256`, `THIRD_PARTY_NOTICES-macos.md`), and the zip must match its `.sha256`, downloaded within the day (retention 1 day). A red step in validation mode leaves no bundle. That is accepted, because a red run 10 needs a fix round anyway. No workflow change.
+   - **A3:** the counting rule. The census line ranges are `str.splitlines()` line numbers: the log's line 4 carries bare CRs, so `grep -n` counts differently. The old range used the same convention.
+
+   The review is `wp6.5\dr163\A-claude-lock\r1\review.txt`; quote its pointers.
+3. **The READY post to CHARC** (gen 23). Head = `53095351` + that ledger commit. Include:
+   - the gate figures and the slowest-ten serial line (owed per `d0d9b6dd`: `grep -A12 "slowest" serial.log`);
+   - the push-bar checks run at the seat against `6bf69487..HEAD`: `git diff --stat` shows no `src/` and no `native-licences/`; the `.github` diff = the one step; the lock = the re-pin; `git ls-files --eol` on every changed file shows `i/lf`;
+   - the run-10 reading rule pointer.
+
+   CHARC pushes `macos-validation/wp6.5`. NEVER push it yourself, and never push any other ref.
+4. **After run 10 (CHARC reads it with you):**
+   - Download the `macos-validation-bundle` within the day (`gh run download <id> -n macos-validation-bundle`, read-only), verify the zip against its `.sha256`, and fill the sheet's markers: version / commit, the bundle sha256 at 10a, the run id at L1, the runner's wall and the expected `D` at step 30 (from the seat's own collection with the sheet's `-m` / `-k`), and the DR-163 and 10-bit lines.
+   - Then the stage-1 close. The owner runs stage 2 by hand.
+5. **DR-165 (CHARC `b08a354a`, RESERVED; a 1.2.0 RELEASE BLOCKER):** the bundled macOS FFmpeg is patched, and the bundle does not say so.
+   - Its own package, AFTER run 10 is green. Lane by pace; Codex + Claude A expected.
+   - Scope:
+     1. a strict `patches` field in `ffmpeg-macos.lock.json` (name + sha256 per entry), with the validator checking it against the asset's `build/versions.txt` patch line;
+     2. `ffmpeg-BUILD.txt` gains a "Modified:" line (patch name, sha256, where its text is; `build.py:3082-3102`);
+     3. the patch text is carried into the bundle beside the FFmpeg notices;
+     4. `tools/package/ffmpeg-fork-macos.patch`'s description is brought up to the built recipe.
+   - The Windows lock, Windows `ffmpeg-BUILD.txt` bytes and Windows notices stay byte-identical.
+   - Send CHARC the premise ONLY if the lock schema change reaches a frozen interface; otherwise dispatch on the ruling.
+   - It runs in parallel with the owner's stage 2.
+6. **"DR-164 verify" package** (defect ii, the sink's media-duration gap; `cf8f3060` / `7da78562`): AFTER the WP6.5 accept. Codex + Claude A; 50-100 lines; IF-5 internals only; RED = the DR-164 fixture refused by the SINK.
+7. **Paces at 11:09Z:** Codex 0 % (a new window since 10:07Z; resets 2026-11-18 10:08Z); Claude 77 %, pace 2.632 (resets 2026-11-16 10:00Z). Claude is the scarce lane. Re-read both before every dispatch.
+
+### Standing facts for WP6.5 (each re-verifiable)
+
+- **`wp6.5` head `53095351`** (`git -C .worktrees/wp6.5 log --oneline -8`):
+  - `5c8579d4` + `53095351`: the half-B LOCK turn (lock re-pinned to fork `5314a43` / asset `4f2fd870...d810`, validator PASS, 12 components; the `macos-validation-bundle` step; A1 / A4 folds; ledger with F1 / F2 / A2 / A3 lines, Q1-tool RED 16, the five noise classes);
+  - `372e6700`: the sheet's L2 / L4 seat fill; `42901645`: the sheet's step 34 / 37 fill;
+  - `e4fb0d4d`: WP6.5 Q1-tool (`--vt-rate-control {A,B}`), Claude A r1 clean (4 ADV);
+  - `2cb03a49..bfff36cc`: the run sheet (Codex r4 CLEAN);
+  - `9e523602` + `86d4c9df`: DR-163 half B (tests), Claude A r1 clean (folds carried into the lock turn).
+- **Runner branch of record:** `origin/macos-validation/wp6.5` = `6bf69487` (run 9). CHARC pushes run 10 on my READY post. NEVER push any other ref to origin for WP6.5 (the gen-71 slip: `origin/wp6.5` was pushed and deleted on CHARC `6df71d1d`).
+- **CHARC's run-10 push bar** (gen 23 `dc7aaa21`): fast-forward from `6bf69487`; `src/` 0; `.github` = the validation-bundle step only; `native-licences/` 0; the lock = the re-pin only; `git ls-files --eol` all `i/lf`. Reading: macOS leg `234 passed, 2 xfailed, 0 failed` plus the ledger's reading lines (`da5a86b7` + `ef405237` + `792af2fd` + `c1339c28` + `e2b7e458`).
+- **Fork build (DR-163 half A):** run `43061417269` attempt 3 SUCCESS (attempts 1-2 not acquired; attempt 3 early on the OWNER's chat word after a GitHub Pro upgrade). Tag `ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-5314a43`; asset 37,980,024 B, sha256 `4f2fd870a8c2fc023df3fb2a2bc607f37ff13d5e2004f7789985a77eaeaed810` three ways; patch line `b598505e...93c4f`. Record: `wp6.5\seat\fork-recipe-macos.md` Act 6.
+- **DR-164:** census 0 of 58 (`wp6.5\dr164\seat\census.md`); CHARC `7da78562`: Phase 7, not a blocker; the "DR-164 verify" package (defect ii) is commissioned AFTER the WP6.5 accept.
+- **Seat items done for the Mac run:** L2 `work/orch-g71/l2/GX011627-trim.mp4` (90 frames, sha256 `ffb57fb1...`); L4 `work/wp3.21/oracle/win-ref` (CPU, `ok`, `oracle.json` md5 `15f82ba8...`). Evidence `wp6.5\seat-l2l4\`.
+- **Sheet markers still open:** version / commit (step 4), bundle sha256 (10a), run id (L1), the runner's wall and expected `D` (step 30), the DR-163 and 10-bit run-10 lines. All filled after run 10.
+- **Worktrees:** `wp6.5` (package), `wp6.5-rA` (review copy, detached), `wp6.5-rB` (gate copy, detached), `wp6.5-q1` (Q1-tool, landed; keep until the accept), `wp6.5-sheet` / `-sheet-r`, `wp6.5-dr163a`, plus gen 70's list. Any prune needs the owner's word.
+
+### GEN-71 RECORD
+
+- Online `a33617b1`; CHARC acks `b06e7f6a`.
+- **DR-164 census** (`cf8f3060`): 58 sources, 0 long terminal frames; ruled Phase 7 (`7da78562`).
+- **Half B Claude A r1** NO_NEW_CRITICAL_MAJOR (2 MINOR + 4 ADV, carried into the lock turn, `e2b7e458`).
+- **The sheet:** `wp65-sheet3` folded Codex r2 (`5940a484`); Codex r3 1 MAJOR (step 57 perl `-0777`, seat-applied `4830ec82`); r4 CLEAN; cherry-picked onto `wp6.5`.
+- **Gate green on `bfff36cc`:** parallel 9,414 / 223 / 0 (673 s); serial 1,324 / 19 / 0 (2,261 s); identity 10,987; harness 423.
+- **Q1-tool** (`6df71d1d`): one Codex turn, Claude A r1 clean; landed `e4fb0d4d`; sheet 34 / 37 filled (`4ff3ad5b`).
+- **L2 + L4** at the seat (`4ff3ad5b`).
+- **Fork dispatch** on the owner's word (`81814c85`): attempts 1-2 not acquired, attempt 3 (owner's early word) SUCCESS.
+- **Lock turn:** B3 STOPPED on build-log noise; the seat classified every difference (`dr163\lock-stop\classify.txt`); CHARC `efa2de83` ruled five classes; B4 resumed and landed.
+- **CHARC rolled gen 22 -> gen 23 at 19:00Z.**
+- **Lock turn Claude A r1** NO_NEW_CRITICAL_MAJOR (1 MINOR + 3 ADV; `wp6.5\dr163\A-claude-lock\r1\review.txt`); CHARC `b08a354a`: M1 / A2 / A3 = the seat ledger append before READY; A1 = DR-165 (a 1.2.0 blocker, its own package after run 10).
+- **Gate on `53095351`:** QA green; static / collect / harness / parallel green; serial STOPPED under external load (see PICKUP 1).
+
+### Gen-71 lessons
+
+- **A re-pin is a re-census when the validator ties census fields to identity fields** (`census_build_commit == build_repository_commit`): read the validator before briefing a "re-pin", and stage both builds' `build/` metadata and job logs for the cell.
+- **A strict "anything else differs = STOP" rule fires on build-log noise** (curl meters, parallel-make order). Classify the differences at the seat (a multiset of lines with digits / hex masked) before asking for a ruling; it turned a vague STOP into a five-class ruling in one round.
+- **Check the target ref before every push:** the runner branch is `macos-validation/<branch>`; a plain `git push origin <branch>` made a new public ref.
+- **Read a sheet step's other options against the tool when filling a marker** (`--out` must exist; the default suffix): the fill is a claim.
+- **The heredoc backslash collapse struck once** (a dispatch builder with a Windows path; nothing written); redone with the Write tool and `chr(92)`.
+- **Another harness on this laptop can contaminate a gate leg** (gen 71: `swing-trading` ran three `pytest -n 8` suites during the serial leg; CPU at 100 %, a 300 s timeout, the parallel leg 57 % slower). Before every serial leg, check `Win32_Processor` LoadPercentage and look for sibling pytest processes; a leg run under that load is not of record.
+- **Windows Python cannot open `/c/...` paths** from Git Bash variables: pass `C:/...` forms.
 
 ### GEN-70 RECORD
 
