@@ -5336,8 +5336,8 @@ source/manifest/workflow pass and focused tests found no new product issue.
 same macho identity plus changed whole-file sha256 means record signing variability,
 no failure; a changed identity is a STOP to CHARC. PBS BUILD absent/different is
 recorded and the existing parent-version refusal is a FINDING with the observed
-value, not a STOP. RECORD-ownership refusals are findings unless they name a
-product file. Confirm bundled FFmpeg/ffprobe, notices at Contents/Resources, seal
+value, not a STOP. CHARC `da5a86b7` item 1, verbatim: "a refusal in run 8 is a finding, not a STOP, unless it names a product file".
+Confirm bundled FFmpeg/ffprobe, notices at Contents/Resources, seal
 and smoke PASS, stage success with no validation-mode macos-release upload, and
 the formerly excluded FFmpeg families. U1-U10 and the census's U3/U4/U10 accept
 notes remain in the accepted census; no new upstream evidence claim is made.
@@ -5470,3 +5470,157 @@ ready/push/run-8 proof under the expanded reading checklist.
 | Phase / cumulative review round | Critical | Major | Minor | Advisories | In/out | NEW/REOPENED | Reverts | Fix kind | Review status / transport | Depth |
 |---|---:|---:|---:|---:|---|---|---:|---|---|---|
 | F0-2b Claude A r1 fold | 0 | 2 | 0 | 3 | 5/0 | 5/0 | 0 | Product + manifest statement + tests + ledger | A r1 findings supplied by dispatch, Claude at seat; A r2/B pending | Not supplied |
+
+
+### F0-2b run-8 fold
+
+2026-11-11, fresh Codex implementer; dispatch F0-2b / 4, base `9a086f49`.
+Rulings: CHARC `d0d9b6dd` and `ef405237`. Claude A r2 and Claude B r1
+findings supplied by the dispatcher; no cell invokes its own reviewer. Claude A
+r3, short B on the delta, the two-leg gate and run 9 remain at the seat.
+
+**Run 8 evidence (seat reading, accepted in this dispatch):**
+`clearwater-review-evidence/wp6.5/runner/run-42930761176/` (`macos-evidence/`
+and `full-job.log`), run `42930761176` on `9a086f49`, switch ON, FAILED,
+no STOP. Run 7 reference: `42897107215` on `8955f790`.
+
+| Surface | Run 7 | Run 8 |
+| --- | --- | --- |
+| Runner | macos26 20261102.0473.1, 26.7.2 (25G332), arm64 | Same |
+| PBS BUILD | Not recorded | `20260303`, F4 confirmed |
+| Parallel | 8,018 passed / 1,279 skipped | 8,106 passed / 1,236 skipped / 1 failed (F8-2) |
+| Serial | 526 passed / 797 skipped | Same |
+| Unbundled checks | PASS | PASS |
+| Bundled build | Skipped | Native-origin, hidden-import and content checks PASS; notices refuses only `pyz:_sysconfigdata__darwin_darwin` (F8-1) |
+| Mach-O identities | 155 | 157 (155 plus FFmpeg/ffprobe), zero identity changes, zero shared, zero without `macho:`; bootloader line present |
+| macOS bundle tests | 136 passed | 221 passed / 5 failed (F8-3, F8-4); 90 newly run |
+| Skip check | PASS | Only the five failures; no disallowed skip |
+| Notices/write/seal/smoke/TCL_TK | Not reached | Not reached, planner refused first |
+
+The bootloader's whole-file bytes differ build to build; identity equal.
+The sole unknown-entry message means the real plan admitted the complete file
+inventory, including native files, framework seals, RECORD-owned Info.plists,
+links and resources; stages after the unknown-entry check have no run-8 proof.
+
+**Adjudication and changes:**
+
+| Finding | Classification and disposition | Mechanic and evidence |
+| --- | --- | --- |
+| F8-1 | MAJOR, new, in-envelope, CONFIRMED/FIXED | `build.py:495` `_sysconfigdata_name` holds the unchanged expression; content-check caller `:521` retains its POSIX and PYZ guards. `notices.py:2572` admits only the exact generated module with a `pyz:` label on a POSIX/darwin plan. `run7_release` builds the darwin name on Windows too. Parent RED reproduces the exact run-8 refusal; exact-name/non-PYZ and near-miss controls remain unknown. |
+| F8-2 | MINOR, new, in-envelope, CONFIRMED/FIXED | `test_tools_package_notices.py:5173` removes `.dylibs` with unlink if a symlink, rmdir otherwise; parametrised folder/link shapes preserve the unknown-entry assertion. Host can create the link. Separate APFS-rmdir model executes the parent's test body and current test body against the same link shape. |
+| F8-3 | MAJOR, new, OUTSIDE product ownership, RECORDED; test remediation applied | `test_macos_portability.py:849` marks EXACTLY four VT/VFR sets strict xfail with the ruled DR-163 reason. `:924` wraps `_verify` only for those cases and captures before sink cleanup. `:876` records ffprobe packet/stream/format output, `read_movie_boxes` edit list and product verify reader's last stts `(count, delta)`, plus written first/end and time base. Re-raises the original `VideoEncodeError`. No product timing change; hypothesis remains unconfirmed pending run-9 output. |
+| F8-4 | MINOR, new, in-envelope, CONFIRMED/FIXED | P17 at `test_macos_portability.py:1104` supplies the three x265 colour tags with `log-level=error`. Search of every `_clip` call found only P17 using colour output options, so only P17 changed. External laptop FFmpeg proves old transfer unknown, new transfer arib-std-b67. |
+| B F1 | MINOR, new, in-envelope, CONFIRMED/FIXED test recorder | `test_tools_package_notices.py:502` adds executable-absent seal; both absent and unowned cases require the seal label. A scratch mutant replacing the executable-attributed guard with True fails BOTH controls: absent case does not raise; unowned case names only the executable. |
+| B A1 | ADVISORY, new, in-envelope, CONFIRMED/FIXED | `_carried_notice_rows`, `notices.py:2816`, filters context by declared same-platform hosts, matching loader F1. `test_tools_package_notices.py:4485` appends a darwin host to a Windows carried row: literal Windows error unchanged. Parent includes the darwin path and fails equality. |
+| B A2 | ADVISORY, new, in-envelope, CONFIRMED/FIXED | `test_tools_package_notices.py:5583` renamed for preserved hosts/components/limits; asserts the current census complete and all 17 Windows limits equal `200dffd8`. |
+| B A3 | ADVISORY, new, in-envelope, CONFIRMED/FIXED | The historical Run 8 checklist now quotes CHARC `da5a86b7` item 1 verbatim, widening it from RECORD-ownership to every refusal. Identity changes remain the separate STOP. |
+| A r2 ADV | ADVISORY, new, in-envelope, CONFIRMED/FIXED optional recorder | `test_tools_package_notices.py:826` adds other-row: TCL_TK only in numpy and absent from Pillow refuses with the named U-T1 message. No product change required. |
+
+**Validation evidence:** all runners write under `work/wp6.5/f02b-run8/`.
+The copied runner preloads `sandbox_mkdir_shim`, clears the inherited PYTHONPATH
+before build tools execute, disables cacheprovider, uses disposable basetemps,
+and excludes the shell-start integration test; all rosters exclude GPU.
+No frozen build/run, network fetch, product entry-point launch or GUI launch.
+Only installed external Winget FFmpeg/ffprobe were used for the tiny synthetic
+MP4 probe, never the repository's `bin/` tools.
+
+- Focused GREEN: 22 passed (`green2.log`).
+- Parent RED: `red-code.log` has two expected failures (exact run-8 unknown
+  PYZ message and carried-context literal equality); `red-mac.log` has two
+  expected failures (no xfail marks, P17 still uses colour_trc).
+- Seal guard mutation: two expected failures (`mutant-seal.log`).
+- Recorder unit controls exercise actual synthetic movie boxes with mocked
+  ffprobe output and prove capture occurs before cleanup, preserving the original
+  exception. `real-probe.log` and `synthetic-vt-evidence.txt` additionally exercise
+  the writer on a real libx265 MP4 with external FFmpeg/ffprobe. Real VT failure
+  capture and the four xfails cannot execute off macOS; run 9 supplies them.
+- The workflow's existing summary parser accepts `xfailed` via its `[a-z]+`
+  counts; it rejects only failed/errors and disallowed SKIPPED reasons. Four
+  xfails with passing tests therefore pass as written; executing that exact step
+  against a synthetic 221-passed/4-xfailed log succeeded (`skip-probe.log`).
+  Workflow unchanged.
+- `root-annex.log`: root annex matches. No annex regeneration.
+
+| Final check | Observed result | Log |
+| --- | --- | --- |
+| ruff check . | All checks passed | `ruff-final.log` |
+| ruff format --check . | 339 files already formatted | `format-final.log` |
+| mypy | Success, 166 source files | `mypy.log` |
+| mypy --platform darwin | Success, 166 source files | `mypy-darwin.log` |
+| notices/build, plain -n 3 | 1,345 passed, 1 skipped, 137.47 s | `plain-final.log` |
+| notices/build, -n 3 --dist loadfile | 1,345 passed, 1 skipped, 214.98 s | `loadfile-final.log` |
+| smoke/macOS/workflow/bench serial, not gpu | 245 passed, 227 skipped, 1 deselected, 5 sandbox Git failures, 105.39 s | `serial.log` |
+| Windows ordinary/X.app output, platform-local refusal literals, declarations/limits | 5 passed | `windows-locks.log` |
+| APFS-rmdir parent/current probe | Parent: 1 expected NotADirectoryError failure; current: 1 passed | `red-dot-final.log`, `green-dot-final.log` |
+| root annex CLI | root annex matches | `root-annex.log` |
+| diff/scope/LF | diff check 0; only five owned files, each LF-only | `diff-final.log`, `final-integrity.log` |
+
+Total valid parent RED: five expected failures (F8-1 exact unknown module;
+B A1 full refusal equality; F8-4 option-list equality; F8-3 exact four-xfail
+roster absent; F8-2 APFS rmdir model). The two deliberate seal-mutant failures
+are additional test-sensitivity evidence, not parent defects. All new controls
+and the three corrected shared-reference fixtures pass in both final rosters.
+The notices/build skip is the existing POSIX-only CPython sysconfig comparison
+on Windows. The serial roster's native-Mac cases skip off darwin; actual VT,
+HLG native P17, native-link shape and run-9 bundle proof remain runner work.
+
+**Seat rerun required:** the same five
+`test_real_git_gate_restores_checkout_overwrite_and_refuses_invalid_tags`
+cases (annotated, lightweight, wrong-commit, mismatched-name, deleted-origin).
+Each fails inside Git's sh.exe with `fatal error - CreateFileMapping`, before
+the gate assertion; scratch local Git fixtures only, no network fetch. No
+out-of-envelope change was made to those tests. Re-run outside the sandbox.
+The serial roster is not claimed green, and the seat's full two-leg gate is
+not substituted by these cell rosters.
+
+**Verification loop:** suspected missing generated-module ownership, confirmed
+independently by parent refusal; fixed with the shared expression and exact-entry
+controls. Suspected seal recorder could pass for the executable's refusal alone,
+confirmed with guard mutation; fixed both message assertions and absent case.
+Three direct shared-reference controls omitted host declarations, which the
+new platform-context rule needs. Confirmed by both initial suite runs (three
+failures each); fixed the fixtures with their same-platform host declaration,
+retaining the original-heading and deduplication assertions.
+Suspected HLG stream tag absent, confirmed by external ffprobe; fixed P17 only.
+A raw root-annex comparison initially flagged the pre-existing CRLF checkout
+conversion: rejected as a false positive after baseline/head blobs compared
+equal, and normalising only checkout CRLF matched all 854,656 LF bytes
+(`annex-lock.log`); no annex edit. The first dot-probe parent loader incorrectly
+resolved ROOT under scratch; invalid result discarded, loader re-rooted and
+`red-dot-final.log` used instead.
+TCL_TK in another row is rejected; no additional product defect. The VT duration
+hypothesis is not claimed confirmed. Final scope/output review retains Windows
+success/refusal locks, unchanged manifest/hosts/limits/texts, no src/workflow/lock
+changes, and the sole permitted build.py helper extraction.
+
+**Run 9 READING CHECKLIST (CHARC `da5a86b7`, `d0d9b6dd`, `ef405237`):**
+
+- Identity changes from run 7 are STOP to CHARC; whole-file sha256-only differences
+  with equal identities get one record sentence. PBS BUILD 20260303 was confirmed
+  in run 8; absent/different in run 9 is a FINDING with the recorded value.
+- CHARC `da5a86b7` item 1 verbatim: "a refusal in run 8 is a finding, not a STOP, unless it names a product file".
+  Apply that reading to run 9; identity changes are the separate STOP.
+- The post-plan stages (native rows, carried texts, limits, `TCL_TK`, the write,
+  the seal with FFmpeg inside, smoke) are proven for the first time.
+- Require notices at `Contents/Resources/THIRD_PARTY_NOTICES.md`, seal and smoke
+  PASS, both FFmpeg tools, the five formerly excluded FFmpeg test families green,
+  successful staging and no validation-mode public macos-release artifact upload.
+- First real-Mac `app_release` / run-7 fixture failures (PBS BUILD, pillow-heif
+  LICENSES_bundled.txt) are FINDINGS, as is a U-T1 refusal. The rendered macOS
+  Pillow block must carry TCL_TK. The pinned Pillow wheel evidence remains census
+  P-P1: 70,307 B, SHA-256
+  `dda12a98c1979cf3d94df1cff45d27a4cb3f04a60c76f76902ac54cac03ec0ce`, line 1365.
+- Expect exactly four strict DR-163 xfails for VT/VFR at 8 and 10 bit; XPASS
+  fails. Read `work/evidence/f8-3-*.txt` for packet duration, edit list, last stts
+  and written first/end. Compare the hypothesised last delta 1335 vs 2002 (667
+  tick shortfall for vid-vfr); diagnosis and product repair are separate work.
+  F8-3 remains a watched OPEN Mac 1.2.0 release blocker, not a stage-1 blocker.
+- U1-U10 census accept notes and the historical CUDA rationale correction remain.
+
+No hosts/components/texts/limits added or modified. Counts remain 56 darwin hosts,
+15 new components, 94 existing component additions, 11 added texts, two reused
+texts, 14 darwin limits; Windows 110 hosts and 17 limits unchanged.
+
+| Phase | Critical | Major | Minor | Advisory | In/out | New/reopened | Reverts | Fix surface | Review / next | Dispatcher depth |
+| --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- | --- |
+| F0-2b run-8 fold | 0 | 2 | 3 | 4 | 8/1 | 9/0 | 0 | Notices + shared build helper + tests + ledger; F8-3 product repair out of scope | A r3 / short B / gate / run 9 at seat | Not supplied |
