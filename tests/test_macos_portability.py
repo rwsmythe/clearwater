@@ -27,12 +27,14 @@ from __future__ import annotations
 import contextlib
 import errno
 import functools
+import hashlib
 import importlib
 import json
 import os
 import re
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import textwrap
@@ -873,6 +875,90 @@ def _vt_vfr_case(source: str, encoder: str) -> bool:
     return encoder == VT and source in {"sample:vid-vfr", "clip:vfr-gap"}
 
 
+def _timing_boxes(path: Path) -> dict[str, Any]:
+    """Read raw video timing using product walkers; parse only the missing header durations.
+
+    ``read_movie_boxes`` supplies timescales and raw edits. ``verify`` supplies the moov,
+    bounded child walk and table reader. The product has no mvhd/mdhd/tkhd duration reader;
+    the small read-only parser here handles their version-0/1 payloads. ctts version 0 is
+    UNSIGNED (unlike version 1); retain that distinction rather than normalising offsets.
+    """
+    from clearwater.io.video import verify
+    from clearwater.io.video.boxes import BoxError, read_movie_boxes
+
+    boxes = read_movie_boxes(path)
+    moov = verify._moov(path)
+    if moov is None:
+        raise BoxError("timing evidence: no moov")
+    media = verify._video_media(moov)
+    if media is None:
+        raise BoxError("timing evidence: no video track")
+    track = next(
+        (start, end)
+        for kind, start, end in verify._boxes(moov, 0, len(moov))
+        if kind == b"trak" and verify._child(moov, (start, end), b"mdia") == media
+    )
+    minf = verify._child(moov, media, b"minf")
+    stbl = verify._child(moov, minf, b"stbl") if minf else None
+    stts = verify._child(moov, stbl, b"stts") if stbl else None
+    entries = list(verify._table_entries(moov, stts, ">II")) if stts else []
+    ctts = verify._child(moov, stbl, b"ctts") if stbl else None
+    ctts_version = moov[ctts[0]] if ctts and ctts[1] > ctts[0] else None
+    if ctts is not None and ctts_version not in (0, 1):
+        raise BoxError("timing evidence: ctts of unknown version")
+    offsets = (
+        list(verify._table_entries(moov, ctts, ">Ii" if ctts_version == 1 else ">II"))
+        if ctts
+        else []
+    )
+    stsz = verify._child(moov, stbl, b"stsz") if stbl else None
+    if stsz is not None and stsz[1] - stsz[0] < 12:
+        raise BoxError("timing evidence: stsz too short")
+    sample_count = struct.unpack_from(">I", moov, stsz[0] + 8)[0] if stsz else None
+    edts = verify._child(moov, track, b"edts")
+    elst = verify._child(moov, edts, b"elst") if edts else None
+
+    def duration(span: tuple[int, int] | None, *, track_header: bool = False) -> Any:
+        if span is None:
+            return None
+        start, end = span
+        if end - start < 4 or moov[start] not in (0, 1):
+            raise BoxError("timing evidence: duration header too short or of unknown version")
+        version = moov[start]
+        # FullBox + creation/modification + (track ID/reserved OR timescale).
+        offset = start + 4 + (16 if version else 8) + (8 if track_header else 4)
+        size = 8 if version else 4
+        if offset + size > end:
+            raise BoxError("timing evidence: duration past the end of its header")
+        return {
+            "version": version,
+            "ticks": struct.unpack_from(">Q" if version else ">I", moov, offset)[0],
+        }
+
+    return {
+        "movie_timescale": boxes.movie_timescale,
+        "media_timescale": boxes.video_timescale,
+        "elst_version": moov[elst[0]] if elst else None,
+        "elst": [
+            {
+                "segment_duration": e.segment_duration,
+                "media_time": e.media_time,
+                "rate": str(e.media_rate),
+            }
+            for e in boxes.edits
+        ],
+        "durations": {
+            "mvhd": duration(verify._child(moov, (0, len(moov)), b"mvhd")),
+            "mdhd": duration(verify._child(moov, media, b"mdhd")),
+            "tkhd": duration(verify._child(moov, track, b"tkhd"), track_header=True),
+        },
+        "stts": entries,
+        "ctts": {"version": ctts_version, "entries": offsets},
+        "sample_count": sum(count for count, _ in entries),
+        "stsz_sample_count": sample_count,
+    }
+
+
 def _write_vt_failure(
     output: Path,
     destination: Path,
@@ -881,9 +967,20 @@ def _write_vt_failure(
     end: int,
     time_base: Fraction,
     error: str,
+    source: Path | None = None,
+    recipe: str | None = None,
+    written_pts: Sequence[int] = (),
+    frame_rate: Fraction | None = None,
+    encode_argv: Sequence[str] = (),
 ) -> None:
-    """Record failed output before sink cleanup, using the product's own box readers."""
-    from clearwater.io.video import find_tool, verify
+    """Record finished output (VT refusal or x265 control) before any sink cleanup.
+
+    The corpus is at most two seconds. Keep a named truncation diagnostic if unexpected
+    metadata exceeds the 192 KiB evidence budget; neither a huge tag nor an external reader
+    error should hide the original encode refusal. ``end`` is the sentinel actually sent by
+    ``_end_stream``; ``written_pts`` excludes that sentinel, as the sink's own list does.
+    """
+    from clearwater.io.video import find_tool
     from clearwater.io.video.boxes import read_movie_boxes
 
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -892,55 +989,134 @@ def _write_vt_failure(
         f"written first: {first}; end: {end}; time_base: {time_base}",
         f"written first seconds: {first * time_base}; end seconds: {end * time_base}",
     ]
+    if source is not None:
+        lines += [
+            "written pts: " + json.dumps(list(written_pts)),
+            f"sentinel pts: {end}",
+            f"source probe.video.frame_rate: {frame_rate}",
+            "encode argv: " + json.dumps(list(encode_argv)),
+        ]
+        try:
+            with source.open("rb") as handle:
+                digest = hashlib.file_digest(handle, "sha256").hexdigest()
+            lines.append(
+                "source identity: "
+                + json.dumps(
+                    {
+                        "path": str(source),
+                        "sha256": digest,
+                        "size_bytes": source.stat().st_size,
+                        "recipe": recipe,
+                    }
+                )
+            )
+        except Exception as diagnostic_error:
+            lines.append(
+                f"source identity failed: {type(diagnostic_error).__name__}: {diagnostic_error}"
+            )
     # Leave a named diagnostic even if a reader fails; never hide the encode refusal.
-    try:
-        done = _run(
-            [
-                str(find_tool("ffprobe")),
-                "-v",
-                "error",
-                "-show_entries",
-                "format:stream:packet=pts,dts,duration,flags",
-                "-of",
-                "compact",
-                str(output),
-            ]
-        )
-        lines.extend([f"ffprobe returncode: {done.returncode}", done.stdout, done.stderr])
-        boxes = read_movie_boxes(output)
-        lines.append(f"read_movie_boxes: {boxes!r}")
-        moov = verify._moov(output)
-        media = verify._video_media(moov) if moov is not None else None
-        minf = verify._child(moov, media, b"minf") if media else None
-        stbl = verify._child(moov, minf, b"stbl") if minf else None
-        stts = verify._child(moov, stbl, b"stts") if stbl else None
-        entries = list(verify._table_entries(moov, stts, ">II")) if stts else []
-        lines.append(f"last stts (count, delta): {entries[-1] if entries else None}")
-    except Exception as diagnostic_error:
-        lines.append(f"evidence read failed: {type(diagnostic_error).__name__}: {diagnostic_error}")
-    destination.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    paths = [("output", output)] + ([("source", source)] if source is not None else [])
+    for label, path in paths:
+        lines.append(f"{label} ffprobe (format, streams, packets):")
+        try:
+            done = _run(
+                [
+                    str(find_tool("ffprobe")),
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format:stream:packet=pts,dts,duration,flags",
+                    "-of",
+                    "compact",
+                    str(path),
+                ]
+            )
+            lines.extend([f"ffprobe returncode: {done.returncode}", done.stdout, done.stderr])
+        except Exception as diagnostic_error:
+            lines.append(
+                f"{label} ffprobe failed: {type(diagnostic_error).__name__}: {diagnostic_error}"
+            )
+        try:
+            lines.append(f"{label} read_movie_boxes: {read_movie_boxes(path)!r}")
+            raw = _timing_boxes(path)
+            lines.append(f"{label} boxes: " + json.dumps(raw))
+            entries = raw["stts"]
+            lines.append(f"last stts (count, delta): {entries[-1] if entries else None}")
+        except Exception as diagnostic_error:
+            lines.append(
+                f"{label} evidence read failed: "
+                f"{type(diagnostic_error).__name__}: {diagnostic_error}"
+            )
+    data = ("\n".join(lines) + "\n").encode("utf-8")
+    limit = 192 * 1024
+    if len(data) > limit:
+        marker = b"\n# EVIDENCE TRUNCATED: exceeded 192 KiB budget\n"
+        data = data[: limit - len(marker)].decode("utf-8", errors="ignore").encode("utf-8") + marker
+    destination.write_bytes(data)
 
 
-def _capture_vt_failure(monkeypatch: pytest.MonkeyPatch, case_id: str, root: Path) -> None:
-    """Wrap verification so failed bytes are read before ``close`` deletes the output."""
+def _capture_vt_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    case_id: str,
+    root: Path,
+    *,
+    source: Path | None = None,
+    recipe: str | None = None,
+) -> None:
+    """Capture verification failures AND VFR controls before ``close`` can delete bytes.
+
+    Observe ``_start``'s final argv without altering it. The original verification result or
+    exception is preserved; diagnostic failures add a note to the original encode exception.
+    No encoder argv/logging option changes, packet tracing or product edits are involved.
+    """
     from clearwater.io.video import FFmpegVideoSink, VideoEncodeError
 
     original = FFmpegVideoSink._verify
     safe_id = re.sub(r"[^A-Za-z0-9_.-]", "_", case_id)
+    commands: dict[int, list[str]] = {}
+    if source is not None:
+        start = FFmpegVideoSink._start
+
+        def record_start(sink: Any, command: list[str]) -> Any:
+            commands[id(sink)] = list(command)
+            return start(sink, command)
+
+        monkeypatch.setattr(FFmpegVideoSink, "_start", record_start)
+
+    def capture(sink: Any, end: int, error: str) -> None:
+        extra = (
+            {}
+            if source is None
+            else {
+                "source": source,
+                "recipe": recipe,
+                "written_pts": tuple(sink._written),
+                "frame_rate": sink._probe.video.frame_rate,
+                "encode_argv": commands.get(id(sink), ()),
+            }
+        )
+        _write_vt_failure(
+            sink._out_path,
+            root / f"f8-3-{safe_id}.txt",
+            first=min(sink._written),
+            end=end,
+            time_base=sink._probe.video.time_base,
+            error=error,
+            **extra,
+        )
 
     def verify(sink: Any, end: int) -> Any:
         try:
-            return original(sink, end)
+            result = original(sink, end)
         except VideoEncodeError as error:
-            _write_vt_failure(
-                sink._out_path,
-                root / f"f8-3-{safe_id}.txt",
-                first=min(sink._written),
-                end=end,
-                time_base=sink._probe.video.time_base,
-                error=str(error),
-            )
+            try:
+                capture(sink, end, str(error))
+            except Exception as diagnostic_error:
+                error.add_note(f"DR-163 evidence capture failed: {diagnostic_error!r}")
             raise
+        if source is not None:
+            capture(sink, end, "verification passed")
+        return result
 
     monkeypatch.setattr(FFmpegVideoSink, "_verify", verify)
 
@@ -1030,8 +1206,19 @@ def test_macos_videotoolbox_v4_corpus(
         return
     source = _v4_source(source_id, sample, tmp_path_factory)
     out = tmp_path / "out.mp4"
-    if _vt_vfr_case(source_id, encoder):
-        _capture_vt_failure(monkeypatch, f"{source_id}-{encoder}-{depth}", REPO / "work/evidence")
+    if source_id in {"sample:vid-vfr", "clip:vfr-gap"}:
+        recipe = (
+            f"{source_id} (tools/fixtures/video.py)"
+            if source_id.startswith("sample:")
+            else f"{source_id} (test_io_video_encode.Clips.make; kwargs={V4_CLIPS['vfr-gap']!r})"
+        )
+        _capture_vt_failure(
+            monkeypatch,
+            f"{source_id}-{encoder}-{depth}",
+            REPO / "work/evidence",
+            source=source,
+            recipe=recipe,
+        )
     run = vf.encode_file(source, out, encoder=encoder, bit_depth=depth)
     record = vf.fidelity_record(source, out, bit_depth=depth, run=run)
     assert record["bit_depth"] == depth
