@@ -5756,3 +5756,172 @@ the run-8 fold, not a new review round; its prior cumulative counts remain above
 | Phase | Critical | Major | Minor | Advisory | In/out | New/reopened | Reverts | Fix surface | Review / next | Dispatcher depth |
 | --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- | --- |
 | F8-3 hook widened | 0 | 0 | 0 | 0 | No new findings | 0/0 | 0 | Tests and ledger only | A/B / seat gate / run 9 | Not supplied |
+
+### F0-2b run-9 record and post-run fold
+
+#### (a) Run 9 record
+
+2026-11-11. Run **42983584425** on **6bf69487**, completed
+**2026-11-11 08:16:16Z**, was GREEN (CHARC `cffbd052`). The following
+runner facts are the seat's record supplied in F0-2b dispatch 6; this cell
+has no access to the downloaded evidence folder and did not re-read it.
+The run-9 reading checklist (`:5596` onward) was applied and every line held.
+
+| Check | Run 8 `42930761176` (`9a086f49`) | Run 9 `42983584425` (`6bf69487`) |
+| --- | --- | --- |
+| Runner | macos26 20261102.0473.1, 26.7.2 (25G332), arm64 | Same |
+| pbs BUILD | 20260303 | 20260303 |
+| Identities | 157 | 157; 0 identity differences |
+| Parallel | 1 failed / 8,106 passed / 1,236 skipped | 8,129 passed / 1,238 skipped / 0 failed |
+| Serial | 526 passed / 797 skipped | 526 passed / 797 skipped |
+| Bundled build | FAILED at notices (`pyz:_sysconfigdata__darwin_darwin`) | All PASS |
+| macOS leg | 5 failed / 221 passed | 222 passed / 4 xfailed / 0 failed; skip-reason step PASS; no XPASS |
+| F8-3 evidence | n/a | 8 of 8 files |
+
+The bootloader's whole-file bytes differ build to build; identity equal
+(`Contents/MacOS/Clearwater` is the sole sha256-only difference).
+
+PASS marks on real bytes in run 9's `build.log`:
+
+- Native-origin, hidden-import and bundle checks PASS.
+- Wrote `Clearwater.app/Contents/Resources/THIRD_PARTY_NOTICES.md`.
+- `bundle seal: PASS (ad-hoc re-sign; codesign --verify --deep --strict)`:
+  the first passing seal with FFmpeg inside the bundle.
+- Bundle and hidden-import re-reads PASS.
+- `notices: PASS (1612 entries; 142 component rows)`: native rows, carried
+  texts, the 14 limits, `TCL_TK` and the darwin `_python_licence` path all
+  passed on real bytes. The corrected first-proof boundary is recorded below.
+- Smoke PASS: the 12 refusals and worker cases, `planted-exception-log`,
+  `ffmpeg-version` / `ffprobe-version` `n9.0.2-47-gb204e94e90`, and smoke's
+  re-plan on the sealed bundle.
+- `ffmpeg-encoders: PASS (hevc_videotoolbox; libx265)`.
+- Wrote `Clearwater-1.1.1-macos.zip`.
+
+F8-3's eight evidence files, with raw timing tables ruling over packet lines:
+
+| Case (both depths) | error: line | Output last raw stts | Media timescale | mdhd duration | elst (movie timescale) | Half-1 prediction |
+| --- | --- | --- | ---: | ---: | --- | --- |
+| vid-vfr VT 8 / 10 | verify_failed edit-list mismatch, `39373/30000` vs `1001/750` | (1, 1335) | 30000 | 39373 | 314984 @ 240000 | Exact |
+| vfr-gap VT 8 / 10 | verify_failed edit-list mismatch, `30767/15360` vs `2` | (1, 559) | 15360 | 30767 | 192000 empty + 769175 @ 384000 | Exact |
+| vid-vfr x265 8 / 10 | verification passed | (2, 2002) | 30000 | 40040 | 320320 @ 240000 | Span intact |
+| vfr-gap x265 8 / 10 | verification passed | (43, 512) | 15360 | 30720 | 192000 + 768000 @ 384000 | Span intact |
+
+The decisive refuter, a vid-vfr VT final raw stts delta of 2002, was NOT met.
+Diagnosis half 2 then confirmed the cause in the source: the VT wrapper
+never sets `pkt->duration`; `mux.c:605-620` substitutes the average period
+for the last sample. The run-9 values match both half-1 predictions at
+both depths. The inference boundary is retained in part (c).
+
+#### (b) Standing macOS-run reading checklist additions
+
+These apply to run 10 and every later macOS run. The watched-xfail checks
+apply while the four DR-163 xfails remain; their removal belongs to the
+separate DR-163 package. Existing identity and product-file STOP rules hold.
+
+- [ ] **A r3 MINOR 1:** Each strict DR-163 xfail must have failed FOR
+  DR-163: each of the four VT `f8-3-*.txt` files exists and its `error:` line
+  is the `verify_failed` "video edit list" mismatch. A missing file or any
+  other error is a FINDING: the xfail held for a different reason. pytest's
+  junit and `-rs` record only the xfail reason, never the real exception;
+  the evidence file is the only record. No `raises=` is added: it would
+  change CHARC's ruled form and still hide a different `VideoEncodeError`
+  code.
+- [ ] **A r3 ADVISORY 2:** Correct the historical run-9 checklist's
+  first-proof claim: native rows, `_embedded_claims`, `load_native_licences`,
+  `_native_rows` and `_check_embedded_parents` were already proven in run 8,
+  before the unknown-entry raise at `notices.py:2632`. Run 9 first proved
+  the fixture stubs on real inputs: `_python_licence`'s darwin path
+  `lib/python3.12/LICENSE.txt`; the real carried-text pins (3 numpy,
+  1 Pillow); the real macOS wheels' licence inputs; the seal with FFmpeg
+  nested in `Contents/MacOS`; and smoke on darwin, including its re-plan
+  on the sealed bundle. All PASSED on run 9.
+- [ ] **B F1 (MINOR):** Read an `XPASS(strict)` on a watched VT case
+  first against VT's advertised bit depths. An unadvertised depth runs
+  `assert_unadvertised_refused(row); return` and passes. An XPASS with no
+  `f8-3-<case>.txt` file is an unadvertised depth (`capability._detect`'s
+  10-bit trial failed): a capability FINDING, not a DR-163 fix.
+- [ ] **B F2 (MINOR):** F8-3's packet table has no `stream_index`;
+  vid-vfr has an AAC track copied by the sink, so its last `packet|` line
+  can be audio. Read the last VIDEO sample from the raw final `stts` entry
+  with the video stream's time base. Raw `stts` is the storage evidence
+  and rules over any ffprobe packet line or duration. Capturing
+  `stream_index` would change CHARC's ruled argv and was not done.
+- [ ] **B F3 (ADVISORY):** The F8-3 evidence set is EIGHT files: four VT,
+  each with the `verify_failed` edit-list error, and four `libx265`
+  controls, each with `verification passed`. A missing control file means
+  the hook was not installed: a FINDING. CHARC `ef405237` item 2's
+  confirmation clause is "(or 0 with stts last entry 1335)".
+  Half 1's caveat (`half-1.txt:236`) still applies: a zero or missing
+  ffprobe duration beside a raw 1335 / 559 is an additional demux/reporting
+  observation, not the confirmation itself; the raw `stts` is.
+
+#### (c) DR-163 disposition
+
+CHARC `d94f38dd`: diagnosis half 2 is the diagnosis of record. The VT
+wrapper emits no packet duration; the generic mux layer substitutes the
+average period on the terminal sample. Every earlier sample keeps its
+source duration; there is no reordering. The boundary into
+`guess_pkt_duration` stays INFERRED; no packet trace was added by this cell.
+
+Fix = option (b), an FFmpeg VideoToolbox wrapper patch in the owner's fork
+and a re-pinned macOS lock, in the separate **WP6.5 DR-163** package,
+proven by run 10. No such repair or xfail change belongs to this fold.
+
+**Reserved, closed by the DR-163 package when run 10 is green:**
+
+> product, watched -> closed by the DR-163 package: FFmpeg's VideoToolbox wrapper emits no packet duration; the muxer's average-period substitution alters the terminal sample of a VFR (and in principle CFR) export; Clearwater's D94 verify refuses it; signal = the four VT+VFR xfails; fix = the fork wrapper patch + re-pinned macOS lock; evidence = runs 8-9 + `f83/half-1.txt` / `half-2.txt`.
+
+#### (d) Success-path capture guard and local validation
+
+A r3 ADVISORY 3: CONFIRMED/FIXED, new, in-envelope. At
+`tests/test_macos_portability.py:1120`, only the success-path `capture(...)`
+call is guarded, matching the failure-path diagnostic guard. On a capture
+exception, `warnings.warn` (`:1123`) names the original case id and error;
+verification's original report is returned unchanged. The original verify
+call, its failure path, safe-write cleanup and the four strict DR-163
+xfails are unchanged. The docstring now covers successful-capture warnings.
+
+The portable regression at `tests/test_macos_timing_evidence.py:347`
+stubs the writer to raise `OSError("evidence disk full")`, calls the real
+interception wrapper, asserts report object identity, and requires exactly
+one UserWarning containing the case id and error. The failure-path control
+still asserts the original `VideoEncodeError` object survives diagnostics.
+
+Evidence under `work/wp6.5/f02b-postrun/`, every command run in the foreground:
+
+| Check | Observed result | Log |
+| --- | --- | --- |
+| RED on byte-exact `git show 6bf69487:tests/test_macos_portability.py`, via `WP65_MACOS_TEST_SCRIPT` | 1 failed, 12 deselected: writer's OSError escapes at wrapped verify; `pytest.warns` reports DID NOT WARN | `red.log` |
+| Focused GREEN | 1 passed, 12 deselected: original report returned, exactly one named warning | `green.log` |
+| Both touched test modules, serial, `-m "not gpu"` | 13 passed, 226 skipped (native macOS leg off darwin) | `modules.log` |
+| ruff check . | All checks passed | `ruff.log` |
+| ruff format --check . | 340 files already formatted | `format.log` |
+| mypy | Success, 166 source files | `mypy.log` |
+| mypy --platform darwin | Success, 166 source files | `mypy-darwin.log` |
+| Scope, append-only ledger, parent copy, LF and diff | Exactly three owned files; ledger extends HEAD byte-for-byte; parent copy exact; zero CR bytes; diff check exit 0 | `integrity.log` |
+
+The copied sandbox runner loads `sandbox_mkdir_shim` after adding scripts
+to its import path and clears PYTHONPATH for the environment guard. Tests
+use `-p sandbox_mkdir_shim -p no:cacheprovider`, worktree basetemps and
+`-k 'not test_python_m_clearwater_starts_the_shell_and_exits_0'`. No GPU,
+GUI, frozen run, network fetch or repository bin tool was used. Native VT
+tests skip on this Windows host; the run-9 facts above are supplied seat
+evidence, not a claim of local VT execution. A VIRTUAL_ENV path mismatch
+warning from uv is incidental: uv selected this worktree's `.venv`.
+
+Verification loop: suspected evidence-I/O failure on successful verify;
+confirmed independently against the pinned parent; fixed the capture-only
+guard; full touched-module rerun preserves normal capture and original
+failure identity. The first format check requested one line collapse in
+the new test; formatted it before the recorded final checks. No false
+positive or remaining implementation finding. Reviewer/gate acceptance
+remains with the seat. Dispatcher depth was not supplied.
+
+No hosts, components, texts or limits changed (zero additions). No product,
+workflow, manifest, lock or existing licence text changed. All 110 Windows
+host rows and 17 Windows limits remain untouched; the historical Windows
+byte-check results are not presented as fresh local runs in this fold.
+
+| Phase | Critical | Major | Minor | Advisory | In/out | New/reopened | Reverts | Fix surface | Review / next | Dispatcher depth |
+| --- | ---: | ---: | ---: | ---: | --- | --- | ---: | --- | --- | --- |
+| F0-2b post-run fold | 0 | 0 | 3 (A r3 M1 + B F1/F2) | 3 (A r3 A2/A3 + B F3) | 6/0 | 6/0 | 0 | One test guard + ledger | Supplied A r3/B items folded; seat acceptance / separate DR-163 package and run 10 | Not supplied |
