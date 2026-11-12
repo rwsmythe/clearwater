@@ -5,73 +5,93 @@
 
 ### Generation
 
-- **Generation 71** (session `clearwater-orchestrator-20261110-2357`). LIVE 2026-11-11 09:57Z from gen 70's rollover `491211bf`. **ROLLED ~20:26Z 2026-11-11 at the ~400K cap, with NOTHING it started still running.**
-  - **Seat folder `work/orch-g71/`:**
-    - drains 1-11;
-    - posts (`online.md`, `q-*.md`, `post-*.md`, `status-*.md`);
-    - `census.py` (DR-164 census), `classify_logs.py` (build-metadata multiset classifier);
-    - `l2_trim.py` (the persistent trim), `l4.sh` (the win-ref record), `qa-gate.sh <sha>` (seat QA then the full gate);
-    - `make_dQ1.py` / `make_dB3.py` / `make_dB4.py` (dispatch + FRESH-prompt assembly);
-    - `pending.md` (the running seat notes).
-  - **Seat QA + gate:** `bash work/orch-g71/qa-gate.sh <sha>` (from the detached `wp6.5-rB`), which chains gen 65's `qa.sh` and gen 64's `gate.sh` (legs static collect harness parallel serial). Watch: gen 64's `watch2.sh g71-<sha> <lines>`.
-  - **Bash gauge:** 34 ms (PowerShell-measured).
-- **NOTHING IS RUNNING.** No cell, Codex turn, review, gate or leg.
-  - Retired cells: `wp65-sheet3` (102,716 at yield). Do not message it.
-  - Codex sessions: Q1-tool `01a1ca4d` DONE (126,470); lock turn `01a1cbf4` DONE (turn 4 returned at 178,918; any further lock-turn fold is FRESH).
-- **CHARC is gen 23, `clearwater-charc-20261111-0900`** (online 19:01Z). Re-verify the name in `comms/.launch-sessions.json` before every cue.
+- **Generation 72** (session `clearwater-orchestrator-20261111-1026`). LIVE 2026-11-11 20:27Z from gen 71's rollover `43a255e9`. **ROLLED ~01:25Z 2026-11-12 at the ~400K cap, with NOTHING it started still running.** Checked at roll: 0 guard / loop / gate processes, 0 clearwater pytest, 0 `codex exec`.
+  - **Seat folder `work/orch-g72/`:**
+    - drains 1-3; posts (`online.md`, `post-*.md`, `q-*.md`, `status-*.md`); `pending.md` (the running notes);
+    - `read_run10.py` + `run10-reading.txt` (the run-10 reading);
+    - `fill_sheet.py`, `append_ledger.py`, `ledger_dr165_seat.py` (seat ledger / sheet edits, LF bytes);
+    - **`quiet-serial.sh <run-id> [N]`** (the guarded quiet serial leg) and **`retry-serial.sh`** (attempts g72q5..g72q12; edit the `for i` list to fresh ids before re-arming); `watch-retry.sh` (the Monitor form);
+    - `qa-rA.sh` / `qa-gate-rA.sh <sha>` (seat QA + static / collect / harness / parallel from `wp6.5-rA`);
+    - `wp6.5-mac-in/` (the staged Drive folder); `dr165/` (seat inputs: fork series, the asset's `versions.txt` and patch).
+  - **Bash gauge:** 85 ms (PowerShell-measured).
+- **NOTHING IS RUNNING.** No cell, Codex turn, review, gate, leg or loop.
+  - Retired cell: `wp65-dr165` (353,277 at its final yield). Do not message it.
+- **CHARC is gen 23, `clearwater-charc-20261111-0900`.** Re-verify the name in `comms/.launch-sessions.json` before every cue.
 
 ### PICKUP, in order
 
-1. **Read the gate on `53095351` FIRST:** `work/orch-g64/gate-g71-53095351/summary.txt` and the QA `work/orch-g65/qa-g71-53095351/summary.txt`. **The gate on `53095351` is INCOMPLETE: the serial leg was STOPPED by gen 71 under external CPU load. RE-RUN THE SERIAL LEG.**
-   - Seat QA: fully green (`work/orch-g65/qa-g71-53095351/summary.txt`).
-   - Gate legs (`work/orch-g64/gate-g71-53095351/summary.txt`): static clean; collect identity 9,679 + 1,343 + 7 = 11,029, 0 dup, 0 diff; harness 423 OK; parallel 9,456 passed / 223 skipped / 0 failed (1,056 s, slow under load).
-   - Serial: at ~48 % it showed ONE `F` and then a 300 s timeout in `tests/test_jobs_export_video.py::test_v4_synthetic_5k3_8_7_clip` (stack dump in `serial.log`). The cause: a SIBLING harness (`swing-trading`) was running three `pytest -n 8` suites (about 24 workers) plus msmpeng at 175 %, with CPU at 100 % (seen ~20:23Z). Gen 71 killed its own gate tree (`taskkill /T` on the `gate.sh` bash, PID 42760) at ~20:24Z and confirmed that no `wp6.5-rB` pytest was left. `serial.xml` was not written.
-   - **First act:** check that the machine is quiet: `Get-CimInstance Win32_Processor | Select LoadPercentage`, and no sibling `pytest -n 8` in `Get-CimInstance Win32_Process`. Then re-run the serial leg ALONE from the detached `wp6.5-rB` (already at `53095351`): `bash work/orch-g64/gate.sh wp6.5-rB g72-53095351 serial` in the background, plus a Monitor on `watch2.sh g72-53095351 0`.
-   - If the `F` or the timeout recurs on a quiet machine: identify it from the junit, re-run it alone 3x, and run it at the previous head (`bfff36cc`, where the serial leg was green, 1,324 / 19 / 0) before calling it a defect. Then go to CHARC.
-   - The parallel leg's 1,056 s was under the same load; it was green, so no re-run is needed.
-2. **The seat LEDGER APPEND (CHARC `b08a354a`, binding), before the READY post.** Make one ledger-only commit on `wp6.5` (in the `wp6.5` worktree, by pathspec, LF bytes, CR 0, append-only) carrying:
-   - **M1:** the corrected pointers. Lock `:6` = `census.job_url` (run + job), `:20` = tag, `:21` = commit, `:22` = `build_run_url`. This corrects the line at ledger `:6264`.
-   - **A2:** a run-10 reading line. The `macos-validation-bundle` artifact must exist with its three files (zip, `.zip.sha256`, `THIRD_PARTY_NOTICES-macos.md`), and the zip must match its `.sha256`, downloaded within the day (retention 1 day). A red step in validation mode leaves no bundle. That is accepted, because a red run 10 needs a fix round anyway. No workflow change.
-   - **A3:** the counting rule. The census line ranges are `str.splitlines()` line numbers: the log's line 4 carries bare CRs, so `grep -n` counts differently. The old range used the same convention.
-
-   The review is `wp6.5\dr163\A-claude-lock\r1\review.txt`; quote its pointers.
-3. **The READY post to CHARC** (gen 23). Head = `53095351` + that ledger commit. Include:
-   - the gate figures and the slowest-ten serial line (owed per `d0d9b6dd`: `grep -A12 "slowest" serial.log`);
-   - the push-bar checks run at the seat against `6bf69487..HEAD`: `git diff --stat` shows no `src/` and no `native-licences/`; the `.github` diff = the one step; the lock = the re-pin; `git ls-files --eol` on every changed file shows `i/lf`;
-   - the run-10 reading rule pointer.
-
-   CHARC pushes `macos-validation/wp6.5`. NEVER push it yourself, and never push any other ref.
-4. **After run 10 (CHARC reads it with you):**
-   - Download the `macos-validation-bundle` within the day (`gh run download <id> -n macos-validation-bundle`, read-only), verify the zip against its `.sha256`, and fill the sheet's markers: version / commit, the bundle sha256 at 10a, the run id at L1, the runner's wall and the expected `D` at step 30 (from the seat's own collection with the sheet's `-m` / `-k`), and the DR-163 and 10-bit lines.
-   - Then the stage-1 close. The owner runs stage 2 by hand.
-5. **DR-165 (CHARC `b08a354a`, RESERVED; a 1.2.0 RELEASE BLOCKER):** the bundled macOS FFmpeg is patched, and the bundle does not say so.
-   - Its own package, AFTER run 10 is green. Lane by pace; Codex + Claude A expected.
-   - Scope:
-     1. a strict `patches` field in `ffmpeg-macos.lock.json` (name + sha256 per entry), with the validator checking it against the asset's `build/versions.txt` patch line;
-     2. `ffmpeg-BUILD.txt` gains a "Modified:" line (patch name, sha256, where its text is; `build.py:3082-3102`);
-     3. the patch text is carried into the bundle beside the FFmpeg notices;
-     4. `tools/package/ffmpeg-fork-macos.patch`'s description is brought up to the built recipe.
-   - The Windows lock, Windows `ffmpeg-BUILD.txt` bytes and Windows notices stay byte-identical.
-   - Send CHARC the premise ONLY if the lock schema change reaches a frozen interface; otherwise dispatch on the ruling.
-   - It runs in parallel with the owner's stage 2.
-6. **"DR-164 verify" package** (defect ii, the sink's media-duration gap; `cf8f3060` / `7da78562`): AFTER the WP6.5 accept. Codex + Claude A; 50-100 lines; IF-5 internals only; RED = the DR-164 fixture refused by the SINK.
-7. **Paces at 11:09Z:** Codex 0 % (a new window since 10:07Z; resets 2026-11-18 10:08Z); Claude 77 %, pace 2.632 (resets 2026-11-16 10:00Z). Claude is the scarce lane. Re-read both before every dispatch.
+1. **Drain the inbox first.** CHARC may have answered `f8d4bacc` (the DR-165 gate), relayed the owner's sibling-pause word, or relayed the Drive word.
+2. **THE QUIET SERIAL LEG ON `d4a1b507` IS STILL OWED** (CHARC `f67fa7f1` + `6899b0eb`; a precondition of the stage-1 close; option 3 refused).
+   - The gate copy `wp6.5-rB` is detached at `d4a1b507`; do not move it.
+   - **Re-arm at pickup** (CHARC: "re-arm the retry loop ... let it run overnight"):
+     - set fresh ids in `work/orch-g72/retry-serial.sh`'s `for i` list (g72q1-g72q5 are used; use e.g. `g73q1`... by editing the `RUN` prefix, or `13 14 ...`);
+     - then `bash work/orch-g72/retry-serial.sh > work/orch-g72/retry-serial.out 2>&1` in the background, plus a Monitor on `watch-retry.sh` (its glob is `gate-g72q*-d4a1b507`: widen it if you change the prefix).
+   - **The guard (`quiet-serial.sh`):**
+     - it starts a leg only after N=10 quiet 60 s samples: CPU < 35 %, no non-clearwater pytest, no seat work (a `codex exec ... read-only` review or a clearwater pytest), and no `work/orch-g72/HOLD` file;
+     - it STOPS the leg (`taskkill /T`) when a sibling pytest shows on 2 consecutive samples;
+     - logs: `work/orch-g72/guard-<run>.log`, summaries `work/orch-g64/gate-<run>/summary.txt`.
+   - **Never edit `quiet-serial.sh` while an instance runs:** stop the loop with TaskStop, then `taskkill /T` the leftovers (TaskStop leaves the bash children), then edit and restart.
+   - **On the owner's pause word** (CHARC relays): if a cell is mid-check, let it reach its yield first. Then make sure the loop is armed. It starts within ~10 min of quiet; for a faster start, run `quiet-serial.sh <id> 3` directly.
+   - **When a leg completes green:** post the figures + the slowest ten to CHARC (`grep -A12 slowest serial.log`). That is the stage-1 close precondition.
+   - A V7 failure on a QUIET leg is a finding to CHARC with the junit.
+3. **The stage-1 close after the quiet leg** (CHARC orders it): the sheet is filled (`c6a1b9bb`), and the run-10 reading is posted (`ac92b486`) and in the ledger.
+   - Hand-over of the Drive folder `work/orch-g72/wp6.5-mac-in/`: copy to `G:\My Drive\wp6.5-mac-in` ONLY on CHARC's relay of the owner's word.
+   - The bundle artifact expired 2026-11-12 23:07Z, but the local copy is in `clearwater-review-evidence\wp6.5\runner\run-43115320682\macos-validation-bundle\` and in the staged folder.
+4. **DR-165 (`wp6.5-dr165`, head `40de4915`):** both nets clean, QA green. The parallel leg had 3 load timeouts (`test_app_export_worker`), 3/3 alone. AWAIT CHARC's ruling on `f8d4bacc` (my recommendation: legs of record on a quiet machine with the WP6.5 accept gate, or back to back with the quiet `d4a1b507` leg). Its serial leg has not been run. It merges into `wp6.5` at the WP6.5 accept (the orchestrator merges); its proof on the real archive is the next runner run with the switch on.
+5. **Accept items held** (for the WP6.5 accept):
+   - a watched DR row for the load-sensitive V7 100 ms bounds (`test_app_v7::test_v7_a_b_analysis_and_scrubbing`, `test_gui_timeline::test_v7_interface_never_waits_more_than_100_ms_during_analysis_and_a_drag`) and the three export-worker 10 s child-start bounds;
+   - DR-159 additions: the `docs/release-checklist.md:102` `-1` (the fork record is now a two-commit series), and CHARC's residual sentence for the lock-turn checklist item.
+6. **"DR-164 verify" package** (defect ii): AFTER the WP6.5 accept (`cf8f3060` / `7da78562`).
+7. **Paces at 23:20Z 2026-11-11:** Codex 8 %, pace 1.017 (resets 2026-11-18 10:08Z); Claude 3 %, pace 0.082 (resets 2026-11-16 10:00Z). The Claude figure dropped from gen 71's 77 % / 2.632, so treat it as possibly a probe anomaly and re-read before every dispatch.
 
 ### Standing facts for WP6.5 (each re-verifiable)
 
-- **`wp6.5` head `53095351`** (`git -C .worktrees/wp6.5 log --oneline -8`):
-  - `5c8579d4` + `53095351`: the half-B LOCK turn (lock re-pinned to fork `5314a43` / asset `4f2fd870...d810`, validator PASS, 12 components; the `macos-validation-bundle` step; A1 / A4 folds; ledger with F1 / F2 / A2 / A3 lines, Q1-tool RED 16, the five noise classes);
-  - `372e6700`: the sheet's L2 / L4 seat fill; `42901645`: the sheet's step 34 / 37 fill;
-  - `e4fb0d4d`: WP6.5 Q1-tool (`--vt-rate-control {A,B}`), Claude A r1 clean (4 ADV);
-  - `2cb03a49..bfff36cc`: the run sheet (Codex r4 CLEAN);
-  - `9e523602` + `86d4c9df`: DR-163 half B (tests), Claude A r1 clean (folds carried into the lock turn).
-- **Runner branch of record:** `origin/macos-validation/wp6.5` = `6bf69487` (run 9). CHARC pushes run 10 on my READY post. NEVER push any other ref to origin for WP6.5 (the gen-71 slip: `origin/wp6.5` was pushed and deleted on CHARC `6df71d1d`).
-- **CHARC's run-10 push bar** (gen 23 `dc7aaa21`): fast-forward from `6bf69487`; `src/` 0; `.github` = the validation-bundle step only; `native-licences/` 0; the lock = the re-pin only; `git ls-files --eol` all `i/lf`. Reading: macOS leg `234 passed, 2 xfailed, 0 failed` plus the ledger's reading lines (`da5a86b7` + `ef405237` + `792af2fd` + `c1339c28` + `e2b7e458`).
-- **Fork build (DR-163 half A):** run `43061417269` attempt 3 SUCCESS (attempts 1-2 not acquired; attempt 3 early on the OWNER's chat word after a GitHub Pro upgrade). Tag `ffmpeg-9.0-gb204e94e-macos-arm64-nozvbi-5314a43`; asset 37,980,024 B, sha256 `4f2fd870a8c2fc023df3fb2a2bc607f37ff13d5e2004f7789985a77eaeaed810` three ways; patch line `b598505e...93c4f`. Record: `wp6.5\seat\fork-recipe-macos.md` Act 6.
-- **DR-164:** census 0 of 58 (`wp6.5\dr164\seat\census.md`); CHARC `7da78562`: Phase 7, not a blocker; the "DR-164 verify" package (defect ii) is commissioned AFTER the WP6.5 accept.
-- **Seat items done for the Mac run:** L2 `work/orch-g71/l2/GX011627-trim.mp4` (90 frames, sha256 `ffb57fb1...`); L4 `work/wp3.21/oracle/win-ref` (CPU, `ok`, `oracle.json` md5 `15f82ba8...`). Evidence `wp6.5\seat-l2l4\`.
-- **Sheet markers still open:** version / commit (step 4), bundle sha256 (10a), run id (L1), the runner's wall and expected `D` (step 30), the DR-163 and 10-bit run-10 lines. All filled after run 10.
-- **Worktrees:** `wp6.5` (package), `wp6.5-rA` (review copy, detached), `wp6.5-rB` (gate copy, detached), `wp6.5-q1` (Q1-tool, landed; keep until the accept), `wp6.5-sheet` / `-sheet-r`, `wp6.5-dr163a`, plus gen 70's list. Any prune needs the owner's word.
+- **`wp6.5` head `c6a1b9bb`** (`git -C .worktrees/wp6.5 log --oneline -4`):
+  - `c6a1b9bb`: the run-10 reading in the ledger, plus the run-sheet fills (version 1.1.1, commit `d4a1b507...`, 10a sha256 `903cf474...4fc0`, L1 run `43115320682`, step-30 wall 233.49 s with the DR-164 xfails, expected `D` 10808, DR-163 "closed by run 10", 10-bit "proven in run 10");
+  - `d4a1b507`: the seat ledger append M1 / A2 / A3 (`b08a354a`);
+  - `53095351` and below: as gen 71 recorded.
+- **Runner branch of record:** `origin/macos-validation/wp6.5` = `d4a1b507` (CHARC pushed run 10). NEVER push any other ref for WP6.5.
+- **Run 10 `43115320682` GREEN on `d4a1b507`** (22:52-23:07Z). Every reading line held (post `ac92b486`):
+  - macOS leg 234 passed / 2 xfailed (exactly the DR-164 libx265 regular-final pair, with values 1.1 vs 1.0 s);
+  - VT = x265 at 8 AND 10 bit;
+  - smoke `n9.0.2-47-gb204e94e90-20261111`;
+  - identities = run 7 + ffmpeg / ffprobe;
+  - bundle zip sha256 `903cf47410e2e38fad1d7f5a61558594f0e3d3631668900d7bdf2b140f3a4fc0`, `# source-commit: d4a1b507...`.
+
+  Evidence: `clearwater-review-evidence\wp6.5\runner\run-43115320682\`.
+- **The gate on `53095351` / `d4a1b507`:** QA, static, collect (11,029), harness 423 and parallel 9,456 / 223 / 0 are of record from gen 71. Serial: only a LOADED run exists (1,322 / 2 V7 failures, 3,516 s; not of record); the V7 nodes pass 3/3 alone. The quiet leg is owed (PICKUP 2).
+- **DR-165 commits** (`wp6.5-dr165`, from `c6a1b9bb`):
+  - `e2e06854` build;
+  - `f961b918` ledger;
+  - `2595ab05` + `0579d7bd` (A r1 fold);
+  - `4a40cb26` + `9b0f2b8b` (A r2);
+  - `8ff54a0f` + `67d2c290` (A r3);
+  - `40de4915` seat ledger (depths, stop rule `7283c16a`, residual sentence).
+
+  Dispatch and returns: `clearwater-review-evidence\wp6.5\dr165\`. Worktree `.worktrees/wp6.5-dr165` (LF working copy: made by removing the tracked files and re-checking them out with `-c core.autocrlf=false -c core.eol=lf`).
+- **Worktrees:** `wp6.5-rA` detached at `40de4915` (DR-165 review + QA copy); `wp6.5-rB` detached at `d4a1b507` (the serial-leg copy); `wp6.5-dr165`; plus gen 71's list. Any prune needs the owner's word.
+
+### GEN-72 RECORD
+
+- Online `bcf9e78f`.
+- **Serial re-run on `53095351`:** under load, 2 V7 wall-clock failures. READY `04c290e9` (recommend push), and CHARC pushed run 10 (`f67fa7f1`: a quiet serial leg owed before the stage-1 close).
+- **Ledger append** `d4a1b507` (M1 / A2 / A3, plus the `# source-commit:` line rule; line 5 concurred).
+- **Run 10 GREEN;** reading `ac92b486`; ledger + sheet fills `c6a1b9bb`.
+- **Quiet-leg attempts:** g72q stopped at 23:07Z and g72q2 at 23:41Z by `swing-trading` pytest. Query `46f9cdfb`; CHARC `6899b0eb`: option 3 refused, the owner is asked to pause the sibling, the loop runs overnight, the Drive folder is staged only.
+- **DR-165:**
+  - lane Claude by pace; cell `wp65-dr165` (sonnet-high) dispatched under an exclusive-window hold (no tests until released);
+  - A r1-r3 each found a MAJOR in the `versions.txt` classifier and was folded (an allowlist, then exact full-line forms); stop-rule query, CHARC `7283c16a`;
+  - A r4 clean; B clean; QA green; parallel had 3 load timeouts. Post `f8d4bacc`.
+
+### Gen-72 lessons
+
+- **A sibling harness can make a quiet leg impossible for hours** (`swing-trading` started a `pytest -n 8` every 5-15 min). A guard that STARTS only after N quiet samples and STOPS the leg on a sibling's return keeps an unrecorded figure out of the record. A 3-sample pre-check was too short; 10 was still not enough while the sibling was active. Ask the owner for a pause early.
+- **A guard must also gate on the SEAT's own work:** a review's probes or a cell's pytest would contaminate the leg as surely as a sibling's. A HOLD file covers a live cell between its edits and its tests.
+- **Never edit a running bash script** (bash reads it by offset): stop the loop, `taskkill /T` the leftovers, edit, restart.
+- **A Windows worktree checkout is CRLF under the system `autocrlf=true`, and `checkout-index -f` does NOT rewrite files the index thinks are up to date.** Remove the tracked files, then `git -c core.autocrlf=false -c core.eol=lf checkout -- .`.
+- **A classifier reviewed adversarially converges asymptotically** (three MAJORs, one per round, each a new record shape). Go to conservative refusal by round 2, to exact full-line forms by round 3, and ask the director for a stop rule as soon as the second round repeats the class.
+- **An idle notification can truncate a cell's return:** read its last assistant text from the subagent transcript (`agent-a<name>-*.jsonl`) instead of messaging it, because a message re-wakes it.
+- **`glob` skips dot-directories** (`.worktrees`): junit-history scans need the explicit `.worktrees/*/work/` pattern.
 
 ### GEN-71 RECORD
 
