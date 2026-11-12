@@ -6292,6 +6292,18 @@ def _break_patches(case, kind):
         case.members[versions] = fixture_versions(case.data).replace(
             entry["sha256"].encode(), entry["sha256"].upper().encode()
         )
+    elif kind.startswith("empty-lock-"):
+        # An UNPATCHED lock against a checksum record the build cannot treat as a patch: the
+        # record must be refused, never ignored (it would pass as an unpatched build).
+        record = {
+            "empty-lock-diff": f"{entry['sha256']}  {entry['name'][:-6]}.diff",
+            "empty-lock-patch-bak": f"{entry['sha256']}  {entry['name']}.bak",
+            "empty-lock-sha-only": entry["sha256"],
+            "empty-lock-sha-and-word": f"{entry['sha256']}  checksum-of-something",
+            "empty-lock-sha-upper": f"{entry['sha256'].upper()}  {entry['name'][:-6]}.diff",
+        }[kind]
+        case.data["patches"] = []
+        case.members[versions] = fixture_versions(case.data, extra=[record])
     elif kind == "versions-not-utf8":
         case.members[versions] += b"\xff\xfe\n"
     elif kind == "versions-missing":
@@ -6319,6 +6331,11 @@ def _break_patches(case, kind):
         ("versions-repeats-the-patch", "patch lines differ from the lock's patches"),
         ("single-space-patch-line", "malformed patch line"),
         ("uppercase-patch-hash", "malformed patch line"),
+        ("empty-lock-diff", "unsupported checksum record"),
+        ("empty-lock-patch-bak", "unsupported checksum record"),
+        ("empty-lock-sha-only", "unsupported checksum record"),
+        ("empty-lock-sha-and-word", "unsupported checksum record"),
+        ("empty-lock-sha-upper", "unsupported checksum record"),
         ("versions-not-utf8", "not strict UTF-8"),
         ("versions-missing", "missing member"),
         ("patch-file-missing", "missing member"),

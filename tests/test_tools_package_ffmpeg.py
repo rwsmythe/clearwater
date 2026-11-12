@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 import re
 import urllib.request
 from email.message import Message
@@ -1111,9 +1112,10 @@ def test_windows_build_record_bytes_are_the_pre_dr165_form(synthetic_bundle):
             "",
         ]
     )
-    # The writer opens the record in text mode: its line ends are the host's; compare as LF.
-    written = (destination / "ffmpeg-BUILD.txt").read_bytes().replace(b"\r\n", b"\n")
-    assert written == expected.encode("utf-8")
+    # The writer opens the record in text mode (``write_text``): each "\n" is written as the
+    # host's ``os.linesep``. The RAW bytes are compared, so a newline-byte change is seen.
+    wanted = expected.replace("\n", os.linesep).encode("utf-8")
+    assert (destination / "ffmpeg-BUILD.txt").read_bytes() == wanted
     assert sorted(path.name for path in destination.iterdir() if path.suffix == ".txt") == [
         "ffmpeg-BUILD.txt",
         "ffmpeg-LICENSE.txt",

@@ -3080,6 +3080,9 @@ def _check_macos_toolchain_marker(path: Path, lock: FFmpegMacLock) -> None:
 _MACOS_VERSIONS_PATCH_LINE = re.compile(r"([0-9a-f]{64})  (\S+\.patch)")
 """A patch line of the asset's ``build/versions.txt``: sha256, TWO spaces, the recipe path."""
 
+_MACOS_VERSIONS_CHECKSUM = re.compile(r"[0-9a-fA-F]{64}")
+"""A ``versions.txt`` line's first field when the line is a checksum record, not a component row."""
+
 _MACOS_BUILD_MEMBER_LIMIT = 1024 * 1024
 """The most bytes read from one ``build/`` member (``versions.txt`` is under 1 KiB)."""
 
@@ -3133,10 +3136,15 @@ def _macos_build_member(archive: zipfile.ZipFile, lock: FFmpegMacLock, name: str
 def _macos_patch_texts(archive: zipfile.ZipFile, lock: FFmpegMacLock) -> dict[str, bytes]:
     """The lock's patches, proven against the verified archive (DR-165); name -> patch bytes.
 
-    Reads ``<archive_root>/build/versions.txt`` (strict UTF-8) and collects every line whose
-    second field ends in ``.patch``: each must be exactly ``<sha256>  <path>`` (TWO spaces).
-    Those lines must equal the lock's ``patches`` (same entries, none extra, none missing,
-    none repeated), or the lock does not describe the asset. Then each patch's text is read
+    Reads ``<archive_root>/build/versions.txt`` (strict UTF-8) and classifies every line. A
+    component or version row (its first field a name: ``ffmpeg <commit> (...)``,
+    ``x264 <commit> (git)``, ``fontconfig 2.17.1``) is accepted. A CHECKSUM record (its first
+    field 64 hex digits) or any line whose second field ends in ``.patch`` must be exactly
+    ``<sha256>  <path ending .patch>`` (TWO spaces), or the build refuses it: a checksum of
+    another form (``.diff``, ``.patch.bak``, no path) is never ignored, so an unsupported
+    record cannot pass as an unpatched build. The patch records collected must equal the
+    lock's ``patches`` (same entries, none extra, none missing, none repeated), or the lock
+    does not describe the asset. Then each patch's text is read
     from ``<archive_root>/build/<its file name>`` and must hash to the lock's sha256, so the
     bytes the bundle carries are the bytes the build recorded.
 
@@ -3152,10 +3160,16 @@ def _macos_patch_texts(archive: zipfile.ZipFile, lock: FFmpegMacLock) -> dict[st
     recorded: list[tuple[str, str]] = []
     for line in versions.split("\n"):
         fields = line.split()
-        if len(fields) >= 2 and fields[1].endswith(".patch"):
+        patch_shaped = len(fields) >= 2 and fields[1].endswith(".patch")
+        checksum_shaped = bool(fields) and _MACOS_VERSIONS_CHECKSUM.fullmatch(fields[0]) is not None
+        if patch_shaped or checksum_shaped:
             match = _MACOS_VERSIONS_PATCH_LINE.fullmatch(line)
             if match is None:
-                raise ValueError("FFmpeg archive: malformed patch line in build/versions.txt")
+                raise ValueError(
+                    "FFmpeg archive: malformed patch line in build/versions.txt"
+                    if patch_shaped
+                    else "FFmpeg archive: unsupported checksum record in build/versions.txt"
+                )
             recorded.append((match.group(2), match.group(1)))
     locked = [(patch["name"], patch["sha256"]) for patch in lock["patches"]]
     if sorted(recorded) != sorted(locked):
