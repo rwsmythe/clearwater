@@ -6562,47 +6562,66 @@ sibling-harness load and is not of record.
 
 ### DR-165 (wp65-dr165, dispatch DR-165-1; base c6a1b9bb)
 
-Build commit `e2e06854` (items 1-4 and tests). Lane: Claude (pace 0.082 against Codex 1.017);
-Reviewer A is Codex, run by the seat.
+Build commit `e2e06854` (items 1-4 and tests); A r1 fold commit `2595ab05`. Lane: Claude (pace
+0.082 against Codex 1.017); Reviewer A is Codex, run by the seat. Every file:line below was
+re-read against the final source (head of the fold commit) when this section was last written.
 
 **Round-0 answers**
 - Patch line: `<sha256>  <recipe path>` (two spaces) is line 2 of the asset's `build/versions.txt`,
-  as dispatched; component lines carry no `.patch` second field.
+  as dispatched; the other lines are component / version rows (first field a name).
 - Validator: the key set is strict by equality with `FFmpegMacLock.__annotations__`
-  (`build.py:1657` `_ffmpeg_fields`); `schema_version` is the literal `== 2` (`build.py:2113`)
-  and does not require a bump for an added field. Not bumped.
-- Archive read and hashed: `_bundle_macos_ffmpeg` after `_download_ffmpeg`'s hash check;
-  `_macos_archive_members` has inspected every member (unsafe names, duplicates, outside the
-  root). `build/` members are ordinary members of that archive, reached through it.
+  (`build.py:1674` `_ffmpeg_fields`); `schema_version` is the literal `== 2` in the macOS
+  validator (`build.py:2182`; the Windows validator has its own at `:2393`) and does not
+  require a bump for an added field. Not bumped.
+- Archive read and hashed: `_bundle_macos_ffmpeg` (`build.py:3191`) after `_download_ffmpeg`'s
+  hash check; `_macos_archive_members` has inspected every member (unsafe names, duplicates,
+  outside the root). `build/` members are ordinary members of that archive, reached through it.
 - Notices census: a new `Contents/Resources` file is refused ("unknown or ambiguous bundled
-  entry") unless the FFmpeg row lists it (`notices.py` `ffmpeg_labels`), so the patch files
-  are row entries.
+  entry") unless the FFmpeg row lists it (`notices.py:2555` `ffmpeg_labels`, used at `:2561`),
+  so the patch files are row entries.
 
 **Items**
 1. Lock field: `FFmpegPatch` / `FFmpegMacLock.patches` (`build.py:1151`, `:1196`);
    `_macos_patch_entries` (`build.py:2151`, called `:2232`); `_MACOS_PATCH_NAME` (`:2127`).
    Empty list is LEGAL (records an unpatched build; the bundling still checks it against
    versions.txt, so `[]` cannot hide a patch). Build-time proof `_macos_patch_texts`
-   (`build.py:3133`): versions.txt strict UTF-8, patch lines exact, equal to the lock, each patch
-   file hashed to its entry, reads capped at 1 MiB. Lock and fixture carry the field.
-2. BUILD record: `macos_ffmpeg_modified_lines` (`build.py:3087`), used beside `FFmpeg ref:`.
+   (`build.py:3136`): versions.txt strict UTF-8; every line classified (a component / version
+   row accepted; a line whose first field is 64 hex digits, `_MACOS_VERSIONS_CHECKSUM`
+   `:3083`, or whose second field ends `.patch`, must be exactly `<sha>  <path>.patch` or the
+   build refuses it); the patch records equal to the lock; each patch file hashed to its entry;
+   reads capped at 1 MiB (`_macos_build_member`, `:3115`). Lock and fixture carry the field.
+2. BUILD record: `macos_ffmpeg_modified_lines` (`build.py:3090`), used beside `FFmpeg ref:`
+   (`build.py:3291`).
 3. Patch text: `extract_members` left pinned (widening would change an existing lock field); the
    text is read through its own bounded path from the verified archive, staged 0644, placed as
-   `Contents/Resources/ffmpeg-patch-<file>` by `place_macos_tools`. Sites changed:
-   `notices.py:2088-2193` (`_macos_ffmpeg_rows`: patch files from the lock, sha256 checked,
-   row entries, Modified lines compared with the build's, a note per patch);
-   `build.py:3218-3226` (pre-existence), `:3251-3254` (staging). Left deliberately:
-   `notices.py:83` `_APP_FFMPEG_TEXTS` (constant, `material[1]` is indexed; names are
-   lock-derived), `notices.py:2010` and `:3565` (Windows), `:3329` / `:3398` (match
-   `ffmpeg-LICENSE.txt` only), `build.py:614` / `:701` content rules (a `.patch` under Resources
-   breaks no rule; pinned by a test), smoke (names no FFmpeg text).
-4. Recipe record: `tools/package/ffmpeg-fork-macos.patch` = the seat's series (sha256
-   `013b8dfe08cb...ce11`, 0 CR); second commit adds no SKIP switch (25 occurrences, as before);
-   `recipe_skips()` still 21; `build.py` docstring after `FFMPEG_MACOS_EXCLUDED_STAGES` updated; no reader broke.
+   `Contents/Resources/ffmpeg-patch-<file>` by `place_macos_tools` (`build.py:4934`). Sites
+   changed: `notices.py:2088-2193` (`_macos_ffmpeg_rows`: patch files from the lock and sha256
+   checked `:2120-2129`, Modified lines compared with the build's `:2154-2157`, row entries
+   `:2160-2162`, a note per patch `:2169-2172`); `build.py:3232-3240` (pre-existence),
+   `:3265-3268` (staging). Left deliberately:
+   - `notices.py:83` `_APP_FFMPEG_TEXTS` (constant, `material[1]` is indexed; the patch names
+     are lock-derived);
+   - `notices.py:2000-2010` `_ffmpeg_rows` and the Windows FFmpeg entry tuple
+     `notices.py:3588-3593` (Windows);
+   - `notices.py:3355` / `:3424` (the licence-name checks match `ffmpeg-LICENSE.txt` only);
+   - `build.py:614` `_app_content_rules` / `:701` `_app_forbidden_paths` (a `.patch` under
+     Resources breaks no name or module rule; pinned by a test);
+   - smoke (`smoke.py:1082-1118` reuses the forbidden-path check and regenerates notices; it
+     names no FFmpeg text file).
 
-**Checks (after the window)**
-- ruff check, ruff format --check (340 files), mypy, mypy --platform darwin: all clean
-  (`ruff format` left the five files unchanged).
+   Walkers named by Reviewer A r1 that the first version of this section omitted; A's reading
+   is that each handles the patch as ordinary non-native text, and I left them unchanged:
+   native-origin inspection `build.py:5078` (`_macos_native_origin_violations`), release zip
+   enumeration `build.py:5441` (`_macos_release_files`), release snapshots `build.py:5494`
+   (`_release_snapshot`); notices' `_app_inventory` (`notices.py:1647`) also inventories it
+   normally.
+4. Recipe record: `tools/package/ffmpeg-fork-macos.patch` = the seat's series (sha256
+   `013b8dfe08cb...ce11`, 0 CR); the second commit adds no SKIP switch (25 occurrences, as
+   before); `recipe_skips()` still 21; the `build.py` docstring after
+   `FFMPEG_MACOS_EXCLUDED_STAGES` (`:1232`) updated; no reader broke.
+
+**Checks at the build commit (after the window)**
+- ruff check, ruff format --check, mypy, mypy --platform darwin: all clean.
 - `-m "not gpu"`, `-k "not test_python_m_clearwater_starts_the_shell_and_exits_0"`, `-n 3`:
   build 836 passed / 1 skipped; notices 560 passed; ffmpeg 292 passed; smoke 76 passed /
   1 skipped; macos_portability 236 skipped (darwin-only); release_workflow 171 passed.
@@ -6610,14 +6629,49 @@ Reviewer A is Codex, run by the seat.
   build 325 failed / 511 passed (every `macos_bundle`-based test fails on the fixture's
   `patches` key, plus the new tests); notices 16 failed; ffmpeg 292 passed. Of the new tests,
   44 build tests and 7 notices tests are RED. GREEN on both by design: the content-check
-  admission test, the fixture-entry self-consistency test, and the two Windows guards
-  (`test_windows_build_record_bytes_are_the_pre_dr165_form`,
-  `test_windows_lock_has_no_patches_field_and_refuses_one`).
+  admission test, the fixture-entry self-consistency test, and the two Windows guards.
+
+#### A r1 fold
+
+Codex Reviewer A r1 on `c6a1b9bb..f961b918`: 1 MAJOR, 2 ADVISORY, all in-envelope, all folded.
+Round ledger: round 1, major 1 / advisory 2, NEW, no reverts, product-code fix 1 (F1), test-only
+fixes 1 (A1), ledger fix 1 (A2).
+
+- **F1 MAJOR (`build.py:3155` at `f961b918`; now `_macos_patch_texts`, `:3136`):** a checksum
+  record whose path did not end `.patch` (`.diff`, `.patch.bak`) was ignored, so an empty lock
+  passed it as an unpatched build (A's probe: `ACCEPT []`). Fixed in `2595ab05`: every
+  versions.txt line is classified. A line whose first field is 64 hex digits (either case) or
+  whose second field ends `.patch` must be exactly `<sha>  <path>.patch`, else the build
+  refuses ("malformed patch line" when the second field ends `.patch`, otherwise "unsupported
+  checksum record"). A 64-hex first field with a non-path second field (or none) is REFUSED.
+  Component / version rows (first field a name) stay accepted. Real asset probe (read-only,
+  zip read with `zipfile`, the asset's sha256 equal to the lock's): every one of its 20
+  lines classifies correctly (one checksum / patch record, 18 rows, one blank); the real lock
+  with the real archive is ACCEPTED (one patch, 3,098 bytes); with an empty lock the real
+  versions.txt is REFUSED as before, and `.diff`, `.patch.bak`, sha-only and sha + word
+  variants (in-memory overlay, original untouched) are all REFUSED "unsupported checksum
+  record". Output kept at `work/dr165/probe.txt` in the cell worktree. Tests: five empty-lock
+  refusal cases (`.diff`, `.patch.bak`, sha only, sha + word, uppercase sha), RED on
+  `f961b918` (5 failed there), GREEN now.
+- **A1 ADVISORY (`tests/test_tools_package_ffmpeg.py:1115` at `f961b918`):** the Windows guard
+  normalised CRLF to LF. Fixed in `2595ab05`: it compares the RAW bytes with the independently
+  assembled expected text under the host's text-mode newline (`os.linesep`, the writer's
+  `write_text` behaviour). GREEN on `f961b918` as well (a guard, no production change).
+- **A2 ADVISORY (ledger citations):** corrected in this section: `_ffmpeg_fields`
+  `build.py:1674`, schema check `:2182`, `notices.py` licence-name checks `:3355` / `:3424`,
+  Windows FFmpeg entry tuple `:3588-3593`; the three omitted walkers added above; every other
+  citation re-read. This section is new in this package, so the ledger stays append-only
+  against `c6a1b9bb`.
+
+Counts after the fold (same flags): build 841 passed / 1 skipped; notices 560 passed; ffmpeg 292
+passed; smoke + release_workflow 247 passed / 1 skipped; ruff check / format --check / mypy /
+mypy --platform darwin clean.
 
 **For the dispatcher**
 - `docs/release-checklist.md:102` (`git format-patch --base=<parent> -1 <fork commit>`) is stale
   for a two-commit series; left as is, it goes to DR-159 (CHARC's word).
-- The next runner run with the switch on is the proof on the real archive (the real patch bytes
-  and versions.txt were never read by a test; the tests use a synthetic archive).
+- The next runner run with the switch on is the proof on the real archive for the bundling
+  itself (the tests use a synthetic archive; the read-only probe above covered the real
+  asset's classification and hashes).
 
 Depth at yield: DISPATCHER TO FILL
