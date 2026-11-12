@@ -6790,4 +6790,22 @@ NEW in form, no reverts, product-code fix 1). The last fold this cell takes.
   itself (the tests use a synthetic archive; the read-only probe above covered the real
   asset's classification and hashes).
 
-Depth at yield: DISPATCHER TO FILL
+Depth at yield (read by the dispatcher with `cell_depth.py`, each figure static across two
+readings at the yield it names): READY-FOR-CHECKS 222,204; build commit 241,861; A r1 fold
+275,829; A r2 fold 317,566; A r3 fold 353,277 (155 turns). The cell ends at fold 3
+(CHARC `7283c16a`); any further fold is a fresh cell from this ledger.
+
+#### Seat: the Reviewer A stop rule (CHARC `7283c16a`, 2026-11-12 00:29Z)
+
+Binding on A r4 and on Reviewer B for DR-165. A finding is ADVISORY (this residual list, no
+fold) when it lives only in the `versions.txt` classifier AND needs a future re-pinned
+archive that writes a row the current recipe never writes. It stays MAJOR when the CURRENT
+pinned asset (`4f2fd870...`) can pass without its notice, the real lock fails, a Windows byte
+changes, the `Modified:` line is false, or the fold-3 grammar is not default-deny (a line
+matching none of the exact row forms is accepted or skipped instead of refused).
+
+**Residual assumption (CHARC rider, verbatim):** the classifier is exact for the row forms of
+the fork writer at `5314a43`; a re-pin whose writer changes re-reads this grammar in its lock
+turn. (The same sentence goes into DR-159's lock-turn checklist item, held for the accept.)
+
+**Residual list (advisory findings under the stop rule):** none yet.
