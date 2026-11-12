@@ -5076,7 +5076,7 @@ def fixture_versions(lock: dict[str, Any], patches=None, extra=()) -> bytes:
     lines = [f"ffmpeg {lock['ffmpeg_commit']} (release/9.0, git describe synthetic)"]
     lines += [f"{row['sha256']}  {row['name']}" for row in rows]
     lines += list(extra)
-    lines += ["x264 0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee (git)", "zlib 1.3.2", ""]
+    lines += ["nasm 3.02", "ninja 1.13.2", f"recipe rwsmythe/FFmpeg-Builds@{'5' * 40}", ""]
     return "\n".join(lines).encode()
 
 
@@ -6301,6 +6301,23 @@ def _break_patches(case, kind):
             "empty-lock-sha-only": entry["sha256"],
             "empty-lock-sha-and-word": f"{entry['sha256']}  checksum-of-something",
             "empty-lock-sha-upper": f"{entry['sha256'].upper()}  {entry['name'][:-6]}.diff",
+            # A r2: records that name a patch but are not the exact form.
+            "empty-lock-sha256-prefix-spaced": f"sha256: {entry['sha256']}  {entry['name']}",
+            "empty-lock-sha256-prefix": f"sha256:{entry['sha256']}  {entry['name'][:-6]}.diff",
+            "empty-lock-hex-63": f"{entry['sha256'][:-1]}  {entry['name'][:-6]}.diff",
+            "empty-lock-hex-65": f"{entry['sha256']}0  {entry['name'][:-6]}.diff",
+            "empty-lock-bom": f"\ufeff{entry['sha256']}  {entry['name'][:-6]}.diff",
+            "empty-lock-upper-patch-suffix": f"{entry['sha256']}  {entry['name'][:-6]}.PATCH",
+            "empty-lock-leading-space": f" {entry['sha256']}  {entry['name']}",
+            "empty-lock-trailing-cr": f"{entry['sha256']}  {entry['name']}\r",
+            "empty-lock-dotdot-path": f"{entry['sha256']}  ../{entry['name']}",
+            # A r2: lines that are not recognised component rows.
+            "empty-lock-unknown-row": "foo 1.0",
+            "empty-lock-component-name-only": "nasm",
+            "empty-lock-tab-row": "nasm\t3.02",
+            "empty-lock-non-ascii-row": "nasm 3.02 caf\u00e9",
+            "empty-lock-whitespace-line": "   ",
+            "empty-lock-crlf-row": "nasm 3.02\r",
         }[kind]
         case.data["patches"] = []
         case.members[versions] = fixture_versions(case.data, extra=[record])
@@ -6329,13 +6346,28 @@ def _break_patches(case, kind):
         ("versions-sha-differs", "patch lines differ from the lock's patches"),
         ("versions-name-differs", "patch lines differ from the lock's patches"),
         ("versions-repeats-the-patch", "patch lines differ from the lock's patches"),
-        ("single-space-patch-line", "malformed patch line"),
-        ("uppercase-patch-hash", "malformed patch line"),
-        ("empty-lock-diff", "unsupported checksum record"),
-        ("empty-lock-patch-bak", "unsupported checksum record"),
-        ("empty-lock-sha-only", "unsupported checksum record"),
-        ("empty-lock-sha-and-word", "unsupported checksum record"),
-        ("empty-lock-sha-upper", "unsupported checksum record"),
+        ("single-space-patch-line", "unrecognised versions.txt record"),
+        ("uppercase-patch-hash", "unrecognised versions.txt record"),
+        ("empty-lock-diff", "unrecognised versions.txt record"),
+        ("empty-lock-patch-bak", "unrecognised versions.txt record"),
+        ("empty-lock-sha-only", "unrecognised versions.txt record"),
+        ("empty-lock-sha-and-word", "unrecognised versions.txt record"),
+        ("empty-lock-sha-upper", "unrecognised versions.txt record"),
+        ("empty-lock-sha256-prefix-spaced", "unrecognised versions.txt record"),
+        ("empty-lock-sha256-prefix", "unrecognised versions.txt record"),
+        ("empty-lock-hex-63", "unrecognised versions.txt record"),
+        ("empty-lock-hex-65", "unrecognised versions.txt record"),
+        ("empty-lock-bom", "unrecognised versions.txt record"),
+        ("empty-lock-upper-patch-suffix", "unrecognised versions.txt record"),
+        ("empty-lock-leading-space", "unrecognised versions.txt record"),
+        ("empty-lock-trailing-cr", "unrecognised versions.txt record"),
+        ("empty-lock-dotdot-path", "unrecognised versions.txt record"),
+        ("empty-lock-unknown-row", "unrecognised versions.txt record"),
+        ("empty-lock-component-name-only", "unrecognised versions.txt record"),
+        ("empty-lock-tab-row", "unrecognised versions.txt record"),
+        ("empty-lock-non-ascii-row", "unrecognised versions.txt record"),
+        ("empty-lock-whitespace-line", "unrecognised versions.txt record"),
+        ("empty-lock-crlf-row", "unrecognised versions.txt record"),
         ("versions-not-utf8", "not strict UTF-8"),
         ("versions-missing", "missing member"),
         ("patch-file-missing", "missing member"),
@@ -6354,6 +6386,40 @@ def test_macos_bundle_refuses_a_lock_that_does_not_describe_the_archive_patches(
         bundle_macos(case)
     assert not (case.app / "Contents/MacOS/ffmpeg").exists()
     assert not (case.app / "Contents/Resources").exists()
+
+
+def test_macos_versions_txt_rows_are_recognised_positively():
+    """DR-165 A r2: the rows the real recipe writes are accepted (the lock's own component
+    names, plus ``ffmpeg`` / build tools / ``recipe``), blank lines are ignored and the one
+    patch record matches; the allowlist is the lock's components and the module constant."""
+    lock = real_macos_lock()
+    lock["patches"] = macos_lock()["patches"]
+    (patch,) = lock["patches"]
+    names = [component["name"] for component in lock["components"]]
+    assert len(names) == 12 and {"x264", "x265", "fontconfig"} <= set(names)
+    assert {
+        "ffmpeg",
+        "nasm",
+        "ninja",
+        "pkg-config",
+        "meson",
+        "recipe",
+    } == build._MACOS_VERSIONS_ROWS
+    lines = [f"ffmpeg {lock['ffmpeg_commit']} (release/9.0, git describe synthetic)"]
+    lines += [f"{patch['sha256']}  {patch['name']}", ""]
+    lines += [f"{name} 1.0 (git)" for name in names]
+    lines += [f"{name} 2.0" for name in sorted(build._MACOS_VERSIONS_ROWS - {"ffmpeg"})]
+    lines += ["meson 1.11.2 (build tool, PyPI wheel by hash)", ""]
+    root = lock["archive_root"]
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr(f"{root}/build/versions.txt", "\n".join(lines))
+        archive.writestr(f"{root}/build/{FIXTURE_PATCH_FILE}", FIXTURE_PATCH_BYTES)
+    with zipfile.ZipFile(buffer) as archive:
+        assert build._macos_patch_texts(archive, lock) == {patch["name"]: FIXTURE_PATCH_BYTES}
+        lock["components"] = []
+        with pytest.raises(ValueError, match=f"unrecognised versions.txt record: '{names[0]} 1.0"):
+            build._macos_patch_texts(archive, lock)
 
 
 def test_macos_bundle_refuses_an_existing_patch_text_in_the_app(macos_bundle):

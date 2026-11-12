@@ -3077,11 +3077,22 @@ def _check_macos_toolchain_marker(path: Path, lock: FFmpegMacLock) -> None:
     raise ValueError(f"{path.name}: missing the Apple toolchain marker {toolchain['compiler']!r}")
 
 
-_MACOS_VERSIONS_PATCH_LINE = re.compile(r"([0-9a-f]{64})  (\S+\.patch)")
-"""A patch line of the asset's ``build/versions.txt``: sha256, TWO spaces, the recipe path."""
+_MACOS_VERSIONS_PATCH_LINE = re.compile(r"([0-9a-f]{64})  (" + _MACOS_PATCH_NAME.pattern + r")")
+"""A PATCH RECORD of the asset's ``build/versions.txt``, exactly: lowercase sha256, TWO spaces,
+a recipe path in the lock's name grammar (:data:`_MACOS_PATCH_NAME`, ending ``.patch``)."""
 
-_MACOS_VERSIONS_CHECKSUM = re.compile(r"[0-9a-fA-F]{64}")
-"""A ``versions.txt`` line's first field when the line is a checksum record, not a component row."""
+_MACOS_VERSIONS_ROWS = frozenset({"ffmpeg", "nasm", "ninja", "pkg-config", "meson", "recipe"})
+"""The first fields of the non-component rows the fork's recipe writes into ``versions.txt``.
+
+A component row's first field is a name from the lock's ``components`` or from this set (the
+FFmpeg commit line, the build tools, the recipe line). Deliberate trade: a future recipe that
+adds a component or tool row makes the bundling REFUSE until this set (or the lock) names it,
+because a refusal costs a round trip at build time while a row mistaken for something else
+could ship an unnoticed modified FFmpeg.
+"""
+
+_MACOS_VERSIONS_TEXT = re.compile(r"[\x20-\x7e]+")
+"""A component row's whole line: printable ASCII only (no tab, no BOM, no control character)."""
 
 _MACOS_BUILD_MEMBER_LIMIT = 1024 * 1024
 """The most bytes read from one ``build/`` member (``versions.txt`` is under 1 KiB)."""
@@ -3136,17 +3147,22 @@ def _macos_build_member(archive: zipfile.ZipFile, lock: FFmpegMacLock, name: str
 def _macos_patch_texts(archive: zipfile.ZipFile, lock: FFmpegMacLock) -> dict[str, bytes]:
     """The lock's patches, proven against the verified archive (DR-165); name -> patch bytes.
 
-    Reads ``<archive_root>/build/versions.txt`` (strict UTF-8) and classifies every line. A
-    component or version row (its first field a name: ``ffmpeg <commit> (...)``,
-    ``x264 <commit> (git)``, ``fontconfig 2.17.1``) is accepted. A CHECKSUM record (its first
-    field 64 hex digits) or any line whose second field ends in ``.patch`` must be exactly
-    ``<sha256>  <path ending .patch>`` (TWO spaces), or the build refuses it: a checksum of
-    another form (``.diff``, ``.patch.bak``, no path) is never ignored, so an unsupported
-    record cannot pass as an unpatched build. The patch records collected must equal the
-    lock's ``patches`` (same entries, none extra, none missing, none repeated), or the lock
-    does not describe the asset. Then each patch's text is read
-    from ``<archive_root>/build/<its file name>`` and must hash to the lock's sha256, so the
-    bytes the bundle carries are the bytes the build recorded.
+    Reads ``<archive_root>/build/versions.txt`` (strict UTF-8) and recognises every line
+    POSITIVELY; anything else is refused ("unrecognised versions.txt record"), never ignored:
+
+    - an empty line is skipped;
+    - a PATCH RECORD is exactly :data:`_MACOS_VERSIONS_PATCH_LINE` (lowercase sha256, two
+      spaces, a ``.patch`` path in the lock's name grammar);
+    - a COMPONENT ROW is printable ASCII (:data:`_MACOS_VERSIONS_TEXT`) whose first field
+      (up to the first space, then a space) is a name from the lock's ``components`` or from
+      :data:`_MACOS_VERSIONS_ROWS`; the rest of the row is not parsed.
+
+    So a checksum record of any other form (a ``sha256:`` prefix, another hex length, upper
+    case, ``.diff`` / ``.PATCH`` / ``.patch.bak``, a BOM, a tab) cannot pass as an unpatched
+    build. The patch records collected must equal the lock's ``patches`` (same entries, none
+    extra, none missing, none repeated), or the lock does not describe the asset. Then each
+    patch's text is read from ``<archive_root>/build/<its file name>`` and must hash to the
+    lock's sha256, so the bytes the bundle carries are the bytes the build recorded.
 
     Raises:
         ValueError: ``versions.txt`` or a patch file is missing, malformed or oversized, the
@@ -3157,20 +3173,18 @@ def _macos_patch_texts(archive: zipfile.ZipFile, lock: FFmpegMacLock) -> dict[st
         versions = raw.decode("utf-8")
     except UnicodeDecodeError:
         raise ValueError("FFmpeg archive: build/versions.txt is not strict UTF-8") from None
+    rows = _MACOS_VERSIONS_ROWS | {component["name"] for component in lock["components"]}
     recorded: list[tuple[str, str]] = []
     for line in versions.split("\n"):
-        fields = line.split()
-        patch_shaped = len(fields) >= 2 and fields[1].endswith(".patch")
-        checksum_shaped = bool(fields) and _MACOS_VERSIONS_CHECKSUM.fullmatch(fields[0]) is not None
-        if patch_shaped or checksum_shaped:
-            match = _MACOS_VERSIONS_PATCH_LINE.fullmatch(line)
-            if match is None:
-                raise ValueError(
-                    "FFmpeg archive: malformed patch line in build/versions.txt"
-                    if patch_shaped
-                    else "FFmpeg archive: unsupported checksum record in build/versions.txt"
-                )
+        if not line:
+            continue
+        match = _MACOS_VERSIONS_PATCH_LINE.fullmatch(line)
+        if match is not None:
             recorded.append((match.group(2), match.group(1)))
+            continue
+        name, space, _rest = line.partition(" ")
+        if not (space and _MACOS_VERSIONS_TEXT.fullmatch(line) and name in rows):
+            raise ValueError(f"FFmpeg archive: unrecognised versions.txt record: {line[:60]!r}")
     locked = [(patch["name"], patch["sha256"]) for patch in lock["patches"]]
     if sorted(recorded) != sorted(locked):
         raise ValueError(
