@@ -6563,7 +6563,7 @@ sibling-harness load and is not of record.
 ### DR-165 (wp65-dr165, dispatch DR-165-1; base c6a1b9bb)
 
 Build commit `e2e06854` (items 1-4 and tests); A r1 fold commit `2595ab05`; A r2 fold
-commit `4a40cb26`. Lane: Claude (pace
+commit `4a40cb26`; A r3 fold commit `8ff54a0f`. Lane: Claude (pace
 0.082 against Codex 1.017); Reviewer A is Codex, run by the seat. Every file:line below was
 re-read against the final source (head of the fold commit) when this section was last written.
 
@@ -6574,7 +6574,7 @@ re-read against the final source (head of the fold commit) when this section was
   (`build.py:1674` `_ffmpeg_fields`); `schema_version` is the literal `== 2` in the macOS
   validator (`build.py:2182`; the Windows validator has its own at `:2393`) and does not
   require a bump for an added field. Not bumped.
-- Archive read and hashed: `_bundle_macos_ffmpeg` (`build.py:3205`) after `_download_ffmpeg`'s
+- Archive read and hashed: `_bundle_macos_ffmpeg` (`build.py:3237`) after `_download_ffmpeg`'s
   hash check; `_macos_archive_members` has inspected every member (unsafe names, duplicates,
   outside the root). `build/` members are ordinary members of that archive, reached through it.
 - Notices census: a new `Contents/Resources` file is refused ("unknown or ambiguous bundled
@@ -6586,21 +6586,23 @@ re-read against the final source (head of the fold commit) when this section was
    `_macos_patch_entries` (`build.py:2151`, called `:2232`); `_MACOS_PATCH_NAME` (`:2127`).
    Empty list is LEGAL (records an unpatched build; the bundling still checks it against
    versions.txt, so `[]` cannot hide a patch). Build-time proof `_macos_patch_texts`
-   (`build.py:3147`): versions.txt strict UTF-8; every line recognised POSITIVELY (A r2: an
-   empty line skipped; a patch record exactly `_MACOS_VERSIONS_PATCH_LINE` `:3080`; a component
-   row printable ASCII, `_MACOS_VERSIONS_TEXT` `:3094`, whose first field is a lock component
-   name or in `_MACOS_VERSIONS_ROWS` `:3084`; anything else refused); the patch records equal
-   to the lock; each patch file hashed to its entry; reads capped at 1 MiB
-   (`_macos_build_member`, `:3126`). Lock and fixture carry the field.
-2. BUILD record: `macos_ffmpeg_modified_lines` (`build.py:3101`), used beside `FFmpeg ref:`
-   (`build.py:3305`).
+   (`build.py:3165`): versions.txt strict UTF-8; every line recognised POSITIVELY and in FULL
+   (A r2 / r3: an empty line skipped; a patch record exactly `_MACOS_VERSIONS_PATCH_LINE`
+   `:3080`; any other row must `fullmatch` one exact recipe form, `_MACOS_VERSIONS_FORMS`
+   `:3084` (ffmpeg, x264, meson, recipe rows) or `<name> <version>` with a name from the lock's
+   components other than x264 or `_MACOS_VERSIONS_TOOLS` `:3104` and one version token
+   `_MACOS_VERSIONS_VERSION` `:3112` not ending `.patch` / `.diff`; anything else refused); the
+   patch records equal to the lock; each patch file hashed to its entry; reads capped at 1 MiB
+   (`_macos_build_member`, `:3144`). Lock and fixture carry the field.
+2. BUILD record: `macos_ffmpeg_modified_lines` (`build.py:3119`), used beside `FFmpeg ref:`
+   (`build.py:3337`).
 3. Patch text: `extract_members` left pinned (widening would change an existing lock field); the
    text is read through its own bounded path from the verified archive, staged 0644, placed as
-   `Contents/Resources/ffmpeg-patch-<file>` by `place_macos_tools` (`build.py:4948`). Sites
+   `Contents/Resources/ffmpeg-patch-<file>` by `place_macos_tools` (`build.py:4980`). Sites
    changed: `notices.py:2088-2193` (`_macos_ffmpeg_rows`: patch files from the lock and sha256
    checked `:2120-2129`, Modified lines compared with the build's `:2154-2157`, row entries
-   `:2160-2162`, a note per patch `:2169-2172`); `build.py:3246-3254` (pre-existence),
-   `:3279-3282` (staging). Left deliberately:
+   `:2160-2162`, a note per patch `:2169-2172`); `build.py:3278-3286` (pre-existence),
+   `:3311-3314` (staging). Left deliberately:
    - `notices.py:83` `_APP_FFMPEG_TEXTS` (constant, `material[1]` is indexed; the patch names
      are lock-derived);
    - `notices.py:2000-2010` `_ffmpeg_rows` and the Windows FFmpeg entry tuple
@@ -6613,8 +6615,8 @@ re-read against the final source (head of the fold commit) when this section was
 
    Walkers named by Reviewer A r1 that the first version of this section omitted; A's reading
    is that each handles the patch as ordinary non-native text, and I left them unchanged:
-   native-origin inspection `build.py:5092` (`_macos_native_origin_violations`), release zip
-   enumeration `build.py:5455` (`_macos_release_files`), release snapshots `build.py:5508`
+   native-origin inspection `build.py:5124` (`_macos_native_origin_violations`), release zip
+   enumeration `build.py:5487` (`_macos_release_files`), release snapshots `build.py:5540`
    (`_release_snapshot`); notices' `_app_inventory` (`notices.py:1647`) also inventories it
    normally.
 4. Recipe record: `tools/package/ffmpeg-fork-macos.patch` = the seat's series (sha256
@@ -6639,7 +6641,7 @@ Codex Reviewer A r1 on `c6a1b9bb..f961b918`: 1 MAJOR, 2 ADVISORY, all in-envelop
 Round ledger: round 1, major 1 / advisory 2, NEW, no reverts, product-code fix 1 (F1), test-only
 fixes 1 (A1), ledger fix 1 (A2).
 
-- **F1 MAJOR (`build.py:3155` at `f961b918`; now `_macos_patch_texts`, `:3147`; superseded by A r2 below):** a checksum
+- **F1 MAJOR (`build.py:3155` at `f961b918`; now `_macos_patch_texts`, `:3165`; superseded by A r2 below):** a checksum
   record whose path did not end `.patch` (`.diff`, `.patch.bak`) was ignored, so an empty lock
   passed it as an unpatched build (A's probe: `ACCEPT []`). Fixed in `2595ab05`: every
   versions.txt line is classified. A line whose first field is 64 hex digits (either case) or
@@ -6674,7 +6676,8 @@ mypy --platform darwin clean.
 Codex Reviewer A r2 on `f961b918..0579d7bd`: A1 and A2 CLOSED; 1 MAJOR remained in the same
 classifier (round 2: major 1, NEW in this classifier's form, no reverts, product-code fix 1).
 
-- **F1' MAJOR (`build.py:3163` at `0579d7bd`):** the r1 predicate recognised only a 64-hex
+- **F1' MAJOR (`build.py:3163` at `0579d7bd`; the design and line numbers below are as of
+  `4a40cb26` and are superseded by A r3):** the r1 predicate recognised only a 64-hex
   first field or a second field ending `.patch`, so with `patches: []` these replacement
   records still passed as unpatched (`ACCEPT []`): `sha256: H  P`, `sha256:H  P.diff`, a 63-hex
   or 65-hex checksum with a `.diff` path, a BOM + `H` with a `.diff` path. Fixed in `4a40cb26`
@@ -6719,6 +6722,64 @@ classifier (round 2: major 1, NEW in this classifier's form, no reverts, product
   already refused there, under a different message (the r1 cases and `.PATCH`, leading-space,
   trailing-CR and `..`), so they fail only on the message and pass now.
 - **Counts after the fold (same flags):** build 857 passed / 1 skipped; notices 560 passed;
+  ffmpeg 292 passed; smoke + release_workflow 247 passed / 1 skipped; ruff check, ruff format
+  --check, mypy and mypy `--platform darwin` clean.
+
+#### A r3 fold
+
+Codex Reviewer A r3 on `0579d7bd..9b0f2b8b`: checks 1, 3, 4 passed; 1 MAJOR (round 3: major 1,
+NEW in form, no reverts, product-code fix 1). The last fold this cell takes.
+
+- **F1'' MAJOR (`build.py:3186` at `9b0f2b8b`):** an allowlisted first field still let the REST
+  of a row carry an unlisted patch record. A's probes: `ffmpeg H  P` and `recipe H  P` with
+  `patches: []` gave `ACCEPT []`; the real record kept and `recipe applied-patch <64 c>
+  .../0002-unlisted.patch` appended gave ACCEPT (only the original patch returned). Fixed in
+  `8ff54a0f`: the whole class is closed by requiring every row to FULLY match
+  (`fullmatch`) an exact form. The forms are the ones the fork's workflow writes (series file
+  lines 465-476 and the `shasum` line at 3101):
+  1. `ffmpeg [0-9a-f]{40} \(release/[0-9]+(?:\.[0-9]+)*, git describe [A-Za-z0-9._+-]+\)`;
+  2. `x264 [0-9a-f]{40} \(git\)`;
+  3. `<name> <version>`: `<name>` in (the lock's `components` names, minus `x264`) union
+     {`nasm`, `ninja`, `pkg-config`}; `<version>` ONE token `[0-9][0-9A-Za-z._+-]*` that does
+     not end in `.patch` or `.diff`;
+  4. `meson [0-9][0-9A-Za-z._+-]* \(build tool, PyPI wheel by hash\)`;
+  5. `recipe <owner>/<repo>@[0-9a-f]{40} \(vendored <path> [0-9a-f]{40}\)`;
+  6. the PATCH RECORD `[0-9a-f]{64}  <_MACOS_PATCH_NAME>` as before.
+  A blank line is skipped; EVERYTHING ELSE refuses "unrecognised versions.txt record"
+  (`_MACOS_VERSIONS_FORMS` `build.py:3084`, `_MACOS_VERSIONS_TOOLS` `:3104`,
+  `_MACOS_VERSIONS_VERSION` `:3112`; the old `_MACOS_VERSIONS_ROWS` and printable-ASCII
+  constant are gone, the ASCII requirement is now implied by the forms).
+  **The deliberate trade, widened:** any change of a row's FORM in the fork's writer fails the
+  bundling loudly until the forms name it (a refusal costs a round trip at build time; a
+  mis-recognised row could ship an unnoticed modified FFmpeg). Stated in the
+  `_macos_patch_texts` docstring.
+- **Real asset probe (read-only `zipfile`, nothing extracted or run; `work/dr165/probe3.txt`
+  in the cell worktree; the zip's sha256 equals the lock's):** all 20 lines fullmatch exactly
+  one form: line 1 `ffmpeg` form; line 2 PATCH RECORD; line 3 `x264` form; lines 4-17
+  (`fontconfig`, `freetype`, `fribidi`, `harfbuzz`, `libass`, `libogg`, `libxml2`, `nasm`,
+  `ninja`, `openssl`, `pkg-config`, `sdl`, `x265`, `zlib`) `<name> <version>`; line 18 `meson`
+  form; line 19 `recipe` form; line 20 blank. The real lock with the real archive is ACCEPTED
+  (one patch, 3,098 bytes); the empty-lock probes of the earlier folds still all REFUSE.
+- **Tests (`tests/test_tools_package_build.py`):** 14 new cases in
+  `test_macos_bundle_refuses_a_lock_that_does_not_describe_the_archive_patches` (36 record /
+  row cases now): A's three probes (`ffmpeg H  P`, `recipe H  P`, the appended `recipe
+  applied-patch` record with the lock's entry kept), a record in the tail of an `ffmpeg`, `x264`,
+  `meson` and `recipe` row, `recipe applied-patch H  P`, a version token ending `.patch` or
+  `.diff`, a two-token version, a version that is a record, `x264` as a plain component row, a
+  39-hex `ffmpeg` commit. The positive test now builds every form (including a lock
+  component refused when the lock lists none), and
+  `test_macos_versions_txt_of_the_real_asset_classifies_line_by_line` pins the real 708-byte
+  file (every line passes classification; the only refusal left is the patch FILE's bytes,
+  which that archive does not carry). All earlier cases kept.
+- **RED on `9b0f2b8b`** (detached throwaway worktree, the new test file copied in, each case
+  run alone, removed after): ACCEPTED there (RED): `recipe-appended-record`, `ffmpeg H  P`,
+  `recipe H  P`, `recipe applied-patch H  P`, the `ffmpeg`, `meson` and `recipe` row tails,
+  version ends `.patch`, version ends `.diff`, two-token version, version is a record, the
+  39-hex `ffmpeg` commit (12 cases); the positive test is RED too. Already refused there (pass
+  both ways): the `x264` row tail and `x264` as a component (the fixture lock lists no
+  components, so the old first-field allowlist refused `x264`), and the real-asset
+  classification test (a guard).
+- **Counts after the fold (same flags):** build 872 passed / 1 skipped; notices 560 passed;
   ffmpeg 292 passed; smoke + release_workflow 247 passed / 1 skipped; ruff check, ruff format
   --check, mypy and mypy `--platform darwin` clean.
 
