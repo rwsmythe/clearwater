@@ -3081,18 +3081,36 @@ _MACOS_VERSIONS_PATCH_LINE = re.compile(r"([0-9a-f]{64})  (" + _MACOS_PATCH_NAME
 """A PATCH RECORD of the asset's ``build/versions.txt``, exactly: lowercase sha256, TWO spaces,
 a recipe path in the lock's name grammar (:data:`_MACOS_PATCH_NAME`, ending ``.patch``)."""
 
-_MACOS_VERSIONS_ROWS = frozenset({"ffmpeg", "nasm", "ninja", "pkg-config", "meson", "recipe"})
-"""The first fields of the non-component rows the fork's recipe writes into ``versions.txt``.
+_MACOS_VERSIONS_FORMS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        # the FFmpeg line: ``ffmpeg <HEAD> (release/9.0, git describe <base>)``
+        r"ffmpeg [0-9a-f]{40} \(release/[0-9]+(?:\.[0-9]+)*, git describe [A-Za-z0-9._+-]+\)",
+        # x264 is built from git master: its row carries the commit, not a version file's text
+        r"x264 [0-9a-f]{40} \(git\)",
+        # the build-tool row: ``echo "meson $MESON_VERSION (build tool, PyPI wheel by hash)"``
+        r"meson [0-9][0-9A-Za-z._+-]* \(build tool, PyPI wheel by hash\)",
+        # the recipe row: repository@commit and the vendored build script at its commit
+        r"recipe [A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40} "
+        r"\(vendored [A-Za-z0-9_./-]+ [0-9a-f]{40}\)",
+    )
+)
+"""The exact forms of the fixed ``versions.txt`` rows the fork's recipe writes (WP6.5 DR-165).
 
-A component row's first field is a name from the lock's ``components`` or from this set (the
-FFmpeg commit line, the build tools, the recipe line). Deliberate trade: a future recipe that
-adds a component or tool row makes the bundling REFUSE until this set (or the lock) names it,
-because a refusal costs a round trip at build time while a row mistaken for something else
-could ship an unnoticed modified FFmpeg.
+Each is matched against the WHOLE line (``fullmatch``): nothing may follow the recognised
+text, so a row cannot carry a patch record (or anything else) in its tail.
 """
 
-_MACOS_VERSIONS_TEXT = re.compile(r"[\x20-\x7e]+")
-"""A component row's whole line: printable ASCII only (no tab, no BOM, no control character)."""
+_MACOS_VERSIONS_TOOLS = frozenset({"nasm", "ninja", "pkg-config"})
+"""Names of the tool rows (``<name> <version>``) that are not lock components.
+
+A ``<name> <version>`` row (``for f in macos/build-script/version/*``) is recognised when the
+name is one of these or a lock ``components`` name other than ``x264`` and the version is ONE
+token (:data:`_MACOS_VERSIONS_VERSION`).
+"""
+
+_MACOS_VERSIONS_VERSION = re.compile(r"[0-9][0-9A-Za-z._+-]*")
+"""A version token: one word starting with a digit; never ``.patch`` or ``.diff`` text."""
 
 _MACOS_BUILD_MEMBER_LIMIT = 1024 * 1024
 """The most bytes read from one ``build/`` member (``versions.txt`` is under 1 KiB)."""
@@ -3153,14 +3171,19 @@ def _macos_patch_texts(archive: zipfile.ZipFile, lock: FFmpegMacLock) -> dict[st
     - an empty line is skipped;
     - a PATCH RECORD is exactly :data:`_MACOS_VERSIONS_PATCH_LINE` (lowercase sha256, two
       spaces, a ``.patch`` path in the lock's name grammar);
-    - a COMPONENT ROW is printable ASCII (:data:`_MACOS_VERSIONS_TEXT`) whose first field
-      (up to the first space, then a space) is a name from the lock's ``components`` or from
-      :data:`_MACOS_VERSIONS_ROWS`; the rest of the row is not parsed.
+    - any other row must FULLY match (``fullmatch``, the whole line) one exact form the
+      recipe writes: :data:`_MACOS_VERSIONS_FORMS` (the ``ffmpeg``, ``x264``, ``meson`` and
+      ``recipe`` rows) or ``<name> <version>`` with a name from the lock's ``components``
+      (other than ``x264``) or :data:`_MACOS_VERSIONS_TOOLS` and ONE version token
+      (:data:`_MACOS_VERSIONS_VERSION`) that does not end in ``.patch`` or ``.diff``.
 
-    So a checksum record of any other form (a ``sha256:`` prefix, another hex length, upper
-    case, ``.diff`` / ``.PATCH`` / ``.patch.bak``, a BOM, a tab) cannot pass as an unpatched
-    build. The patch records collected must equal the lock's ``patches`` (same entries, none
-    extra, none missing, none repeated), or the lock does not describe the asset. Then each
+    Nothing after a recognised row's text is ignored, so no row can carry a patch record, and a
+    checksum record of any other form (a ``sha256:`` prefix, another hex length, upper case,
+    ``.diff`` / ``.PATCH`` / ``.patch.bak``, a BOM, a tab) cannot pass as an unpatched build.
+    Deliberate trade: any change of a row's FORM in the fork's writer fails the bundling
+    loudly until the forms name it. The patch records collected must equal the lock's
+    ``patches`` (same entries, none extra, none missing, none repeated), or the lock does not
+    describe the asset. Then each
     patch's text is read from ``<archive_root>/build/<its file name>`` and must hash to the
     lock's sha256, so the bytes the bundle carries are the bytes the build recorded.
 
@@ -3173,7 +3196,9 @@ def _macos_patch_texts(archive: zipfile.ZipFile, lock: FFmpegMacLock) -> dict[st
         versions = raw.decode("utf-8")
     except UnicodeDecodeError:
         raise ValueError("FFmpeg archive: build/versions.txt is not strict UTF-8") from None
-    rows = _MACOS_VERSIONS_ROWS | {component["name"] for component in lock["components"]}
+    names = (_MACOS_VERSIONS_TOOLS | {component["name"] for component in lock["components"]}) - {
+        "x264"
+    }
     recorded: list[tuple[str, str]] = []
     for line in versions.split("\n"):
         if not line:
@@ -3182,8 +3207,15 @@ def _macos_patch_texts(archive: zipfile.ZipFile, lock: FFmpegMacLock) -> dict[st
         if match is not None:
             recorded.append((match.group(2), match.group(1)))
             continue
-        name, space, _rest = line.partition(" ")
-        if not (space and _MACOS_VERSIONS_TEXT.fullmatch(line) and name in rows):
+        if any(form.fullmatch(line) for form in _MACOS_VERSIONS_FORMS):
+            continue
+        name, space, version = line.partition(" ")
+        if not (
+            space
+            and name in names
+            and _MACOS_VERSIONS_VERSION.fullmatch(version)
+            and not version.endswith((".patch", ".diff"))
+        ):
             raise ValueError(f"FFmpeg archive: unrecognised versions.txt record: {line[:60]!r}")
     locked = [(patch["name"], patch["sha256"]) for patch in lock["patches"]]
     if sorted(recorded) != sorted(locked):
